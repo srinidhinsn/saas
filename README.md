@@ -7,5 +7,5 @@ Saas application
 4. Load virtual environment using CMD: dev/Scripts/activate ("deactivate" command - to exit) 
 5. CMD: pip install fastapi uvicorn psycopg2-binary sqlalchemy alembic passlib bcrypt python-jose setuptools
 6. Under common-lib folder run CMD: python setup.py build
-7. Under  folder run CMD: pip install fastapi uvicorn psycopg2-binary sqlalchemy alembic passlib bcrypt python-jose setuptools saas\common-lib
+7. Under  folder run CMD: pip install ..\common-lib
 8. uvicorn app.main:app --port 8000 --reload - (Used ports 8000, 8001, 8002, 8003) 
