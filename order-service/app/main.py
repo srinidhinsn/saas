@@ -9,7 +9,7 @@ from config.settings import LOGGING_CONFIG
 app = FastAPI()
 logging.config.dictConfig(LOGGING_CONFIG)
 logger = logging.getLogger(__name__)
-app.include_router(api.router, prefix="/saas/orders")
+app.include_router(routes.router, prefix="/saas/orders")
 
 
 @app.middleware("http")

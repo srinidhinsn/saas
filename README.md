@@ -1,7 +1,11 @@
 # saas
 Saas application
 
-Always pull latest common-lib. Build and install to required microservice
-python setup.py build
-pip install common-lib 
-
+1. Create a folder named saas_app
+2. Clone/Checkout/Pull latest code from git hub from branch backend-dev. CMD: git clone https://github.com/srinidhinsn/saas.git -b backend-dev
+3. Create virtual environment under any project using CMD: python -m venv dev
+4. Load virtual environment using CMD: dev/Scripts/activate ("deactivate" command - to exit) 
+5. CMD: pip install fastapi uvicorn psycopg2-binary sqlalchemy alembic passlib bcrypt python-jose setuptools
+6. Under common-lib folder run CMD: python setup.py build
+7. Under  folder run CMD: pip install fastapi uvicorn psycopg2-binary sqlalchemy alembic passlib bcrypt python-jose setuptools saas\common-lib
+8. uvicorn app.main:app --port 8000 --reload - (Used ports 8000, 8001, 8002, 8003) 
