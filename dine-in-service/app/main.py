@@ -9,17 +9,23 @@ from config.settings import LOGGING_CONFIG
 app = FastAPI()
 logging.config.dictConfig(LOGGING_CONFIG)
 logger = logging.getLogger(__name__)
-app.include_router(routes.router, prefix="/saas/dine-in")
 
+app.include_router(routes.router, prefix="/saas/{clientid}/dine-in")
 
 @app.middleware("http")
-async def log_requests(request: Request, call_next):
+async def log_requests(request: Request, call_next): 
     start_time = time.time()
-    logger.info(f"Start time: {start_time: .4f}s")
+    path = request.url.path
+    path_parts = path.split("/")
+    
+    if len(path_parts) > 3:
+        context = SaasContext(path_parts[2], path_parts[3], "sri", ["admin"], ["inventory", "dine-in"])
+        saasContext.set(context)
+
+    logger.info(f"Request start time: {request.method} {request.url} - Request: {request} - Time: {start_time: .4f}s")
     response = await call_next(request)
-    logger.info(f"End time: {time.time(): .4f}s")
     process_time = time.time() - start_time
-    logger.info(f"Request: {request.method} {request.url} - Response: {response.status_code} - Time: {process_time: .4f}s")
+    logger.info(f"Request processed time: {request.method} {request.url} - Response: {response.status_code} - Time: {process_time: .4f}s")
     return response
 
 @app.get("/saas/dine-in/")
