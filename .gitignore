@@ -1,0 +1,11 @@
+*.vsidx
+/.vs/saas/v17/.wsuo
+/.vs/slnx.sqlite
+*.pyc
+/common-lib/common_lib.egg-info/PKG-INFO
+/common-lib/common_lib.egg-info/SOURCES.txt
+/common-lib/common_lib.egg-info/dependency_links.txt
+/common-lib/common_lib.egg-info/top_level.txt
+/common-lib/build/*
+*.log
+/.vs/VSWorkspaceState.json

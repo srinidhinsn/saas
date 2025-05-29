@@ -1,36 +1,28 @@
 import config.settings
-from fastapi import FastAPI, Depends, Request
+from fastapi import FastAPI, Depends, Request, Header, HTTPException
 from sqlalchemy.orm import Session
 from .api import routes
 import logging, time
 from config.settings import LOGGING_CONFIG
-from models.saas_context import SaasContext, saasContext
 
 
 app = FastAPI()
 logging.config.dictConfig(LOGGING_CONFIG)
 logger = logging.getLogger(__name__)
 
-app.include_router(routes.router, prefix="/saas/{clientid}/users")
+app.include_router(routes.router, prefix="/saas/{clientId}/users")
 
 
 @app.middleware("http")
-async def log_requests(request: Request, call_next): 
+async def log_requests(request: Request, call_next):
     start_time = time.time()
-    path = request.url.path
-    path_parts = path.split("/")
-    
-    if len(path_parts) > 3:
-        context = SaasContext(path_parts[2], path_parts[3], "sri", ["admin"], ["inventory", "dine-in"])
-        saasContext.set(context)
-
     logger.info(f"Request start time: {request.method} {request.url} - Request: {request} - Time: {start_time: .4f}s")
     response = await call_next(request)
     process_time = time.time() - start_time
     logger.info(f"Request processed time: {request.method} {request.url} - Response: {response.status_code} - Time: {process_time: .4f}s")
     return response
 
-@app.get("/saas/{clientid}/users/")
+@app.get("/saas/{clientId}/users/")
 async def read_root():
     return {"message": "Users Service Running"}
 
