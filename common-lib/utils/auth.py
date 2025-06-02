@@ -4,6 +4,10 @@ from passlib.context import CryptContext
 from fastapi import Depends, HTTPException, Request
 from fastapi.security import OAuth2PasswordBearer
 from models.saas_context import SaasContext, saasContext
+from models.user_model import PageDefinitionModel
+from models.user_entity import PageDefinition
+from database.postgres import get_db
+from sqlalchemy.orm import Session
 
 SECRET_KEY = "nsn"
 ALGORITHM = "HS256"
@@ -24,7 +28,7 @@ def create_access_token(data: dict):
     to_encode.update({"exp": expire})
     return jwt.encode(to_encode, SECRET_KEY, algorithm=ALGORITHM)
 
-def verify_token(req: Request = None, token: str = Depends(oauth2_scheme)):
+def verify_token(req: Request = None, token: str = Depends(oauth2_scheme), db: Session = Depends(get_db)):
     try:
         print ("token - ", token)
         payload = jwt.decode(token, SECRET_KEY, algorithms=[ALGORITHM])
@@ -40,13 +44,29 @@ def verify_token(req: Request = None, token: str = Depends(oauth2_scheme)):
         roles = payload["roles"]
         grants = payload["grants"]
         
+        page_definitions = get_page_definition(roles, urlModule, clientId, db)
 
+        # Convert list of PageDefinition entities to PageDefinitionModel instances
+        pageDefinitionModels = [PageDefinitionModel(**page_def.__dict__) for page_def in page_definitions]
+
+        # Remove SQLAlchemy metadata (_sa_instance_state)
+        for model in pageDefinitionModels:
+            model.__dict__.pop("_sa_instance_state", None)
+
+        print("pageDefinitionModels - ", pageDefinitionModels)
+            
         if (grants.index(urlModule) >= 0 and urlClientId == clientId):
-            context = SaasContext(clientId, urlModule, urlOperation, str(payload.get("userId")), roles, grants)
+            screenId = get_screen_id(pageDefinitionModels, urlOperation)
+            print ("screenId - ", screenId)
+            
+            if (screenId == "accessRestricted"):
+                raise HTTPException(status_code=403, detail="Restricted Access. Please contact administrator.")
+
+            context = SaasContext(clientId, urlModule, urlOperation, str(payload.get("userId")), roles, grants, screenId)
             saasContext.set(context)
-        
+
         if context is None:
-            raise HTTPException(status_code=401, detail="Invalid token")
+            raise HTTPException(status_code=403, detail="Restricted Access. Please contact administrator.")
         return context
     except jwt.ExpiredSignatureError:
         raise HTTPException(status_code=401, detail="Token expired")
@@ -54,4 +74,24 @@ def verify_token(req: Request = None, token: str = Depends(oauth2_scheme)):
         print(f"Other JWT error: {e}")
         raise HTTPException(status_code=401, detail="Invalid Token")
     except ValueError:
-            print(f"User do not have access to ", urlModule)
+        print(f"User do not have access to ", urlModule)
+        raise HTTPException(status_code=403, detail="Restricted Grants. Please contact administrator.")
+
+
+def get_screen_id(page_definitions, urlOperation):    
+    for page_def in page_definitions:
+        if urlOperation in page_def.operations and page_def.loadType == "include":
+            return page_def.screenId
+        if urlOperation not in page_def.operations and page_def.loadType == "exclude":
+            return page_def.screenId
+    return "accessRestricted"
+
+
+def get_page_definition(roles: list[str], module: str, clientId: str, db: Session):
+    page_definitions = db.query(PageDefinition).filter(
+                            PageDefinition.role.in_(roles),  # Multiple roles
+                            PageDefinition.module == module,  # Matching module
+                            PageDefinition.clientId == clientId  # Matching client ID
+                        ).all()
+
+    return page_definitions  # Returning the fetched results
