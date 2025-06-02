@@ -7,7 +7,6 @@ from utils.auth import hash_password, verify_password, create_access_token
 
 router = APIRouter()
 
-
 @router.post("/{clientid}/register")
 async def register_user(userReq: UserRequest, clientid: str, db: Session = Depends(get_db)):
     userReq.clientid = clientid
@@ -27,7 +26,6 @@ async def login_user(clientid: str, userReq: UserRequest, db: Session = Depends(
         raise HTTPException(status_code=400, detail="Invalid credentials")
     token = create_access_token({"sub": user.username, "roles": ["admin"], "clientid": userReq.clientid})
     return {"access_token": token, "token_type": "bearer"}
-
 
 @router.get("/test")
 async def test_msg():
