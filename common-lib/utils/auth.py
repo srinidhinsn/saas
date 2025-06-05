@@ -47,12 +47,15 @@ def verify_token(req: Request = None, token: str = Depends(oauth2_scheme), db: S
         page_definitions = get_page_definition(roles, urlModule, clientId, db)
 
         # Convert list of PageDefinition entities to PageDefinitionModel instances
+        pageDefinitionModels = PageDefinition.copyToModels(page_definitions)
+        
+        '''
         pageDefinitionModels = [PageDefinitionModel(**page_def.__dict__) for page_def in page_definitions]
 
         # Remove SQLAlchemy metadata (_sa_instance_state)
         for model in pageDefinitionModels:
             model.__dict__.pop("_sa_instance_state", None)
-
+        '''    
         print("pageDefinitionModels - ", pageDefinitionModels)
             
         if (grants.index(urlModule) >= 0 and urlClientId == clientId):

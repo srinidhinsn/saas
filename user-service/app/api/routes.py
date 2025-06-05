@@ -21,12 +21,7 @@ async def register_user(clientId: str, userReq: LoginRequest, db: Session = Depe
 @router.post("/login")
 async def login_user(clientId: str, userReq: LoginRequest, db: Session = Depends(get_db)):
     user = db.query(User).filter(User.username == userReq.username and User.clientId == clientId).first()
-    user_dict = user.__dict__.copy()
-    print("user dict - ", user_dict)
-    user_dict.pop("_sa_instance_state", None)  # Remove SQLAlchemy metadata
-    print("user dict before - ", user_dict)
-
-    userModel = UserModel(**user_dict)
+    userModel = user.copyToModel(user)
     print("user model - ", userModel)
 
     if not userModel or not verify_password(userReq.password, userModel.hashed_password):
