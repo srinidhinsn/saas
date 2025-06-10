@@ -10,9 +10,11 @@ from models.user_model import UserModel
 router = APIRouter()
 
 @router.post("/register")
-async def register_user(clientId: str, userReq: LoginRequest, db: Session = Depends(get_db)):
+async def register_user(clientId: str, userReq: UserModel, db: Session = Depends(get_db)):
     hashed_pw = hash_password(userReq.password)
-    user = User(username=userReq.username, hashed_password=hashed_pw, clientId = clientId)
+    print("user model 1 - ", userReq)
+    userReq.clientId = clientId
+    user = User(username=userReq.username, hashed_password=hashed_pw, clientId = userReq.clientId, roles=userReq.roles, grants=userReq.grants)
     db.add(user)
     db.commit()
     return {"message": "User registered successfully"}

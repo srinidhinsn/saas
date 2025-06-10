@@ -3,7 +3,7 @@ from sqlalchemy import Column , Integer, String, ARRAY
 from .user_model import UserModel, PageDefinitionModel
 
 class User(Base):
-    __tablename__ = "Users"
+    __tablename__ = "User"
     id = Column(Integer, primary_key=True, index=True)
     username = Column(String, index=True)
     hashed_password = Column(String)

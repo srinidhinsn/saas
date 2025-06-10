@@ -3,28 +3,28 @@ from typing import Optional
 import datetime
 
 class DineinOrderModel(BaseModel):
-    id: int
-    clientId: str
-    dineinOrderId: Optional[str]
-    tableNumber: Optional[int]
-    invoiceId: Optional[str]
-    handlerId: Optional[str]
-    invoiceStatus: Optional[str]
-    price: Optional[float]
-    cst: Optional[float]
-    gst: Optional[float]
-    discount: Optional[float]
-    totalPrice: Optional[float]
-    createdBy: Optional[str]
-    updatedBy: Optional[str]
+    id: Optional[int] = None
+    clientId: Optional[str] = None
+    dineinOrderId: Optional[str] = None
+    tableNumber: Optional[int] = None
+    invoiceId: Optional[str] = None
+    handlerId: Optional[str] = None
+    invoiceStatus: Optional[str] = None
+    price: Optional[float] = None
+    cst: Optional[float] = None
+    gst: Optional[float] = None
+    discount: Optional[float] = None
+    totalPrice: Optional[float] = None
+    createdBy: Optional[str] = None
+    updatedBy: Optional[str] = None
     createdDateTime: Optional[datetime.datetime]
     updatedDateTime: Optional[datetime.datetime]
-    status: Optional[str]
+    status: Optional[str] = None
 
 class OrderItemModel(BaseModel):
-    id: int
-    clientId: Optional[str]
-    orderId: Optional[str]
-    orderItemId: Optional[str]
-    itemId: Optional[str]
-    quantity: int
+    id: Optional[int] = None
+    clientId: Optional[str] = None
+    orderId: Optional[str] = None
+    orderItemId: Optional[str] = None
+    itemId: Optional[str] = None
+    quantity: Optional[int] = None

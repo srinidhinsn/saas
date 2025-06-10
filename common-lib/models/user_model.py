@@ -8,21 +8,23 @@ class LoginRequest(BaseModel):
 
 
 class UserModel(BaseModel):
-    id: int
-    clientId: Optional[str]
-    username: Optional[str]
-    roles: Optional[list[str]] = []
-    grants: Optional[list[str]] = []
-    hashed_password: Optional[str]
+    id: Optional[int] = None
+    clientId: Optional[str] = None
+    username: Optional[str] = None
+    password: Optional[str] = None
+    roles: Optional[List[str]] = []
+    grants: Optional[List[str]] = []
+    hashed_password: Optional[str] = None
+
 
 
 class PageDefinitionModel(BaseModel):
-    id: int
-    clientId: Optional[str]
-    module: Optional[str]
+    id: Optional[int] = None
+    clientId: Optional[str] = None
+    module: Optional[str] = None
     operations: Optional[list[str]] = []
-    role: Optional[str]
-    screenId: Optional[str]
-    loadType: Optional[str]
+    role: Optional[str] = None
+    screenId: Optional[str] = None
+    loadType: Optional[str] = None
 
 

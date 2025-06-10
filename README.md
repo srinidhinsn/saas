@@ -9,3 +9,4 @@ Saas application
 6. Under common-lib folder run CMD: python setup.py build
 7. Under  folder run CMD: pip install ..\common-lib
 8. uvicorn app.main:app --port 8000 --reload - (Used ports 8000, 8001, 8002, 8003) 
+9. Copy all content in init.sql and run on pgAdmin.

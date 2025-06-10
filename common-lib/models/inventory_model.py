@@ -3,27 +3,27 @@ from typing import Optional, List
 import datetime
 
 class InventoryModel(BaseModel):
-    id: int
-    clientId: Optional[str]
-    inventoryId: Optional[str]
-    itemId: Optional[str]
-    lineItemId: Optional[List[str]]  # ARRAY converted to Python List[str]
-    name: Optional[str]
-    description: Optional[str]
-    category: Optional[str]
-    realm: Optional[str]
-    availability: Optional[int]
-    unit: Optional[str]
-    unitPrice: Optional[float]
-    unitCst: Optional[float]
-    unitGst: Optional[float]
-    unitTotalPrice: Optional[float]
-    price: Optional[float]
-    cst: Optional[float]
-    gst: Optional[float]
-    discount: Optional[float]
-    totalPrice: Optional[float]
-    createdBy: Optional[str]
-    updatedBy: Optional[str]
+    id: Optional[int] = None
+    clientId: Optional[str] = None
+    inventoryId: Optional[str] = None
+    itemId: Optional[str] = None
+    lineItemId: Optional[List[str]] = []  # ARRAY converted to Python List[str]
+    name: Optional[str] = None
+    description: Optional[str] = None
+    category: Optional[str] = None
+    realm: Optional[str] = None
+    availability: Optional[int] = None
+    unit: Optional[str] = None
+    unitPrice: Optional[float] = None
+    unitCst: Optional[float] = None
+    unitGst: Optional[float] = None
+    unitTotalPrice: Optional[float] = None
+    price: Optional[float] = None
+    cst: Optional[float] = None
+    gst: Optional[float] = None
+    discount: Optional[float] = None
+    totalPrice: Optional[float] = None
+    createdBy: Optional[str] = None
+    updatedBy: Optional[str] = None
     createdDateTime: Optional[datetime.datetime]
     updatedDateTime: Optional[datetime.datetime]
