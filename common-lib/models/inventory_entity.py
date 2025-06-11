@@ -9,7 +9,7 @@ Base = declarative_base()
 class Inventory(Base):
     __tablename__ = "Inventory"
 
-    id = Column(Integer, primary_key=True, autoincrement=True)
+    id = Column(Integer, primary_key=True)
     clientId = Column(String, nullable=True)
     inventoryId = Column(String, nullable=True)
     itemId = Column(String, nullable=True)

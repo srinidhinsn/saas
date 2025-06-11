@@ -9,8 +9,8 @@ Base = declarative_base()
 class DineinOrder(Base):
     __tablename__ = "DineinOrders"
 
-    id = Column(Integer, primary_key=True, autoincrement=True)
-    clientId = Column(String, nullable=False)
+    id = Column(Integer, primary_key=True)
+    clientId = Column(String, nullable=True)
     dineinOrderId = Column(String, unique=True, nullable=True)
     tableNumber = Column(Integer, nullable=True)
     invoiceId = Column(String, nullable=True)
@@ -63,12 +63,12 @@ class DineinOrder(Base):
 class OrderItem(Base):
     __tablename__ = "OrderItems"
 
-    id = Column(Integer, primary_key=True, autoincrement=True)
-    clientId = Column(String, nullable=False)
-    orderId = Column(String, ForeignKey("dinein_orders.dineinOrderId"), nullable=False)
-    orderItemId = Column(String, unique=True, nullable=False)
-    itemId = Column(String, nullable=False)
-    quantity = Column(Integer, nullable=False)
+    id = Column(Integer, primary_key=True)
+    clientId = Column(String, nullable=True)
+    orderId = Column(String, nullable=True)
+    orderItemId = Column(String, nullable=True)
+    itemId = Column(String, nullable=True)
+    quantity = Column(Integer, nullable=True)
 
     @staticmethod
     def copyToModel(orderItem):

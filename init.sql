@@ -35,6 +35,7 @@ CREATE TABLE "OrderItem" (
     "clientId" text,
     "orderId" bigint,
     "itemId" bigint,
+	status text,
     quantity INT
 );
 
@@ -142,15 +143,15 @@ VALUES
 ('easyfood', 'order_3', 4, 3, '1000', 'paid', 90, 8, 8, 0, 106, 'Served');
 
 -- Insert into OrderItem
-INSERT INTO "OrderItem" ("clientId", "orderId", "itemId", quantity)
+INSERT INTO "OrderItem" ("clientId", "orderId", "itemId", quantity, status)
 VALUES 
-('easyfood', 1, 1, 1),
-('easyfood', 1, 2, 2),
-('easyfood', 1, 3, 1),
-('easyfood', 1, 4, 2),
-('easyfood', 2, 2, 1),
-('easyfood', 2, 2, 1),
-('easyfood', 3, 3, 1);
+('easyfood', 1, 1, 1, 'Served'),
+('easyfood', 1, 2, 2, 'Preparing'),
+('easyfood', 1, 3, 1, 'Served'),
+('easyfood', 1, 4, 2, 'New'),
+('easyfood', 2, 2, 1, 'Served'),
+('easyfood', 2, 2, 1, 'Served'),
+('easyfood', 3, 3, 1, 'Served');
 
 -- Insert into Inventory
 INSERT INTO "Inventory" ("clientId", "inventoryId", "lineItemId", name, description, category, realm, availability, unit, "unitPrice", "unitCst", "unitGst", "unitTotalPrice", price, cst, gst, discount, "totalPrice")
