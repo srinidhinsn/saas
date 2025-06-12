@@ -6,6 +6,7 @@ from models.user_entity import User
 from utils.auth import hash_password, verify_password, create_access_token, verify_token
 from models.saas_context import SaasContext, saasContext
 from models.user_model import UserModel
+from models.reponse_model import ResponseModel
 
 router = APIRouter()
 
@@ -29,7 +30,8 @@ async def login_user(clientId: str, userReq: LoginRequest, db: Session = Depends
     if not userModel or not verify_password(userReq.password, userModel.hashed_password):
         raise HTTPException(status_code=400, detail="Invalid credentials")
     token = create_access_token({"userId": userModel.id, "roles": userModel.roles, "clientId": userModel.clientId, "grants" : userModel.grants})
-    return {"access_token": token, "token_type": "bearer"}
+    response : ResponseModel.set_response(screenId="defaultUser", data={"access_token": token, "token_type": "bearer"})
+    return response
 
 '''    
 @router.post("/login")
