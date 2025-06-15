@@ -1,0 +1,153 @@
+.export-container {
+  border: 1px solid #ccc;
+  padding: 16px;
+  border-radius: 8px;
+  margin-top: 24px;
+  box-shadow: 0 2px 6px rgba(0, 0, 0, 0.1);
+  width: 560px;
+  background-color: white;
+  margin: auto;
+}
+
+.export-title {
+  font-size: 1.1rem;
+  font-weight: 600;
+  margin-bottom: 12px;
+  color: gray;
+}
+
+.export-section {
+  display: flex;
+  flex-direction: column;
+  align-items: center;
+  gap: 16px;
+  margin-bottom: 32px;
+}
+
+.export-field {
+  display: flex;
+  flex-direction: column;
+  gap: 4px;
+  width: 90%;
+}
+
+.export-field select,
+.export-field input {
+  border: 1px solid #ccc;
+  padding: 6px 8px;
+  border-radius: 4px;
+}
+
+.export-filters {
+  display: flex;
+  flex-wrap: wrap;
+  align-content: center;
+  justify-content: center;
+  gap: 8px;
+  margin-bottom: 12px;
+}
+
+.export-filters button {
+  font-size: 0.8rem;
+  border: 1px solid #ccc;
+  padding: 4px 8px;
+  border-radius: 4px;
+  background-color: rgb(251, 110, 110);
+  cursor: pointer;
+}
+
+.export-filters button:hover {
+  background-color: #e0e0e0;
+}
+
+.export-count {
+  font-size: 0.9rem;
+  color: #333;
+  margin-bottom: 12px;
+}
+
+.export-download {
+  background-color: rgb(255, 77, 77);
+  color: white;
+  padding: 10px 16px;
+  border: none;
+  border-radius: 6px;
+  cursor: pointer;
+  width: 100%;
+}
+
+.export-download:hover {
+  background-color: rgb(253, 129, 129);
+}
+
+
+/* Responsive for export container */
+
+/* Below 1024px */
+@media (max-width: 1024px) {
+  .export-container {
+    max-width: 90vw;
+  }
+
+  .export-field {
+    width: 140px;
+  }
+}
+
+/* Below 900px */
+@media (max-width: 900px) {
+  .export-container {
+    max-width: 85vw;
+  }
+
+  .export-field {
+    width: 130px;
+  }
+}
+
+/* Below 768px */
+@media (max-width: 768px) {
+  .export-container {
+    max-width: 90%;
+    margin-top: 16px;
+  }
+
+  .export-section {
+    flex-direction: column;
+  }
+
+  .export-field {
+    width: 100%;
+  }
+
+  .export-filters {
+    justify-content: flex-start;
+  }
+}
+
+/* Below 480px */
+@media (max-width: 480px) {
+  .export-container {
+    margin-top: 12px;
+  }
+
+  .export-title {
+    font-size: 1rem;
+  }
+
+  .export-field select,
+  .export-field input {
+    font-size: 14px;
+    padding: 8px 10px;
+  }
+
+  .export-filters button {
+    font-size: 0.75rem;
+    padding: 4px 6px;
+  }
+
+  .export-download {
+    font-size: 1rem;
+    padding: 10px 14px;
+  }
+}

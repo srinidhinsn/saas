@@ -1,0 +1,77 @@
+// import React, { useState } from "react";
+// import axios from "axios";
+
+// function AddCategoryForm({ clientId, onAdd }) {
+//   const [name, setName] = useState("");
+//   const [description, setDescription] = useState("");
+
+//   const handleSubmit = async (e) => {
+//     e.preventDefault();
+//     const res = await axios.post(`http://localhost:8000/api/v1/${clientId}/menu/categories`, {
+//       name,
+//       description,
+//       client_id: clientId
+//     });
+//     onAdd(res.data);
+//     setName("");
+//     setDescription("");
+//   };
+
+//   return (
+//     <form onSubmit={handleSubmit} className="mt-2">
+//       <input value={name} onChange={(e) => setName(e.target.value)} placeholder="Category Name" className="border p-1" />
+//       <input value={description} onChange={(e) => setDescription(e.target.value)} placeholder="Description" className="border p-1 ml-2" />
+//       <button type="submit" className="bg-blue-600 text-white px-2 py-1 ml-2">Add</button>
+//     </form>
+//   );
+// }
+
+// export default AddCategoryForm;
+
+
+
+
+
+
+
+import React, { useState } from "react";
+import axios from "axios";
+import '../styles/AddCategoryForm.css'
+
+function AddCategoryForm({ clientId, onAdd }) {
+  const [name, setName] = useState("");
+  const [description, setDescription] = useState("");
+
+  const handleSubmit = async (e) => {
+    e.preventDefault();
+    const res = await axios.post(`http://localhost:8000/api/v1/${clientId}/menu/categories`, {
+      name,
+      description,
+      client_id: clientId
+    });
+    onAdd(res.data);
+    setName("");
+    setDescription("");
+  };
+
+  return (
+    <form onSubmit={handleSubmit} className="add-category-form">
+      <input
+        value={name}
+        onChange={(e) => setName(e.target.value)}
+        placeholder="Category Name"
+        className="input-field"
+      />
+      <input
+        value={description}
+        onChange={(e) => setDescription(e.target.value)}
+        placeholder="Description"
+        className="input-field input-description"
+      />
+      <button type="submit" className="btn-add">Add</button>
+    </form>
+  );
+}
+
+export default AddCategoryForm;
+

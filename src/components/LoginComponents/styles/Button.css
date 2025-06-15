@@ -1,0 +1,19 @@
+button {
+    margin-top: 10px;
+    padding: 14px;
+    /* background-color: red; */
+    background-color: rgb(255, 77, 77);
+    /* background: linear-gradient(to right,  #3396ff, #454eff);
+    background: linear-gradient(to right,  #646464, #2b2b30); */
+    border: none;
+    color: white;
+    border-radius: 8px;
+    font-size: 16px;
+    font-weight: bold;
+    cursor: pointer;
+    transition: transform 0.2s ease;
+}
+
+button:hover {
+    transform: scale(1.05);
+}

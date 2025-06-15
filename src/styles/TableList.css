@@ -1,0 +1,204 @@
+.table-list-title {
+  margin-bottom: 10px;
+  color: gray;
+}
+
+.table-list {
+  display: grid;
+  grid-template-columns: repeat(auto-fill, minmax(280px, 1fr));
+  gap: 35px;
+  list-style-type: none;
+  padding: 0;
+  margin: 0;
+}
+
+.table-list-item {
+  border: 1px solid #ccc;
+  padding: 12px;
+  background-color: whitesmoke;
+  border-radius: 6px;
+  box-shadow: 0 2px 5px rgba(0, 0, 0, 0.1);
+  transition: box-shadow 0.3s ease;
+  cursor: pointer;
+}
+
+.table-list-item:hover {
+  box-shadow: 0 4px 10px rgba(0, 0, 0, 0.15);
+}
+
+.table-row {
+  display: flex;
+  flex-direction: column;
+  align-items: center;
+}
+
+.table-info {
+  font-weight: bold;
+  color: grey;
+  margin-bottom: 12px;
+  text-align: center;
+}
+
+.table-actions {
+  display: flex;
+  justify-content: center;
+  gap: 8px;
+}
+
+.edit-button,
+.delete-button,
+.save-button,
+.cancel-button {
+  padding: 6px 10px;
+  font-size: 14px;
+  border: none;
+  cursor: pointer;
+  border-radius: 4px;
+}
+
+.table-actions .edit-button {
+  background-color: #ececec;
+  color: gray;
+}
+
+.table-actions .edit-button:hover {
+  background-color: #999898;
+  color: rgb(255, 255, 255);
+}
+
+.table-actions .delete-button {
+  border: 2px solid rgb(255, 77, 77);
+  color: gray;
+}
+
+.table-actions .delete-button:hover {
+  background-color: rgb(255, 77, 77);
+  color: rgb(255, 255, 255);
+}
+
+.table-actions .save-button {
+  background-color: #28a745;
+  color: #fff;
+  margin-top: 10px;
+}
+
+.cancel-button {
+  background-color: #6c757d;
+  color: #fff;
+  margin-top: 10px;
+}
+
+.edit-forms {
+  display: flex;
+  flex-direction: column;
+  gap: 8px;
+}
+
+.form-inputs {
+  max-height: 20px;
+  margin-bottom: 15px;
+}
+
+.form-input {
+  padding: 6px;
+  font-size: 14px;
+  border-radius: 4px;
+  border: 1px solid #ccc;
+  height: 56px;
+}
+
+/* ✅ Responsive Enhancements */
+
+/* Large tablets and smaller desktops (1200px and below) */
+@media (max-width: 1200px) {
+  .table-list {
+    grid-template-columns: repeat(auto-fill, minmax(240px, 1fr));
+    gap: 30px;
+  }
+}
+
+/* Standard tablets (1024px and below) */
+@media (max-width: 1024px) {
+  .table-list {
+    grid-template-columns: repeat(auto-fill, minmax(270px,0fr));
+    gap: 24px;
+  }
+
+  .form-input {
+    height: 48px;
+  }
+
+  .table-info {
+    font-size: 1rem;
+  }
+}
+
+/* Small tablets and landscape phones (900px and below) */
+@media (max-width: 900px) {
+
+  .table-actions {
+    flex-direction: column;
+    align-items: center;
+    gap: 8px;
+  }
+
+  .edit-button,
+  .delete-button,
+  .save-button,
+  .cancel-button {
+    width: 100%;
+  }
+
+  .table-info {
+    font-size: 0.95rem;
+    text-align: center;
+  }
+}
+
+/* Tablets and large phones (768px and below) */
+@media (max-width: 768px) {
+  .table-list {
+    grid-template-columns: repeat(auto-fill, minmax(174px, 0fr));
+    gap: 20px;
+  }
+
+  .form-inputs {
+    gap: 12px;
+  }
+
+  .form-input {
+    width: 100%;
+    font-size: 13px;
+  }
+  
+}
+
+/* Phones (480px and below) */
+@media (max-width: 480px) {
+  .table-list {
+    grid-template-columns: repeat(auto-fill, minmax(192px, 0fr));
+    gap: 18px;
+  }
+  .table-info {
+    font-size: 0.9rem;
+  }
+
+  .edit-button,
+  .delete-button,
+  .save-button,
+  .cancel-button {
+    font-size: 12px;
+    padding: 6px 10px;
+  }
+
+  .form-input {
+    height: 42px;
+  }
+}
+
+@media (max-width: 400px) {
+  .table-list {
+    grid-template-columns: repeat(auto-fill, minmax(164px, 0fr));
+    gap: 18px;
+  }
+}

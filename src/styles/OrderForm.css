@@ -1,0 +1,177 @@
+.order-form-wrapper {
+    background: #fff;
+    padding: 24px;
+    margin-bottom: 24px;
+    border-radius: 12px;
+    box-shadow: 0 4px 12px rgba(0, 0, 0, 0.08);
+    max-width: 720px;
+  }
+  
+  .order-form-heading {
+    font-size: 1.5rem;
+    font-weight: bold;
+    margin-bottom: 20px;
+    color: #2c3e50;
+  }
+  
+  .order-form-row {
+    display: flex;
+    gap: 12px;
+    margin-bottom: 16px;
+    align-items: center;
+  }
+  
+  .order-select {
+    flex: 2;
+    padding: 10px;
+    border-radius: 6px;
+    border: 1px solid #ccc;
+    background-color: #fafafa;
+    font-size: 14px;
+  }
+  
+  .order-input {
+    width: 70px;
+    padding: 10px;
+    border-radius: 6px;
+    border: 1px solid #ccc;
+    font-size: 14px;
+  }
+  
+  .order-form-actions {
+    display: flex;
+    align-items: center;
+    gap: 14px;
+    margin-top: 20px;
+    flex-wrap: wrap;
+  }
+  
+  .order-total {
+    font-weight: 600;
+    color: #333;
+    font-size: 16px;
+    margin-right: auto;
+  }
+  
+  .btn {
+    padding: 10px 18px;
+    border-radius: 6px;
+    border: none;
+    cursor: pointer;
+    font-weight: 500;
+    font-size: 14px;
+    transition: background-color 0.3s ease;
+  }
+  
+  .add-btn {
+    background-color: #e2e8f0;
+    color: #2d3748;
+  }
+  
+  .add-btn:hover {
+    background-color: #cbd5e0;
+  }
+  
+  .submit-btn {
+    background-color: rgb(255, 77, 77);
+    color: white;
+  }
+  
+  .submit-btn:hover {
+    background-color: rgb(250, 126, 126);
+  }
+  
+  .menu-grid,
+.combo-grid {
+  display: grid;
+  grid-template-columns: repeat(auto-fill, minmax(160px, 1fr));
+  gap: 10px;
+  margin-bottom: 20px;
+}
+
+.menu-card {
+  border: 1px solid #ccc;
+  padding: 10px;
+  border-radius: 6px;
+  background-color: #f4fdfd;
+  cursor: pointer;
+  text-align: center;
+  transition: 0.2s;
+}
+
+.menu-card:hover {
+  background-color: #d0f7f7;
+}
+
+.section-title {
+  margin: 15px 0 10px;
+  font-weight: bold;
+}
+/* Base styles (your original CSS) */
+
+/* Responsive adjustments */
+@media (max-width: 720px) {
+  .order-form-wrapper {
+    padding: 16px;
+    margin-bottom: 20px;
+    max-width: 100%;
+    box-sizing: border-box;
+  }
+
+  .order-form-row {
+    flex-direction: column;
+    align-items: stretch;
+    gap: 12px;
+    margin-bottom: 14px;
+  }
+
+  .order-select {
+    flex: none;
+    width: 100%;
+    font-size: 15px;
+  }
+
+  .order-input {
+    width: 100%;
+    max-width: 120px;
+    font-size: 15px;
+  }
+
+  .order-form-actions {
+    justify-content: center;
+    gap: 12px;
+  }
+
+  .order-total {
+    font-size: 15px;
+    margin-bottom: 10px;
+    margin-right: 0;
+    text-align: center;
+    width: 100%;
+  }
+}
+
+/* Smaller phones */
+@media (max-width: 480px) {
+  
+  .order-form-wrapper {
+    padding: 12px;
+  }
+
+  .btn {
+    padding: 8px 14px;
+    font-size: 13px;
+  }
+
+  .menu-grid,
+  .combo-grid {
+    grid-template-columns: repeat(auto-fill, minmax(140px, 1fr));
+    gap: 8px;
+    margin-bottom: 16px;
+  }
+
+  .menu-card {
+    padding: 8px;
+    font-size: 13px;
+  }
+}

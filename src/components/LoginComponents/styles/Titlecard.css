@@ -1,0 +1,35 @@
+.title-screen {
+    height: 100vh;
+    background: black;
+    color: white;
+    font-family: 'Cinzel', serif;
+    display: flex;
+    flex-direction: column;
+    justify-content: center;
+    align-items: center;
+    text-align: center;
+}
+
+.title-main {
+    font-size: 64px;
+    letter-spacing: 4px;
+    animation: fadeIn 2s ease-in-out;
+}
+
+.subtitle {
+    font-size: 20px;
+    margin-top: 16px;
+    color: #aaa;
+}
+
+@keyframes fadeIn {
+    0% {
+        opacity: 0;
+        transform: scale(0.95);
+    }
+
+    100% {
+        opacity: 1;
+        transform: scale(1);
+    }
+}

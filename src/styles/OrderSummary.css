@@ -1,0 +1,130 @@
+.order-summary-container {
+  padding: 2rem;
+  font-family: "Segoe UI", sans-serif;
+  background-color: #f9f9f9;
+  min-height: 100vh;
+}
+
+.summary-title {
+  font-size: 2rem;
+  color: #333;
+  margin-bottom: 1.5rem;
+}
+
+.no-data {
+  font-style: italic;
+  color: #777;
+  padding: 1rem;
+}
+
+.table-block {
+  margin-bottom: 2.5rem;
+}
+
+.table-title {
+  font-size: 1.5rem;
+  color: #ff3f3f;
+  border-left: 5px solid #d63333;
+  padding-left: 1rem;
+  margin-bottom: 1rem;
+}
+
+.date-block {
+  margin-left: 1rem;
+  margin-bottom: 1rem;
+}
+
+.date-title {
+  font-size: 1.2rem;
+  color: #6c757d;
+  margin-bottom: 0.75rem;
+}
+
+/* 🎯 Responsive grid layout for order cards */
+.orders-grid {
+  display: grid;
+  grid-template-columns: repeat(auto-fill, minmax(300px, 1fr));
+  gap: 1rem;
+}
+
+
+.order-card:hover {
+  transform: scale(1.02);
+}
+
+.order-card-grid {
+  display: grid;
+  grid-template-columns: repeat(auto-fill, minmax(350px, 1fr));
+  margin-top: 10px;
+  padding: 1rem;
+  border-radius: 10px;
+  transition: transform 0.2s;
+}
+
+.order-header {
+  display: flex;
+  justify-content: space-between;
+  margin-bottom: 0.5rem;
+  font-weight: bold;
+  color: #555;
+}
+
+.order-time {
+  font-size: 0.85rem;
+  color: #888;
+  margin-bottom: 0.5rem;
+}
+
+.status-tag {
+  padding: 0.3rem 0.6rem;
+  font-size: 0.75rem;
+  color: white;
+  border-radius: 6px;
+  text-transform: uppercase;
+}
+
+.status-badge {
+  padding: 4px 10px;
+  border-radius: 20px;
+  font-size: 0.85rem;
+  font-weight: bold;
+  display: inline-block;
+  text-transform: capitalize;
+}
+
+/* Status Colors */
+.status-pending {
+  background-color: #ffe5e5;
+  color: #d32f2f;
+}
+
+.status-preparing {
+  background-color: #fff4e5;
+  color: #f57c00;
+}
+
+.status-served {
+  background-color: #e6f4ea;
+  color: #388e3c;
+}
+
+
+.item-list {
+  list-style: none;
+  padding: 0;
+  margin: 0;
+}
+
+.item-list li {
+  padding: 2px 0;
+  color: #444;
+}
+
+.item-name {
+  font-weight: 500;
+}
+
+.item-type {
+  color: #777;
+  font-size: 0.85rem;
+}

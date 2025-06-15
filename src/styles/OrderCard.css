@@ -1,0 +1,244 @@
+.order-card {
+    background: #fff;
+    border-radius: 10px;
+    padding: 16px;
+    box-shadow: 0 4px 12px rgba(0, 0, 0, 0.08);
+    width: 100%;
+    width: 320px;
+    margin-bottom: 16px;
+    transition: transform 0.2s ease;
+  }
+  
+  .order-card:hover {
+    transform: translateY(-2px);
+  }
+  
+  .order-header {
+    display: flex;
+    justify-content: space-between;
+    align-items: center;
+  }
+  
+  .table-number {
+    font-size: 16px;
+    font-weight: bold;
+    color: #333;
+  }
+  
+  .status-badge {
+    font-size: 12px;
+    font-weight: bold;
+    padding: 4px 8px;
+    border-radius: 8px;
+    text-transform: uppercase;
+    min-width: 80px;
+    text-align: center;
+  }
+  
+  .status-badge.pending {
+    background-color: #f44336;
+    color: white;
+  }
+  
+  .status-badge.preparing {
+    background-color: #ffeb3b;
+    color: #333;
+  }
+  
+  .status-badge.served {
+    background-color: #4caf50;
+    color: white;
+  }
+  
+  .time-placed {
+    font-size: 12px;
+    color: #888;
+    margin: 6px 0;
+  }
+  
+  .items-list {
+    font-size: 14px;
+    color: #444;
+    margin-bottom: 12px;
+    padding-left: 16px;
+  }
+  
+  .items-list li {
+    margin-bottom: 2px;
+  }
+  
+  .action-buttons {
+    display: flex;
+    justify-content: flex-end;
+    gap: 10px;
+  }
+  
+  .start-btn {
+    background-color: #b0b0b0; /* grey */
+    color: white;
+    font-size: 13px;
+    font-weight: 500;
+    padding: 6px 12px;
+    border: none;
+    border-radius: 6px;
+    cursor: pointer;
+    transition: background-color 0.3s ease;
+  }
+  
+  .start-btn:hover {
+    background-color: #8c8c8c;
+  }
+  
+  .serve-btn {
+    background-color: #a8d5a2; /* light green */
+    color: #2f5d2f;
+    font-size: 13px;
+    font-weight: 500;
+    padding: 6px 12px;
+    border: none;
+    border-radius: 6px;
+    cursor: pointer;
+    transition: background-color 0.3s ease;
+  }
+  
+  .serve-btn:hover {
+    background-color: #85c17c;
+  }
+
+
+
+/* Responsive order card */
+
+/* Below 1024px */
+@media (max-width: 1024px) {
+  .order-card {
+    width: 280px;
+    padding: 14px;
+  }
+  
+  .table-number {
+    font-size: 15px;
+  }
+
+  .status-badge {
+    font-size: 11px;
+    padding: 3px 7px;
+    min-width: 70px;
+  }
+  
+  .time-placed {
+    font-size: 11px;
+  }
+  
+  .items-list {
+    font-size: 13px;
+  }
+
+  .start-btn,
+  .serve-btn {
+    font-size: 12px;
+    padding: 5px 10px;
+  }
+}
+
+/* Below 900px */
+@media (max-width: 900px) {
+  .order-card {
+    width: 240px;
+    padding: 12px;
+  }
+  
+  .table-number {
+    font-size: 14px;
+  }
+
+  .status-badge {
+    font-size: 10px;
+    padding: 3px 6px;
+    min-width: 60px;
+  }
+  
+  .time-placed {
+    font-size: 10px;
+  }
+  
+  .items-list {
+    font-size: 12px;
+  }
+
+  .start-btn,
+  .serve-btn {
+    font-size: 11px;
+    padding: 5px 8px;
+  }
+}
+
+/* Below 768px */
+@media (max-width: 768px) {
+  .order-card {
+    width: 100%;
+    padding: 12px;
+    margin-bottom: 12px;
+  }
+  
+  .order-header {
+    flex-direction: column;
+    align-items: flex-start;
+    gap: 6px;
+  }
+  
+  .status-badge {
+    min-width: auto;
+    padding: 4px 8px;
+  }
+  
+  .items-list {
+    font-size: 13px;
+    padding-left: 12px;
+  }
+
+  .action-buttons {
+    justify-content: flex-start;
+    flex-wrap: wrap;
+    gap: 8px;
+  }
+
+  .start-btn,
+  .serve-btn {
+    font-size: 13px;
+    padding: 6px 12px;
+  }
+}
+
+/* Below 480px */
+@media (max-width: 480px) {
+  .order-card {
+    padding: 10px;
+    width: 80%;
+  }
+  
+  .table-number {
+    font-size: 13px;
+  }
+
+  .status-badge {
+    font-size: 9px;
+    padding: 2px 6px;
+    min-width: auto;
+  }
+  
+  .time-placed {
+    font-size: 9px;
+  }
+  
+  .items-list {
+    font-size: 12px;
+    padding-left: 10px;
+  }
+
+  .start-btn,
+  .serve-btn {
+    font-size: 11px;
+    padding: 5px 8px;
+  }
+}

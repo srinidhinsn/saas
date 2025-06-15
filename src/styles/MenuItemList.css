@@ -1,0 +1,359 @@
+.menu-item-list {
+  padding: 16px;
+}
+
+.menu-item-title {
+  font-size: 1.5rem;
+  margin-bottom: 16px;
+  font-weight: 600;
+  color: gray;
+}
+
+.menu-item-grid {
+  display: grid;
+  grid-template-columns: repeat(auto-fill, minmax(220px, 1fr));
+  gap: 20px;
+}
+
+.menu-item-card {
+  background: #fff;
+  border-radius: 8px;
+  box-shadow: 0 2px 8px rgb(0 0 0 / 0.1);
+  padding: 12px;
+  display: flex;
+  flex-direction: column;
+  transition: box-shadow 0.2s ease;
+}
+
+.menu-item-card:hover {
+  box-shadow: 0 4px 16px rgb(0 0 0 / 0.15);
+}
+
+.menu-item-image-wrapper {
+  width: 100%;
+  height: 140px;
+  border-radius: 6px;
+  overflow: hidden;
+  background-color: #f0f0f0;
+  margin-bottom: 10px;
+  display: flex;
+  align-items: center;
+  justify-content: center;
+}
+
+.menu-item-image {
+  width: 100%;
+  height: 100%;
+  object-fit: cover;
+}
+
+.menu-item-image-placeholder {
+  color: #999;
+  font-size: 0.9rem;
+}
+
+.menu-item-info {
+  flex-grow: 1;
+}
+
+.menu-item-name {
+  font-size: 1.1rem;
+  font-weight: 700;
+  margin: 0 0 6px 0;
+  color: gray;
+}
+
+.menu-item-price {
+  color: rgb(95, 28, 28);
+  font-weight: 600;
+  margin: 0 0 6px 0;
+}
+
+.menu-item-desc {
+  font-size: 0.9rem;
+  color: #555;
+  margin: 0;
+}
+
+.menu-item-actions {
+  display: flex;
+  justify-content: flex-end;
+  gap: 10px;
+  margin-top: 8px;
+}
+
+.btn-edit,
+.btn-delete,
+.btn-save,
+.btn-cancel {
+  cursor: pointer;
+  padding: 6px 10px;
+  border-radius: 4px;
+  border: none;
+  font-size: 0.9rem;
+  font-weight: 600;
+  transition: background-color 0.2s ease;
+}
+
+.btn-edit {
+  background-color: #aca9a6;
+  color: white;
+}
+
+.btn-edit:hover {
+  background-color: #948d8b;
+}
+
+.btn-delete {
+  background-color: rgb(255, 77, 77);
+  color: white;
+}
+
+.btn-delete:hover {
+  background-color: #ff9898;
+}
+
+.menu-item-edit-form {
+  display: flex;
+  flex-direction: column;
+  gap: 8px;
+}
+
+.menu-item-input {
+  padding: 8px;
+  border: 1px solid #ccc;
+  border-radius: 4px;
+  font-size: 1rem;
+}
+
+.menu-item-btn-group {
+  display: flex;
+  justify-content: flex-end;
+  gap: 10px;
+}
+
+.btn-save {
+  background-color: #2a9d8f;
+  color: white;
+}
+
+.btn-save:hover {
+  background-color: #21867a;
+}
+
+.btn-cancel {
+  background-color: #aaa;
+  color: white;
+}
+
+.btn-cancel:hover {
+  background-color: #888;
+}
+
+.menu-item-header {
+  display: flex;
+  align-items: center;
+  justify-content: space-between;
+  margin-bottom: 16px;
+}
+
+.btn-add {
+  background-color: #be2333;
+  color: white;
+  border: none;
+  padding: 8px 14px;
+  border-radius: 6px;
+  font-weight: 600;
+  cursor: pointer;
+  transition: background-color 0.2s ease;
+}
+
+.btn-add:hover {
+  background-color: rgb(255, 135, 135);
+}
+
+/* Modal styles */
+.modal-overlay {
+  position: fixed;
+  top: 0;
+  left: 0;
+  width: 100vw;
+  height: 100vh;
+  background-color: rgba(0,0,0,0.5);
+  display: flex;
+  align-items: center;
+  justify-content: center;
+  z-index: 9999;
+}
+
+.modal-content {
+  background: white;
+  border-radius: 8px;
+  padding: 24px;
+  max-width: 480px;
+  width: 90%;
+  box-shadow: 0 4px 20px rgb(0 0 0 / 0.25);
+  position: relative;
+  display: flex;
+  flex-direction: column;
+  gap: 16px;
+}
+
+.modal-content h3 {
+  margin: 0 0 8px 0;
+  font-weight: 700;
+}
+
+.modal-close-btn {
+  align-self: flex-end;
+  background-color: #aaa;
+  color: white;
+  border: none;
+  padding: 6px 12px;
+  border-radius: 5px;
+  cursor: pointer;
+  font-weight: 600;
+  transition: background-color 0.2s ease;
+}
+
+.modal-close-btn:hover {
+  background-color: #888;
+}
+
+.modal-content form {
+  max-width: 400px;
+  margin: 0 auto;
+  padding: 20px;
+  background: #fff;
+  border-radius: 10px;
+  display: flex;
+  flex-direction: column;
+  gap: 14px;
+}
+
+.modal-content form input,
+.modal-content form textarea {
+  width: 100%;
+  max-width: 100%;
+  padding: 8px 10px;
+  font-size: 14px;
+  border: 1px solid #ccc;
+  border-radius: 6px;
+  box-sizing: border-box;
+  max-height: 56px;
+}
+
+
+.modal-content form .form-buttons {
+  display: flex;
+  gap: 12px;  /* horizontal space between buttons */
+  justify-content: flex-end; /* align buttons to the right */
+}
+
+.modal-content form button {
+  padding: 8px 16px;
+  font-weight: 600;
+  border-radius: 6px;
+  border: none;
+  cursor: pointer;
+}
+
+.modal-content form button[type="submit"] {
+  background-color: #ff3348;
+  color: white;
+}
+
+.modal-content form button[type="submit"]:hover {
+  background-color: #ff9595;
+}
+
+.modal-content form button.cancel-btn {
+  background-color: #aaa;
+  color: white;
+}
+
+.modal-content form button.cancel-btn:hover {
+  background-color: #888;
+}
+
+
+@media (max-width: 768px) {
+  .menu-item-grid {
+    grid-template-columns: repeat(auto-fill, minmax(160px, 1fr));
+    gap: 16px;
+  }
+
+  .menu-item-card {
+    padding: 10px;
+  }
+
+  .menu-item-title {
+    font-size: 1.3rem;
+    text-align: center;
+  }
+
+  .menu-item-header {
+    flex-direction: column;
+    gap: 12px;
+    align-items: flex-start;
+  }
+
+  .btn-add {
+    width: 100%;
+    text-align: center;
+  }
+}
+
+@media (max-width: 480px) {
+  .menu-item-grid {
+    grid-template-columns: 1fr;
+    gap: 32px;
+  }
+
+  .menu-item-card {
+    padding: 8px;
+  }
+
+  .menu-item-name {
+    font-size: 1rem;
+  }
+
+  .menu-item-price,
+  .menu-item-desc {
+    font-size: 0.85rem;
+  }
+
+  .menu-item-actions {
+    flex-direction: column;
+    align-items: flex-start;
+    gap: 6px;
+  }
+
+  .btn-edit,
+  .btn-delete,
+  .btn-save,
+  .btn-cancel {
+    width: 100%;
+    font-size: 0.85rem;
+  }
+
+  .modal-content {
+    padding: 16px;
+    max-width: 95%;
+  }
+
+  .modal-content form {
+    padding: 12px;
+  }
+
+  .modal-content form .form-buttons {
+    flex-direction: column;
+    gap: 10px;
+  }
+
+  .modal-content form button {
+    width: 100%;
+    text-align: center;
+  }
+}
+
