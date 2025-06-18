@@ -134,6 +134,69 @@ ALTER TABLE "PageDefinition" ALTER COLUMN id ADD GENERATED ALWAYS AS IDENTITY (
     CACHE 1
 );
 
+CREATE TABLE "Client" (
+    id text NOT NULL,
+    "name" text,
+    realm text,
+    email text,
+    phone text,
+    logo text,
+    "savedAddressIds" text[],
+    "createdDateTime" TIMESTAMP DEFAULT CURRENT_TIMESTAMP,
+    "updatedDateTime" TIMESTAMP DEFAULT CURRENT_TIMESTAMP
+);
+
+
+ALTER TABLE "Client" OWNER TO postgres;
+
+
+
+CREATE TABLE "Person" (
+    id text NOT NULL,
+    "firstName" text,
+    "lastName" text,
+    dob text,
+    email text,
+    phone text,
+    "personType" text,
+    "savedAddressIds" text[],
+    "createdDateTime" TIMESTAMP DEFAULT CURRENT_TIMESTAMP,
+    "updatedDateTime" TIMESTAMP DEFAULT CURRENT_TIMESTAMP
+);
+
+
+ALTER TABLE "Person" OWNER TO postgres;
+
+
+
+
+CREATE TABLE "Address" (
+    id bigint NOT NULL,
+    "addressLine1" text,
+    "addressLine2" text,
+    city text,
+    country text,
+    "state" text,
+    pincode text,
+    "contactName" text,
+    "contactNumber" text,
+    "createdDateTime" TIMESTAMP DEFAULT CURRENT_TIMESTAMP,
+    "updatedDateTime" TIMESTAMP DEFAULT CURRENT_TIMESTAMP
+);
+
+
+ALTER TABLE "Address" OWNER TO postgres;
+
+ALTER TABLE "Address" ALTER COLUMN id ADD GENERATED ALWAYS AS IDENTITY (
+    SEQUENCE NAME address_id_seq
+    START WITH 1000
+    INCREMENT BY 1
+    MINVALUE 1000
+    MAXVALUE 1000000000000
+    CACHE 1
+);
+
+
 
 -- Insert into DineinOrder
 INSERT INTO "DineinOrder" ("clientId", "dineinOrderId", "tableNumber", "invoiceId", "handlerId", "invoiceStatus", price, cst, gst, discount, "totalPrice", status)
@@ -166,8 +229,10 @@ VALUES
 
 INSERT INTO "PageDefinition" (id, "clientId", module, role, "screenId", "loadType", operations) OVERRIDING SYSTEM VALUE VALUES (1001, 'easyfood', 'dinein', 'Admin', 'defaultDinein', 'include', '{ALL}');
 INSERT INTO "PageDefinition" (id, "clientId", module, role, "screenId", "loadType", operations) OVERRIDING SYSTEM VALUE VALUES (1003, 'easyfood', 'order', 'Admin', 'defaultOrder', 'include', '{ALL}');
+INSERT INTO "PageDefinition" (id, "clientId", module, role, "screenId", "loadType", operations) OVERRIDING SYSTEM VALUE VALUES (1005, 'easyfood', 'tables', 'Admin', 'defaultTables', 'include', '{ALL}');
 INSERT INTO "PageDefinition" (id, "clientId", module, role, "screenId", "loadType", operations) OVERRIDING SYSTEM VALUE VALUES (1002, 'easyfood', 'inventory', 'Admin', 'defaultInventory', 'include', '{ALL}');
 INSERT INTO "PageDefinition" (id, "clientId", module, role, "screenId", "loadType", operations) OVERRIDING SYSTEM VALUE VALUES (1004, 'easyfood', 'users', 'Admin', 'defaultUser', 'exclude', '{test}');
+INSERT INTO "PageDefinition" (id, "clientId", module, role, "screenId", "loadType", operations) OVERRIDING SYSTEM VALUE VALUES (1006, 'easyfood', 'invoice', 'Admin', 'defaultInvoice', 'include', '{ALL}');
 
 
-INSERT INTO "User" (username, hashed_password, id, "clientId", roles, grants) OVERRIDING SYSTEM VALUE VALUES ('admin', '$2b$12$sKBSlLDTo4T7ce3cFk8ffO0LLlFzhkpOkGxFq3P4CcvrLBijZv7Ly', 1000, 'easyfood', '{Admin}', '{dinein,order,inventory,users}');
+INSERT INTO "User" (username, hashed_password, id, "clientId", roles, grants) OVERRIDING SYSTEM VALUE VALUES ('admin', '$2b$12$sKBSlLDTo4T7ce3cFk8ffO0LLlFzhkpOkGxFq3P4CcvrLBijZv7Ly', 1000, 'easyfood', '{Admin}', '{dinein,order,inventory,users,tables,invoice}');
