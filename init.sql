@@ -55,7 +55,7 @@ CREATE TABLE "Inventory" (
     id bigint NOT NULL,
     "clientId" text,
     "inventoryId" bigint,
-    "lineItemId" text[],
+    "lineItemId" bigint[],
     name text,
     description text,
     category text,
@@ -151,6 +151,7 @@ ALTER TABLE "Client" OWNER TO postgres;
 
 
 
+
 CREATE TABLE "Person" (
     id text NOT NULL,
     "firstName" text,
@@ -199,31 +200,31 @@ ALTER TABLE "Address" ALTER COLUMN id ADD GENERATED ALWAYS AS IDENTITY (
 
 
 -- Insert into DineinOrder
-INSERT INTO "DineinOrder" ("clientId", "dineinOrderId", "tableNumber", "invoiceId", "handlerId", "invoiceStatus", price, cst, gst, discount, "totalPrice", status)
-VALUES 
-('easyfood', 'order_1', 3, 1, '1000', 'new', NULL, NULL, NULL, NULL, NULL, 'New'),
-('easyfood', 'order_2', 4, 2, '1000', 'generated', 180, 16, 16, 0, 212, 'Preparing'),
-('easyfood', 'order_3', 4, 3, '1000', 'paid', 90, 8, 8, 0, 106, 'Served');
+INSERT INTO "DineinOrder" ("id", "clientId", "dineinOrderId", "tableNumber", "invoiceId", "handlerId", "invoiceStatus", price, cst, gst, discount, "totalPrice", status)
+OVERRIDING SYSTEM VALUE VALUES
+(1000, 'easyfood', 'order_1', 3, 1, '1000', 'new', NULL, NULL, NULL, NULL, NULL, 'New'),
+(1001, 'easyfood', 'order_2', 4, 2, '1000', 'generated', 180, 16, 16, 0, 212, 'Preparing'),
+(1002, 'easyfood', 'order_3', 4, 3, '1000', 'paid', 90, 8, 8, 0, 106, 'Served');
 
 -- Insert into OrderItem
-INSERT INTO "OrderItem" ("clientId", "orderId", "itemId", quantity, status)
-VALUES 
-('easyfood', 1, 1, 1, 'Served'),
-('easyfood', 1, 2, 2, 'Preparing'),
-('easyfood', 1, 3, 1, 'Served'),
-('easyfood', 1, 4, 2, 'New'),
-('easyfood', 2, 2, 1, 'Served'),
-('easyfood', 2, 2, 1, 'Served'),
-('easyfood', 3, 3, 1, 'Served');
+INSERT INTO "OrderItem" ("id", "clientId", "orderId", "itemId", quantity, status)
+OVERRIDING SYSTEM VALUE VALUES
+(1000, 'easyfood', 1000, 1000, 1, 'Served'),
+(1001, 'easyfood', 1000, 1004, 2, 'Preparing'),
+(1002, 'easyfood', 1000, 1003, 1, 'Served'),
+(1003, 'easyfood', 1000, 1004, 2, 'New'),
+(1004, 'easyfood', 1001, 1000, 1, 'Served'),
+(1005, 'easyfood', 1001, 1001, 1, 'Served'),
+(1006, 'easyfood', 1002, 1003, 1, 'Served');
 
 -- Insert into Inventory
-INSERT INTO "Inventory" ("clientId", "inventoryId", "lineItemId", name, description, category, realm, availability, unit, "unitPrice", "unitCst", "unitGst", "unitTotalPrice", price, cst, gst, discount, "totalPrice")
-VALUES 
-('easyfood', 1, '{"2","3"}', 'Veg biriyani', 'tasty veg biriyani', 'Biriyani', 'food', 100, 'number', 90, 8, 8, 106, 9000, 800, 800, 0, 10600),
-('easyfood', 1, NULL, 'Sherwa', 'Veg gravy', 'Gravy', 'food', 100, 'number', 10, 9, 9, 28, 1000, 80, 80, 0, 11160),
-('easyfood', 1, NULL, 'Raita', 'Plain raitha', 'Raitha', 'food', 100, 'number', 0, 0, 0, 0, 0, 0, 0, 0, 0),
-('easyfood', 1, '{"3"}', 'Rice bath', 'Plain rice bath', 'Rice', 'food', 100, 'number', 90, 8, 8, 106, 9000, 800, 800, 0, 10600),
-('easyfood', 1, NULL, 'Mushroom biriyani', 'Mushroom biriyani without Sherwa', 'Biriyani', 'food', 100, 'number', 90, 8, 8, 106, 9000, 800, 800, 0, 11600);
+INSERT INTO "Inventory" ("id", "clientId", "inventoryId", "lineItemId", name, description, category, realm, availability, unit, "unitPrice", "unitCst", "unitGst", "unitTotalPrice", price, cst, gst, discount, "totalPrice")
+OVERRIDING SYSTEM VALUE VALUES
+(1000, 'easyfood', 1, '{1001,1002}', 'Veg biriyani', 'tasty veg biriyani', 'Biriyani', 'food', 100, 'number', 90, 8, 8, 106, 9000, 800, 800, 0, 10600),
+(1001, 'easyfood', 1, NULL, 'Sherwa', 'Veg gravy', 'Gravy', 'food', 100, 'number', 10, 9, 9, 28, 1000, 80, 80, 0, 11160),
+(1002, 'easyfood', 1, NULL, 'Raita', 'Plain raitha', 'Raitha', 'food', 100, 'number', 0, 0, 0, 0, 0, 0, 0, 0, 0),
+(1003, 'easyfood', 1, '{1002}', 'Rice bath', 'Plain rice bath', 'Rice', 'food', 100, 'number', 90, 8, 8, 106, 9000, 800, 800, 0, 10600),
+(1004, 'easyfood', 1, NULL, 'Mushroom biriyani', 'Mushroom biriyani without Sherwa', 'Biriyani', 'food', 100, 'number', 90, 8, 8, 106, 9000, 800, 800, 0, 11600);
 
 
 
