@@ -1,0 +1,25 @@
+1. Keep common-lib folder structure as:
+   a. common-lib/
+   b. /config/
+   c. /database
+   d. /entity
+   e. /models
+   f. /utils
+
+2. base.py added under database folder
+
+3. Under setup.py : ** packages=['database', 'models', 'utils', 'config','entity'], ** 
+                    changed to 
+                    **packages = find_packages(), **
+
+4. For common-lib installation use : cd common-lib and then,
+
+ # Dev mode (editable)
+   pip install -e .
+
+ # Prod mode (build)
+   BUILD_MODE=prod python setup.py build
+   pip install ./build/lib
+
+
+	

@@ -1,0 +1,12 @@
+Metadata-Version: 2.1
+Name: common-lib
+Version: 0.1
+Summary: Packaging all common functionalities
+Home-page: 
+Author: Srinidhi Nagarajan
+Author-email: srinidhinsn@gmail.com
+License: BSD
+Keywords: Saas application
+Classifier: Development Status :: Initial version
+Classifier: Topic :: Common library
+Classifier: License :: OSI Approved :: BSD License
