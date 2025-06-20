@@ -1,0 +1,17 @@
+CREATE TABLE IF NOT EXISTS public.tables (
+    id             BIGSERIAL PRIMARY KEY,
+    client_id      TEXT NOT NULL,
+    name           TEXT NOT NULL,
+    slug           TEXT UNIQUE,
+    qr_code_url    TEXT,
+    description    TEXT,
+    status         TEXT DEFAULT 'Vacant',
+    section        TEXT,
+    location_zone  TEXT,
+    sort_order     INTEGER,
+    is_active      BOOLEAN NOT NULL DEFAULT TRUE,
+    created_by     TEXT,
+    updated_by     TEXT,
+    created_at     TIMESTAMP WITHOUT TIME ZONE DEFAULT CURRENT_TIMESTAMP,
+    updated_at     TIMESTAMP WITHOUT TIME ZONE DEFAULT CURRENT_TIMESTAMP
+);

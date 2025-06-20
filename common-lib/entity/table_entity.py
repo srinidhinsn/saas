@@ -1,4 +1,4 @@
-from sqlalchemy import Column, BigInteger, Text, DateTime, func, UniqueConstraint
+from sqlalchemy import Column, Integer, BigInteger, Boolean, Text, DateTime, func, UniqueConstraint
 from sqlalchemy.dialects.postgresql import UUID
 import uuid
 
@@ -6,16 +6,35 @@ import uuid
 from database.base import Base
 from models.table_model import Table
 
-class DiningTable(Base):
-    __tablename__  = "tables"
+# class DiningTable(Base):
+#     __tablename__  = "tables"
 
-    id             = Column(BigInteger, primary_key=True, index=True)
-    client_id      = Column(Text, nullable=True)
-    table_number   = Column(Text, nullable=True)
-    table_type     = Column(Text, nullable=True)
-    status         = Column(Text, nullable=True, default="Vacant")
-    location_zone  = Column(Text, nullable=True)
+#     id             = Column(BigInteger, primary_key=True, index=True)
+#     client_id      = Column(Text, nullable=True)
+#     table_number   = Column(Text, nullable=True)
+#     table_type     = Column(Text, nullable=True)
+#     status         = Column(Text, nullable=True, default="Vacant")
+#     location_zone  = Column(Text, nullable=True)
+#     qr_code_url    = Column(Text, nullable=True)
+#     created_at     = Column(DateTime, default=func.now())
+#     updated_at     = Column(DateTime, default=func.now(), onupdate=func.now())
+
+class DiningTable(Base):
+    __tablename__ = "tables"
+
+    id             = Column(BigInteger, primary_key=True, autoincrement=True)
+    client_id      = Column(Text, nullable=False)
+    name           = Column(Text, nullable=False)
+    slug           = Column(Text, unique=True, nullable=True)
     qr_code_url    = Column(Text, nullable=True)
+    description    = Column(Text, nullable=True)
+    status         = Column(Text, nullable=True, default="Vacant")
+    section        = Column(Text, nullable=True)
+    location_zone  = Column(Text, nullable=True)
+    sort_order     = Column(Integer, nullable=True)
+    is_active      = Column(Boolean, nullable=False, default=True)
+    created_by     = Column(Text, nullable=True)
+    updated_by     = Column(Text, nullable=True)
     created_at     = Column(DateTime, default=func.now())
     updated_at     = Column(DateTime, default=func.now(), onupdate=func.now())
 
