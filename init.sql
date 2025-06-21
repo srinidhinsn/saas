@@ -160,7 +160,7 @@ CREATE TABLE "Person" (
     email text,
     phone text,
     "personType" text,
-    "savedAddressIds" text[],
+    "savedAddressIds" bigint[],
     "createdDateTime" TIMESTAMP DEFAULT CURRENT_TIMESTAMP,
     "updatedDateTime" TIMESTAMP DEFAULT CURRENT_TIMESTAMP
 );
@@ -197,6 +197,21 @@ ALTER TABLE "Address" ALTER COLUMN id ADD GENERATED ALWAYS AS IDENTITY (
     CACHE 1
 );
 
+CREATE TABLE "Category" (
+    id text NOT NULL,
+    "clientId" text,
+    "name" text,
+    "description" text,
+    "subCategories" text[],
+    "createdBy" bigint,
+    "updatedBy" bigint,
+    "createdDateTime" TIMESTAMP DEFAULT CURRENT_TIMESTAMP,
+    "updatedDateTime" TIMESTAMP DEFAULT CURRENT_TIMESTAMP
+);
+
+
+ALTER TABLE "Category" OWNER TO postgres;
+
 
 
 -- Insert into DineinOrder
@@ -228,6 +243,21 @@ OVERRIDING SYSTEM VALUE VALUES
 
 
 
+(1009, 'samsung', 1, '{1012}', 'Screen 5inch', '5inch screen', 'Screen', 'digital', 100, 'number', 90, 8, 8, 106, 9000, 800, 800, 0, 11600),
+(1010, 'samsung', 1, '{1011,1013}', 'Screen 15inch', '15inch screen', 'Screen', 'digital', 100, 'number', 90, 8, 8, 106, 9000, 800, 800, 0, 11600),
+(1011, 'samsung', 1, NULL, 'Wiring 6mm', 'Wiring 6mm', 'Screen', 'digital', 100, 'number', 90, 8, 8, 106, 9000, 800, 800, 0, 11600),
+(1012, 'samsung', 1, NULL, 'Wiring 2mm', 'Wiring 2mm', 'Screen', 'digital', 100, 'number', 90, 8, 8, 106, 9000, 800, 800, 0, 11600),
+(1013, 'samsung', 1, '{1014, 1015}', 'PCB sheet', 'PCB sheet', 'Boards', 'digital', 100, 'number', 90, 8, 8, 106, 9000, 800, 800, 0, 11600),
+(1014, 'samsung', 1, NULL, 'transistors', 'PCB sheet', 'Boards', 'digital', 100, 'number', 90, 8, 8, 106, 9000, 800, 800, 0, 11600),
+(1015, 'samsung', 1, NULL, 'capacitor', 'PCB sheet', 'Boards', 'digital', 100, 'number', 90, 8, 8, 106, 9000, 800, 800, 0, 11600);
+
+
+(1016, 'easyfood', 1, NULL, 'Veg noodles', 'Veg gravy', 'Gravy', 'food', 100, 'number', 10, 9, 9, 28, 1000, 80, 80, 0, 11160),
+(1018, 'easyfood', 1, NULL, 'Raita', 'Plain raitha', 'Raitha', 'food', 100, 'number', 0, 0, 0, 0, 0, 0, 0, 0, 0),
+(1019, 'easyfood', 1, '{1002}', 'Rice bath', 'Plain rice bath', 'Rice', 'food', 100, 'number', 90, 8, 8, 106, 9000, 800, 800, 0, 10600),
+
+(1020, 'easyfood', 1, NULL, 'Veg noodles', 'Veg noodles', 'chinese_02', 'food', 100, 'number', 90, 8, 8, 106, 9000, 800, 800, 0, 11600);
+
 INSERT INTO "PageDefinition" (id, "clientId", module, role, "screenId", "loadType", operations) OVERRIDING SYSTEM VALUE VALUES (1001, 'easyfood', 'dinein', 'Admin', 'defaultDinein', 'include', '{ALL}');
 INSERT INTO "PageDefinition" (id, "clientId", module, role, "screenId", "loadType", operations) OVERRIDING SYSTEM VALUE VALUES (1003, 'easyfood', 'order', 'Admin', 'defaultOrder', 'include', '{ALL}');
 INSERT INTO "PageDefinition" (id, "clientId", module, role, "screenId", "loadType", operations) OVERRIDING SYSTEM VALUE VALUES (1005, 'easyfood', 'tables', 'Admin', 'defaultTables', 'include', '{ALL}');
@@ -237,3 +267,20 @@ INSERT INTO "PageDefinition" (id, "clientId", module, role, "screenId", "loadTyp
 
 
 INSERT INTO "User" (username, hashed_password, id, "clientId", roles, grants) OVERRIDING SYSTEM VALUE VALUES ('admin', '$2b$12$sKBSlLDTo4T7ce3cFk8ffO0LLlFzhkpOkGxFq3P4CcvrLBijZv7Ly', 1000, 'easyfood', '{Admin}', '{dinein,order,inventory,users,tables,invoice}');
+
+
+INSERT INTO "Category" (id, "clientId", "name", "description", "subCategories", "createdBy", "updatedBy") OVERRIDING SYSTEM VALUE VALUES 
+('chinese_01', 'easyfood', 'Chinese', 'Chinese delicious', '{"chinese_02", "chinese_03"}', '1000', '1000'),
+('chinese_02', 'easyfood', 'Noodles', 'Noodles special delicious',null, '1000', '1000'),
+('chinese_03', 'easyfood', 'Soups', 'Soups special delicious',null, '1000', '1000'),
+('northindian_01', 'easyfood', 'North Indian', 'North Indian Special', '{"northindian_meals_02", "northindian_breads_03", "northindian_gravy_04"}', '1000', '1000'),
+('northindian_meals_02', 'easyfood', 'North Meals', 'Unlimited north means', null, '1000', '1000'),
+('northindian_breads_03', 'easyfood', 'Breads', 'All roti and naans', null, '1000', '1000'),
+('northindian_gravy_04', 'easyfood', 'Gravy', 'All gravies of north indian style', '{"northindian_veg_05", "northindian_non_veg_06"}', '1000', '1000'),
+('northindian_veg_05', 'easyfood', 'Veg', 'Veg only', null, '1000', '1000'),
+('northindian_non_veg_06', 'easyfood', 'Non-Veg', 'Non vegeterian', null, '1000', '1000'),
+('l_bit_rod_01', 'ram_manufacturing', 'L_BIT_ROD', 'All bit rods', '{"red_wire_01", "switch_01"}', '1000', '1000'),
+('red_wire_01', 'ram_manufacturing', 'RED_WIRE', 'All red wires', null, '1000', '1000'),
+('switch_01', 'ram_manufacturing', 'SWITCH', 'All switches', null, '1000', '1000'),
+('switch_02', 'ram_manufacturing', 'DP SWITCH', 'All switches','{"red_wire_01"}' , '1000', '1000')
+;
