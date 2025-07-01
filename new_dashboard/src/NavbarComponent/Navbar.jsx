@@ -2,12 +2,17 @@ import React, { useEffect, useState } from 'react';
 import axios from 'axios';
 import { GiHamburgerMenu } from "react-icons/gi";
 import { FaHamburger, FaCashRegister } from "react-icons/fa";
-import { BiSolidSelectMultiple } from "react-icons/bi";
 import { MdOutlineMenuBook, MdOutlineRateReview } from "react-icons/md";
 import { FcComboChart } from "react-icons/fc";
 import { FaKitchenSet, FaFileInvoiceDollar } from "react-icons/fa6";
 import { useNavigate, useLocation } from 'react-router-dom';
 import { useTheme } from "../ThemeChangerComponent/ThemeContext";
+import { MdOutlineTableBar } from "react-icons/md";
+import { FaUserPlus } from "react-icons/fa6";
+import { FaTableCells } from "react-icons/fa6";
+import { FaRegMoneyBillAlt } from "react-icons/fa";
+
+
 
 const Navbar = () => {
     const nav = useNavigate();
@@ -67,12 +72,12 @@ const Navbar = () => {
                 <li className="menu-header"><span>Admin</span></li>
                 {isEnabled("Table Management") && (
                     <li title='Table Management' onClick={() => nav('/table-selection')} className={location.pathname === '/table-selection' ? 'page-active' : ''}>
-                        <BiSolidSelectMultiple /><span>Table Management</span>
+                        <MdOutlineTableBar /><span>Table Management</span>
                     </li>
                 )}
                 {isEnabled("Table Selection") && (
                     <li title='Table Selection' onClick={() => nav('/view-tables')} className={location.pathname.startsWith('/view-tables') ? 'page-active' : ''}>
-                        <BiSolidSelectMultiple /><span>Table Selection</span>
+                        <FaTableCells /><span>Table Selection</span>
                     </li>
                 )}
                 {isEnabled("Menu") && (
@@ -107,12 +112,12 @@ const Navbar = () => {
                 )}
                 {isEnabled("KOT bill") && (
                     <li title='KOT bill' onClick={() => nav('/customer-reviews')} className={location.pathname === '/customer-reviews' ? 'page-active' : ''}>
-                        <MdOutlineRateReview /><span>KOT bill</span>
+                        <FaRegMoneyBillAlt /><span>KOT bill</span>
                     </li>
                 )}
                 {isEnabled("Add Users") && (
                     <li title='Add Users' onClick={() => nav('/add-users')} className={location.pathname === '/add-users' ? 'page-active' : ''}>
-                        <MdOutlineRateReview /><span>+Add Users</span>
+                        <FaUserPlus /><span>Add Users</span>
                     </li>
                 )}
             </ul>

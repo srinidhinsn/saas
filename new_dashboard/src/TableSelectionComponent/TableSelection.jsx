@@ -1,5 +1,4 @@
 import React, { useEffect, useState } from "react";
-import axios from "axios";
 import { FiSun, FiMoon } from "react-icons/fi";
 import { useTheme } from "../ThemeChangerComponent/ThemeContext";
 import { FaEdit, FaTrash, FaCheck, FaTimes } from "react-icons/fa";
@@ -9,7 +8,6 @@ import api from '../PortExportingPage/api'
 const TableSelection = () => {
     const clientId = localStorage.getItem("clientId");
     const { darkMode, toggleTheme } = useTheme();
-
     const [tableRanges, setTableRanges] = useState([]);
     const [tables, setTables] = useState([]);
     const [originalTables, setOriginalTables] = useState([]);
@@ -53,9 +51,10 @@ const TableSelection = () => {
                 const prefixStart = startStr.match(/[A-Za-z]+/);
                 const startNum = startStr.match(/\d+/);
                 const endNum = endStr.match(/\d+/);
+
                 if (!prefixStart || !startNum || !endNum) continue;
 
-                const prefix = prefixStart[0];
+                const prefix = prefixStart[0].toUpperCase();
                 const start = parseInt(startNum[0]);
                 const end = parseInt(endNum[0]);
 
@@ -66,7 +65,9 @@ const TableSelection = () => {
                 const prefix = part.match(/[A-Za-z]+/);
                 const num = part.match(/\d+/);
                 if (!prefix || !num) continue;
-                tables.push(`${prefix[0]}${parseInt(num[0]).toString().padStart(2, '0')}`);
+
+                const formatted = `${prefix[0].toUpperCase()}${parseInt(num[0]).toString().padStart(2, '0')}`;
+                tables.push(formatted);
             }
         }
 

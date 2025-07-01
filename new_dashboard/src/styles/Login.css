@@ -47,11 +47,11 @@ label {
 }
 
 .Register-pages input,
-select {
+.Register-pages select {
     background: #f9f9fb;
     border: 1px solid #ccc;
     border-radius: 6px;
-    /* padding: 12px 14px; */
+    padding: 12px 14px;
     font-size: 14px;
     width: 100%;
     transition: border 0.2s ease;
@@ -71,7 +71,7 @@ select:focus {
     color: #ffffff;
     font-size: 14px;
     font-weight: 600;
-    /* padding: 12px; */
+    padding: 12px;
     text-transform: uppercase;
     cursor: pointer;
     transition: background 0.3s ease, transform 0.1s ease;

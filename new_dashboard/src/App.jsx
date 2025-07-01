@@ -2,11 +2,9 @@ import './App.css';
 import React, { useState, useEffect } from 'react';
 import { Routes, Route, Navigate, useLocation, BrowserRouter } from 'react-router-dom';
 import axios from 'axios';
-
 import Navbar from './NavbarComponent/Navbar';
 import MainPage from './MainComponent/MainPage';
 import TableSelection from './TableSelectionComponent/TableSelection';
-import MenuPage from './MenuComponents/MenuPage';
 import ComboPage from './ComboComponents/ComboPage';
 import OrderForm from './OrderComponents/OrderForm';
 import KitchenDisplay from './KDS/KitchenDisplay';
@@ -16,10 +14,17 @@ import ViewTables from './TableSelectionComponent/ViewTables';
 import TableOverview from './TableOverviewComponents/TableOverview';
 import OrdersVisiblePage from './OrderComponents/OrdersVisiblePage';
 import DisplayMenuManager from './MenuComponents/DisplayMenuManager';
-import MenuManager from './MenuComponents/DisplayMenuManager';
 import Login from './pages/Login';
 import Register from './pages/Register';
 import ForgotPassword from './pages/ForgotPassword';
+import './styles/MenuStylings.css'
+import MenuManager from './MenuComponents/MenuManager';
+import SwiggyMenuManager from './MenuComponents/SwiggyMenuManager';
+import ZomatoMenuManager from './MenuComponents/ZomatoManager';
+
+import MenuTypeSelector from './MenuComponents/MenuTypeSelector'
+
+
 
 const App = () => {
   const [clientId, setClientId] = useState(() => localStorage.getItem("clientId") || "");
@@ -78,6 +83,10 @@ const App = () => {
           <Route path="/register" element={<Register />} />
           <Route path="/login" element={<Login />} />
           <Route path="/forgot" element={<ForgotPassword />} />
+          {/* <Route  /> */}
+          <Route path="/dinein-page" element={<MenuManager clientId={clientId} />} />
+          <Route path="/swiggy-page" element={<SwiggyMenuManager clientId={clientId} />} />
+          <Route path="/zomato-page" element={<ZomatoMenuManager clientId={clientId} />} />
 
           {isEnabled("Table Management") && (
             <Route
@@ -98,12 +107,9 @@ const App = () => {
             <>
               <Route
                 path="/menu-page"
-                element={<MenuManager clientId={clientId} onAdd={() => { }} />}
+                element={<MenuTypeSelector clientId={clientId} onAdd={() => { }} />}
               />
-              <Route
-                path="/display-menu"
-                element={<DisplayMenuManager clientId={clientId} />}
-              />
+
             </>
           )}
 

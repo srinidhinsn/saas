@@ -233,7 +233,6 @@
 
 
 import React, { useEffect, useState } from "react";
-import axios from "axios";
 import { useTheme } from "../ThemeChangerComponent/ThemeContext";
 import OrderForm from "../OrderComponents/OrderForm";
 import { useNavigate, useParams, useSearchParams } from "react-router-dom";
@@ -256,13 +255,20 @@ const ViewTables = ({ onOrderUpdate, clientId }) => {
 
     useEffect(() => {
         if (!clientId) return;
+
         api.get(`/${clientId}/tables`).then(res => setTables(res.data));
+
         api.get(`/${clientId}/menu/categories`).then(res => {
-            setCategories(res.data);
-            setActiveCategory(res.data[0]?.id || null);
+            const allCategory = { id: "all", name: "All" }; // fake one for UI filter
+            const filteredCategories = res.data.filter(cat => cat.name.toLowerCase() !== "all"); // remove real All
+            setCategories([allCategory, ...filteredCategories]);
+            setActiveCategory("all");
         });
+
+
         api.get(`/${clientId}/menu/items`).then(res => setItems(res.data));
     }, [clientId]);
+
 
     useEffect(() => {
         if (tableId) {
@@ -303,11 +309,19 @@ const ViewTables = ({ onOrderUpdate, clientId }) => {
     };
 
     const getFilteredItems = () => {
+        if (activeCategory === "all") {
+            return items.filter(i =>
+                i.name.toLowerCase().includes(searchTerm.toLowerCase())
+            );
+        }
+
         return items.filter(
-            i => i.category_id === activeCategory &&
+            i =>
+                i.category_id === activeCategory &&
                 i.name.toLowerCase().includes(searchTerm.toLowerCase())
         );
     };
+
 
     const handleModeClick = (mode) => {
         setSearchParams({ mode });
@@ -345,6 +359,7 @@ const ViewTables = ({ onOrderUpdate, clientId }) => {
                         <div className="zone-group" key={zone}>
                             <h3 className="zone-title">{zone}</h3>
                             <div className="zone-section">
+
                                 {tables.filter(t => t.location_zone === zone).map(table => (
                                     <div
                                         key={table.id}
@@ -375,6 +390,8 @@ const ViewTables = ({ onOrderUpdate, clientId }) => {
                                 />
                             </div>
                             <ul className="category-list">
+
+
                                 {categories.map(cat => (
                                     <li
                                         key={cat.id}

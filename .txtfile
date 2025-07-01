@@ -1,0 +1,11 @@
+Table Management-----Remarks and one more field 
+Table Selection----- delivery and pickup backend codes,split payment ,cash payment and balance,customer info,kot,bill,ebill,upi,card
+
+
+
+
+
+Admin dashboard
+create ,update clients,subscription dates,bill status,clientid,all other details like fssai,license,aadhar ,pan,address,gst number,email and more
+
+assign features-all our features duration and previously assigned,compulsory features for that one database and microservice

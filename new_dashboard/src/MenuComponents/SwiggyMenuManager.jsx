@@ -1,60 +1,7 @@
-// import React, { useState } from "react";
-// import CategoryList from "./CategoryList";
-// import MenuItemList from './MenuList'
-// import AddCategoryForm from "./AddCategory";
-
-// function MenuManager({ clientId }) {
-//   const [selectedCategory, setSelectedCategory] = useState(null);
-//   const [showAddCategoryForm, setShowAddCategoryForm] = useState(false);
-
-//   const handleAddCategoryClick = () => {
-//     setSelectedCategory(null);
-//     setShowAddCategoryForm(true);
-//   };
-
-//   const handleCategorySelect = (category) => {
-//     setSelectedCategory(category);
-//     setShowAddCategoryForm(false);
-//   };
-
-//   const handleCategoryAdded = (newCategory) => {
-//     setSelectedCategory(newCategory);
-//     setShowAddCategoryForm(false);
-//   };
-
-//   return (
-//     <div className="menu-manager-container" >
-//       {/* Sidebar stays fixed height and scrolls independently if needed */}
-//       <div className="menu-category-sidebar ">
-//         <CategoryList
-//           clientId={clientId}
-//           onCategorySelect={handleCategorySelect}
-//           onAddCategoryClick={handleAddCategoryClick}
-//         />
-//       </div>
-
-//       {/* Main area is scrollable independently */}
-//       <div style={{ flex: 1, overflowY: "auto" }}>
-//         {showAddCategoryForm ? (
-//           <AddCategoryForm
-//             clientId={clientId}
-//             onAdd={handleCategoryAdded}
-//             onCancel={() => setShowAddCategoryForm(false)}
-//           />
-//         ) : (
-//           <MenuItemList clientId={clientId} category={selectedCategory} />
-//         )}
-//       </div>
-//     </div>
-//   );
-// }
-
-// export default MenuManager;
-
 
 import React, { useState, useEffect } from "react";
 import CategoryList from "./CategoryList";
-import MenuItemList from "./MenuList";
+import SwiggyMenuItemList from "./SwiggyMenuList";
 import AddCategoryForm from "./AddCategory";
 import AddonLayout from "./AddOnLayout";
 // Placeholder components
@@ -128,7 +75,7 @@ function MenuManager({ clientId }) {
                   onCancel={() => setShowAddCategoryForm(false)}
                 />
               ) : (
-                <MenuItemList
+                <SwiggyMenuItemList
                   clientId={clientId}
                   category={selectedCategory}
                 />
