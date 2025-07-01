@@ -1,0 +1,114 @@
+pip uninstall psycopg2 psycopg2-binary -y
+pip install psycopg2-binary==2.9.9
+
+pip install psycopg2-binary --force-reinstall --no-cache-dir
+
+pip install pydantic-settings
+
+
+CREATE TABLE tables (
+    id UUID PRIMARY KEY,
+    client_id UUID NOT NULL,
+    table_number VARCHAR(50) NOT NULL,
+    table_type VARCHAR(50),
+    status VARCHAR(20) DEFAULT 'Vacant',
+    location_zone VARCHAR(50),
+    qr_code_url TEXT,
+    created_at TIMESTAMP DEFAULT CURRENT_TIMESTAMP,
+    updated_at TIMESTAMP DEFAULT CURRENT_TIMESTAMP,
+    UNIQUE (client_id, table_number)
+);
+
+CREATE TABLE menu_categories (
+    id UUID PRIMARY KEY,
+    client_id UUID NOT NULL,
+    name VARCHAR(100) NOT NULL,
+    description TEXT,
+    created_at TIMESTAMP DEFAULT CURRENT_TIMESTAMP,
+    updated_at TIMESTAMP DEFAULT CURRENT_TIMESTAMP,
+    UNIQUE (client_id, name)
+);
+
+CREATE TABLE menu_items (
+    id UUID PRIMARY KEY,
+    client_id UUID NOT NULL,
+    category_id UUID NOT NULL,
+    name VARCHAR(100) NOT NULL,
+    description TEXT,
+    price NUMERIC(10, 2) NOT NULL,
+    is_available BOOLEAN DEFAULT TRUE,
+    image_url TEXT,
+    created_at TIMESTAMP DEFAULT CURRENT_TIMESTAMP,
+    updated_at TIMESTAMP DEFAULT CURRENT_TIMESTAMP,
+    FOREIGN KEY (category_id) REFERENCES menu_categories(id) ON DELETE CASCADE
+);
+
+CREATE TABLE menu_combos (
+    id UUID PRIMARY KEY,
+    client_id UUID NOT NULL,
+    name VARCHAR(100) NOT NULL,
+    description TEXT,
+    price NUMERIC(10, 2) NOT NULL,
+    created_at TIMESTAMP DEFAULT CURRENT_TIMESTAMP,
+    updated_at TIMESTAMP DEFAULT CURRENT_TIMESTAMP
+);
+
+CREATE TABLE menu_combo_items (
+    id UUID PRIMARY KEY,
+    combo_id UUID NOT NULL,
+    menu_item_id UUID NOT NULL,
+    quantity INTEGER DEFAULT 1,
+    FOREIGN KEY (combo_id) REFERENCES menu_combos(id) ON DELETE CASCADE,
+    FOREIGN KEY (menu_item_id) REFERENCES menu_items(id) ON DELETE CASCADE
+);
+
+CREATE TABLE IF NOT EXISTS orders (
+    id UUID PRIMARY KEY DEFAULT gen_random_uuid(),
+    client_id UUID NOT NULL,
+    table_id UUID NOT NULL,
+    status VARCHAR(20) DEFAULT 'pending',
+    created_at TIMESTAMP DEFAULT CURRENT_TIMESTAMP,
+    FOREIGN KEY (table_id) REFERENCES tables(id) ON DELETE CASCADE
+);
+
+CREATE TABLE IF NOT EXISTS order_items (
+    id UUID PRIMARY KEY DEFAULT gen_random_uuid(),
+    order_id UUID NOT NULL,
+    item_id UUID NOT NULL,
+    item_type VARCHAR(10) NOT NULL CHECK (item_type IN ('item', 'combo')),
+    quantity INTEGER NOT NULL,
+    FOREIGN KEY (order_id) REFERENCES orders(id) ON DELETE CASCADE
+);
+
+
+64a873ab-bf3c-4bcc-a6d0-97b21edd2b78
+
+6d3c9198-7964-4b8d-bc9a-7df39f791667
+
+	
+
+
+
+
+
+
+
+
+
+
+
+
+
+
+
+
+
+
+
+
+
+
+
+
+
+

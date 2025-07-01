@@ -1,0 +1,2 @@
+admin dashboard frontend 5173,9000,
+website 5174,8000

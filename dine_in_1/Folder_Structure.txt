@@ -1,0 +1,24 @@
+dine_in_service/
+│
+├── app/
+│   ├── api/
+│   │   ├── v1/
+│   │   │   ├── endpoints/
+│   │   │   │   └── tables.py
+│   │   │   └── api_router.py
+│   ├── core/
+│   │   ├── config.py         # environment & settings
+│   │   └── constants.py      # dynamic values, names, URLs
+│   ├── crud/
+│   │   └── table_crud.py
+│   ├── models/
+│   │   └── table.py
+│   ├── schemas/
+│   │   └── table.py
+│   ├── services/
+│   │   └── table_service.py
+│   ├── main.py
+│
+├── alembic/                 # DB migrations
+├── requirements.txt
+└── .env

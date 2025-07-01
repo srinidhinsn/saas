@@ -1,0 +1,141 @@
+.client-page {
+    padding: 2rem;
+    background: linear-gradient(to bottom, #eef2f3, #ffffff);
+    font-family: "Segoe UI", sans-serif;
+}
+
+.client-header {
+    display: flex;
+    justify-content: space-between;
+    align-items: center;
+    flex-wrap: wrap;
+    gap: 1rem;
+    margin-bottom: 2rem;
+}
+
+.client-header h2 {
+    font-size: 1.8rem;
+    font-weight: 600;
+    color: #222;
+}
+
+.client-tools {
+    display: flex;
+    gap: 1rem;
+    align-items: center;
+    flex-wrap: wrap;
+}
+
+.search-box {
+    display: flex;
+    align-items: center;
+    background: #fff;
+    border: 1px solid #ddd;
+    padding: 0.5rem 1rem;
+    border-radius: 8px;
+    box-shadow: 0 2px 5px rgba(0, 0, 0, 0.06);
+}
+
+.search-box input {
+    border: none;
+    outline: none;
+    padding-left: 0.5rem;
+    font-size: 14px;
+}
+
+.sort-btn,
+.add-client-btn {
+    padding: 0.5rem 1rem;
+    border: none;
+    border-radius: 6px;
+    font-size: 14px;
+    cursor: pointer;
+    display: flex;
+    align-items: center;
+    gap: 0.5rem;
+    background: #f0f4ff;
+    color: #333;
+    transition: all 0.2s ease;
+}
+
+.add-client-btn {
+    background: #3a82f7;
+    color: white;
+}
+
+.add-client-btn:hover {
+    background: #2d6ae6;
+}
+
+.client-grid {
+    display: grid;
+    grid-template-columns: repeat(auto-fill, minmax(280px, 1fr));
+    gap: 1.5rem;
+}
+
+.client-card {
+    background: rgba(255, 255, 255, 0.85);
+    backdrop-filter: blur(4px);
+    border-radius: 12px;
+    padding: 1.2rem;
+    box-shadow: 0 4px 12px rgba(0, 0, 0, 0.05);
+    transition: transform 0.2s ease;
+    cursor: pointer;
+    border: 1px solid #e6e6e6;
+}
+
+.client-card:hover {
+    transform: scale(1.015);
+    box-shadow: 0 6px 16px rgba(0, 0, 0, 0.1);
+}
+
+.client-info h3 {
+    margin: 0;
+    font-size: 1.2rem;
+    color: #222;
+}
+
+.client-info .services {
+    color: #555;
+    font-size: 14px;
+    margin-top: 0.25rem;
+}
+
+.client-meta {
+    display: flex;
+    justify-content: space-between;
+    align-items: center;
+    margin-top: 0.8rem;
+    font-size: 13px;
+    color: #444;
+}
+
+.badge {
+    background: #eff6ff;
+    color: #1d4ed8;
+    padding: 0.25rem 0.5rem;
+    border-radius: 12px;
+    font-size: 12px;
+}
+
+.client-action {
+    margin-top: 1rem;
+    text-align: right;
+}
+
+.view-icon {
+    font-size: 1.2rem;
+    color: #555;
+    transition: color 0.2s ease;
+}
+
+.view-icon:hover {
+    color: #1d4ed8;
+}
+
+.empty-msg {
+    font-size: 1rem;
+    color: #777;
+    text-align: center;
+    padding: 3rem;
+}

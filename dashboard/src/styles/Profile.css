@@ -1,0 +1,344 @@
+/* -------- Base Layout -------- */
+.profile-page {
+    padding: 20px;
+    font-family: 'Segoe UI', sans-serif;
+    background: #f7f9fb;
+}
+
+/* -------- Header -------- */
+.profile-header {
+    display: flex;
+    flex-wrap: wrap;
+    justify-content: space-between;
+    align-items: center;
+    gap: 12px;
+    margin-bottom: 20px;
+}
+
+.action-buttons {
+    display: flex;
+    flex-wrap: wrap;
+    gap: 10px;
+}
+
+.action-buttons button {
+    background: white;
+    border: 1px solid #ddd;
+    padding: 8px 14px;
+    border-radius: 6px;
+    cursor: pointer;
+    display: flex;
+    align-items: center;
+    gap: 6px;
+    font-size: 0.9rem;
+}
+
+.action-buttons .primary {
+    background-color: #ff5722;
+    color: white;
+    border: none;
+}
+
+/* -------- Table Layout -------- */
+/* -------- Table Container -------- */
+.profile-table {
+    overflow-x: auto;
+    background: #fcfbf9;
+    border-radius: 14px;
+    box-shadow: 0 2px 10px rgba(180, 160, 130, 0.15);
+    margin-bottom: 24px;
+    padding: 6px;
+}
+
+/* -------- Table Structure -------- */
+table {
+    width: 100%;
+    border-collapse: separate;
+    border-spacing: 0;
+    min-width: 950px;
+    background-color: #fefcfb;
+    border-radius: 12px;
+    overflow: hidden;
+    font-family: 'Segoe UI', sans-serif;
+}
+
+th {
+    text-transform: uppercase;
+    font-size: 0.78rem;
+    background: #f3f0ed;
+    font-weight: 600;
+    color: #6b5e53;
+    padding: 14px 16px;
+    border-bottom: 2px solid #e3ded9;
+    position: sticky;
+    top: 0;
+    z-index: 1;
+    letter-spacing: 0.5px;
+    white-space: nowrap;
+}
+
+td {
+    font-size: 0.95rem;
+    padding: 14px 16px;
+    color: #2f2b26;
+    background-color: #fefdfc;
+    border-bottom: 1px solid #eae6e2;
+    vertical-align: middle;
+}
+
+/* -------- Row Hover -------- */
+tr:hover td {
+    background-color: #f8f4f0;
+    transition: background 0.2s ease;
+}
+
+/* -------- Stripe Rows -------- */
+tr:nth-child(even) td {
+    background-color: #f9f7f4;
+}
+
+/* -------- Rounded Corners for First and Last Columns -------- */
+td:first-child,
+th:first-child {
+    border-top-left-radius: 12px;
+    border-bottom-left-radius: 12px;
+}
+
+td:last-child,
+th:last-child {
+    border-top-right-radius: 12px;
+    border-bottom-right-radius: 12px;
+}
+
+/* -------- Status Indicators -------- */
+.active {
+    color: #2e7d32;
+    font-weight: 600;
+}
+
+.inactive {
+    color: #a32727;
+    font-weight: 600;
+}
+
+.expired {
+    background: #fbeaea;
+    color: #943232;
+    padding: 4px 10px;
+    border-radius: 16px;
+    font-size: 0.8rem;
+}
+
+.tag.days-left {
+    background: #f1eee8;
+    color: #6b4f3f;
+    padding: 4px 10px;
+    border-radius: 16px;
+    font-size: 0.8rem;
+    font-weight: 500;
+}
+
+/* -------- Action Icons -------- */
+td svg {
+    font-size: 1.1rem;
+    color: #66604f;
+    transition: transform 0.2s, color 0.2s;
+}
+
+td svg:hover {
+    color: #000;
+    transform: scale(1.1);
+}
+
+/* -------- Responsive Table Adjustments -------- */
+@media (max-width: 768px) {
+    table {
+        font-size: 0.87rem;
+        min-width: 100%;
+    }
+
+    td,
+    th {
+        padding: 12px;
+    }
+
+    .action-buttons {
+        flex-direction: column;
+        gap: 8px;
+    }
+}
+
+
+/* -------- Modal Styling -------- */
+.modal-overlay {
+    position: fixed;
+    inset: 0;
+    background: rgba(0, 0, 0, 0.5);
+    display: flex;
+    align-items: center;
+    justify-content: center;
+    z-index: 1000;
+}
+
+.modal-box {
+    background: #ffffff;
+    border-radius: 14px;
+    padding: 28px 24px;
+    max-width: 520px;
+    width: 92%;
+    box-shadow: 0 12px 32px rgba(0, 0, 0, 0.2);
+    animation: fadeIn 0.2s ease-out;
+}
+
+@keyframes fadeIn {
+    from {
+        transform: scale(0.95);
+        opacity: 0;
+    }
+
+    to {
+        transform: scale(1);
+        opacity: 1;
+    }
+}
+
+.modal-box h3 {
+    margin: 0 0 16px;
+    font-size: 1.4rem;
+    color: #333;
+}
+
+.modal-content {
+    display: flex;
+    flex-direction: column;
+    gap: 18px;
+    max-height: 65vh;
+    overflow-y: auto;
+    margin-bottom: 24px;
+}
+
+.modal-section-title {
+    font-size: 1.1rem;
+    font-weight: 600;
+    color: #444;
+    margin-bottom: 6px;
+    border-bottom: 1px solid #eee;
+    padding-bottom: 4px;
+    margin-top: 12px;
+}
+
+.field-row {
+    display: flex;
+    flex-direction: column;
+}
+
+.field-row label {
+    font-size: 0.85rem;
+    font-weight: 500;
+    color: #555;
+    margin-bottom: 6px;
+}
+
+.input-with-copy {
+    display: flex;
+    align-items: center;
+    gap: 8px;
+}
+
+.input-with-copy input,
+.modal-content input,
+.modal-box select {
+    flex: 1;
+    padding: 9px 12px;
+    border: 1px solid #ccc;
+    border-radius: 6px;
+    font-size: 0.95rem;
+    background: #fafafa;
+    transition: border-color 0.3s ease;
+}
+
+.input-with-copy input:focus,
+.modal-content input:focus,
+.modal-box select:focus {
+    border-color: #007bff;
+    outline: none;
+    background: #fff;
+}
+
+.copy-btn {
+    padding: 7px 10px;
+    background-color: #f4f4f4;
+    border: 1px solid #bbb;
+    border-radius: 6px;
+    cursor: pointer;
+    font-size: 0.85rem;
+    color: #444;
+    transition: background 0.2s ease;
+}
+
+.copy-btn:hover {
+    background-color: #e0e0e0;
+}
+
+.modal-actions {
+    display: flex;
+    justify-content: flex-end;
+    gap: 10px;
+    margin-top: 12px;
+}
+
+.save-btn,
+.cancel-btn {
+    padding: 10px 18px;
+    border-radius: 6px;
+    font-weight: 500;
+    font-size: 0.95rem;
+    cursor: pointer;
+    border: none;
+    transition: background 0.2s ease;
+}
+
+.save-btn {
+    background-color: #007bff;
+    color: #fff;
+}
+
+.save-btn:hover {
+    background-color: #0062d2;
+}
+
+.cancel-btn {
+    background-color: #e0e0e0;
+    color: #333;
+}
+
+.cancel-btn:hover {
+    background-color: #c9c9c9;
+}
+
+/* -------- Responsive -------- */
+@media (max-width: 768px) {
+    .profile-header {
+        flex-direction: column;
+        align-items: flex-start;
+    }
+
+    .action-buttons {
+        width: 100%;
+        justify-content: flex-start;
+    }
+
+    table {
+        font-size: 0.9rem;
+        min-width: 100%;
+    }
+
+    .modal-box {
+        padding: 20px;
+        width: 95%;
+    }
+
+    .modal-content {
+        max-height: 60vh;
+    }
+}
