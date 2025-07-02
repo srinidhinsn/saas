@@ -1,115 +1,134 @@
 from fastapi import APIRouter, Depends, HTTPException
 from sqlalchemy.orm import Session
-from uuid import UUID
 from typing import List
-from database import get_db
-
-from common_lib.models.menu_model import *
-from common_lib.models.menu_entity import Item as ItemModel,  ItemCategory as ItemCategoryModel # SQLAlchemy model
+from database.postgres import get_db
+from models.item_model import ItemCategoryModel, ItemModel
+from entity.item_entity import ItemCategoryEntity, ItemEntity
+from models.response_model import ResponseModel
+from models.saas_context import SaasContext
+from utils.auth import verify_token
 
 router = APIRouter()
 
-# --------------- Item Category ---------------- #
+# -------------------------- CATEGORY ROUTES --------------------------
 
-# Get Categories
-@router.get("/{clientid}/menu/categories", response_model=List[ItemCategory])
-def list_categories(clientid: UUID, db: Session = Depends(get_db)):
-    return db.query(ItemCategoryModel).filter(ItemCategoryModel.client_id == clientid).all()
+@router.get("/read", response_model=ResponseModel[List[ItemCategoryModel]])
+def read_categories(client_id: str, context: SaasContext = Depends(verify_token), db: Session = Depends(get_db)):
+    categories = db.query(ItemCategoryEntity).filter(ItemCategoryEntity.client_id == client_id).all()
+    models     = ItemCategoryEntity.copyToModels(categories)
+    return ResponseModel(screenId=context.screenId, status="success", message="Fetched categories", data=models)
 
-# Create Categories
-@router.post("/{clientid}/menu/categories/create", response_model=ItemCategory)
-def add_category(clientid: UUID, cat: ItemCategory, db: Session = Depends(get_db)):
-    if clientid != cat.client_id:
-        raise HTTPException(status_code=400, detail="Client ID mismatch")
-    db_category = ItemCategoryModel(**cat.dict())
+
+@router.post("/create", response_model=ResponseModel[ItemCategoryModel])
+def create_category(client_id: str, category: ItemCategoryModel, context: SaasContext = Depends(verify_token), db: Session = Depends(get_db)):
+    if category.client_id != client_id or client_id != context.client_id:
+        raise HTTPException(status_code=400, detail="Client ID mismatch or unauthorized")
+
+    db_category = ItemCategoryEntity(**category.dict())
     db.add(db_category)
     db.commit()
     db.refresh(db_category)
-    return db_category
 
-# Update Categories
-@router.post("/{clientid}/menu/categories/update", response_model=ItemCategory)
-def edit_category(clientid: UUID, category: ItemCategory, db: Session = Depends(get_db)):
-    if not category.id:
+    model = ItemCategoryEntity.copyToModel(db_category)
+
+    return ResponseModel(screenId=context.screenId, status="success", message="Category created", data=model)
+
+
+@router.post("/update", response_model=ResponseModel[ItemCategoryModel])
+def update_category(client_id: str, updates: ItemCategoryModel, context: SaasContext = Depends(verify_token), db: Session = Depends(get_db)):
+    if not updates.id:
         raise HTTPException(status_code=400, detail="Missing category ID")
-    
-    db_cat = db.query(ItemCategoryModel).filter_by(id=category.id, client_id=clientid).first()
-    if not db_cat:
-        raise HTTPException(status_code=404, detail="Category not found")
-    
-    for key, value in category.dict(exclude_unset=True).items():
-        setattr(db_cat, key, value)
-    
-    db.commit()
-    db.refresh(db_cat)
-    return db_cat
+    if client_id != context.client_id:
+        raise HTTPException(status_code=403, detail="Unauthorized")
 
-# Delete Categories
-@router.post("/{clientid}/menu/categories/delete", response_model=ItemCategory)
-def remove_category(clientid: UUID, category: ItemCategory, db: Session = Depends(get_db)):
-    if not category.id:
-        raise HTTPException(status_code=400, detail="Missing category ID")
-
-    db_cat = db.query(ItemCategoryModel).filter_by(id=category.id, client_id=clientid).first()
-    if not db_cat:
+    db_category = db.query(ItemCategoryEntity).filter(ItemCategoryEntity.id == updates.id, ItemCategoryEntity.client_id == client_id).first()
+    if not db_category:
         raise HTTPException(status_code=404, detail="Category not found")
 
-    db.delete(db_cat)
+    for key, value in updates.dict(exclude_unset=True).items():
+        setattr(db_category, key, value)
     db.commit()
-    return db_cat
+    db.refresh(db_category)
 
-# --------------- Item --------------- #
+    model = ItemCategoryEntity.copyToModel(db_category)
 
-@router.get("/{clientid}/menu/items", response_model=List[Item])
-def list_items(clientid: UUID, db: Session = Depends(get_db)):
-    return db.query(ItemModel).filter(ItemModel.client_id == clientid).all()
+    return ResponseModel(screenId=context.screenId, status="success", message="Category updated", data=model)
 
-@router.post("/{clientid}/menu/items/create", response_model=Item)
-def add_item(clientid: UUID, item: Item, db: Session = Depends(get_db)):
-    if clientid != item.client_id:
-        raise HTTPException(status_code=400, detail="Client ID mismatch")
 
-    db_item = ItemModel(**item.dict(exclude_unset=True))
+@router.post("/delete", response_model=ResponseModel[ItemCategoryModel])
+def delete_category(client_id: str, category: ItemCategoryModel, context: SaasContext = Depends(verify_token), db: Session = Depends(get_db)):
+    if client_id != context.client_id:
+        raise HTTPException(status_code=403, detail="Unauthorized")
+
+    db_category = db.query(ItemCategoryEntity).filter(ItemCategoryEntity.id == category.id, ItemCategoryEntity.client_id == client_id).first()
+    if not db_category:
+        raise HTTPException(status_code=404, detail="Category not found")
+
+    db.delete(db_category)
+    db.commit()
+
+    model = ItemCategoryEntity.copyToModel(db_category)
+
+    return ResponseModel(screenId=context.screenId, status="success", message="Category deleted", data=model)
+
+
+# -------------------------- ITEM ROUTES --------------------------
+
+@router.get("/items/read", response_model=ResponseModel[List[ItemModel]])
+def read_items(client_id: str, context: SaasContext = Depends(verify_token), db: Session = Depends(get_db)):
+    items  = db.query(ItemEntity).filter(ItemEntity.client_id == client_id).all()
+    models = ItemEntity.copyToModels(items)
+    return ResponseModel(screenId=context.screenId, status="success", message="Fetched items", data=models)
+
+
+@router.post("/items/create", response_model=ResponseModel[ItemModel])
+def create_item(client_id: str, item: ItemModel, context: SaasContext = Depends(verify_token), db: Session = Depends(get_db)):
+    if item.client_id != client_id or client_id != context.client_id:
+        raise HTTPException(status_code=400, detail="Client ID mismatch or unauthorized")
+
+    db_item = ItemEntity(**item.dict())
     db.add(db_item)
     db.commit()
     db.refresh(db_item)
-    return db_item
 
-@router.post("/{clientid}/menu/items/update", response_model=Item)
-def edit_item(clientid: UUID, updates: Item, db: Session = Depends(get_db)):
+    model = ItemEntity.copyToModel(db_item)
+
+    return ResponseModel(screenId=context.screenId, status="success", message="Item created", data=model)
+
+
+@router.post("/items/update", response_model=ResponseModel[ItemModel])
+def update_item(client_id: str, updates: ItemModel, context: SaasContext = Depends(verify_token), db: Session = Depends(get_db)):
     if not updates.id:
-        raise HTTPException(status_code=400, detail="Missing item ID in body")
+        raise HTTPException(status_code=400, detail="Missing item ID")
+    if client_id != context.client_id:
+        raise HTTPException(status_code=403, detail="Unauthorized")
 
-    db_item = db.query(ItemModel).filter_by(id=updates.id, client_id=clientid).first()
+    db_item = db.query(ItemEntity).filter(ItemEntity.id == updates.id, ItemEntity.client_id == client_id).first()
     if not db_item:
         raise HTTPException(status_code=404, detail="Item not found")
 
     for key, value in updates.dict(exclude_unset=True).items():
         setattr(db_item, key, value)
-
     db.commit()
     db.refresh(db_item)
-    return db_item
 
-@router.post("/{clientid}/menu/items/delete", response_model=Item)
-def remove_item(clientid: UUID, item_id: UUID, db: Session = Depends(get_db)):
-    db_item = db.query(ItemModel).filter_by(id=item_id, client_id=clientid).first()
+    model = ItemEntity.copyToModel(db_item)
+
+    return ResponseModel(screenId=context.screenId, status="success", message="Item updated", data=model)
+
+
+@router.post("/items/delete", response_model=ResponseModel[ItemModel])
+def delete_item(client_id: str, item: ItemModel, context: SaasContext = Depends(verify_token), db: Session = Depends(get_db)):
+    if client_id != context.client_id:
+        raise HTTPException(status_code=403, detail="Unauthorized")
+
+    db_item = db.query(ItemEntity).filter(ItemEntity.id == item.id, ItemEntity.client_id == client_id).first()
     if not db_item:
         raise HTTPException(status_code=404, detail="Item not found")
 
     db.delete(db_item)
     db.commit()
-    return db_item
 
+    model = ItemEntity.copyToModel(db_item)
 
-
-
-
-
-
-
-
-
-
-
-
+    return ResponseModel(screenId=context.screenId, status="success", message="Item deleted", data=model)

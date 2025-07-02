@@ -15,3 +15,49 @@ CREATE TABLE IF NOT EXISTS public.tables (
     created_at     TIMESTAMP WITHOUT TIME ZONE DEFAULT CURRENT_TIMESTAMP,
     updated_at     TIMESTAMP WITHOUT TIME ZONE DEFAULT CURRENT_TIMESTAMP
 );
+
+CREATE TABLE IF NOT EXISTS public.item_categories (
+    id BIGSERIAL PRIMARY KEY,
+    client_id TEXT NOT NULL,
+    name TEXT NOT NULL,
+    slug TEXT UNIQUE,
+    description TEXT,
+    image_url TEXT,
+    sort_order INTEGER,
+    parent_id TEXT,
+    kds_section TEXT,
+    is_active BOOLEAN NOT NULL DEFAULT TRUE,
+    created_by TEXT,
+    updated_by TEXT,
+    created_at TIMESTAMP DEFAULT CURRENT_TIMESTAMP,
+    updated_at TIMESTAMP DEFAULT CURRENT_TIMESTAMP
+);
+
+CREATE TABLE IF NOT EXISTS public.items (
+    id BIGSERIAL PRIMARY KEY,
+    client_id TEXT NOT NULL,
+    name TEXT NOT NULL,
+    item_code TEXT UNIQUE,  -- 🆕 POS-friendly code like '25'
+    slug TEXT UNIQUE,
+    category_id BIGINT REFERENCES item_categories(id) ON DELETE SET NULL,
+    description TEXT,
+    image_url TEXT,
+    price NUMERIC(10,2) NOT NULL,
+
+    -- GST fields
+    cgst_percent NUMERIC(5,2) DEFAULT 0.0,
+    sgst_percent NUMERIC(5,2) DEFAULT 0.0,
+    igst_percent NUMERIC(5,2) DEFAULT 0.0,
+
+    discount NUMERIC(10,2) DEFAULT 0.0,
+    preparation_time TEXT,
+    is_veg BOOLEAN,
+    is_available BOOLEAN NOT NULL DEFAULT TRUE,
+    sort_order INTEGER,
+    kds_section TEXT,
+    is_active BOOLEAN NOT NULL DEFAULT TRUE,
+    created_by TEXT,
+    updated_by TEXT,
+    created_at TIMESTAMP DEFAULT CURRENT_TIMESTAMP,
+    updated_at TIMESTAMP DEFAULT CURRENT_TIMESTAMP
+);

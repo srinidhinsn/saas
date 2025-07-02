@@ -288,3 +288,91 @@ AttributeError: module 'bcrypt' has no attribute '__about__'
 2025-06-20 12:37:42,344 - INFO - main - Request processed time: GET http://localhost:8001/saas/easyfood/tables/read - Response: 200 - Time:  0.0120s
 2025-06-20 12:38:05,581 - INFO - main - Request start time: POST http://127.0.0.1:8001/saas/easyfood/tables/delete - Request: <starlette.middleware.base._CachedRequest object at 0x0000028E14C79090> - Time:  1750403285.5819s
 2025-06-20 12:38:05,599 - INFO - main - Request processed time: POST http://127.0.0.1:8001/saas/easyfood/tables/delete - Response: 200 - Time:  0.0177s
+2025-06-20 16:39:18,067 - INFO - app.main - Request start time: POST http://localhost:8000/saas/easyfood/users/login - Request: <starlette.middleware.base._CachedRequest object at 0x000001C22F1F2F90> - Time:  1750417758.0652s
+2025-06-20 16:39:18,574 - INFO - app.main - Request processed time: POST http://localhost:8000/saas/easyfood/users/login - Response: 200 - Time:  0.5097s
+2025-06-20 16:45:15,238 - INFO - main - Request start time: GET http://127.0.0.1:8001/ - Request: <starlette.middleware.base._CachedRequest object at 0x000001EBFC265010> - Time:  1750418115.2381s
+2025-06-20 16:45:15,238 - INFO - main - Request processed time: GET http://127.0.0.1:8001/ - Response: 404 - Time:  0.0000s
+2025-06-20 16:45:24,905 - INFO - main - Request start time: GET http://localhost:8001/saas/easyfood/item_categories/read - Request: <starlette.middleware.base._CachedRequest object at 0x000001EBFC2ACED0> - Time:  1750418124.9055s
+2025-06-20 16:45:25,030 - INFO - main - Request processed time: GET http://localhost:8001/saas/easyfood/item_categories/read - Response: 403 - Time:  0.1250s
+2025-06-20 16:55:01,769 - INFO - main - Request start time: GET http://localhost:8001/saas/easyfood/item_categories/read - Request: <starlette.middleware.base._CachedRequest object at 0x0000017050C75090> - Time:  1750418701.7695s
+2025-06-20 16:55:01,916 - INFO - main - Request processed time: GET http://localhost:8001/saas/easyfood/item_categories/read - Response: 403 - Time:  0.1469s
+2025-06-20 16:55:51,946 - INFO - app.main - Request start time: POST http://localhost:8000/saas/easyfood/users/login - Request: <starlette.middleware.base._CachedRequest object at 0x000001C22F2066D0> - Time:  1750418751.9462s
+2025-06-20 16:55:52,411 - INFO - app.main - Request processed time: POST http://localhost:8000/saas/easyfood/users/login - Response: 200 - Time:  0.4654s
+2025-06-20 16:56:10,533 - INFO - main - Request start time: GET http://localhost:8001/saas/easyfood/item_categories/read - Request: <starlette.middleware.base._CachedRequest object at 0x0000027E9C36D310> - Time:  1750418770.5323s
+2025-06-20 16:56:10,709 - INFO - main - Request processed time: GET http://localhost:8001/saas/easyfood/item_categories/read - Response: 200 - Time:  0.1772s
+2025-06-20 20:16:17,203 - INFO - app.main - Request start time: POST http://localhost:8000/saas/easyfood/users/login - Request: <starlette.middleware.base._CachedRequest object at 0x000001C22F206910> - Time:  1750430777.2019s
+2025-06-20 20:16:17,724 - INFO - app.main - Request processed time: POST http://localhost:8000/saas/easyfood/users/login - Response: 200 - Time:  0.5223s
+2025-06-20 20:16:21,178 - INFO - main - Request start time: GET http://localhost:8001/saas/easyfood/item_categories/read - Request: <starlette.middleware.base._CachedRequest object at 0x0000027E9C414E50> - Time:  1750430781.1773s
+2025-06-20 20:16:21,295 - INFO - main - Request processed time: GET http://localhost:8001/saas/easyfood/item_categories/read - Response: 200 - Time:  0.1182s
+2025-06-20 20:19:06,736 - INFO - main - Request start time: POST http://localhost:8001/saas/easyfood/item_categories/update - Request: <starlette.middleware.base._CachedRequest object at 0x0000027E9C416190> - Time:  1750430946.7361s
+2025-06-20 20:19:06,819 - INFO - main - Request processed time: POST http://localhost:8001/saas/easyfood/item_categories/update - Response: 200 - Time:  0.0836s
+2025-06-20 20:25:07,400 - INFO - main - Request start time: POST http://localhost:8001/saas/easyfood/item_categories/create - Request: <starlette.middleware.base._CachedRequest object at 0x0000027E9C415E10> - Time:  1750431307.4009s
+2025-06-20 20:25:07,426 - INFO - main - Request processed time: POST http://localhost:8001/saas/easyfood/item_categories/create - Response: 422 - Time:  0.0252s
+2025-06-20 20:25:46,394 - INFO - main - Request start time: POST http://localhost:8001/saas/easyfood/item_categories/create - Request: <starlette.middleware.base._CachedRequest object at 0x0000027E9C430E90> - Time:  1750431346.3942s
+2025-06-20 20:25:46,404 - INFO - main - Request processed time: POST http://localhost:8001/saas/easyfood/item_categories/create - Response: 422 - Time:  0.0100s
+2025-06-20 20:27:38,818 - INFO - main - Request start time: POST http://localhost:8001/saas/easyfood/item_categories/create - Request: <starlette.middleware.base._CachedRequest object at 0x0000027E9C415610> - Time:  1750431458.8170s
+2025-06-20 20:27:38,828 - INFO - main - Request processed time: POST http://localhost:8001/saas/easyfood/item_categories/create - Response: 422 - Time:  0.0110s
+2025-06-20 20:27:47,903 - INFO - main - Request start time: POST http://localhost:8001/saas/easyfood/item_categories/create - Request: <starlette.middleware.base._CachedRequest object at 0x0000027E9C433F10> - Time:  1750431467.9039s
+2025-06-20 20:27:47,911 - INFO - main - Request processed time: POST http://localhost:8001/saas/easyfood/item_categories/create - Response: 422 - Time:  0.0080s
+2025-06-20 20:29:52,200 - INFO - main - Request start time: POST http://localhost:8001/saas/easyfood/item_categories/create - Request: <starlette.middleware.base._CachedRequest object at 0x0000027E9C4394D0> - Time:  1750431592.2006s
+2025-06-20 20:29:52,211 - INFO - main - Request processed time: POST http://localhost:8001/saas/easyfood/item_categories/create - Response: 422 - Time:  0.0110s
+2025-06-20 20:30:26,951 - INFO - main - Request start time: POST http://localhost:8001/saas/easyfood/item_categories/create - Request: <starlette.middleware.base._CachedRequest object at 0x0000027E9C43B510> - Time:  1750431626.9513s
+2025-06-20 20:30:26,962 - INFO - main - Request processed time: POST http://localhost:8001/saas/easyfood/item_categories/create - Response: 422 - Time:  0.0110s
+2025-06-20 20:31:12,689 - INFO - main - Request start time: POST http://localhost:8001/saas/easyfood/item_categories/create - Request: <starlette.middleware.base._CachedRequest object at 0x0000027E9C438390> - Time:  1750431672.6895s
+2025-06-20 20:31:12,698 - INFO - main - Request processed time: POST http://localhost:8001/saas/easyfood/item_categories/create - Response: 422 - Time:  0.0090s
+2025-06-20 20:34:11,322 - INFO - main - Request start time: POST http://localhost:8001/saas/easyfood/item_categories/create - Request: <starlette.middleware.base._CachedRequest object at 0x0000027E9C433A90> - Time:  1750431851.3220s
+2025-06-20 20:34:11,350 - INFO - main - Request processed time: POST http://localhost:8001/saas/easyfood/item_categories/create - Response: 200 - Time:  0.0286s
+2025-06-20 20:36:31,013 - INFO - main - Request start time: GET http://localhost:8001/saas/easyfood/item_categories/read - Request: <starlette.middleware.base._CachedRequest object at 0x0000027E9C433250> - Time:  1750431991.0131s
+2025-06-20 20:36:31,030 - INFO - main - Request processed time: GET http://localhost:8001/saas/easyfood/item_categories/read - Response: 200 - Time:  0.0170s
+2025-06-20 20:36:47,229 - INFO - main - Request start time: POST http://localhost:8001/saas/easyfood/item_categories/delete - Request: <starlette.middleware.base._CachedRequest object at 0x0000027E9C43BA50> - Time:  1750432007.2298s
+2025-06-20 20:36:47,265 - INFO - main - Request processed time: POST http://localhost:8001/saas/easyfood/item_categories/delete - Response: 200 - Time:  0.0355s
+2025-06-22 17:10:05,127 - INFO - main - Request start time: GET http://127.0.0.1:8000/ - Request: <starlette.middleware.base._CachedRequest object at 0x000002CEC7BDD250> - Time:  1750592405.1275s
+2025-06-22 17:10:05,130 - INFO - main - Request processed time: GET http://127.0.0.1:8000/ - Response: 404 - Time:  0.0030s
+2025-06-22 17:10:22,565 - INFO - main - Request start time: GET http://127.0.0.1:8000/ - Request: <starlette.middleware.base._CachedRequest object at 0x000002CEC7C2D190> - Time:  1750592422.5656s
+2025-06-22 17:10:22,569 - INFO - main - Request processed time: GET http://127.0.0.1:8000/ - Response: 404 - Time:  0.0035s
+2025-06-22 17:11:06,362 - INFO - main - Request start time: GET http://127.0.0.1:8000/ - Request: <starlette.middleware.base._CachedRequest object at 0x000002288A52D4D0> - Time:  1750592466.3627s
+2025-06-22 17:11:06,362 - INFO - main - Request processed time: GET http://127.0.0.1:8000/ - Response: 404 - Time:  0.0000s
+2025-06-22 17:38:51,850 - INFO - app.main - Request start time: GET http://127.0.0.1:8002/ - Request: <starlette.middleware.base._CachedRequest object at 0x000001B1C866D990> - Time:  1750594131.8509s
+2025-06-22 17:38:51,852 - INFO - app.main - Request processed time: GET http://127.0.0.1:8002/ - Response: 404 - Time:  0.0020s
+2025-06-22 17:38:51,945 - INFO - app.main - Request start time: GET http://127.0.0.1:8002/favicon.ico - Request: <starlette.middleware.base._CachedRequest object at 0x000001B1C866D710> - Time:  1750594131.9459s
+2025-06-22 17:38:51,947 - INFO - app.main - Request processed time: GET http://127.0.0.1:8002/favicon.ico - Response: 404 - Time:  0.0010s
+2025-06-22 17:39:05,518 - INFO - app.main - Request start time: POST http://localhost:8002/saas/easyfood/users/login - Request: <starlette.middleware.base._CachedRequest object at 0x000001B1C866E910> - Time:  1750594145.5186s
+2025-06-22 17:39:05,718 - WARNING - passlib.handlers.bcrypt - (trapped) error reading bcrypt version
+Traceback (most recent call last):
+  File "C:\Users\user\Documents\PROJECTS_A\saas\dev\Lib\site-packages\passlib\handlers\bcrypt.py", line 620, in _load_backend_mixin
+    version = _bcrypt.__about__.__version__
+              ^^^^^^^^^^^^^^^^^
+AttributeError: module 'bcrypt' has no attribute '__about__'
+2025-06-22 17:39:06,217 - INFO - app.main - Request processed time: POST http://localhost:8002/saas/easyfood/users/login - Response: 200 - Time:  0.6989s
+2025-06-22 17:45:54,013 - INFO - app.main - Request start time: GET http://127.0.0.1:8002/ - Request: <starlette.middleware.base._CachedRequest object at 0x000001B1C8A3DE50> - Time:  1750594554.0131s
+2025-06-22 17:45:54,014 - INFO - app.main - Request processed time: GET http://127.0.0.1:8002/ - Response: 404 - Time:  0.0010s
+2025-06-22 17:54:44,805 - INFO - app.main - Request start time: GET http://127.0.0.1:8002/ - Request: <starlette.middleware.base._CachedRequest object at 0x000001B1C8A3F2D0> - Time:  1750595084.8059s
+2025-06-22 17:54:44,805 - INFO - app.main - Request processed time: GET http://127.0.0.1:8002/ - Response: 404 - Time:  0.0000s
+2025-06-22 17:55:40,849 - INFO - app.main - Request start time: POST http://localhost:8002/saas/easyfood/users/login - Request: <starlette.middleware.base._CachedRequest object at 0x000001B1C8A5C1D0> - Time:  1750595140.8499s
+2025-06-22 17:55:41,307 - INFO - app.main - Request processed time: POST http://localhost:8002/saas/easyfood/users/login - Response: 200 - Time:  0.4573s
+2025-06-22 18:10:05,913 - INFO - app.main - Request start time: POST http://localhost:8002/saas/easyfood/users/login - Request: <starlette.middleware.base._CachedRequest object at 0x000001B1C8A5E010> - Time:  1750596005.9138s
+2025-06-22 18:10:06,303 - INFO - app.main - Request processed time: POST http://localhost:8002/saas/easyfood/users/login - Response: 200 - Time:  0.3896s
+2025-06-23 18:53:05,944 - INFO - app.main - Request start time: POST http://localhost:8002/saas/easyfood/users/login - Request: <starlette.middleware.base._CachedRequest object at 0x000001B1C8A5FD10> - Time:  1750684985.9449s
+2025-06-23 18:53:06,280 - INFO - app.main - Request processed time: POST http://localhost:8002/saas/easyfood/users/login - Response: 200 - Time:  0.3352s
+2025-06-23 18:55:44,101 - INFO - app.main - Request start time: GET http://127.0.0.1:8002/ - Request: <starlette.middleware.base._CachedRequest object at 0x000002491DA1DFD0> - Time:  1750685144.1017s
+2025-06-23 18:55:44,104 - INFO - app.main - Request processed time: GET http://127.0.0.1:8002/ - Response: 404 - Time:  0.0030s
+2025-06-23 19:11:23,227 - INFO - app.main - Request start time: GET http://127.0.0.1:8002/ - Request: <starlette.middleware.base._CachedRequest object at 0x000002491DA6A890> - Time:  1750686083.2274s
+2025-06-23 19:11:23,230 - INFO - app.main - Request processed time: GET http://127.0.0.1:8002/ - Response: 404 - Time:  0.0010s
+2025-06-23 19:32:34,312 - INFO - app.main - Request start time: POST http://localhost:8002/saas/easyfood/users/login - Request: <starlette.middleware.base._CachedRequest object at 0x000002491DA6B610> - Time:  1750687354.3121s
+2025-06-23 19:32:34,537 - WARNING - passlib.handlers.bcrypt - (trapped) error reading bcrypt version
+Traceback (most recent call last):
+  File "C:\Users\user\Documents\PROJECTS_A\saas\dev\Lib\site-packages\passlib\handlers\bcrypt.py", line 620, in _load_backend_mixin
+    version = _bcrypt.__about__.__version__
+              ^^^^^^^^^^^^^^^^^
+AttributeError: module 'bcrypt' has no attribute '__about__'
+2025-06-23 19:32:35,029 - INFO - app.main - Request processed time: POST http://localhost:8002/saas/easyfood/users/login - Response: 200 - Time:  0.7175s
+2025-07-02 17:04:48,578 - INFO - app.main - Request start time: GET http://127.0.0.1:8000/ - Request: <starlette.middleware.base._CachedRequest object at 0x000002ED3382E3D0> - Time:  1751456088.5760s
+2025-07-02 17:04:48,580 - INFO - app.main - Request processed time: GET http://127.0.0.1:8000/ - Response: 404 - Time:  0.0042s
+2025-07-02 17:05:07,526 - INFO - app.main - Request start time: POST http://localhost:8000/saas/easyfood/users/login - Request: <starlette.middleware.base._CachedRequest object at 0x000002ED3387E910> - Time:  1751456107.5261s
+2025-07-02 17:05:07,829 - WARNING - passlib.handlers.bcrypt - (trapped) error reading bcrypt version
+Traceback (most recent call last):
+  File "C:\Users\user\Documents\PROJECTS_A\saas\dev\Lib\site-packages\passlib\handlers\bcrypt.py", line 620, in _load_backend_mixin
+    version = _bcrypt.__about__.__version__
+              ^^^^^^^^^^^^^^^^^
+AttributeError: module 'bcrypt' has no attribute '__about__'
+2025-07-02 17:05:08,415 - INFO - app.main - Request processed time: POST http://localhost:8000/saas/easyfood/users/login - Response: 200 - Time:  0.8890s

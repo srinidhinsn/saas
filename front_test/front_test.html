@@ -1,0 +1,136 @@
+<!DOCTYPE html>
+<html lang="en">
+<head>
+  <meta charset="UTF-8" />
+  <meta name="viewport" content="width=device-width, initial-scale=1.0" />
+  <title>Inventory Service UI</title>
+  <style>
+    body { font-family: Arial, sans-serif; padding: 20px; }
+    h2 { margin-top: 40px; }
+    table { border-collapse: collapse; width: 100%; margin-top: 10px; }
+    th, td { border: 1px solid #ccc; padding: 8px; text-align: left; }
+    input, textarea { width: 100%; padding: 6px; margin: 5px 0; }
+    button { padding: 8px 12px; margin-top: 10px; }
+    .form-section { margin-top: 20px; }
+  </style>
+</head>
+<body>
+  <h1>Inventory Service UI</h1>
+
+  <input type="text" id="token" placeholder="Enter JWT Token" style="width: 100%; padding: 6px; margin-bottom: 20px;" />
+
+  <h2>Category List</h2>
+  <button onclick="loadCategories()">Load Categories</button>
+  <table id="categoryTable">
+    <thead><tr><th>ID</th><th>Name</th><th>Description</th><th>Sub-Categories</th></tr></thead>
+    <tbody></tbody>
+  </table>
+
+  <div class="form-section">
+    <h2>Create Category</h2>
+    <input type="text" id="catId" placeholder="Category ID (e.g., chinese_01)" />
+	<input type="text" id="catClientId" placeholder="Client ID" />
+	<input type="text" id="catName" placeholder="Name" />
+	<input type="text" id="catDescription" placeholder="Description" />
+	<input type="text" id="catSubCategories" placeholder='Sub Categories (e.g., ["chinese_02", "chinese_03"])' />
+
+    <button onclick="createCategory()">Submit</button>
+  </div>
+
+  <h2>Inventory List</h2>
+  <button onclick="loadInventory()">Load Inventory</button>
+  <table id="inventoryTable">
+    <thead><tr><th>ID</th><th>Name</th><th>Category</th><th>Realm</th><th>Unit</th></tr></thead>
+    <tbody></tbody>
+  </table>
+
+  <div class="form-section">
+    <h2>Create Inventory</h2>
+    <input type="text" id="invClientId" placeholder="Client ID" />
+    <input type="text" id="invName" placeholder="Name" />
+    <input type="text" id="invCategory" placeholder="Category" />
+    <input type="text" id="invRealm" placeholder="Realm" />
+    <input type="text" id="invUnit" placeholder="Unit" />
+    <button onclick="createInventory()">Submit</button>
+  </div>
+
+  <script>
+    function getAuthHeaders() {
+      return {
+        'Content-Type': 'application/json',
+        'Authorization': 'Bearer ' + document.getElementById('token').value
+      };
+    }
+
+    async function loadCategories() {
+      const clientId = document.getElementById('catClientId').value || 'easyfood';
+      const res = await fetch('http://localhost:8000/saas/' + clientId + '/inventory/category/read?client_id=' + clientId, {
+        method: 'GET',
+        headers: getAuthHeaders()
+      });
+      const data = await res.json();
+      const rows = data.data.map(c => `<tr><td>${c.id}</td><td>${c.name}</td><td>${c.description}</td><td>${c.sub_categories}</td></tr>`);
+      document.querySelector('#categoryTable tbody').innerHTML = rows.join('');
+    }
+
+    async function createCategory() {
+	  let subCategoriesInput = document.getElementById('catSubCategories').value.trim();
+	  let subCategories;
+	  try {
+		subCategories = subCategoriesInput ? JSON.parse(subCategoriesInput) : [];
+		if (!Array.isArray(subCategories)) throw "Invalid format";
+	  } catch {
+		alert("Please enter sub-categories as a valid JSON array, e.g., [\"abc\", \"def\"] or leave blank.");
+		return;
+	  }
+
+	  const payload = {
+		id: document.getElementById('catId').value,
+		client_id: document.getElementById('catClientId').value,
+		name: document.getElementById('catName').value,
+		description: document.getElementById('catDescription').value,
+		sub_categories: subCategories
+	  };
+
+	  await fetch('http://localhost:8000/saas/' + payload.client_id + '/inventory/category/create?client_id=' + payload.client_id, {
+		method: 'POST',
+		headers: getAuthHeaders(),
+		body: JSON.stringify(payload)
+	  });
+
+	  loadCategories();
+	}
+
+
+    async function loadInventory() {
+      const clientId = document.getElementById('invClientId').value || 'easyfood';
+      const res = await fetch('http://localhost:8000/saas/' + clientId + '/inventory/inventory/read?client_id=' + clientId, {
+        method: 'GET',
+        headers: getAuthHeaders()
+      });
+      const data = await res.json();
+      const rows = data.data.map(i => `<tr><td>${i.id}</td><td>${i.name}</td><td>${i.category}</td><td>${i.realm}</td><td>${i.unit}</td></tr>`);
+      document.querySelector('#inventoryTable tbody').innerHTML = rows.join('');
+    }
+
+    async function createInventory() {
+      const payload = {
+	    id: document.getElementById('catId').value,
+        client_id: document.getElementById('invClientId').value,
+        name: document.getElementById('invName').value,
+        category: document.getElementById('invCategory').value,
+        realm: document.getElementById('invRealm').value,
+        unit: document.getElementById('invUnit').value
+      };
+
+      await fetch('http://localhost:8000/saas/' + payload.client_id + '/inventory/inventory/create?client_id=' + payload.client_id, {
+        method: 'POST',
+        headers: getAuthHeaders(),
+        body: JSON.stringify(payload)
+      });
+
+      loadInventory();
+    }
+  </script>
+</body>
+</html>

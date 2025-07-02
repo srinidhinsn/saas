@@ -1,58 +1,71 @@
-from sqlalchemy import Column, Integer, String, Float, DateTime, ForeignKey, ARRAY
-from sqlalchemy.orm import declarative_base
-from models.inventory_model import InventoryModel
-import datetime
+from sqlalchemy import Column, Integer, BigInteger, Boolean, Text, DateTime, Float, func, ARRAY
+from database.base import Base
+from models.inventory_model import Inventory, Category
+from sqlalchemy.dialects.postgresql import JSONB
 
-Base = declarative_base()
+class InventoryEntity(Base):
+    __tablename__ = "inventory"
 
-# Inventory Table
-class Inventory(Base):
-    __tablename__ = "Inventory"
-
-    id = Column(Integer, primary_key=True)
-    clientId = Column(String, nullable=True)
-    inventoryId = Column(String, nullable=True)
-    itemId = Column(String, nullable=True)
-    lineItemId = Column(ARRAY(String), nullable=True)
-    name = Column(String, nullable=True)
-    description = Column(String, nullable=True)
-    category = Column(String, nullable=True)
-    realm = Column(String, nullable=True)
-    availability = Column(Integer, nullable=True)
-    unit = Column(String, nullable=True)
-    unitPrice = Column(Float, nullable=True)
-    unitCst = Column(Float, nullable=True)
-    unitGst = Column(Float, nullable=True)
-    unitTotalPrice = Column(Float, nullable=True)
-    price = Column(Float, nullable=True)
-    cst = Column(Float, nullable=True)
-    gst = Column(Float, nullable=True)
-    discount = Column(Float, nullable=True)
-    totalPrice = Column(Float, nullable=True)
-    createdBy = Column(String, nullable=True)
-    updatedBy = Column(String, nullable=True)
-    createdDateTime = Column(DateTime, default=datetime.datetime.utcnow)
-    updatedDateTime = Column(DateTime, default=datetime.datetime.utcnow, onupdate=datetime.datetime.utcnow)
-
+    id                = Column(BigInteger, primary_key=True, autoincrement=True)
+    client_id         = Column(Text, nullable=False)
+    inventory_id      = Column(BigInteger, nullable=True)
+    line_item_id      = Column(ARRAY(BigInteger), nullable=True)
+    name              = Column(Text, nullable=True)
+    description       = Column(Text, nullable=True)
+    category          = Column(Text, nullable=True)
+    realm             = Column(Text, nullable=True)
+    availability      = Column(Integer, nullable=True)
+    unit              = Column(Text, nullable=True)
+    unit_price        = Column(Float, nullable=True)
+    unit_cst          = Column(Float, nullable=True)
+    unit_gst          = Column(Float, nullable=True)
+    unit_total_price  = Column(Float, nullable=True)
+    price             = Column(Float, nullable=True)
+    cst               = Column(Float, nullable=True)
+    gst               = Column(Float, nullable=True)
+    discount          = Column(Float, nullable=True)
+    total_price       = Column(Float, nullable=True)
+    created_by        = Column(Text, nullable=True)
+    updated_by        = Column(Text, nullable=True)
+    created_at        = Column(DateTime, default=func.now())
+    updated_at        = Column(DateTime, default=func.now(), onupdate=func.now())
 
     @staticmethod
-    def copyToModel(inventory):
-        inventoryModel = InventoryModel(**inventory.__dict__)
-        inventoryModel.__dict__.pop("_sa_instance_state", None)
-        return inventoryModel
+    def copyToModel(row):
+        model = Inventory(**row.__dict__)
+        model.__dict__.pop("_sa_instance_state", None)
+        return model
 
     @staticmethod
-    def copyFromModel(inventoryModel):
-        return Inventory(**inventoryModel.dict(exclude_unset=True))
+    def copyToModels(rows):
+        models = [Inventory(**row.__dict__) for row in rows]
+        for m in models:
+            m.__dict__.pop("_sa_instance_state", None)
+        return models
+
+class CategoryEntity(Base):
+    __tablename__ = "category"
+
+    id              = Column(Text, primary_key=True)
+    client_id       = Column(Text, nullable=False)
+    name            = Column(Text, nullable=True)
+    description     = Column(Text, nullable=True)
+    #sub_categories  = Column(ARRAY(Text), nullable=True)
+    sub_categories  = Column(JSONB, nullable=True, default=[])
+    created_by      = Column(Text, nullable=True)
+    updated_by      = Column(Text, nullable=True)
+    created_at      = Column(DateTime, default=func.now())
+    updated_at      = Column(DateTime, default=func.now(), onupdate=func.now())
 
     @staticmethod
-    def copyToModels(inventories):
-        inventoryModels = [InventoryModel(**item.__dict__) for item in inventories]
-        for model in inventoryModels:
-            model.__dict__.pop("_sa_instance_state", None)
-        return inventoryModels
+    def copyToModel(row):
+        model = Category(**row.__dict__)
+        model.__dict__.pop("_sa_instance_state", None)
+        return model
 
     @staticmethod
-    def copyFromModels(inventoryModels):
-        return [Inventory(**model.dict(exclude_unset=True)) for model in inventoryModels]
-
+    def copyToModels(rows):
+        models = [Category(**row.__dict__) for row in rows]
+        for m in models:
+            m.__dict__.pop("_sa_instance_state", None)
+        return models
