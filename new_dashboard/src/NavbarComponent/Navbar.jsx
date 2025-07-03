@@ -158,7 +158,7 @@ const Navbar = () => {
         <aside className="sidebar">
             <div className="brand">DineIn Software</div>
             <ul className="menu">
-                <li title='Dashboard' onClick={() => nav('/')} className={location.pathname === '/' ? 'page-active' : ''}>
+                <li title='Dashboard' onClick={() => nav('/main')} className={location.pathname === '/' ? 'page-active' : ''}>
                     <GiHamburgerMenu /><span>Dashboard</span>
                 </li>
                 <li title='Order' onClick={() => nav('/orders-view')} className={location.pathname === '/orders-view' ? 'page-active' : ''}>
