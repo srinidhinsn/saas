@@ -83,6 +83,8 @@ def verify_token(req: Request = None, token: str = Depends(oauth2_scheme), db: S
 
 def get_screen_id(page_definitions, url_operation):    
     for page_def in page_definitions:
+        if "ALL" in page_def.operations:
+            return page_def.screen_id
         if url_operation in page_def.operations and page_def.load_type == "include":
             return page_def.screen_id
         if url_operation not in page_def.operations and page_def.load_type == "exclude":

@@ -48,3 +48,8 @@ async def test_msg(client_id: str, context: SaasContext = Depends(verify_token),
 async def test_msg(client_id: str, context: SaasContext = Depends(verify_token), db: Session = Depends(get_db)):
     print("test context2 - ", context)
     return {"message": "Test2 Authentication Service Running in user routes"}
+
+@router.get("/test3", include_in_schema=False)
+async def test_msg(client_id: str, context: SaasContext = Depends(verify_token), db: Session = Depends(get_db)):
+    print("test context3 - ", context)
+    return {"message": "Test3 Authentication Service Running in user routes"}

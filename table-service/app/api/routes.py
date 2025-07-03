@@ -17,15 +17,12 @@ def read_tables(client_id: str, context: SaasContext = Depends(verify_token), db
     
     table_entities = db.query(DiningTable).filter(DiningTable.client_id == client_id).all()
     tables         = DiningTable.copyToModels(table_entities)
-    response       = ResponseModel[List[Table]](screenId=context.screenId, status="success", message="Fetched table list", data=tables)
+    response       = ResponseModel[List[Table]](screen_id=context.screen_id, data=tables)
     return response
 
 # create tables
 @router.post("/create", response_model=ResponseModel[Table])
 def create_table(table: Table, client_id: str, context: SaasContext = Depends(verify_token), db: Session = Depends(get_db)):
-
-    if table.client_id != client_id or client_id != context.client_id:
-        raise HTTPException(status_code=400, detail="Client ID mismatch or unauthorized")
 
     db_table = DiningTable(**table.dict())
     db.add(db_table)
@@ -33,7 +30,7 @@ def create_table(table: Table, client_id: str, context: SaasContext = Depends(ve
     db.refresh(db_table)
 
     table_model = DiningTable.copyToModel(db_table)
-    response    = ResponseModel[Table](screenId=context.screenId, status="success", message="Table created successfully", data=table_model)
+    response    = ResponseModel[Table](screen_id=context.screen_id, data=table_model)
     return response
 
 # update tables
@@ -57,15 +54,12 @@ def update_table(client_id: str, updates: Table, context: SaasContext = Depends(
     db.refresh(db_table)
 
     table_model = DiningTable.copyToModel(db_table)
-    response    = ResponseModel[Table](screenId=context.screenId, status="success", message="Table updated successfully", data=table_model)
+    response    = ResponseModel[Table](screen_id=context.screen_id, status="success", message="Table updated successfully", data=table_model)
     return response
 
 # delete tables
 @router.post("/delete", response_model=ResponseModel[Table])
 def delete_table(client_id: str, table: Table, context: SaasContext = Depends(verify_token), db: Session = Depends(get_db)):
-
-    if client_id != context.client_id:
-        raise HTTPException(status_code=403, detail="Unauthorized")
 
     db_table = db.query(DiningTable).filter(DiningTable.id == table.id, DiningTable.client_id == client_id).first()
 
@@ -76,7 +70,7 @@ def delete_table(client_id: str, table: Table, context: SaasContext = Depends(ve
     db.commit()
 
     table_model = DiningTable.copyToModel(db_table)
-    response    = ResponseModel[Table](screenId=context.screenId, status="success", message="Table deleted successfully", data=table_model)
+    response    = ResponseModel[Table](screen_id=context.screen_id, status="success", message="Table deleted successfully", data=table_model)
     return response
 
 
