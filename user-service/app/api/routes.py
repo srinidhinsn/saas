@@ -2,7 +2,7 @@ from fastapi import Depends, HTTPException, APIRouter, Header
 from sqlalchemy.orm import Session
 from database.postgres import get_db
 from models.user_model import LoginRequest
-from models.user_entity import User
+from entity.user_entity import User
 from utils.auth import hash_password, verify_password, create_access_token, verify_token
 from models.saas_context import SaasContext, saasContext
 from models.user_model import UserModel

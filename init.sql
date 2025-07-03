@@ -213,6 +213,44 @@ CREATE TABLE "Category" (
 ALTER TABLE "Category" OWNER TO postgres;
 
 
+CREATE TABLE document (
+    id text NOT NULL,
+    client_id text,
+    category_id text,
+    name text,
+    description text,
+    is_protected boolean,
+    realm text,
+    url text,
+    path text,
+    is_active boolean,
+    created_by bigint,
+    last_read_by bigint,
+    created_date_time TIMESTAMP DEFAULT CURRENT_TIMESTAMP,
+    last_read_date_time TIMESTAMP DEFAULT CURRENT_TIMESTAMP
+);
+
+
+ALTER TABLE document OWNER TO postgres;
+
+CREATE TABLE document_version (
+    id text NOT NULL,
+    version_no int,
+    url text,
+    path text,
+    status text,
+    created_by bigint,
+    last_read_by bigint,
+    created_date_time TIMESTAMP DEFAULT CURRENT_TIMESTAMP,
+    last_read_date_time TIMESTAMP DEFAULT CURRENT_TIMESTAMP
+);
+
+
+ALTER TABLE document_version OWNER TO postgres;
+
+
+
+
 
 -- Insert into DineinOrder
 INSERT INTO "DineinOrder" ("id", "clientId", "dineinOrderId", "tableNumber", "invoiceId", "handlerId", "invoiceStatus", price, cst, gst, discount, "totalPrice", status)

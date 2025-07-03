@@ -9,7 +9,7 @@ setup(
     license = "BSD",
     keywords = "Saas application",
     url = "",
-    packages=['database', 'models', 'utils', 'config'],
+    packages=['database', 'models', 'utils', 'config', 'entity'],
     classifiers=[
         "Development Status :: Initial version",
         "Topic :: Common library",

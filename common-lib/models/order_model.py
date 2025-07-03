@@ -17,8 +17,8 @@ class DineinOrderModel(BaseModel):
     totalPrice: Optional[float] = None
     createdBy: Optional[str] = None
     updatedBy: Optional[str] = None
-    createdDateTime: Optional[datetime.datetime]
-    updatedDateTime: Optional[datetime.datetime]
+    createdDateTime: Optional[datetime.datetime] = None
+    updatedDateTime: Optional[datetime.datetime] = None
     status: Optional[str] = None
 
 class OrderItemModel(BaseModel):
