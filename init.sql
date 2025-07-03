@@ -89,43 +89,34 @@ ALTER TABLE "Inventory" ALTER COLUMN id ADD GENERATED ALWAYS AS IDENTITY (
     CACHE 1
 );
 
-CREATE TABLE "User" (
+CREATE TABLE "user" (
     username text,
     hashed_password text,
-    id bigint NOT NULL,
-    "clientId" text,
+    id UUID PRIMARY KEY DEFAULT gen_random_uuid(),
+    client_id text,
     roles text[],
     grants text[]
 );
 
 
-ALTER TABLE "User" OWNER TO postgres;
-
-ALTER TABLE "User" ALTER COLUMN id ADD GENERATED ALWAYS AS IDENTITY (
-    SEQUENCE NAME user_id_seq
-    START WITH 1000
-    INCREMENT BY 1
-    MINVALUE 1000
-    MAXVALUE 1000000000000
-    CACHE 1
-);
+ALTER TABLE "user" OWNER TO postgres;
 
 
 
-CREATE TABLE "PageDefinition" (
+CREATE TABLE page_definition (
     id bigint NOT NULL,
-    "clientId" text,
+    client_id text,
     module text,
     role text,
-    "screenId" text,
-    "loadType" text,
+    screen_id text,
+    load_type text,
     operations text[]
 );
 
 
-ALTER TABLE "PageDefinition" OWNER TO postgres;
+ALTER TABLE page_definition OWNER TO postgres;
 
-ALTER TABLE "PageDefinition" ALTER COLUMN id ADD GENERATED ALWAYS AS IDENTITY (
+ALTER TABLE page_definition ALTER COLUMN id ADD GENERATED ALWAYS AS IDENTITY (
     SEQUENCE NAME pageDefinition_id_seq
     START WITH 1000
     INCREMENT BY 1
@@ -134,20 +125,20 @@ ALTER TABLE "PageDefinition" ALTER COLUMN id ADD GENERATED ALWAYS AS IDENTITY (
     CACHE 1
 );
 
-CREATE TABLE "Client" (
+CREATE TABLE client (
     id text NOT NULL,
-    "name" text,
+    name text,
     realm text,
     email text,
     phone text,
     logo text,
-    "savedAddressIds" text[],
-    "createdDateTime" TIMESTAMP DEFAULT CURRENT_TIMESTAMP,
-    "updatedDateTime" TIMESTAMP DEFAULT CURRENT_TIMESTAMP
+    saved_address_ids text[],
+    created_date_time TIMESTAMP DEFAULT CURRENT_TIMESTAMP,
+    updated_date_time TIMESTAMP DEFAULT CURRENT_TIMESTAMP
 );
 
 
-ALTER TABLE "Client" OWNER TO postgres;
+ALTER TABLE client OWNER TO postgres;
 
 
 
@@ -249,8 +240,25 @@ CREATE TABLE document_version (
 ALTER TABLE document_version OWNER TO postgres;
 
 
+CREATE TABLE IF NOT EXISTS public.tables (
+    id             BIGINT PRIMARY KEY,
+    client_id      TEXT NOT NULL,
+    name           TEXT NOT NULL,
+    slug           TEXT UNIQUE,
+    qr_code_url    TEXT,
+    description    TEXT,
+    status         TEXT DEFAULT 'Vacant',
+    section        TEXT,
+    location_zone  TEXT,
+    sort_order     INTEGER,
+    is_active      BOOLEAN NOT NULL DEFAULT TRUE,
+    created_by     TEXT,
+    updated_by     TEXT,
+    created_at     TIMESTAMP WITHOUT TIME ZONE DEFAULT CURRENT_TIMESTAMP,
+    updated_at     TIMESTAMP WITHOUT TIME ZONE DEFAULT CURRENT_TIMESTAMP
+);
 
-
+ALTER TABLE public.tables OWNER TO postgres;
 
 -- Insert into DineinOrder
 INSERT INTO "DineinOrder" ("id", "clientId", "dineinOrderId", "tableNumber", "invoiceId", "handlerId", "invoiceStatus", price, cst, gst, discount, "totalPrice", status)
@@ -277,34 +285,29 @@ OVERRIDING SYSTEM VALUE VALUES
 (1001, 'easyfood', 1, NULL, 'Sherwa', 'Veg gravy', 'Gravy', 'food', 100, 'number', 10, 9, 9, 28, 1000, 80, 80, 0, 11160),
 (1002, 'easyfood', 1, NULL, 'Raita', 'Plain raitha', 'Raitha', 'food', 100, 'number', 0, 0, 0, 0, 0, 0, 0, 0, 0),
 (1003, 'easyfood', 1, '{1002}', 'Rice bath', 'Plain rice bath', 'Rice', 'food', 100, 'number', 90, 8, 8, 106, 9000, 800, 800, 0, 10600),
-(1004, 'easyfood', 1, NULL, 'Mushroom biriyani', 'Mushroom biriyani without Sherwa', 'Biriyani', 'food', 100, 'number', 90, 8, 8, 106, 9000, 800, 800, 0, 11600);
-
-
-
+(1004, 'easyfood', 1, NULL, 'Mushroom biriyani', 'Mushroom biriyani without Sherwa', 'Biriyani', 'food', 100, 'number', 90, 8, 8, 106, 9000, 800, 800, 0, 11600),
 (1009, 'samsung', 1, '{1012}', 'Screen 5inch', '5inch screen', 'Screen', 'digital', 100, 'number', 90, 8, 8, 106, 9000, 800, 800, 0, 11600),
 (1010, 'samsung', 1, '{1011,1013}', 'Screen 15inch', '15inch screen', 'Screen', 'digital', 100, 'number', 90, 8, 8, 106, 9000, 800, 800, 0, 11600),
 (1011, 'samsung', 1, NULL, 'Wiring 6mm', 'Wiring 6mm', 'Screen', 'digital', 100, 'number', 90, 8, 8, 106, 9000, 800, 800, 0, 11600),
 (1012, 'samsung', 1, NULL, 'Wiring 2mm', 'Wiring 2mm', 'Screen', 'digital', 100, 'number', 90, 8, 8, 106, 9000, 800, 800, 0, 11600),
 (1013, 'samsung', 1, '{1014, 1015}', 'PCB sheet', 'PCB sheet', 'Boards', 'digital', 100, 'number', 90, 8, 8, 106, 9000, 800, 800, 0, 11600),
 (1014, 'samsung', 1, NULL, 'transistors', 'PCB sheet', 'Boards', 'digital', 100, 'number', 90, 8, 8, 106, 9000, 800, 800, 0, 11600),
-(1015, 'samsung', 1, NULL, 'capacitor', 'PCB sheet', 'Boards', 'digital', 100, 'number', 90, 8, 8, 106, 9000, 800, 800, 0, 11600);
-
-
+(1015, 'samsung', 1, NULL, 'capacitor', 'PCB sheet', 'Boards', 'digital', 100, 'number', 90, 8, 8, 106, 9000, 800, 800, 0, 11600),
 (1016, 'easyfood', 1, NULL, 'Veg noodles', 'Veg gravy', 'Gravy', 'food', 100, 'number', 10, 9, 9, 28, 1000, 80, 80, 0, 11160),
 (1018, 'easyfood', 1, NULL, 'Raita', 'Plain raitha', 'Raitha', 'food', 100, 'number', 0, 0, 0, 0, 0, 0, 0, 0, 0),
 (1019, 'easyfood', 1, '{1002}', 'Rice bath', 'Plain rice bath', 'Rice', 'food', 100, 'number', 90, 8, 8, 106, 9000, 800, 800, 0, 10600),
 
 (1020, 'easyfood', 1, NULL, 'Veg noodles', 'Veg noodles', 'chinese_02', 'food', 100, 'number', 90, 8, 8, 106, 9000, 800, 800, 0, 11600);
 
-INSERT INTO "PageDefinition" (id, "clientId", module, role, "screenId", "loadType", operations) OVERRIDING SYSTEM VALUE VALUES (1001, 'easyfood', 'dinein', 'Admin', 'defaultDinein', 'include', '{ALL}');
-INSERT INTO "PageDefinition" (id, "clientId", module, role, "screenId", "loadType", operations) OVERRIDING SYSTEM VALUE VALUES (1003, 'easyfood', 'order', 'Admin', 'defaultOrder', 'include', '{ALL}');
-INSERT INTO "PageDefinition" (id, "clientId", module, role, "screenId", "loadType", operations) OVERRIDING SYSTEM VALUE VALUES (1005, 'easyfood', 'tables', 'Admin', 'defaultTables', 'include', '{ALL}');
-INSERT INTO "PageDefinition" (id, "clientId", module, role, "screenId", "loadType", operations) OVERRIDING SYSTEM VALUE VALUES (1002, 'easyfood', 'inventory', 'Admin', 'defaultInventory', 'include', '{ALL}');
-INSERT INTO "PageDefinition" (id, "clientId", module, role, "screenId", "loadType", operations) OVERRIDING SYSTEM VALUE VALUES (1004, 'easyfood', 'users', 'Admin', 'defaultUser', 'exclude', '{test}');
-INSERT INTO "PageDefinition" (id, "clientId", module, role, "screenId", "loadType", operations) OVERRIDING SYSTEM VALUE VALUES (1006, 'easyfood', 'invoice', 'Admin', 'defaultInvoice', 'include', '{ALL}');
+INSERT INTO page_definition (id, client_id, module, role, screen_id, load_type, operations) OVERRIDING SYSTEM VALUE VALUES (1001, 'easyfood', 'dinein', 'Admin', 'defaultDinein', 'include', '{ALL}');
+INSERT INTO page_definition (id, client_id, module, role, screen_id, load_type, operations) OVERRIDING SYSTEM VALUE VALUES (1003, 'easyfood', 'order', 'Admin', 'defaultOrder', 'include', '{ALL}');
+INSERT INTO page_definition (id, client_id, module, role, screen_id, load_type, operations) OVERRIDING SYSTEM VALUE VALUES (1005, 'easyfood', 'tables', 'Admin', 'defaultTables', 'include', '{ALL}');
+INSERT INTO page_definition (id, client_id, module, role, screen_id, load_type, operations) OVERRIDING SYSTEM VALUE VALUES (1002, 'easyfood', 'inventory', 'Admin', 'defaultInventory', 'include', '{ALL}');
+INSERT INTO page_definition (id, client_id, module, role, screen_id, load_type, operations) OVERRIDING SYSTEM VALUE VALUES (1004, 'easyfood', 'users', 'Admin', 'defaultUser', 'exclude', '{test}');
+INSERT INTO page_definition (id, client_id, module, role, screen_id, load_type, operations) OVERRIDING SYSTEM VALUE VALUES (1006, 'easyfood', 'invoice', 'Admin', 'defaultInvoice', 'include', '{ALL}');
 
 
-INSERT INTO "User" (username, hashed_password, id, "clientId", roles, grants) OVERRIDING SYSTEM VALUE VALUES ('admin', '$2b$12$sKBSlLDTo4T7ce3cFk8ffO0LLlFzhkpOkGxFq3P4CcvrLBijZv7Ly', 1000, 'easyfood', '{Admin}', '{dinein,order,inventory,users,tables,invoice}');
+--INSERT INTO "user" (username, hashed_password, id, client_id, roles, grants) OVERRIDING SYSTEM VALUE VALUES ('admin', '$2b$12$sKBSlLDTo4T7ce3cFk8ffO0LLlFzhkpOkGxFq3P4CcvrLBijZv7Ly', "", 'easyfood', '{Admin}', '{dinein,order,inventory,users,tables,invoice}');
 
 
 INSERT INTO "Category" (id, "clientId", "name", "description", "subCategories", "createdBy", "updatedBy") OVERRIDING SYSTEM VALUE VALUES 

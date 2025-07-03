@@ -1,4 +1,4 @@
-from setuptools import setup
+from setuptools import setup, find_packages
 
 setup(
     name = "common_lib",
@@ -9,7 +9,8 @@ setup(
     license = "BSD",
     keywords = "Saas application",
     url = "",
-    packages=['database', 'models', 'utils', 'config', 'entity'],
+    #packages=['database', 'models', 'utils', 'config', 'entity'],
+    packages = find_packages(),
     classifiers=[
         "Development Status :: Initial version",
         "Topic :: Common library",

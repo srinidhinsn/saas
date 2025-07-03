@@ -1,39 +1,32 @@
 from typing import TypeVar, Generic, Optional
-from pydantic import BaseModel
+from pydantic import BaseModel, root_validator
 
 # Define a generic type variable
 T = TypeVar("T")
 
 # Create a generic response model with a custom constructor
 class ResponseModel(BaseModel, Generic[T]):
-    screenId: Optional[str] = None
-    status: Optional[str] = None
-    message: Optional[str] = None
+    screen_id: Optional[str] = None
+    status: str = "200"
+    message: str = "success"
     data: Optional[T] = None
 
-    def __init__(self, screenId: Optional[str] = None, status: Optional[str] = None, 
-                 message: Optional[str] = None, data: Optional[T] = None):
-        super().__init__(screenId=screenId, status=status, message=message, data=data)
 
-    def set_response(self, screenId: Optional[str] = None, status: Optional[str] = None, 
+    def set_response(self, screen_id: Optional[str] = None, status: Optional[str] = None, 
                      message: Optional[str] = None, data: Optional[T] = None):
         """Setter method to update response attributes"""
-        if screenId is not None:
-            self.screenId = screenId
+        if screen_id is not None:
+            self.screen_id = screen_id
         if status is not None:
             self.status = status
-        if status is None:
-            self.status = "200"
         if message is not None:
             self.message = message
-        if message is None:
-            self.message = "success"
         if data is not None:
             self.data = data
-        super().__init__(screenId=screenId, status=status, message=message, data=data)
+        super().__init__(screen_id=screen_id, status=status, message=message, data=data)
 
 # Example usage
-response = ResponseModel(screenId="home", status="success", message="Operation completed", data={"id": 1, "name": "Rajath"})
+response = ResponseModel(screen_id="home", status="success", message="Operation completed", data={"id": 1, "name": "Rajath"})
 print(response)
 
 # Updating response using setter method

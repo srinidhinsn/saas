@@ -5,7 +5,7 @@ from fastapi import Depends, HTTPException, Request
 from fastapi.security import OAuth2PasswordBearer
 from models.saas_context import SaasContext, saasContext
 from models.user_model import PageDefinitionModel
-from models.user_entity import PageDefinition
+from entity.user_entity import PageDefinition
 from database.postgres import get_db
 from sqlalchemy.orm import Session
 
@@ -34,17 +34,17 @@ def verify_token(req: Request = None, token: str = Depends(oauth2_scheme), db: S
         payload = jwt.decode(token, SECRET_KEY, algorithms=[ALGORITHM])
         print ("Payload - ", payload)
 
-        clientId = payload.get("clientId")
+        client_id = payload.get("client_id")
 
         path = req.url.path
         path_parts = path.split("/")
-        urlClientId = path_parts[2]
-        urlModule = path_parts[3]
-        urlOperation = path_parts[4]
+        url_client_id = path_parts[2]
+        url_module = path_parts[3]
+        url_operation = path_parts[4]
         roles = payload["roles"]
         grants = payload["grants"]
         
-        page_definitions = get_page_definition(roles, urlModule, clientId, db)
+        page_definitions = get_page_definition(roles, url_module, client_id, db)
 
         # Convert list of PageDefinition entities to PageDefinitionModel instances
         pageDefinitionModels = PageDefinition.copyToModels(page_definitions)
@@ -58,14 +58,14 @@ def verify_token(req: Request = None, token: str = Depends(oauth2_scheme), db: S
         '''    
         print("pageDefinitionModels - ", pageDefinitionModels)
             
-        if (grants.index(urlModule) >= 0 and urlClientId == clientId):
-            screenId = get_screen_id(pageDefinitionModels, urlOperation)
-            print ("screenId - ", screenId)
+        if (grants.index(url_module) >= 0 and url_client_id == client_id):
+            screenId = get_screen_id(pageDefinitionModels, url_operation)
+            print ("screen_id - ", screenId)
             
             if (screenId == "accessRestricted"):
                 raise HTTPException(status_code=403, detail="Restricted Access. Please contact administrator.")
 
-            context = SaasContext(clientId, urlModule, urlOperation, str(payload.get("userId")), roles, grants, screenId)
+            context = SaasContext(client_id, url_module, url_operation, str(payload.get("user_id")), roles, grants, screenId)
             saasContext.set(context)
 
         if context is None:
@@ -77,24 +77,24 @@ def verify_token(req: Request = None, token: str = Depends(oauth2_scheme), db: S
         print(f"Other JWT error: {e}")
         raise HTTPException(status_code=401, detail="Invalid Token")
     except ValueError:
-        print(f"User do not have access to ", urlModule)
+        print(f"User do not have access to ", url_module)
         raise HTTPException(status_code=403, detail="Restricted Grants. Please contact administrator.")
 
 
-def get_screen_id(page_definitions, urlOperation):    
+def get_screen_id(page_definitions, url_operation):    
     for page_def in page_definitions:
-        if urlOperation in page_def.operations and page_def.loadType == "include":
-            return page_def.screenId
-        if urlOperation not in page_def.operations and page_def.loadType == "exclude":
-            return page_def.screenId
+        if url_operation in page_def.operations and page_def.load_type == "include":
+            return page_def.screen_id
+        if url_operation not in page_def.operations and page_def.load_type == "exclude":
+            return page_def.screen_id
     return "accessRestricted"
 
 
-def get_page_definition(roles: list[str], module: str, clientId: str, db: Session):
+def get_page_definition(roles: list[str], module: str, client_id: str, db: Session):
     page_definitions = db.query(PageDefinition).filter(
                             PageDefinition.role.in_(roles),  # Multiple roles
                             PageDefinition.module == module,  # Matching module
-                            PageDefinition.clientId == clientId  # Matching client ID
+                            PageDefinition.client_id == client_id  # Matching client ID
                         ).all()
 
     return page_definitions  # Returning the fetched results

@@ -1,15 +1,23 @@
+import uuid
 from database.postgres import Base
-from sqlalchemy import Column , Integer, String, ARRAY
-from .user_model import UserModel, PageDefinitionModel
+from sqlalchemy import Column , Integer, String, ARRAY, UUID, event
+from models.user_model import UserModel, PageDefinitionModel
+
 
 class User(Base):
-    __tablename__ = "User"
-    id = Column(Integer, primary_key=True, index=True)
-    username = Column(String, index=True)
-    hashed_password = Column(String)
-    clientId = Column(String)
-    roles = Column(ARRAY(String))
-    grants = Column(ARRAY(String))
+    __tablename__ = "user"
+    id = Column(UUID(as_uuid=True), primary_key=True, default=uuid.uuid4)
+    username = Column(String, index=True, nullable=False)
+    hashed_password = Column(String, nullable=False)
+    client_id = Column(String, nullable=False)
+    roles = Column(ARRAY(String), default=[])
+    grants = Column(ARRAY(String), default=[])
+
+
+    def generate_uuid(username: str, client_id: str) -> uuid.UUID:
+        namespace = uuid.UUID("6ba7b810-9dad-11d1-80b4-00c04fd430c8")  # DNS namespace
+        combined_key = f"{username}-{client_id}"
+        return uuid.uuid5(namespace, combined_key)
 
 
     @staticmethod
@@ -42,15 +50,22 @@ class User(Base):
         return [User(**model.dict(exclude_unset=True)) for model in userModels]
 
 
+
+@event.listens_for(User, "before_insert")
+def set_uuid(mapper, connection, target):
+    if not target.id and target.username and target.client_id:
+        target.id = User.generate_uuid(target.username, target.client_id)
+
+
 class PageDefinition(Base):
-    __tablename__ = "PageDefinition"
+    __tablename__ = "page_definition"
     id = Column (Integer, primary_key=True, index=True)
-    clientId = Column(String)
+    client_id = Column(String)
     role = Column(String)
     module = Column(String)
     operations = Column(ARRAY(String))
-    screenId = Column(String)
-    loadType = Column(String)
+    screen_id = Column(String)
+    load_type = Column(String)
 
     @staticmethod
     def copyToModels(page_definitions):
