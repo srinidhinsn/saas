@@ -172,7 +172,7 @@ const OrderForm = ({ table, onOrderCreated }) => {
                         <div
                             className="table-id clickable"
                             title="Click to change table"
-                            onClick={async () => {
+                            onMouseOver={async () => {
                                 if (mode === "Dine In") {
                                     try {
                                         const res = await api.get(`/${clientId}/tables`);

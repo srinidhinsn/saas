@@ -105,35 +105,26 @@ function AddonItemManager({ group }) {
         <button className="btn-add" onClick={() => setShowAddModal(true)}>+ Add Item</button>
       </div>
 
-      <table className="menu-item-table">
-        <thead>
-          <tr>
-            <th>#</th>
-            <th>Item Name</th>
-            <th>Price (₹)</th>
-            <th>Dietary</th>
-            <th>Actions</th>
-          </tr>
-        </thead>
-        <tbody>
-          {items.length === 0 ? (
-            <tr>
-              <td colSpan="5" style={{ textAlign: "center" }}>No items found.</td>
-            </tr>
-          ) : (
-            items.map((item, index) => (
-              <tr key={item.id}>
-                <td>{index + 1}</td>
-                <td>
+      <div className="menu-grid-container">
+        {items.length === 0 ? (
+          <p className="no-items">No items found.</p>
+        ) : (
+          items.map((item, index) => (
+            <div key={item.id} className="menu-grid-card">
+              <div className="menu-card-body">
+                <h4 className="menu-card-name">
                   {editingItemId === item.id ? (
                     <input
                       value={item.name}
                       className="menu-item-input"
                       onChange={(e) => handleEditChange(item.id, "name", e.target.value)}
                     />
-                  ) : item.name}
-                </td>
-                <td>
+                  ) : (
+                    item.name
+                  )}
+                </h4>
+
+                <p className="menu-card-price">
                   {editingItemId === item.id ? (
                     <input
                       type="number"
@@ -143,39 +134,41 @@ function AddonItemManager({ group }) {
                         handleEditChange(item.id, "price", parseFloat(e.target.value))
                       }
                     />
-                  ) : `₹${item.price.toFixed(2)}`}
-                </td>
-                <td>
+                  ) : (
+                    `₹${item.price.toFixed(2)}`
+                  )}
+                </p>
+
+                <p className="menu-card-dietary">
                   {editingItemId === item.id ? (
                     <input
                       className="menu-item-input"
                       value={item.dietary}
                       onChange={(e) => handleEditChange(item.id, "dietary", e.target.value)}
                     />
-                  ) : item.dietary || "—"}
-                </td>
-                <td className="menu-item-actions">
-                  {editingItemId === item.id ? (
-                    <>
-                      <button onClick={() => handleEditSave(item)} className="btn-edit">Save</button>
-                      <button onClick={() => setEditingItemId(null)} className="btn-delete">Cancel</button>
-                    </>
                   ) : (
-                    <>
-                      <button onClick={() => setEditingItemId(item.id)} className="btn-edit">
-                        <FaEdit />
-                      </button>
-                      <button onClick={() => handleDelete(item.id)} className="btn-delete">
-                        <FaTrash />
-                      </button>
-                    </>
+                    item.dietary || "—"
                   )}
-                </td>
-              </tr>
-            ))
-          )}
-        </tbody>
-      </table>
+                </p>
+              </div>
+
+              <div className="menu-card-footer">
+                {editingItemId === item.id ? (
+                  <>
+                    <button onClick={() => handleEditSave(item)} className="btn-edit">Save</button>
+                    <button onClick={() => setEditingItemId(null)} className="btn-delete">Cancel</button>
+                  </>
+                ) : (
+                  <>
+                    <button onClick={() => setEditingItemId(item.id)} className="btn-edit"><FaEdit /></button>
+                    <button onClick={() => handleDelete(item.id)} className="btn-delete"><FaTrash /></button>
+                  </>
+                )}
+              </div>
+            </div>
+          ))
+        )}
+      </div>
 
       {showAddModal && (
         <div className="modal-overlay" onClick={(e) => {

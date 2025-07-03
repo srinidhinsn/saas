@@ -33,7 +33,7 @@ export default function Login() {
             localStorage.setItem("username", username || "");
 
             alert("✅ Login successful");
-            navigate("/profile");
+            navigate("/main");
         } catch (err) {
             console.error("Login error:", err?.response?.data);
             const detail = err?.response?.data?.detail;

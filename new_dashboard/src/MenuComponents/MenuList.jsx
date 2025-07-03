@@ -160,6 +160,78 @@
 
 // export default MenuItemList;
 
+// const handleExcelImport = async (e) => {
+//   const file = e.target.files[0];
+//   if (!file) return;
+
+//   const reader = new FileReader();
+//   reader.onload = async (evt) => {
+//     const data = new Uint8Array(evt.target.result);
+//     const workbook = XLSX.read(data, { type: "array" });
+//     const sheetName = workbook.SheetNames[0];
+//     const sheet = workbook.Sheets[sheetName];
+
+//     const rows = XLSX.utils.sheet_to_json(sheet).filter(row => row && row.Category);
+
+//     try {
+
+//       const categoryMap = {};
+//       categories.forEach(cat => {
+//         if (cat.name) {
+//           categoryMap[cat.name.trim().toLowerCase()] = cat.id;
+//         }
+//       });
+
+//       for (const row of rows) {
+//         const categoryName = row.Category?.trim()?.toLowerCase();
+
+//         if (!categoryName || !categoryMap[categoryName]) {
+//           alert(`Invalid or missing category: "${row.Category}"`);
+//           continue;
+//         }
+
+//         const payload = {
+//           itemCode: parseInt(row.ItemCode),
+//           name: row.Name,
+//           description: row.Description || "",
+//           price: parseFloat(row.Price),
+//           image_url: row.ImageURL || "",
+//           dietary: row.Dietary || "",
+//           gst: parseFloat(row.GST || 0),
+//           swiggyPrice: parseFloat(row.SwiggyPrice || 0),
+//           zomatoPrice: parseFloat(row.ZomatoPrice || 0),
+//           isAvailableSwiggy: row.isAvailableSwiggy === true || row.isAvailableSwiggy === "true",
+//           isAvailableZomato: row.isAvailableZomato === true || row.isAvailableZomato === "true",
+//           client_id: clientId,
+//           category_id: categoryMap[categoryName]
+//         };
+
+//         const res = await axios.post(`http://localhost:8000/api/v1/${clientId}/menu/items/upsert`, payload);
+
+//         setItems(prev => {
+//           const existingIndex = prev.findIndex(i => i.itemCode === res.data.itemCode);
+//           if (existingIndex !== -1) {
+//             // Replace existing item
+//             const updated = [...prev];
+//             updated[existingIndex] = res.data;
+//             return updated;
+//           } else {
+//             // Add new item
+//             return [...prev, res.data];
+//           }
+//         });
+
+//       }
+
+//       alert("Import completed!");
+//     } catch (error) {
+//       console.error("Import failed:", error);
+//       alert("Import failed. Check console.");
+//     }
+//   };
+
+//   reader.readAsArrayBuffer(file);
+// };
 
 
 import React, { useEffect, useState } from "react";
@@ -177,6 +249,11 @@ function MenuItemList({ clientId, category }) {
   const [recentlyEditedId, setRecentlyEditedId] = useState(null);
   const [deleteTarget, setDeleteTarget] = useState(null);
   const [showEditModal, setShowEditModal] = useState(false);
+  const [showDateModal, setShowDateModal] = useState(false);
+  const [targetItem, setTargetItem] = useState(null);
+  const [fromDate, setFromDate] = useState("");
+  const [toDate, setToDate] = useState("");
+
 
 
   const isAllCategory = category?.name?.toLowerCase() === "all";
@@ -288,79 +365,6 @@ function MenuItemList({ clientId, category }) {
   };
 
 
-  // const handleExcelImport = async (e) => {
-  //   const file = e.target.files[0];
-  //   if (!file) return;
-
-  //   const reader = new FileReader();
-  //   reader.onload = async (evt) => {
-  //     const data = new Uint8Array(evt.target.result);
-  //     const workbook = XLSX.read(data, { type: "array" });
-  //     const sheetName = workbook.SheetNames[0];
-  //     const sheet = workbook.Sheets[sheetName];
-
-  //     const rows = XLSX.utils.sheet_to_json(sheet).filter(row => row && row.Category);
-
-  //     try {
-
-  //       const categoryMap = {};
-  //       categories.forEach(cat => {
-  //         if (cat.name) {
-  //           categoryMap[cat.name.trim().toLowerCase()] = cat.id;
-  //         }
-  //       });
-
-  //       for (const row of rows) {
-  //         const categoryName = row.Category?.trim()?.toLowerCase();
-
-  //         if (!categoryName || !categoryMap[categoryName]) {
-  //           alert(`Invalid or missing category: "${row.Category}"`);
-  //           continue;
-  //         }
-
-  //         const payload = {
-  //           itemCode: parseInt(row.ItemCode),
-  //           name: row.Name,
-  //           description: row.Description || "",
-  //           price: parseFloat(row.Price),
-  //           image_url: row.ImageURL || "",
-  //           dietary: row.Dietary || "",
-  //           gst: parseFloat(row.GST || 0),
-  //           swiggyPrice: parseFloat(row.SwiggyPrice || 0),
-  //           zomatoPrice: parseFloat(row.ZomatoPrice || 0),
-  //           isAvailableSwiggy: row.isAvailableSwiggy === true || row.isAvailableSwiggy === "true",
-  //           isAvailableZomato: row.isAvailableZomato === true || row.isAvailableZomato === "true",
-  //           client_id: clientId,
-  //           category_id: categoryMap[categoryName]
-  //         };
-
-  //         const res = await axios.post(`http://localhost:8000/api/v1/${clientId}/menu/items/upsert`, payload);
-
-  //         setItems(prev => {
-  //           const existingIndex = prev.findIndex(i => i.itemCode === res.data.itemCode);
-  //           if (existingIndex !== -1) {
-  //             // Replace existing item
-  //             const updated = [...prev];
-  //             updated[existingIndex] = res.data;
-  //             return updated;
-  //           } else {
-  //             // Add new item
-  //             return [...prev, res.data];
-  //           }
-  //         });
-
-  //       }
-
-  //       alert("Import completed!");
-  //     } catch (error) {
-  //       console.error("Import failed:", error);
-  //       alert("Import failed. Check console.");
-  //     }
-  //   };
-
-  //   reader.readAsArrayBuffer(file);
-  // };
-
   const handleExcelImport = async (e) => {
     const file = e.target.files[0];
     if (!file) return;
@@ -437,15 +441,44 @@ function MenuItemList({ clientId, category }) {
     reader.readAsArrayBuffer(file);
   };
 
-  const toggleAvailability = async (item) => {
+  // const toggleAvailability = async (item) => {
+  //   try {
+  //     const res = await axios.put(
+  //       `http://localhost:8000/api/v1/${clientId}/menu/items/${item.id}`,
+  //       { ...item, is_available: !item.is_available }
+  //     );
+  //     setItems((prev) =>
+  //       prev.map((i) => (i.id === item.id ? res.data : i))
+  //     );
+  //   } catch (err) {
+  //     console.error("Toggle failed:", err);
+  //     alert("Failed to update availability.");
+  //   }
+  // };
+
+
+  const toggleAvailability = (item) => {
+    if (item.is_available) {
+      setTargetItem(item);         // Save item for confirmation
+      setShowDateModal(true);     // Show confirmation modal before turning OFF
+    } else {
+      // Turn ON directly
+      updateAvailability(item, true);
+    }
+  };
+
+  // Actual PUT logic
+  const updateAvailability = async (item, newStatus) => {
     try {
       const res = await axios.put(
         `http://localhost:8000/api/v1/${clientId}/menu/items/${item.id}`,
-        { ...item, is_available: !item.is_available }
+        { ...item, is_available: newStatus }
       );
       setItems((prev) =>
         prev.map((i) => (i.id === item.id ? res.data : i))
       );
+      setShowDateModal(false);
+      setTargetItem(null);
     } catch (err) {
       console.error("Toggle failed:", err);
       alert("Failed to update availability.");
@@ -490,7 +523,7 @@ function MenuItemList({ clientId, category }) {
         </h3>
 
         {!isAllCategory && (
-          <div style={{ display: "flex", gap: "10px" }}>
+          <div className="btns">
             <button className="btn-add" onClick={() => {
               setShowAddModal(true);
               setAddTargetCategoryId(category.id);
@@ -515,64 +548,57 @@ function MenuItemList({ clientId, category }) {
         )}
       </div>
 
-      <table className="menu-item-table">
-        <thead>
-          <tr>
-            <th>Item Code</th>
-            <th>Item Name</th>
-            <th>Description</th>
-            <th>Category</th>
-            <th>Dietary</th>
-            <th>Image</th>
-            <th>GST (%)</th>
-            <th>Price (₹)</th>
-            <th>Actions</th>
-            <th>Available</th>
+      <div className="menu-grid-container">
+        {filteredItems.length === 0 ? (
+          <p className="no-items">No items found.</p>
+        ) : (
+          filteredItems.map((item) => (
+            <div
+              key={item.id}
+              className={`menu-grid-card ${recentlyEditedId === item.id ? "highlight" : ""}`}
+            >
+              <div className="menu-card-image">
+                {item.image_url ? (
+                  <img src={`http://localhost:8000${item.image_url}`} alt={item.name} />
+                ) : (
+                  <div className="no-image">No Image</div>
+                )}
+              </div>
+              <div className="menu-card-body">
+                <h4>{item.name}</h4>
+                <p className="menu-card-price">₹{item.price}</p>
+                <p className="menu-card-code">Code: {item.itemCode || "x"}</p>
+                <p className="menu-card-code">GST: {item.gst || "x"}%</p>
+                <p className="menu-card-code">
+                  Category: {categories.find(cat => cat.id === item.category_id)?.name || "N/A"}
+                </p>
+                <p className="menu-card-code">Dietary: {item.dietary || "x"}</p>
+                <p className="menu-card-code">Description: {item.description || "x"}</p>
+              </div>
 
-          </tr>
-        </thead>
-        <tbody>
-          {filteredItems.length === 0 ? (
-            <tr>
-              <td colSpan="10" style={{ textAlign: "center" }}>No items found.</td>
-            </tr>
-          ) : (
-            filteredItems.map((item) => (
-              <tr key={item.id} className={recentlyEditedId === item.id ? "menu-item-highlight" : ""}>
-                <td>{item.itemCode || "x"}</td>
-                <td>{item.name}</td>
-                <td>{item.description}</td>
-                <td>{categories.find(cat => cat.id === item.category_id)?.name || "N/A"}</td>
-                <td>{item.dietary || "x"}</td>
-                <td>
-                  {item.image_url ? (
-                    <img
-                      src={`http://localhost:8000${item.image_url}`}
-                      alt="img"
-                      style={{ width: "60px", height: "40px", objectFit: "cover" }}
-                    />
-                  ) : "x"}
-                </td>
-                <td>{item.gst || "x"}%</td>
-                <td>₹{item.price}</td>
-                <td className="menu-item-actions">
-                  <button onClick={() => handleEdit(item)} className="btn-edit"><FaEdit /></button>
-                  <button onClick={() => setDeleteTarget(item)} className="btn-delete"><FaTrash /></button>
-                </td>
-                <td>
-                  <button
-                    className={item.is_available ? "btn-on" : "btn-off"}
-                    onClick={() => toggleAvailability(item)}
-                  >
-                    {item.is_available ? "ON" : "OFF"}
+              <div className="menu-card-footer">
+                <button
+                  className={item.is_available ? "btn-on" : "btn-off"}
+                  onClick={() => toggleAvailability(item)}
+                >
+                  {item.is_available ? "ON" : "OFF"}
+                </button>
+                <div>
+                  <button onClick={() => handleEdit(item)} className="btn-edit">
+                    <FaEdit />
                   </button>
-                </td>
-              </tr>
-            ))
-          )}
+                  <button onClick={() => setDeleteTarget(item)} className="btn-delete">
+                    <FaTrash />
+                  </button>
+                </div>
+              </div>
 
-        </tbody>
-      </table>
+
+            </div>
+
+          ))
+        )}
+      </div>
 
       {showAddModal && (
         <div className="modal-overlay" onClick={(e) => {
@@ -680,6 +706,49 @@ function MenuItemList({ clientId, category }) {
                 <button type="button" className="btn-cancel" onClick={() => setShowEditModal(false)}>Cancel</button>
               </div>
             </form>
+          </div>
+        </div>
+      )}
+
+
+      {showDateModal && targetItem && (
+        <div className="modal-overlay">
+          <div className="modal-box">
+            <h3>Turn Off Availability</h3>
+            <p>Enter duration to disable <strong>{targetItem.name}</strong>:</p>
+
+            <div className="date-inputs">
+              <label>
+                From:
+                <input
+                  type="date"
+                  value={fromDate}
+                  onChange={(e) => setFromDate(e.target.value)}
+                />
+              </label>
+
+              <label>
+                To:
+                <input
+                  type="date"
+                  value={toDate}
+                  onChange={(e) => setToDate(e.target.value)}
+                />
+              </label>
+            </div>
+
+            <div className="modal-actions">
+              <button
+                className="btn-confirm"
+                onClick={() => updateAvailability(targetItem, false)}
+                disabled={!fromDate || !toDate}
+              >
+                Confirm
+              </button>
+              <button className="btn-cancel" onClick={() => setShowDateModal(false)}>
+                Cancel
+              </button>
+            </div>
           </div>
         </div>
       )}

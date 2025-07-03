@@ -2,6 +2,7 @@
 
 import React, { useState } from "react";
 import axios from "axios";
+// import '../styles/AddCategoryForm.css'
 
 function AddCategoryForm({ clientId, onAdd }) {
   const [name, setName] = useState("");

@@ -141,65 +141,61 @@ function SwiggyMenuItemList({ clientId, category }) {
 
 
         </div>
+        <div className="menu-grid-container">
+          {filteredItems.length === 0 ? (
+            <p className="no-items">No items found.</p>
+          ) : (
+            filteredItems.map((item) => (
+              <div
+                key={item.id}
+                className={`menu-grid-card ${recentlyEditedId === item.id ? "highlight" : ""}`}
+              >
+                {/* Image section */}
+                <div className="menu-card-image">
+                  {item.image_url ? (
+                    <img src={`http://localhost:8000${item.image_url}`} alt={item.name} />
+                  ) : (
+                    <div className="no-image">No Image</div>
+                  )}
+                </div>
 
-        <table className="menu-item-table">
-          <thead>
-            <tr>
-              <th>Item Code</th>
-              <th>Item Name</th>
-              <th>Description</th>
-              <th>Category</th>
-              <th>Dietary</th>
-              <th>Image</th>
-              <th>GST (%)</th>
-              <th>Price (₹)</th>
-              <th>Actions</th>
-              <th>Available</th>
-            </tr>
+                {/* Name, price, code */}
+                <div className="menu-card-body">
+                  <h4>{item.name}</h4>
+                  <p className="menu-card-price">₹{item.price}</p>
+                  <p className="menu-card-code">Code: {item.itemCode || "x"}</p>
+                  <p className="menu-card-code">GST: {item.gst || "x"}%</p>
+                  <p className="menu-card-code">
+                    Category: {categories.find(cat => cat.id === item.category_id)?.name || "N/A"}
+                  </p>
+                  <p className="menu-card-code">Dietary: {item.dietary || "x"}</p>
+                  <p className="menu-card-code">Description: {item.description || "x"}</p>
+                </div>
 
-          </thead>
-          <tbody>
-            {filteredItems.length === 0 ? (
-              <tr>
-                <td colSpan="10" style={{ textAlign: "center" }}>No items found.</td>
-              </tr>
-            ) : (
-              filteredItems.map((item) => (
-                <tr key={item.id} className={recentlyEditedId === item.id ? "menu-item-highlight" : ""}>
-                  <td>{item.itemCode || "x"}</td>
-                  <td>{item.name}</td>
-                  <td>{item.description}</td>
-                  <td>{categories.find(cat => cat.id === item.category_id)?.name || "N/A"}</td>
-                  <td>{item.dietary || "x"}</td>
-                  <td>
-                    {item.image_url ? (
-                      <img
-                        src={`http://localhost:8000${item.image_url}`}
-                        alt="img"
-                        style={{ width: "60px", height: "40px", objectFit: "cover" }}
-                      />
-                    ) : "x"}
-                  </td>
-                  <td>{item.gst || "x"}%</td>
-                  <td>₹{item.price}</td>
-                  <td className="menu-item-actions">
-                    <button onClick={() => handleEdit(item)} className="btn-edit"><FaEdit /></button>
-                    <button onClick={() => setDeleteTarget(item)} className="btn-delete"><FaTrash /></button>
-                  </td>
-                  <td>
-                    <button
-                      className={item.isAvailableSwiggy ? "btn-on" : "btn-off"}
-                      onClick={() => toggleAvailability(item)}
-                    >
-                      {item.isAvailableSwiggy ? "ON" : "OFF"}
+                {/* Actions and availability */}
+                <div className="menu-card-footer">
+                  <button
+                    className={item.isAvailableSwiggy ? "btn-on" : "btn-off"}
+                    onClick={() => toggleAvailability(item)}
+                  >
+                    {item.isAvailableSwiggy ? "ON" : "OFF"}
+                  </button>
+
+                  <div>
+                    <button onClick={() => handleEdit(item)} className="btn-edit">
+                      <FaEdit />
                     </button>
+                    <button onClick={() => setDeleteTarget(item)} className="btn-delete">
+                      <FaTrash />
+                    </button>
+                  </div>
+                </div>
+              </div>
+            ))
+          )}
+        </div>
 
-                  </td>
-                </tr>
-              ))
-            )}
-          </tbody>
-        </table>
+
 
         {/* Add Item Modal */}
         {showAddModal && (

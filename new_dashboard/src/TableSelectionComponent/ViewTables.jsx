@@ -367,7 +367,7 @@ const ViewTables = ({ onOrderUpdate, clientId }) => {
                                         onClick={() => navigate(`/view-tables/${table.id}`)}
                                     >
                                         <div className="table-number">{table.table_number}</div>
-                                        <div className="table-status">{table.status}</div>
+                                        {/* <div className="table-status">{table.status}</div> */}
                                     </div>
                                 ))}
                             </div>
