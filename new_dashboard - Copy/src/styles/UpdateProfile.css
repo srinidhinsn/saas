@@ -1,0 +1,483 @@
+/* :root {
+    --primary-color: rgb(242, 171, 105);
+    --background-light: #f9f9f9;
+    --text-dark: #1e1e1e;
+    --input-bg: #fff;
+    --input-border: #ccc;
+    --border-radius: 12px;
+    --font-family: 'Poppins', sans-serif;
+}
+
+[data-theme='dark'] {
+    --primary-color: #ffa733;
+    --background-light: #1e1e1e;
+    --text-dark: #f1f1f1;
+    --input-bg: #2b2b2b;
+    --input-border: #555;
+}
+
+body {
+    margin: 0;
+    font-family: var(--font-family);
+    background-color: var(--background-light);
+    color: var(--text-dark);
+}
+
+.profile-wrapper {
+    display: flex;
+    flex-wrap: wrap;
+    width: 100%;
+    box-sizing: border-box;
+    gap: 1.5rem;
+}
+
+.profile-sidebar {
+    width: 280px;
+    background-color: var(--input-bg);
+    padding: 2rem 1.5rem;
+    border-radius: var(--border-radius);
+    box-shadow: 0 2px 8px rgba(0, 0, 0, 0.05);
+    text-align: center;
+    flex-shrink: 0;
+}
+
+.profile-pic-container {
+    position: relative;
+    width: 100px;
+    height: 100px;
+    margin: 0 auto;
+}
+
+.profile-img {
+    width: 100px;
+    height: 100px;
+    border-radius: 50%;
+    object-fit: cover;
+}
+
+.edit-icon {
+    position: absolute;
+    bottom: 0;
+    right: 0;
+    background: var(--primary-color);
+    color: white;
+    border-radius: 50%;
+    padding: 0.3rem;
+    cursor: pointer;
+    font-size: 0.8rem;
+}
+
+.profile-name {
+    margin-top: 1rem;
+    font-size: 1.2rem;
+    font-weight: 600;
+}
+
+.profile-role {
+    color: gray;
+    font-size: 0.95rem;
+    margin-bottom: 2rem;
+}
+
+.profile-menu {
+    display: flex;
+    flex-direction: column;
+    gap: 1rem;
+}
+
+.profile-menu button {
+    padding: 0.75rem;
+    background: none;
+    border: none;
+    border-radius: var(--border-radius);
+    cursor: pointer;
+    font-weight: 500;
+    text-align: left;
+    transition: background 0.2s;
+}
+
+.profile-menu button.active,
+.profile-menu button:hover {
+    background-color: var(--primary-color);
+    color: white;
+}
+
+.profile-main {
+    flex: 1;
+    min-width: 300px;
+    background: var(--input-bg);
+    padding: 2rem;
+    border-radius: var(--border-radius);
+    box-shadow: 0 2px 8px rgba(0, 0, 0, 0.05);
+    height: 100vh;
+    overflow: auto;
+}
+
+.profile-main h2 {
+    font-size: 1.5rem;
+    margin-bottom: 1.5rem;
+}
+
+.gender-select {
+    display: flex;
+    flex-wrap: wrap;
+    gap: 2rem;
+    margin-bottom: 1.5rem;
+    font-weight: 500;
+}
+
+.gender-select label {
+    display: flex;
+    align-items: center;
+    gap: 0.4rem;
+}
+
+.profile-form .form-grid {
+    display: grid;
+    grid-template-columns: repeat(auto-fit, minmax(280px, 1fr));
+    gap: 1.5rem;
+}
+
+.form-field {
+    display: flex;
+    flex-direction: column;
+}
+
+.form-field label {
+    font-weight: 500;
+    margin-bottom: 0.5rem;
+    font-size: 0.95rem;
+    text-align: justify;
+}
+
+.form-field input,
+.form-field select,
+.form-field textarea {
+    width: 100%;
+    padding: 0.75rem 1rem;
+    font-size: 1rem;
+    border: 1px solid var(--input-border);
+    border-radius: var(--border-radius);
+    background-color: var(--input-bg);
+    color: var(--text-dark);
+    box-sizing: border-box;
+}
+
+.form-field.full {
+    grid-column: span 2;
+}
+
+.form-field textarea {
+    resize: vertical;
+    min-height: 100px;
+}
+
+.form-buttons {
+    display: flex;
+    justify-content: flex-end;
+    gap: 1rem;
+    margin-top: 2rem;
+    flex-wrap: wrap;
+}
+
+.btn-discard,
+.btn-save {
+    padding: 0.75rem 2rem;
+    border-radius: var(--border-radius);
+    font-weight: 600;
+    font-size: 1rem;
+    cursor: pointer;
+    transition: all 0.2s ease;
+    border: none;
+}
+
+.btn-discard {
+    background-color: transparent;
+    border: 1px solid var(--primary-color);
+    color: var(--primary-color);
+}
+
+.btn-discard:hover {
+    background-color: var(--primary-color);
+    color: #fff;
+}
+
+.btn-save {
+    background-color: var(--primary-color);
+    color: #fff;
+}
+
+.btn-save:hover {
+    opacity: 0.9;
+}
+
+@media (max-width: 768px) {
+    .profile-wrapper {
+        flex-direction: column;
+    }
+
+    .profile-sidebar {
+        width: 100%;
+        margin-bottom: 1rem;
+    }
+
+    .profile-main {
+        width: 100%;
+    }
+
+    .form-field.full {
+        grid-column: span 1;
+    }
+
+    .form-buttons {
+        flex-direction: column;
+        align-items: stretch;
+    }
+}
+
+
+
+ */
+
+
+:root {
+    --primary-color: rgb(228, 153, 103);
+    --background-light: #f9f9f9;
+    --text-dark: #1e1e1e;
+    --input-bg: #ffffff;
+    --input-border: #cccccc;
+    --border-radius: 12px;
+    --font-family: 'Poppins', sans-serif;
+}
+
+body.theme-dark {
+    --primary-color: rgb(228, 153, 103);
+    --background-light: #1e1e1e;
+    --text-dark: #f1f1f1;
+    --input-bg: #2b2b2b;
+    --input-border: #555555;
+}
+
+body {
+    margin: 0;
+    font-family: var(--font-family);
+    background-color: var(--background-light);
+    color: var(--text-dark);
+}
+
+.profile-wrapper {
+    display: flex;
+    flex-wrap: wrap;
+    width: 100%;
+    box-sizing: border-box;
+    gap: 1.5rem;
+}
+
+.profile-sidebar {
+    width: 280px;
+    background-color: var(--input-bg);
+    padding: 2rem 1.5rem;
+    border-radius: var(--border-radius);
+    box-shadow: 0 2px 8px rgba(0, 0, 0, 0.05);
+    text-align: center;
+    flex-shrink: 0;
+    color: var(--text-dark);
+}
+
+.profile-pic-container {
+    position: relative;
+    width: 100px;
+    height: 100px;
+    margin: 0 auto;
+}
+
+.profile-img {
+    width: 100px;
+    height: 100px;
+    border-radius: 50%;
+    object-fit: cover;
+}
+
+.edit-icon {
+    position: absolute;
+    bottom: 0;
+    right: 0;
+    background: var(--primary-color);
+    color: white;
+    border-radius: 50%;
+    padding: 0.3rem;
+    cursor: pointer;
+    font-size: 0.8rem;
+}
+
+.profile-name {
+    margin-top: 1rem;
+    font-size: 1.2rem;
+    font-weight: 600;
+}
+
+.profile-role {
+    color: gray;
+    font-size: 0.95rem;
+    margin-bottom: 2rem;
+}
+
+.profile-menu {
+    display: flex;
+    flex-direction: column;
+    gap: 1rem;
+}
+
+.profile-menu button {
+    padding: 0.75rem;
+    background: none;
+    border: none;
+    border-radius: var(--border-radius);
+    cursor: pointer;
+    font-weight: 500;
+    text-align: left;
+    transition: background 0.2s;
+    color: var(--text-dark);
+}
+
+.profile-menu button.active,
+.profile-menu button:hover {
+    background-color: var(--primary-color);
+    color: #fff;
+}
+
+.profile-main {
+    flex: 1;
+    min-width: 300px;
+    background: var(--input-bg);
+    padding: 2rem;
+    border-radius: var(--border-radius);
+    box-shadow: 0 2px 8px rgba(0, 0, 0, 0.05);
+    height: 100vh;
+    overflow: auto;
+    color: var(--text-dark);
+}
+
+.profile-main h2 {
+    font-size: 1.5rem;
+    margin-bottom: 1.5rem;
+}
+
+.gender-select {
+    display: flex;
+    flex-wrap: wrap;
+    gap: 2rem;
+    font-weight: 500;
+    margin: auto;
+}
+
+.gender-select label {
+    display: flex;
+    align-items: center;
+    gap: 0.4rem;
+    color: var(--text-dark);
+}
+
+.profile-form .form-grid {
+    display: grid;
+    grid-template-columns: repeat(auto-fit, minmax(280px, 1fr));
+    gap: 1.5rem;
+}
+
+.form-field {
+    display: flex;
+    flex-direction: column;
+}
+
+.form-field label {
+    font-weight: 500;
+    margin-bottom: 0.5rem;
+    font-size: 0.95rem;
+    text-align: justify;
+    color: var(--text-dark);
+}
+
+.form-field input,
+.form-field select,
+.form-field textarea {
+    width: 100%;
+    padding: 0.75rem 1rem;
+    font-size: 1rem;
+    border: 1px solid var(--input-border);
+    border-radius: var(--border-radius);
+    background-color: var(--input-bg);
+    color: var(--text-dark);
+    box-sizing: border-box;
+}
+
+.form-field.full {
+    grid-column: span 2;
+}
+
+.form-field textarea {
+    resize: vertical;
+    min-height: 100px;
+}
+
+.form-buttons {
+    display: flex;
+    justify-content: flex-end;
+    gap: 1rem;
+    margin-top: 2rem;
+    flex-wrap: wrap;
+}
+
+.btn-discard,
+.btn-save {
+    padding: 0.75rem 2rem;
+    border-radius: var(--border-radius);
+    font-weight: 600;
+    font-size: 1rem;
+    cursor: pointer;
+    transition: all 0.2s ease;
+    border: none;
+}
+
+.btn-discard {
+    background-color: transparent;
+    border: 1px solid var(--primary-color);
+    color: var(--primary-color);
+}
+
+.btn-discard:hover {
+    background-color: var(--primary-color);
+    color: #fff;
+}
+
+.btn-save {
+    background-color: var(--primary-color);
+    color: #fff;
+}
+
+.btn-save:hover {
+    opacity: 0.9;
+}
+
+@media (max-width: 768px) {
+    .profile-wrapper {
+        flex-direction: column;
+    }
+
+    .profile-sidebar {
+        width: 100%;
+        margin-bottom: 1rem;
+    }
+
+    .profile-main {
+        width: 100%;
+    }
+
+    .form-field.full {
+        grid-column: span 1;
+    }
+
+    .form-buttons {
+        flex-direction: column;
+        align-items: stretch;
+    }
+}
