@@ -214,8 +214,11 @@ const App = () => {
   const fetchTables = async () => {
     if (!clientId) return;
     try {
-      const res = await axios.get(`http://localhost:8000/api/v1/${clientId}/tables`);
+      const res = await axios.get(`http://localhost:8000/saas/${clientId}/tables/read`, {
+
+      });
       setTables(res.data);
+
     } catch (error) {
       console.error("❌ Error fetching tables:", error);
       localStorage.removeItem("clientId");

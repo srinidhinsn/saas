@@ -432,10 +432,18 @@ import React, { useEffect, useState } from "react";
 import { FiSun, FiMoon } from "react-icons/fi";
 import { useTheme } from "../ThemeChangerComponent/ThemeContext";
 import { FaEdit, FaTrash, FaCheck, FaTimes } from "react-icons/fa";
-import api from "../PortExportingPage/api";
+// import newApi from "../PortExportingPage/newApi";
+import axios from "axios";
 
 const TableSelection = () => {
+    useEffect(() => {
+        if (!localStorage.getItem("clientId")) {
+            localStorage.setItem("clientId", "39d5f232-135d-4b7d-8e2b-f339958c8684");
+        }
+    }, []);
+
     const clientId = localStorage.getItem("clientId");
+
     const { darkMode, toggleTheme } = useTheme();
     const [tableRanges, setTableRanges] = useState([]);
     const [tables, setTables] = useState([]);
@@ -448,21 +456,32 @@ const TableSelection = () => {
     const [showConfirmDelete, setShowConfirmDelete] = useState(false);
     const [deleteTableId, setDeleteTableId] = useState(null);
     const [addRowError, setAddRowError] = useState("");
-
+    const TEMP_ACCESS_TOKEN = "mock_token_for_dev";
     useEffect(() => {
         if (clientId) fetchTables();
     }, [clientId]);
 
     const fetchTables = async () => {
+        if (!clientId) return;
         try {
-            const res = await api.get(`/${clientId}/tables`);
-            const sorted = res.data.sort((a, b) => a.table_number.localeCompare(b.table_number));
-            setTables(sorted);
-            setOriginalTables(JSON.parse(JSON.stringify(sorted)));
-        } catch (err) {
-            console.error("Error fetching tables");
+            const token = localStorage.getItem("accessToken"); // 👈 get token
+            const res = await axios.get(`http://localhost:8000/saas/${clientId}/tables/read`);
+
+
+            const result = res.data;
+            const tableList = Array.isArray(result?.data) ? result.data : [];
+
+            setTables(tableList);
+            setOriginalTables(tableList);
+
+        } catch (error) {
+            console.error("❌ Error fetching tables:", error);
+            localStorage.removeItem("clientId");
         }
     };
+
+
+
 
     const parseTableRange = (rangeStr) => {
         const parts = rangeStr.split(",");
@@ -510,24 +529,28 @@ const TableSelection = () => {
 
         const validRows = tableRanges.filter((row, index) => !newErrors[index].range && !newErrors[index].table_type && !newErrors[index].type);
         if (validRows.length === 0) return;
-
         const payload = [];
         for (let row of validRows) {
             const tableNumbers = parseTableRange(row.range);
             tableNumbers.forEach(num => {
                 payload.push({
-                    table_number: num,
-                    table_type: row.table_type.toString(),
+                    client_id: clientId,
+                    name: num,
+                    table_type: row.table_type,        // <-- use this as table name
+                    status: row.remark || "Vacant",
                     location_zone: row.type,
-                    status: row.remark || "",
-                    client_id: clientId
+                    sort_order: null,         // optional, add if you want
+                    // Add any other required fields if you want to send explicitly
                 });
             });
         }
 
         try {
             for (let data of payload) {
-                await api.post(`/${clientId}/tables`, data);
+                await axios.post(`http://localhost:8000/saas/${clientId}/tables/create`, data);
+
+
+
             }
             fetchTables();
             setShowAddTable(false);
@@ -538,11 +561,13 @@ const TableSelection = () => {
         }
     };
 
+
     const handleEditChange = (id, field, value) => {
         setTables(prev =>
             prev.map(table => (table.id === id ? { ...table, [field]: value } : table))
         );
     };
+
 
     const saveEdit = async (table) => {
         const original = originalTables.find(t => t.id === table.id);
@@ -562,12 +587,11 @@ const TableSelection = () => {
         }
 
         try {
-            await api.put(`/${clientId}/tables/${table.id}`, {
-                table_number: table.table_number,
-                table_type: table.table_type?.toString(),
-                location_zone: table.location_zone?.trim(),
-                status: table.status?.trim() || ""
-            });
+            await axios.post(`http://localhost:8000/saas/${clientId}/tables/update`, table);
+
+
+
+
             setEditRowId(null);
             setHighlightRow(table.id);
             setTimeout(() => setHighlightRow(null), 3000);
@@ -585,7 +609,8 @@ const TableSelection = () => {
 
     const confirmDelete = async () => {
         try {
-            await api.delete(`/${clientId}/tables/${deleteTableId}`);
+            await axios.post(`http://localhost:8000/saas/${clientId}/tables/delete`, { id: deleteTableId });
+
             fetchTables();
         } catch (err) {
             console.error("Error deleting table");
@@ -716,7 +741,8 @@ const TableSelection = () => {
                         <div className="form-grid" key={table.id}>
                             <div className="field-block">
                                 <label>Table No</label>
-                                <div>{table.table_number}</div>
+                                <div>{table.name}</div>
+
                             </div>
 
                             {editRowId === table.id ? (
@@ -780,7 +806,7 @@ const TableSelection = () => {
                             Delete table{" "}
                             <strong>
                                 {
-                                    tables.find((t) => t.id === deleteTableId)?.table_number ||
+                                    tables.find((t) => t.id === deleteTableId)?.name ||
                                     "this table"
                                 }
                             </strong>
