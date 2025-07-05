@@ -1,29 +1,47 @@
-from pydantic import BaseModel
 from typing import Optional, List
-import datetime
+from pydantic import BaseModel
+from datetime import datetime
 
-class InventoryModel(BaseModel):
+class Inventory(BaseModel):
     id: Optional[int] = None
-    clientId: Optional[str] = None
-    inventoryId: Optional[str] = None
-    itemId: Optional[str] = None
-    lineItemId: Optional[List[str]] = []  # ARRAY converted to Python List[str]
+    client_id: Optional[str] = None
+    inventory_id: Optional[int] = None
+    line_item_id: Optional[List[int]] = None
     name: Optional[str] = None
     description: Optional[str] = None
     category: Optional[str] = None
     realm: Optional[str] = None
     availability: Optional[int] = None
     unit: Optional[str] = None
-    unitPrice: Optional[float] = None
-    unitCst: Optional[float] = None
-    unitGst: Optional[float] = None
-    unitTotalPrice: Optional[float] = None
+    unit_price: Optional[float] = None
+    unit_cst: Optional[float] = None
+    unit_gst: Optional[float] = None
+    unit_total_price: Optional[float] = None
     price: Optional[float] = None
     cst: Optional[float] = None
     gst: Optional[float] = None
     discount: Optional[float] = None
-    totalPrice: Optional[float] = None
-    createdBy: Optional[str] = None
-    updatedBy: Optional[str] = None
-    createdDateTime: Optional[datetime.datetime]
-    updatedDateTime: Optional[datetime.datetime]
+    total_price: Optional[float] = None
+    slug: Optional[str] = None
+    created_by: Optional[str] = None
+    updated_by: Optional[str] = None
+    created_at: Optional[datetime] = None
+    updated_at: Optional[datetime] = None
+
+    class Config:
+        orm_mode = True
+
+class Category(BaseModel):
+    id: Optional[str] = None
+    client_id: Optional[str] = None
+    name: Optional[str] = None
+    description: Optional[str] = None
+    sub_categories: Optional[List[str]] = None
+    slug: Optional[str] = None
+    created_by: Optional[str] = None
+    updated_by: Optional[str] = None
+    created_at: Optional[datetime] = None
+    updated_at: Optional[datetime] = None
+
+    class Config:
+        orm_mode = True

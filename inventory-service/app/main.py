@@ -9,7 +9,8 @@ from config.settings import LOGGING_CONFIG
 app = FastAPI()
 logging.config.dictConfig(LOGGING_CONFIG)
 logger = logging.getLogger(__name__)
-app.include_router(routes.router, prefix="/saas/{clientId}/inventory")
+app.include_router(routes.router, prefix="/saas/{client_id}/inventory")
+app.include_router(routes.router, prefix="/saas/{client_id}/menu")
 
 
 
@@ -23,7 +24,7 @@ async def log_requests(request: Request, call_next):
     return response
 
 
-@app.get("/saas/{clientId}/inventory/")
+@app.get("/saas/{client_id}/inventory/")
 async def read_root():
     return {"message": "Inventory Service Running"}
 

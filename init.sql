@@ -51,36 +51,39 @@ ALTER TABLE "OrderItem" ALTER COLUMN id ADD GENERATED ALWAYS AS IDENTITY (
     CACHE 1
 );
 
-CREATE TABLE "Inventory" (
+CREATE TABLE inventory (
     id bigint NOT NULL,
-    "clientId" text,
-    "inventoryId" bigint,
-    "lineItemId" bigint[],
+    client_id text,
+    inventory_id bigint,
+    line_item_id bigint[],
+    code text,
     name text,
     description text,
-    category text,
+    category_id text,
     realm text,
     availability INT,
     unit text,
-    "unitPrice" FLOAT,
-    "unitCst" FLOAT,
-    "unitGst" FLOAT,
-    "unitTotalPrice" FLOAT,
+    image_id text,
+    unit_price FLOAT,
+    unit_cst FLOAT,
+    unit_gst FLOAT,
+    unit_total_price FLOAT,
     price FLOAT,
     cst FLOAT,
     gst FLOAT,
     discount FLOAT,
-    "totalPrice" FLOAT,
-    "createdBy" text,
-    "updatedBy" text,
-    "createdDateTime" TIMESTAMP DEFAULT CURRENT_TIMESTAMP,
-    "updatedDateTime" TIMESTAMP DEFAULT CURRENT_TIMESTAMP
+    total_price FLOAT,
+    slug text,
+    created_by text,
+    updated_by text,
+    created_at TIMESTAMP DEFAULT CURRENT_TIMESTAMP,
+    updated_at TIMESTAMP DEFAULT CURRENT_TIMESTAMP
 );
 
-ALTER TABLE "Inventory" OWNER TO postgres;
+ALTER TABLE inventory OWNER TO postgres;
 
 
-ALTER TABLE "Inventory" ALTER COLUMN id ADD GENERATED ALWAYS AS IDENTITY (
+ALTER TABLE inventory ALTER COLUMN id ADD GENERATED ALWAYS AS IDENTITY (
     SEQUENCE NAME inventory_id_seq
     START WITH 1000
     INCREMENT BY 1
@@ -188,20 +191,21 @@ ALTER TABLE "Address" ALTER COLUMN id ADD GENERATED ALWAYS AS IDENTITY (
     CACHE 1
 );
 
-CREATE TABLE "Category" (
+CREATE TABLE category (
     id text NOT NULL,
-    "clientId" text,
-    "name" text,
-    "description" text,
-    "subCategories" text[],
-    "createdBy" bigint,
-    "updatedBy" bigint,
-    "createdDateTime" TIMESTAMP DEFAULT CURRENT_TIMESTAMP,
-    "updatedDateTime" TIMESTAMP DEFAULT CURRENT_TIMESTAMP
+    client_id text,
+    name text,
+    descriptiontext,
+    sub_categories text[],
+    slug text,
+    created_by bigint,
+    updated_by bigint,
+    created_at TIMESTAMP DEFAULT CURRENT_TIMESTAMP,
+    updated_at TIMESTAMP DEFAULT CURRENT_TIMESTAMP
 );
 
 
-ALTER TABLE "Category" OWNER TO postgres;
+ALTER TABLE category OWNER TO postgres;
 
 
 CREATE TABLE document (
@@ -279,7 +283,7 @@ OVERRIDING SYSTEM VALUE VALUES
 (1006, 'easyfood', 1002, 1003, 1, 'Served');
 
 -- Insert into Inventory
-INSERT INTO "Inventory" ("id", "clientId", "inventoryId", "lineItemId", name, description, category, realm, availability, unit, "unitPrice", "unitCst", "unitGst", "unitTotalPrice", price, cst, gst, discount, "totalPrice")
+INSERT INTO inventory (id, client_id, inventory_id, line_item_id, name, description, category_id, realm, availability, unit, unit_price, unit_cst, unit_gst, unit_total_price, price, cst, gst, discount, total_price)
 OVERRIDING SYSTEM VALUE VALUES
 (1000, 'easyfood', 1, '{1001,1002}', 'Veg biriyani', 'tasty veg biriyani', 'Biriyani', 'food', 100, 'number', 90, 8, 8, 106, 9000, 800, 800, 0, 10600),
 (1001, 'easyfood', 1, NULL, 'Sherwa', 'Veg gravy', 'Gravy', 'food', 100, 'number', 10, 9, 9, 28, 1000, 80, 80, 0, 11160),
@@ -299,18 +303,19 @@ OVERRIDING SYSTEM VALUE VALUES
 
 (1020, 'easyfood', 1, NULL, 'Veg noodles', 'Veg noodles', 'chinese_02', 'food', 100, 'number', 90, 8, 8, 106, 9000, 800, 800, 0, 11600);
 
-INSERT INTO page_definition (id, client_id, module, role, screen_id, load_type, operations) OVERRIDING SYSTEM VALUE VALUES (1001, 'easyfood', 'dinein', 'Admin', 'defaultDinein', 'include', '{ALL}');
-INSERT INTO page_definition (id, client_id, module, role, screen_id, load_type, operations) OVERRIDING SYSTEM VALUE VALUES (1003, 'easyfood', 'order', 'Admin', 'defaultOrder', 'include', '{ALL}');
-INSERT INTO page_definition (id, client_id, module, role, screen_id, load_type, operations) OVERRIDING SYSTEM VALUE VALUES (1005, 'easyfood', 'tables', 'Admin', 'defaultTables', 'include', '{ALL}');
-INSERT INTO page_definition (id, client_id, module, role, screen_id, load_type, operations) OVERRIDING SYSTEM VALUE VALUES (1002, 'easyfood', 'inventory', 'Admin', 'defaultInventory', 'include', '{ALL}');
-INSERT INTO page_definition (id, client_id, module, role, screen_id, load_type, operations) OVERRIDING SYSTEM VALUE VALUES (1004, 'easyfood', 'users', 'Admin', 'defaultUser', 'exclude', '{test}');
-INSERT INTO page_definition (id, client_id, module, role, screen_id, load_type, operations) OVERRIDING SYSTEM VALUE VALUES (1006, 'easyfood', 'invoice', 'Admin', 'defaultInvoice', 'include', '{ALL}');
+INSERT INTO page_definition (id, client_id, module, role, screen_id, load_type, operations) OVERRIDING SYSTEM VALUE VALUES (1001, 'easyfood', 'dinein', 'Admin', 'default_dinein', 'include', '{ALL}');
+INSERT INTO page_definition (id, client_id, module, role, screen_id, load_type, operations) OVERRIDING SYSTEM VALUE VALUES (1003, 'easyfood', 'order', 'Admin', 'default_order', 'include', '{ALL}');
+INSERT INTO page_definition (id, client_id, module, role, screen_id, load_type, operations) OVERRIDING SYSTEM VALUE VALUES (1005, 'easyfood', 'tables', 'Admin', 'default_tables', 'include', '{ALL}');
+INSERT INTO page_definition (id, client_id, module, role, screen_id, load_type, operations) OVERRIDING SYSTEM VALUE VALUES (1002, 'easyfood', 'inventory', 'Admin', 'default_inventory', 'include', '{ALL}');
+INSERT INTO page_definition (id, client_id, module, role, screen_id, load_type, operations) OVERRIDING SYSTEM VALUE VALUES (1004, 'easyfood', 'users', 'Admin', 'default_user', 'exclude', '{test}');
+INSERT INTO page_definition (id, client_id, module, role, screen_id, load_type, operations) OVERRIDING SYSTEM VALUE VALUES (1006, 'easyfood', 'invoice', 'Admin', 'default_invoice', 'include', '{ALL}');
+INSERT INTO page_definition (id, client_id, module, role, screen_id, load_type, operations) OVERRIDING SYSTEM VALUE VALUES (1007, 'easyfood', 'menu', 'Admin', 'default_menu', 'include', '{ALL}');
 
 
 --INSERT INTO "user" (username, hashed_password, id, client_id, roles, grants) OVERRIDING SYSTEM VALUE VALUES ('admin', '$2b$12$sKBSlLDTo4T7ce3cFk8ffO0LLlFzhkpOkGxFq3P4CcvrLBijZv7Ly', "", 'easyfood', '{Admin}', '{dinein,order,inventory,users,tables,invoice}');
 
 
-INSERT INTO "Category" (id, "clientId", "name", "description", "subCategories", "createdBy", "updatedBy") OVERRIDING SYSTEM VALUE VALUES 
+INSERT INTO category (id, client_id, name, description, sub_categories, created_by, updated_by) OVERRIDING SYSTEM VALUE VALUES 
 ('chinese_01', 'easyfood', 'Chinese', 'Chinese delicious', '{"chinese_02", "chinese_03"}', '1000', '1000'),
 ('chinese_02', 'easyfood', 'Noodles', 'Noodles special delicious',null, '1000', '1000'),
 ('chinese_03', 'easyfood', 'Soups', 'Soups special delicious',null, '1000', '1000'),
