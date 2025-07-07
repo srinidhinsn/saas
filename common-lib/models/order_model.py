@@ -4,27 +4,26 @@ import datetime
 
 class DineinOrderModel(BaseModel):
     id: Optional[int] = None
-    clientId: Optional[str] = None
-    dineinOrderId: Optional[str] = None
-    tableNumber: Optional[int] = None
-    invoiceId: Optional[str] = None
-    handlerId: Optional[str] = None
-    invoiceStatus: Optional[str] = None
+    client_id: Optional[str] = None
+    dinein_order_id: Optional[str] = None
+    table_id: Optional[int] = None
+    invoice_id: Optional[str] = None
+    handler_id: Optional[str] = None
+    invoice_status: Optional[str] = None
     price: Optional[float] = None
     cst: Optional[float] = None
     gst: Optional[float] = None
     discount: Optional[float] = None
-    totalPrice: Optional[float] = None
-    createdBy: Optional[str] = None
-    updatedBy: Optional[str] = None
-    createdDateTime: Optional[datetime.datetime] = None
-    updatedDateTime: Optional[datetime.datetime] = None
+    total_price: Optional[float] = None
+    created_by: Optional[str] = None
+    updated_by: Optional[str] = None
+    created_at: Optional[datetime.datetime] = None
+    updated_at: Optional[datetime.datetime] = None
     status: Optional[str] = None
 
 class OrderItemModel(BaseModel):
     id: Optional[int] = None
-    clientId: Optional[str] = None
-    orderId: Optional[str] = None
-    orderItemId: Optional[str] = None
-    itemId: Optional[str] = None
+    client_id: Optional[str] = None
+    order_id: Optional[str] = None
+    item_id: Optional[str] = None
     quantity: Optional[int] = None

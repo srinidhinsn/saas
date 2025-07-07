@@ -1,27 +1,27 @@
-CREATE TABLE "DineinOrder" (
+CREATE TABLE dinein_order (
     id bigint NOT NULL,
-    "clientId" text,
-    "dineinOrderId" text,
-    "tableNumber" int,
-    "invoiceId" bigint,
-    "handlerId" bigint,
-    "invoiceStatus" text,
+    client_id text,
+    dinein_order_id text,
+    table_id int,
+    invoice_id bigint,
+    handler_id bigint,
+    invoice_status text,
     price FLOAT,
     cst FLOAT,
     gst FLOAT,
     discount FLOAT,
-    "totalPrice" FLOAT,
-    "createdBy" text,
-    "updatedBy" text,
-    "createdDateTime" TIMESTAMP DEFAULT CURRENT_TIMESTAMP,
-    "updatedDateTime" TIMESTAMP DEFAULT CURRENT_TIMESTAMP,
+    total_price FLOAT,
+    created_by text,
+    updated_by text,
+    created_at TIMESTAMP DEFAULT CURRENT_TIMESTAMP,
+    updated_te TIMESTAMP DEFAULT CURRENT_TIMESTAMP,
     status text
 );
 
-ALTER TABLE "DineinOrder" OWNER TO postgres;
+ALTER TABLE dinein_order OWNER TO postgres;
 
 
-ALTER TABLE "DineinOrder" ALTER COLUMN id ADD GENERATED ALWAYS AS IDENTITY (
+ALTER TABLE dinein_order ALTER COLUMN id ADD GENERATED ALWAYS AS IDENTITY (
     SEQUENCE NAME dineinOrder_id_seq
     START WITH 1000
     INCREMENT BY 1
@@ -30,19 +30,19 @@ ALTER TABLE "DineinOrder" ALTER COLUMN id ADD GENERATED ALWAYS AS IDENTITY (
     CACHE 1
 );
 
-CREATE TABLE "OrderItem" (
+CREATE TABLE order_item (
     id bigint NOT NULL,
-    "clientId" text,
-    "orderId" bigint,
-    "itemId" bigint,
+    client_id text,
+    order_id bigint,
+    item_id bigint,
 	status text,
     quantity INT
 );
 
-ALTER TABLE "OrderItem" OWNER TO postgres;
+ALTER TABLE order_item OWNER TO postgres;
 
 
-ALTER TABLE "OrderItem" ALTER COLUMN id ADD GENERATED ALWAYS AS IDENTITY (
+ALTER TABLE order_item ALTER COLUMN id ADD GENERATED ALWAYS AS IDENTITY (
     SEQUENCE NAME orderItem_id_seq
     START WITH 1000
     INCREMENT BY 1
@@ -265,14 +265,14 @@ CREATE TABLE IF NOT EXISTS public.tables (
 ALTER TABLE public.tables OWNER TO postgres;
 
 -- Insert into DineinOrder
-INSERT INTO "DineinOrder" ("id", "clientId", "dineinOrderId", "tableNumber", "invoiceId", "handlerId", "invoiceStatus", price, cst, gst, discount, "totalPrice", status)
+INSERT INTO dinein_order (id, client_id, dinein_order_id, table_id, invoice_id, handler_id, invoice_status, price, cst, gst, discount, total_price, status)
 OVERRIDING SYSTEM VALUE VALUES
 (1000, 'easyfood', 'order_1', 3, 1, '1000', 'new', NULL, NULL, NULL, NULL, NULL, 'New'),
 (1001, 'easyfood', 'order_2', 4, 2, '1000', 'generated', 180, 16, 16, 0, 212, 'Preparing'),
 (1002, 'easyfood', 'order_3', 4, 3, '1000', 'paid', 90, 8, 8, 0, 106, 'Served');
 
 -- Insert into OrderItem
-INSERT INTO "OrderItem" ("id", "clientId", "orderId", "itemId", quantity, status)
+INSERT INTO order_item (id, client_id, order_id, item_id, quantity, status)
 OVERRIDING SYSTEM VALUE VALUES
 (1000, 'easyfood', 1000, 1000, 1, 'Served'),
 (1001, 'easyfood', 1000, 1004, 2, 'Preparing'),
@@ -310,9 +310,10 @@ INSERT INTO page_definition (id, client_id, module, role, screen_id, load_type, 
 INSERT INTO page_definition (id, client_id, module, role, screen_id, load_type, operations) OVERRIDING SYSTEM VALUE VALUES (1004, 'easyfood', 'users', 'Admin', 'default_user', 'exclude', '{test}');
 INSERT INTO page_definition (id, client_id, module, role, screen_id, load_type, operations) OVERRIDING SYSTEM VALUE VALUES (1006, 'easyfood', 'invoice', 'Admin', 'default_invoice', 'include', '{ALL}');
 INSERT INTO page_definition (id, client_id, module, role, screen_id, load_type, operations) OVERRIDING SYSTEM VALUE VALUES (1007, 'easyfood', 'menu', 'Admin', 'default_menu', 'include', '{ALL}');
+INSERT INTO page_definition (id, client_id, module, role, screen_id, load_type, operations) OVERRIDING SYSTEM VALUE VALUES (1008, 'easyfood', 'document', 'Admin', 'default_document', 'include', '{ALL}');
 
 
---INSERT INTO "user" (username, hashed_password, id, client_id, roles, grants) OVERRIDING SYSTEM VALUE VALUES ('admin', '$2b$12$sKBSlLDTo4T7ce3cFk8ffO0LLlFzhkpOkGxFq3P4CcvrLBijZv7Ly', "", 'easyfood', '{Admin}', '{dinein,order,inventory,users,tables,invoice}');
+INSERT INTO "user" (username, hashed_password, id, client_id, roles, grants) OVERRIDING SYSTEM VALUE VALUES ('admin', '$2b$12$NcusUR2dTlmL/bwUYamZt.QOrGW9.ksrmFSQyx32Lc15VtWfyDPFC', '461e8cc6-a897-59b3-9f0e-1f2e19cd179c', 'easyfood', '{Admin}', '{dinein,order,inventory,users,tables,invoice,menu,document}');
 
 
 INSERT INTO category (id, client_id, name, description, sub_categories, created_by, updated_by) OVERRIDING SYSTEM VALUE VALUES 

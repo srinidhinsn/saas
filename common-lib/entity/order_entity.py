@@ -7,24 +7,24 @@ Base = declarative_base()
 
 # DineinOrders Table
 class DineinOrder(Base):
-    __tablename__ = "DineinOrders"
+    __tablename__ = "dinein_order"
 
     id = Column(Integer, primary_key=True)
-    clientId = Column(String, nullable=True)
-    dineinOrderId = Column(String, unique=True, nullable=True)
-    tableNumber = Column(Integer, nullable=True)
-    invoiceId = Column(String, nullable=True)
-    handlerId = Column(String, nullable=True)
-    invoiceStatus = Column(String, nullable=True)
+    client_id = Column(String, nullable=True)
+    dinein_order_id = Column(String, nullable=True)
+    table_id = Column(Integer, nullable=True)
+    invoice_id = Column(String, nullable=True)
+    handler_id = Column(String, nullable=True)
+    invoice_status = Column(String, nullable=True)
     price = Column(Float, nullable=True)
     cst = Column(Float, nullable=True)
     gst = Column(Float, nullable=True)
     discount = Column(Float, nullable=True)
-    totalPrice = Column(Float, nullable=True)
-    createdBy = Column(String, nullable=True)
-    updatedBy = Column(String, nullable=True)
-    createdDateTime = Column(DateTime, default=datetime.datetime.utcnow)
-    updatedDateTime = Column(DateTime, default=datetime.datetime.utcnow, onupdate=datetime.datetime.utcnow)
+    total_price = Column(Float, nullable=True)
+    created_by = Column(String, nullable=True)
+    updated_by = Column(String, nullable=True)
+    created_at = Column(DateTime, default=datetime.datetime.utcnow)
+    updated_at = Column(DateTime, default=datetime.datetime.utcnow, onupdate=datetime.datetime.utcnow)
     status = Column(String, nullable=True)
 
 
@@ -61,13 +61,12 @@ class DineinOrder(Base):
 
 # OrderItems Table
 class OrderItem(Base):
-    __tablename__ = "OrderItems"
+    __tablename__ = "order_item"
 
     id = Column(Integer, primary_key=True)
-    clientId = Column(String, nullable=True)
-    orderId = Column(String, nullable=True)
-    orderItemId = Column(String, nullable=True)
-    itemId = Column(String, nullable=True)
+    client_id = Column(String, nullable=True)
+    order_id = Column(String, nullable=True)
+    item_id = Column(String, nullable=True)
     quantity = Column(Integer, nullable=True)
 
     @staticmethod
