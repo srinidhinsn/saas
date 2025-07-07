@@ -7,7 +7,7 @@ from models.table_model import Table
 from entity.table_entity import DiningTable
 from models.response_model import ResponseModel 
 from models.saas_context import SaasContext
-from utils.auth import hash_password, verify_password, create_access_token, verify_token
+from utils.auth import verify_token
 
 router = APIRouter()
 

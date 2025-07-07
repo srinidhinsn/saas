@@ -14,7 +14,7 @@ CREATE TABLE dinein_order (
     created_by text,
     updated_by text,
     created_at TIMESTAMP DEFAULT CURRENT_TIMESTAMP,
-    updated_te TIMESTAMP DEFAULT CURRENT_TIMESTAMP,
+    updated_at TIMESTAMP DEFAULT CURRENT_TIMESTAMP,
     status text
 );
 
@@ -195,7 +195,7 @@ CREATE TABLE category (
     id text NOT NULL,
     client_id text,
     name text,
-    descriptiontext,
+    description text,
     sub_categories text[],
     slug text,
     created_by bigint,
@@ -267,20 +267,20 @@ ALTER TABLE public.tables OWNER TO postgres;
 -- Insert into DineinOrder
 INSERT INTO dinein_order (id, client_id, dinein_order_id, table_id, invoice_id, handler_id, invoice_status, price, cst, gst, discount, total_price, status)
 OVERRIDING SYSTEM VALUE VALUES
-(1000, 'easyfood', 'order_1', 3, 1, '1000', 'new', NULL, NULL, NULL, NULL, NULL, 'New'),
-(1001, 'easyfood', 'order_2', 4, 2, '1000', 'generated', 180, 16, 16, 0, 212, 'Preparing'),
-(1002, 'easyfood', 'order_3', 4, 3, '1000', 'paid', 90, 8, 8, 0, 106, 'Served');
+(1000, 'easyfood', 'order_1', 3, 1, '1000', 'new', NULL, NULL, NULL, NULL, NULL, 'new'),
+(1001, 'easyfood', 'order_2', 4, 2, '1000', 'generated', 180, 16, 16, 0, 212, 'preparing'),
+(1002, 'easyfood', 'order_3', 4, 3, '1000', 'paid', 90, 8, 8, 0, 106, 'served');
 
 -- Insert into OrderItem
 INSERT INTO order_item (id, client_id, order_id, item_id, quantity, status)
 OVERRIDING SYSTEM VALUE VALUES
-(1000, 'easyfood', 1000, 1000, 1, 'Served'),
-(1001, 'easyfood', 1000, 1004, 2, 'Preparing'),
-(1002, 'easyfood', 1000, 1003, 1, 'Served'),
-(1003, 'easyfood', 1000, 1004, 2, 'New'),
-(1004, 'easyfood', 1001, 1000, 1, 'Served'),
-(1005, 'easyfood', 1001, 1001, 1, 'Served'),
-(1006, 'easyfood', 1002, 1003, 1, 'Served');
+(1000, 'easyfood', 1000, 1000, 1, 'served'),
+(1001, 'easyfood', 1000, 1004, 2, 'preparing'),
+(1002, 'easyfood', 1000, 1003, 1, 'served'),
+(1003, 'easyfood', 1000, 1004, 2, 'new'),
+(1004, 'easyfood', 1001, 1000, 1, 'served'),
+(1005, 'easyfood', 1001, 1001, 1, 'served'),
+(1006, 'easyfood', 1002, 1003, 1, 'served');
 
 -- Insert into Inventory
 INSERT INTO inventory (id, client_id, inventory_id, line_item_id, name, description, category_id, realm, availability, unit, unit_price, unit_cst, unit_gst, unit_total_price, price, cst, gst, discount, total_price)

@@ -9,7 +9,7 @@ from config.settings import LOGGING_CONFIG
 app = FastAPI()
 logging.config.dictConfig(LOGGING_CONFIG)
 logger = logging.getLogger(__name__)
-app.include_router(routes.router, prefix="/saas/{clientId}/orders")
+app.include_router(routes.router, prefix="/saas/{client_id}")
 
 
 @app.middleware("http")
@@ -21,7 +21,7 @@ async def log_requests(request: Request, call_next):
     logger.info(f"Request processed time: {request.method} {request.url} - Response: {response.status_code} - Time: {process_time: .4f}s")
     return response
 
-@app.get("/saas/{clientId}/orders/")
+@app.get("/saas/{client_id}/")
 async def read_root():
     return {"message": "orders Service Running"}
 

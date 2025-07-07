@@ -1,6 +1,27 @@
 from pydantic import BaseModel
-from typing import Optional
+from typing import Optional, List
 import datetime
+from enum import Enum
+
+class OrderStatusEnum(str, Enum):
+    new = "new"
+    pending = "pending"
+    preparing = "preparing"
+    served = "served"
+    cancelled = "cancelled"
+
+
+class OrderItemModel(BaseModel):
+    id: Optional[int] = None
+    client_id: Optional[str] = None
+    order_id: Optional[str] = None
+    item_id: Optional[str] = None
+    quantity: Optional[int] = None
+    status: Optional[OrderStatusEnum] = OrderStatusEnum.new
+
+    class Config:
+        orm_mode = True
+
 
 class DineinOrderModel(BaseModel):
     id: Optional[int] = None
@@ -19,11 +40,8 @@ class DineinOrderModel(BaseModel):
     updated_by: Optional[str] = None
     created_at: Optional[datetime.datetime] = None
     updated_at: Optional[datetime.datetime] = None
-    status: Optional[str] = None
+    status: Optional[OrderStatusEnum] = OrderStatusEnum.new
+    items: Optional[List[OrderItemModel]] = [] 
 
-class OrderItemModel(BaseModel):
-    id: Optional[int] = None
-    client_id: Optional[str] = None
-    order_id: Optional[str] = None
-    item_id: Optional[str] = None
-    quantity: Optional[int] = None
+    class Config:
+        orm_mode = True

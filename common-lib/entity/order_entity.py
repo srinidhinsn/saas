@@ -1,5 +1,5 @@
 from sqlalchemy import Column, Integer, String, Float, DateTime, ForeignKey, ARRAY
-from sqlalchemy.orm import declarative_base
+from sqlalchemy.orm import declarative_base, relationship
 import datetime
 from models.order_model import OrderItemModel, DineinOrderModel
 Base = declarative_base()
@@ -26,6 +26,7 @@ class DineinOrder(Base):
     created_at = Column(DateTime, default=datetime.datetime.utcnow)
     updated_at = Column(DateTime, default=datetime.datetime.utcnow, onupdate=datetime.datetime.utcnow)
     status = Column(String, nullable=True)
+    items = relationship("OrderItem", backref="order", cascade="all, delete-orphan")
 
 
     @staticmethod
@@ -65,32 +66,33 @@ class OrderItem(Base):
 
     id = Column(Integer, primary_key=True)
     client_id = Column(String, nullable=True)
-    order_id = Column(String, nullable=True)
+    order_id = Column(Integer, ForeignKey("dinein_order.id"))
     item_id = Column(String, nullable=True)
     quantity = Column(Integer, nullable=True)
+    status = Column(String, nullable=True)
 
     @staticmethod
     def copyToModel(orderItem):
         """Convert SQLAlchemy OrderItems entities into Pydantic models."""
-        orderItemModel = OrderItemsModel(**item.__dict__)
+        orderItemModel = OrderItemModel(**orderItem.__dict__)
         orderItemModel.__dict__.pop("_sa_instance_state", None)
         return orderItemModel
 
     @staticmethod
     def copyFromModel(orderItemModel):
         """Convert Pydantic OrderItems models into SQLAlchemy entities."""
-        return OrderItem(**model.dict(exclude_unset=True))
+        return OrderItem(**orderItemModel.dict(exclude_unset=True))
 
     @staticmethod
     def copyToModels(order_items):
         """Convert SQLAlchemy OrderItems entities into Pydantic models."""
-        orderItemsModels = [OrderItemsModel(**item.__dict__) for item in order_items]
-        for model in orderItemsModels:
+        orderItemModels = [OrderItemModel(**item.__dict__) for item in order_items]
+        for model in orderItemModels:
             model.__dict__.pop("_sa_instance_state", None)
-        return orderItemsModels
+        return orderItemModels
 
     @staticmethod
-    def copyFromModels(order_items_models):
+    def copyFromModels(order_item_models):
         """Convert Pydantic OrderItems models into SQLAlchemy entities."""
-        return [OrderItems(**model.dict(exclude_unset=True)) for model in order_items_models]
+        return [OrderItems(**model.dict(exclude_unset=True)) for model in order_item_models]
 
