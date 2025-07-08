@@ -436,13 +436,9 @@ import { FaEdit, FaTrash, FaCheck, FaTimes } from "react-icons/fa";
 import axios from "axios";
 
 const TableSelection = () => {
-    useEffect(() => {
-        if (!localStorage.getItem("clientId")) {
-            localStorage.setItem("clientId", "39d5f232-135d-4b7d-8e2b-f339958c8684");
-        }
-    }, []);
 
-    const clientId = localStorage.getItem("clientId");
+
+    const clientId = localStorage.getItem("client_id");
 
     const { darkMode, toggleTheme } = useTheme();
     const [tableRanges, setTableRanges] = useState([]);
@@ -464,8 +460,8 @@ const TableSelection = () => {
     const fetchTables = async () => {
         if (!clientId) return;
         try {
-            const token = localStorage.getItem("accessToken"); // 👈 get token
-            const res = await axios.get(`http://localhost:8000/saas/${clientId}/tables/read`);
+            const token = localStorage.getItem("accessToken");
+            const res = await axios.get(`http://localhost:8001/saas/${clientId}/tables/read`);
 
 
             const result = res.data;
@@ -536,18 +532,22 @@ const TableSelection = () => {
                 payload.push({
                     client_id: clientId,
                     name: num,
-                    table_type: row.table_type,        // <-- use this as table name
+                    table_type: row.table_type.toString(),
                     status: row.remark || "Vacant",
                     location_zone: row.type,
-                    sort_order: null,         // optional, add if you want
-                    // Add any other required fields if you want to send explicitly
+                    description: row.description,
+                    section: row.section,
+                    sort_order: row.sort_order ? parseInt(row.sort_order) : null,
+                    is_active: row.is_active, qr_code_url: row.qr_code_url || "",
+                    slug: row.slug || "",
                 });
+
             });
         }
 
         try {
             for (let data of payload) {
-                await axios.post(`http://localhost:8000/saas/${clientId}/tables/create`, data);
+                await axios.post(`http://localhost:8001/saas/${clientId}/tables/create`, data);
 
 
 
@@ -587,7 +587,7 @@ const TableSelection = () => {
         }
 
         try {
-            await axios.post(`http://localhost:8000/saas/${clientId}/tables/update`, table);
+            await axios.post(`http://localhost:8001/saas/${clientId}/tables/update`, table);
 
 
 
@@ -609,7 +609,13 @@ const TableSelection = () => {
 
     const confirmDelete = async () => {
         try {
-            await axios.post(`http://localhost:8000/saas/${clientId}/tables/delete`, { id: deleteTableId });
+            await axios.post(`http://localhost:8001/saas/${clientId}/tables/delete`, {
+                id: deleteTableId,
+                client_id: clientId,
+                name: "",          // optional but needed for schema match
+                table_type: "",    // optional
+                location_zone: "", // optional
+            });
 
             fetchTables();
         } catch (err) {
@@ -634,7 +640,7 @@ const TableSelection = () => {
                 {!showAddTable && (
                     <button className="btn-primary" onClick={() => {
                         setShowAddTable(true);
-                        setTableRanges([{ range: "", table_type: "", type: "", remark: "" }]);
+                        setTableRanges([...tableRanges, { range: "", table_type: "", type: "", remark: "", is_active: false }]);
                         setFieldErrors([{}]);
                     }}>
                         + Add Table
@@ -694,15 +700,97 @@ const TableSelection = () => {
 
                                 <div className="field-block">
                                     <label>Remark</label>
-                                    <input
+                                    <select
                                         value={row.remark}
                                         onChange={(e) => {
                                             const updated = [...tableRanges];
                                             updated[index].remark = e.target.value;
                                             setTableRanges(updated);
                                         }}
+                                    >
+                                        <option value="Vacant">Vacant</option>
+                                        <option value="Occupied">Occupied</option>
+                                        <option value="Reserved">Reserved</option>
+                                    </select>
+                                </div>
+                                <div className="field-block">
+                                    <label>QR Code URL</label>
+                                    <input
+                                        type="text"
+                                        value={row.qr_code_url || ""}
+                                        onChange={(e) => {
+                                            const updated = [...tableRanges];
+                                            updated[index].qr_code_url = e.target.value;
+                                            setTableRanges(updated);
+                                        }}
+                                        placeholder="Enter QR code URL"
                                     />
                                 </div>
+                                <div className="field-block">
+                                    <label>Description</label>
+                                    <input
+                                        value={row.description}
+                                        onChange={(e) => {
+                                            const updated = [...tableRanges];
+                                            updated[index].description = e.target.value;
+                                            setTableRanges(updated);
+                                        }}
+                                    />
+                                </div>
+                                <div className="field-block">
+                                    <label>Slug</label>
+                                    <input
+                                        type="text"
+                                        value={row.slug || ""}
+                                        onChange={(e) => {
+                                            const updated = [...tableRanges];
+                                            updated[index].slug = e.target.value;
+                                            setTableRanges(updated);
+                                        }}
+                                        placeholder="Enter slug"
+                                    />
+                                </div>
+
+                                <div className="field-block">
+                                    <label>Section</label>
+                                    <input
+                                        value={row.section}
+                                        onChange={(e) => {
+                                            const updated = [...tableRanges];
+                                            updated[index].section = e.target.value;
+                                            setTableRanges(updated);
+                                        }}
+                                    />
+                                </div>
+
+                                <div className="field-block">
+                                    <label>Sort Order</label>
+                                    <input
+                                        type="number"
+                                        value={row.sort_order}
+                                        onChange={(e) => {
+                                            const updated = [...tableRanges];
+                                            updated[index].sort_order = e.target.value;
+                                            setTableRanges(updated);
+                                        }}
+                                    />
+                                </div>
+
+                                <div className="field-block checkbox-field">
+                                    <label>
+                                        <input
+                                            type="checkbox"
+                                            checked={row.is_active}
+                                            onChange={(e) => {
+                                                const updated = [...tableRanges];
+                                                updated[index].is_active = e.target.checked;
+                                                setTableRanges(updated);
+                                            }}
+                                        />
+                                        Active
+                                    </label>
+                                </div>
+
                             </div>
                         ))}
 
@@ -723,7 +811,7 @@ const TableSelection = () => {
                                 return;
                             }
                             setAddRowError("");
-                            setTableRanges([...tableRanges, { range: "", table_type: "", type: "", remark: "" }]);
+                            setTableRanges([...tableRanges, { range: "", table_type: "", type: "", remark: "", is_active: false }]);
                             setFieldErrors([...fieldErrors, {}]);
                         }}>
                             + Add Row

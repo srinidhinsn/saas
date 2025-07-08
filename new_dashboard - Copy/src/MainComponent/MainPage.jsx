@@ -362,7 +362,7 @@ const MainPage = () => {
             <main className="main">
                 <header className="main-header">
                     <div className="actions">
-                        <Input />
+                        {/* <Input /> */}
 
                         <div className="avatar" onClick={handleAvatarClick} ref={dropdownRef} style={{ cursor: 'pointer', position: 'relative' }}>
                             👤
