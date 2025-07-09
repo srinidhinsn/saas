@@ -827,64 +827,106 @@ const TableSelection = () => {
                 <h3>Edit Tables</h3>
                 <div className="edit-grid">
                     {tables.map((table) => (
-                        <div className="form-grid" key={table.id}>
-                            <div className="field-block">
-                                <label>Table No</label>
-                                <div>{table.name}</div>
+                        <React.Fragment key={table.id}>
+                            <div
+                                className={`form-grid ${highlightRow === table.id ? "glow-effect" : ""} ${noChangeRowId === table.id ? "no-change-row" : ""
+                                    }`}
+                            >
+                                {noChangeRowId === table.id ? (
+                                    // ✅ Only this block is rendered when no changes are detected
+                                    <div className="info-message full-row">
+                                        <p>⚠️ No changes made!!!</p>
+                                    </div>
+                                ) : (
+                                    <>
+                                        <div className="field-block">
+                                            <label>Table No</label>
+                                            <div>{table.name}</div>
+                                        </div>
 
+                                        {editRowId === table.id ? (
+                                            <>
+                                                <div className="field-block">
+                                                    <label>No of Seating</label>
+                                                    <input
+                                                        type="number"
+                                                        value={table.table_type}
+                                                        onChange={(e) =>
+                                                            handleEditChange(table.id, "table_type", e.target.value)
+                                                        }
+                                                    />
+                                                </div>
+                                                <div className="field-block">
+                                                    <label>Type</label>
+                                                    <select
+                                                        value={table.location_zone}
+                                                        onChange={(e) =>
+                                                            handleEditChange(table.id, "location_zone", e.target.value)
+                                                        }
+                                                    >
+                                                        <option value="AC">AC</option>
+                                                        <option value="Non-AC">Non-AC</option>
+                                                    </select>
+                                                </div>
+                                                <div className="field-block">
+                                                    <label>Remark</label>
+                                                    <input
+                                                        value={table.status || ""}
+                                                        onChange={(e) =>
+                                                            handleEditChange(table.id, "status", e.target.value)
+                                                        }
+                                                    />
+                                                </div>
+                                                <div className="btn-block">
+                                                    <button className="btn-primary" onClick={() => saveEdit(table)}>
+                                                        <FaCheck />
+                                                    </button>
+                                                    <button className="btn-warning" onClick={cancelEdit}>
+                                                        <FaTimes />
+                                                    </button>
+                                                </div>
+                                            </>
+                                        ) : (
+                                            <>
+                                                <div className="field-block">
+                                                    <label>No of Seating</label>
+                                                    <div>{table.table_type}</div>
+                                                </div>
+                                                <div className="field-block">
+                                                    <label>Type</label>
+                                                    <div>{table.location_zone}</div>
+                                                </div>
+                                                <div className="field-block">
+                                                    <label>Remark</label>
+                                                    <div>{table.status || "-"}</div>
+                                                </div>
+                                                <div className="btn-block">
+                                                    <button
+                                                        className="btn-primary"
+                                                        onClick={() => setEditRowId(table.id)}
+                                                    >
+                                                        <FaEdit />
+                                                    </button>
+                                                    <button
+                                                        className="btn-danger"
+                                                        onClick={() => {
+                                                            setDeleteTableId(table.id);
+                                                            setShowConfirmDelete(true);
+                                                        }}
+                                                    >
+                                                        <FaTrash />
+                                                    </button>
+                                                </div>
+                                            </>
+                                        )}
+                                    </>
+                                )}
                             </div>
 
-                            {editRowId === table.id ? (
-                                <>
-                                    <div className="field-block">
-                                        <label>No of Seating</label>
-                                        <input
-                                            type="number"
-                                            value={table.table_type}
-                                            onChange={(e) => handleEditChange(table.id, "table_type", e.target.value)}
-                                        />
-                                    </div>
+                        </React.Fragment>
 
-                                    <div className="field-block">
-                                        <label>Type</label>
-                                        <select
-                                            value={table.location_zone}
-                                            onChange={(e) => handleEditChange(table.id, "location_zone", e.target.value)}
-                                        >
-                                            <option value="AC">AC</option>
-                                            <option value="Non-AC">Non-AC</option>
-                                        </select>
-                                    </div>
-
-                                    <div className="field-block">
-                                        <label>Remark</label>
-                                        <input
-                                            value={table.status || ""}
-                                            onChange={(e) => handleEditChange(table.id, "status", e.target.value)}
-                                        />
-                                    </div>
-
-                                    <div className="btn-block">
-                                        <button className="btn-primary" onClick={() => saveEdit(table)}><FaCheck /></button>
-                                        <button className="btn-warning" onClick={cancelEdit}><FaTimes /></button>
-                                    </div>
-                                </>
-                            ) : (
-                                <>
-                                    <div className="field-block"><label>No of Seating</label><div>{table.table_type}</div></div>
-                                    <div className="field-block"><label>Type</label><div>{table.location_zone}</div></div>
-                                    <div className="field-block"><label>Remark</label><div>{table.status || "-"}</div></div>
-                                    <div className="btn-block">
-                                        <button className="btn-primary" onClick={() => setEditRowId(table.id)}><FaEdit /></button>
-                                        <button className="btn-danger" onClick={() => {
-                                            setDeleteTableId(table.id);
-                                            setShowConfirmDelete(true);
-                                        }}><FaTrash /></button>
-                                    </div>
-                                </>
-                            )}
-                        </div>
                     ))}
+
                 </div>
             </div>
 

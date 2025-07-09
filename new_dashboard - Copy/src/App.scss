@@ -481,6 +481,9 @@ body.theme-dark {
             margin-bottom: 10px;
         }
 
+
+
+
         .form-grid {
             display: grid;
             grid-template-columns: repeat(auto-fit, minmax(200px, 1fr));
@@ -490,6 +493,48 @@ body.theme-dark {
             background-color: var(--grid-background-light);
             border-radius: 10px;
             box-shadow: 0 1px 4px rgba(0, 0, 0, 0.1);
+
+            .info-message.full-row {
+                grid-column: 1 / -1;
+                padding: 20px;
+                background-color: #fff3cd;
+                color: #856404;
+                font-weight: 600;
+                text-align: center;
+                border-left: 5px solid #ffc107;
+                border-radius: 8px;
+                font-size: 15px;
+                animation: fadeIn 0.3s ease;
+            }
+
+            // .no-change-row {
+            //     border: 2px dashed #ffc107;
+            //     background-color: rgba(255, 193, 7, 0.05);
+            // }
+
+            // .info-message {
+            //     margin-top: -10px;
+            //     margin-bottom: 10px;
+            //     padding: 10px 16px;
+            //     background-color: #fff3cd;
+            //     color: #856404;
+            //     border-left: 4px solid #ffc107;
+            //     border-radius: 6px;
+            //     font-size: 14px;
+            //     animation: fadeIn 0.3s ease;
+            // }
+
+            @keyframes fadeIn {
+                from {
+                    opacity: 0;
+                    transform: translateY(-4px);
+                }
+
+                to {
+                    opacity: 1;
+                    transform: translateY(0);
+                }
+            }
 
             .field-block {
                 display: flex;
@@ -528,6 +573,9 @@ body.theme-dark {
                 gap: 10px;
             }
         }
+
+
+
 
         .example-text {
             font-size: 13px;
@@ -742,16 +790,19 @@ body.theme-dark {
     }
 }
 
+.glow-effect {
+    animation: glow 1.5s ease-in-out forwards;
+}
+
 @keyframes glow {
     0% {
-        background-color: #d4edda;
+        background-color: rgb(212, 237, 218);
     }
 
     100% {
         background-color: transparent;
     }
 }
-
 
 
 

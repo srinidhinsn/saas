@@ -141,7 +141,7 @@ export default function UpdateProfile() {
     const navigate = useNavigate();
     const [form, setForm] = useState({});
     const [loading, setLoading] = useState(true);
-    const clientId = localStorage.getItem("clientId");
+    const clientId = localStorage.getItem("client_id");
 
     useEffect(() => {
         async function fetchClient() {

@@ -402,6 +402,29 @@ body.theme-dark {
   border-radius: 10px;
   box-shadow: 0 1px 4px rgba(0, 0, 0, 0.1);
 }
+.table-selection .add-tables-section .form-grid .info-message.full-row,
+.table-selection .edit-tables-section .form-grid .info-message.full-row {
+  grid-column: 1/-1;
+  padding: 20px;
+  background-color: #fff3cd;
+  color: #856404;
+  font-weight: 600;
+  text-align: center;
+  border-left: 5px solid #ffc107;
+  border-radius: 8px;
+  font-size: 15px;
+  animation: fadeIn 0.3s ease;
+}
+@keyframes fadeIn {
+  from {
+    opacity: 0;
+    transform: translateY(-4px);
+  }
+  to {
+    opacity: 1;
+    transform: translateY(0);
+  }
+}
 .table-selection .add-tables-section .form-grid .field-block,
 .table-selection .edit-tables-section .form-grid .field-block {
   display: flex;
@@ -632,9 +655,13 @@ body.theme-dark {
   color: rgb(156, 0, 6);
 }
 
+.glow-effect {
+  animation: glow 1.5s ease-in-out forwards;
+}
+
 @keyframes glow {
   0% {
-    background-color: #d4edda;
+    background-color: rgb(212, 237, 218);
   }
   100% {
     background-color: transparent;
