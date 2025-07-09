@@ -454,14 +454,16 @@ import OrderForm from "../OrderComponents/OrderForm";
 import { useNavigate, useParams, useSearchParams } from "react-router-dom";
 import { FiSearch } from "react-icons/fi";
 import api from '../PortExportingPage/api'
+import axios from "axios";
 
-const ViewTables = ({ onOrderUpdate, clientId }) => {
+
+const ViewTables = ({ onOrderUpdate }) => {
     const { darkMode } = useTheme();
     const navigate = useNavigate();
     const { tableId } = useParams();
     const [searchParams, setSearchParams] = useSearchParams();
     const modeFromParams = searchParams.get("mode") || "table";
-
+    const clientId = localStorage.getItem("client_id");
     const [tables, setTables] = useState([]);
     const [selectedTable, setSelectedTable] = useState(null);
     const [categories, setCategories] = useState([]);
@@ -472,19 +474,35 @@ const ViewTables = ({ onOrderUpdate, clientId }) => {
     useEffect(() => {
         if (!clientId) return;
 
-        api.get(`/${clientId}/tables`).then(res => setTables(res.data));
+        // Fetch tables
+        // Fetch tables
+        axios.get(`http://localhost:8001/saas/${clientId}/tables/read`)
+            .then(res => {
+                const tableList = Array.isArray(res.data?.data) ? res.data.data.map(t => ({
+                    ...t,
+                    table_number: t.name || t.table_number || "-", // fallback if `table_number` is missing
+                })) : [];
+                setTables(tableList);
+            })
+            .catch(err => console.error("❌ Error fetching tables:", err));
 
-        api.get(`/${clientId}/menu/categories`).then(res => {
-            const allCategory = { id: "all", name: "All" }; // fake one for UI filter
-            const filteredCategories = res.data.filter(cat => cat.name.toLowerCase() !== "all"); // remove real All
-            setCategories([allCategory, ...filteredCategories]);
-            setActiveCategory("all");
-        });
 
+        // Fetch menu categories
+        axios.get(`http://localhost:8001/saas/${clientId}/menu/categories`)
+            .then(res => {
+                const allCategory = { id: "all", name: "All" };
+                const filteredCategories = res.data.filter(cat => cat.name.toLowerCase() !== "all");
+                setCategories([allCategory, ...filteredCategories]);
+                setActiveCategory("all");
+            })
+            .catch(err => console.error("❌ Error fetching categories:", err));
 
-        api.get(`/${clientId}/menu/items`).then(res => setItems(res.data));
+        // Fetch menu items
+        axios.get(`http://localhost:8001/saas/${clientId}/menu/items`)
+            .then(res => setItems(res.data))
+            .catch(err => console.error("❌ Error fetching menu items:", err));
+
     }, [clientId]);
-
 
     useEffect(() => {
         if (tableId) {

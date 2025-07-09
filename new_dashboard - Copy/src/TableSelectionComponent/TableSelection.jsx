@@ -466,9 +466,10 @@ const TableSelection = () => {
 
             const result = res.data;
             const tableList = Array.isArray(result?.data) ? result.data : [];
-
+            tableList.sort((a, b) => a.name.localeCompare(b.name, undefined, { numeric: true }));
             setTables(tableList);
             setOriginalTables(tableList);
+
 
         } catch (error) {
             console.error("❌ Error fetching tables:", error);
@@ -539,7 +540,7 @@ const TableSelection = () => {
                     section: row.section,
                     sort_order: row.sort_order ? parseInt(row.sort_order) : null,
                     is_active: row.is_active, qr_code_url: row.qr_code_url || "",
-                    slug: row.slug || "",
+                    slug: row.slug || num.toLowerCase(),
                 });
 
             });
