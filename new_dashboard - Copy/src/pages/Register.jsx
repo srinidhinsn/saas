@@ -140,8 +140,8 @@ export default function Register() {
         username: "",
         password: "",
         confirm_password: "",
-        role: "",         // dropdown selection
-        grants: []        // selected checkboxes
+        role: "",
+        grants: []
     });
 
     const [error, setError] = useState("");
@@ -178,8 +178,7 @@ export default function Register() {
                 roles: [form.role],
                 grants: form.grants
             };
-
-            const client_id = "easyfood"; // or dynamically get it
+            const client_id = localStorage.getItem("client_id");
 
             const response = await axios.post(
                 `http://localhost:8000/saas/${client_id}/users/register`,

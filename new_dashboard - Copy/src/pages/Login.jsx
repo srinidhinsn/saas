@@ -271,15 +271,13 @@ export default function Login() {
 
             const token = response.data.data.access_token;
 
-            // Decode token
+
             const decoded = jwtDecode(token);
 
             console.log("Decoded Token:", decoded);
 
-            // Extract client_id
             const client_id = decoded.client_id;
 
-            // Store in localStorage
             localStorage.setItem("access_token", token);
             localStorage.setItem("client_id", client_id);
             localStorage.setItem("username", decoded.username);

@@ -833,7 +833,6 @@ const TableSelection = () => {
                                     }`}
                             >
                                 {noChangeRowId === table.id ? (
-                                    // ✅ Only this block is rendered when no changes are detected
                                     <div className="info-message full-row">
                                         <p>⚠️ No changes made!!!</p>
                                     </div>
