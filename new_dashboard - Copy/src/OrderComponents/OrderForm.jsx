@@ -8,7 +8,7 @@ import Modal from "react-modal";
 import { FaUser, FaTable, FaTrash } from "react-icons/fa";
 import { BsCash, BsCreditCard, BsQrCode } from "react-icons/bs";
 import api from '../PortExportingPage/api'
-
+import { useParams } from 'react-router-dom';
 Modal.setAppElement("#root");
 
 const OrderForm = ({ table, onOrderCreated }) => {
@@ -30,8 +30,8 @@ const OrderForm = ({ table, onOrderCreated }) => {
     const [selectedTable, setSelectedTable] = useState(table || {});
     const [splitError, setSplitError] = useState("");
 
-
-    const clientId = localStorage.getItem("clientId");
+    // const { clientId } = useParams();
+    const clientId = localStorage.getItem("client_id");
 
     useEffect(() => {
         setMode(table?.mode || "Dine In");
@@ -83,8 +83,12 @@ const OrderForm = ({ table, onOrderCreated }) => {
         if (mode === "Delivery" || mode === "Pick Up") total += 10;
         return total.toFixed(2);
     };
-
     const handlePlaceOrder = () => {
+        if (orderItems.length === 0) {
+            alert("Please select at least one item before placing the order.");
+            return;
+        }
+
         const totalPaid = Object.values(splitAmounts).reduce((sum, v) => sum + parseFloat(v || 0), 0);
         if (splitMode && Math.abs(totalPaid - calculateTotal()) > 0.01) {
             alert("Split amounts don't match total. Please check.");
@@ -92,27 +96,26 @@ const OrderForm = ({ table, onOrderCreated }) => {
         }
 
         const payload = {
-            mode,
-            status: mode === "Delivery" ? "Dispatched" : mode === "Pick Up" ? "Delivered" : "KOT",
-            customer,
-            table_id: selectedTable?.id,
-            items: orderItems.map(({ id, quantity, note }) => ({
-                item_id: id,
+            tableId: selectedTable?.id,
+            status: "new",
+            totalPrice: parseFloat(calculateTotal()),
+            price: parseFloat(calculateTotal()),
+            items: orderItems.map(({ id, quantity }) => ({
+                itemId: id,
                 quantity,
-                note,
-                item_type: "item",
-            })),
-            total: parseFloat(calculateTotal()),
-            payment: splitMode ? splitAmounts : { mode: paymentMode }
+                status: "new"
+            }))
         };
+        console.log("Sending payload:", payload);
 
-        api.post(`/${clientId}/orders`, payload)
+        axios.post(`http://localhost:8002/saas/${clientId}/dinein/create`, payload)
             .then(res => onOrderCreated?.(res.data))
             .catch(err => {
                 console.error("Order creation failed:", err);
                 alert("Order creation failed. Please check console.");
             });
     };
+
     useEffect(() => {
         if (availableTables.length) {
             console.log("Available Tables:", availableTables.map(t => ({ id: t.id, number: t.table_number, type: t.type })));
@@ -129,7 +132,9 @@ const OrderForm = ({ table, onOrderCreated }) => {
                         onClick={async () => {
                             if (mode === "Pick Up") {
                                 try {
-                                    const res = await api.get(`/${clientId}/tables`);
+                                    const res = await axios.get(`http://localhost:8001/saas/${clientId}/tables/read`);
+
+
                                     const available = res.data.filter(t => t.status !== "occupied" && t.mode !== "delivery");
                                     setAvailableTables(available);
                                     setDineInTableModalOpen(true);
@@ -175,11 +180,16 @@ const OrderForm = ({ table, onOrderCreated }) => {
                             onMouseOver={async () => {
                                 if (mode === "Dine In") {
                                     try {
-                                        const res = await api.get(`/${clientId}/tables`);
-                                        const available = res.data.filter(
+                                        const res = await axios.get(`http://localhost:8001/saas/${clientId}/tables/read`);
+                                        const available = Array.isArray(res.data)
+                                            ? res.data
+                                            : res.data?.data || [];
+
+                                        const filtered = available.filter(
                                             t => t.status !== "occupied" && t.mode !== "delivery"
                                         );
-                                        setAvailableTables(available);
+                                        setAvailableTables(filtered);
+
                                         setDineInTableModalOpen(true);
                                     } catch (err) {
                                         console.error("Failed to fetch tables", err);
@@ -189,6 +199,8 @@ const OrderForm = ({ table, onOrderCreated }) => {
                             }}
                         >
                             <FaTable /> {selectedTable?.table_number || "T1"}
+
+
                         </div>
 
                     ) : (
@@ -438,10 +450,24 @@ const OrderForm = ({ table, onOrderCreated }) => {
                                 return typeNormalized === groupKey;
                             })
                             .sort((a, b) => {
-                                const aNum = parseInt(a.table_number?.replace(/\D/g, "")) || 0;
-                                const bNum = parseInt(b.table_number?.replace(/\D/g, "")) || 0;
-                                return aNum - bNum;
+                                const extractParts = (str) => {
+                                    const match = (str || "").match(/^([A-Za-z]+)(\d+)$/);
+                                    return match ? [match[1], parseInt(match[2])] : ["", 0];
+                                };
+
+                                const valA = a.table_number || a.name || "";
+                                const valB = b.table_number || b.name || "";
+
+                                const [prefixA, numA] = extractParts(valA);
+                                const [prefixB, numB] = extractParts(valB);
+
+                                if (prefixA === prefixB) {
+                                    return numA - numB;
+                                } else {
+                                    return prefixA.localeCompare(prefixB);
+                                }
                             });
+
 
 
                         if (filtered.length === 0) return null;
@@ -458,14 +484,18 @@ const OrderForm = ({ table, onOrderCreated }) => {
                                                 setMode("Dine In");
                                                 setSelectedTable({
                                                     id: t.id,
-                                                    table_number: t.number || t.table_number,
-                                                    type: t.location_zone || "Non AC", // ✅ FIXED
+                                                    table_number: t.table_number || t.name,
+                                                    type: t.location_zone || "Non AC",
                                                     mode: "Dine In",
                                                 });
+
+
                                                 setDineInTableModalOpen(false);
                                             }}
                                         >
-                                            {t.number || t.table_number}
+                                            {t.table_number || t.name}
+
+
                                         </div>
                                     ))}
                                 </div>

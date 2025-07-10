@@ -229,14 +229,11 @@
 
 // // 
 
-
 import "../styles/Login.css";
 import React, { useState } from "react";
 import { useNavigate } from "react-router-dom";
 import axios from "axios";
 import { jwtDecode } from "jwt-decode";
-
-
 
 export default function Login() {
     const navigate = useNavigate();
@@ -268,25 +265,20 @@ export default function Login() {
                 payload
             );
 
-
             const token = response.data.data.access_token;
-
-
             const decoded = jwtDecode(token);
-
-            console.log("Decoded Token:", decoded);
 
             const client_id = decoded.client_id;
 
+            // ✅ Save to localStorage
             localStorage.setItem("access_token", token);
-            localStorage.setItem("client_id", client_id);
+            localStorage.setItem("clientId", client_id);
             localStorage.setItem("username", decoded.username);
 
-
-
             alert("✅ Login successful");
-            navigate("/profile");
 
+            // ✅ Navigate to client-specific route
+            navigate(`/saas/${client_id}`);
         } catch (err) {
             console.error("Login error:", err?.response?.data);
             const detail = err?.response?.data?.detail;
@@ -295,6 +287,7 @@ export default function Login() {
         }
     };
 
+    const dynamicBase = form.client_code ? `/saas/${form.client_code}` : "#";
 
     return (
         <div className="Register-pages">
@@ -309,6 +302,7 @@ export default function Login() {
                             placeholder="Client Code"
                             value={form.client_code}
                             onChange={handleChange}
+                            required
                         />
 
                         <input
@@ -334,23 +328,40 @@ export default function Login() {
                         <button type="submit">Login</button>
 
                         <p className="login-link">
-                            Don’t have an account? <a href="/register">Register</a>
+                            Don’t have an account?{" "}
+                            <span
+                                onClick={() => {
+                                    if (form.client_code) {
+                                        navigate(`/saas/${form.client_code}/register`);
+                                    } else {
+                                        setError("⚠️ Please enter Client Code before registering.");
+                                    }
+                                }}
+                                style={{ color: "blue", cursor: "pointer", textDecoration: "underline" }}
+                            >
+                                Register
+                            </span>
+
                         </p>
+
 
                         <button
                             type="button"
                             className="ghost"
-                            onClick={() => navigate("/forgot")}
+                            onClick={() => {
+                                if (form.client_code) {
+                                    navigate(`/saas/${form.client_code}/forgot`);
+                                } else {
+                                    setError("⚠️ Please enter Client Code to continue.");
+                                }
+                            }}
                         >
                             Forgot Password?
                         </button>
+
                     </form>
                 </div>
             </div>
         </div>
     );
 }
-
-
-// 
-

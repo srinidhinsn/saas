@@ -131,8 +131,6 @@
 
 
 //
-
-// no connection with the dashboard
 import React, { useEffect } from 'react';
 import axios from 'axios';
 import { GiHamburgerMenu } from "react-icons/gi";
@@ -142,57 +140,62 @@ import { FcComboChart } from "react-icons/fc";
 import { FaKitchenSet, FaFileInvoiceDollar, FaUserPlus, FaTableCells } from "react-icons/fa6";
 import { MdOutlineTableBar } from "react-icons/md";
 import { FaRegMoneyBillAlt } from "react-icons/fa";
-import { useNavigate, useLocation } from 'react-router-dom';
+import { useNavigate, useLocation, useParams } from 'react-router-dom';
 import { useTheme } from "../ThemeChangerComponent/ThemeContext";
 
 const Navbar = () => {
     const nav = useNavigate();
     const location = useLocation();
+    const { clientId } = useParams()
     const { darkMode } = useTheme();
 
     useEffect(() => {
         document.body.classList.toggle("theme-dark", darkMode);
     }, [darkMode]);
 
+    const go = (path) => nav(`/saas/${clientId}${path}`);
+    const isActive = (path) => location.pathname === `/saas/${clientId}${path}`;
+    const startsWith = (path) => location.pathname.startsWith(`/saas/${clientId}${path}`);
+
     return (
         <aside className="sidebar">
             <div className="brand">DineIn Software</div>
             <ul className="menu">
-                <li title='Dashboard' onClick={() => nav('/')} className={location.pathname === '/' ? 'page-active' : ''}>
+                <li title='Dashboard' onClick={() => go('/')} className={isActive('/') ? 'page-active' : ''}>
                     <GiHamburgerMenu /><span>Dashboard</span>
                 </li>
-                <li title='Order' onClick={() => nav('/orders-view')} className={location.pathname === '/orders-view' ? 'page-active' : ''}>
+                <li title='Order' onClick={() => go('/orders-view')} className={isActive('/orders-view') ? 'page-active' : ''}>
                     <FaHamburger /><span>Order</span>
                 </li>
                 <li className="menu-header"><span>Admin</span></li>
-                <li title='Table Management' onClick={() => nav('/table-selection')} className={location.pathname === '/table-selection' ? 'page-active' : ''}>
+                <li title='Table Management' onClick={() => go('/table-selection')} className={isActive('/table-selection') ? 'page-active' : ''}>
                     <MdOutlineTableBar /><span>Table Management</span>
                 </li>
-                <li title='Table Selection' onClick={() => nav('/view-tables')} className={location.pathname.startsWith('/view-tables') ? 'page-active' : ''}>
+                <li title='Table Selection' onClick={() => go('/view-tables')} className={startsWith('/view-tables') ? 'page-active' : ''}>
                     <FaTableCells /><span>Table Selection</span>
                 </li>
-                <li title='Menu' onClick={() => nav('/menu-page')} className={location.pathname === '/menu-page' ? 'page-active' : ''}>
+                <li title='Menu' onClick={() => go('/menu-page')} className={isActive('/menu-page') ? 'page-active' : ''}>
                     <MdOutlineMenuBook /><span>Menu</span>
                 </li>
-                <li title='Combos' onClick={() => nav('/combo-page')} className={location.pathname === '/combo-page' ? 'page-active' : ''}>
+                <li title='Combos' onClick={() => go('/combo-page')} className={isActive('/combo-page') ? 'page-active' : ''}>
                     <FcComboChart /><span>Combos</span>
                 </li>
-                <li title='KDS' onClick={() => nav('/kds-page')} className={location.pathname === '/kds-page' ? 'page-active' : ''}>
+                <li title='KDS' onClick={() => go('/kds-page')} className={isActive('/kds-page') ? 'page-active' : ''}>
                     <FaKitchenSet /><span>KDS</span>
                 </li>
-                <li title='Invoice' onClick={() => nav('/invoice')} className={location.pathname === '/invoice' ? 'page-active' : ''}>
+                <li title='Invoice' onClick={() => go('/invoice')} className={isActive('/invoice') ? 'page-active' : ''}>
                     <FaFileInvoiceDollar /><span>Invoice</span>
                 </li>
-                <li title='Transaction' onClick={() => nav('/transaction')} className={location.pathname === '/transaction' ? 'page-active' : ''}>
+                <li title='Transaction' onClick={() => go('/transaction')} className={isActive('/transaction') ? 'page-active' : ''}>
                     <FaCashRegister /><span>Transaction</span>
                 </li>
-                <li title='Customer Reviews' onClick={() => nav('/customer-reviews')} className={location.pathname === '/customer-reviews' ? 'page-active' : ''}>
+                <li title='Customer Reviews' onClick={() => go('/customer-reviews')} className={isActive('/customer-reviews') ? 'page-active' : ''}>
                     <MdOutlineRateReview /><span>Customer Reviews</span>
                 </li>
-                <li title='KOT bill' onClick={() => nav('/kot-bill')} className={location.pathname === '/kot-bill' ? 'page-active' : ''}>
+                <li title='KOT bill' onClick={() => go('/kot-bill')} className={isActive('/kot-bill') ? 'page-active' : ''}>
                     <FaRegMoneyBillAlt /><span>KOT bill</span>
                 </li>
-                <li title='Add Users' onClick={() => nav('/add-users')} className={location.pathname === '/add-users' ? 'page-active' : ''}>
+                <li title='Add Users' onClick={() => go('/add-users')} className={isActive('/add-users') ? 'page-active' : ''}>
                     <FaUserPlus /><span>Add Users</span>
                 </li>
             </ul>

@@ -434,11 +434,11 @@ import { useTheme } from "../ThemeChangerComponent/ThemeContext";
 import { FaEdit, FaTrash, FaCheck, FaTimes } from "react-icons/fa";
 // import newApi from "../PortExportingPage/newApi";
 import axios from "axios";
+import { useParams } from 'react-router-dom';
 
 const TableSelection = () => {
 
-
-    const clientId = localStorage.getItem("client_id");
+    const { clientId } = useParams();
 
     const { darkMode, toggleTheme } = useTheme();
     const [tableRanges, setTableRanges] = useState([]);
@@ -453,6 +453,12 @@ const TableSelection = () => {
     const [deleteTableId, setDeleteTableId] = useState(null);
     const [addRowError, setAddRowError] = useState("");
     const TEMP_ACCESS_TOKEN = "mock_token_for_dev";
+    useEffect(() => {
+
+        if (clientId) {
+            localStorage.setItem("client_id", clientId);
+        }
+    }, []);
     useEffect(() => {
         if (clientId) fetchTables();
     }, [clientId]);
@@ -524,6 +530,12 @@ const TableSelection = () => {
         }));
         setFieldErrors(newErrors);
 
+        // --------------------------------------------- //
+
+
+        // --------------------------------------------- //
+
+
         const validRows = tableRanges.filter((row, index) => !newErrors[index].range && !newErrors[index].table_type && !newErrors[index].type);
         if (validRows.length === 0) return;
         const payload = [];
@@ -540,7 +552,8 @@ const TableSelection = () => {
                     section: row.section,
                     sort_order: row.sort_order ? parseInt(row.sort_order) : null,
                     is_active: row.is_active, qr_code_url: row.qr_code_url || "",
-                    slug: row.slug || num.toLowerCase(),
+                    slug: `${clientId}-${(row.slug || num).toLowerCase()}`,
+
                 });
 
             });

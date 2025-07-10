@@ -127,14 +127,14 @@
 
 // 
 
-
+import "../styles/Register.css";
 import React, { useState } from "react";
 import axios from "axios";
-import "../styles/Register.css";
-import { useNavigate } from "react-router-dom";
+import { useNavigate, useParams } from "react-router-dom";
 
 export default function Register() {
     const navigate = useNavigate();
+    const { clientId } = useParams();
 
     const [form, setForm] = useState({
         username: "",
@@ -171,22 +171,20 @@ export default function Register() {
         }
 
         try {
-
             const payload = {
                 username: form.username,
                 password: form.password,
                 roles: [form.role],
                 grants: form.grants
             };
-            const client_id = localStorage.getItem("client_id");
 
             const response = await axios.post(
-                `http://localhost:8000/saas/${client_id}/users/register`,
+                `http://localhost:8000/saas/${clientId}/users/register`,
                 payload
             );
 
             alert("🎉 Registered successfully!");
-            navigate("/login");
+            navigate(`/saas/${clientId}/login`);
         } catch (err) {
             console.error("❌ Registration failed:", err?.response?.data);
             const detail = err?.response?.data?.detail;
@@ -280,11 +278,11 @@ export default function Register() {
 
                         <button type="submit">Sign Up</button>
                         <p className="login-link">
-                            Already registered? <a href="/login">Log in here</a>
+                            Already registered? <a href={`/saas/${clientId}/login`}>Log in here</a>
                         </p>
                     </form>
                 </div>
             </div>
         </div>
     );
-}  
+}

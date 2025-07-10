@@ -474,14 +474,15 @@ const ViewTables = ({ onOrderUpdate }) => {
     useEffect(() => {
         if (!clientId) return;
 
-        // Fetch tables
-        // Fetch tables
         axios.get(`http://localhost:8001/saas/${clientId}/tables/read`)
             .then(res => {
                 const tableList = Array.isArray(res.data?.data) ? res.data.data.map(t => ({
                     ...t,
-                    table_number: t.name || t.table_number || "-", // fallback if `table_number` is missing
+                    table_number: t.name || t.table_number || "-",
                 })) : [];
+                tableList.sort((a, b) =>
+                    a.table_number.localeCompare(b.table_number, undefined, { numeric: true })
+                );
                 setTables(tableList);
             })
             .catch(err => console.error("❌ Error fetching tables:", err));
@@ -598,7 +599,9 @@ const ViewTables = ({ onOrderUpdate }) => {
                                     <div
                                         key={table.id}
                                         className="table-card"
-                                        onClick={() => navigate(`/view-tables/${table.id}`)}
+                                        onClick={() => navigate(`${table.id}`)
+                                        }
+
                                     >
                                         <div className="table-number">{table.table_number}</div>
                                         {/* <div className="table-status">{table.status}</div> */}

@@ -1682,7 +1682,9 @@ body.theme-dark {
   background: var(--modal-bg);
   padding: 1.5rem;
   border-radius: 8px;
-  width: 300px;
+  width: 500px;
+  height: auto;
+  overflow: auto;
   max-width: 90vw;
   display: flex;
   flex-direction: column;
