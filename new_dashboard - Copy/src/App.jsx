@@ -310,12 +310,85 @@
 // 
 
 
+// // App.jsx
+// import './App.css';
+// import React, { useState, useEffect } from 'react';
+// import { Routes, Route, Navigate, useLocation } from 'react-router-dom';
 
+// import './styles/MenuStylings.css';
+// import Login from './pages/Login';
+// import Register from './pages/Register';
+// import ForgotPassword from './pages/ForgotPassword';
+// import ProtectedRoute from './ProtectedRoutes/ProtectedRoute';
+// import SaasClientRoutes from './pages/SaasClientRoutes';
+
+// const App = () => {
+//   const [tables, setTables] = useState([]);
+//   const [selectedTableId, setSelectedTableId] = useState("");
+//   const [latestOrder, setLatestOrder] = useState(null);
+
+//   const location = useLocation();
+//   const hideNavbar = /\/saas\/[^/]+\/(login|register|forgot)/.test(location.pathname);
+//   // App.jsx (inside useEffect)
+//   useEffect(() => {
+//     const storedClient = localStorage.getItem("clientId");
+//     const currentClient = location.pathname.split('/')[2]; // pulls :clientId from URL
+//     if (storedClient && currentClient && storedClient !== currentClient) {
+//       // Clear session data when clientId changes
+//       localStorage.clear();
+//       window.location.href = `/saas/${currentClient}/login`;
+//     }
+//   }, [location]);
+
+//   return (
+//     <div style={{ display: 'flex' }}>
+//       <div style={{ flex: 1 }}>
+//         <Routes>
+//           {/* Public routes */}
+//           <Route path="/saas/:clientId/login" element={<Login />} />
+//           <Route path="/saas/:clientId/register" element={<Register />} />
+//           <Route path="/saas/:clientId/forgot" element={<ForgotPassword />} />
+
+//           {/* Protected routes with accessToken */}
+//           <Route
+//             path="/saas/:clientId/:pageName/:accessToken/*"
+//             element={
+//               <ProtectedRoute>
+//                 <SaasClientRoutes
+//                   selectedTableId={selectedTableId}
+//                   setSelectedTableId={setSelectedTableId}
+//                   latestOrder={latestOrder}
+//                   setLatestOrder={setLatestOrder}
+//                   tables={tables}
+//                   setTables={setTables}
+//                   hideNavbar={hideNavbar}
+//                 />
+//               </ProtectedRoute>
+//             }
+//           />
+
+//           {/* Fallback */}
+//           <Route path="*" element={<Navigate to="/saas/demo/login" />} />
+//         </Routes>
+//       </div>
+//     </div>
+//   );
+// };
+
+// export default App;
+
+
+
+// 
+
+
+
+
+// App.jsx
 import './App.css';
 import React, { useState, useEffect } from 'react';
 import { Routes, Route, Navigate, useLocation } from 'react-router-dom';
-import axios from 'axios';
-
+import { ToastContainer } from 'react-toastify';
 import './styles/MenuStylings.css';
 import Login from './pages/Login';
 import Register from './pages/Register';
@@ -331,20 +404,35 @@ const App = () => {
   const location = useLocation();
   const hideNavbar = /\/saas\/[^/]+\/(login|register|forgot)/.test(location.pathname);
 
+  useEffect(() => {
+    const storedClient = localStorage.getItem("clientId");
+    const currentClient = location.pathname.split('/')[2];
+
+    if (
+      storedClient &&
+      currentClient &&
+      storedClient !== currentClient &&
+      !hideNavbar // don't trigger this on login/register pages
+    ) {
+      console.warn("🔁 Switching client context. Resetting session.");
+      localStorage.clear();
+      window.location.href = `/saas/${currentClient}/login`;
+    }
+  }, [location]);
 
   return (
     <div style={{ display: 'flex' }}>
-      {/* ✅ Navbar is conditionally shown inside SaasClientRoutes now */}
       <div style={{ flex: 1 }}>
         <Routes>
+
           {/* Public routes */}
           <Route path="/saas/:clientId/login" element={<Login />} />
           <Route path="/saas/:clientId/register" element={<Register />} />
           <Route path="/saas/:clientId/forgot" element={<ForgotPassword />} />
 
-          {/* Protected routes */}
+          {/* Protected routes with accessToken in URL */}
           <Route
-            path="/saas/:clientId/*"
+            path="/saas/:clientId/:pageName/:accessToken/*"
             element={
               <ProtectedRoute>
                 <SaasClientRoutes
@@ -360,9 +448,21 @@ const App = () => {
             }
           />
 
-          {/* Fallback */}
-          <Route path="*" element={<Navigate to="/saas/demo/login" />} />
+          <Route
+            path="*"
+            element={
+              <Navigate
+                to={
+                  localStorage.getItem("clientId")
+                    ? `/saas/${localStorage.getItem("clientId")}/login`
+                    : `/`
+                }
+              />
+            }
+          />
+
         </Routes>
+        <ToastContainer />
       </div>
     </div>
   );

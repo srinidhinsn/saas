@@ -99,7 +99,7 @@
 // // }
 
 
-// // // 
+// // //
 
 
 
@@ -227,23 +227,399 @@
 // }
 
 
-// // 
+// //
+
+// import "../styles/Login.css";
+// import React, { useState } from "react";
+// import { useNavigate } from "react-router-dom";
+// import axios from "axios";
+// import { jwtDecode } from "jwt-decode";
+
+// export default function Login() {
+//     const navigate = useNavigate();
+//     const [form, setForm] = useState({
+//         client_code: "",
+//         username: "",
+//         password: ""
+//     });
+
+//     const [error, setError] = useState("");
+
+//     const handleChange = (e) => {
+//         const { name, value } = e.target;
+//         setForm((prev) => ({ ...prev, [name]: value }));
+//     };
+
+//     const handleLogin = async (e) => {
+//         e.preventDefault();
+//         setError("");
+
+//         const payload = {
+//             username: form.username,
+//             password: form.password
+//         };
+
+//         try {
+//             const response = await axios.post(
+//                 `http://localhost:8000/saas/${form.client_code}/users/login`,
+//                 payload
+//             );
+
+//             const token = response.data.data.access_token;
+//             const decoded = jwtDecode(token);
+
+//             const client_id = decoded.client_id;
+
+//             // ✅ Save to localStorage
+//             localStorage.setItem("access_token", token);
+//             localStorage.setItem("clientId", client_id);
+//             localStorage.setItem("username", decoded.username);
+
+//             alert("✅ Login successful");
+
+//             // ✅ Navigate to client-specific route
+//             navigate(`/saas/${client_id}`);
+//         } catch (err) {
+//             console.error("Login error:", err?.response?.data);
+//             const detail = err?.response?.data?.detail;
+//             const msg = Array.isArray(detail) ? detail[0]?.msg : detail;
+//             setError(msg || "Invalid client code or credentials");
+//         }
+//     };
+
+//     const dynamicBase = form.client_code ? `/saas/${form.client_code}` : "#";
+
+//     return (
+//         <div className="Register-pages">
+//             <div className="container">
+//                 <div className="form-container">
+//                     <form onSubmit={handleLogin}>
+//                         <h1>Login</h1>
+
+//                         <input
+//                             type="text"
+//                             name="client_code"
+//                             placeholder="Client Code"
+//                             value={form.client_code}
+//                             onChange={handleChange}
+//                             required
+//                         />
+
+//                         <input
+//                             type="text"
+//                             name="username"
+//                             placeholder="Username"
+//                             value={form.username}
+//                             onChange={handleChange}
+//                             required
+//                         />
+
+//                         <input
+//                             type="password"
+//                             name="password"
+//                             placeholder="Password"
+//                             value={form.password}
+//                             onChange={handleChange}
+//                             required
+//                         />
+
+//                         {error && <p className="error">{error}</p>}
+
+//                         <button type="submit">Login</button>
+
+//                         <p className="login-link">
+//                             Don’t have an account?{" "}
+//                             <span
+//                                 onClick={() => {
+//                                     if (form.client_code) {
+//                                         navigate(`/saas/${form.client_code}/register`);
+//                                     } else {
+//                                         setError("⚠️ Please enter Client Code before registering.");
+//                                     }
+//                                 }}
+//                                 style={{ color: "blue", cursor: "pointer", textDecoration: "underline" }}
+//                             >
+//                                 Register
+//                             </span>
+
+//                         </p>
+
+
+//                         <button
+//                             type="button"
+//                             className="ghost"
+//                             onClick={() => {
+//                                 if (form.client_code) {
+//                                     navigate(`/saas/${form.client_code}/forgot`);
+//                                 } else {
+//                                     setError("⚠️ Please enter Client Code to continue.");
+//                                 }
+//                             }}
+//                         >
+//                             Forgot Password?
+//                         </button>
+
+//                     </form>
+//                 </div>
+//             </div>
+//         </div>
+//     );
+// }
+
+
+//
+
+
+// //
+
+// import "../styles/Login.css";
+// import React, { useState } from "react";
+// import { useNavigate, useParams } from "react-router-dom";
+// import axios from "axios";
+// import { jwtDecode } from "jwt-decode";
+
+// export default function Login() {
+//     const navigate = useNavigate();
+//     const { clientId } = useParams(); // ✅ get from URL
+//     const [form, setForm] = useState({ username: "", password: "" });
+//     const [error, setError] = useState("");
+
+//     const handleChange = (e) => {
+//         const { name, value } = e.target;
+//         setForm((prev) => ({ ...prev, [name]: value }));
+//     };
+
+//     const handleLogin = async (e) => {
+//         e.preventDefault();
+//         setError("");
+
+//         if (!clientId) {
+//             setError("⚠️ Client ID missing in URL.");
+//             return;
+//         }
+
+//         const payload = {
+//             username: form.username,
+//             password: form.password
+//         };
+
+//         try {
+//             const response = await axios.post(
+//                 `http://localhost:8000/saas/${clientId}/users/login`,
+//                 payload
+//             );
+
+//             const token = response.data.data.access_token;
+//             const decoded = jwtDecode(token);
+
+//             // ✅ Save to localStorage
+//             localStorage.setItem("access_token", token);
+//             localStorage.setItem("clientId", decoded.client_id);
+//             localStorage.setItem("username", decoded.username);
+
+//             alert("✅ Login successful");
+
+//             navigate(`/saas/${clientId}/main/${token}`);
+
+//         } catch (err) {
+//             console.error("Login error:", err?.response?.data);
+//             const detail = err?.response?.data?.detail;
+//             const msg = Array.isArray(detail) ? detail[0]?.msg : detail;
+//             setError(msg || "Invalid credentials");
+//         }
+//     };
+
+//     return (
+//         <div className="Register-pages">
+//             <div className="container">
+//                 <div className="form-container">
+//                     <form onSubmit={handleLogin}>
+//                         <h1>Login</h1>
+
+//                         <input
+//                             type="text"
+//                             name="username"
+//                             placeholder="Username"
+//                             value={form.username}
+//                             onChange={handleChange}
+//                             required
+//                         />
+
+//                         <input
+//                             type="password"
+//                             name="password"
+//                             placeholder="Password"
+//                             value={form.password}
+//                             onChange={handleChange}
+//                             required
+//                         />
+
+//                         {error && <p className="error">{error}</p>}
+
+//                         <button type="submit">Login</button>
+
+//                         <p className="login-link">
+//                             Don’t have an account?{" "}
+//                             <span
+//                                 onClick={() => navigate(`/saas/${clientId}/register`)}
+//                                 style={{ color: "blue", cursor: "pointer", textDecoration: "underline" }}
+//                             >
+//                                 Register
+//                             </span>
+//                         </p>
+
+//                         <button
+//                             type="button"
+//                             className="ghost"
+//                             onClick={() => navigate(`/saas/${clientId}/forgot`)}
+//                         >
+//                             Forgot Password?
+//                         </button>
+//                     </form>
+//                 </div>
+//             </div>
+//         </div>
+//     );
+// }
+
+
+//
+//
+
+// import "../styles/Login.css";
+// import React, { useState } from "react";
+// import { useNavigate } from "react-router-dom";
+// import axios from "axios";
+// import { jwtDecode } from "jwt-decode";
+
+// export default function Login() {
+//     const navigate = useNavigate();
+//     const [form, setForm] = useState({ username: "", password: "" });
+//     const [error, setError] = useState("");
+//     const [loading, setLoading] = useState(false);
+
+//     const handleChange = (e) => {
+//         const { name, value } = e.target;
+//         setForm((prev) => ({ ...prev, [name]: value }));
+//     };
+
+//     const handleLogin = async (e) => {
+//         e.preventDefault();
+//         setError("");
+//         setLoading(true);
+
+//         try {
+//             const clientRes = await axios.post(
+//                 `http://localhost:8000/saas/demo/users/client-id-by-credentials`,
+//                 {
+//                     username: form.username,
+//                     password: form.password
+//                 }
+//             );
+//             const clientId = clientRes.data.client_id;
+
+
+//             // Step 2: Login using real clientId
+//             const loginRes = await axios.post(
+//                 `http://localhost:8000/saas/${clientId}/users/login`,
+//                 {
+//                     username: form.username,
+//                     password: form.password,
+//                 }
+//             );
+
+//             const token = loginRes.data.data.access_token;
+//             const decoded = jwtDecode(token);
+
+//             localStorage.setItem("access_token", token);
+//             localStorage.setItem("clientId", decoded.client_id);
+//             localStorage.setItem("username", decoded.username);
+
+//             alert("✅ Login successful");
+//             navigate(`/saas/${clientId}/main/${token}`);
+//         } catch (err) {
+//             console.error("Login error:", err?.response?.data);
+//             const msg = err?.response?.data?.detail;
+//             setError(msg || "Invalid credentials");
+//         } finally {
+//             setLoading(false);
+//         }
+//     };
+
+//     return (
+//         <div className="Register-pages">
+//             <div className="container">
+//                 <div className="form-container">
+//                     <form onSubmit={handleLogin}>
+//                         <h1>Login</h1>
+
+//                         <input
+//                             type="text"
+//                             name="username"
+//                             placeholder="Username"
+//                             value={form.username}
+//                             onChange={handleChange}
+//                             required
+//                         />
+
+//                         <input
+//                             type="password"
+//                             name="password"
+//                             placeholder="Password"
+//                             value={form.password}
+//                             onChange={handleChange}
+//                             required
+//                         />
+
+//                         {error && <p className="error">{error}</p>}
+
+//                         <button type="submit" disabled={loading}>
+//                             {loading ? "Logging in..." : "Login"}
+//                         </button>
+//                         <p className="login-link">
+//                             Don’t have an account?{" "}
+//                             <span
+//                                 onClick={() => navigate("/saas/demo/register")}
+//                                 style={{ color: "blue", cursor: "pointer", textDecoration: "underline" }}
+//                             >
+//                                 Register
+//                             </span>
+//                         </p>
+
+//                         <button
+//                             type="button"
+//                             className="ghost"
+//                             onClick={() => navigate("/saas/demo/forgot")}
+//                         >
+//                             Forgot Password?
+//                         </button>
+
+//                     </form>
+//                 </div>
+//             </div>
+//         </div>
+//     );
+// }
+
+
+
+// ======================================================================================================================= //
 
 import "../styles/Login.css";
 import React, { useState } from "react";
 import { useNavigate } from "react-router-dom";
 import axios from "axios";
 import { jwtDecode } from "jwt-decode";
+import { FaUser, FaLock } from "react-icons/fa";
+import { toast } from 'react-toastify';
+import 'react-toastify/dist/ReactToastify.css';
+
 
 export default function Login() {
     const navigate = useNavigate();
-    const [form, setForm] = useState({
-        client_code: "",
-        username: "",
-        password: ""
-    });
-
+    const [form, setForm] = useState({ username: "", password: "" });
     const [error, setError] = useState("");
+    const [loading, setLoading] = useState(false);
 
     const handleChange = (e) => {
         const { name, value } = e.target;
@@ -253,58 +629,61 @@ export default function Login() {
     const handleLogin = async (e) => {
         e.preventDefault();
         setError("");
-
-        const payload = {
-            username: form.username,
-            password: form.password
-        };
+        setLoading(true);
 
         try {
-            const response = await axios.post(
-                `http://localhost:8000/saas/${form.client_code}/users/login`,
-                payload
+            const clientRes = await axios.post(
+                `http://localhost:8000/saas/demo/users/client-id-by-credentials`,
+                {
+                    username: form.username,
+                    password: form.password,
+                }
+            );
+            const clientId = clientRes.data.client_id;
+
+            const loginRes = await axios.post(
+                `http://localhost:8000/saas/${clientId}/users/login`,
+                {
+                    username: form.username,
+                    password: form.password,
+                }
             );
 
-            const token = response.data.data.access_token;
+            const token = loginRes.data.data.access_token;
             const decoded = jwtDecode(token);
 
-            const client_id = decoded.client_id;
-
-            // ✅ Save to localStorage
             localStorage.setItem("access_token", token);
-            localStorage.setItem("clientId", client_id);
+            localStorage.setItem("clientId", decoded.client_id);
             localStorage.setItem("username", decoded.username);
+            toast.success("Login successful", {
+                position: "top-right",
+                autoClose: 3000,
+                hideProgressBar: false,
+                closeOnClick: true,
+                pauseOnHover: true,
+                draggable: true,
+                progress: undefined,
+            });
 
-            alert("✅ Login successful");
-
-            // ✅ Navigate to client-specific route
-            navigate(`/saas/${client_id}`);
+            navigate(`/saas/${clientId}/main/${token}`);
         } catch (err) {
             console.error("Login error:", err?.response?.data);
-            const detail = err?.response?.data?.detail;
-            const msg = Array.isArray(detail) ? detail[0]?.msg : detail;
-            setError(msg || "Invalid client code or credentials");
+            const msg = err?.response?.data?.detail;
+            setError(msg || "Invalid credentials");
+        } finally {
+            setLoading(false);
         }
     };
 
-    const dynamicBase = form.client_code ? `/saas/${form.client_code}` : "#";
-
     return (
-        <div className="Register-pages">
-            <div className="container">
-                <div className="form-container">
-                    <form onSubmit={handleLogin}>
-                        <h1>Login</h1>
-
-                        <input
-                            type="text"
-                            name="client_code"
-                            placeholder="Client Code"
-                            value={form.client_code}
-                            onChange={handleChange}
-                            required
-                        />
-
+        <div className="login-page">
+            <div className="login-card">
+                <div className="avatar-circle">
+                    <FaUser className="avatar-icon" />
+                </div>
+                <form onSubmit={handleLogin}>
+                    <div className="input-group">
+                        <FaUser className="input-icon" />
                         <input
                             type="text"
                             name="username"
@@ -313,7 +692,9 @@ export default function Login() {
                             onChange={handleChange}
                             required
                         />
-
+                    </div>
+                    <div className="input-group">
+                        <FaLock className="input-icon" />
                         <input
                             type="password"
                             name="password"
@@ -322,45 +703,28 @@ export default function Login() {
                             onChange={handleChange}
                             required
                         />
+                    </div>
 
-                        {error && <p className="error">{error}</p>}
+                    <div className="options-row">
 
-                        <button type="submit">Login</button>
-
-                        <p className="login-link">
-                            Don’t have an account?{" "}
-                            <span
-                                onClick={() => {
-                                    if (form.client_code) {
-                                        navigate(`/saas/${form.client_code}/register`);
-                                    } else {
-                                        setError("⚠️ Please enter Client Code before registering.");
-                                    }
-                                }}
-                                style={{ color: "blue", cursor: "pointer", textDecoration: "underline" }}
-                            >
-                                Register
-                            </span>
-
-                        </p>
-
-
-                        <button
-                            type="button"
-                            className="ghost"
-                            onClick={() => {
-                                if (form.client_code) {
-                                    navigate(`/saas/${form.client_code}/forgot`);
-                                } else {
-                                    setError("⚠️ Please enter Client Code to continue.");
-                                }
-                            }}
+                        <span
+                            className="forgot-link"
+                            onClick={() => navigate("/saas/demo/forgot")}
                         >
                             Forgot Password?
-                        </button>
+                        </span>
+                    </div>
 
-                    </form>
-                </div>
+                    {error && <p className="error">{error}</p>}
+
+                    <button type="submit" className="login-button" disabled={loading}>
+                        {loading ? "Logging in..." : "LOGIN"}
+                    </button>
+                    <p className="login-link">
+                        Don’t have an account?{" "}
+                        <span onClick={() => navigate("/saas/demo/register")}>Register here</span>
+                    </p>
+                </form>
             </div>
         </div>
     );

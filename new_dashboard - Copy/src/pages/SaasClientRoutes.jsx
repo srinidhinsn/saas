@@ -1,5 +1,5 @@
-import React, { useEffect, useState } from "react";
-import { Routes, Route, useParams, useLocation, useNavigate } from "react-router-dom";
+import React, { useEffect } from "react";
+import { Routes, Route, useParams, Navigate, useNavigate } from "react-router-dom";
 import axios from "axios";
 
 import Navbar from "../NavbarComponent/Navbar";
@@ -30,28 +30,60 @@ const SaasClientRoutes = ({
     setTables,
     hideNavbar
 }) => {
-    const { clientId } = useParams();
-    const Navigate = useNavigate();
+    const { clientId, accessToken } = useParams();
+    const navigate = useNavigate();
 
+    const token = localStorage.getItem("access_token");
+
+    // 🔒 Redirect to login if not authenticated
+    if (!token && !accessToken) {
+        return <Navigate to={`/saas/${clientId}/login`} />;
+    }
+
+    // ✅ Sync clientId and token to localStorage
     useEffect(() => {
-        localStorage.setItem("clientId", clientId);
+        if (clientId) localStorage.setItem("clientId", clientId);
+        if (accessToken) localStorage.setItem("access_token", accessToken);
+    }, [clientId, accessToken]);
+
+    // ❗ Optional: Force logout if different client is loaded
+    useEffect(() => {
+        const storedClient = localStorage.getItem("clientId");
+        if (storedClient && storedClient !== clientId) {
+            console.warn("Client mismatch. Resetting session.");
+            localStorage.clear();
+            window.location.href = `/saas/${clientId}/login`;
+        }
     }, [clientId]);
 
+    // ✅ Load tables only for this client
     // const fetchTables = async () => {
     //     try {
-    //         const res = await axios.get(`http://localhost:8000/api/v1/${clientId}/tables`);
+    //         const token = localStorage.getItem("access_token");
+    //         const res = await axios.get(`http://localhost:8000/saas/${clientId}/tables/read`, {
+    //             headers: {
+    //                 Authorization: `Bearer ${token}`
+    //             }
+    //         });
     //         setTables(res.data);
     //     } catch (error) {
-    //         console.error("❌ Error fetching tables:", error);
+    //         console.error("❌ Failed to fetch tables:", error);
     //     }
     // };
 
-    // useEffect(() => {
-    //     fetchTables();
-    // }, [clientId]);
+    useEffect(() => {
+        // if (clientId) {
+        //     fetchTables();
+        // }
+        if (!clientId) {
+            console.error("❌ Missing client ID. Cannot fetch tables.");
+            return;
+        }
+
+    }, [clientId]);
 
     return (
-        <div style={{ display: 'flex' }}>
+        <div style={{ display: "flex" }}>
             {!hideNavbar && <Navbar />}
             <div style={{ flex: 1 }}>
                 <Routes>
@@ -98,6 +130,5 @@ const SaasClientRoutes = ({
         </div>
     );
 };
-
 
 export default SaasClientRoutes;

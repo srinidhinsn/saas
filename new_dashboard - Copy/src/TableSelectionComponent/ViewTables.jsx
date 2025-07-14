@@ -489,18 +489,29 @@ const ViewTables = ({ onOrderUpdate }) => {
 
 
         // Fetch menu categories
-        axios.get(`http://localhost:8001/saas/${clientId}/menu/categories`)
+        axios.get(`http://localhost:8003/saas/${clientId}/inventory/read_category`)
             .then(res => {
                 const allCategory = { id: "all", name: "All" };
-                const filteredCategories = res.data.filter(cat => cat.name.toLowerCase() !== "all");
+                const filteredCategories = res.data.data.filter(cat => cat.name?.toLowerCase() !== "all");
                 setCategories([allCategory, ...filteredCategories]);
                 setActiveCategory("all");
             })
+
             .catch(err => console.error("❌ Error fetching categories:", err));
 
         // Fetch menu items
-        axios.get(`http://localhost:8001/saas/${clientId}/menu/items`)
-            .then(res => setItems(res.data))
+        axios.get(`http://localhost:8003/saas/${clientId}/inventory/read`)
+            .then(res => {
+                const rawItems = res.data.data;
+                console.log("Fetched items full:", rawItems);
+
+                const enrichedItems = rawItems.map((item, index) => ({
+                    ...item,
+                    category: index % 2 === 0 ? "Rice" : "Gravy"
+                }));
+
+                setItems(enrichedItems);
+            })
             .catch(err => console.error("❌ Error fetching menu items:", err));
 
     }, [clientId]);
@@ -517,17 +528,23 @@ const ViewTables = ({ onOrderUpdate }) => {
         if (tableId && tables.length > 0) {
             const table = tables.find(t => t.id.toString() === tableId);
             setSelectedTable(table || null);
-        } else if (modeFromParams !== "table") {
-            setSelectedTable({
-                id: modeFromParams,
-                table_number: modeFromParams === "pickup" ? "Pickup" : "Delivery",
-                mode: modeFromParams === "pickup" ? "Pick Up" : "Delivery"
-            });
-            document.body.classList.add("sidebar-minimized");
         } else {
-            setSelectedTable(null);
+            const isPickup = modeFromParams === "pickup";
+            const isDelivery = modeFromParams === "delivery";
+
+            if (isPickup || isDelivery) {
+                setSelectedTable({
+                    id: modeFromParams,
+                    table_number: isPickup ? "Pickup" : "Delivery",
+                    mode: isPickup ? "Pick Up" : "Delivery"
+                });
+                document.body.classList.add("sidebar-minimized");
+            } else {
+                setSelectedTable(null);
+            }
         }
     }, [tableId, tables, modeFromParams]);
+
 
     const uniqueZones = Array.from(new Set(tables.map(t => t.location_zone))).filter(Boolean);
 
@@ -542,9 +559,8 @@ const ViewTables = ({ onOrderUpdate }) => {
         if (["veg", "paneer", "dal", "juice", "drinks"].some(w => name.includes(w))) return "item-card veg";
         return "item-card";
     };
-
     const getFilteredItems = () => {
-        if (activeCategory === "all") {
+        if (activeCategory?.toLowerCase() === "all") {
             return items.filter(i =>
                 i.name.toLowerCase().includes(searchTerm.toLowerCase())
             );
@@ -552,10 +568,14 @@ const ViewTables = ({ onOrderUpdate }) => {
 
         return items.filter(
             i =>
-                i.category_id === activeCategory &&
+                i.category?.toLowerCase() === activeCategory.toLowerCase() &&
                 i.name.toLowerCase().includes(searchTerm.toLowerCase())
         );
     };
+
+
+
+
 
 
     const handleModeClick = (mode) => {
@@ -632,8 +652,8 @@ const ViewTables = ({ onOrderUpdate }) => {
                                 {categories.map(cat => (
                                     <li
                                         key={cat.id}
-                                        className={cat.id === activeCategory ? "active" : ""}
-                                        onClick={() => setActiveCategory(cat.id)}
+                                        className={cat.name === activeCategory ? "active" : ""}
+                                        onClick={() => setActiveCategory(cat.name)} // ✅ use name
                                     >
                                         {cat.name}
                                     </li>
@@ -663,7 +683,7 @@ const ViewTables = ({ onOrderUpdate }) => {
                                 onOrderCreated={(latestOrder) => {
                                     navigate('/view-tables');
                                     setSearchParams({});
-                                    api.get(`/${clientId}/tables`).then(res => setTables(res.data));
+                                    axios.get(`http://localhost:8001/saas/${clientId}/tables/read`).then(res => setTables(res.data));
                                     onOrderUpdate?.(latestOrder);
                                     setSelectedTable(null);
                                     document.body.classList.remove("sidebar-minimized");

@@ -425,9 +425,7 @@
 
 // 
 
-
-
-// TableSelection.jsx
+// ----------------------------------------------------------------------------------------------------------------------------------------------- //
 import React, { useEffect, useState } from "react";
 import { FiSun, FiMoon } from "react-icons/fi";
 import { useTheme } from "../ThemeChangerComponent/ThemeContext";
@@ -437,9 +435,9 @@ import axios from "axios";
 import { useParams } from 'react-router-dom';
 
 const TableSelection = () => {
-
+    // --------------------Get client ID from route URL ---------------------------------- //
     const { clientId } = useParams();
-
+    // ---------------------Theme Changer ------------------------------------------------ //
     const { darkMode, toggleTheme } = useTheme();
     const [tableRanges, setTableRanges] = useState([]);
     const [tables, setTables] = useState([]);
@@ -453,16 +451,19 @@ const TableSelection = () => {
     const [deleteTableId, setDeleteTableId] = useState(null);
     const [addRowError, setAddRowError] = useState("");
     const TEMP_ACCESS_TOKEN = "mock_token_for_dev";
-    useEffect(() => {
 
+    // ---------------------- Used to set the clientId in localstorage --------------------- //
+    useEffect(() => {
         if (clientId) {
             localStorage.setItem("client_id", clientId);
         }
     }, []);
+    // ----------------------- Fetch the tables only clientid is available ----------------- //
     useEffect(() => {
         if (clientId) fetchTables();
     }, [clientId]);
 
+    // ----------------------- Fetch the tables from the backend API ----------------------- //
     const fetchTables = async () => {
         if (!clientId) return;
         try {
@@ -482,10 +483,7 @@ const TableSelection = () => {
             localStorage.removeItem("clientId");
         }
     };
-
-
-
-
+    // --------------- Parse the table range input into an array of table name -------------- //
     const parseTableRange = (rangeStr) => {
         const parts = rangeStr.split(",");
         const tables = [];
@@ -513,15 +511,15 @@ const TableSelection = () => {
                 const prefix = part.match(/[A-Za-z]+/);
                 const num = part.match(/\d+/);
                 if (!prefix || !num) continue;
-
                 const formatted = `${prefix[0].toUpperCase()}${parseInt(num[0]).toString().padStart(2, "0")}`;
                 tables.push(formatted);
             }
         }
-
         return tables;
     };
 
+    //  ----------------- Generate tables based on the user input ----------------- //
+    // ----------------- This function validates the input,parses the range,sends the data to the backend and reset the form
     const generateTables = async () => {
         const newErrors = tableRanges.map(row => ({
             range: !row.range,
@@ -529,12 +527,6 @@ const TableSelection = () => {
             type: !row.type
         }));
         setFieldErrors(newErrors);
-
-        // --------------------------------------------- //
-
-
-        // --------------------------------------------- //
-
 
         const validRows = tableRanges.filter((row, index) => !newErrors[index].range && !newErrors[index].table_type && !newErrors[index].type);
         if (validRows.length === 0) return;
@@ -562,9 +554,6 @@ const TableSelection = () => {
         try {
             for (let data of payload) {
                 await axios.post(`http://localhost:8001/saas/${clientId}/tables/create`, data);
-
-
-
             }
             fetchTables();
             setShowAddTable(false);
@@ -574,15 +563,14 @@ const TableSelection = () => {
             console.error("Error generating tables", err);
         }
     };
-
-
+    // ---------------- Handling the edit functionality for a table row ----------------- //
     const handleEditChange = (id, field, value) => {
         setTables(prev =>
             prev.map(table => (table.id === id ? { ...table, [field]: value } : table))
         );
     };
 
-
+    // ------------ Save the edited table data to the backend and update the state ------ //
     const saveEdit = async (table) => {
         const original = originalTables.find(t => t.id === table.id);
         const hasChanged = (
@@ -602,10 +590,6 @@ const TableSelection = () => {
 
         try {
             await axios.post(`http://localhost:8001/saas/${clientId}/tables/update`, table);
-
-
-
-
             setEditRowId(null);
             setHighlightRow(table.id);
             setTimeout(() => setHighlightRow(null), 3000);
@@ -614,21 +598,21 @@ const TableSelection = () => {
             console.error("Error updating table");
         }
     };
-
+    // ---------------- Cancel the edit and reset the state ------------------ //
     const cancelEdit = () => {
         setEditRowId(null);
         setNoChangeRowId(null);
         fetchTables();
     };
-
+    // ------------------ Handle the delete functionality for a table row --------------- //
     const confirmDelete = async () => {
         try {
             await axios.post(`http://localhost:8001/saas/${clientId}/tables/delete`, {
                 id: deleteTableId,
                 client_id: clientId,
-                name: "",          // optional but needed for schema match
-                table_type: "",    // optional
-                location_zone: "", // optional
+                name: "",
+                table_type: "",
+                location_zone: "",
             });
 
             fetchTables();
@@ -639,17 +623,19 @@ const TableSelection = () => {
             setDeleteTableId(null);
         }
     };
-
+    // ==================================================================================================================================== //
     return (
-        <div className={`table-selection ${darkMode ? "dark" : ""}`}>
+        // ------------------------------- Main COmponent Structure ------------------------------- //
+
+        <div className={`table-selection ${darkMode ? "dark" : ""}`}>  {/*Theme changer */}
             <div className="header">
-                <h2>Table Management</h2>
+                <h2>Table Management</h2> {/*Header section start*/}
                 <button className="theme-toggle" onClick={toggleTheme}>
                     {darkMode ? <FiSun /> : <FiMoon />}
                 </button>
-            </div>
+            </div>{/*Header section end*/}
 
-            <div className="add-tables-section">
+            <div className="add-tables-section"> {/*Add Table Section  */}
                 <h3>Add New Tables</h3>
                 {!showAddTable && (
                     <button className="btn-primary" onClick={() => {
@@ -659,14 +645,15 @@ const TableSelection = () => {
                     }}>
                         + Add Table
                     </button>
-                )}
-
+                )}    {/* Add table BUtton */}
+                {/*show the form to add nnew tables (dynamically after clicking the add table button)*/}
                 {showAddTable && (
                     <>
                         {tableRanges.map((row, index) => (
                             <div className="form-grid" key={index}>
                                 <div className="field-block">
                                     <label>Table Range</label>
+                                    {/* Table Range Input */}
                                     <input
                                         value={row.range}
                                         onChange={(e) => {
@@ -681,6 +668,7 @@ const TableSelection = () => {
 
                                 <div className="field-block">
                                     <label>No of Seating</label>
+                                    {/* No of seating Input */}
                                     <input
                                         type="number"
                                         value={row.table_type}
@@ -696,6 +684,7 @@ const TableSelection = () => {
 
                                 <div className="field-block">
                                     <label>Type</label>
+                                    {/* Table type Input (AC or Non-AC ) */}
                                     <select
                                         value={row.type}
                                         onChange={(e) => {
@@ -714,6 +703,7 @@ const TableSelection = () => {
 
                                 <div className="field-block">
                                     <label>Remark</label>
+                                    {/* Remark or any specification Input */}
                                     <select
                                         value={row.remark}
                                         onChange={(e) => {
@@ -729,6 +719,7 @@ const TableSelection = () => {
                                 </div>
                                 <div className="field-block">
                                     <label>QR Code URL</label>
+                                    {/* QR code Input(optional) */}
                                     <input
                                         type="text"
                                         value={row.qr_code_url || ""}
@@ -742,6 +733,7 @@ const TableSelection = () => {
                                 </div>
                                 <div className="field-block">
                                     <label>Description</label>
+                                    {/* Description Input (optional) */}
                                     <input
                                         value={row.description}
                                         onChange={(e) => {
@@ -753,6 +745,7 @@ const TableSelection = () => {
                                 </div>
                                 <div className="field-block">
                                     <label>Slug</label>
+                                    {/* Slug Input (optional) */}
                                     <input
                                         type="text"
                                         value={row.slug || ""}
@@ -767,6 +760,7 @@ const TableSelection = () => {
 
                                 <div className="field-block">
                                     <label>Section</label>
+                                    {/* Section Input (optional) */}
                                     <input
                                         value={row.section}
                                         onChange={(e) => {
@@ -779,6 +773,7 @@ const TableSelection = () => {
 
                                 <div className="field-block">
                                     <label>Sort Order</label>
+                                    {/* Sort-order Input (optional) */}
                                     <input
                                         type="number"
                                         value={row.sort_order}
@@ -792,6 +787,7 @@ const TableSelection = () => {
 
                                 <div className="field-block checkbox-field">
                                     <label>
+                                        {/* Active or not marking Input (optional) */}
                                         <input
                                             type="checkbox"
                                             checked={row.is_active}
@@ -807,7 +803,7 @@ const TableSelection = () => {
 
                             </div>
                         ))}
-
+                        {/* Example Text for creating tables (for user references) */}
                         <div className="example-text">
                             Example:<br />
                             a) Table Range: T01:T10<br />

@@ -1,14 +1,10 @@
-
-
-
-
 import React, { useEffect, useState } from "react";
 import axios from "axios";
 import Modal from "react-modal";
 import { FaUser, FaTable, FaTrash } from "react-icons/fa";
 import { BsCash, BsCreditCard, BsQrCode } from "react-icons/bs";
-import api from '../PortExportingPage/api'
-import { useParams } from 'react-router-dom';
+// import api from '../PortExportingPage/api'
+// import { useParams } from 'react-router-dom';
 Modal.setAppElement("#root");
 
 const OrderForm = ({ table, onOrderCreated }) => {
@@ -111,7 +107,7 @@ const OrderForm = ({ table, onOrderCreated }) => {
         axios.post(`http://localhost:8002/saas/${clientId}/dinein/create`, payload)
             .then(res => onOrderCreated?.(res.data))
             .catch(err => {
-                console.error("Order creation failed:", err);
+                console.error(" Order creation failed:", err);
                 alert("Order creation failed. Please check console.");
             });
     };
