@@ -1,10 +1,279 @@
 
 
+// import React, { useEffect, useState } from "react";
+// import axios from "axios";
+// import { FaEdit, FaTrash } from "react-icons/fa";
+
+// function CategoryList({ clientId, onCategorySelect }) {
+//   const [categories, setCategories] = useState([]);
+//   const [editingId, setEditingId] = useState(null);
+//   const [editName, setEditName] = useState("");
+//   const [editDescription, setEditDescription] = useState("");
+//   const [showAddModal, setShowAddModal] = useState(false);
+//   const [showEditModal, setShowEditModal] = useState(false);
+//   const [newName, setNewName] = useState("");
+//   const [newDescription, setNewDescription] = useState("");
+//   const [deleteTarget, setDeleteTarget] = useState(null);
+//   const [includeAddons, setIncludeAddons] = useState(false);
+//   const [addonGroups, setAddonGroups] = useState([]);
+//   const [selectedAddonGroup, setSelectedAddonGroup] = useState("");
+//   const [editIncludeAddons, setEditIncludeAddons] = useState(false);
+//   const [editAddonGroups, setEditAddonGroups] = useState([]);
+//   const [editSelectedAddonGroup, setEditSelectedAddonGroup] = useState("");
+
+
+//   useEffect(() => {
+//     if (includeAddons) {
+//       axios.get(`http://localhost:8000/api/v1/${clientId}/addons/groups`)
+//         .then(res => setAddonGroups(res.data))
+//         .catch(err => console.error("Error fetching addon groups:", err));
+//     }
+//   }, [includeAddons]);
+
+//   useEffect(() => {
+//     if (editIncludeAddons) {
+//       axios.get(`http://localhost:8000/api/v1/${clientId}/addons/groups`)
+//         .then((res) => setEditAddonGroups(res.data))
+//         .catch((err) => console.error("Error fetching addon groups:", err));
+//     }
+//   }, [editIncludeAddons]);
+
+
+
+//   useEffect(() => {
+//     axios
+//       .get(`http://localhost:8000/api/v1/${clientId}/menu/categories`)
+//       .then((res) => setCategories(res.data));
+//   }, [clientId]);
+
+//   const handleDelete = async (id) => {
+//     await axios.delete(`http://localhost:8000/api/v1/${clientId}/menu/categories/${id}`);
+//     setCategories(categories.filter((cat) => cat.id !== id));
+//     setDeleteTarget(null);
+//   };
+
+//   const startEdit = (cat) => {
+//     setEditingId(cat.id);
+//     setEditName(cat.name);
+//     setEditDescription(cat.description);
+//     setEditIncludeAddons(!!cat.addon_group_id); // true if add-on group exists
+//     setEditSelectedAddonGroup(cat.addon_group_id || "");
+
+//     if (cat.addon_group_id) {
+//       axios.get(`http://localhost:8000/api/v1/${clientId}/addons/groups`)
+//         .then((res) => setEditAddonGroups(res.data))
+//         .catch((err) => console.error("Error fetching addon groups:", err));
+//     }
+
+//     setShowEditModal(true);
+//   };
+
+//   const handleEditSave = async () => {
+//     const payload = {
+//       name: editName,
+//       description: editDescription,
+//     };
+
+//     if (editIncludeAddons && editSelectedAddonGroup) {
+//       payload.addon_group_id = editSelectedAddonGroup;
+//     }
+
+//     const res = await axios.put(`http://localhost:8000/api/v1/${clientId}/menu/categories/${editingId}`, payload);
+//     setCategories(categories.map((cat) => (cat.id === editingId ? res.data : cat)));
+//     setEditingId(null);
+//     setEditIncludeAddons(false);
+//     setEditSelectedAddonGroup("");
+//   };
+
+
+//   const handleAddCategory = async () => {
+//     const res = await axios.post(`http://localhost:8000/api/v1/${clientId}/menu/categories`, {
+//       name: newName,
+//       description: newDescription,
+//       client_id: clientId
+//     });
+//     setCategories([...categories, res.data]);
+//     setNewName("");
+//     setNewDescription("");
+//     setShowAddModal(false);
+//   };
+
+//   return (
+//     <div className="category-list-container">
+//       <div className="category-header">
+//         {/* 👇 Make this clickable to show all items */}
+//         <h3 className="category-list-title">
+//           Categories
+//         </h3>
+//         <button className="add-btn" onClick={() => setShowAddModal(true)}>➕</button>
+//       </div>
+
+//       <ul className="category-list">
+//         {categories.map((cat) => (
+//           <li key={cat.id} className="category-item" onClick={() => onCategorySelect(cat)}>{cat.name}
+//             <span className="category-name"></span>
+//             {cat.name !== "All" && (
+//               <div className="category-actions">
+//                 <button onClick={() => startEdit(cat)} className="edit-btn"><FaEdit /></button>
+//                 <button onClick={() => setDeleteTarget(cat)} className="delete-btn"><FaTrash /></button>
+//               </div>
+//             )}
+//           </li>
+//         ))}
+//       </ul>
+
+//       {/* Add Modal */}
+//       {showAddModal && (
+//         <div className="modal-overlay">
+//           <div className="modal-content">
+//             <h4>Add New Category</h4>
+
+//             <input
+//               type="text"
+//               value={newName}
+//               onChange={(e) => setNewName(e.target.value)}
+//               placeholder="Category Name"
+//               className="modal-input"
+//             />
+//             <input
+//               type="text"
+//               value={newDescription}
+//               onChange={(e) => setNewDescription(e.target.value)}
+//               placeholder="Description"
+//               className="modal-input"
+//             />
+
+//             <label className="checkbox-label" style={{ display: 'flex', alignItems: 'center', gap: '8px' }}>
+//               <input
+//                 type="checkbox"
+//                 checked={includeAddons}
+//                 onChange={(e) => setIncludeAddons(e.target.checked)}
+//               />
+//               Want to add Add-ons?
+//             </label>
+
+//             {includeAddons && (
+//               <select
+//                 value={selectedAddonGroup}
+//                 onChange={(e) => setSelectedAddonGroup(e.target.value)}
+//                 className="modal-input"
+//               >
+//                 <option value="">Select Addon Group</option>
+//                 {addonGroups.map((group) => (
+//                   <option key={group.id} value={group.id}>{group.name}</option>
+//                 ))}
+//               </select>
+//             )}
+
+//             <div className="modal-buttons">
+//               <button onClick={handleAddCategory} className="modal-save-btn">Add</button>
+//               <button onClick={() => setShowAddModal(false)} className="modal-cancel-btn">Cancel</button>
+//             </div>
+//           </div>
+//         </div>
+//       )}
+
+
+//       {/* Edit Modal */}
+//       {showEditModal && (
+//   <div className="modal-overlay">
+//     <div className="modal-content">
+//       <h4>Edit Category</h4>
+
+//       <input
+//         type="text"
+//         value={editName}
+//         onChange={(e) => setEditName(e.target.value)}
+//         placeholder="Category Name"
+//         className="modal-input"
+//       />
+//       <input
+//         type="text"
+//         value={editDescription}
+//         onChange={(e) => setEditDescription(e.target.value)}
+//         placeholder="Description"
+//         className="modal-input"
+//       />
+
+//       <label className="checkbox-label" style={{ display: 'flex', alignItems: 'center', gap: '8px' }}>
+//         <input
+//           type="checkbox"
+//           checked={editIncludeAddons}
+//           onChange={(e) => setEditIncludeAddons(e.target.checked)}
+//         />
+//         Want to add Add-ons?
+//       </label>
+
+//       {editIncludeAddons && (
+//         <select
+//           value={editSelectedAddonGroup}
+//           onChange={(e) => setEditSelectedAddonGroup(e.target.value)}
+//           className="modal-input"
+//         >
+//           <option value="">Select Addon Group</option>
+//           {editAddonGroups.map((group) => (
+//             <option key={group.id} value={group.id}>{group.name}</option>
+//           ))}
+//         </select>
+//       )}
+
+//       <div className="modal-buttons">
+//         <button
+//           onClick={async () => {
+//             await handleEditSave();
+//             setShowEditModal(false);
+//           }}
+//           className="modal-save-btn"
+//         >
+//           Save
+//         </button>
+//         <button
+//           onClick={() => {
+//             setShowEditModal(false);
+//             setEditingId(null);
+//           }}
+//           className="modal-cancel-btn"
+//         >
+//           Cancel
+//         </button>
+//       </div>
+//     </div>
+//   </div>
+// )}
+
+
+//       {deleteTarget && (
+//         <div className="modal-overlay">
+//           <div className="modal-content">
+//             <h4>Confirm Delete</h4>
+//             <p>Are you sure you want to delete <strong>{deleteTarget.name}</strong>?</p>
+//             <div className="modal-buttons">
+//               <button onClick={() => handleDelete(deleteTarget.id)} className="modal-save-btn">Yes</button>
+//               <button onClick={() => setDeleteTarget(null)} className="modal-cancel-btn">No</button>
+//             </div>
+//           </div>
+//         </div>
+//       )}
+//     </div>
+//   );
+// }
+
+// export default CategoryList;
+
+// 
+
+
+
+
+
+
+
 import React, { useEffect, useState } from "react";
 import axios from "axios";
 import { FaEdit, FaTrash } from "react-icons/fa";
+import { jwtDecode } from "jwt-decode"; import { useParams } from 'react-router-dom';
 
-function CategoryList({ clientId, onCategorySelect }) {
+function CategoryList({ onCategorySelect, onCategoryAdded }) {
   const [categories, setCategories] = useState([]);
   const [editingId, setEditingId] = useState(null);
   const [editName, setEditName] = useState("");
@@ -14,120 +283,174 @@ function CategoryList({ clientId, onCategorySelect }) {
   const [newName, setNewName] = useState("");
   const [newDescription, setNewDescription] = useState("");
   const [deleteTarget, setDeleteTarget] = useState(null);
-  const [includeAddons, setIncludeAddons] = useState(false);
-  const [addonGroups, setAddonGroups] = useState([]);
-  const [selectedAddonGroup, setSelectedAddonGroup] = useState("");
-  const [editIncludeAddons, setEditIncludeAddons] = useState(false);
-  const [editAddonGroups, setEditAddonGroups] = useState([]);
-  const [editSelectedAddonGroup, setEditSelectedAddonGroup] = useState("");
+
+  const clientId = localStorage.getItem("clientId");
+  const token = localStorage.getItem("access_token");
+
+  console.log("Token in localStorage:", token);
 
 
   useEffect(() => {
-    if (includeAddons) {
-      axios.get(`http://localhost:8000/api/v1/${clientId}/addons/groups`)
-        .then(res => setAddonGroups(res.data))
-        .catch(err => console.error("Error fetching addon groups:", err));
-    }
-  }, [includeAddons]);
+    if (!token || !clientId) return;
+    axios.get(`http://localhost:8002/saas/${clientId}/inventory/read_category?client_id=${clientId}`, {
+      headers: {
+        Authorization: `Bearer ${token}`,
+      },
+    })
 
-  useEffect(() => {
-    if (editIncludeAddons) {
-      axios.get(`http://localhost:8000/api/v1/${clientId}/addons/groups`)
-        .then((res) => setEditAddonGroups(res.data))
-        .catch((err) => console.error("Error fetching addon groups:", err));
-    }
-  }, [editIncludeAddons]);
-  
-
-
-  useEffect(() => {
-    axios
-      .get(`http://localhost:8000/api/v1/${clientId}/menu/categories`)
-      .then((res) => setCategories(res.data));
+      .then((res) => {
+        setCategories(res.data.data || []);
+      })
+      .catch((err) => {
+        console.error("Error fetching categories:", err);
+      });
   }, [clientId]);
 
-  const handleDelete = async (id) => {
-    await axios.delete(`http://localhost:8000/api/v1/${clientId}/menu/categories/${id}`);
-    setCategories(categories.filter((cat) => cat.id !== id));
-    setDeleteTarget(null);
+
+
+
+  const handleAddCategory = async () => {
+    if (!newName.trim()) return;
+
+    let createdBy = "unknown";
+    let updatedBy = "unknown";
+
+    try {
+      const decoded = jwtDecode(token);
+      createdBy = decoded.user_id || "unknown";
+      updatedBy = decoded.user_id || "unknown";
+    } catch (err) {
+      console.error("Token decode failed:", err);
+    }
+
+    const payload = {
+      category: {
+        name: newName.trim(),
+        description: newDescription.trim(),
+        created_by: createdBy,
+        updated_by: updatedBy
+      },
+    };
+
+    try {
+      const res = await axios.post(
+        `http://localhost:8002/saas/${clientId}/inventory/create_category`,
+        payload,
+        {
+          headers: {
+            Authorization: `Bearer ${token}`
+          },
+        }
+      );
+
+      const newCategory = res.data.data;
+      setCategories([...categories, newCategory]);
+      setNewName("");
+      setNewDescription("");
+      setShowAddModal(false);
+    } catch (err) {
+      console.error("Error adding category:", err.response?.data || err);
+      alert(JSON.stringify(err.response?.data || err, null, 2));
+    }
   };
+
+
+
+
+
 
   const startEdit = (cat) => {
     setEditingId(cat.id);
     setEditName(cat.name);
     setEditDescription(cat.description);
-    setEditIncludeAddons(!!cat.addon_group_id); // true if add-on group exists
-    setEditSelectedAddonGroup(cat.addon_group_id || "");
-  
-    if (cat.addon_group_id) {
-      axios.get(`http://localhost:8000/api/v1/${clientId}/addons/groups`)
-        .then((res) => setEditAddonGroups(res.data))
-        .catch((err) => console.error("Error fetching addon groups:", err));
-    }
-  
     setShowEditModal(true);
   };
-  
+
   const handleEditSave = async () => {
     const payload = {
+      id: editingId,
       name: editName,
       description: editDescription,
     };
-  
-    if (editIncludeAddons && editSelectedAddonGroup) {
-      payload.addon_group_id = editSelectedAddonGroup;
-    }
-  
-    const res = await axios.put(`http://localhost:8000/api/v1/${clientId}/menu/categories/${editingId}`, payload);
-    setCategories(categories.map((cat) => (cat.id === editingId ? res.data : cat)));
-    setEditingId(null);
-    setEditIncludeAddons(false);
-    setEditSelectedAddonGroup("");
-  };
-  
 
-  const handleAddCategory = async () => {
-    const res = await axios.post(`http://localhost:8000/api/v1/${clientId}/menu/categories`, {
-      name: newName,
-      description: newDescription,
-      client_id: clientId
-    });
-    setCategories([...categories, res.data]);
-    setNewName("");
-    setNewDescription("");
-    setShowAddModal(false);
+    try {
+      const res = await axios.post(
+        `http://localhost:8002/saas/${clientId}/inventory/update_category`,
+        payload,
+        {
+          headers: {
+            Authorization: `Bearer ${token}`,
+          },
+        }
+      );
+
+      setCategories(
+        categories.map((cat) => (cat.id === editingId ? res.data.data : cat))
+      );
+      setEditingId(null);
+      setShowEditModal(false);
+    } catch (err) {
+      console.error("Error editing category:", err);
+    }
+  };
+
+  const handleDelete = async (id) => {
+    const payload = { id };
+
+    try {
+      await axios.post(
+        `http://localhost:8002/saas/${clientId}/inventory/delete_category`,
+        payload,
+        {
+          headers: {
+            Authorization: `Bearer ${token}`,
+          },
+        }
+      );
+
+      setCategories(categories.filter((cat) => cat.id !== id));
+      setDeleteTarget(null);
+    } catch (err) {
+      console.error("Error deleting category:", err);
+    }
   };
 
   return (
     <div className="category-list-container">
       <div className="category-header">
-        {/* 👇 Make this clickable to show all items */}
-        <h3 className="category-list-title">
-          Categories
-        </h3>
-        <button className="add-btn" onClick={() => setShowAddModal(true)}>➕</button>
+        <h3 className="category-list-title">Categories</h3>
+        <button className="add-btn" onClick={() => setShowAddModal(true)}>
+          ➕
+        </button>
       </div>
 
       <ul className="category-list">
         {categories.map((cat) => (
-          <li key={cat.id} className="category-item" onClick={() => onCategorySelect(cat)}>{cat.name}
-            <span className="category-name"></span>
-            {cat.name !== "All" && (
-              <div className="category-actions">
-                <button onClick={() => startEdit(cat)} className="edit-btn"><FaEdit /></button>
-                <button onClick={() => setDeleteTarget(cat)} className="delete-btn"><FaTrash /></button>
-              </div>
-            )}
+          <li
+            key={cat.id}
+            className="category-item"
+            onClick={() => onCategorySelect(cat)}
+          >
+            {cat.name}
+            <div className="category-actions">
+              <button onClick={() => startEdit(cat)} className="edit-btn">
+                <FaEdit />
+              </button>
+              <button
+                onClick={() => setDeleteTarget(cat)}
+                className="delete-btn"
+              >
+                <FaTrash />
+              </button>
+            </div>
           </li>
         ))}
       </ul>
 
-      {/* Add Modal */}
       {showAddModal && (
         <div className="modal-overlay">
           <div className="modal-content">
             <h4>Add New Category</h4>
-
             <input
               type="text"
               value={newName}
@@ -142,114 +465,83 @@ function CategoryList({ clientId, onCategorySelect }) {
               placeholder="Description"
               className="modal-input"
             />
-
-            <label className="checkbox-label" style={{ display: 'flex', alignItems: 'center', gap: '8px' }}>
-              <input
-                type="checkbox"
-                checked={includeAddons}
-                onChange={(e) => setIncludeAddons(e.target.checked)}
-              />
-              Want to add Add-ons?
-            </label>
-
-            {includeAddons && (
-              <select
-                value={selectedAddonGroup}
-                onChange={(e) => setSelectedAddonGroup(e.target.value)}
-                className="modal-input"
-              >
-                <option value="">Select Addon Group</option>
-                {addonGroups.map((group) => (
-                  <option key={group.id} value={group.id}>{group.name}</option>
-                ))}
-              </select>
-            )}
-
             <div className="modal-buttons">
-              <button onClick={handleAddCategory} className="modal-save-btn">Add</button>
-              <button onClick={() => setShowAddModal(false)} className="modal-cancel-btn">Cancel</button>
+              <button onClick={handleAddCategory} className="modal-save-btn">
+                Add
+              </button>
+              <button
+                onClick={() => {
+                  setShowAddModal(false);
+                  setNewName("");
+                  setNewDescription("");
+                }}
+                className="modal-cancel-btn"
+              >
+                Cancel
+              </button>
             </div>
           </div>
         </div>
       )}
 
 
-      {/* Edit Modal */}
       {showEditModal && (
-  <div className="modal-overlay">
-    <div className="modal-content">
-      <h4>Edit Category</h4>
-
-      <input
-        type="text"
-        value={editName}
-        onChange={(e) => setEditName(e.target.value)}
-        placeholder="Category Name"
-        className="modal-input"
-      />
-      <input
-        type="text"
-        value={editDescription}
-        onChange={(e) => setEditDescription(e.target.value)}
-        placeholder="Description"
-        className="modal-input"
-      />
-
-      <label className="checkbox-label" style={{ display: 'flex', alignItems: 'center', gap: '8px' }}>
-        <input
-          type="checkbox"
-          checked={editIncludeAddons}
-          onChange={(e) => setEditIncludeAddons(e.target.checked)}
-        />
-        Want to add Add-ons?
-      </label>
-
-      {editIncludeAddons && (
-        <select
-          value={editSelectedAddonGroup}
-          onChange={(e) => setEditSelectedAddonGroup(e.target.value)}
-          className="modal-input"
-        >
-          <option value="">Select Addon Group</option>
-          {editAddonGroups.map((group) => (
-            <option key={group.id} value={group.id}>{group.name}</option>
-          ))}
-        </select>
+        <div className="modal-overlay">
+          <div className="modal-content">
+            <h4>Edit Category</h4>
+            <input
+              type="text"
+              value={editName}
+              onChange={(e) => setEditName(e.target.value)}
+              placeholder="Category Name"
+              className="modal-input"
+            />
+            <input
+              type="text"
+              value={editDescription}
+              onChange={(e) => setEditDescription(e.target.value)}
+              placeholder="Description"
+              className="modal-input"
+            />
+            <div className="modal-buttons">
+              <button onClick={handleEditSave} className="modal-save-btn">
+                Save
+              </button>
+              <button
+                onClick={() => {
+                  setShowEditModal(false);
+                  setEditingId(null);
+                }}
+                className="modal-cancel-btn"
+              >
+                Cancel
+              </button>
+            </div>
+          </div>
+        </div>
       )}
-
-      <div className="modal-buttons">
-        <button
-          onClick={async () => {
-            await handleEditSave();
-            setShowEditModal(false);
-          }}
-          className="modal-save-btn"
-        >
-          Save
-        </button>
-        <button
-          onClick={() => {
-            setShowEditModal(false);
-            setEditingId(null);
-          }}
-          className="modal-cancel-btn"
-        >
-          Cancel
-        </button>
-      </div>
-    </div>
-  </div>
-)}
-
 
       {deleteTarget && (
         <div className="modal-overlay">
           <div className="modal-content">
             <h4>Confirm Delete</h4>
-            <p>Are you sure you want to delete <strong>{deleteTarget.name}</strong>?</p>
+            <p>
+              Are you sure you want to delete {" "}
+              <strong>{deleteTarget.name}</strong>?
+            </p>
             <div className="modal-buttons">
-              <button onClick={() => handleDelete(deleteTarget.id)} className="modal-save-btn">Yes</button>
-              <button onClick={() => setDeleteTarget(null)} className="modal-cancel-btn">No</button>
+              <button
+                onClick={() => handleDelete(deleteTarget.id)}
+                className="modal-save-btn"
+              >
+                Yes
+              </button>
+              <button
+                onClick={() => setDeleteTarget(null)}
+                className="modal-cancel-btn"
+              >
+                No
+              </button>
             </div>
           </div>
         </div>
@@ -259,4 +551,3 @@ function CategoryList({ clientId, onCategorySelect }) {
 }
 
 export default CategoryList;
-

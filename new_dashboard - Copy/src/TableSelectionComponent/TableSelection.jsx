@@ -450,14 +450,15 @@ const TableSelection = () => {
     const [showConfirmDelete, setShowConfirmDelete] = useState(false);
     const [deleteTableId, setDeleteTableId] = useState(null);
     const [addRowError, setAddRowError] = useState("");
-    const TEMP_ACCESS_TOKEN = "mock_token_for_dev";
+    const token = localStorage.getItem("access_token");
+    // const clientId = localStorage.getItem("clientId");
 
     // ---------------------- Used to set the clientId in localstorage --------------------- //
     useEffect(() => {
         if (clientId) {
-            localStorage.setItem("client_id", clientId);
+            localStorage.setItem("clientId", clientId);
         }
-    }, []);
+    }, [clientId]);
     // ----------------------- Fetch the tables only clientid is available ----------------- //
     useEffect(() => {
         if (clientId) fetchTables();
@@ -467,8 +468,12 @@ const TableSelection = () => {
     const fetchTables = async () => {
         if (!clientId) return;
         try {
-            const token = localStorage.getItem("accessToken");
-            const res = await axios.get(`http://localhost:8001/saas/${clientId}/tables/read`);
+            const res = await axios.get(`http://localhost:8001/saas/${clientId}/tables/read`,
+                {
+                    headers: {
+                        Authorization: `Bearer ${token}`,
+                    },
+                });
 
 
             const result = res.data;
@@ -544,7 +549,8 @@ const TableSelection = () => {
                     section: row.section,
                     sort_order: row.sort_order ? parseInt(row.sort_order) : null,
                     is_active: row.is_active, qr_code_url: row.qr_code_url || "",
-                    slug: `${clientId}-${(row.slug || num).toLowerCase()}`,
+                    slug: `${clientId}-${(row.slug || num).toLowerCase().replace(/[^a-z0-9-]/g, '')}`
+
 
                 });
 
@@ -553,7 +559,16 @@ const TableSelection = () => {
 
         try {
             for (let data of payload) {
-                await axios.post(`http://localhost:8001/saas/${clientId}/tables/create`, data);
+
+                await axios.post(
+                    `http://localhost:8001/saas/${clientId}/tables/create`,
+                    data,
+                    {
+                        headers: {
+                            Authorization: `Bearer ${token}`,
+                        },
+                    }
+                );
             }
             fetchTables();
             setShowAddTable(false);

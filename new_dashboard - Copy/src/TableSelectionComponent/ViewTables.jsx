@@ -470,11 +470,15 @@ const ViewTables = ({ onOrderUpdate }) => {
     const [items, setItems] = useState([]);
     const [activeCategory, setActiveCategory] = useState(null);
     const [searchTerm, setSearchTerm] = useState("");
-
+    const token = localStorage.getItem("access_token");
     useEffect(() => {
         if (!clientId) return;
 
-        axios.get(`http://localhost:8001/saas/${clientId}/tables/read`)
+        axios.get(`http://localhost:8001/saas/${clientId}/tables/read`, {
+            headers: {
+                Authorization: `Bearer ${token}`
+            }
+        })
             .then(res => {
                 const tableList = Array.isArray(res.data?.data) ? res.data.data.map(t => ({
                     ...t,
@@ -489,7 +493,11 @@ const ViewTables = ({ onOrderUpdate }) => {
 
 
         // Fetch menu categories
-        axios.get(`http://localhost:8003/saas/${clientId}/inventory/read_category`)
+        axios.get(`http://localhost:8002/saas/${clientId}/inventory/read_category`, {
+            headers: {
+                Authorization: `Bearer ${token}`,
+            },
+        })
             .then(res => {
                 const allCategory = { id: "all", name: "All" };
                 const filteredCategories = res.data.data.filter(cat => cat.name?.toLowerCase() !== "all");
@@ -500,7 +508,11 @@ const ViewTables = ({ onOrderUpdate }) => {
             .catch(err => console.error("❌ Error fetching categories:", err));
 
         // Fetch menu items
-        axios.get(`http://localhost:8003/saas/${clientId}/inventory/read`)
+        axios.get(`http://localhost:8002/saas/${clientId}/inventory/read`, {
+            headers: {
+                Authorization: `Bearer ${token}`,
+            },
+        })
             .then(res => {
                 const rawItems = res.data.data;
                 console.log("Fetched items full:", rawItems);
@@ -565,7 +577,7 @@ const ViewTables = ({ onOrderUpdate }) => {
                 i.name.toLowerCase().includes(searchTerm.toLowerCase())
             );
         }
-
+        if (!items || !Array.isArray(items)) return [];
         return items.filter(
             i =>
                 i.category?.toLowerCase() === activeCategory.toLowerCase() &&
@@ -592,7 +604,7 @@ const ViewTables = ({ onOrderUpdate }) => {
                     >
                         Table
                     </button>
-                    <button
+                    {/* <button
                         className={modeFromParams === "pickup" ? "active" : ""}
                         onClick={() => handleModeClick("pickup")}
                     >
@@ -603,7 +615,7 @@ const ViewTables = ({ onOrderUpdate }) => {
                         onClick={() => handleModeClick("delivery")}
                     >
                         Delivery
-                    </button>
+                    </button> */}
                 </div>
             )}
 

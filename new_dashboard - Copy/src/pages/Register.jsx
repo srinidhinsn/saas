@@ -314,8 +314,23 @@ export default function Register() {
 
     const handleChange = (e) => {
         const { name, value } = e.target;
-        setForm((prev) => ({ ...prev, [name]: value }));
+
+        if (name === "role") {
+            const defaultGrants =
+                value === "admin"
+                    ? ['invoice', 'inventory', 'billing', 'tables', 'order', 'menu', 'users', 'document']
+                    : [];
+
+            setForm((prev) => ({
+                ...prev,
+                role: value,
+                grants: defaultGrants,
+            }));
+        } else {
+            setForm((prev) => ({ ...prev, [name]: value }));
+        }
     };
+
 
     const handleGrantChange = (e) => {
         const { value, checked } = e.target;
@@ -414,7 +429,7 @@ export default function Register() {
 
                     <label>Grants Service:</label>
                     <div className="checkbox-group">
-                        {['invoice', 'inventory', 'billing'].map((g) => (
+                        {['invoice', 'inventory', 'billing', 'tables'].map((g) => (
                             <label key={g}>
                                 <input
                                     type="checkbox"

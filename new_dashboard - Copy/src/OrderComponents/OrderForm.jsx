@@ -27,7 +27,7 @@ const OrderForm = ({ table, onOrderCreated }) => {
     const [splitError, setSplitError] = useState("");
 
     // const { clientId } = useParams();
-    const clientId = localStorage.getItem("client_id");
+    const clientId = localStorage.getItem("clientId");
 
     useEffect(() => {
         setMode(table?.mode || "Dine In");
@@ -96,15 +96,21 @@ const OrderForm = ({ table, onOrderCreated }) => {
             status: "new",
             totalPrice: parseFloat(calculateTotal()),
             price: parseFloat(calculateTotal()),
-            items: orderItems.map(({ id, quantity }) => ({
+            mode,
+            paymentMode,
+            customer,
+            items: orderItems.map(({ id, quantity, note }) => ({
                 itemId: id,
                 quantity,
-                status: "new"
+                status: "new",
+                note,
             }))
+
+
         };
         console.log("Sending payload:", payload);
 
-        axios.post(`http://localhost:8002/saas/${clientId}/dinein/create`, payload)
+        axios.post(`http://localhost:8003/saas/${clientId}/dinein/create`, payload)
             .then(res => onOrderCreated?.(res.data))
             .catch(err => {
                 console.error(" Order creation failed:", err);

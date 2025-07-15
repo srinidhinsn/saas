@@ -93,7 +93,7 @@ const SaasClientRoutes = ({
                     <Route path="dinein-page" element={<MenuManager clientId={clientId} />} />
                     <Route path="swiggy-page" element={<SwiggyMenuManager clientId={clientId} />} />
                     <Route path="zomato-page" element={<ZomatoMenuManager clientId={clientId} />} />
-                    <Route path="menu-page" element={<MenuTypeSelector clientId={clientId} />} />
+                    <Route path="menu-page" element={<MenuManager clientId={clientId} />} />
                     <Route
                         path="table-selection"
                         element={
