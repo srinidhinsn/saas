@@ -665,7 +665,7 @@ export default function Login() {
                 progress: undefined,
             });
 
-            navigate(`/saas/${clientId}/main/${token}`);
+            navigate(`/saas/${clientId}/main`);
         } catch (err) {
             console.error("Login error:", err?.response?.data);
             const msg = err?.response?.data?.detail;
@@ -707,12 +707,7 @@ export default function Login() {
 
                     <div className="options-row">
 
-                        <span
-                            className="forgot-link"
-                            onClick={() => navigate("/saas/demo/forgot")}
-                        >
-                            Forgot Password?
-                        </span>
+                        <span onClick={() => navigate(`/saas/${form.username || "demo"}/forgot`)}>Forgot Password?</span>
                     </div>
 
                     {error && <p className="error">{error}</p>}
@@ -722,7 +717,7 @@ export default function Login() {
                     </button>
                     <p className="login-link">
                         Don’t have an account?{" "}
-                        <span onClick={() => navigate("/saas/demo/register")}>Register here</span>
+                        <span onClick={() => navigate(`/saas/${form.username || "demo"}/register`)}>Register here</span>
                     </p>
                 </form>
             </div>

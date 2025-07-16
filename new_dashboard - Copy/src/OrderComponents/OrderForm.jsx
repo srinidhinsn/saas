@@ -79,44 +79,105 @@ const OrderForm = ({ table, onOrderCreated }) => {
         if (mode === "Delivery" || mode === "Pick Up") total += 10;
         return total.toFixed(2);
     };
+    // const handlePlaceOrder = () => {
+    //     if (orderItems.length === 0) {
+    //         alert("Please select at least one item before placing the order.");
+    //         return;
+    //     }
+
+    //     const totalPaid = Object.values(splitAmounts).reduce((sum, v) => sum + parseFloat(v || 0), 0);
+    //     if (splitMode && Math.abs(totalPaid - calculateTotal()) > 0.01) {
+    //         alert("Split amounts don't match total. Please check.");
+    //         return;
+    //     }
+
+    //     const payload = {
+    //         table_id: selectedTable?.id,  // ✅ use `table_id` as backend expects
+    //         status: "new",
+    //         total_price: parseFloat(calculateTotal()),  // ✅ use `snake_case`
+    //         price: parseFloat(calculateTotal()),
+    //         mode,
+    //         paymentMode,
+    //         customer,
+    //         items: orderItems
+    //             .filter(item => item && item.id && !isNaN(Number(item.id)))
+    //             .map(item => ({
+    //                 client_id: clientId,
+    //                 item_id: item.id.toString(),
+    //                 quantity: Number(item.quantity),
+    //                 status: item.status || "new",
+    //                 note: item.note || ""
+    //             }))
+    //     };
+
+    //     console.log("Sending payload:", payload);
+
+    //     axios.post(`http://localhost:8003/saas/${clientId}/dinein/create`, payload, {
+    //         headers: {
+    //             Authorization: `Bearer ${localStorage.getItem("access_token")}`,
+    //         }
+    //     })
+    //         .then(res => {
+    //             onOrderCreated?.(res.data);
+    //         })
+    //         .catch(err => {
+    //             console.error("Order creation failed:", err);
+
+    //             if (err.response?.status === 422) {
+    //                 console.error("422 Validation Error:", JSON.stringify(err.response.data, null, 2));
+    //             }
+
+    //             alert("Order creation failed. Please check console.");
+    //         });
+    // };
+
     const handlePlaceOrder = () => {
         if (orderItems.length === 0) {
             alert("Please select at least one item before placing the order.");
             return;
         }
 
-        const totalPaid = Object.values(splitAmounts).reduce((sum, v) => sum + parseFloat(v || 0), 0);
-        if (splitMode && Math.abs(totalPaid - calculateTotal()) > 0.01) {
-            alert("Split amounts don't match total. Please check.");
-            return;
-        }
+        const total = parseFloat(calculateTotal());
 
         const payload = {
-            tableId: selectedTable?.id,
+            table_id: selectedTable?.id,
             status: "new",
-            totalPrice: parseFloat(calculateTotal()),
-            price: parseFloat(calculateTotal()),
-            mode,
-            paymentMode,
-            customer,
-            items: orderItems.map(({ id, quantity, note }) => ({
-                itemId: id,
-                quantity,
-                status: "new",
-                note,
+            total_price: total,
+            price: total,
+            mode: mode,
+            paymentMode: paymentMode,
+            customer: customer,
+            items: orderItems.map(item => ({
+                client_id: clientId,
+                item_id: Number(item.id),  // ✅ FIXED
+                quantity: Number(item.quantity),
+                status: item.status || "new",
+                note: item.note || ""
             }))
-
-
         };
-        console.log("Sending payload:", payload);
 
-        axios.post(`http://localhost:8003/saas/${clientId}/dinein/create`, payload)
-            .then(res => onOrderCreated?.(res.data))
+        console.log("📦 Sending payload:", JSON.stringify(payload, null, 2));
+
+        axios.post(`http://localhost:8003/saas/${clientId}/dinein/create?client_id=${clientId}`, payload, {
+            headers: {
+                Authorization: `Bearer ${localStorage.getItem("access_token")}`
+            }
+        })
+
+            .then(res => {
+                console.log("✅ Order placed:", res.data);
+                onOrderCreated?.(res.data);
+            })
             .catch(err => {
-                console.error(" Order creation failed:", err);
-                alert("Order creation failed. Please check console.");
+                console.error("❌ Order failed:", err);
+                if (err.response?.status === 422) {
+                    console.error("🔍 422 Error:", JSON.stringify(err.response.data, null, 2));
+                }
+                alert("Order failed. Check console.");
             });
     };
+
+
 
     useEffect(() => {
         if (availableTables.length) {

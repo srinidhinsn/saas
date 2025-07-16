@@ -880,8 +880,8 @@ function InventoryItemList({ clientId }) {
         {items.length === 0 ? (
           <p className="no-items">No inventory found.</p>
         ) : (
-          items.map((item) => (
-            <div className="menu-grid-card" key={item.inventory_id}>
+          items.map((item, index) => (
+            <div className="menu-grid-card" key={`${item.inventory_id}-${index}`}>
               <div className="menu-card-body">
                 <h4>{item.name}</h4>
                 <p className="menu-card-price">₹{item.unit_total_price}</p>

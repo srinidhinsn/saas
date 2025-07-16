@@ -432,7 +432,7 @@ const App = () => {
 
           {/* Protected routes with accessToken in URL */}
           <Route
-            path="/saas/:clientId/:pageName/:accessToken/*"
+            path="/saas/:clientId/:pageName/*"
             element={
               <ProtectedRoute>
                 <SaasClientRoutes

@@ -19,17 +19,28 @@ const KitchenDisplay = () => {
     };
     const fetchOrders = async () => {
         try {
-            const res = await api.get(`/${clientId}/kds/orders`);
-            const data = res.data;
+            const token = localStorage.getItem("access_token");
+
+            const res = await fetch(`http://localhost:8003/saas/${clientId}/kds/orders?client_id=${clientId}`, {
+                headers: {
+                    Authorization: `Bearer ${token}`,
+                    "Content-Type": "application/json",
+                },
+            });
+
+            const json = await res.json();
+            const data = json.data || []; // from ResponseModel
+
             const now = Date.now();
 
             const status = {};
             const newTimers = {};
 
             data.forEach(order => {
-                if (!order.created_at) {
-                    order.created_at = now;
-                }
+                order.items = order.items.map(item => ({
+                    ...item,
+                    item_id: Number(item.item_id),
+                }));
 
                 status[order.order_id] = order.items.map(() => false);
 
@@ -40,13 +51,15 @@ const KitchenDisplay = () => {
                 }));
             });
 
+
             setOrders(data);
             setItemStatus(status);
             setTimers(newTimers);
         } catch (err) {
-            console.error("Failed to fetch KDS orders", err);
+            console.error("❌ Failed to fetch KDS orders:", err);
         }
     };
+
 
     useEffect(() => {
         fetchOrders();

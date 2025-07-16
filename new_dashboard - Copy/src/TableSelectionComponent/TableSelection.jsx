@@ -604,7 +604,12 @@ const TableSelection = () => {
         }
 
         try {
-            await axios.post(`http://localhost:8001/saas/${clientId}/tables/update`, table);
+            await axios.post(`http://localhost:8001/saas/${clientId}/tables/update`, table,
+                {
+                    headers: {
+                        Authorization: `Bearer ${token}`,  // ✅ Pass token here
+                    },
+                });
             setEditRowId(null);
             setHighlightRow(table.id);
             setTimeout(() => setHighlightRow(null), 3000);
@@ -628,7 +633,12 @@ const TableSelection = () => {
                 name: "",
                 table_type: "",
                 location_zone: "",
-            });
+            },
+                {
+                    headers: {
+                        Authorization: `Bearer ${token}`,
+                    },
+                });
 
             fetchTables();
         } catch (err) {

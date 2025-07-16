@@ -30,21 +30,21 @@ const SaasClientRoutes = ({
     setTables,
     hideNavbar
 }) => {
-    const { clientId, accessToken } = useParams();
+    const { clientId } = useParams();
     const navigate = useNavigate();
 
     const token = localStorage.getItem("access_token");
 
     // 🔒 Redirect to login if not authenticated
-    if (!token && !accessToken) {
+    if (!token) {
         return <Navigate to={`/saas/${clientId}/login`} />;
     }
 
     // ✅ Sync clientId and token to localStorage
     useEffect(() => {
         if (clientId) localStorage.setItem("clientId", clientId);
-        if (accessToken) localStorage.setItem("access_token", accessToken);
-    }, [clientId, accessToken]);
+        // if (accessToken) localStorage.setItem("access_token", accessToken);
+    }, [clientId]);
 
     // ❗ Optional: Force logout if different client is loaded
     useEffect(() => {

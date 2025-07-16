@@ -282,17 +282,17 @@ function CategoryList({ onCategorySelect, onCategoryAdded }) {
   const [showEditModal, setShowEditModal] = useState(false);
   const [newName, setNewName] = useState("");
   const [newDescription, setNewDescription] = useState("");
+  const [subCategoryInput, setSubCategoryInput] = useState("");
   const [deleteTarget, setDeleteTarget] = useState(null);
-
   const clientId = localStorage.getItem("clientId");
   const token = localStorage.getItem("access_token");
 
-  console.log("Token in localStorage:", token);
+
 
 
   useEffect(() => {
     if (!token || !clientId) return;
-    axios.get(`http://localhost:8002/saas/${clientId}/inventory/read_category?client_id=${clientId}`, {
+    axios.get(`http://localhost:8002/saas/${clientId}/inventory/read_category`, {
       headers: {
         Authorization: `Bearer ${token}`,
       },
@@ -308,31 +308,53 @@ function CategoryList({ onCategorySelect, onCategoryAdded }) {
 
 
 
-
   const handleAddCategory = async () => {
-    if (!newName.trim()) return;
+    if (!newName.trim() || !newDescription.trim()) {
+      alert("Name and description are required.");
+      return;
+    }
 
     let createdBy = "unknown";
     let updatedBy = "unknown";
 
     try {
       const decoded = jwtDecode(token);
-      createdBy = decoded.user_id || "unknown";
-      updatedBy = decoded.user_id || "unknown";
+      createdBy = decoded.username || decoded.user_id || "unknown";
+      updatedBy = decoded.username || decoded.user_id || "unknown";
     } catch (err) {
       console.error("Token decode failed:", err);
     }
 
+    // const subCategoriesFormatted = `{"${subCategoryInput
+    //   .split(",")
+    //   .map((s) => s.trim())
+    //   .filter(Boolean)
+    //   .join('","')}"}`;
+
+
+    const slug = newName.trim().toLowerCase().replace(/\s+/g, "-");
+    // const subCategoriesArray = subCategoryInput
+    //   .split(",")
+    //   .map((s) => s.trim())
+    //   .filter(Boolean);
+
     const payload = {
       category: {
+        client_id: clientId,
         name: newName.trim(),
         description: newDescription.trim(),
+        slug,
+        sub_categories: JSON.stringify(subCategoryInput),
         created_by: createdBy,
         updated_by: updatedBy
       },
+
+
     };
 
     try {
+      console.log("Payload being sent:", payload);
+
       const res = await axios.post(
         `http://localhost:8002/saas/${clientId}/inventory/create_category`,
         payload,
@@ -347,12 +369,14 @@ function CategoryList({ onCategorySelect, onCategoryAdded }) {
       setCategories([...categories, newCategory]);
       setNewName("");
       setNewDescription("");
+      setSubCategoryInput(""); // reset subcategories
       setShowAddModal(false);
     } catch (err) {
       console.error("Error adding category:", err.response?.data || err);
       alert(JSON.stringify(err.response?.data || err, null, 2));
     }
   };
+
 
 
 
@@ -465,6 +489,14 @@ function CategoryList({ onCategorySelect, onCategoryAdded }) {
               placeholder="Description"
               className="modal-input"
             />
+            <input
+              type="text"
+              value={subCategoryInput}
+              onChange={(e) => setSubCategoryInput(e.target.value)}
+              placeholder="Subcategories (comma separated)"
+              className="modal-input"
+            />
+
             <div className="modal-buttons">
               <button onClick={handleAddCategory} className="modal-save-btn">
                 Add

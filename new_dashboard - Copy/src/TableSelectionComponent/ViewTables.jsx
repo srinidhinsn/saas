@@ -695,7 +695,25 @@ const ViewTables = ({ onOrderUpdate }) => {
                                 onOrderCreated={(latestOrder) => {
                                     navigate('/view-tables');
                                     setSearchParams({});
-                                    axios.get(`http://localhost:8001/saas/${clientId}/tables/read`).then(res => setTables(res.data));
+                                    const token = localStorage.getItem("access_token");
+                                    axios
+                                        .get(`http://localhost:8001/saas/${clientId}/tables/read`, {
+                                            headers: {
+                                                Authorization: `Bearer ${token}`,
+                                            },
+                                        })
+                                        .then((res) => {
+                                            const responseData = Array.isArray(res.data)
+                                                ? res.data
+                                                : res.data?.data || [];
+
+                                            setTables(responseData);
+                                        })
+                                        .catch((err) => {
+                                            console.error("Failed to fetch tables:", err);
+                                            setTables([]); // fallback to empty array
+                                        });
+
                                     onOrderUpdate?.(latestOrder);
                                     setSelectedTable(null);
                                     document.body.classList.remove("sidebar-minimized");

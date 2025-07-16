@@ -145,11 +145,11 @@ import { FaKitchenSet, FaFileInvoiceDollar, FaUserPlus, FaTableCells } from "rea
 const Navbar = () => {
     const navigate = useNavigate();
     const location = useLocation();
-    const { clientId: paramClientId, accessToken: paramToken } = useParams();
+    const { clientId: paramClientId } = useParams();
     const { darkMode } = useTheme();
 
     const clientId = paramClientId || localStorage.getItem("clientId");
-    const accessToken = paramToken || localStorage.getItem("access_token");
+    const accessToken = localStorage.getItem("access_token");
 
     useEffect(() => {
         document.body.classList.toggle("theme-dark", darkMode);
@@ -171,9 +171,9 @@ const Navbar = () => {
         const trimmedPath = path.startsWith("/") ? path.slice(1) : path;
 
         // Force dashboard path to use 'main'
-        const pageName = path === "/" ? "main" : trimmedPath.split("/")[0];
+        // const pageName = path === "/" ? "main" : trimmedPath.split("/")[0];
+        navigate(`/saas/${clientId}/main/${trimmedPath}`);
 
-        navigate(`/saas/${clientId}/${pageName}/${accessToken}/${trimmedPath}`);
     };
 
 
