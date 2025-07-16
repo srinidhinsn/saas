@@ -2,6 +2,7 @@ import React, { useEffect, useState } from "react";
 import { useNavigate } from "react-router-dom";
 import { useTheme } from "../ThemeChangerComponent/ThemeContext";
 import api from '../PortExportingPage/api'
+import { useLocation } from "react-router-dom";
 
 const KitchenDisplay = () => {
     const { darkMode, toggleTheme } = useTheme();
@@ -9,6 +10,11 @@ const KitchenDisplay = () => {
     const [orders, setOrders] = useState([]);
     const [itemStatus, setItemStatus] = useState({});
     const [timers, setTimers] = useState({});
+    // --------------------------------------------------------- //
+    const location = useLocation();
+    const recentTable = location.state?.table_number;
+    const recentOrderId = location.state?.order_id;
+    // --------------------------------------------------------- //
     const navigate = useNavigate();
 
     const getPrepTime = (itemName) => {
@@ -20,7 +26,6 @@ const KitchenDisplay = () => {
     const fetchOrders = async () => {
         try {
             const token = localStorage.getItem("access_token");
-
             const res = await fetch(`http://localhost:8003/saas/${clientId}/kds/orders?client_id=${clientId}`, {
                 headers: {
                     Authorization: `Bearer ${token}`,
@@ -28,11 +33,10 @@ const KitchenDisplay = () => {
                 },
             });
 
-            const json = await res.json();
-            const data = json.data || []; // from ResponseModel
+            const json = await res.json(); console.log("💡 Orders from backend:", json.data);
+            const data = json.data || [];
 
             const now = Date.now();
-
             const status = {};
             const newTimers = {};
 
@@ -41,20 +45,32 @@ const KitchenDisplay = () => {
                     ...item,
                     item_id: Number(item.item_id),
                 }));
-
                 status[order.order_id] = order.items.map(() => false);
-
                 newTimers[order.order_id] = order.items.map(item => ({
                     start: now,
                     duration: getPrepTime(item.name),
                     remaining: getPrepTime(item.name),
                 }));
             });
+            setOrders(prev => {
+                const orderMap = new Map(prev.map(o => [o.order_id, o]));
+                data.forEach(order => {
+                    orderMap.set(order.order_id, order);
+                });
+                return Array.from(orderMap.values());
+            });
 
 
-            setOrders(data);
-            setItemStatus(status);
-            setTimers(newTimers);
+            setItemStatus(prev => ({
+                ...prev,
+                ...status,
+            }));
+
+            setTimers(prev => ({
+                ...prev,
+                ...newTimers,
+            }));
+
         } catch (err) {
             console.error("❌ Failed to fetch KDS orders:", err);
         }
@@ -133,6 +149,11 @@ const KitchenDisplay = () => {
                     {darkMode ? "☀️ Light" : "🌙 Dark"}
                 </button>
             </div>
+            {recentOrderId && (
+                <div className="recent-order-banner">
+                    ✅ Order <b>#{recentOrderId}</b> placed for Table <b>{recentTable}</b>
+                </div>
+            )}
 
             <div className="kds-grid">
                 {orders.map((order) => {

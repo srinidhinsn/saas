@@ -5,6 +5,8 @@ import { FaUser, FaTable, FaTrash } from "react-icons/fa";
 import { BsCash, BsCreditCard, BsQrCode } from "react-icons/bs";
 // import api from '../PortExportingPage/api'
 // import { useParams } from 'react-router-dom';
+import { useNavigate } from "react-router-dom";
+
 Modal.setAppElement("#root");
 
 const OrderForm = ({ table, onOrderCreated }) => {
@@ -25,6 +27,7 @@ const OrderForm = ({ table, onOrderCreated }) => {
     const [dineInTableModalOpen, setDineInTableModalOpen] = useState(false);
     const [selectedTable, setSelectedTable] = useState(table || {});
     const [splitError, setSplitError] = useState("");
+    const navigate = useNavigate();
 
     // const { clientId } = useParams();
     const clientId = localStorage.getItem("clientId");
@@ -149,12 +152,13 @@ const OrderForm = ({ table, onOrderCreated }) => {
             customer: customer,
             items: orderItems.map(item => ({
                 client_id: clientId,
-                item_id: Number(item.id),  // ✅ FIXED
+                item_id: Number(item.id),
                 quantity: Number(item.quantity),
                 status: item.status || "new",
                 note: item.note || ""
             }))
         };
+
 
         console.log("📦 Sending payload:", JSON.stringify(payload, null, 2));
 
@@ -167,6 +171,14 @@ const OrderForm = ({ table, onOrderCreated }) => {
             .then(res => {
                 console.log("✅ Order placed:", res.data);
                 onOrderCreated?.(res.data);
+                navigate(`/saas/${clientId}/main/kds-page`, {
+                    state: {
+                        table_number: selectedTable?.table_number || selectedTable?.id,
+                        order_id: res.data.data.id,
+                    }
+                });
+
+
             })
             .catch(err => {
                 console.error("❌ Order failed:", err);
