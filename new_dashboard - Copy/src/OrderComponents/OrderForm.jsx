@@ -27,10 +27,63 @@ const OrderForm = ({ table, onOrderCreated }) => {
     const [dineInTableModalOpen, setDineInTableModalOpen] = useState(false);
     const [selectedTable, setSelectedTable] = useState(table || {});
     const [splitError, setSplitError] = useState("");
+    const [gstRate, setGstRate] = useState(5);        // in percent
+    const [cstRate, setCstRate] = useState(2);        // in percent
+    const [discount, setDiscount] = useState(0);      // flat discount ₹
+    const [orderData, setOrderData] = useState({
+        gst: 0,
+        cst: 0,
+        discount: 0,
+    });
+
     const navigate = useNavigate();
 
     // const { clientId } = useParams();
     const clientId = localStorage.getItem("clientId");
+
+    const calculateSubtotal = () => {
+        return orderItems.reduce((sum, item) => sum + item.price * item.quantity, 0);
+    };
+
+    const calculateGST = () => {
+        return parseFloat(((calculateSubtotal() * gstRate) / 100).toFixed(2));
+    };
+
+    const calculateCST = () => {
+        return parseFloat(((calculateSubtotal() * cstRate) / 100).toFixed(2));
+    };
+
+    const calculateDiscount = () => {
+        return parseFloat(discount || 0);
+    };
+
+    const calculateTotalPrice = () => {
+        const subtotal = calculateSubtotal();
+        const gst = calculateGST();
+        const cst = calculateCST();
+        const disc = calculateDiscount();
+        const delivery = mode === "Delivery" ? 20 : 0;
+        const container = (mode === "Delivery" || mode === "Pick Up") ? 10 : 0;
+        return parseFloat((subtotal + gst + cst + delivery + container - disc).toFixed(2));
+    };
+
+    // Auto-increment ID generators
+    // Auto-increment ID generators
+
+    const generateNextOrderId = () => {
+        let count = parseInt(localStorage.getItem("order_id_counter") || "2", 10); // Start from 2
+        count += 1; // First will be ORDER_3
+        localStorage.setItem("order_id_counter", count);
+        return `ORDER_${count}`;  // ORDER_3, ORDER_4, ...
+    };
+
+    const generateNextInvoiceId = () => {
+        let count = parseInt(localStorage.getItem("invoice_id_counter") || "0", 10); // Start from 0
+        count += 1; // First will be 1
+        localStorage.setItem("invoice_id_counter", count);
+        return `${count}`;  // Just numbers: 1, 2, 3, ...
+    };
+
 
     useEffect(() => {
         setMode(table?.mode || "Dine In");
@@ -76,80 +129,53 @@ const OrderForm = ({ table, onOrderCreated }) => {
         setOrderItems(orderItems.filter(i => i.id !== id));
     };
 
-    const calculateTotal = () => {
-        let total = orderItems.reduce((sum, i) => sum + i.price * i.quantity, 0);
-        if (mode === "Delivery") total += 20;
-        if (mode === "Delivery" || mode === "Pick Up") total += 10;
-        return total.toFixed(2);
-    };
-    // const handlePlaceOrder = () => {
-    //     if (orderItems.length === 0) {
-    //         alert("Please select at least one item before placing the order.");
-    //         return;
-    //     }
-
-    //     const totalPaid = Object.values(splitAmounts).reduce((sum, v) => sum + parseFloat(v || 0), 0);
-    //     if (splitMode && Math.abs(totalPaid - calculateTotal()) > 0.01) {
-    //         alert("Split amounts don't match total. Please check.");
-    //         return;
-    //     }
-
-    //     const payload = {
-    //         table_id: selectedTable?.id,  // ✅ use `table_id` as backend expects
-    //         status: "new",
-    //         total_price: parseFloat(calculateTotal()),  // ✅ use `snake_case`
-    //         price: parseFloat(calculateTotal()),
-    //         mode,
-    //         paymentMode,
-    //         customer,
-    //         items: orderItems
-    //             .filter(item => item && item.id && !isNaN(Number(item.id)))
-    //             .map(item => ({
-    //                 client_id: clientId,
-    //                 item_id: item.id.toString(),
-    //                 quantity: Number(item.quantity),
-    //                 status: item.status || "new",
-    //                 note: item.note || ""
-    //             }))
-    //     };
-
-    //     console.log("Sending payload:", payload);
-
-    //     axios.post(`http://localhost:8003/saas/${clientId}/dinein/create`, payload, {
-    //         headers: {
-    //             Authorization: `Bearer ${localStorage.getItem("access_token")}`,
-    //         }
-    //     })
-    //         .then(res => {
-    //             onOrderCreated?.(res.data);
-    //         })
-    //         .catch(err => {
-    //             console.error("Order creation failed:", err);
-
-    //             if (err.response?.status === 422) {
-    //                 console.error("422 Validation Error:", JSON.stringify(err.response.data, null, 2));
-    //             }
-
-    //             alert("Order creation failed. Please check console.");
-    //         });
+    // const calculateTotal = () => {
+    //     let total = orderItems.reduce((sum, i) => sum + i.price * i.quantity, 0);
+    //     if (mode === "Delivery") total += 20;
+    //     if (mode === "Delivery" || mode === "Pick Up") total += 10;
+    //     return total.toFixed(2);
     // };
 
     const handlePlaceOrder = () => {
+        if (!selectedTable && mode === "Dine In") {
+            alert("Please select a table before placing the order.");
+            return;
+        }
+
         if (orderItems.length === 0) {
             alert("Please select at least one item before placing the order.");
             return;
         }
 
-        const total = parseFloat(calculateTotal());
+        // const total = parseFloat(calculateTotal());
+        const subtotal = orderItems.reduce(
+            (sum, item) => sum + (item.price || 0) * (item.quantity || 0),
+            0
+        );
+        const gstValue = (subtotal * gstRate) / 100;
+        const cstValue = (subtotal * cstRate) / 100;
+        const discountValue = discount
+        const total_price = subtotal + gstValue + cstValue - discountValue;
+
+        const dinein_order_id = generateNextOrderId();
+        const invoice_id = generateNextInvoiceId();
+        const invoice_status = "unpaid";
 
         const payload = {
+            client_id: clientId,
             table_id: selectedTable?.id,
             status: "new",
-            total_price: total,
-            price: total,
-            mode: mode,
-            paymentMode: paymentMode,
-            customer: customer,
+            price: subtotal,
+            gst: gstValue,
+            cst: cstValue,
+            discount: discountValue,
+            total_price,
+            mode,
+            paymentMode,
+            customer,
+            dinein_order_id,
+            invoice_id,
+            invoice_status,
             items: orderItems.map(item => ({
                 client_id: clientId,
                 item_id: Number(item.id),
@@ -332,8 +358,10 @@ const OrderForm = ({ table, onOrderCreated }) => {
             <div className="order-bottom">
                 <div className="split-total">
                     <button className="split-btn" onClick={() => { setSplitMode(true); setSplitPopupOpen(true); }}>Split</button>
-                    <div className="total-price">Total ₹{calculateTotal()}</div>
+                    <div className="total-price">Total ₹{calculateTotalPrice()}
+                    </div>
                 </div>
+
                 {(mode === "Delivery" || mode === "Pick Up") && (
                     <div className="extra-charges">
                         {mode === "Delivery" && <span style={{ color: 'rgb(244,242,239)' }}>+ ₹20 Delivery Charges</span>}
@@ -359,6 +387,35 @@ const OrderForm = ({ table, onOrderCreated }) => {
                             {opt}
                         </button>
                     ))}
+                </div>
+                <div className="charges-inputs" style={{ marginTop: "1rem", color: "#eee" }}>
+                    <label>
+                        GST (%):
+                        <input
+                            type="number"
+                            value={gstRate}
+                            min="0"
+                            onChange={e => setGstRate(parseFloat(e.target.value || 0))}
+                        />
+                    </label>
+                    <label>
+                        CST (%):
+                        <input
+                            type="number"
+                            value={cstRate}
+                            min="0"
+                            onChange={e => setCstRate(parseFloat(e.target.value || 0))}
+                        />
+                    </label>
+                    <label>
+                        Discount (₹):
+                        <input
+                            type="number"
+                            value={discount}
+                            min="0"
+                            onChange={e => setDiscount(parseFloat(e.target.value || 0))}
+                        />
+                    </label>
                 </div>
 
                 <div className="action-buttons">
@@ -415,7 +472,7 @@ const OrderForm = ({ table, onOrderCreated }) => {
             >
 
                 <h3>Split Payment</h3>
-                <div>Total: ₹{calculateTotal()}</div>
+                <div>Total: ₹{calculateTotalPrice()}</div>
                 {["Cash", "Card", "UPI"].map(mode => (
                     <div key={mode} className="split-entry">
 
@@ -426,7 +483,7 @@ const OrderForm = ({ table, onOrderCreated }) => {
                             min="0"
                             value={splitAmounts[mode]}
                             onFocus={() => {
-                                const total = parseFloat(calculateTotal());
+                                const total = parseFloat(calculateTotalPrice());
                                 const others = Object.entries(splitAmounts)
                                     .filter(([key]) => key !== mode)
                                     .reduce((sum, [, val]) => sum + (parseFloat(val) || 0), 0);
@@ -449,7 +506,7 @@ const OrderForm = ({ table, onOrderCreated }) => {
                     <button onClick={() => setSplitPopupOpen(false)} className="cancel-btn">Cancel</button>
                     <button
                         onClick={() => {
-                            const total = parseFloat(calculateTotal());
+                            const total = parseFloat(calculateTotalPrice());
                             const enteredTotal = Object.values(splitAmounts).reduce((sum, val) => sum + (parseFloat(val) || 0), 0);
 
                             if (enteredTotal < total) {
@@ -477,14 +534,14 @@ const OrderForm = ({ table, onOrderCreated }) => {
             >
 
                 <h3>Cash Payment</h3>
-                <div><strong>Total Bill:</strong> ₹{calculateTotal()}</div>
+                <div><strong>Total Bill:</strong> ₹{calculateTotalPrice()}</div>
                 <input type="number" placeholder="Amount Received" value={cashReceived} onChange={(e) => setCashReceived(e.target.value)} />
-                {parseFloat(cashReceived) >= parseFloat(calculateTotal()) && (
+                {parseFloat(cashReceived) >= parseFloat(calculateTotalPrice()) && (
                     <div style={{ marginTop: "10px", fontWeight: "bold" }}>
-                        Return Amount: ₹{(parseFloat(cashReceived) - parseFloat(calculateTotal())).toFixed(2)}
+                        Return Amount: ₹{(parseFloat(cashReceived) - parseFloat(calculateTotalPrice())).toFixed(2)}
                     </div>
                 )}
-                {parseFloat(cashReceived) < parseFloat(calculateTotal()) && cashReceived !== "" && (
+                {parseFloat(cashReceived) < parseFloat(calculateTotalPrice()) && cashReceived !== "" && (
                     <div style={{ marginTop: "10px", color: "red" }}>
                         Amount received is less than total.
                     </div>
@@ -493,7 +550,7 @@ const OrderForm = ({ table, onOrderCreated }) => {
                     <button onClick={() => setCashPopupOpen(false)} className="cancel-btn">Cancel</button>
                     <button
                         onClick={() => {
-                            if (parseFloat(cashReceived) >= parseFloat(calculateTotal())) {
+                            if (parseFloat(cashReceived) >= parseFloat(calculateTotalPrice())) {
                                 setPaymentMode("Cash");
                                 setSplitMode(false);
                                 setCashPopupOpen(false);

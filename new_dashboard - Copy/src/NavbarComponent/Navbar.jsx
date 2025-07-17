@@ -175,43 +175,55 @@ const Navbar = () => {
         navigate(`/saas/${clientId}/main/${trimmedPath}`);
 
     };
+    const basePath = `/saas/${clientId}`;
+    const currentPath = location.pathname;
 
+    // const isActive = (targetPath) => currentPath === `${basePath}${targetPath}`;
+    const startsWith = (targetPath) => currentPath.startsWith(`${basePath}${targetPath}`);
+    const isActive = (targetPath) => {
+        const normalize = (path) => path.replace(/\/+$/, ''); // remove trailing slashes
+        const current = normalize(currentPath);
+        const target = normalize(`${basePath}${targetPath}`);
 
-    const pathSegments = location.pathname.split("/");
-    const cleanPath = pathSegments.slice(0, 4).join("/");
-    const isActive = (path) => cleanPath === `/saas/${clientId}${path}`;
-    const startsWith = (path) => location.pathname.startsWith(`/saas/${clientId}${path}`);
+        if (targetPath === '/main') {
+            return current === target;
+        }
+
+        return current === target || current.startsWith(`${target}/`);
+    };
+
 
     return (
         <aside className="sidebar">
             <div className="brand">DineIn Software</div>
             <ul className="menu">
-                <li title="Dashboard" onClick={() => go('/')} className={startsWith('/main') ? 'page-active' : ''}>
+                <li title="Dashboard" onClick={() => go('/')} className={isActive('/main') ? 'page-active' : ''}>
+
 
                     <GiHamburgerMenu /><span>Dashboard</span>
                 </li>
-                <li title="Order" onClick={() => go('/orders-view')} className={startsWith('/orders-view') ? 'page-active' : ''}>
+                <li title="Order" onClick={() => go('/orders-view')} className={isActive('/main/orders-view') ? 'page-active' : ''}>
                     <FaHamburger /><span>Order</span>
                 </li>
-                <li title="Table Management" onClick={() => go('/table-selection')} className={startsWith('/table-selection') ? 'page-active' : ''}>
+                <li title="Table Management" onClick={() => go('/table-selection')} className={isActive('/main/table-selection') ? 'page-active' : ''}>
                     <MdOutlineTableBar /><span>Table Management</span>
                 </li>
-                <li title="Table Selection" onClick={() => go('/view-tables')} className={startsWith('/view-tables') ? 'page-active' : ''}>
+                <li title="Table Selection" onClick={() => go('/view-tables')} className={isActive('/main/view-tables') ? 'page-active' : ''}>
                     <FaTableCells /><span>Table Selection</span>
                 </li>
-                <li title="Menu" onClick={() => go('/menu-page')} className={startsWith('/menu-page') ? 'page-active' : ''}>
+                <li title="Menu" onClick={() => go('/menu-page')} className={isActive('/main/menu-page') ? 'page-active' : ''}>
                     <MdOutlineMenuBook /><span>Menu</span>
                 </li>
                 {/* <li title="Combos" onClick={() => go('/combo-page')} className={startsWith('/combo-page') ? 'page-active' : ''}>
                     <FcComboChart /><span>Combos</span>
                 </li> */}
-                <li title="KDS" onClick={() => go('/kds-page')} className={startsWith('/kds-page') ? 'page-active' : ''}>
+                <li title="KDS" onClick={() => go('/kds-page')} className={isActive('/main/kds-page') ? 'page-active' : ''}>
                     <FaKitchenSet /><span>KDS</span>
                 </li>
-                <li title="Invoice" onClick={() => go('/invoice')} className={startsWith('/invoice') ? 'page-active' : ''}>
+                <li title="Invoice" onClick={() => go('/invoice')} className={isActive('/main/invoice') ? 'page-active' : ''}>
                     <FaFileInvoiceDollar /><span>Invoice</span>
                 </li>
-                <li title="Add Users" onClick={() => go('/add-users')} className={startsWith('/add-users') ? 'page-active' : ''}>
+                <li title="Add Users" onClick={() => go('/add-users')} className={isActive('/main/add-users') ? 'page-active' : ''}>
                     <FaUserPlus /><span>Add Users</span>
                 </li>
             </ul>
