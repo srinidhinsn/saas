@@ -1275,7 +1275,7 @@ function InventoryItemList({ clientId }) {
             <div className="menu-grid-card" key={item.inventory_id}>
               <div className="menu-card-body">
                 <h4>{item.name}</h4>
-                <p className="menu-card-price">₹{item.unit_total_price}</p>
+                <p className="menu-card-price">₹{item.price}</p>
               </div>
               <div className="menu-card-footer">
                 <button className="btn-edit" onClick={() => handleEdit(item)}>Edit</button>
