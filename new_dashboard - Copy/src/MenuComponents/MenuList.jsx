@@ -784,9 +784,405 @@
 
 
 
+// import React, { useEffect, useState } from "react";
+// import axios from "axios";
+// import AddMenuItemForm from "./AddMenuForm";
+
+// function InventoryItemList({ clientId }) {
+//   const [items, setItems] = useState([]);
+//   const [editingItem, setEditingItem] = useState(null);
+//   const [showEditModal, setShowEditModal] = useState(false);
+//   const [deleteTarget, setDeleteTarget] = useState(null);
+//   const [showAddModal, setShowAddModal] = useState(false);
+
+
+//   const token = localStorage.getItem("access_token");
+//   const headers = { Authorization: `Bearer ${token}` };
+
+//   useEffect(() => {
+//     if (!clientId || !token) return;
+
+//     axios
+//       .get(`http://localhost:8002/saas/${clientId}/inventory/read`, { headers })
+//       .then((res) => {
+//         setItems(res.data.data || []);
+//       })
+//       .catch((err) => {
+//         console.error("Failed to load inventory:", err);
+//       });
+//   }, [clientId, token]);
+
+//   const handleEdit = (item) => {
+//     setEditingItem({ ...item });
+//     setShowEditModal(true);
+//   };
+
+//   const handleAddItem = async (newItem) => {
+//     try {
+//       const response = await axios.post(
+//         `http://localhost:8002/saas/${clientId}/inventory/create`,
+//         newItem,
+//         { headers }
+//       );
+//       setItems((prev) => [...prev, response.data]);
+//       setShowAddModal(false);
+//     } catch (err) {
+//       console.error("Add failed:", err);
+//       alert("Failed to add item.");
+//     }
+//   };
+
+//   const handleEditSave = async () => {
+//     const { inventory_id, name, price } = editingItem;
+
+//     try {
+//       const res = await axios.put(
+//         `http://localhost:8002/saas/${clientId}/inventory/${inventory_id}`,
+//         { name, price },
+//         { headers }
+//       );
+
+//       setItems((prev) =>
+//         prev.map((i) => (i.inventory_id === inventory_id ? res.data : i))
+//       );
+//       setShowEditModal(false);
+//       setEditingItem(null);
+//     } catch (err) {
+//       console.error("Edit failed:", err);
+//       alert("Edit failed.");
+//     }
+//   };
+
+//   const handleDelete = async (id) => {
+//     try {
+//       await axios.delete(
+//         `http://localhost:8002/saas/${clientId}/inventory/${id}`,
+//         { headers }
+//       );
+//       setItems(items.filter((i) => i.inventory_id !== id));
+//     } catch (err) {
+//       console.error("Delete failed:", err);
+//       alert("Delete failed.");
+//     }
+//   };
+
+//   return (
+//     <div className="menu-items-panel">
+//       <div className="btns">
+//         <button className="btn-add" onClick={() => {
+//           setShowAddModal(true);
+//           setEditingItem(null);
+//         }}>
+//           + Add Item
+//         </button>
+//       </div>
+//       <div className="menu-grid-container">
+//         {items.length === 0 ? (
+//           <p className="no-items">No inventory found.</p>
+//         ) : (
+//           items.map((item, index) => (
+//             <div className="menu-grid-card" key={`${item.inventory_id}-${index}`}>
+//               <div className="menu-card-body">
+//                 <h4>{item.name}</h4>
+//                 <p className="menu-card-price">₹{item.unit_total_price}</p>
+//               </div>
+//               <div className="menu-card-footer">
+//                 <button
+//                   className="btn-edit"
+//                   onClick={() => handleEdit(item)}
+//                 >
+//                   Edit
+//                 </button>
+//                 <button
+//                   className="btn-delete"
+//                   onClick={() => setDeleteTarget(item)}
+//                 >
+//                   Delete
+//                 </button>
+//               </div>
+//             </div>
+//           ))
+//         )}
+//       </div>
+
+
+//       {showAddModal && (
+//         <div
+//           className="modal-overlay"
+//           onClick={(e) => {
+//             if (e.target.classList.contains("modal-overlay")) {
+//               setShowAddModal(false);
+//             }
+//           }}
+//         >
+//           <div className="menu-modal-content">
+//             <h3>Add New Inventory Item</h3>
+//             <AddMenuItemForm
+//               onSubmit={handleAddItem}
+//               onCancel={() => setShowAddModal(false)}
+//             />
+//           </div>
+//         </div>
+//       )}
+
+//       {showEditModal && editingItem && (
+//         <div className="modal-overlay" onClick={(e) => {
+//           if (e.target.classList.contains("modal-overlay")) setShowEditModal(false);
+//         }}>
+//           <div className="menu-modal-content">
+//             <h3>Edit Inventory Item</h3>
+//             <form onSubmit={(e) => {
+//               e.preventDefault();
+//               handleEditSave();
+//             }} className="add-menu-item-form">
+//               <div className="form-row">
+//                 <input
+//                   type="text"
+//                   value={editingItem.name}
+//                   onChange={(e) => setEditingItem({ ...editingItem, name: e.target.value })}
+//                   placeholder="Name"
+//                   className="form-input"
+//                   required
+//                 />
+//                 <input
+//                   type="number"
+//                   value={editingItem.price}
+//                   onChange={(e) => setEditingItem({ ...editingItem, price: e.target.value })}
+//                   placeholder="Price"
+//                   className="form-input"
+//                   required
+//                 />
+//               </div>
+//               <div className="form-actions">
+//                 <button type="submit" className="btn-add">Save</button>
+//                 <button type="button" className="btn-cancel" onClick={() => setShowEditModal(false)}>Cancel</button>
+//               </div>
+//             </form>
+//           </div>
+//         </div>
+//       )}
+
+
+//       {deleteTarget && (
+//         <div className="modal-overlay">
+//           <div className="modal-content">
+//             <h4>Confirm Delete</h4>
+//             <p>Delete <strong>{deleteTarget.name}</strong>?</p>
+//             <div className="modal-buttons">
+//               <button className="btn-add" onClick={async () => {
+//                 await handleDelete(deleteTarget.inventory_id);
+//                 setDeleteTarget(null);
+//               }}>Yes</button>
+//               <button className="btn-cancel" onClick={() => setDeleteTarget(null)}>No</button>
+//             </div>
+//           </div>
+//         </div>
+//       )}
+//     </div>
+//   );
+// }
+
+// export default InventoryItemList;
+
+// 
+// 
+
+
+
+
+
+// import React, { useEffect, useState } from "react";
+// import axios from "axios";
+// import AddMenuForm from './AddMenuForm'
+
+// function InventoryItemList({ clientId }) {
+//   const [items, setItems] = useState([]);
+//   const [editingItem, setEditingItem] = useState(null);
+//   const [showEditModal, setShowEditModal] = useState(false);
+//   const [deleteTarget, setDeleteTarget] = useState(null);
+//   const [showAddModal, setShowAddModal] = useState(false);
+
+//   const token = localStorage.getItem("access_token");
+//   const headers = { Authorization: `Bearer ${token}` };
+
+//   useEffect(() => {
+//     if (!clientId || !token) return;
+
+//     axios
+//       .get(`http://localhost:8002/saas/${clientId}/inventory/read`, { headers })
+//       .then((res) => {
+//         setItems(res.data.data || []);
+//       })
+//       .catch((err) => {
+//         console.error("Failed to load inventory:", err);
+//       });
+//   }, [clientId, token]);
+
+//   const handleEdit = (item) => {
+//     setEditingItem({ ...item });
+//     setShowEditModal(true);
+//   };
+
+//   const handleEditSave = async () => {
+//     const updatedItem = { ...editingItem, client_id: clientId };
+
+//     try {
+//       const res = await axios.post(
+//         `http://localhost:8002/saas/${clientId}/inventory/update?client_id=${clientId}`,
+//         updatedItem,
+//         { headers }
+//       );
+
+//       setItems((prev) =>
+//         prev.map((i) =>
+//           i.inventory_id === updatedItem.inventory_id ? res.data.data : i
+//         )
+//       );
+//       setShowEditModal(false);
+//       setEditingItem(null);
+//     } catch (err) {
+//       console.error("Edit failed:", err);
+//       alert("Edit failed.");
+//     }
+//   };
+
+//   const handleDelete = async (inventoryId) => {
+//     try {
+//       await axios.post(
+//         `http://localhost:8002/saas/${clientId}/inventory/delete?client_id=${clientId}`,
+//         { id }, // 👈 key fix
+//         { headers }
+//       );
+
+//       setItems((prev) => prev.filter((i) => i.inventory_id !== inventoryId));
+//     } catch (err) {
+//       console.error("Delete failed:", err);
+//       alert("Delete failed.");
+//     }
+//   };
+
+
+
+
+//   const handleItemCreated = (responseData) => {
+//     if (responseData?.data) {
+//       setItems((prev) => [...prev, responseData.data]);
+//     }
+//     setShowAddModal(false);
+//   };
+
+//   return (
+//     <div className="menu-items-panel">
+//       <div className="btns">
+//         <button className="btn-add" onClick={() => {
+//           setShowAddModal(true);
+//           setEditingItem(null);
+//         }}>
+//           + Add Item
+//         </button>
+//       </div>
+
+//       <div className="menu-grid-container">
+//         {items.length === 0 ? (
+//           <p className="no-items">No inventory found.</p>
+//         ) : (
+//           items.map((item) => (
+//             <div className="menu-grid-card" key={item.inventory_id}>
+//               <div className="menu-card-body">
+//                 <h4>{item.name}</h4>
+//                 <p className="menu-card-price">₹{item.unit_total_price}</p>
+//               </div>
+//               <div className="menu-card-footer">
+//                 <button className="btn-edit" onClick={() => handleEdit(item)}>Edit</button>
+//                 <button className="btn-delete" onClick={() => setDeleteTarget(item)}>Delete</button>
+//               </div>
+//             </div>
+//           ))
+//         )}
+//       </div>
+
+//       {showAddModal && (
+//         <div className="modal-overlay" onClick={(e) => {
+//           if (e.target.classList.contains("modal-overlay")) {
+//             setShowAddModal(false);
+//           }
+//         }}>
+//           <div className="menu-modal-content">
+//             <h3>Add New Inventory Item</h3>
+//             <AddMenuForm
+//               clientId={clientId}
+//               onItemCreated={handleItemCreated}
+//             />
+//           </div>
+//         </div>
+//       )}
+
+//       {showEditModal && editingItem && (
+//         <div className="modal-overlay" onClick={(e) => {
+//           if (e.target.classList.contains("modal-overlay")) setShowEditModal(false);
+//         }}>
+//           <div className="menu-modal-content">
+//             <h3>Edit Inventory Item</h3>
+//             <form onSubmit={(e) => {
+//               e.preventDefault();
+//               handleEditSave();
+//             }} className="add-menu-item-form">
+//               <div className="form-row">
+//                 <input
+//                   type="text"
+//                   value={editingItem.name}
+//                   onChange={(e) => setEditingItem({ ...editingItem, name: e.target.value })}
+//                   placeholder="Name"
+//                   className="form-input"
+//                   required
+//                 />
+//                 <input
+//                   type="number"
+//                   value={editingItem.price}
+//                   onChange={(e) => setEditingItem({ ...editingItem, price: e.target.value })}
+//                   placeholder="Price"
+//                   className="form-input"
+//                   required
+//                 />
+//               </div>
+//               <div className="form-actions">
+//                 <button type="submit" className="btn-add">Save</button>
+//                 <button type="button" className="btn-cancel" onClick={() => setShowEditModal(false)}>Cancel</button>
+//               </div>
+//             </form>
+//           </div>
+//         </div>
+//       )}
+
+//       {deleteTarget && (
+//         <div className="modal-overlay">
+//           <div className="modal-content">
+//             <h4>Confirm Delete</h4>
+//             <p>Delete <strong>{deleteTarget.name}</strong>?</p>
+//             <div className="modal-buttons">
+//               <button className="btn-add" onClick={async () => {
+//                 await handleDelete(deleteTarget.inventory_id);
+//                 setDeleteTarget(null);
+//               }}>Yes</button>
+//               <button className="btn-cancel" onClick={() => setDeleteTarget(null)}>No</button>
+//             </div>
+//           </div>
+//         </div>
+//       )}
+//     </div>
+//   );
+// }
+
+// export default InventoryItemList;
+
+
+
+
+
+
 import React, { useEffect, useState } from "react";
 import axios from "axios";
-import AddMenuItemForm from "./AddMenuForm";
+import AddMenuForm from './AddMenuForm';
 
 function InventoryItemList({ clientId }) {
   const [items, setItems] = useState([]);
@@ -794,7 +1190,6 @@ function InventoryItemList({ clientId }) {
   const [showEditModal, setShowEditModal] = useState(false);
   const [deleteTarget, setDeleteTarget] = useState(null);
   const [showAddModal, setShowAddModal] = useState(false);
-
 
   const token = localStorage.getItem("access_token");
   const headers = { Authorization: `Bearer ${token}` };
@@ -817,33 +1212,20 @@ function InventoryItemList({ clientId }) {
     setShowEditModal(true);
   };
 
-  const handleAddItem = async (newItem) => {
-    try {
-      const response = await axios.post(
-        `http://localhost:8002/saas/${clientId}/inventory/create`,
-        newItem,
-        { headers }
-      );
-      setItems((prev) => [...prev, response.data]);
-      setShowAddModal(false);
-    } catch (err) {
-      console.error("Add failed:", err);
-      alert("Failed to add item.");
-    }
-  };
-
   const handleEditSave = async () => {
-    const { inventory_id, name, price } = editingItem;
+    const updatedItem = { ...editingItem, client_id: clientId };
 
     try {
-      const res = await axios.put(
-        `http://localhost:8002/saas/${clientId}/inventory/${inventory_id}`,
-        { name, price },
+      const res = await axios.post(
+        `http://localhost:8002/saas/${clientId}/inventory/update?client_id=${clientId}`,
+        updatedItem,
         { headers }
       );
 
       setItems((prev) =>
-        prev.map((i) => (i.inventory_id === inventory_id ? res.data : i))
+        prev.map((i) =>
+          i.inventory_id === updatedItem.inventory_id ? res.data.data : i
+        )
       );
       setShowEditModal(false);
       setEditingItem(null);
@@ -852,18 +1234,26 @@ function InventoryItemList({ clientId }) {
       alert("Edit failed.");
     }
   };
-
   const handleDelete = async (id) => {
     try {
-      await axios.delete(
-        `http://localhost:8002/saas/${clientId}/inventory/${id}`,
+      await axios.post(
+        `http://localhost:8002/saas/${clientId}/inventory/delete?client_id=${clientId}`,
+        { id }, // ✅ backend expects { id: value }
         { headers }
       );
-      setItems(items.filter((i) => i.inventory_id !== id));
+
+      setItems((prev) => prev.filter((i) => i.id !== id));
     } catch (err) {
       console.error("Delete failed:", err);
       alert("Delete failed.");
     }
+  };
+
+  const handleItemCreated = (responseData) => {
+    if (responseData?.data) {
+      setItems((prev) => [...prev, responseData.data]);
+    }
+    setShowAddModal(false);
   };
 
   return (
@@ -876,50 +1266,37 @@ function InventoryItemList({ clientId }) {
           + Add Item
         </button>
       </div>
+
       <div className="menu-grid-container">
         {items.length === 0 ? (
           <p className="no-items">No inventory found.</p>
         ) : (
-          items.map((item, index) => (
-            <div className="menu-grid-card" key={`${item.inventory_id}-${index}`}>
+          items.map((item) => (
+            <div className="menu-grid-card" key={item.inventory_id}>
               <div className="menu-card-body">
                 <h4>{item.name}</h4>
                 <p className="menu-card-price">₹{item.unit_total_price}</p>
               </div>
               <div className="menu-card-footer">
-                <button
-                  className="btn-edit"
-                  onClick={() => handleEdit(item)}
-                >
-                  Edit
-                </button>
-                <button
-                  className="btn-delete"
-                  onClick={() => setDeleteTarget(item)}
-                >
-                  Delete
-                </button>
+                <button className="btn-edit" onClick={() => handleEdit(item)}>Edit</button>
+                <button className="btn-delete" onClick={() => setDeleteTarget(item)}>Delete</button>
               </div>
             </div>
           ))
         )}
       </div>
 
-
       {showAddModal && (
-        <div
-          className="modal-overlay"
-          onClick={(e) => {
-            if (e.target.classList.contains("modal-overlay")) {
-              setShowAddModal(false);
-            }
-          }}
-        >
+        <div className="modal-overlay" onClick={(e) => {
+          if (e.target.classList.contains("modal-overlay")) {
+            setShowAddModal(false);
+          }
+        }}>
           <div className="menu-modal-content">
             <h3>Add New Inventory Item</h3>
-            <AddMenuItemForm
-              onSubmit={handleAddItem}
-              onCancel={() => setShowAddModal(false)}
+            <AddMenuForm
+              clientId={clientId}
+              onItemCreated={handleItemCreated}
             />
           </div>
         </div>
@@ -962,17 +1339,19 @@ function InventoryItemList({ clientId }) {
         </div>
       )}
 
-
       {deleteTarget && (
         <div className="modal-overlay">
           <div className="modal-content">
             <h4>Confirm Delete</h4>
             <p>Delete <strong>{deleteTarget.name}</strong>?</p>
             <div className="modal-buttons">
-              <button className="btn-add" onClick={async () => {
-                await handleDelete(deleteTarget.inventory_id);
-                setDeleteTarget(null);
-              }}>Yes</button>
+              <button
+                className="btn-add"
+                onClick={async () => {
+                  await handleDelete(deleteTarget.id);
+                  setDeleteTarget(null);
+                }}
+              >Yes</button>
               <button className="btn-cancel" onClick={() => setDeleteTarget(null)}>No</button>
             </div>
           </div>

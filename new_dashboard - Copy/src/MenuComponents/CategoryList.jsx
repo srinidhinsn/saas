@@ -268,133 +268,442 @@
 
 
 
+// import React, { useEffect, useState } from "react";
+// import axios from "axios";
+// import { FaEdit, FaTrash } from "react-icons/fa";
+// import { jwtDecode } from "jwt-decode"; import { useParams } from 'react-router-dom';
+
+// function CategoryList({ onCategorySelect, onCategoryAdded }) {
+//   const [categories, setCategories] = useState([]);
+//   const [editingId, setEditingId] = useState(null);
+//   const [editName, setEditName] = useState("");
+//   const [editDescription, setEditDescription] = useState("");
+//   const [showAddModal, setShowAddModal] = useState(false);
+//   const [showEditModal, setShowEditModal] = useState(false);
+//   const [newName, setNewName] = useState("");
+//   const [newDescription, setNewDescription] = useState("");
+//   const [subCategoryInput, setSubCategoryInput] = useState("");
+//   const [deleteTarget, setDeleteTarget] = useState(null);
+//   const clientId = localStorage.getItem("clientId");
+//   const token = localStorage.getItem("access_token");
+
+
+
+
+//   useEffect(() => {
+//     if (!token || !clientId) return;
+//     axios.get(`http://localhost:8002/saas/${clientId}/inventory/read_category`, {
+//       headers: {
+//         Authorization: `Bearer ${token}`,
+//       },
+//     })
+
+//       .then((res) => {
+//         setCategories(res.data.data || []);
+//       })
+//       .catch((err) => {
+//         console.error("Error fetching categories:", err);
+//       });
+//   }, [clientId]);
+
+
+
+//   const handleAddCategory = async () => {
+//     if (!newName.trim() || !newDescription.trim()) {
+//       alert("Name and description are required.");
+//       return;
+//     }
+
+//     let createdBy = "unknown";
+//     let updatedBy = "unknown";
+
+//     try {
+//       const decoded = jwtDecode(token);
+//       createdBy = decoded.username || decoded.user_id || "unknown";
+//       updatedBy = decoded.username || decoded.user_id || "unknown";
+//     } catch (err) {
+//       console.error("Token decode failed:", err);
+//     }
+
+//     // const subCategoriesFormatted = `{"${subCategoryInput
+//     //   .split(",")
+//     //   .map((s) => s.trim())
+//     //   .filter(Boolean)
+//     //   .join('","')}"}`;
+
+
+//     const slug = newName.trim().toLowerCase().replace(/\s+/g, "-");
+//     // const subCategoriesArray = subCategoryInput
+//     //   .split(",")
+//     //   .map((s) => s.trim())
+//     //   .filter(Boolean);
+
+//     const payload = {
+//       category: {
+//         client_id: clientId,
+//         name: newName.trim(),
+//         description: newDescription.trim(),
+//         slug,
+//         sub_categories: JSON.stringify(subCategoryInput),
+//         created_by: createdBy,
+//         updated_by: updatedBy
+//       },
+
+
+//     };
+
+//     try {
+//       console.log("Payload being sent:", payload);
+
+//       const res = await axios.post(
+//         `http://localhost:8002/saas/${clientId}/inventory/create_category`,
+//         payload,
+//         {
+//           headers: {
+//             Authorization: `Bearer ${token}`
+//           },
+//         }
+//       );
+
+//       const newCategory = res.data.data;
+//       setCategories([...categories, newCategory]);
+//       setNewName("");
+//       setNewDescription("");
+//       setSubCategoryInput(""); // reset subcategories
+//       setShowAddModal(false);
+//     } catch (err) {
+//       console.error("Error adding category:", err.response?.data || err);
+//       alert(JSON.stringify(err.response?.data || err, null, 2));
+//     }
+//   };
+
+
+
+
+
+
+
+//   const startEdit = (cat) => {
+//     setEditingId(cat.id);
+//     setEditName(cat.name);
+//     setEditDescription(cat.description);
+//     setShowEditModal(true);
+//   };
+
+//   const handleEditSave = async () => {
+//     const payload = {
+//       id: editingId,
+//       name: editName,
+//       description: editDescription,
+//     };
+
+//     try {
+//       const res = await axios.post(
+//         `http://localhost:8002/saas/${clientId}/inventory/update_category`,
+//         payload,
+//         {
+//           headers: {
+//             Authorization: `Bearer ${token}`,
+//           },
+//         }
+//       );
+
+//       setCategories(
+//         categories.map((cat) => (cat.id === editingId ? res.data.data : cat))
+//       );
+//       setEditingId(null);
+//       setShowEditModal(false);
+//     } catch (err) {
+//       console.error("Error editing category:", err);
+//     }
+//   };
+
+//   const handleDelete = async (id) => {
+//     const payload = { id };
+
+//     try {
+//       await axios.post(
+//         `http://localhost:8002/saas/${clientId}/inventory/delete_category`,
+//         payload,
+//         {
+//           headers: {
+//             Authorization: `Bearer ${token}`,
+//           },
+//         }
+//       );
+
+//       setCategories(categories.filter((cat) => cat.id !== id));
+//       setDeleteTarget(null);
+//     } catch (err) {
+//       console.error("Error deleting category:", err);
+//     }
+//   };
+
+//   return (
+//     <div className="category-list-container">
+//       <div className="category-header">
+//         <h3 className="category-list-title">Categories</h3>
+//         <button className="add-btn" onClick={() => setShowAddModal(true)}>
+//           ➕
+//         </button>
+//       </div>
+
+//       <ul className="category-list">
+//         {categories.map((cat) => (
+//           <li
+//             key={cat.id}
+//             className="category-item"
+//             onClick={() => onCategorySelect(cat)}
+//           >
+//             {cat.name}
+//             <div className="category-actions">
+//               <button onClick={() => startEdit(cat)} className="edit-btn">
+//                 <FaEdit />
+//               </button>
+//               <button
+//                 onClick={() => setDeleteTarget(cat)}
+//                 className="delete-btn"
+//               >
+//                 <FaTrash />
+//               </button>
+//             </div>
+//           </li>
+//         ))}
+//       </ul>
+
+//       {showAddModal && (
+//         <div className="modal-overlay">
+//           <div className="modal-content">
+//             <h4>Add New Category</h4>
+//             <input
+//               type="text"
+//               value={newName}
+//               onChange={(e) => setNewName(e.target.value)}
+//               placeholder="Category Name"
+//               className="modal-input"
+//             />
+//             <input
+//               type="text"
+//               value={newDescription}
+//               onChange={(e) => setNewDescription(e.target.value)}
+//               placeholder="Description"
+//               className="modal-input"
+//             />
+//             <input
+//               type="text"
+//               value={subCategoryInput}
+//               onChange={(e) => setSubCategoryInput(e.target.value)}
+//               placeholder="Subcategories (comma separated)"
+//               className="modal-input"
+//             />
+
+//             <div className="modal-buttons">
+//               <button onClick={handleAddCategory} className="modal-save-btn">
+//                 Add
+//               </button>
+//               <button
+//                 onClick={() => {
+//                   setShowAddModal(false);
+//                   setNewName("");
+//                   setNewDescription("");
+//                 }}
+//                 className="modal-cancel-btn"
+//               >
+//                 Cancel
+//               </button>
+//             </div>
+//           </div>
+//         </div>
+//       )}
+
+
+//       {showEditModal && (
+//         <div className="modal-overlay">
+//           <div className="modal-content">
+//             <h4>Edit Category</h4>
+//             <input
+//               type="text"
+//               value={editName}
+//               onChange={(e) => setEditName(e.target.value)}
+//               placeholder="Category Name"
+//               className="modal-input"
+//             />
+//             <input
+//               type="text"
+//               value={editDescription}
+//               onChange={(e) => setEditDescription(e.target.value)}
+//               placeholder="Description"
+//               className="modal-input"
+//             />
+//             <div className="modal-buttons">
+//               <button onClick={handleEditSave} className="modal-save-btn">
+//                 Save
+//               </button>
+//               <button
+//                 onClick={() => {
+//                   setShowEditModal(false);
+//                   setEditingId(null);
+//                 }}
+//                 className="modal-cancel-btn"
+//               >
+//                 Cancel
+//               </button>
+//             </div>
+//           </div>
+//         </div>
+//       )}
+
+//       {deleteTarget && (
+//         <div className="modal-overlay">
+//           <div className="modal-content">
+//             <h4>Confirm Delete</h4>
+//             <p>
+//               Are you sure you want to delete {" "}
+//               <strong>{deleteTarget.name}</strong>?
+//             </p>
+//             <div className="modal-buttons">
+//               <button
+//                 onClick={() => handleDelete(deleteTarget.id)}
+//                 className="modal-save-btn"
+//               >
+//                 Yes
+//               </button>
+//               <button
+//                 onClick={() => setDeleteTarget(null)}
+//                 className="modal-cancel-btn"
+//               >
+//                 No
+//               </button>
+//             </div>
+//           </div>
+//         </div>
+//       )}
+//     </div>
+//   );
+// }
+
+// export default CategoryList;
+
+
+// 
+// 
+
+
+
+
+
+
 import React, { useEffect, useState } from "react";
 import axios from "axios";
 import { FaEdit, FaTrash } from "react-icons/fa";
-import { jwtDecode } from "jwt-decode"; import { useParams } from 'react-router-dom';
+import { jwtDecode } from "jwt-decode";
 
-function CategoryList({ onCategorySelect, onCategoryAdded }) {
+function CategoryList({ onCategorySelect }) {
   const [categories, setCategories] = useState([]);
   const [editingId, setEditingId] = useState(null);
   const [editName, setEditName] = useState("");
   const [editDescription, setEditDescription] = useState("");
+  const [editSubcategories, setEditSubcategories] = useState([]);
   const [showAddModal, setShowAddModal] = useState(false);
   const [showEditModal, setShowEditModal] = useState(false);
   const [newName, setNewName] = useState("");
   const [newDescription, setNewDescription] = useState("");
-  const [subCategoryInput, setSubCategoryInput] = useState("");
+  const [newSubcategories, setNewSubcategories] = useState([]);
   const [deleteTarget, setDeleteTarget] = useState(null);
+  const [newId, setNewId] = useState("");
+
   const clientId = localStorage.getItem("clientId");
   const token = localStorage.getItem("access_token");
 
-
-
-
   useEffect(() => {
     if (!token || !clientId) return;
-    axios.get(`http://localhost:8002/saas/${clientId}/inventory/read_category`, {
-      headers: {
-        Authorization: `Bearer ${token}`,
-      },
-    })
 
+    axios
+      .get(`http://localhost:8002/saas/${clientId}/inventory/read_category?client_id=${clientId}`, {
+        headers: {
+          Authorization: `Bearer ${token}`,
+        },
+      })
       .then((res) => {
         setCategories(res.data.data || []);
       })
       .catch((err) => {
         console.error("Error fetching categories:", err);
       });
-  }, [clientId]);
+  }, [clientId, token]);
 
+  const toggleSubcategory = (id, isEdit = false) => {
+    const state = isEdit ? editSubcategories : newSubcategories;
+    const setter = isEdit ? setEditSubcategories : setNewSubcategories;
 
+    setter(
+      state.includes(id)
+        ? state.filter((sid) => sid !== id)
+        : [...state, id]
+    );
+  };
 
   const handleAddCategory = async () => {
-    if (!newName.trim() || !newDescription.trim()) {
-      alert("Name and description are required.");
+    if (!newId.trim() || !newName.trim()) {
+      alert("ID and Name are required");
       return;
     }
 
-    let createdBy = "unknown";
-    let updatedBy = "unknown";
+    let createdBy = "null";
+    let updatedBy = "null";
 
     try {
       const decoded = jwtDecode(token);
-      createdBy = decoded.username || decoded.user_id || "unknown";
-      updatedBy = decoded.username || decoded.user_id || "unknown";
+      createdBy = parseInt(decoded.user_id);  // Ensure string, not number
+      updatedBy = parseInt(decoded.user_id);
     } catch (err) {
       console.error("Token decode failed:", err);
     }
 
-    // const subCategoriesFormatted = `{"${subCategoryInput
-    //   .split(",")
-    //   .map((s) => s.trim())
-    //   .filter(Boolean)
-    //   .join('","')}"}`;
-
-
-    const slug = newName.trim().toLowerCase().replace(/\s+/g, "-");
-    // const subCategoriesArray = subCategoryInput
-    //   .split(",")
-    //   .map((s) => s.trim())
-    //   .filter(Boolean);
-
     const payload = {
-      category: {
-        client_id: clientId,
-        name: newName.trim(),
-        description: newDescription.trim(),
-        slug,
-        sub_categories: JSON.stringify(subCategoryInput),
-        created_by: createdBy,
-        updated_by: updatedBy
-      },
-
-
+      id: newId.trim(),
+      client_id: clientId,
+      name: newName.trim(),
+      description: newDescription.trim(),
+      sub_categories: newSubcategories,
+      created_by: createdBy,
+      updated_by: updatedBy,
     };
 
     try {
-      console.log("Payload being sent:", payload);
-
       const res = await axios.post(
         `http://localhost:8002/saas/${clientId}/inventory/create_category`,
         payload,
-        {
-          headers: {
-            Authorization: `Bearer ${token}`
-          },
-        }
+        { headers: { Authorization: `Bearer ${token}` } }
       );
 
-      const newCategory = res.data.data;
-      setCategories([...categories, newCategory]);
+      setCategories([...categories, res.data.data]);
+      setNewId("");
       setNewName("");
       setNewDescription("");
-      setSubCategoryInput(""); // reset subcategories
+      setNewSubcategories([]);
       setShowAddModal(false);
     } catch (err) {
       console.error("Error adding category:", err.response?.data || err);
-      alert(JSON.stringify(err.response?.data || err, null, 2));
+      alert(JSON.stringify(err.response?.data || err));
     }
   };
-
-
-
-
-
 
 
   const startEdit = (cat) => {
     setEditingId(cat.id);
     setEditName(cat.name);
     setEditDescription(cat.description);
+    setEditSubcategories(cat.sub_categories || []);
     setShowEditModal(true);
   };
 
   const handleEditSave = async () => {
     const payload = {
       id: editingId,
-      name: editName,
-      description: editDescription,
+      name: editName.trim(),
+      description: editDescription.trim(),
+      sub_categories: editSubcategories,
     };
 
     try {
@@ -404,40 +713,59 @@ function CategoryList({ onCategorySelect, onCategoryAdded }) {
         {
           headers: {
             Authorization: `Bearer ${token}`,
+            "Content-Type": "application/json",
           },
         }
       );
 
-      setCategories(
-        categories.map((cat) => (cat.id === editingId ? res.data.data : cat))
+      const updatedCategory = res.data.data;
+
+      setCategories((prev) =>
+        prev.map((cat) => (cat.id === editingId ? updatedCategory : cat))
       );
+
+      // Reset states
       setEditingId(null);
       setShowEditModal(false);
     } catch (err) {
-      console.error("Error editing category:", err);
+      console.error("Error editing category:", err.response?.data || err);
+      alert("Failed to update category.");
     }
   };
 
-  const handleDelete = async (id) => {
-    const payload = { id };
+
+  const handleDelete = async (categoryId) => {
+    const category = categories.find((cat) => cat.id === categoryId);
+    if (!category) return;
 
     try {
-      await axios.post(
-        `http://localhost:8002/saas/${clientId}/inventory/delete_category`,
-        payload,
+      const res = await axios.post(
+        `http://localhost:8002/saas/${clientId}/inventory/delete_category?client_id=${clientId}`,
+        {
+          id: category.id,
+          name: category.name, // optional, included for clarity
+        },
         {
           headers: {
             Authorization: `Bearer ${token}`,
+            "Content-Type": "application/json",
           },
         }
       );
 
-      setCategories(categories.filter((cat) => cat.id !== id));
-      setDeleteTarget(null);
+      // Update UI
+      const updatedCategories = categories.filter((c) => c.id !== category.id);
+      setCategories(updatedCategories);
+      setDeleteTarget(null); // close modal
+      alert(res.data.message || "Category deleted successfully");
     } catch (err) {
-      console.error("Error deleting category:", err);
+      console.error("Delete error:", err.response?.data || err);
+      alert(err.response?.data?.detail || "Failed to delete category");
     }
   };
+
+
+
 
   return (
     <div className="category-list-container">
@@ -471,10 +799,19 @@ function CategoryList({ onCategorySelect, onCategoryAdded }) {
         ))}
       </ul>
 
+      {/* Add Modal */}
       {showAddModal && (
         <div className="modal-overlay">
           <div className="modal-content">
             <h4>Add New Category</h4>
+            <input
+              type="text"
+              value={newId}
+              onChange={(e) => setNewId(e.target.value)}
+              placeholder="Category ID (required)"
+              className="modal-input"
+              required
+            />
             <input
               type="text"
               value={newName}
@@ -489,14 +826,19 @@ function CategoryList({ onCategorySelect, onCategoryAdded }) {
               placeholder="Description"
               className="modal-input"
             />
-            <input
-              type="text"
-              value={subCategoryInput}
-              onChange={(e) => setSubCategoryInput(e.target.value)}
-              placeholder="Subcategories (comma separated)"
-              className="modal-input"
-            />
-
+            <label>Assign as Subcategory under:</label>
+            <div className="subcategory-checkboxes">
+              {categories.map((cat) => (
+                <label key={cat.id}>
+                  <input
+                    type="checkbox"
+                    checked={newSubcategories.includes(cat.id)}
+                    onChange={() => toggleSubcategory(cat.id)}
+                  />
+                  {cat.name}
+                </label>
+              ))}
+            </div>
             <div className="modal-buttons">
               <button onClick={handleAddCategory} className="modal-save-btn">
                 Add
@@ -504,8 +846,10 @@ function CategoryList({ onCategorySelect, onCategoryAdded }) {
               <button
                 onClick={() => {
                   setShowAddModal(false);
+                  setNewId("");
                   setNewName("");
                   setNewDescription("");
+                  setNewSubcategories([]);
                 }}
                 className="modal-cancel-btn"
               >
@@ -516,7 +860,7 @@ function CategoryList({ onCategorySelect, onCategoryAdded }) {
         </div>
       )}
 
-
+      {/* Edit Modal */}
       {showEditModal && (
         <div className="modal-overlay">
           <div className="modal-content">
@@ -535,6 +879,21 @@ function CategoryList({ onCategorySelect, onCategoryAdded }) {
               placeholder="Description"
               className="modal-input"
             />
+            <label>Subcategories:</label>
+            <div className="subcategory-checkboxes">
+              {categories
+                .filter((cat) => cat.id !== editingId)
+                .map((cat) => (
+                  <label key={cat.id}>
+                    <input
+                      type="checkbox"
+                      checked={editSubcategories.includes(cat.id)}
+                      onChange={() => toggleSubcategory(cat.id, true)}
+                    />
+                    {cat.name}
+                  </label>
+                ))}
+            </div>
             <div className="modal-buttons">
               <button onClick={handleEditSave} className="modal-save-btn">
                 Save
@@ -553,12 +912,14 @@ function CategoryList({ onCategorySelect, onCategoryAdded }) {
         </div>
       )}
 
+      {/* Delete Modal */}
+      {/* Delete Modal */}
       {deleteTarget && (
         <div className="modal-overlay">
           <div className="modal-content">
             <h4>Confirm Delete</h4>
             <p>
-              Are you sure you want to delete {" "}
+              Are you sure you want to delete{" "}
               <strong>{deleteTarget.name}</strong>?
             </p>
             <div className="modal-buttons">
@@ -578,6 +939,7 @@ function CategoryList({ onCategorySelect, onCategoryAdded }) {
           </div>
         </div>
       )}
+
     </div>
   );
 }

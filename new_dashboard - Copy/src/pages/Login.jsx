@@ -632,8 +632,9 @@ export default function Login() {
         setLoading(true);
 
         try {
+            const clientCode = form.clientCode;
             const clientRes = await axios.post(
-                `http://localhost:8000/saas/demo/users/client-id-by-credentials`,
+                `http://localhost:8000/saas/${clientCode}/users/client-id-by-credentials`,
                 {
                     username: form.username,
                     password: form.password,
@@ -717,7 +718,7 @@ export default function Login() {
                     </button>
                     <p className="login-link">
                         Don’t have an account?{" "}
-                        <span onClick={() => navigate(`/saas/${form.username || "demo"}/register`)}>Register here</span>
+                        <span onClick={() => navigate(`/saas/${form.clientCode || ":clientId"}/register`)}>Register here</span>
                     </p>
                 </form>
             </div>
