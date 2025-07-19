@@ -1,0 +1,80 @@
+<!DOCTYPE html>
+<html lang="en">
+<head>
+  <meta charset="UTF-8" />
+  <meta name="viewport" content="width=device-width, initial-scale=1.0" />
+  <title>Restaurant Management Dashboard</title>
+  <script src="https://cdn.tailwindcss.com"></script>
+</head>
+<body class="bg-gray-100 text-gray-800">
+  <div class="flex min-h-screen">
+    <!-- Sidebar -->
+    <aside class="w-64 bg-indigo-700 text-white p-4 space-y-6">
+      <h2 class="text-2xl font-bold mb-6">Dashboard</h2>
+      <nav class="space-y-3">
+        <a href="#" class="block hover:bg-indigo-600 px-3 py-2 rounded">Tables</a>
+        <a href="#" class="block bg-indigo-600 px-3 py-2 rounded">Orders</a>
+        <a href="#" class="block hover:bg-indigo-600 px-3 py-2 rounded">Menu</a>
+        <a href="#" class="block hover:bg-indigo-600 px-3 py-2 rounded">Stacked</a>
+        <a href="#" class="block hover:bg-indigo-600 px-3 py-2 rounded">Settings</a>
+      </nav>
+    </aside>
+
+    <!-- Main Content -->
+    <main class="flex-1 p-8">
+      <div class="flex items-center justify-between mb-6">
+        <h1 class="text-2xl font-bold">Restaurant Management</h1>
+        <button class="bg-green-600 text-white px-4 py-2 rounded hover:bg-green-700">New Order</button>
+      </div>
+
+      <!-- Stats Cards -->
+      <div class="grid grid-cols-1 md:grid-cols-4 gap-4 mb-8">
+        <div class="bg-white p-6 rounded-lg shadow text-center">
+          <p class="text-3xl font-bold">12</p>
+          <p class="text-gray-500">Tables</p>
+        </div>
+        <div class="bg-white p-6 rounded-lg shadow text-center">
+          <p class="text-3xl font-bold">24</p>
+          <p class="text-gray-500">Orders</p>
+        </div>
+        <div class="bg-white p-6 rounded-lg shadow text-center">
+          <p class="text-3xl font-bold">42</p>
+          <p class="text-gray-500">Items</p>
+        </div>
+        <div class="bg-white p-6 rounded-lg shadow text-center">
+          <p class="text-3xl font-bold">5</p>
+          <p class="text-gray-500">Combos</p>
+        </div>
+      </div>
+
+      <!-- Orders and Sales -->
+      <div class="grid grid-cols-1 md:grid-cols-2 gap-6">
+        <div class="bg-white p-6 rounded-lg shadow">
+          <h2 class="text-lg font-semibold mb-4">Orders</h2>
+          <table class="w-full text-left text-sm">
+            <thead>
+              <tr class="text-gray-500 border-b">
+                <th class="pb-2">Order ID</th>
+                <th class="pb-2">Table</th>
+                <th class="pb-2">Status</th>
+              </tr>
+            </thead>
+            <tbody>
+              <tr><td>#1024</td><td>5</td><td>Pending</td></tr>
+              <tr><td>#1023</td><td>2</td><td>Served</td></tr>
+              <tr><td>#1022</td><td>1</td><td>In Progress</td></tr>
+            </tbody>
+          </table>
+        </div>
+
+        <div class="bg-white p-6 rounded-lg shadow">
+          <h2 class="text-lg font-semibold mb-4">Sales</h2>
+          <div class="w-full h-40 flex items-center justify-center text-gray-400">
+            [Sales chart placeholder]
+          </div>
+        </div>
+      </div>
+    </main>
+  </div>
+</body>
+</html>
