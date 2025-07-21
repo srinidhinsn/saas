@@ -656,6 +656,14 @@ export default function Login() {
             localStorage.setItem("access_token", token);
             localStorage.setItem("clientId", decoded.client_id);
             localStorage.setItem("username", decoded.username);
+
+            if (decoded.grants) {
+                localStorage.setItem("grants", JSON.stringify(decoded.grants));
+                console.log("Grants saved:", decoded.grants);
+            } else {
+                localStorage.setItem("grants", JSON.stringify([]));
+                console.warn("No grants found in token");
+            }
             toast.success("Login successful", {
                 position: "top-right",
                 autoClose: 3000,
