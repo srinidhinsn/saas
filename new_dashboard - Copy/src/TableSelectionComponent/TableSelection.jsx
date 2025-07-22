@@ -426,6 +426,8 @@
 // 
 
 // ----------------------------------------------------------------------------------------------------------------------------------------------- //
+
+
 import React, { useEffect, useState } from "react";
 import { FiSun, FiMoon } from "react-icons/fi";
 import { useTheme } from "../ThemeChangerComponent/ThemeContext";
@@ -451,14 +453,8 @@ const TableSelection = () => {
     const [deleteTableId, setDeleteTableId] = useState(null);
     const [addRowError, setAddRowError] = useState("");
     const token = localStorage.getItem("access_token");
-    // const clientId = localStorage.getItem("clientId");
 
-    // ---------------------- Used to set the clientId in localstorage --------------------- //
-    useEffect(() => {
-        if (clientId) {
-            localStorage.setItem("clientId", clientId);
-        }
-    }, [clientId]);
+
     // ----------------------- Fetch the tables only clientid is available ----------------- //
     useEffect(() => {
         if (clientId) fetchTables();
@@ -485,7 +481,6 @@ const TableSelection = () => {
 
         } catch (error) {
             console.error("❌ Error fetching tables:", error);
-            localStorage.removeItem("clientId");
         }
     };
     // --------------- Parse the table range input into an array of table name -------------- //
@@ -550,10 +545,7 @@ const TableSelection = () => {
                     sort_order: row.sort_order ? parseInt(row.sort_order) : null,
                     is_active: row.is_active, qr_code_url: row.qr_code_url || "",
                     slug: `${clientId}-${(row.slug || num).toLowerCase().replace(/[^a-z0-9-]/g, '')}`
-
-
                 });
-
             });
         }
 

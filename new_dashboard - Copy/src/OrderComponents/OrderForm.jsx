@@ -4,7 +4,7 @@ import Modal from "react-modal";
 import { FaUser, FaTable, FaTrash } from "react-icons/fa";
 import { BsCash, BsCreditCard, BsQrCode } from "react-icons/bs";
 // import api from '../PortExportingPage/api'
-// import { useParams } from 'react-router-dom';
+import { useParams } from 'react-router-dom';
 import { useNavigate } from "react-router-dom";
 
 Modal.setAppElement("#root");
@@ -38,8 +38,8 @@ const OrderForm = ({ table, onOrderCreated }) => {
 
     const navigate = useNavigate();
 
-    // const { clientId } = useParams();
-    const clientId = localStorage.getItem("clientId");
+
+    const { clientId } = useParams();
 
     const calculateSubtotal = () => {
         return orderItems.reduce((sum, item) => sum + item.price * item.quantity, 0);
@@ -66,9 +66,6 @@ const OrderForm = ({ table, onOrderCreated }) => {
         const container = (mode === "Delivery" || mode === "Pick Up") ? 10 : 0;
         return parseFloat((subtotal + gst + cst + delivery + container - disc).toFixed(2));
     };
-
-    // Auto-increment ID generators
-    // Auto-increment ID generators
 
     const generateNextOrderId = () => {
         let count = parseInt(localStorage.getItem("order_id_counter") || "2", 10); // Start from 2

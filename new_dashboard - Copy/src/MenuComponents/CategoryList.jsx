@@ -654,8 +654,8 @@ function CategoryList({ onCategorySelect }) {
 
     try {
       const decoded = jwtDecode(token);
-      createdBy = parseInt(decoded.user_id);  // Ensure string, not number
-      updatedBy = parseInt(decoded.user_id);
+      createdBy = decoded.user_id;
+      updatedBy = decoded.user_id;
     } catch (err) {
       console.error("Token decode failed:", err);
     }

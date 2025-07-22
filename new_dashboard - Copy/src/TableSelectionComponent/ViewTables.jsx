@@ -463,7 +463,7 @@ const ViewTables = ({ onOrderUpdate }) => {
     const { tableId } = useParams();
     const [searchParams, setSearchParams] = useSearchParams();
     const modeFromParams = searchParams.get("mode") || "table";
-    const clientId = localStorage.getItem("client_id");
+    const { clientId } = useParams();
     const [tables, setTables] = useState([]);
     const [selectedTable, setSelectedTable] = useState(null);
     const [categories, setCategories] = useState([]);
@@ -695,7 +695,6 @@ const ViewTables = ({ onOrderUpdate }) => {
                                 onOrderCreated={(latestOrder) => {
                                     navigate('/view-tables');
                                     setSearchParams({});
-                                    const token = localStorage.getItem("access_token");
                                     axios
                                         .get(`http://localhost:8001/saas/${clientId}/tables/read`, {
                                             headers: {

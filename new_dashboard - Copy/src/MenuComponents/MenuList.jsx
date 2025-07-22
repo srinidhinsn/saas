@@ -1180,6 +1180,200 @@
 
 
 
+// import React, { useEffect, useState } from "react";
+// import axios from "axios";
+// import AddMenuForm from './AddMenuForm';
+
+// function InventoryItemList({ clientId }) {
+//   const [items, setItems] = useState([]);
+//   const [editingItem, setEditingItem] = useState(null);
+//   const [showEditModal, setShowEditModal] = useState(false);
+//   const [deleteTarget, setDeleteTarget] = useState(null);
+//   const [showAddModal, setShowAddModal] = useState(false);
+
+//   const token = localStorage.getItem("access_token");
+//   const headers = { Authorization: `Bearer ${token}` };
+
+//   useEffect(() => {
+//     if (!clientId || !token) return;
+
+//     axios
+//       .get(`http://localhost:8002/saas/${clientId}/inventory/read`, { headers })
+//       .then((res) => {
+//         console.log("fetched items  :", res.data.data)
+//         setItems(res.data.data || []);
+//       })
+//       .catch((err) => {
+//         console.error("Failed to load inventory:", err);
+//       });
+//   }, [clientId, token]);
+
+//   const handleEdit = (item) => {
+//     setEditingItem({ ...item });
+//     setShowEditModal(true);
+//   };
+
+//   const handleEditSave = async () => {
+//     const updatedItem = { ...editingItem, client_id: clientId };
+
+//     try {
+//       const res = await axios.post(
+//         `http://localhost:8002/saas/${clientId}/inventory/update?client_id=${clientId}`,
+//         updatedItem,
+//         { headers }
+//       );
+
+//       setItems((prev) =>
+//         prev.map((i) =>
+//           i.inventory_id === updatedItem.inventory_id ? res.data.data : i
+//         )
+//       );
+//       setShowEditModal(false);
+//       setEditingItem(null);
+//     } catch (err) {
+//       console.error("Edit failed:", err);
+//       alert("Edit failed.");
+//     }
+//   };
+//   const handleDelete = async (id) => {
+//     try {
+//       await axios.post(
+//         `http://localhost:8002/saas/${clientId}/inventory/delete?client_id=${clientId}`,
+//         { id }, // ✅ backend expects { id: value }
+//         { headers }
+//       );
+
+//       setItems((prev) => prev.filter((i) => i.id !== id));
+//     } catch (err) {
+//       console.error("Delete failed:", err);
+//       alert("Delete failed.");
+//     }
+//   };
+
+//   const handleItemCreated = (responseData) => {
+//     if (responseData?.data) {
+//       setItems((prev) => [...prev, responseData.data]);
+//     }
+//     setShowAddModal(false);
+//   };
+
+//   return (
+//     <div className="menu-items-panel">
+//       <div className="btns">
+//         <button className="btn-add" onClick={() => {
+//           setShowAddModal(true);
+//           setEditingItem(null);
+//         }}>
+//           + Add Item
+//         </button>
+//       </div>
+
+//       <div className="menu-grid-container">
+//         {items.length === 0 ? (
+//           <p className="no-items">No inventory found.</p>
+//         ) : (
+//           items.map((item) => (
+//             <div className="menu-grid-card" key={item.inventory_id}>
+//               <div className="menu-card-body">
+//                 <h4>{item.name}</h4>
+//                 <p className="menu-card-price">₹{item.price}</p>
+//               </div>
+//               <div className="menu-card-footer">
+//                 <button className="btn-edit" onClick={() => handleEdit(item)}>Edit</button>
+//                 <button className="btn-delete" onClick={() => setDeleteTarget(item)}>Delete</button>
+//               </div>
+//             </div>
+//           ))
+//         )}
+//       </div>
+
+//       {showAddModal && (
+//         <div className="modal-overlay" onClick={(e) => {
+//           if (e.target.classList.contains("modal-overlay")) {
+//             setShowAddModal(false);
+//           }
+//         }}>
+//           <div className="menu-modal-content">
+//             <h3>Add New Inventory Item</h3>
+//             <AddMenuForm
+//               clientId={clientId}
+//               onItemCreated={handleItemCreated}
+//             />
+//           </div>
+//         </div>
+//       )}
+
+//       {showEditModal && editingItem && (
+//         <div className="modal-overlay" onClick={(e) => {
+//           if (e.target.classList.contains("modal-overlay")) setShowEditModal(false);
+//         }}>
+//           <div className="menu-modal-content">
+//             <h3>Edit Inventory Item</h3>
+//             <form onSubmit={(e) => {
+//               e.preventDefault();
+//               handleEditSave();
+//             }} className="add-menu-item-form">
+//               <div className="form-row">
+//                 <input
+//                   type="text"
+//                   value={editingItem.name}
+//                   onChange={(e) => setEditingItem({ ...editingItem, name: e.target.value })}
+//                   placeholder="Name"
+//                   className="form-input"
+//                   required
+//                 />
+//                 <input
+//                   type="number"
+//                   value={editingItem.price}
+//                   onChange={(e) => setEditingItem({ ...editingItem, price: e.target.value })}
+//                   placeholder="Price"
+//                   className="form-input"
+//                   required
+//                 />
+//               </div>
+//               <div className="form-actions">
+//                 <button type="submit" className="btn-add">Save</button>
+//                 <button type="button" className="btn-cancel" onClick={() => setShowEditModal(false)}>Cancel</button>
+//               </div>
+//             </form>
+//           </div>
+//         </div>
+//       )}
+
+//       {deleteTarget && (
+//         <div className="modal-overlay">
+//           <div className="modal-content">
+//             <h4>Confirm Delete</h4>
+//             <p>Delete <strong>{deleteTarget.name}</strong>?</p>
+//             <div className="modal-buttons">
+//               <button
+//                 className="btn-add"
+//                 onClick={async () => {
+//                   await handleDelete(deleteTarget.id);
+//                   setDeleteTarget(null);
+//                 }}
+//               >Yes</button>
+//               <button className="btn-cancel" onClick={() => setDeleteTarget(null)}>No</button>
+//             </div>
+//           </div>
+//         </div>
+//       )}
+//     </div>
+//   );
+// }
+
+// export default InventoryItemList;
+
+
+
+///
+
+
+
+///
+
+
+
 import React, { useEffect, useState } from "react";
 import axios from "axios";
 import AddMenuForm from './AddMenuForm';
@@ -1200,6 +1394,7 @@ function InventoryItemList({ clientId }) {
     axios
       .get(`http://localhost:8002/saas/${clientId}/inventory/read`, { headers })
       .then((res) => {
+        console.log(res.data.data)
         setItems(res.data.data || []);
       })
       .catch((err) => {
@@ -1234,11 +1429,12 @@ function InventoryItemList({ clientId }) {
       alert("Edit failed.");
     }
   };
+
   const handleDelete = async (id) => {
     try {
       await axios.post(
         `http://localhost:8002/saas/${clientId}/inventory/delete?client_id=${clientId}`,
-        { id }, // ✅ backend expects { id: value }
+        { id },
         { headers }
       );
 
@@ -1256,67 +1452,104 @@ function InventoryItemList({ clientId }) {
     setShowAddModal(false);
   };
 
+  // ✅ Group items by category
+  const groupedItems = items.reduce((acc, item) => {
+    const category = item.category || "Uncategorized";
+    if (!acc[category]) {
+      acc[category] = [];
+    }
+    acc[category].push(item);
+    return acc;
+  }, {});
+
   return (
     <div className="menu-items-panel">
       <div className="btns">
-        <button className="btn-add" onClick={() => {
-          setShowAddModal(true);
-          setEditingItem(null);
-        }}>
+        <button
+          className="btn-add"
+          onClick={() => {
+            setShowAddModal(true);
+            setEditingItem(null);
+          }}
+        >
           + Add Item
         </button>
       </div>
 
-      <div className="menu-grid-container">
-        {items.length === 0 ? (
-          <p className="no-items">No inventory found.</p>
-        ) : (
-          items.map((item) => (
-            <div className="menu-grid-card" key={item.inventory_id}>
-              <div className="menu-card-body">
-                <h4>{item.name}</h4>
-                <p className="menu-card-price">₹{item.price}</p>
-              </div>
-              <div className="menu-card-footer">
-                <button className="btn-edit" onClick={() => handleEdit(item)}>Edit</button>
-                <button className="btn-delete" onClick={() => setDeleteTarget(item)}>Delete</button>
-              </div>
+      {Object.keys(groupedItems).length === 0 ? (
+        <p className="no-items">No inventory found.</p>
+      ) : (
+        Object.keys(groupedItems).map((category) => (
+          <div key={category}>
+            <h2 className="category-heading">{category}</h2>
+            <div className="menu-grid-container">
+              {groupedItems[category].map((item) => (
+                <div className="menu-grid-card" key={item.inventory_id}>
+                  <div className="menu-card-body">
+                    <h4>{item.name}</h4>
+                    <p className="menu-card-price">₹{item.price}</p>
+                  </div>
+                  <div className="menu-card-footer">
+                    <button
+                      className="btn-edit"
+                      onClick={() => handleEdit(item)}
+                    >
+                      Edit
+                    </button>
+                    <button
+                      className="btn-delete"
+                      onClick={() => setDeleteTarget(item)}
+                    >
+                      Delete
+                    </button>
+                  </div>
+                </div>
+              ))}
             </div>
-          ))
-        )}
-      </div>
+          </div>
+        ))
+      )}
 
       {showAddModal && (
-        <div className="modal-overlay" onClick={(e) => {
-          if (e.target.classList.contains("modal-overlay")) {
-            setShowAddModal(false);
-          }
-        }}>
+        <div
+          className="modal-overlay"
+          onClick={(e) => {
+            if (e.target.classList.contains("modal-overlay")) {
+              setShowAddModal(false);
+            }
+          }}
+        >
           <div className="menu-modal-content">
             <h3>Add New Inventory Item</h3>
-            <AddMenuForm
-              clientId={clientId}
-              onItemCreated={handleItemCreated}
-            />
+            <AddMenuForm clientId={clientId} onItemCreated={handleItemCreated} />
           </div>
         </div>
       )}
 
       {showEditModal && editingItem && (
-        <div className="modal-overlay" onClick={(e) => {
-          if (e.target.classList.contains("modal-overlay")) setShowEditModal(false);
-        }}>
+        <div
+          className="modal-overlay"
+          onClick={(e) => {
+            if (e.target.classList.contains("modal-overlay"))
+              setShowEditModal(false);
+          }}
+        >
           <div className="menu-modal-content">
             <h3>Edit Inventory Item</h3>
-            <form onSubmit={(e) => {
-              e.preventDefault();
-              handleEditSave();
-            }} className="add-menu-item-form">
+            <form
+              onSubmit={(e) => {
+                e.preventDefault();
+                handleEditSave();
+              }}
+              className="add-menu-item-form"
+            >
               <div className="form-row">
                 <input
                   type="text"
                   value={editingItem.name}
-                  onChange={(e) => setEditingItem({ ...editingItem, name: e.target.value })}
+                  onChange={(e) =>
+                    setEditingItem({ ...editingItem, name: e.target.value })
+                  }
                   placeholder="Name"
                   className="form-input"
                   required
@@ -1324,15 +1557,25 @@ function InventoryItemList({ clientId }) {
                 <input
                   type="number"
                   value={editingItem.price}
-                  onChange={(e) => setEditingItem({ ...editingItem, price: e.target.value })}
+                  onChange={(e) =>
+                    setEditingItem({ ...editingItem, price: e.target.value })
+                  }
                   placeholder="Price"
                   className="form-input"
                   required
                 />
               </div>
               <div className="form-actions">
-                <button type="submit" className="btn-add">Save</button>
-                <button type="button" className="btn-cancel" onClick={() => setShowEditModal(false)}>Cancel</button>
+                <button type="submit" className="btn-add">
+                  Save
+                </button>
+                <button
+                  type="button"
+                  className="btn-cancel"
+                  onClick={() => setShowEditModal(false)}
+                >
+                  Cancel
+                </button>
               </div>
             </form>
           </div>
@@ -1343,7 +1586,9 @@ function InventoryItemList({ clientId }) {
         <div className="modal-overlay">
           <div className="modal-content">
             <h4>Confirm Delete</h4>
-            <p>Delete <strong>{deleteTarget.name}</strong>?</p>
+            <p>
+              Delete <strong>{deleteTarget.name}</strong>?
+            </p>
             <div className="modal-buttons">
               <button
                 className="btn-add"
@@ -1351,8 +1596,15 @@ function InventoryItemList({ clientId }) {
                   await handleDelete(deleteTarget.id);
                   setDeleteTarget(null);
                 }}
-              >Yes</button>
-              <button className="btn-cancel" onClick={() => setDeleteTarget(null)}>No</button>
+              >
+                Yes
+              </button>
+              <button
+                className="btn-cancel"
+                onClick={() => setDeleteTarget(null)}
+              >
+                No
+              </button>
             </div>
           </div>
         </div>

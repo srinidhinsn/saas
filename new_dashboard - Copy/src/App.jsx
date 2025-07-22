@@ -385,6 +385,7 @@
 
 
 // App.jsx
+
 import './App.css';
 import React, { useState, useEffect } from 'react';
 import { Routes, Route, Navigate, useLocation } from 'react-router-dom';
@@ -404,21 +405,6 @@ const App = () => {
   const location = useLocation();
   const hideNavbar = /\/saas\/[^/]+\/(login|register|forgot)/.test(location.pathname);
 
-  useEffect(() => {
-    const storedClient = localStorage.getItem("clientId");
-    const currentClient = location.pathname.split('/')[2];
-
-    if (
-      storedClient &&
-      currentClient &&
-      storedClient !== currentClient &&
-      !hideNavbar // don't trigger this on login/register pages
-    ) {
-      console.warn("🔁 Switching client context. Resetting session.");
-      localStorage.clear();
-      window.location.href = `/saas/${currentClient}/login`;
-    }
-  }, [location]);
 
   return (
     <div style={{ display: 'flex' }}>
@@ -447,19 +433,9 @@ const App = () => {
               </ProtectedRoute>
             }
           />
+          <Route path="*" element={<Navigate to="/" />} />
 
-          <Route
-            path="*"
-            element={
-              <Navigate
-                to={
-                  localStorage.getItem("clientId")
-                    ? `/saas/${localStorage.getItem("clientId")}/login`
-                    : `/`
-                }
-              />
-            }
-          />
+
 
         </Routes>
         <ToastContainer />

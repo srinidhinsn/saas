@@ -605,18 +605,268 @@
 
 // ======================================================================================================================= //
 
+// import "../styles/Login.css";
+// import React, { useState } from "react";
+// import { useNavigate } from "react-router-dom";
+// import axios from "axios";
+// import { jwtDecode } from "jwt-decode";
+// import { FaUser, FaLock } from "react-icons/fa";
+// import { toast } from 'react-toastify';
+// import 'react-toastify/dist/ReactToastify.css';
+
+
+// export default function Login() {
+//     const navigate = useNavigate();
+//     const [form, setForm] = useState({ username: "", password: "" });
+//     const [error, setError] = useState("");
+//     const [loading, setLoading] = useState(false);
+
+//     const handleChange = (e) => {
+//         const { name, value } = e.target;
+//         setForm((prev) => ({ ...prev, [name]: value }));
+//     };
+
+//     const handleLogin = async (e) => {
+//         e.preventDefault();
+//         setError("");
+//         setLoading(true);
+
+//         try {
+//             const clientCode = form.clientCode;
+//             const clientRes = await axios.post(
+//                 `http://localhost:8000/saas/${clientCode}/users/client-id-by-credentials`,
+//                 {
+//                     username: form.username,
+//                     password: form.password,
+//                 }
+//             );
+//             const clientId = clientRes.data.client_id;
+
+//             const loginRes = await axios.post(
+//                 `http://localhost:8000/saas/${clientId}/users/login`,
+//                 {
+//                     username: form.username,
+//                     password: form.password,
+//                 }
+//             );
+
+//             const token = loginRes.data.data.access_token;
+//             const decoded = jwtDecode(token);
+
+//             localStorage.setItem("access_token", token);
+//             localStorage.setItem("clientId", decoded.client_id);
+//             localStorage.setItem("username", decoded.username);
+
+//             if (decoded.grants) {
+//                 localStorage.setItem("grants", JSON.stringify(decoded.grants));
+//                 console.log("Grants saved:", decoded.grants);
+//             } else {
+//                 localStorage.setItem("grants", JSON.stringify([]));
+//                 console.warn("No grants found in token");
+//             }
+//             toast.success("Login successful", {
+//                 position: "top-right",
+//                 autoClose: 3000,
+//                 hideProgressBar: false,
+//                 closeOnClick: true,
+//                 pauseOnHover: true,
+//                 draggable: true,
+//                 progress: undefined,
+//             });
+
+//             navigate(`/saas/${clientId}/main`);
+//         } catch (err) {
+//             console.error("Login error:", err?.response?.data);
+//             const msg = err?.response?.data?.detail;
+//             setError(msg || "Invalid credentials");
+//         } finally {
+//             setLoading(false);
+//         }
+//     };
+
+//     return (
+//         <div className="login-page">
+//             <div className="login-card">
+//                 <div className="avatar-circle">
+//                     <FaUser className="avatar-icon" />
+//                 </div>
+//                 <form onSubmit={handleLogin}>
+//                     <div className="input-group">
+//                         <FaUser className="input-icon" />
+//                         <input
+//                             type="text"
+//                             name="username"
+//                             placeholder="Username"
+//                             value={form.username}
+//                             onChange={handleChange}
+//                             required
+//                         />
+//                     </div>
+//                     <div className="input-group">
+//                         <FaLock className="input-icon" />
+//                         <input
+//                             type="password"
+//                             name="password"
+//                             placeholder="Password"
+//                             value={form.password}
+//                             onChange={handleChange}
+//                             required
+//                         />
+//                     </div>
+
+//                     <div className="options-row">
+
+//                         <span onClick={() => navigate(`/saas/${form.username || "demo"}/forgot`)}>Forgot Password?</span>
+//                     </div>
+
+//                     {error && <p className="error">{error}</p>}
+
+//                     <button type="submit" className="login-button" disabled={loading}>
+//                         {loading ? "Logging in..." : "LOGIN"}
+//                     </button>
+//                     <p className="login-link">
+//                         Don’t have an account?{" "}
+//                         <span onClick={() => navigate(`/saas/${form.clientCode || ":clientId"}/register`)}>Register here</span>
+//                     </p>
+//                 </form>
+//             </div>
+//         </div>
+//     );
+// }
+
+
+
+
+//
+
+
+
+// import "../styles/Login.css";
+// import React, { useState } from "react";
+// import { useNavigate, useParams } from "react-router-dom";
+// import axios from "axios";
+// import { jwtDecode } from "jwt-decode";
+// import { FaUser, FaLock } from "react-icons/fa";
+// import { toast } from 'react-toastify';
+// import 'react-toastify/dist/ReactToastify.css';
+
+// export default function Login() {
+//     const navigate = useNavigate();
+//     const { clientId } = useParams();
+//     const [form, setForm] = useState({ username: "", password: "" });
+//     const [error, setError] = useState("");
+//     const [loading, setLoading] = useState(false);
+
+//     const handleChange = (e) => {
+//         const { name, value } = e.target;
+//         setForm((prev) => ({ ...prev, [name]: value }));
+//     };
+
+//     const handleLogin = async (e) => {
+//         e.preventDefault();
+//         setError("");
+//         setLoading(true);
+
+//         try {
+//             const loginRes = await axios.post(
+//                 `http://localhost:8000/saas/${clientId}/users/login`,
+//                 {
+//                     username: form.username,
+//                     password: form.password,
+//                 }
+//             );
+
+//             const token = loginRes.data.data.access_token;
+//             const decoded = jwtDecode(token);
+
+//             localStorage.setItem("access_token", token);
+//             localStorage.setItem("clientId", decoded.client_id);
+//             localStorage.setItem("username", decoded.username);
+
+//             if (decoded.grants) {
+//                 localStorage.setItem("grants", JSON.stringify(decoded.grants));
+//                 console.log("Grants saved:", decoded.grants);
+//             } else {
+//                 localStorage.setItem("grants", JSON.stringify([]));
+//                 console.warn("No grants found in token");
+//             }
+
+//             toast.success("Login successful");
+
+//             navigate(`/saas/${clientId}/main`);
+//         } catch (err) {
+//             console.error("Login error:", err?.response?.data);
+//             const msg = err?.response?.data?.detail;
+//             setError(msg || "Invalid credentials");
+//         } finally {
+//             setLoading(false);
+//         }
+//     };
+
+//     return (
+//         <div className="login-page">
+//             <div className="login-card">
+//                 <div className="avatar-circle">
+//                     <FaUser className="avatar-icon" />
+//                 </div>
+//                 <form onSubmit={handleLogin}>
+//                     <div className="input-group">
+//                         <FaUser className="input-icon" />
+//                         <input
+//                             type="text"
+//                             name="username"
+//                             placeholder="Username"
+//                             value={form.username}
+//                             onChange={handleChange}
+//                             required
+//                         />
+//                     </div>
+//                     <div className="input-group">
+//                         <FaLock className="input-icon" />
+//                         <input
+//                             type="password"
+//                             name="password"
+//                             placeholder="Password"
+//                             value={form.password}
+//                             onChange={handleChange}
+//                             required
+//                         />
+//                     </div>
+
+//                     <div className="options-row">
+//                         <span onClick={() => navigate(`/saas/${clientId}/forgot`)}>Forgot Password?</span>
+//                     </div>
+
+//                     {error && <p className="error">{error}</p>}
+
+//                     <button type="submit" className="login-button" disabled={loading}>
+//                         {loading ? "Logging in..." : "LOGIN"}
+//                     </button>
+//                     <p className="login-link">
+//                         Don’t have an account?{" "}
+//                         <span onClick={() => navigate(`/saas/${clientId}/register`)}>Register here</span>
+//                     </p>
+//                 </form>
+//             </div>
+//         </div>
+//     );
+// }
+
+// 
+
+
 import "../styles/Login.css";
 import React, { useState } from "react";
-import { useNavigate } from "react-router-dom";
+import { useNavigate, useParams } from "react-router-dom";
 import axios from "axios";
 import { jwtDecode } from "jwt-decode";
 import { FaUser, FaLock } from "react-icons/fa";
-import { toast } from 'react-toastify';
-import 'react-toastify/dist/ReactToastify.css';
-
+import { toast } from "react-toastify";
+import "react-toastify/dist/ReactToastify.css";
 
 export default function Login() {
     const navigate = useNavigate();
+    const { clientId } = useParams();
     const [form, setForm] = useState({ username: "", password: "" });
     const [error, setError] = useState("");
     const [loading, setLoading] = useState(false);
@@ -632,17 +882,7 @@ export default function Login() {
         setLoading(true);
 
         try {
-            const clientCode = form.clientCode;
-            const clientRes = await axios.post(
-                `http://localhost:8000/saas/${clientCode}/users/client-id-by-credentials`,
-                {
-                    username: form.username,
-                    password: form.password,
-                }
-            );
-            const clientId = clientRes.data.client_id;
-
-            const loginRes = await axios.post(
+            const res = await axios.post(
                 `http://localhost:8000/saas/${clientId}/users/login`,
                 {
                     username: form.username,
@@ -650,35 +890,22 @@ export default function Login() {
                 }
             );
 
-            const token = loginRes.data.data.access_token;
+            const token = res.data.data.access_token;
             const decoded = jwtDecode(token);
 
             localStorage.setItem("access_token", token);
             localStorage.setItem("clientId", decoded.client_id);
             localStorage.setItem("username", decoded.username);
+            localStorage.setItem("grants", JSON.stringify(decoded.grants || []));
 
-            if (decoded.grants) {
-                localStorage.setItem("grants", JSON.stringify(decoded.grants));
-                console.log("Grants saved:", decoded.grants);
-            } else {
-                localStorage.setItem("grants", JSON.stringify([]));
-                console.warn("No grants found in token");
-            }
-            toast.success("Login successful", {
-                position: "top-right",
-                autoClose: 3000,
-                hideProgressBar: false,
-                closeOnClick: true,
-                pauseOnHover: true,
-                draggable: true,
-                progress: undefined,
-            });
+            toast.success("Login successful");
 
             navigate(`/saas/${clientId}/main`);
         } catch (err) {
-            console.error("Login error:", err?.response?.data);
-            const msg = err?.response?.data?.detail;
-            setError(msg || "Invalid credentials");
+            console.error("Login failed:", err?.response?.data);
+            const msg = err?.response?.data?.detail || "Invalid credentials";
+            setError(msg);
+            toast.error(msg);
         } finally {
             setLoading(false);
         }
@@ -690,6 +917,7 @@ export default function Login() {
                 <div className="avatar-circle">
                     <FaUser className="avatar-icon" />
                 </div>
+
                 <form onSubmit={handleLogin}>
                     <div className="input-group">
                         <FaUser className="input-icon" />
@@ -702,6 +930,7 @@ export default function Login() {
                             required
                         />
                     </div>
+
                     <div className="input-group">
                         <FaLock className="input-icon" />
                         <input
@@ -715,8 +944,7 @@ export default function Login() {
                     </div>
 
                     <div className="options-row">
-
-                        <span onClick={() => navigate(`/saas/${form.username || "demo"}/forgot`)}>Forgot Password?</span>
+                        <span onClick={() => navigate(`/saas/${clientId}/forgot`)}>Forgot Password?</span>
                     </div>
 
                     {error && <p className="error">{error}</p>}
@@ -724,9 +952,10 @@ export default function Login() {
                     <button type="submit" className="login-button" disabled={loading}>
                         {loading ? "Logging in..." : "LOGIN"}
                     </button>
+
                     <p className="login-link">
                         Don’t have an account?{" "}
-                        <span onClick={() => navigate(`/saas/${form.clientCode || ":clientId"}/register`)}>Register here</span>
+                        <span onClick={() => navigate(`/saas/${clientId}/register`)}>Register here</span>
                     </p>
                 </form>
             </div>
