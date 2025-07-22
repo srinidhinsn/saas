@@ -10,7 +10,7 @@ app = FastAPI()
 logging.config.dictConfig(LOGGING_CONFIG)
 logger = logging.getLogger(__name__)
 
-app.include_router(table_router, prefix="/saas/{client_id}/documents")
+app.include_router(table_router, prefix="/saas/{client_id}/document")
 
 @app.middleware("http")
 async def log_requests(request: Request, call_next):
@@ -21,7 +21,7 @@ async def log_requests(request: Request, call_next):
     logger.info(f"Request processed time: {request.method} {request.url} - Response: {response.status_code} - Time: {process_time: .4f}s")
     return response
 
-@app.get("/saas/{client_id}/documents/")
+@app.get("/saas/{client_id}/document/")
 async def read_root():
     return {"message": "document Service is Running"}
 
