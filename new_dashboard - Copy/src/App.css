@@ -64,6 +64,17 @@ body.sidebar-minimized .sidebar li span {
   font-weight: 700;
   border: 1px solid #DADAE6;
 }
+.sidebar .menu li .arrow-indicator {
+  margin-left: auto;
+  display: flex;
+  align-items: center;
+  color: #999;
+  font-size: 18px;
+  transition: transform 0.3s ease;
+}
+.sidebar .menu li.page-active .arrow-indicator {
+  display: none;
+}
 .sidebar .menu li svg {
   font-size: 15px;
 }
@@ -74,19 +85,6 @@ body.sidebar-minimized .sidebar li span {
   background: rgb(21, 175, 163);
   color: red;
   font-weight: 700;
-}
-
-.sidebar .menu li .arrow-indicator {
-  margin-left: auto;
-  display: flex;
-  align-items: center;
-  color: #999;
-  font-size: 18px;
-  transition: transform 0.3s ease;
-}
-
-.sidebar .menu li.page-active .arrow-indicator {
-  display: none;
 }
 
 @media screen and (max-width: 1024px) {

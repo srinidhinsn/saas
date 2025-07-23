@@ -70,6 +70,19 @@ body.sidebar-minimized .sidebar li span {
                 border: 1px solid #DADAE6;
             }
 
+            .arrow-indicator {
+                margin-left: auto;
+                display: flex;
+                align-items: center;
+                color: #999;
+                font-size: 18px;
+                transition: transform 0.3s ease;
+            }
+
+            &.page-active .arrow-indicator {
+                display: none;
+            }
+
             svg {
                 font-size: 15px;
             }
@@ -90,18 +103,18 @@ body.sidebar-minimized .sidebar li span {
     }
 }
 
-.sidebar .menu li .arrow-indicator {
-    margin-left: auto;
-    display: flex;
-    align-items: center;
-    color: #999;
-    font-size: 18px;
-    transition: transform 0.3s ease;
-}
+// .sidebar .menu li .arrow-indicator {
+//     margin-left: auto;
+//     display: flex;
+//     align-items: center;
+//     color: #999;
+//     font-size: 18px;
+//     transition: transform 0.3s ease;
+// }
 
-.sidebar .menu li.page-active .arrow-indicator {
-    display: none;
-}
+// .sidebar .menu li.page-active .arrow-indicator {
+//     display: none;
+// }
 
 @media screen and (max-width: 1024px) {
     .sidebar {
