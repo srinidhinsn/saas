@@ -315,21 +315,25 @@ import { useParams } from "react-router-dom";
 import { useTheme } from "../ThemeChangerComponent/ThemeContext";
 
 const OrdersVisiblePage = () => {
-    const { clientId } = useParams();
-    const [orders, setOrders] = useState([]);
-    const [loading, setLoading] = useState(true);
-    const [expandedOrderIndex, setExpandedOrderIndex] = useState(null);
-    const { darkMode } = useTheme();
-    const token = localStorage.getItem("access_token");
+    const { clientId } = useParams();                                                            // extract clientId from URL
+    const [orders, setOrders] = useState([]);                                                    // store orders
+    const [loading, setLoading] = useState(true);                                                // loader flag
+    const [expandedOrderIndex, setExpandedOrderIndex] = useState(null);                          // which order is expanded
+    const { darkMode } = useTheme();                                                             // check if dark mode is enabled
+    const token = localStorage.getItem("access_token");                                          // get token from local storage
 
+
+    //Theme Effect(dark & light theme)
     useEffect(() => {
         document.body.setAttribute("data-theme", darkMode ? "dark" : "light");
     }, [darkMode]);
 
+    //Fetching orders
     useEffect(() => {
         const fetchOrders = async () => {
+            //no accesstoken no access
             if (!token) {
-                console.error("❌ Access token not found.");
+                console.error(" Access token not found");
                 setLoading(false);
                 return;
             }
@@ -343,10 +347,11 @@ const OrdersVisiblePage = () => {
                         },
                     }
                 );
-                console.log("✅ Orders:", response.data);
+                console.log("Placed Orders:", response.data);
+                //on success ...orders are stored in state (orders) else it returns empty array
                 setOrders(response.data?.data || []);
                 setLoading(false);
-            } catch (error) {
+            } catch (error) { //if it fails shows an error
                 console.error("❌ Error fetching dine-in orders:", error);
                 setLoading(false);
             }
@@ -357,10 +362,14 @@ const OrdersVisiblePage = () => {
         }
     }, [clientId]);
 
+
+    //Expands/collapses the details for a particular order
     const toggleExpand = (index) => {
         setExpandedOrderIndex(index === expandedOrderIndex ? null : index);
     };
 
+
+    //Change Order Status
     const handleStatusChange = async (orderId, newStatus) => {
         const order = orders.find((o) => o.id === orderId);
         if (!order || order.status === "served") return;
@@ -372,6 +381,7 @@ const OrdersVisiblePage = () => {
                     id: orderId,
                     client_id: clientId,
                     status: newStatus,
+                    invoice_status: newStatus === "served" ? "paid" : undefined,
                 },
                 {
                     headers: {
@@ -380,6 +390,20 @@ const OrdersVisiblePage = () => {
                 }
             );
 
+            // if (newStatus === "served") {
+            //     await axios.post(
+            //         `http://localhost:8003/saas/${clientId}/dinein/update`,
+            //         {
+            //             order_id: orderId,
+            //             invoice_status: "paid",
+            //         },
+            //         {
+            //             headers: {
+            //                 Authorization: `Bearer ${token}`,
+            //             },
+            //         }
+            //     );
+            // }
             setOrders((prev) =>
                 prev.map((o) =>
                     o.id === orderId ? { ...o, status: newStatus } : o
@@ -387,6 +411,63 @@ const OrdersVisiblePage = () => {
             );
         } catch (err) {
             console.error("❌ Failed to update status", err);
+        }
+    };
+    const handleItemStatusChange = async (orderId, itemId, newStatus) => {
+        try {
+            await axios.post(`http://localhost:8003/saas/${clientId}/dinein/item/update`, {
+                order_id: orderId,
+                item_id: itemId,
+                status: newStatus
+            }, {
+                headers: {
+                    Authorization: `Bearer ${token}`,
+                }
+            });
+
+            setOrders((prev) =>
+                prev.map((order) =>
+                    order.id === orderId
+                        ? {
+                            ...order,
+                            items: order.items.map((item) =>
+                                item.item_id === itemId ? { ...item, status: newStatus } : item
+                            ),
+                        }
+                        : order
+                )
+            );
+        } catch (err) {
+            console.error("❌ Failed to update item status", err);
+        }
+    };
+
+    const cancelItem = async (orderId, itemId) => {
+        try {
+            await axios.post(`http://localhost:8003/saas/${clientId}/dinein/item/update`, {
+                order_id: orderId,
+                item_id: itemId,
+                status: "cancelled"
+            }, {
+                headers: {
+                    Authorization: `Bearer ${token}`,
+                }
+            });
+
+            setOrders((prev) =>
+                prev.map((order) =>
+                    order.id === orderId
+                        ? {
+                            ...order,
+                            items: order.items.map((item) =>
+                                item.item_id === itemId ? { ...item, status: "cancelled" } : item
+                            ),
+                        }
+                        : order
+                )
+            );
+        } catch (err) {
+            console.error("❌ Failed to cancel item", err);
         }
     };
 
@@ -433,7 +514,13 @@ const OrdersVisiblePage = () => {
                                                 <td data-label="Items">
                                                     {order.items?.map((item) => item.name || item.item_id).filter(Boolean).join(", ") || "-"}
                                                 </td>
-                                                <td data-label="Status" className="status"> {order.status} </td>
+                                                <td
+                                                    data-label="Status"
+                                                    className={`status ${order.status?.toLowerCase()}`}
+                                                >
+                                                    {order.status}
+                                                </td>
+
                                                 <td data-label="Action">
                                                     <button
                                                         className="btn toggle"
@@ -474,14 +561,37 @@ const OrdersVisiblePage = () => {
                                                                 <tbody>
                                                                     {order.items?.map((item, idx) => (
                                                                         <tr key={idx}>
-                                                                            <td>{item?.name ?? item?.item_id ?? "-"}</td>
-                                                                            <td>{item?.order_id ?? order.id}</td>
-                                                                            <td>{order?.table_id ?? "-"}</td>
-                                                                            <td>{item?.quantity ?? 1}</td>
-                                                                            <td>{item?.status ?? "-"}</td>
+                                                                            <td data-label="Item">{item?.name ?? item?.item_id ?? "-"}</td>
+                                                                            <td data-label="Order ID">{item?.order_id ?? order.id}</td>
+                                                                            <td data-label="Table ID">{order?.table_id ?? "-"}</td>
+                                                                            <td data-label="Quantity">{item?.quantity ?? 1}</td>
+                                                                            <td data-label="Status">
+                                                                                <span className={`tag ${item.status}`}>{item.status}</span>
+                                                                            </td>
+                                                                            <td data-label="Actions">
+                                                                                {["new", "preparing", "served"].map((status) => (
+                                                                                    <button
+                                                                                        key={status}
+                                                                                        className={`btn-sm ${item.status === status ? "active" : ""}`}
+                                                                                        onClick={() => handleItemStatusChange(order.id, item.item_id, status)}
+                                                                                        disabled={item.status === "served" || item.status === "cancelled"}
+                                                                                    >
+                                                                                        {status}
+                                                                                    </button>
+                                                                                ))}
+                                                                                <button
+                                                                                    className="btn-sm cancel"
+                                                                                    onClick={() => cancelItem(order.id, item.item_id)}
+                                                                                    disabled={item.status === "cancelled"}
+                                                                                >
+                                                                                    Cancel
+                                                                                </button>
+                                                                            </td>
                                                                         </tr>
+
                                                                     ))}
                                                                 </tbody>
+
                                                             </table>
                                                         </div>
                                                     </td>

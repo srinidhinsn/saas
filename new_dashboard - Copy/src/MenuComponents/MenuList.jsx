@@ -1621,6 +1621,7 @@
 
 
 
+
 import React, { useEffect, useState } from "react";
 import axios from "axios";
 import AddMenuForm from './AddMenuForm';
@@ -1631,10 +1632,26 @@ function InventoryItemList({ clientId, selectedCategory }) {
   const [showEditModal, setShowEditModal] = useState(false);
   const [deleteTarget, setDeleteTarget] = useState(null);
   const [showAddModal, setShowAddModal] = useState(false);
-  const [originalItems, setOriginalItems] = useState([]);
+  const [originalItems, setOriginalItems] = useState([]); // ✅ Add this
 
   const token = localStorage.getItem("access_token");
   const headers = { Authorization: `Bearer ${token}` };
+
+  const [categories, setCategories] = useState([]);
+
+  useEffect(() => {
+    if (!token || !clientId) return;
+
+    axios.get(`http://localhost:8002/saas/${clientId}/inventory/read_category?client_id=${clientId}`, {
+      headers: { Authorization: `Bearer ${token}` },
+    })
+      .then((res) => {
+        setCategories(res.data.data || []);
+      })
+      .catch((err) => {
+        console.error("Error fetching categories:", err);
+      });
+  }, [clientId]);
 
   useEffect(() => {
     if (!clientId || !token) return;
@@ -1767,25 +1784,199 @@ function InventoryItemList({ clientId, selectedCategory }) {
             <form onSubmit={(e) => {
               e.preventDefault();
               handleEditSave();
-            }} className="add-menu-item-form">
-              <div className="form-row">
-                <input
-                  type="text"
-                  value={editingItem.name}
-                  onChange={(e) => setEditingItem({ ...editingItem, name: e.target.value })}
-                  placeholder="Name"
-                  className="form-input"
-                  required
-                />
-                <input
-                  type="number"
-                  value={editingItem.price}
-                  onChange={(e) => setEditingItem({ ...editingItem, price: e.target.value })}
-                  placeholder="Price"
-                  className="form-input"
-                  required
-                />
+            }}>
+
+              <div className="form-entry-wrapper">
+                <div className="form-row">
+                  <input
+                    type="text"
+                    value={editingItem.inventory_id}
+                    onChange={(e) => setEditingItem({ ...editingItem, inventory_id: e.target.value })}
+                    placeholder="Inventory ID"
+                    className="form-input short"
+                    readOnly
+                  />
+                  <input
+                    type="text"
+                    value={editingItem.line_item_id}
+                    onChange={(e) => setEditingItem({ ...editingItem, line_item_id: e.target.value })}
+                    placeholder="Line Item IDs (comma-separated)"
+                    className="form-input"
+                    readOnly
+                  />
+                  <label htmlFor="">Name : </label>
+                  <input
+                    type="text"
+                    value={editingItem.name}
+                    onChange={(e) => setEditingItem({ ...editingItem, name: e.target.value })}
+                    placeholder="Name"
+                    className="form-input"
+                  />
+                  <label htmlFor="">Description : </label>
+                  <input
+                    value={editingItem.description}
+                    onChange={(e) => setEditingItem({ ...editingItem, description: e.target.value })}
+                    placeholder="Description"
+                    className="form-input"
+                  />
+
+                </div>
+
+                <div className="form-row">
+                  <label htmlFor="">Categories :</label>
+                  <select
+                    value={editingItem.category_id}
+                    onChange={(e) => setEditingItem({ ...editingItem, category_id: e.target.value })}
+                    className="form-input"
+                  >
+                    <option value="">Select Category</option>
+                    {categories.map((cat) => (
+                      <option key={cat.id} value={cat.id}>
+                        {cat.name}
+                      </option>
+                    ))}
+                  </select>
+
+                  <label htmlFor="">Realm :</label>
+                  <input
+                    value={editingItem.realm}
+                    onChange={(e) => setEditingItem({ ...editingItem, realm: e.target.value })}
+                    placeholder="Realm"
+                    className="form-input"
+                  />
+                  <label htmlFor="">Dietary : </label>
+                  <select
+                    value={editingItem.dietary_type}
+                    onChange={(e) => setEditingItem({ ...editingItem, dietary_type: e.target.value })}
+                    className="form-input"
+                  >
+                    <option value="">Select Dietary Type</option>
+                    <option value="veg">Veg</option>
+                    <option value="non-veg">NonVeg</option>
+                  </select>
+
+                  <label htmlFor="">Availability :</label>
+                  <input
+                    value={editingItem.availability}
+                    onChange={(e) => setEditingItem({ ...editingItem, availability: e.target.value })}
+                    placeholder="Availability"
+                    type="number"
+                    className="form-input short"
+                  />
+
+                  <label htmlFor="">Units :</label>
+                  <input
+                    value={editingItem.unit}
+                    onChange={(e) => setEditingItem({ ...editingItem, unit: e.target.value })}
+                    placeholder="Unit (e.g. kg, pcs)"
+                    className="form-input short"
+                  />
+                </div>
+
+                <div className="form-row">
+                  <label htmlFor=""> Unit Price :</label>
+                  <input
+                    type="number"
+                    value={editingItem.unit_price}
+                    onChange={(e) => setEditingItem({ ...editingItem, unit_price: e.target.value })}
+                    placeholder="Price"
+                    className="form-input"
+                  />
+
+                  <label htmlFor="">CST :</label>
+                  <input
+                    type="number"
+                    value={editingItem.unit_cst}
+                    onChange={(e) => setEditingItem({ ...editingItem, unit_cst: e.target.value })}
+                    placeholder="Unit CST"
+                    className="form-input short"
+                  />
+
+                  <label htmlFor="">GST :</label>
+                  <input
+                    type="number"
+                    value={editingItem.unit_gst}
+                    onChange={(e) => setEditingItem({ ...editingItem, unit_gst: e.target.value })}
+                    placeholder="Unit GST"
+                    className="form-input short"
+                  />
+
+                  <label htmlFor="">Total Price : </label>
+                  <input
+                    type="number"
+                    value={editingItem.unit_total_price}
+                    onChange={(e) => setEditingItem({ ...editingItem, unit_total_price: e.target.value })}
+                    placeholder="Unit Total Price"
+                    className="form-input short"
+                  />
+                </div>
+
+
+                <div className="form-row">
+                  <label htmlFor="">Total Price :</label>
+                  <input
+                    type="number"
+                    value={editingItem.price}
+                    onChange={(e) => setEditingItem({ ...editingItem, price: e.target.value })}
+                    placeholder="Price"
+                    className="form-input short"
+                  />
+
+                  <label htmlFor="">Total GST :</label>
+                  <input
+                    type="number"
+                    value={editingItem.cst}
+                    onChange={(e) => setEditingItem({ ...editingItem, cst: e.target.value })}
+                    placeholder="CST"
+                    className="form-input short"
+                  />
+
+                  <label htmlFor="">Total GST :</label>
+                  <input
+                    type="number"
+                    value={editingItem.gst}
+                    onChange={(e) => setEditingItem({ ...editingItem, gst: e.target.value })}
+                    placeholder="GST"
+                    className="form-input short"
+                  />
+
+                  <label htmlFor="">Discount :</label>
+                  <input
+                    type="number"
+                    value={editingItem.discount}
+                    onChange={(e) => setEditingItem({ ...editingItem, discount: e.target.value })}
+                    placeholder="Discount"
+                    className="form-input short"
+                  />
+
+                  <label htmlFor="">Total Price :</label>
+                  <input
+                    type="number"
+                    value={editingItem.total_price}
+                    onChange={(e) => setEditingItem({ ...editingItem, total_price: e.target.value })}
+                    placeholder="Total Price"
+                    className="form-input short"
+                  />
+
+                  <label htmlFor="">Slug :</label>
+                  <input
+                    value={editingItem.slug}
+                    onChange={(e) => setEditingItem({ ...editingItem, slug: e.target.value })}
+                    placeholder="Slug"
+                    className="form-input"
+                  />
+                  <button
+                    type="button"
+                    className="btn-cancel-row"
+                    onClick={() => handleCancel(index)}
+                  >
+                    Cancel
+                  </button>
+                </div>
               </div>
+
+
+
               <div className="form-actions">
                 <button type="submit" className="btn-add">Save</button>
                 <button type="button" className="btn-cancel" onClick={() => setShowEditModal(false)}>Cancel</button>

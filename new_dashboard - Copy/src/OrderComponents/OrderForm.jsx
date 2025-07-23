@@ -69,9 +69,9 @@ const OrderForm = ({ table, onOrderCreated }) => {
 
     const generateNextOrderId = () => {
         let count = parseInt(localStorage.getItem("order_id_counter") || "2", 10); // Start from 2
-        count += 1; // First will be ORDER_3
+        count += 1;
         localStorage.setItem("order_id_counter", count);
-        return `ORDER_${count}`;  // ORDER_3, ORDER_4, ...
+        return `order_${count}`;
     };
 
     const generateNextInvoiceId = () => {

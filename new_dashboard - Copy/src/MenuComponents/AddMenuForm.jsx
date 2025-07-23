@@ -914,6 +914,7 @@ function AddInventoryItemForm({ onItemCreated }) {
     const updated = [...items];
     updated[index][field] = value ?? "";
     setItems(updated);
+
   };
 
   const handleAddItem = () => {
@@ -944,11 +945,9 @@ function AddInventoryItemForm({ onItemCreated }) {
       const responses = await Promise.all(
         items.map(async (item) => {
           const payload = {
-
-            ...item, client_id: clientId,
-            line_item_id: item.line_item_id
-              ? item.line_item_id.split(",").map((id) => parseInt(id.trim()))
-              : [],
+            ...item,
+            client_id: clientId,
+            line_item_id: item.line_item_id ? item.line_item_id.split(",").map((id) => parseInt(id.trim())) : [],
             availability: parseInt(item.availability) || 0,
             unit_price: parseFloat(item.unit_price) || 0,
             unit_cst: parseFloat(item.unit_cst) || 0,
