@@ -423,8 +423,8 @@ export default function Register() {
                         className="form-input"
                     >
                         <option value="">Select Role</option>
-                        <option value="admin">Admin</option>
-                        <option value="waiter">Waiter</option>
+                        <option value="Admin">Admin</option>
+                        <option value="Waiter">Waiter</option>
                     </select>
 
                     <label>Grants Service:</label>

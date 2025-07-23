@@ -141,6 +141,7 @@ import { FaHamburger, FaCashRegister, FaRegMoneyBillAlt } from "react-icons/fa";
 import { MdOutlineMenuBook, MdOutlineRateReview, MdOutlineTableBar } from "react-icons/md";
 import { FcComboChart } from "react-icons/fc";
 import { FaKitchenSet, FaFileInvoiceDollar, FaUserPlus, FaTableCells } from "react-icons/fa6";
+import { MdKeyboardArrowRight } from "react-icons/md";
 
 const Navbar = () => {
     const navigate = useNavigate();
@@ -198,33 +199,42 @@ const Navbar = () => {
             <div className="brand">DineIn Software</div>
             <ul className="menu">
                 <li title="Dashboard" onClick={() => go('/')} className={isActive('/main') ? 'page-active' : ''}>
-
-
-                    <GiHamburgerMenu /><span>Dashboard</span>
+                    <GiHamburgerMenu />
+                    <span>Dashboard</span>
+                    {!isActive('/main') && <span className="arrow-indicator"><MdKeyboardArrowRight /></span>}
                 </li>
+
                 <li title="Order" onClick={() => go('/orders-view')} className={isActive('/main/orders-view') ? 'page-active' : ''}>
-                    <FaHamburger /><span>Order</span>
+                    <FaHamburger /><span>Order </span>
+                    {!isActive('/main/orders-view') && <span className="arrow-indicator"><MdKeyboardArrowRight /></span>}
                 </li>
                 <li title="Table Management" onClick={() => go('/table-selection')} className={isActive('/main/table-selection') ? 'page-active' : ''}>
                     <MdOutlineTableBar /><span>Table Management</span>
+                    {!isActive('/main/table-selection') && <span className="arrow-indicator"><MdKeyboardArrowRight /></span>}
                 </li>
                 <li title="Table Selection" onClick={() => go('/view-tables')} className={isActive('/main/view-tables') ? 'page-active' : ''}>
                     <FaTableCells /><span>Table Selection</span>
+                    {!isActive('/main/view-tables') && <span className="arrow-indicator"><MdKeyboardArrowRight /></span>}
                 </li>
                 <li title="Menu" onClick={() => go('/menu-page')} className={isActive('/main/menu-page') ? 'page-active' : ''}>
                     <MdOutlineMenuBook /><span>Menu</span>
+                    {!isActive('/main/menu-page') && <span className="arrow-indicator"><MdKeyboardArrowRight /></span>}
                 </li>
                 {/* <li title="Combos" onClick={() => go('/combo-page')} className={startsWith('/combo-page') ? 'page-active' : ''}>
                     <FcComboChart /><span>Combos</span>
+                    {!isActive('/main/orders-view') && <span className="arrow-indicator"><MdKeyboardArrowRight /></span>}
                 </li> */}
                 <li title="KDS" onClick={() => go('/kds-page')} className={isActive('/main/kds-page') ? 'page-active' : ''}>
                     <FaKitchenSet /><span>KDS</span>
+                    {!isActive('/main/kds-page') && <span className="arrow-indicator"><MdKeyboardArrowRight /></span>}
                 </li>
                 <li title="Invoice" onClick={() => go('/invoice')} className={isActive('/main/invoice') ? 'page-active' : ''}>
                     <FaFileInvoiceDollar /><span>Invoice</span>
+                    {!isActive('/main/invoice') && <span className="arrow-indicator"><MdKeyboardArrowRight /></span>}
                 </li>
                 <li title="Add Users" onClick={() => go('/add-users')} className={isActive('/main/add-users') ? 'page-active' : ''}>
                     <FaUserPlus /><span>Add Users</span>
+                    {!isActive('/main/add-users') && <span className="arrow-indicator"><MdKeyboardArrowRight /></span>}
                 </li>
             </ul>
         </aside>

@@ -463,7 +463,7 @@ const ViewTables = ({ onOrderUpdate }) => {
     const { tableId } = useParams();
     const [searchParams, setSearchParams] = useSearchParams();
     const modeFromParams = searchParams.get("mode") || "table";
-    const { clientId } = useParams();
+    const { clientId } = useParams();//useParams() hook in React (specifically from React Router) is used to access URL parameters defined in your application's routes.
     const [tables, setTables] = useState([]);
     const [selectedTable, setSelectedTable] = useState(null);
     const [categories, setCategories] = useState([]);
