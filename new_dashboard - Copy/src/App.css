@@ -7,6 +7,17 @@
 
 body {
   font-family: Arial, Helvetica, sans-serif;
+  transition: all;
+}
+body::-moz-selection {
+  color: aqua;
+  background: black;
+  border-radius: 10px;
+}
+body::selection {
+  color: aqua;
+  background: black;
+  border-radius: 10px;
 }
 
 .sidebar {
