@@ -91,34 +91,40 @@ body.sidebar-minimized .sidebar li span {
 
 @media screen and (max-width: 1024px) {
   .sidebar {
-    width: 80px;
+    width: 80px !important;
     min-height: 100vh;
   }
   .sidebar .brand,
-  .sidebar .menu-header {
-    display: none;
+  .sidebar .menu-header,
+  .sidebar .menu li span,
+  .sidebar .arrow-indicator {
+    display: none !important;
   }
-  .sidebar .menu li span {
-    display: none;
+  .sidebar .menu li {
+    justify-content: center;
+    padding: 12px 6px;
+  }
+  .sidebar .menu li svg {
+    font-size: 20px;
+    display: inline-block !important;
   }
 }
 @media screen and (max-width: 768px) {
   .sidebar {
+    width: 70px !important;
     min-height: 100vh;
   }
   .main {
-    padding: 10px;
+    padding: 10px !important;
   }
-  .main .main-header {
-    flex-direction: column;
-    align-items: flex-start;
-  }
+  .main .main-header,
   .main .main-title {
-    flex-direction: column;
-    align-items: flex-start;
+    flex-direction: column !important;
+    align-items: flex-start !important;
   }
   .main .charts {
-    grid-template-columns: 1fr;
+    display: grid;
+    grid-template-columns: 1fr !important;
   }
 }
 /* === Theme Variables === */
