@@ -37,20 +37,41 @@ def create_order(client_id: str, order: DineinOrderModel, context: SaasContext =
 
 
 @router.get("/dinein/table")
-def get_orders_for_table(client_id: str, table_id: str, context: SaasContext = Depends(verify_token), db: Session = Depends(get_db)):
-    orders = db.query(DBOrder).filter(DBOrder.client_id ==
-                                      client_id, DBOrder.table_id == table_id).all()
-    # order_items = db.query(DBOrderItem).filter(DBOrderItem.client_id == client_id, DBOrderItem.order_id == orders[0].order_id)
-    print("Orders - ", orders)
+def get_orders_for_table(client_id: str, table_id: Optional[str] = None, context: SaasContext = Depends(verify_token), db: Session = Depends(get_db)):
+    if table_id:
+        orders = db.query(DBOrder).filter(
+            DBOrder.client_id == client_id,
+            DBOrder.table_id == table_id
+        ).all()
+    else:
+        orders = db.query(DBOrder).filter(
+            DBOrder.client_id == client_id
+        ).all()
+
     result = []
     for order in orders:
-        print("order - ", order)
-        items = [
-            DBOrderItem.copyToModel(order)
-            for i in order.items
-        ]
-        result.append(DineinOrderModel(id=order.id, table_id=order.table_id, client_id=order.client_id,
-                                       status=order.status, created_at=order.created_at, items=items))
+        items = order.items
+        item_names = []
+        item_models = []
+
+        for item in items:
+            try:
+                item_names.append(item.name)
+            except:
+                item_names.append("Unknown")
+            item_models.append(DBOrderItem.copyToModel(item))
+
+        result.append({
+            "id": order.id,
+            "table_id": order.table_id,
+            "client_id": order.client_id,
+            "status": order.status,
+            # i have many items in single order so make it as a dictionary
+            "created_at": order.created_at,
+            "items": [i.dict() for i in item_models],
+            "total_price": order.total_price,
+            "item_names": item_names
+        })
 
     response = ResponseModel(screen_id=context.screen_id, data=result)
     return response
