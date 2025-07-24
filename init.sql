@@ -264,6 +264,8 @@ CREATE TABLE IF NOT EXISTS public.tables (
 
 ALTER TABLE public.tables OWNER TO postgres;
 
+
+
 -- Insert into DineinOrder
 INSERT INTO dinein_order (id, client_id, dinein_order_id, table_id, invoice_id, handler_id, invoice_status, price, cst, gst, discount, total_price, status)
 OVERRIDING SYSTEM VALUE VALUES
