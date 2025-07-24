@@ -327,6 +327,7 @@ const OrdersVisiblePage = () => {
     const [inventoryMap, setInventoryMap] = useState({});
     const [showDeleteModal, setShowDeleteModal] = useState(false);
     const [orderToDelete, setOrderToDelete] = useState(null);
+    const [tablesMap, setTablesMap] = useState({});
 
 
     //Theme Effect(dark & light theme)
@@ -554,6 +555,27 @@ const OrdersVisiblePage = () => {
         }
     };
 
+    useEffect(() => {
+        const fetchTables = async () => {
+            try {
+                const res = await axios.get(`http://localhost:8001/saas/${clientId}/tables/read`, {
+                    headers: { Authorization: `Bearer ${token}` }
+                });
+
+                const tableList = res.data?.data || [];
+                const map = {};
+                tableList.forEach(table => {
+                    map[table.id] = table.name;
+                });
+                setTablesMap(map);
+            } catch (error) {
+                console.error("❌ Failed to fetch tables:", error);
+            }
+        };
+
+        fetchTables();
+    }, [clientId]);
+
 
     // --------------------------------------------------------------------------- //
 
@@ -618,7 +640,8 @@ const OrdersVisiblePage = () => {
                                         <React.Fragment key={order.id || index}>
                                             <tr className="order-row">
                                                 <td data-label="#"> {index + 1} </td>
-                                                <td data-label="Table"> {order.table_id} </td>
+                                                <td data-label="Table">{tablesMap[order.table_id] || order.table_id}</td>
+
                                                 <td data-label="Items">
                                                     {order.items?.map((item) => inventoryMap[item.item_id] || item.item_id).join(", ") || "-"}
                                                 </td>
@@ -671,9 +694,9 @@ const OrdersVisiblePage = () => {
                                                             <table className="items-table">
                                                                 <thead>
                                                                     <tr>
-                                                                        <th>Item</th>
-                                                                        <th>Order ID</th>
-                                                                        <th>Table ID</th>
+                                                                        <th>Item(s)</th>
+                                                                        {/* <th>Order ID</th> */}
+                                                                        {/* <th>Table</th> */}
                                                                         <th>Quantity</th>
                                                                         <th>Status</th>
                                                                     </tr>
@@ -682,9 +705,9 @@ const OrdersVisiblePage = () => {
                                                                     {order.items?.map((item, idx) => (
 
                                                                         <tr key={idx}>
-                                                                            <td data-label="Item">{inventoryMap[item.item_id] || item.item_id}</td>
-                                                                            <td data-label="Order ID">{item?.order_id ?? order.id}</td>
-                                                                            <td data-label="Table ID">{order?.table_id ?? "-"}</td>
+                                                                            <td data-label="Item(s)">{inventoryMap[item.item_id] || item.item_id}</td>
+                                                                            {/* <td data-label="Order ID">{item?.order_id ?? order.id}</td> */}
+                                                                            {/* <td data-label="Table">{tablesMap[order.table_id] || order.table_id}</td> */}
                                                                             <td data-label="Quantity">
                                                                                 <input
                                                                                     type="number"

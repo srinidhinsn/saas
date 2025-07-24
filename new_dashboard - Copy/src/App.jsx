@@ -446,7 +446,6 @@ const App = () => {
           rtl={false}
           pauseOnFocusLoss
           draggable
-          pauseOnHover
           theme="colored" />
       </div>
     </div>

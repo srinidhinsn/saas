@@ -302,7 +302,6 @@
 
 
 // 
-
 import React, { useEffect, useState, useRef } from 'react';
 import { FaHamburger } from "react-icons/fa";
 import { RiMoneyRupeeCircleLine } from "react-icons/ri";
@@ -313,14 +312,34 @@ import { MdDeliveryDining } from "react-icons/md";
 import { BsPersonCheck } from "react-icons/bs";
 import { MdOutlineTableBar } from "react-icons/md";
 import { GoPackageDependents } from "react-icons/go";
-import Input from '../InputComponent/Input';
-import { useNavigate } from 'react-router-dom';
+import {
+    LineChart, Line, XAxis, YAxis, CartesianGrid, Tooltip, ResponsiveContainer, BarChart, Bar
+} from 'recharts';
+
+import { useNavigate, useParams } from 'react-router-dom';
+import axios from 'axios';
 
 const MainPage = () => {
     const nav = useNavigate();
+    const { clientId } = useParams(); // Extract clientId from route
     const { darkMode, toggleTheme } = useTheme();
     const [showDropdown, setShowDropdown] = useState(false);
     const dropdownRef = useRef(null);
+
+    // 📊 Dashboard stats
+    const [totalOrders, setTotalOrders] = useState(0);
+    const [pendingOrders, setPendingOrders] = useState(0);
+    const [totalEarnings, setTotalEarnings] = useState(0);
+    const [totalCustomers, setTotalCustomers] = useState(0);
+
+    const [newOrders, setNewOrders] = useState(0);
+    const [preparingOrders, setPreparingOrders] = useState(0);
+    const [servedOrders, setServedOrders] = useState(0);
+    const [chartData, setChartData] = useState([]);
+
+
+
+    const token = localStorage.getItem("access_token");
 
     useEffect(() => {
         const body = document.body;
@@ -331,7 +350,6 @@ const MainPage = () => {
         }
     }, [darkMode]);
 
-    // Close dropdown on outside click
     useEffect(() => {
         const handleClickOutside = (e) => {
             if (dropdownRef.current && !dropdownRef.current.contains(e.target)) {
@@ -354,16 +372,66 @@ const MainPage = () => {
         localStorage.clear();
         nav('/login');
     };
+
     function settings() {
-        nav('/settings')
+        nav('/settings');
     }
+
+    // 🔄 Fetch orders & calculate dashboard stats
+    useEffect(() => {
+        const fetchStats = async () => {
+            if (!token || !clientId) return;
+
+            try {
+                const res = await axios.get(`http://localhost:8003/saas/${clientId}/dinein/table`, {
+                    headers: { Authorization: `Bearer ${token}` }
+                });
+
+                const orders = res.data?.data || [];
+
+                setTotalOrders(orders.length);
+                setPendingOrders(
+                    orders.filter(o => o.status === "pending" || o.status === "preparing").length
+                );
+                setTotalEarnings(
+                    Math.round(
+                        orders.reduce((sum, o) => sum + (parseFloat(o.total_price) || 0), 0)
+                    )
+                );
+
+                setTotalCustomers(orders.length);
+                setNewOrders(orders.filter(o => o.status === "new").length);
+                setPreparingOrders(orders.filter(o => o.status === "preparing").length);
+                setServedOrders(orders.filter(o => o.status === "served").length);
+
+                //
+                const ordersByDate = {};
+                orders.forEach(order => {
+                    const date = new Date(order.created_at).toISOString().split('T')[0]; // 'YYYY-MM-DD'
+                    if (!ordersByDate[date]) {
+                        ordersByDate[date] = { date, sales: 0, count: 0 };
+                    }
+                    ordersByDate[date].sales += parseFloat(order.total_price) || 0;
+                    ordersByDate[date].count += 1;
+                });
+
+                const chartData = Object.values(ordersByDate).sort((a, b) => new Date(a.date) - new Date(b.date));
+                setChartData(chartData);
+                //
+
+            } catch (err) {
+                console.error("❌ Failed to fetch dashboard stats:", err);
+            }
+        };
+
+        fetchStats();
+    }, [clientId]);
+
     return (
         <div className="dashboard">
             <main className="main">
                 <header className="main-header">
                     <div className="actions">
-                        {/* <Input /> */}
-
                         <div className="avatar" onClick={handleAvatarClick} ref={dropdownRef} style={{ cursor: 'pointer', position: 'relative' }}>
                             👤
                             {showDropdown && (
@@ -379,35 +447,18 @@ const MainPage = () => {
                                     zIndex: 1000,
                                     minWidth: '150px',
                                 }}>
-                                    <div onClick={handleUpdateProfile} style={{
-                                        padding: '10px 15px',
-                                        cursor: 'pointer',
-                                        borderBottom: '1px solid #ccc',
-                                        fontSize: '14px',
-                                        background: 'var(--card-bg)',
-                                    }}>
+                                    <div onClick={handleUpdateProfile} style={{ padding: '10px 15px', cursor: 'pointer', borderBottom: '1px solid #ccc', fontSize: '14px', background: 'var(--card-bg)' }}>
                                         Update Profile
                                     </div>
-                                    <div onClick={settings} style={{
-                                        padding: '10px 15px',
-                                        cursor: 'pointer',
-                                        fontSize: '14px',
-                                        background: 'var(--card-bg)'
-                                    }}>
+                                    <div onClick={settings} style={{ padding: '10px 15px', cursor: 'pointer', fontSize: '14px', background: 'var(--card-bg)' }}>
                                         Settings
                                     </div>
-                                    <div onClick={handleLogout} style={{
-                                        padding: '10px 15px',
-                                        cursor: 'pointer',
-                                        fontSize: '14px',
-                                        background: 'var(--card-bg)'
-                                    }}>
+                                    <div onClick={handleLogout} style={{ padding: '10px 15px', cursor: 'pointer', fontSize: '14px', background: 'var(--card-bg)' }}>
                                         Logout
                                     </div>
                                 </div>
                             )}
                         </div>
-
                         <div className="theme-toggle-icon" onClick={toggleTheme}>
                             {darkMode ? <FiSun size={20} /> : <FiMoon size={20} />}
                         </div>
@@ -430,45 +481,47 @@ const MainPage = () => {
                     <div className="stats">
                         <div className="stat-card">
                             <div className="flexible"><div className="card-icons"><FaHamburger /></div>
-                                <div><div className="value">30</div><div className="title">Total Orders</div></div>
-                            </div><div className="sub">Active: 50</div>
+                                <div><div className="value">{totalOrders}</div><div className="title">Total Orders</div></div>
+                            </div><div className="sub">Active: {totalOrders}</div>
                         </div>
 
                         <div className="stat-card">
                             <div className="flexible"><div className="card-icons"><PiHamburgerThin /></div>
-                                <div><div className="value">10</div><div className="title">Pending Orders</div></div>
-                            </div><div className="sub">Active: 50</div>
+                                <div><div className="value">{pendingOrders}</div><div className="title">Pending Orders</div></div>
+                            </div><div className="sub">Active: {pendingOrders}</div>
                         </div>
 
                         <div className="stat-card">
                             <div className="flexible"><div className="card-icons"><RiMoneyRupeeCircleLine /></div>
-                                <div><div className="value">5000</div><div className="title">Total Earnings</div></div>
+                                <div><div className="value">₹{totalEarnings}</div>
+                                    <div className="title">Total Earnings</div></div>
                             </div><div className="sub">Bill</div>
                         </div>
 
                         <div className="stat-card">
                             <div className="flexible"><div className="card-icons"><BsPersonCheck /></div>
-                                <div><div className="value">30</div><div className="title">Customers</div></div>
-                            </div><div className="sub">Active: 15</div>
+                                <div><div className="value">{totalCustomers}</div><div className="title">Customers</div></div>
+                            </div><div className="sub">Active: {totalCustomers}</div>
                         </div>
 
                         <div className="stat-card">
                             <div className="flexible"><div className="card-icons"><MdOutlineTableBar /></div>
-                                <div><div className="value">20</div><div className="title">Dine In</div></div>
-                            </div><div className="sub">Active: 10</div>
+                                <div><div className="value">{newOrders}</div><div className="title">New</div></div>
+                            </div><div className="sub">Active: {newOrders}</div>
                         </div>
 
                         <div className="stat-card">
                             <div className="flexible"><div className="card-icons"><GoPackageDependents /></div>
-                                <div><div className="value">5</div><div className="title">Take Away</div></div>
-                            </div><div className="sub">Active: 10</div>
+                                <div><div className="value">{preparingOrders}</div><div className="title">Preparing</div></div>
+                            </div><div className="sub">Active: {preparingOrders}</div>
                         </div>
 
                         <div className="stat-card">
                             <div className="flexible"><div className="card-icons"><MdDeliveryDining /></div>
-                                <div><div className="value">5</div><div className="title">Delivery</div></div>
-                            </div><div className="sub">Active: 10</div>
+                                <div><div className="value">{servedOrders}</div><div className="title">Served</div></div>
+                            </div><div className="sub">Active: {servedOrders}</div>
                         </div>
+
                     </div>
 
                     <div className="charts">
