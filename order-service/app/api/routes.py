@@ -14,21 +14,6 @@ from typing import Optional
 
 router = APIRouter()
 
-# @router.post("/dinein/create", response_model=ResponseModel[DineinOrderModel])
-# def create_order(client_id: str, order: DineinOrderModel, context: SaasContext = Depends(verify_token), db: Session = Depends(get_db)):
-#     db_order = DBOrder(client_id=client_id, table_id=order.table_id)
-#     db.add(db_order)
-#     db.flush()
-#     for item in order.items:
-#         db_item = DBOrderItem(order_id=db_order.id, item_id=item.item_id, item_type=item.item_type, quantity=item.quantity)
-#         db.add(db_item)
-#     db.commit()
-#     db.refresh(db_order)
-#     dinein_model = DineinOrderModel(
-#         id=db_order.id, table_id=db_order.table_id, client_id=db_order.client_id, status=db_order.status,
-#         created_at=db_order.created_at, items=order.items)
-#     response    = ResponseModel(screen_id=context.screen_id, data=dinein_model)
-#     return response
 
 
 @router.post("/dinein/create", response_model=ResponseModel[DineinOrderModel])
@@ -51,66 +36,27 @@ def create_order(client_id: str, order: DineinOrderModel, context: SaasContext =
     return response
 
 
-# @router.get("/dinein/table")
-# def get_orders_for_table(client_id: str, table_id: str, context: SaasContext = Depends(verify_token), db: Session = Depends(get_db)):
-#     orders = db.query(DBOrder).filter(DBOrder.client_id ==
-#                                       client_id, DBOrder.table_id == table_id).all()
-#     # order_items = db.query(DBOrderItem).filter(DBOrderItem.client_id == client_id, DBOrderItem.order_id == orders[0].order_id)
-#     print("Orders - ", orders)
-#     result = []
-#     for order in orders:
-#         print("order - ", order)
-#         items = [
-#             DBOrderItem.copyToModel(order)
-#             for i in order.items
-#         ]
-#         result.append(DineinOrderModel(id=order.id, table_id=order.table_id, client_id=order.client_id,
-#                                        status=order.status, created_at=order.created_at, items=items))
-
-#     response = ResponseModel(screen_id=context.screen_id, data=result)
-#     return response
-
-
-# changed whole code
 @router.get("/dinein/table")
-def get_orders_for_table(client_id: str, table_id: Optional[str] = None, context: SaasContext = Depends(verify_token), db: Session = Depends(get_db)):
-    if table_id:
-        orders = db.query(DBOrder).filter(
-            DBOrder.client_id == client_id,
-            DBOrder.table_id == table_id
-        ).all()
-    else:
-        orders = db.query(DBOrder).filter(
-            DBOrder.client_id == client_id
-        ).all()
-
+def get_orders_for_table(client_id: str, table_id: str, context: SaasContext = Depends(verify_token), db: Session = Depends(get_db)):
+    orders = db.query(DBOrder).filter(DBOrder.client_id ==
+                                      client_id, DBOrder.table_id == table_id).all()
+    # order_items = db.query(DBOrderItem).filter(DBOrderItem.client_id == client_id, DBOrderItem.order_id == orders[0].order_id)
+    print("Orders - ", orders)
     result = []
     for order in orders:
-        items = order.items
-        item_names = []
-        item_models = []
-
-        for item in items:
-            try:
-                item_names.append(item.name)
-            except:
-                item_names.append("Unknown")
-            item_models.append(DBOrderItem.copyToModel(item))
-
-        result.append({
-            "id": order.id,
-            "table_id": order.table_id,
-            "client_id": order.client_id,
-            "status": order.status,
-            # i have many items in single order so make it as a dictionary
-            "created_at": order.created_at,
-            "items": [i.dict() for i in item_models],
-            "total_price": order.total_price,
-            "item_names": item_names
-        })
+        print("order - ", order)
+        items = [
+            DBOrderItem.copyToModel(order)
+            for i in order.items
+        ]
+        result.append(DineinOrderModel(id=order.id, table_id=order.table_id, client_id=order.client_id,
+                                       status=order.status, created_at=order.created_at, items=items))
 
     response = ResponseModel(screen_id=context.screen_id, data=result)
     return response
+
+
+
 
 
 @router.post("/dinein/update")
@@ -128,26 +74,7 @@ def update_order_status(client_id: str, body: DineinOrderModel, context: SaasCon
                              "message": "Status updated", "new_status": order.status})
     return response
 #
-# @router.post("/dinein/update")
-# def update_order_status(client_id: str, body: DineinOrderModel, context: SaasContext = Depends(verify_token), db: Session = Depends(get_db)):
-#     if body.id is None:
-#         raise HTTPException(status_code=400, detail="Order ID is required")
 
-#     order = db.query(DBOrder).filter(DBOrder.id == body.id,
-#                                      DBOrder.client_id == client_id).first()
-
-#     if not order:
-#         raise HTTPException(status_code=404, detail="Order not found")
-
-#     order.status = body.status.value
-#     if body.status == OrderStatusEnum.served:
-#         order.invoice_status = "unpaid"
-#     db.commit()
-#     response = ResponseModel(screen_id=context.screen_id, data={
-#         "message": "Status updated",
-#         "new_status": order.status,
-#         "invoice_status": order.invoice_status})
-#     return response
 #  -----------------------------
 
 # order_id to dinein_order_id
