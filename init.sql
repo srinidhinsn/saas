@@ -1,4 +1,4 @@
-CREATE TABLE dinein_order (
+sCREATE TABLE dinein_order (
     id bigint NOT NULL,
     client_id text,
     dinein_order_id text,

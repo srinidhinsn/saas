@@ -2,6 +2,7 @@ from typing import Optional, List
 from pydantic import BaseModel
 from datetime import datetime
 
+
 class Inventory(BaseModel):
     id: Optional[int] = None
     client_id: Optional[str] = None
@@ -9,7 +10,7 @@ class Inventory(BaseModel):
     line_item_id: Optional[List[int]] = None
     name: Optional[str] = None
     description: Optional[str] = None
-    category: Optional[str] = None
+    category_id: Optional[str] = None
     realm: Optional[str] = None
     availability: Optional[int] = None
     unit: Optional[str] = None
@@ -30,6 +31,7 @@ class Inventory(BaseModel):
 
     class Config:
         orm_mode = True
+
 
 class Category(BaseModel):
     id: Optional[str] = None
