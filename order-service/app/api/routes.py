@@ -128,26 +128,28 @@ def update_order_status(client_id: str, body: DineinOrderModel, context: SaasCon
                              "message": "Status updated", "new_status": order.status})
     return response
 #
-# @router.post("/dinein/update")
-# def update_order_status(client_id: str, body: DineinOrderModel, context: SaasContext = Depends(verify_token), db: Session = Depends(get_db)):
-#     if body.id is None:
-#         raise HTTPException(status_code=400, detail="Order ID is required")
 
-#     order = db.query(DBOrder).filter(DBOrder.id == body.id,
-#                                      DBOrder.client_id == client_id).first()
 
-#     if not order:
-#         raise HTTPException(status_code=404, detail="Order not found")
+@router.post("/dinein/update")
+def update_order_status(client_id: str, body: DineinOrderModel, context: SaasContext = Depends(verify_token), db: Session = Depends(get_db)):
+    if body.id is None:
+        raise HTTPException(status_code=400, detail="Order ID is required")
 
-#     order.status = body.status.value
-#     if body.status == OrderStatusEnum.served:
-#         order.invoice_status = "unpaid"
-#     db.commit()
-#     response = ResponseModel(screen_id=context.screen_id, data={
-#         "message": "Status updated",
-#         "new_status": order.status,
-#         "invoice_status": order.invoice_status})
-#     return response
+    order = db.query(DBOrder).filter(DBOrder.id == body.id,
+                                     DBOrder.client_id == client_id).first()
+
+    if not order:
+        raise HTTPException(status_code=404, detail="Order not found")
+
+    order.status = body.status.value
+    if body.status == OrderStatusEnum.served:
+        order.invoice_status = "unpaid"
+    db.commit()
+    response = ResponseModel(screen_id=context.screen_id, data={
+        "message": "Status updated",
+        "new_status": order.status,
+        "invoice_status": order.invoice_status})
+    return response
 #  -----------------------------
 
 # order_id to dinein_order_id
