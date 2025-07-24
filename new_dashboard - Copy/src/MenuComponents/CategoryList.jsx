@@ -959,6 +959,8 @@ import axios from "axios";
 import { FaEdit, FaTrash } from "react-icons/fa";
 import { jwtDecode } from "jwt-decode";
 import { useParams } from "react-router-dom";
+
+
 function CategoryList({ onCategorySelect }) {
   const [categories, setCategories] = useState([]);
   const [editingId, setEditingId] = useState(null);
@@ -1145,17 +1147,21 @@ function CategoryList({ onCategorySelect }) {
             onClick={() => onCategorySelect(cat)}
           >
             {cat.name}
-            <div className="category-actions">
-              <button onClick={() => startEdit(cat)} className="edit-btn">
-                <FaEdit />
-              </button>
-              <button
-                onClick={() => setDeleteTarget(cat)}
-                className="delete-btn"
-              >
-                <FaTrash />
-              </button>
-            </div>
+            <span className="category-name"></span>
+            {cat.name !== "All" && (
+              <div className="category-actions">
+
+                <button onClick={() => startEdit(cat)} className="edit-btn">
+                  <FaEdit />
+                </button>
+                <button
+                  onClick={() => setDeleteTarget(cat)}
+                  className="delete-btn"
+                >
+                  <FaTrash />
+                </button>
+              </div>
+            )}
           </li>
         ))}
       </ul>

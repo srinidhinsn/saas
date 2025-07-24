@@ -313,6 +313,9 @@ import React, { useEffect, useState } from "react";
 import axios from "axios";
 import { useParams } from "react-router-dom";
 import { useTheme } from "../ThemeChangerComponent/ThemeContext";
+import { toast } from "react-toastify";
+import "react-toastify/dist/ReactToastify.css";
+
 
 const OrdersVisiblePage = () => {
     const { clientId } = useParams();                                                            // extract clientId from URL
@@ -321,6 +324,9 @@ const OrdersVisiblePage = () => {
     const [expandedOrderIndex, setExpandedOrderIndex] = useState(null);                          // which order is expanded
     const { darkMode } = useTheme();                                                             // check if dark mode is enabled
     const token = localStorage.getItem("access_token");                                          // get token from local storage
+    const [inventoryMap, setInventoryMap] = useState({});
+    const [showDeleteModal, setShowDeleteModal] = useState(false);
+    const [orderToDelete, setOrderToDelete] = useState(null);
 
 
     //Theme Effect(dark & light theme)
@@ -351,10 +357,13 @@ const OrdersVisiblePage = () => {
                 //on success ...orders are stored in state (orders) else it returns empty array
                 setOrders(response.data?.data || []);
                 setLoading(false);
-            } catch (error) { //if it fails shows an error
-                console.error("❌ Error fetching dine-in orders:", error);
+            } catch (error) {
+                const msg = error?.response?.data?.detail || "❌ Failed to fetch dine-in orders.";
+                console.error(msg, error);
+                toast.error(msg);
                 setLoading(false);
             }
+
         };
 
         if (clientId) {
@@ -389,6 +398,7 @@ const OrdersVisiblePage = () => {
                     },
                 }
             );
+            toast.success("Item status updated");
 
             // if (newStatus === "served") {
             //     await axios.post(
@@ -410,7 +420,10 @@ const OrdersVisiblePage = () => {
                 )
             );
         } catch (err) {
-            console.error("❌ Failed to update status", err);
+            const msg = err?.response?.data?.detail || "❌ Failed to update order status.";
+            console.error(msg, err);
+            toast.error(msg);
+
         }
     };
     const handleItemStatusChange = async (orderId, itemId, newStatus) => {
@@ -467,11 +480,21 @@ const OrdersVisiblePage = () => {
                 )
             );
         } catch (err) {
-            console.error("❌ Failed to cancel item", err);
+            const msg = err?.response?.data?.detail || "❌ Failed to cancel item.";
+            console.error(msg, err);
+            toast.error(msg);
+
         }
     };
     //-------------------------------------------------- //
     const updateOrderItems = async (orderId, items) => {
+        // Step 1: Recalculate total based on quantity and item prices (from inventoryMap)
+        let updatedTotal = 0;
+        items.forEach(item => {
+            const price = inventoryMap[item.item_id]?.price || 0;
+            updatedTotal += item.quantity * price;
+        });
+
         try {
             const response = await axios.post(
                 `http://localhost:8003/saas/${clientId}/order_item/update`,
@@ -480,7 +503,8 @@ const OrdersVisiblePage = () => {
                     items: items.map(item => ({
                         item_id: item.item_id,
                         quantity: item.quantity
-                    }))
+                    })),
+                    total_price: updatedTotal, // Include total
                 },
                 {
                     headers: {
@@ -488,14 +512,73 @@ const OrdersVisiblePage = () => {
                     },
                 }
             );
-            console.log("✅ Order items updated:", response.data);
+            toast.success("✅ Order items updated");
+
+            // Update state after backend update
+            setOrders((prev) =>
+                prev.map((o) =>
+                    o.id === orderId ? { ...o, items, total_price: updatedTotal } : o
+                )
+            );
         } catch (error) {
-            console.error("❌ Failed to update order items:", error);
+            const msg = error?.response?.data?.detail || "❌ Failed to update order items.";
+            console.error(msg, error);
+            toast.error(msg);
+        }
+    };
+
+
+    // ----------------------------------------------------- //
+    const confirmDeleteOrder = async () => {
+        if (!orderToDelete) return;
+        try {
+            await axios.delete(`http://localhost:8003/saas/${clientId}/dinein/delete`, {
+                params: {
+                    dinein_order_id: orderToDelete,
+                    client_id: clientId,
+                },
+                headers: {
+                    Authorization: `Bearer ${token}`,
+                },
+            });
+
+            setOrders((prev) => prev.filter((o) => o.id !== orderToDelete));
+            setExpandedOrderIndex(null);
+            toast.success(" Order deleted");
+        } catch (err) {
+            console.error("❌ Failed to delete order", err);
+            toast.error("❌ Failed to delete order");
+        } finally {
+            setShowDeleteModal(false);
+            setOrderToDelete(null);
         }
     };
 
 
     // --------------------------------------------------------------------------- //
+
+    useEffect(() => {
+        if (!token || !clientId) return;
+
+        axios
+            .get(`http://localhost:8002/saas/${clientId}/inventory/read`, {
+                headers: { Authorization: `Bearer ${token}` },
+            })
+            .then((res) => {
+                const items = res.data.data || [];
+                console.log("📦 Inventory fetched:", items);
+                const map = {};
+                items.forEach((item) => {
+                    map[item.id] = item.name;
+
+                });
+                console.log("🧭 inventoryMap:", map);
+                setInventoryMap(map);
+            })
+            .catch((err) => {
+                console.error("Failed to load inventory for mapping:", err);
+            });
+    }, [clientId]);
     return (
         <div className="orders-page">
             <div className="orders-container">
@@ -516,13 +599,15 @@ const OrdersVisiblePage = () => {
                                 <tr>
                                     <th>#</th>
                                     <th>Table</th>
-                                    <th>Date</th>
-                                    <th>Total</th>
                                     <th>Items</th>
+                                    <th>Total</th>
+                                    <th>Invoice Status</th>
                                     <th>Status</th>
+                                    <th>Date</th>
                                     <th>Action</th>
                                 </tr>
                             </thead>
+
                             <tbody>
                                 {orders.length === 0 ? (
                                     <tr>
@@ -534,18 +619,16 @@ const OrdersVisiblePage = () => {
                                             <tr className="order-row">
                                                 <td data-label="#"> {index + 1} </td>
                                                 <td data-label="Table"> {order.table_id} </td>
-                                                <td data-label="Date"> {new Date(order.created_at).toLocaleString()} </td>
-                                                <td data-label="Total"> ₹{parseFloat(order.total_price || 0).toFixed(2)} </td>
                                                 <td data-label="Items">
-                                                    {order.items?.map((item) => item.name || item.item_id).filter(Boolean).join(", ") || "-"}
-                                                </td>
-                                                <td
-                                                    data-label="Status"
-                                                    className={`status ${order.status?.toLowerCase()}`}
-                                                >
-                                                    {order.status}
+                                                    {order.items?.map((item) => inventoryMap[item.item_id] || item.item_id).join(", ") || "-"}
                                                 </td>
 
+                                                <td data-label="Total"> ₹{parseFloat(order.total_price || 0).toFixed(2)} </td>
+                                                <td data-label="Invoice Status"> {order.invoice_status || "-"} </td>
+                                                <td data-label="Status" className={`status ${order.status?.toLowerCase()}`}>
+                                                    {order.status}
+                                                </td>
+                                                <td data-label="Date"> {new Date(order.created_at).toLocaleDateString()} </td>
                                                 <td data-label="Action">
                                                     <button
                                                         className="btn toggle"
@@ -556,6 +639,7 @@ const OrdersVisiblePage = () => {
                                                 </td>
                                             </tr>
 
+
                                             {expandedOrderIndex === index && (
                                                 <tr>
                                                     <td colSpan="7" className="order-details">
@@ -563,21 +647,11 @@ const OrdersVisiblePage = () => {
                                                             <div className="status-buttons">
                                                                 <button
                                                                     className="btn delete"
-                                                                    onClick={async () => {
-                                                                        try {
-                                                                            const confirmDelete = window.confirm("Delete this order?");
-                                                                            if (!confirmDelete) return;
-
-                                                                            await axios.delete(`http://localhost:8003/saas/${clientId}/dinein/delete`, {
-                                                                                params: { dinein_order_id: order.id, client_id: clientId },
-                                                                                headers: { Authorization: `Bearer ${token}` }
-                                                                            });
-                                                                            setOrders(prev => prev.filter(o => o.id !== order.id));
-                                                                            setExpandedOrderIndex(null);
-                                                                        } catch (err) {
-                                                                            console.error("❌ Failed to delete order", err);
-                                                                        }
+                                                                    onClick={() => {
+                                                                        setOrderToDelete(order.id);
+                                                                        setShowDeleteModal(true);
                                                                     }}
+
                                                                 >
                                                                     Delete Order
                                                                 </button>
@@ -608,7 +682,7 @@ const OrdersVisiblePage = () => {
                                                                     {order.items?.map((item, idx) => (
 
                                                                         <tr key={idx}>
-                                                                            <td data-label="Item">{item?.name ?? item?.item_id ?? "-"}</td>
+                                                                            <td data-label="Item">{inventoryMap[item.item_id] || item.item_id}</td>
                                                                             <td data-label="Order ID">{item?.order_id ?? order.id}</td>
                                                                             <td data-label="Table ID">{order?.table_id ?? "-"}</td>
                                                                             <td data-label="Quantity">
@@ -694,6 +768,21 @@ const OrdersVisiblePage = () => {
                     </div>
                 )}
             </div>
+            {showDeleteModal && (
+                <div className="delete-modal-overlay">
+                    <div className="delete-modal">
+                        <h3>Delete this order?</h3>
+                        <div className="modal-buttons">
+                            <button className="yes" onClick={confirmDeleteOrder}>Yes</button>
+                            <button className="no" onClick={() => {
+                                setShowDeleteModal(false);
+                                setOrderToDelete(null);
+                            }}>No</button>
+                        </div>
+                    </div>
+                </div>
+            )}
+
         </div>
     );
 };

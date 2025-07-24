@@ -6,6 +6,9 @@ import { BsCash, BsCreditCard, BsQrCode } from "react-icons/bs";
 // import api from '../PortExportingPage/api'
 import { useParams } from 'react-router-dom';
 import { useNavigate } from "react-router-dom";
+import { toast, ToastContainer } from 'react-toastify';
+import 'react-toastify/dist/ReactToastify.css';
+
 
 Modal.setAppElement("#root");
 
@@ -192,6 +195,8 @@ const OrderForm = ({ table, onOrderCreated }) => {
         })
 
             .then(res => {
+                toast.success("Order created!");
+
                 console.log("✅ Order placed:", res.data);
                 onOrderCreated?.(res.data);
                 navigate(`/saas/${clientId}/main/kds-page`, {

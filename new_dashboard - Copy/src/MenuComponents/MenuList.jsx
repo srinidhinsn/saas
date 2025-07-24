@@ -1622,23 +1622,24 @@
 
 
 
+
 import React, { useEffect, useState } from "react";
 import axios from "axios";
-import AddMenuForm from './AddMenuForm';
+import AddMenuForm from './AddMenuForm'; import { useParams } from "react-router-dom";
 
-function InventoryItemList({ clientId, selectedCategory }) {
+function InventoryItemList({ selectedCategory }) {
   const [items, setItems] = useState([]);
   const [editingItem, setEditingItem] = useState(null);
   const [showEditModal, setShowEditModal] = useState(false);
   const [deleteTarget, setDeleteTarget] = useState(null);
   const [showAddModal, setShowAddModal] = useState(false);
-  const [originalItems, setOriginalItems] = useState([]); // ✅ Add this
+  const [originalItems, setOriginalItems] = useState([]);
 
   const token = localStorage.getItem("access_token");
   const headers = { Authorization: `Bearer ${token}` };
 
   const [categories, setCategories] = useState([]);
-
+  const { clientId } = useParams();
   useEffect(() => {
     if (!token || !clientId) return;
 
@@ -1686,7 +1687,18 @@ function InventoryItemList({ clientId, selectedCategory }) {
   };
 
   const handleEditSave = async () => {
-    const updatedItem = { ...editingItem, client_id: clientId };
+    const updatedItem = {
+      ...editingItem,
+      client_id: clientId,
+      line_item_id: Array.isArray(editingItem.line_item_id)
+        ? editingItem.line_item_id
+        : typeof editingItem.line_item_id === "string"
+          ? editingItem.line_item_id
+            .split(",")
+            .map((s) => parseInt(s.trim()))
+            .filter((n) => !isNaN(n))
+          : [],
+    };
 
     try {
       const res = await axios.post(
@@ -1703,10 +1715,12 @@ function InventoryItemList({ clientId, selectedCategory }) {
       setShowEditModal(false);
       setEditingItem(null);
     } catch (err) {
-      console.error("Edit failed:", err);
+      console.error("Edit failed:", err.response?.data || err.message);
       alert("Edit failed.");
     }
   };
+
+
   const handleDelete = async (id) => {
     try {
       await axios.post(
@@ -1796,14 +1810,19 @@ function InventoryItemList({ clientId, selectedCategory }) {
                     className="form-input short"
                     readOnly
                   />
-                  <input
-                    type="text"
+                  <select
                     value={editingItem.line_item_id}
                     onChange={(e) => setEditingItem({ ...editingItem, line_item_id: e.target.value })}
-                    placeholder="Line Item IDs (comma-separated)"
                     className="form-input"
-                    readOnly
-                  />
+                  >
+                    <option value="">Select Addon</option>
+                    {items.map((cat) => (
+                      <option key={cat.id} value={cat.id}>
+                        {cat.name}
+                      </option>
+                    ))}
+                  </select>
+
                   <label htmlFor="">Name : </label>
                   <input
                     type="text"

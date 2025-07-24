@@ -865,9 +865,10 @@
 import React, { useState, useEffect } from "react";
 import axios from "axios";
 import { jwtDecode } from "jwt-decode";
+import { useParams } from "react-router-dom";
 
 function AddInventoryItemForm({ onItemCreated }) {
-  const clientId = localStorage.getItem("clientId");
+  const { clientId } = useParams();
   const token = localStorage.getItem("access_token");
 
   const emptyItem = {
@@ -892,13 +893,14 @@ function AddInventoryItemForm({ onItemCreated }) {
     slug: ""
   };
 
-
   const [items, setItems] = useState([{ ...emptyItem }]);
   const [categories, setCategories] = useState([]);
+  const [lineItems, setLineItems] = useState([]);
 
   useEffect(() => {
     if (!token || !clientId) return;
 
+    // Fetch categories
     axios.get(`http://localhost:8002/saas/${clientId}/inventory/read_category?client_id=${clientId}`, {
       headers: { Authorization: `Bearer ${token}` },
     })
@@ -908,14 +910,32 @@ function AddInventoryItemForm({ onItemCreated }) {
       .catch((err) => {
         console.error("Error fetching categories:", err);
       });
+
+    // Fetch line items
+    axios.get(`http://localhost:8002/saas/${clientId}/inventory/read?client_id=${clientId}`, {
+      headers: { Authorization: `Bearer ${token}` },
+    })
+      .then((res) => {
+        setLineItems(res.data.data || []);
+      })
+      .catch((err) => {
+        console.error("Error fetching line items:", err);
+      });
+
   }, [clientId]);
 
   const handleChange = (index, field, value) => {
     const updated = [...items];
     updated[index][field] = value ?? "";
     setItems(updated);
-
   };
+
+  // const handleLineItemChange = (index, selectedOptions) => {
+  //   const selectedIds = Array.from(selectedOptions).map(option => parseInt(option.value));
+  //   const updated = [...items];
+  //   updated[index].line_item_id = selectedIds;
+  //   setItems(updated);
+  // };
 
   const handleAddItem = () => {
     setItems([...items, { ...emptyItem }]);
@@ -947,8 +967,9 @@ function AddInventoryItemForm({ onItemCreated }) {
           const payload = {
             ...item,
             client_id: clientId,
-            line_item_id: item.line_item_id ? item.line_item_id.split(",").map((id) => parseInt(id.trim())) : [],
+            line_item_id: item.line_item_id ? [parseInt(item.line_item_id)] : [],
             availability: parseInt(item.availability) || 0,
+            dietary_type: ["veg", "nonveg"].includes(item.dietary_type) ? item.dietary_type : "veg",
             unit_price: parseFloat(item.unit_price) || 0,
             unit_cst: parseFloat(item.unit_cst) || 0,
             unit_gst: parseFloat(item.unit_gst) || 0,
@@ -961,6 +982,7 @@ function AddInventoryItemForm({ onItemCreated }) {
             created_by,
             updated_by,
           };
+
 
           console.log("Submitting:", payload);
 
@@ -981,9 +1003,8 @@ function AddInventoryItemForm({ onItemCreated }) {
       console.error("Submit error:", err.response?.data || err);
       alert("Error while creating inventory item(s).");
     }
-
-
   };
+
   if (!token || !clientId) {
     alert("Session expired. Please log in again.");
     return;
@@ -1001,13 +1022,20 @@ function AddInventoryItemForm({ onItemCreated }) {
               placeholder="Inventory ID"
               className="form-input short"
             />
-            <input
-              type="text"
+
+            <select
               value={item.line_item_id || ""}
               onChange={(e) => handleChange(index, "line_item_id", e.target.value)}
-              placeholder="Line Item IDs (comma-separated)"
               className="form-input"
-            />
+            >
+              <option value="">Select Addon</option>
+              {lineItems.map((cat) => (
+                <option key={cat.id} value={cat.id}>
+                  {cat.name}
+                </option>
+              ))}
+            </select>
+
             <input
               value={item.name || ""}
               onChange={(e) => handleChange(index, "name", e.target.value)}

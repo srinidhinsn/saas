@@ -902,11 +902,26 @@ export default function Login() {
 
             navigate(`/saas/${clientId}/main`);
         } catch (err) {
-            console.error("Login failed:", err?.response?.data);
-            const msg = err?.response?.data?.detail || "Invalid credentials";
+            console.error("Login failed:", err);
+
+            let msg = "An unexpected error occurred";
+            const status = err?.response?.status;
+            const detail = err?.response?.data?.detail;
+
+            if (status === 401) {
+                msg = detail || "Unauthorized: Invalid credentials";
+            } else if (status === 404) {
+                msg = detail || "Not Found: API endpoint or client not found";
+            } else if (status === 500) {
+                msg = "Internal Server Error. Please try again later.";
+            } else if (detail && typeof detail === "string") {
+                msg = detail;
+            }
+
             setError(msg);
             toast.error(msg);
-        } finally {
+        }
+        finally {
             setLoading(false);
         }
     };
@@ -947,7 +962,7 @@ export default function Login() {
                         <span onClick={() => navigate(`/saas/${clientId}/forgot`)}>Forgot Password?</span>
                     </div>
 
-                    {error && <p className="error">{error}</p>}
+                    {/* {error && <p className="error">{error}</p>} */}
 
                     <button type="submit" className="login-button" disabled={loading}>
                         {loading ? "Logging in..." : "LOGIN"}
