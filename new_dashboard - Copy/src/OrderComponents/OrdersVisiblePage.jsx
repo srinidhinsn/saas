@@ -470,7 +470,32 @@ const OrdersVisiblePage = () => {
             console.error("❌ Failed to cancel item", err);
         }
     };
+    //-------------------------------------------------- //
+    const updateOrderItems = async (orderId, items) => {
+        try {
+            const response = await axios.post(
+                `http://localhost:8003/saas/${clientId}/order_item/update`,
+                {
+                    dinein_order_id: String(orderId),
+                    items: items.map(item => ({
+                        item_id: item.item_id,
+                        quantity: item.quantity
+                    }))
+                },
+                {
+                    headers: {
+                        Authorization: `Bearer ${token}`,
+                    },
+                }
+            );
+            console.log("✅ Order items updated:", response.data);
+        } catch (error) {
+            console.error("❌ Failed to update order items:", error);
+        }
+    };
 
+
+    // --------------------------------------------------------------------------- //
     return (
         <div className="orders-page">
             <div className="orders-container">
@@ -536,6 +561,27 @@ const OrdersVisiblePage = () => {
                                                     <td colSpan="7" className="order-details">
                                                         <div className="details-wrapper">
                                                             <div className="status-buttons">
+                                                                <button
+                                                                    className="btn delete"
+                                                                    onClick={async () => {
+                                                                        try {
+                                                                            const confirmDelete = window.confirm("Delete this order?");
+                                                                            if (!confirmDelete) return;
+
+                                                                            await axios.delete(`http://localhost:8003/saas/${clientId}/dinein/delete`, {
+                                                                                params: { dinein_order_id: order.id, client_id: clientId },
+                                                                                headers: { Authorization: `Bearer ${token}` }
+                                                                            });
+                                                                            setOrders(prev => prev.filter(o => o.id !== order.id));
+                                                                            setExpandedOrderIndex(null);
+                                                                        } catch (err) {
+                                                                            console.error("❌ Failed to delete order", err);
+                                                                        }
+                                                                    }}
+                                                                >
+                                                                    Delete Order
+                                                                </button>
+
                                                                 {["pending", "preparing", "served"].map((status) => (
                                                                     <button
                                                                         key={status}
@@ -560,15 +606,47 @@ const OrdersVisiblePage = () => {
                                                                 </thead>
                                                                 <tbody>
                                                                     {order.items?.map((item, idx) => (
+
                                                                         <tr key={idx}>
                                                                             <td data-label="Item">{item?.name ?? item?.item_id ?? "-"}</td>
                                                                             <td data-label="Order ID">{item?.order_id ?? order.id}</td>
                                                                             <td data-label="Table ID">{order?.table_id ?? "-"}</td>
-                                                                            <td data-label="Quantity">{item?.quantity ?? 1}</td>
+                                                                            <td data-label="Quantity">
+                                                                                <input
+                                                                                    type="number"
+                                                                                    min="1"
+                                                                                    value={item.quantity}
+                                                                                    onChange={(e) => {
+                                                                                        const newQty = parseInt(e.target.value);
+                                                                                        const currentOrderId = order.id;
+
+                                                                                        setOrders((prev) =>
+                                                                                            prev.map((o) =>
+                                                                                                o.id === currentOrderId
+                                                                                                    ? {
+                                                                                                        ...o,
+                                                                                                        items: o.items.map((it) =>
+                                                                                                            it.item_id === item.item_id
+                                                                                                                ? { ...it, quantity: newQty }
+                                                                                                                : it
+                                                                                                        ),
+                                                                                                    }
+                                                                                                    : o
+                                                                                            )
+                                                                                        );
+                                                                                    }}
+
+                                                                                    style={{ width: "50px" }}
+                                                                                />
+                                                                            </td>
+
                                                                             <td data-label="Status">
                                                                                 <span className={`tag ${item.status}`}>{item.status}</span>
                                                                             </td>
+
+
                                                                             <td data-label="Actions">
+
                                                                                 {["new", "preparing", "served"].map((status) => (
                                                                                     <button
                                                                                         key={status}
@@ -591,7 +669,18 @@ const OrdersVisiblePage = () => {
 
                                                                     ))}
                                                                 </tbody>
-
+                                                                <tfoot>
+                                                                    <tr>
+                                                                        <td colSpan="5" style={{ textAlign: "right" }}>
+                                                                            <button
+                                                                                className="btn save-items"
+                                                                                onClick={() => updateOrderItems(order.id, order.items)}
+                                                                            >
+                                                                                Save Items
+                                                                            </button>
+                                                                        </td>
+                                                                    </tr>
+                                                                </tfoot>
                                                             </table>
                                                         </div>
                                                     </td>
