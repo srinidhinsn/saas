@@ -470,6 +470,10 @@ const ViewTables = ({ onOrderUpdate }) => {
     const [items, setItems] = useState([]);
     const [activeCategory, setActiveCategory] = useState(null);
     const [searchTerm, setSearchTerm] = useState("");
+    const [menuItems, setMenuItems] = useState([]);
+
+
+
     const token = localStorage.getItem("access_token");
     useEffect(() => {
         if (!clientId) return;
@@ -517,12 +521,32 @@ const ViewTables = ({ onOrderUpdate }) => {
                 const rawItems = res.data.data;
                 console.log("Fetched items full:", rawItems);
 
-                const enrichedItems = rawItems.map((item, index) => ({
-                    ...item,
-                    category: index % 2 === 0 ? "Rice" : "Gravy"
-                }));
+                axios.all([
+                    axios.get(`http://localhost:8002/saas/${clientId}/inventory/read_category`, {
+                        headers: { Authorization: `Bearer ${token}` },
+                    }),
+                    axios.get(`http://localhost:8002/saas/${clientId}/inventory/read`, {
+                        headers: { Authorization: `Bearer ${token}` },
+                    }),
+                ])
+                    .then(axios.spread((catRes, itemRes) => {
+                        const allCategory = { id: "all", name: "All" };
+                        const categoryList = catRes.data.data.filter(c => c.name?.toLowerCase() !== "all");
+                        setCategories([allCategory, ...categoryList]);
+                        setActiveCategory("all");
 
-                setItems(enrichedItems);
+                        const enriched = itemRes.data.data.map(item => {
+                            const cat = categoryList.find(c => c.id === item.category_id);
+                            return {
+                                ...item,
+                                category: cat ? cat.name : "Uncategorized"
+                            };
+                        });
+
+                        setItems(enriched);
+                    }))
+                    .catch(err => console.error("❌ Error fetching items/categories:", err));
+
             })
             .catch(err => console.error("❌ Error fetching menu items:", err));
 
@@ -557,6 +581,40 @@ const ViewTables = ({ onOrderUpdate }) => {
         }
     }, [tableId, tables, modeFromParams]);
 
+    useEffect(() => {
+        const fetchData = async () => {
+            try {
+                const [itemsRes, categoryRes] = await Promise.all([
+                    axios.get(`http://localhost:8000/saas/${clientId}/menu_items`),
+                    axios.get(`http://localhost:8000/saas/${clientId}/categories`)
+                ]);
+
+                const items = itemsRes.data;
+                const cats = categoryRes.data;
+
+                setCategories(cats);
+
+                const enriched = items.map(item => {
+                    const category = cats.find(c => c.id === item.category_id);
+                    return {
+                        ...item,
+                        categoryName: category ? category.name : "Uncategorized"
+                    };
+                });
+
+                setMenuItems(enriched);
+
+            } catch (error) {
+                console.error("Error fetching items/categories:", error);
+            }
+        };
+
+        fetchData();
+    }, []);
+    const groupedItems = categories.map(cat => ({
+        categoryName: cat.name,
+        items: menuItems.filter(item => item.category_id === cat.id)
+    }));
 
     const uniqueZones = Array.from(new Set(tables.map(t => t.location_zone))).filter(Boolean);
 
@@ -580,7 +638,7 @@ const ViewTables = ({ onOrderUpdate }) => {
         if (!items || !Array.isArray(items)) return [];
         return items.filter(
             i =>
-                i.category?.toLowerCase() === activeCategory.toLowerCase() &&
+                i.category?.toLowerCase() === activeCategory?.toLowerCase() &&
                 i.name.toLowerCase().includes(searchTerm.toLowerCase())
         );
     };

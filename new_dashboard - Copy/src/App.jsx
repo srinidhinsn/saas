@@ -438,7 +438,7 @@ const App = () => {
 
 
         </Routes>
-        <ToastContainer position="top-center"
+        <ToastContainer position="top-right"
           autoClose={3000}
           hideProgressBar={false}
           newestOnTop={false}
@@ -446,7 +446,7 @@ const App = () => {
           rtl={false}
           pauseOnFocusLoss
           draggable
-          theme="colored" />
+          theme="light" />
       </div>
     </div>
   );

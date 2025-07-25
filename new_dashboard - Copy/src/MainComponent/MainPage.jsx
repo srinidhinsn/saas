@@ -532,7 +532,7 @@ const MainPage = () => {
                         </div>
                         <div className="chart">
                             <div className="chart-header"><h3>Order sales</h3><input type="date" /></div>
-                            <div className="amount">€10,090.34</div>
+                            <div className="amount">₹{totalEarnings}</div>
                             <div className="growth">+5.1k this week</div>
                             <div className="chart-placeholder">[Chart]</div>
                         </div>

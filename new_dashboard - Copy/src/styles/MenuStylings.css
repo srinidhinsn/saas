@@ -431,10 +431,11 @@ input[type="checkbox"] {
 .category-list-container {
     background-color: rgb(244, 242, 239);
     border-right: 1px solid #ddd;
-    height: 100vh;
+    height: 90vh;
     overflow-y: auto;
     box-sizing: border-box;
     padding: 20px;
+
 }
 
 /* Header */
@@ -1015,9 +1016,7 @@ input[type="checkbox"] {
 
 
 /* ******************************************************************* */
-.menu-manager-container {
-    display: flex;
-}
+
 
 /* Sidebar */
 .menu-category-sidebar {
@@ -1157,6 +1156,7 @@ input[type="checkbox"] {
 .menu-items-panel {
     flex: 1;
     padding: 12px;
+    height: 90vh;
     overflow-y: auto;
     background-color: white;
     border: 1px solid #e5e7eb;
