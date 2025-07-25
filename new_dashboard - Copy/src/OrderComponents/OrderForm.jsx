@@ -188,7 +188,7 @@ const OrderForm = ({ table, onOrderCreated }) => {
 
         console.log("📦 Sending payload:", JSON.stringify(payload, null, 2));
 
-        axios.post(`http://localhost:8003/saas/${clientId}/dinein/create?client_id=${clientId}`, payload, {
+        axios.post(`http://localhost:8003/saas/${clientId}/dinein/create`, payload, {
             headers: {
                 Authorization: `Bearer ${localStorage.getItem("access_token")}`
             }
@@ -197,7 +197,7 @@ const OrderForm = ({ table, onOrderCreated }) => {
             .then(res => {
                 toast.success("Order created!");
 
-                console.log("✅ Order placed:", res.data);
+                console.log("Order placed:", res.data);
                 onOrderCreated?.(res.data);
                 navigate(`/saas/${clientId}/main/kds-page`, {
                     state: {

@@ -671,6 +671,7 @@ const OrdersVisiblePage = () => {
                                                                 <button
                                                                     className="btn delete"
                                                                     onClick={() => {
+                                                                        console.log("Clicked delete for", order.id);
                                                                         setOrderToDelete(order.id);
                                                                         setShowDeleteModal(true);
                                                                     }}

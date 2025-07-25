@@ -862,7 +862,7 @@ import axios from "axios";
 import { jwtDecode } from "jwt-decode";
 import { FaUser, FaLock } from "react-icons/fa";
 import { toast } from "react-toastify";
-import "react-toastify/dist/ReactToastify.css";
+import "react-toastify/dist/ReactToastify.css"; import { TiArrowRightThick } from "react-icons/ti";
 
 export default function Login() {
     const navigate = useNavigate();

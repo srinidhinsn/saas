@@ -295,6 +295,20 @@ body.theme-dark {
   border-radius: 10px;
   box-shadow: 0 2px 4px rgba(0, 0, 0, 0.1);
 }
+.dashboard .main .charts .chart svg {
+  overflow: visible;
+}
+.dashboard .main .charts .chart .recharts-line {
+  filter: drop-shadow(0 0 8px #ff4e94);
+}
+.dashboard .main .charts .chart .recharts-dot {
+  stroke: #fff;
+  stroke-width: 2px;
+  r: 6;
+}
+.dashboard .main .charts .chart .recharts-tooltip-wrapper {
+  z-index: 10;
+}
 .dashboard .main .charts .chart .chart-header {
   display: flex;
   justify-content: space-between;

@@ -90,7 +90,7 @@ const SaasClientRoutes = ({
                     <Route path="/" element={<MainPage />} />
                     <Route path="update-profile" element={<UpdateProfile />} />
                     <Route path="settings" element={<Settings />} />
-                    <Route path="dinein-page" element={<MenuManager clientId={clientId} />} />
+                    {/* <Route path="dinein-page" element={<MenuManager clientId={clientId} />} /> */}
                     <Route path="swiggy-page" element={<SwiggyMenuManager clientId={clientId} />} />
                     <Route path="zomato-page" element={<ZomatoMenuManager clientId={clientId} />} />
                     <Route path="menu-page" element={<MenuManager clientId={clientId} />} />

@@ -488,6 +488,24 @@ body.theme-dark {
                 border-radius: 10px;
                 box-shadow: 0 2px 4px rgba(0, 0, 0, 0.1);
 
+                svg {
+                    overflow: visible;
+                }
+
+                .recharts-line {
+                    filter: drop-shadow(0 0 8px #ff4e94);
+                }
+
+                .recharts-dot {
+                    stroke: #fff;
+                    stroke-width: 2px;
+                    r: 6;
+                }
+
+                .recharts-tooltip-wrapper {
+                    z-index: 10;
+                }
+
                 .chart-header {
                     display: flex;
                     justify-content: space-between;

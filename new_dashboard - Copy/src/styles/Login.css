@@ -79,8 +79,10 @@
 
 .login-button {
     width: 100%;
-    background: rgb(255, 199, 206);
-    color: rgb(226, 104, 118);
+    background: linear-gradient(20deg,
+            rgb(242, 80, 201),
+            rgb(149, 125, 206));
+    color: white;
     border: none;
     padding: 12px;
     border-radius: 10px;
