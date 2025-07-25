@@ -83,7 +83,7 @@ const SaasClientRoutes = ({
     }, [clientId]);
 
     return (
-        <div style={{ display: "flex" }}>
+        <div style={{ display: "flex"  }}>
             {!hideNavbar && <Navbar />}
             <div style={{ flex: 1 }}>
                 <Routes>

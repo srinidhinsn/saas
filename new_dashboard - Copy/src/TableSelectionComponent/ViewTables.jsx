@@ -615,9 +615,29 @@ const ViewTables = ({ onOrderUpdate }) => {
 
     const uniqueZones = Array.from(new Set(tables.map(t => t.location_zone))).filter(Boolean);
 
+
     const handleItemClick = (item) => {
-        document.dispatchEvent(new CustomEvent("add-item", { detail: { item } }));
-    };
+        let addonItem = null;
+      
+        if (item.line_item_id) {
+          // Find the add-on item from local menuItems list
+          addonItem = items.find(m => String(m.id) === String(item.line_item_id));
+      
+          if (addonItem) {
+            const confirmAddon = window.confirm(`Do you want to add the add-on: ${addonItem.name}?`);
+            if (!confirmAddon) {
+              addonItem = null; // User declined add-on
+            }
+          }
+        }
+      
+        // Dispatch main item + optional addonItem
+        document.dispatchEvent(new CustomEvent("add-item", {
+          detail: { item, addonItem }
+        }));
+      };
+      
+      
 
     const getItemClass = (item) => {
         const name = item.name.toLowerCase();
@@ -639,11 +659,6 @@ const ViewTables = ({ onOrderUpdate }) => {
                 i.name.toLowerCase().includes(searchTerm.toLowerCase())
         );
     };
-
-
-
-
-
 
     const handleModeClick = (mode) => {
         setSearchParams({ mode });
@@ -737,7 +752,7 @@ const ViewTables = ({ onOrderUpdate }) => {
                                         onClick={() => handleItemClick(item)}
                                     >
                                         <div className="item-name">{item.name}</div>
-                                        <div className="item-price">₹{item.price}</div>
+                                        <div className="item-price">₹{item.unit_price}</div>
                                     </div>
                                 ))}
                             </div>

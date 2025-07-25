@@ -45,7 +45,7 @@ const OrderForm = ({ table, onOrderCreated }) => {
     const { clientId } = useParams();
 
     const calculateSubtotal = () => {
-        return orderItems.reduce((sum, item) => sum + item.price * item.quantity, 0);
+        return orderItems.reduce((sum, item) => sum + item.unit_price * item.quantity, 0);
     };
 
     const calculateGST = () => {
@@ -92,19 +92,35 @@ const OrderForm = ({ table, onOrderCreated }) => {
 
     useEffect(() => {
         const handleAddItem = (e) => {
-            const { item } = e.detail;
-            const exists = orderItems.find(i => i.id === item.id);
-            if (exists) {
-                setOrderItems(orderItems.map(i =>
-                    i.id === item.id ? { ...i, quantity: i.quantity + 1 } : i
-                ));
+          const { item, addonItem } = e.detail;
+      
+          const updatedOrder = [...orderItems];
+      
+          // Add main item
+          const existingMain = updatedOrder.find(i => i.id === item.id);
+          if (existingMain) {
+            existingMain.quantity += 1;
+          } else {
+            updatedOrder.push({ ...item, quantity: 1, note: "" });
+          }
+      
+          // Add add-on item (if selected)
+          if (addonItem) {
+            const existingAddon = updatedOrder.find(i => i.id === addonItem.id);
+            if (existingAddon) {
+              existingAddon.quantity += 1;
             } else {
-                setOrderItems([...orderItems, { ...item, quantity: 1, note: "" }]);
+              updatedOrder.push({ ...addonItem, quantity: 1, note: "" });
             }
+          }
+      
+          setOrderItems(updatedOrder);
         };
+      
         document.addEventListener("add-item", handleAddItem);
         return () => document.removeEventListener("add-item", handleAddItem);
-    }, [orderItems]);
+      }, [orderItems]);
+      
 
     const openNoteEditor = (item) => {
         setCurrentItemForNote(item);
@@ -350,7 +366,7 @@ const OrderForm = ({ table, onOrderCreated }) => {
                                 />
                                 <button onClick={() => updateQuantity(item.id, 1)}>+</button>
                             </div>
-                            <div className="price">{(item.price * item.quantity).toFixed(2)}</div>
+                            <div className="price">{(item.unit_price * item.quantity).toFixed(2)}</div>
                         </li>
                     ))}
                 </ul>

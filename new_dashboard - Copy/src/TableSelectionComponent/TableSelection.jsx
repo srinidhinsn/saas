@@ -927,13 +927,13 @@ const TableSelection = () => {
                                                 </div>
                                                 <div className="btn-block">
                                                     <button
-                                                        className="btn-primary"
+                                                        className="btn-edit"
                                                         onClick={() => setEditRowId(table.id)}
                                                     >
                                                         <FaEdit />
                                                     </button>
                                                     <button
-                                                        className="btn-danger"
+                                                        className="btn-delete"
                                                         onClick={() => {
                                                             setDeleteTableId(table.id);
                                                             setShowConfirmDelete(true);

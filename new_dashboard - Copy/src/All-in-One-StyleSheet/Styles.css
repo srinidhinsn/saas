@@ -1,4 +1,4 @@
-:root {
+/* :root {
   --bg-color: linear-gradient(-60deg, rgb(244, 244, 244), rgb(223, 226, 246));
   --sidebar-bg: rgb(255, 255, 255);
   --text-color: rgb(51, 51, 51);
@@ -541,4 +541,4 @@ body.theme-dark {
   100% {
     background-color: transparent;
   }
-}/*# sourceMappingURL=Styles.css.map */
+}# sourceMappingURL=Styles.css.map */
