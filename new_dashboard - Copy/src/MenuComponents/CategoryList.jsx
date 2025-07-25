@@ -981,18 +981,19 @@ function CategoryList({ onCategorySelect }) {
   useEffect(() => {
     if (!token || !clientId) return;
 
-    axios
-      .get(`http://localhost:8002/saas/${clientId}/inventory/read_category`, {
-        headers: {
-          Authorization: `Bearer ${token}`,
-        },
+    axios.get(`http://localhost:8002/saas/${clientId}/inventory/read_category`, {
+      headers: {
+        Authorization: `Bearer ${token}`,
+      },
+    })
+      .then(res => {
+        const allCategory = { id: "all", name: "All" };
+        const filteredCategories = res.data.data.filter(cat => cat.name?.toLowerCase() !== "all");
+        setCategories([allCategory, ...filteredCategories]);
+        setActiveCategory("all");
       })
-      .then((res) => {
-        setCategories(res.data.data || []);
-      })
-      .catch((err) => {
-        console.error("Error fetching categories:", err);
-      });
+
+      .catch(err => console.error("❌ Error fetching categories:", err));
   }, [clientId, token]);
 
   const toggleSubcategory = (id, isEdit = false) => {
