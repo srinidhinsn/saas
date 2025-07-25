@@ -973,7 +973,7 @@ function CategoryList({ onCategorySelect }) {
   const [newDescription, setNewDescription] = useState("");
   const [newSubcategories, setNewSubcategories] = useState([]);
   const [deleteTarget, setDeleteTarget] = useState(null);
-  const [newId, setNewId] = useState("");
+  const [newId, setNewId] = useState(""); const [activeCategory, setActiveCategory] = useState(null);
 
   const { clientId } = useParams();
   const token = localStorage.getItem("access_token");

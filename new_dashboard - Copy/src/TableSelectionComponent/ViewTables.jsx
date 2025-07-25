@@ -582,34 +582,31 @@ const ViewTables = ({ onOrderUpdate }) => {
     }, [tableId, tables, modeFromParams]);
 
     useEffect(() => {
-        const fetchData = async () => {
-            try {
-                const [itemsRes, categoryRes] = await Promise.all([
-                    axios.get(`http://localhost:8000/saas/${clientId}/menu_items`),
-                    axios.get(`http://localhost:8000/saas/${clientId}/categories`)
-                ]);
+        axios.all([
+            axios.get(`http://localhost:8002/saas/${clientId}/inventory/read_category`, {
+                headers: { Authorization: `Bearer ${token}` },
+            }),
+            axios.get(`http://localhost:8002/saas/${clientId}/inventory/read`, {
+                headers: { Authorization: `Bearer ${token}` },
+            }),
+        ])
+            .then(axios.spread((catRes, itemRes) => {
+                const allCategory = { id: "all", name: "All" };
+                const categoryList = catRes.data.data.filter(c => c.name?.toLowerCase() !== "all");
+                setCategories([allCategory, ...categoryList]);
+                setActiveCategory("all");
 
-                const items = itemsRes.data;
-                const cats = categoryRes.data;
-
-                setCategories(cats);
-
-                const enriched = items.map(item => {
-                    const category = cats.find(c => c.id === item.category_id);
+                const enriched = itemRes.data.data.map(item => {
+                    const cat = categoryList.find(c => c.id === item.category_id);
                     return {
                         ...item,
-                        categoryName: category ? category.name : "Uncategorized"
+                        category: cat ? cat.name : "Uncategorized"
                     };
                 });
 
-                setMenuItems(enriched);
+                setItems(enriched);
+            }))
 
-            } catch (error) {
-                console.error("Error fetching items/categories:", error);
-            }
-        };
-
-        fetchData();
     }, []);
     const groupedItems = categories.map(cat => ({
         categoryName: cat.name,

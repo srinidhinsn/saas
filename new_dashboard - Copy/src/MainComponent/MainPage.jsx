@@ -414,7 +414,7 @@ const MainPage = () => {
 
                 //
                 const ordersByDate = {};
-                orders.forEach(order => {
+                filteredOrders.forEach(order => {
                     const date = new Date(order.created_at).toISOString().split('T')[0]; // 'YYYY-MM-DD'
                     if (!ordersByDate[date]) {
                         ordersByDate[date] = { date, sales: 0, count: 0 };
