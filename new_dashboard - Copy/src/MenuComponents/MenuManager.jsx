@@ -306,7 +306,7 @@ function MenuManager() {
   if (!clientId) return null;
 
   return (
-    <div className="menu-manager-container">
+      <div className="menu-manager-container">
       <div className="tab-buttons">
         {["Categories/Items", "addons", "combo"].map(tab => (
           <button
