@@ -312,6 +312,8 @@ import { MdDeliveryDining } from "react-icons/md";
 import { BsPersonCheck } from "react-icons/bs";
 import { MdOutlineTableBar } from "react-icons/md";
 import { GoPackageDependents } from "react-icons/go";
+import { MdOutlineSoupKitchen } from "react-icons/md";
+import { TbToolsKitchen3 } from "react-icons/tb";
 import {
     LineChart, Line, XAxis, YAxis, CartesianGrid, Tooltip, ResponsiveContainer, BarChart, Bar
 } from 'recharts';
@@ -336,6 +338,8 @@ const MainPage = () => {
     const [preparingOrders, setPreparingOrders] = useState(0);
     const [servedOrders, setServedOrders] = useState(0);
     const [chartData, setChartData] = useState([]);
+    const [timeFilter, setTimeFilter] = useState("Daily");
+
 
 
 
@@ -387,22 +391,26 @@ const MainPage = () => {
                     headers: { Authorization: `Bearer ${token}` }
                 });
 
-                const orders = res.data?.data || [];
+                const allOrders = res.data?.data || [];
 
-                setTotalOrders(orders.length);
+                const startDate = getStartDate(timeFilter);
+                const filteredOrders = allOrders.filter(o => new Date(o.created_at) >= startDate);
+
+
+                setTotalOrders(filteredOrders.length);
                 setPendingOrders(
-                    orders.filter(o => o.status === "pending" || o.status === "preparing").length
+                    filteredOrders.filter(o => o.status === "pending" || o.status === "preparing").length
                 );
                 setTotalEarnings(
                     Math.round(
-                        orders.reduce((sum, o) => sum + (parseFloat(o.total_price) || 0), 0)
+                        filteredOrders.reduce((sum, o) => sum + (parseFloat(o.total_price) || 0), 0)
                     )
                 );
 
-                setTotalCustomers(orders.length);
-                setNewOrders(orders.filter(o => o.status === "new").length);
-                setPreparingOrders(orders.filter(o => o.status === "preparing").length);
-                setServedOrders(orders.filter(o => o.status === "served").length);
+                setTotalCustomers(filteredOrders.length);
+                setNewOrders(filteredOrders.filter(o => o.status === "new").length);
+                setPreparingOrders(filteredOrders.filter(o => o.status === "preparing").length);
+                setServedOrders(filteredOrders.filter(o => o.status === "served").length);
 
                 //
                 const ordersByDate = {};
@@ -425,7 +433,26 @@ const MainPage = () => {
         };
 
         fetchStats();
-    }, [clientId]);
+    }, [clientId, timeFilter]);
+    const getStartDate = (filter) => {
+        const now = new Date();
+        switch (filter) {
+            case "Daily":
+                return new Date(now.setHours(0, 0, 0, 0));
+            case "Weekly":
+                return new Date(now.setDate(now.getDate() - 7));
+            case "Monthly":
+                return new Date(now.setMonth(now.getMonth() - 1));
+            case "Quarterly":
+                return new Date(now.setMonth(now.getMonth() - 3));
+            case "Half Yearly":
+                return new Date(now.setMonth(now.getMonth() - 6));
+            case "Yearly":
+                return new Date(now.setFullYear(now.getFullYear() - 1));
+            default:
+                return new Date(now.setHours(0, 0, 0, 0));
+        }
+    };
 
 
     return (
@@ -469,14 +496,15 @@ const MainPage = () => {
                 <div className="main-content">
                     <div className="main-title">
                         <h2>Dashboard</h2>
-                        <select>
-                            <option>Daily</option>
-                            <option>Weekly</option>
-                            <option>Monthly</option>
-                            <option>Quarterly</option>
-                            <option>Half Yearly</option>
-                            <option>Yearly</option>
+                        <select value={timeFilter} onChange={(e) => setTimeFilter(e.target.value)}>
+                            <option value="Daily">Daily</option>
+                            <option value="Weekly">Weekly</option>
+                            <option value="Monthly">Monthly</option>
+                            <option value="Quarterly">Quarterly</option>
+                            <option value="Half Yearly">Half Yearly</option>
+                            <option value="Yearly">Yearly</option>
                         </select>
+
                     </div>
 
                     <div className="stats">
@@ -512,15 +540,26 @@ const MainPage = () => {
                         </div>
 
                         <div className="stat-card">
-                            <div className="flexible"><div className="card-icons"><GoPackageDependents /></div>
+                            <div className="flexible"><div className="card-icons"><MdOutlineSoupKitchen /></div>
                                 <div><div className="value">{preparingOrders}</div><div className="title">Preparing</div></div>
                             </div><div className="sub">Active: {preparingOrders}</div>
                         </div>
 
                         <div className="stat-card">
-                            <div className="flexible"><div className="card-icons"><MdDeliveryDining /></div>
+                            <div className="flexible"><div className="card-icons"><TbToolsKitchen3 /></div>
                                 <div><div className="value">{servedOrders}</div><div className="title">Served</div></div>
                             </div><div className="sub">Active: {servedOrders}</div>
+                        </div>
+                        <div className="stat-card">
+                            <div className="flexible"><div className="card-icons"><GoPackageDependents /></div>
+                                <div><div className="value">0</div><div className="title">Take away</div></div>
+                            </div><div className="sub">Active:0(under progress)</div>
+                        </div>
+
+                        <div className="stat-card">
+                            <div className="flexible"><div className="card-icons"><MdDeliveryDining /></div>
+                                <div><div className="value">0</div><div className="title">Delivery</div></div>
+                            </div><div className="sub">Active:0(under progress)</div>
                         </div>
 
                     </div>
