@@ -791,21 +791,24 @@ const OrdersVisiblePage = () => {
                         </table>
                     </div>
                 )}
-            </div>
-            {showDeleteModal && (
-                <div className="delete-modal-overlay">
-                    <div className="delete-modal">
-                        <h3>Delete this order?</h3>
-                        <div className="modal-buttons">
-                            <button className="yes" onClick={confirmDeleteOrder}>Yes</button>
-                            <button className="no" onClick={() => {
-                                setShowDeleteModal(false);
-                                setOrderToDelete(null);
-                            }}>No</button>
+
+
+                {showDeleteModal && (
+                    <div className="delete-modal-overlay">
+                        <div className="delete-modal">
+                            <h3>Delete this order?</h3>
+                            <div className="modal-buttons">
+                                <button className="yes" onClick={confirmDeleteOrder}>Yes</button>
+                                <button className="no" onClick={() => {
+                                    setShowDeleteModal(false);
+                                    setOrderToDelete(null);
+                                }}>No</button>
+                            </div>
                         </div>
                     </div>
-                </div>
-            )}
+                )}
+            </div>
+
 
         </div>
     );
