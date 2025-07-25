@@ -901,7 +901,7 @@ function AddInventoryItemForm({ onItemCreated }) {
     if (!token || !clientId) return;
 
     // Fetch categories
-    axios.get(`http://localhost:8002/saas/${clientId}/inventory/read_category?client_id=${clientId}`, {
+    axios.get(`http://localhost:8002/saas/${clientId}/inventory/read_category`, {
       headers: { Authorization: `Bearer ${token}` },
     })
       .then((res) => {
@@ -912,7 +912,7 @@ function AddInventoryItemForm({ onItemCreated }) {
       });
 
     // Fetch line items
-    axios.get(`http://localhost:8002/saas/${clientId}/inventory/read?client_id=${clientId}`, {
+    axios.get(`http://localhost:8002/saas/${clientId}/inventory/read`, {
       headers: { Authorization: `Bearer ${token}` },
     })
       .then((res) => {
@@ -987,7 +987,7 @@ function AddInventoryItemForm({ onItemCreated }) {
           console.log("Submitting:", payload);
 
           const response = await axios.post(
-            `http://localhost:8002/saas/${clientId}/inventory/create?client_id=${clientId}`,
+            `http://localhost:8002/saas/${clientId}/inventory/create`,
             payload,
             { headers: { Authorization: `Bearer ${token}` } }
           );

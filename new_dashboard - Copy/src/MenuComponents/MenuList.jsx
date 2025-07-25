@@ -1643,7 +1643,7 @@ function InventoryItemList({ selectedCategory }) {
   useEffect(() => {
     if (!token || !clientId) return;
 
-    axios.get(`http://localhost:8002/saas/${clientId}/inventory/read_category?client_id=${clientId}`, {
+    axios.get(`http://localhost:8002/saas/${clientId}/inventory/read_category`, {
       headers: { Authorization: `Bearer ${token}` },
     })
       .then((res) => {
@@ -1702,7 +1702,7 @@ function InventoryItemList({ selectedCategory }) {
 
     try {
       const res = await axios.post(
-        `http://localhost:8002/saas/${clientId}/inventory/update?client_id=${clientId}`,
+        `http://localhost:8002/saas/${clientId}/inventory/update`,
         updatedItem,
         { headers }
       );
@@ -1724,7 +1724,7 @@ function InventoryItemList({ selectedCategory }) {
   const handleDelete = async (id) => {
     try {
       await axios.post(
-        `http://localhost:8002/saas/${clientId}/inventory/delete?client_id=${clientId}`,
+        `http://localhost:8002/saas/${clientId}/inventory/delete`,
         { id }, // ✅ backend expects { id: value }
         { headers }
       );

@@ -427,6 +427,7 @@ const MainPage = () => {
         fetchStats();
     }, [clientId]);
 
+
     return (
         <div className="dashboard">
             <main className="main">
