@@ -162,8 +162,8 @@ def upload_document(
         raise HTTPException(status_code=500, detail="Internal Server Error during upload")
 
 # Secure download route
-@router.get("/download/{doc_id}", response_model=None)
-def download_document(doc_id: uuid.UUID, context: SaasContext = Depends(verify_token), db: Session = Depends(get_db)):
+@router.get("/download", response_model=None)
+def download_document(client_id: str, doc_id: Optional[uuid.UUID] = Query(None), context: SaasContext = Depends(verify_token), db: Session = Depends(get_db)):
     doc = db.query(DocumentEntity).filter_by(id=doc_id, deleted=False).first()
     if not doc:
         raise HTTPException(status_code=404, detail="Document not found")
@@ -178,10 +178,10 @@ def download_document(doc_id: uuid.UUID, context: SaasContext = Depends(verify_t
 
 
 
-@router.post("/replace/{doc_id}", response_model=ResponseModel[Document])
+@router.post("/replace", response_model=ResponseModel[Document])
 def replace_document(
     client_id: str,
-    doc_id: UUID,
+    doc_id: Optional[uuid.UUID] = Query(None),
     file: UploadFile = File(...),
     description: str = Form(None),
     category_id: str = Form(None),
