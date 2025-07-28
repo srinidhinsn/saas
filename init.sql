@@ -322,12 +322,12 @@ INSERT INTO page_definition (id, client_id, module, role, screen_id, load_type, 
 INSERT INTO "user" (username, hashed_password, id, client_id, roles, grants) OVERRIDING SYSTEM VALUE VALUES ('admin', '$2b$12$NcusUR2dTlmL/bwUYamZt.QOrGW9.ksrmFSQyx32Lc15VtWfyDPFC', '461e8cc6-a897-59b3-9f0e-1f2e19cd179c', 'easyfood', '{Admin}', '{dinein,order,inventory,users,tables,invoice,menu,document}');
 
 
-INSERT INTO category (id, client_id, name, description, sub_categories, created_by, updated_by) OVERRIDING SYSTEM VALUE VALUES 
-('dietery', 'easyfood', 'Dietery', 'Dietry type', '{"dietery_01", "dietery_02", "dietery_03", "dietery_04"}', '1000', '1000'),
-('dietery_01', 'easyfood', 'Veg', 'Veg only', null, '1000', '1000'),
-('dietery_02', 'easyfood', 'Non-Veg', 'Non veg', null, '1000', '1000'),
-('dietery_03', 'easyfood', 'Vegan', 'Jain food', null, '1000', '1000'),
-('dietery_04', 'easyfood', 'Eggeterian', 'Egg food', null, '1000', '1000'),
+INSERT INTO category (id, client_id, name, description, sub_categories, created_by, updated_by, slug) OVERRIDING SYSTEM VALUE VALUES 
+('dietery', 'easyfood', 'Dietery', 'Dietry type', '{"dietery_01", "dietery_02", "dietery_03", "dietery_04"}', '1000', '1000', '_Dietery'),
+('dietery_01', 'easyfood', 'Veg', 'Veg only', null, '1000', '1000', '_Dietery_Veg'),
+('dietery_02', 'easyfood', 'Non-Veg', 'Non veg', null, '1000', '1000', '_Dietery_Non-Veg'),
+('dietery_03', 'easyfood', 'Vegan', 'Jain food', null, '1000', '1000', '_Dietery_Vegan'),
+('dietery_04', 'easyfood', 'Eggeterian', 'Egg food', null, '1000', '1000', '_Dietery_Eggeterian),
 ('chinese_01', 'easyfood', 'Chinese', 'Chinese delicious', '{"chinese_02", "chinese_03"}', '1000', '1000'),
 ('chinese_02', 'easyfood', 'Noodles', 'Noodles special delicious',null, '1000', '1000'),
 ('chinese_03', 'easyfood', 'Soups', 'Soups special delicious',null, '1000', '1000'),
