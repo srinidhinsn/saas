@@ -2,7 +2,7 @@ from sqlalchemy import create_engine, Column, Integer, String
 from sqlalchemy.ext.declarative import declarative_base
 from sqlalchemy.orm import sessionmaker, session
 
-DATABASE_URL = "postgresql://postgres:admin@localhost:5432/saas"
+DATABASE_URL = "postgresql://postgres:admin123@localhost:5432/New_Saas"
 
 engine = create_engine(DATABASE_URL)
 SessionLocal = sessionmaker(autocommit=False, autoflush=False, bind=engine)

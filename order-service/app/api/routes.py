@@ -15,7 +15,6 @@ from typing import Optional
 router = APIRouter()
 
 
-
 @router.post("/dinein/create", response_model=ResponseModel[DineinOrderModel])
 def create_order(client_id: str, order: DineinOrderModel, context: SaasContext = Depends(verify_token), db: Session = Depends(get_db)):
     db_order = DBOrder(client_id=client_id, table_id=order.table_id, status=order.status or OrderStatusEnum.new,
@@ -77,7 +76,6 @@ def get_orders_for_table(client_id: str, table_id: Optional[str] = None, context
     return response
 
 
-<<<<<<< HEAD
 # @router.post("/dinein/update")
 # def update_order_status(client_id: str, body: DineinOrderModel, context: SaasContext = Depends(verify_token), db: Session = Depends(get_db)):
 #     if not body.id:
@@ -93,31 +91,20 @@ def get_orders_for_table(client_id: str, table_id: Optional[str] = None, context
 #                              "message": "Status updated", "new_status": order.status})
 #     return response
 #
-=======
-
->>>>>>> 389f0716cc7b079ea164f6bc3621377d0c303956
 
 
 @router.post("/dinein/update")
 def update_order_status(client_id: str, body: DineinOrderModel, context: SaasContext = Depends(verify_token), db: Session = Depends(get_db)):
-<<<<<<< HEAD
     if body.id is None:
         raise HTTPException(status_code=400, detail="Order ID is required")
 
     order = db.query(DBOrder).filter(DBOrder.id == body.id,
                                      DBOrder.client_id == client_id).first()
 
-=======
-    if not body.id:
-        raise HTTPException(status_code=400, detail="Order ID is required")
-    order = db.query(DBOrder).filter(DBOrder.id == str(
-        body.id), DBOrder.client_id == str(client_id)).first()
->>>>>>> 389f0716cc7b079ea164f6bc3621377d0c303956
     if not order:
         raise HTTPException(status_code=404, detail="Order not found")
 
     order.status = body.status.value
-<<<<<<< HEAD
     if body.status == OrderStatusEnum.served:
         order.invoice_status = "unpaid"
     db.commit()
@@ -126,14 +113,6 @@ def update_order_status(client_id: str, body: DineinOrderModel, context: SaasCon
         "new_status": order.status,
         "invoice_status": order.invoice_status})
     return response
-=======
-    db.commit()
-    response = ResponseModel(screen_id=context.screen_id, data={
-                             "message": "Status updated", "new_status": order.status})
-    return response
-#
-
->>>>>>> 389f0716cc7b079ea164f6bc3621377d0c303956
 #  -----------------------------
 
 # order_id to dinein_order_id

@@ -18,10 +18,11 @@ from entity.document_entity import DocumentEntity
 from models.response_model import ResponseModel
 from models.saas_context import SaasContext
 from utils.auth import verify_token
-
+from database.base import Base
 router = APIRouter()
 
 BASE_UPLOAD_DIR = "uploads"
+
 
 def create_storage_path():
     now = datetime.now()
@@ -33,6 +34,7 @@ def create_storage_path():
     os.makedirs(full_path, exist_ok=True)
     return full_path
 
+
 def generate_md5(file_obj):
     hash_md5 = hashlib.md5()
     file_obj.seek(0)
@@ -42,17 +44,20 @@ def generate_md5(file_obj):
     return hash_md5.hexdigest()
 
 # Read all documents for a client
+
+
 @router.get("/read", response_model=ResponseModel[List[Document]])
 def read_documents(client_id: str, context: SaasContext = Depends(verify_token), db: Session = Depends(get_db)):
-    docs = db.query(DocumentEntity).filter(DocumentEntity.client_id == client_id, DocumentEntity.deleted != True).all()
+    docs = db.query(DocumentEntity).filter(
+        DocumentEntity.client_id == client_id, DocumentEntity.deleted != True).all()
     models = DocumentEntity.copyToModels(docs)
     return ResponseModel[List[Document]](screen_id=context.screen_id, data=models)
 
 # Upload document with streaming + save as UUID (no extension)
 # @router.post("/upload", response_model=ResponseModel[Document])
 # def upload_document(
-#     client_id: str = Path(...),                         
-#     file: UploadFile = File(...),                   
+#     client_id: str = Path(...),
+#     file: UploadFile = File(...),
 #     description: str = Form(None),
 #     category_id: str = Form(None),
 #     realm: str = Form(None),
@@ -102,6 +107,7 @@ def read_documents(client_id: str, context: SaasContext = Depends(verify_token),
 
 #     return ResponseModel[Document](screen_id=context.screen_id, data=DocumentEntity.copyToModel(doc))
 
+
 @router.post("/upload", response_model=ResponseModel[Document])
 def upload_document(
     client_id: str,
@@ -119,7 +125,7 @@ def upload_document(
         ext = Path(file.filename).suffix
         filetype = file.content_type
 
-        folder_path = create_storage_path()  
+        folder_path = create_storage_path()
         file_path = os.path.join(folder_path, uuid_name)
 
         with open(file_path, "wb") as f:
@@ -159,9 +165,12 @@ def upload_document(
     except Exception as e:
         print("❌ Upload failed:", e)
         print(traceback.format_exc())
-        raise HTTPException(status_code=500, detail="Internal Server Error during upload")
+        raise HTTPException(
+            status_code=500, detail="Internal Server Error during upload")
 
 # Secure download route
+
+
 @router.get("/download/{doc_id}", response_model=None)
 def download_document(doc_id: uuid.UUID, context: SaasContext = Depends(verify_token), db: Session = Depends(get_db)):
     doc = db.query(DocumentEntity).filter_by(id=doc_id, deleted=False).first()
@@ -174,8 +183,6 @@ def download_document(doc_id: uuid.UUID, context: SaasContext = Depends(verify_t
                 yield chunk
 
     return StreamingResponse(iterfile(), media_type=doc.filetype, headers={"Content-Disposition": f"attachment; filename={doc.name}"})
-
-
 
 
 @router.post("/replace/{doc_id}", response_model=ResponseModel[Document])
@@ -192,7 +199,8 @@ def replace_document(
 ):
     try:
         # 1. Fetch and deactivate the old document
-        old_doc = db.query(DocumentEntity).filter_by(id=doc_id, client_id=client_id, deleted=False).first()
+        old_doc = db.query(DocumentEntity).filter_by(
+            id=doc_id, client_id=client_id, deleted=False).first()
         if not old_doc:
             raise HTTPException(status_code=404, detail="Document not found")
 
@@ -254,4 +262,5 @@ def replace_document(
     except Exception as e:
         print("❌ Replace failed:", e)
         print(traceback.format_exc())
-        raise HTTPException(status_code=500, detail="Internal Server Error during replace")
+        raise HTTPException(
+            status_code=500, detail="Internal Server Error during replace")

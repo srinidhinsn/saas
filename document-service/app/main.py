@@ -2,7 +2,8 @@ import os
 from fastapi import FastAPI, Request
 from fastapi.middleware.cors import CORSMiddleware
 from app.api.routes import router as table_router
-
+from database.base import Base
+from database.postgres import engine
 import logging
 import time
 from config.settings import LOGGING_CONFIG
@@ -17,6 +18,7 @@ app.add_middleware(
     allow_methods=["*"],
     allow_credentials=True
 )
+Base.metadata.create_all(bind=engine)
 
 
 @app.get('/')

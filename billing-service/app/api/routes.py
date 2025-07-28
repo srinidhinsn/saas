@@ -6,7 +6,7 @@ from models.response_model import ResponseModel
 from models.saas_context import SaasContext
 from utils.auth import verify_token
 from database.postgres import get_db
-from services.billing_service import (
+from ..services.billing_service import (
     create_billing_document,
     get_billing_document_by_id,
     get_billing_documents
@@ -15,6 +15,8 @@ from services.billing_service import (
 router = APIRouter()
 
 # GET all billing documents
+
+
 @router.get("/read", response_model=ResponseModel[List[BillingDocument]])
 def read_billing_documents(
     client_id: str,
@@ -66,6 +68,7 @@ def create_billing(
         data=result
     )
 
+
 @router.post("/update", response_model=ResponseModel[BillingDocument])
 def update_billing_document(
     client_id: str,
@@ -74,7 +77,8 @@ def update_billing_document(
     db: Session = Depends(get_db)
 ):
     if not updates.id:
-        raise HTTPException(status_code=400, detail="Missing billing document ID")
+        raise HTTPException(
+            status_code=400, detail="Missing billing document ID")
 
     if client_id != context.client_id:
         raise HTTPException(status_code=403, detail="Unauthorized")
@@ -86,6 +90,7 @@ def update_billing_document(
         message="Billing document updated successfully",
         data=updated_doc
     )
+
 
 @router.post("/delete", response_model=ResponseModel[BillingDocument])
 def delete_billing_document(

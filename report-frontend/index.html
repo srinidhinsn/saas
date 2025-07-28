@@ -1,28 +1,101 @@
 <!DOCTYPE html>
 <html lang="en">
+
 <head>
   <meta charset="UTF-8" />
   <title>📊 Report Dashboard</title>
   <meta name="viewport" content="width=device-width, initial-scale=1" />
-  <script src="https://cdn.tailwindcss.com"></script>
+  <style>
+    body {
+      background-color: #f9fafb;
+      min-height: 100vh;
+      padding-top: 2.5rem;
+      font-family: sans-serif;
+    }
+
+    .container {
+      max-width: 768px;
+      margin: 0 auto;
+      padding-left: 1rem;
+      padding-right: 1rem;
+    }
+
+    .heading {
+      font-size: 1.875rem;
+      font-weight: bold;
+      margin-bottom: 1.5rem;
+      text-align: center;
+    }
+
+    .card {
+      background-color: white;
+      box-shadow: 0 1px 2px rgba(0, 0, 0, 0.1);
+      padding: 1rem;
+      border-radius: 0.5rem;
+      margin-bottom: 1.5rem;
+    }
+
+    .form-group {
+      margin-bottom: 1rem;
+    }
+
+    .label {
+      display: block;
+      font-weight: 600;
+      margin-bottom: 0.25rem;
+    }
+
+    .input,
+    .select {
+      width: 100%;
+      padding: 0.5rem;
+      border: 1px solid #d1d5db;
+      border-radius: 0.25rem;
+    }
+
+    .button {
+      background-color: #2563eb;
+      color: white;
+      font-weight: 600;
+      padding: 0.5rem 1rem;
+      border-radius: 0.25rem;
+      cursor: pointer;
+      border: none;
+    }
+
+    .button:hover {
+      background-color: #1d4ed8;
+    }
+
+    .dashboard h2 {
+      font-size: 1.25rem;
+      font-weight: bold;
+      margin-bottom: 1rem;
+    }
+
+    .dashboard p {
+      margin: 0.5rem 0;
+    }
+  </style>
 </head>
-<body class="bg-gray-50 min-h-screen py-10">
-  <div class="max-w-3xl mx-auto px-4">
-    <h1 class="text-3xl font-bold mb-6 text-center">📊 Report Service Dashboard</h1>
+
+<body>
+  <div class="container">
+    <h1 class="heading">📊 Report Service Dashboard</h1>
 
     <!-- Input Section -->
-    <div class="bg-white shadow p-4 rounded mb-6 space-y-4">
-      <div>
-        <label class="block font-semibold">Client ID</label>
-        <input type="text" id="clientId" placeholder="e.g., easyfood" class="w-full border rounded p-2" />
+    <div class="card">
+      <div class="form-group">
+        <label class="label">Client ID</label>
+        <input type="text" id="clientId" placeholder="e.g., easyfood" class="input" />
       </div>
-      <div>
-        <label class="block font-semibold">Access Token</label>
-        <input type="text" id="accessToken" placeholder="Paste your JWT token here" class="w-full border rounded p-2" />
+      <div class="form-group">
+        <label class="label">Access Token</label>
+        <input type="text" id="accessToken" placeholder="Paste your JWT token here" class="input" />
       </div>
-      <div>
-        <label class="block font-semibold">Date Range</label>
-        <select id="dateRange" class="w-full border rounded p-2">
+      <div class="form-group">
+        <label class="label">Date Range</label>
+        <select id="dateRange" class="select">
           <option value="">-- All Dates --</option>
           <option value="today">Today</option>
           <option value="yesterday">Yesterday</option>
@@ -35,14 +108,14 @@
           <option value="current_year">Current Year</option>
         </select>
       </div>
-      <button onclick="generateReport()" class="bg-blue-600 hover:bg-blue-700 text-white font-semibold px-4 py-2 rounded">
+      <button onclick="generateReport()" class="button">
         📥 Generate Order Report
       </button>
     </div>
 
     <!-- Live Dashboard -->
-    <div class="bg-white shadow p-4 rounded space-y-2">
-      <h2 class="text-xl font-bold mb-4">📈 Live Dashboard</h2>
+    <div class="card dashboard">
+      <h2>📈 Live Dashboard</h2>
       <p><strong>Total Orders:</strong> <span id="totalOrders">-</span></p>
       <p><strong>Today's Orders:</strong> <span id="todayOrders">-</span></p>
       <p><strong>Last Updated:</strong> <span id="lastUpdated">-</span></p>
@@ -51,4 +124,5 @@
 
   <script src="app.js"></script>
 </body>
+
 </html>

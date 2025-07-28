@@ -15,11 +15,14 @@ router = APIRouter()
 
 # -------------------- INVENTORY ROUTES --------------------
 
+
 @router.get("/read", response_model=ResponseModel[List[Inventory]])
 def read_inventory(client_id: str, context: SaasContext = Depends(verify_token), db: Session = Depends(get_db)):
-    records = db.query(InventoryEntity).filter(InventoryEntity.client_id == client_id).all()
+    records = db.query(InventoryEntity).filter(
+        InventoryEntity.client_id == client_id).all()
     models = InventoryEntity.copyToModels(records)
     return ResponseModel[List[Inventory]](screen_id=context.screen_id, status="success", message="Fetched inventory list", data=models)
+
 
 @router.post("/create", response_model=ResponseModel[Inventory])
 def create_inventory(item: Inventory, client_id: str, context: SaasContext = Depends(verify_token), db: Session = Depends(get_db)):
@@ -30,12 +33,14 @@ def create_inventory(item: Inventory, client_id: str, context: SaasContext = Dep
     model = InventoryEntity.copyToModel(db_item)
     return ResponseModel[Inventory](screen_id=context.screen_id, status="success", message="Inventory item created", data=model)
 
+
 @router.post("/update", response_model=ResponseModel[Inventory])
 def update_inventory(client_id: str, updates: Inventory, context: SaasContext = Depends(verify_token), db: Session = Depends(get_db)):
     if not updates.id:
         raise HTTPException(status_code=400, detail="Missing item ID")
-    
-    record = db.query(InventoryEntity).filter(InventoryEntity.id == updates.id, InventoryEntity.client_id == client_id).first()
+
+    record = db.query(InventoryEntity).filter(
+        InventoryEntity.id == updates.id, InventoryEntity.client_id == client_id).first()
     if not record:
         raise HTTPException(status_code=404, detail="Inventory item not found")
     for key, value in updates.dict(exclude_unset=True).items():
@@ -45,9 +50,11 @@ def update_inventory(client_id: str, updates: Inventory, context: SaasContext = 
     model = InventoryEntity.copyToModel(record)
     return ResponseModel[Inventory](screen_id=context.screen_id, status="success", message="Inventory item updated", data=model)
 
+
 @router.post("/delete", response_model=ResponseModel[Inventory])
 def delete_inventory(client_id: str, item: Inventory, context: SaasContext = Depends(verify_token), db: Session = Depends(get_db)):
-    record = db.query(InventoryEntity).filter(InventoryEntity.id == item.id, InventoryEntity.client_id == client_id).first()
+    record = db.query(InventoryEntity).filter(
+        InventoryEntity.id == item.id, InventoryEntity.client_id == client_id).first()
     if not record:
         raise HTTPException(status_code=404, detail="Inventory item not found")
     db.delete(record)
@@ -57,14 +64,17 @@ def delete_inventory(client_id: str, item: Inventory, context: SaasContext = Dep
 
 # -------------------- CATEGORY ROUTES --------------------
 
+
 @router.get("/read_category", response_model=ResponseModel)
 def read_categories(client_id: str, category_id: Optional[str] = Query(None), context: SaasContext = Depends(verify_token), db: Session = Depends(get_db)):
-    records = db.query(CategoryEntity).filter(CategoryEntity.client_id == client_id).all()
+    records = db.query(CategoryEntity).filter(
+        CategoryEntity.client_id == client_id).all()
     models = CategoryEntity.copyToModels(records)
     print("models - ", models)
     categoryTree = service.build_category_tree(models, category_id)
     print("categoryTree - ", categoryTree)
     return ResponseModel(screen_id=context.screen_id, status="success", message="Fetched categories", data=categoryTree)
+
 
 @router.post("/create_category", response_model=ResponseModel[Category])
 def create_category(category: Category, client_id: str, context: SaasContext = Depends(verify_token), db: Session = Depends(get_db)):
@@ -75,11 +85,13 @@ def create_category(category: Category, client_id: str, context: SaasContext = D
     model = CategoryEntity.copyToModel(db_item)
     return ResponseModel[Category](screen_id=context.screen_id, status="success", message="Category created", data=model)
 
+
 @router.post("/update_category", response_model=ResponseModel[Category])
 def update_category(client_id: str, updates: Category, context: SaasContext = Depends(verify_token), db: Session = Depends(get_db)):
     if not updates.id:
         raise HTTPException(status_code=400, detail="Missing category ID")
-    record = db.query(CategoryEntity).filter(CategoryEntity.id == updates.id, CategoryEntity.client_id == client_id).first()
+    record = db.query(CategoryEntity).filter(
+        CategoryEntity.id == updates.id, CategoryEntity.client_id == client_id).first()
     if not record:
         raise HTTPException(status_code=404, detail="Category not found")
     for key, value in updates.dict(exclude_unset=True).items():
@@ -89,9 +101,11 @@ def update_category(client_id: str, updates: Category, context: SaasContext = De
     model = CategoryEntity.copyToModel(record)
     return ResponseModel[Category](screen_id=context.screen_id, status="success", message="Category updated", data=model)
 
+
 @router.post("/delete_category", response_model=ResponseModel[Category])
 def delete_category(client_id: str, category: Category, context: SaasContext = Depends(verify_token), db: Session = Depends(get_db)):
-    record = db.query(CategoryEntity).filter(CategoryEntity.id == category.id, CategoryEntity.client_id == client_id).first()
+    record = db.query(CategoryEntity).filter(
+        CategoryEntity.id == category.id, CategoryEntity.client_id == client_id).first()
     if not record:
         raise HTTPException(status_code=404, detail="Category not found")
     db.delete(record)
