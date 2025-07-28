@@ -35,6 +35,7 @@ CREATE TABLE order_item (
     client_id text,
     order_id bigint,
     item_id bigint,
+    item_name text,
 	status text,
     quantity INT
 );
@@ -277,15 +278,15 @@ OVERRIDING SYSTEM VALUE VALUES
 (1002, 'easyfood', 'order_3', 4, 3, '1000', 'paid', 90, 8, 8, 0, 106, 'served');
 
 -- Insert into OrderItem
-INSERT INTO order_item (id, client_id, order_id, item_id, quantity, status)
+INSERT INTO order_item (id, client_id, order_id, item_id, quantity, status, item_name, slug)
 OVERRIDING SYSTEM VALUE VALUES
-(1000, 'easyfood', 1000, 1000, 1, 'served'),
-(1001, 'easyfood', 1000, 1004, 2, 'preparing'),
-(1002, 'easyfood', 1000, 1003, 1, 'served'),
-(1003, 'easyfood', 1000, 1004, 2, 'new'),
-(1004, 'easyfood', 1001, 1000, 1, 'served'),
-(1005, 'easyfood', 1001, 1001, 1, 'served'),
-(1006, 'easyfood', 1002, 1003, 1, 'served');
+(1000, 'easyfood', 1000, 1000, 1, 'served', 'Veg biriyani', null),
+(1001, 'easyfood', 1000, 1004, 2, 'preparing', 'Test data', null),
+(1002, 'easyfood', 1000, 1003, 1, 'served', 'Test data', null),
+(1003, 'easyfood', 1000, 1004, 2, 'new', 'Test data', null),
+(1004, 'easyfood', 1001, 1000, 1, 'served', 'Test data', null),
+(1005, 'easyfood', 1001, 1001, 1, 'served', 'Test data', null),
+(1006, 'easyfood', 1002, 1003, 1, 'served', 'Test data', null);
 
 -- Insert into Inventory
 INSERT INTO inventory (id, client_id, inventory_id, line_item_id, name, description, category_id, realm, availability, unit, unit_price, unit_cst, unit_gst, unit_total_price, price, cst, gst, discount, total_price)

@@ -17,6 +17,8 @@ class OrderItemModel(BaseModel):
     client_id: Optional[str] = None
     order_id: Optional[int] = None
     item_id: Optional[int] = None
+    item_name: Optional[str] = None
+    slug: Optional[str] = None
     quantity: Optional[int] = None
     status: Optional[OrderStatusEnum] = OrderStatusEnum.new
 

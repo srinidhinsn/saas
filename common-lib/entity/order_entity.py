@@ -68,6 +68,8 @@ class OrderItem(Base):
     client_id = Column(String, nullable=True)
     order_id = Column(Integer, ForeignKey("dinein_order.id"))
     item_id = Column(Integer, nullable=True)
+    item_name = Column(String, nullable=True)
+    slug = Column(String, nullable=True)
     quantity = Column(Integer, nullable=True)
     status = Column(String, nullable=True)
 
