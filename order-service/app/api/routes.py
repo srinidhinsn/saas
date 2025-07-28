@@ -113,20 +113,20 @@ def get_orders_for_table(client_id: str, table_id: Optional[str] = None, context
     return response
 
 
-@router.post("/dinein/update")
-def update_order_status(client_id: str, body: DineinOrderModel, context: SaasContext = Depends(verify_token), db: Session = Depends(get_db)):
-    if not body.id:
-        raise HTTPException(status_code=400, detail="Order ID is required")
-    order = db.query(DBOrder).filter(DBOrder.id == str(
-        body.id), DBOrder.client_id == str(client_id)).first()
-    if not order:
-        raise HTTPException(status_code=404, detail="Order not found")
+# @router.post("/dinein/update")
+# def update_order_status(client_id: str, body: DineinOrderModel, context: SaasContext = Depends(verify_token), db: Session = Depends(get_db)):
+#     if not body.id:
+#         raise HTTPException(status_code=400, detail="Order ID is required")
+#     order = db.query(DBOrder).filter(DBOrder.id == str(
+#         body.id), DBOrder.client_id == str(client_id)).first()
+#     if not order:
+#         raise HTTPException(status_code=404, detail="Order not found")
 
-    order.status = body.status.value
-    db.commit()
-    response = ResponseModel(screen_id=context.screen_id, data={
-                             "message": "Status updated", "new_status": order.status})
-    return response
+#     order.status = body.status.value
+#     db.commit()
+#     response = ResponseModel(screen_id=context.screen_id, data={
+#                              "message": "Status updated", "new_status": order.status})
+#     return response
 #
 
 
