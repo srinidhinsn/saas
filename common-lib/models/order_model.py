@@ -3,6 +3,7 @@ from typing import Optional, List
 import datetime
 from enum import Enum
 
+
 class OrderStatusEnum(str, Enum):
     new = "new"
     pending = "pending"
@@ -14,8 +15,8 @@ class OrderStatusEnum(str, Enum):
 class OrderItemModel(BaseModel):
     id: Optional[int] = None
     client_id: Optional[str] = None
-    order_id: Optional[str] = None
-    item_id: Optional[str] = None
+    order_id: Optional[int] = None
+    item_id: Optional[int] = None
     quantity: Optional[int] = None
     status: Optional[OrderStatusEnum] = OrderStatusEnum.new
 
@@ -41,7 +42,7 @@ class DineinOrderModel(BaseModel):
     created_at: Optional[datetime.datetime] = None
     updated_at: Optional[datetime.datetime] = None
     status: Optional[OrderStatusEnum] = OrderStatusEnum.new
-    items: Optional[List[OrderItemModel]] = [] 
+    items: Optional[List[OrderItemModel]] = []
 
     class Config:
         orm_mode = True

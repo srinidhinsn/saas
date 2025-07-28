@@ -6,6 +6,7 @@ import uuid
 from database.base import Base
 from models.table_model import Table
 
+<<<<<<< HEAD
 class DiningTable(Base):
     __tablename__ = "tables"
 
@@ -26,9 +27,44 @@ class DiningTable(Base):
     updated_by     = Column(Text, nullable=True)
     created_at     = Column(DateTime, default=func.now())
     updated_at     = Column(DateTime, default=func.now(), onupdate=func.now())
+=======
+# class DiningTable(Base):
+#     __tablename__  = "tables"
+
+#     id             = Column(BigInteger, primary_key=True, index=True)
+#     client_id      = Column(Text, nullable=True)
+#     table_number   = Column(Text, nullable=True)
+#     table_type     = Column(Text, nullable=True)
+#     status         = Column(Text, nullable=True, default="Vacant")
+#     location_zone  = Column(Text, nullable=True)
+#     qr_code_url    = Column(Text, nullable=True)
+#     created_at     = Column(DateTime, default=func.now())
+#     updated_at     = Column(DateTime, default=func.now(), onupdate=func.now())
+
+
+class DiningTable(Base):
+    __tablename__ = "tables"
+
+    id = Column(BigInteger, primary_key=True, autoincrement=True)
+    client_id = Column(Text, nullable=False)
+    name = Column(Text, nullable=False)
+    table_type = Column(Text)
+    slug = Column(Text, unique=True, nullable=True)
+    qr_code_url = Column(Text, nullable=True)
+    description = Column(Text, nullable=True)
+    status = Column(Text, nullable=True, default="Vacant")
+    section = Column(Text, nullable=True)
+    location_zone = Column(Text, nullable=True)
+    sort_order = Column(Integer, nullable=True)
+    is_active = Column(Boolean, nullable=False, default=True)
+    created_by = Column(Text, nullable=True)
+    updated_by = Column(Text, nullable=True)
+    created_at = Column(DateTime, default=func.now())
+    updated_at = Column(DateTime, default=func.now(), onupdate=func.now())
+>>>>>>> 1608bc1aac33ff82334ae31132613f84dc3e5086
 
     @staticmethod
-    def copyToModel(table): 
+    def copyToModel(table):
         model = Table(**table.__dict__)
         model.__dict__.pop("_sa_instance_state", None)
         return model
@@ -39,6 +75,3 @@ class DiningTable(Base):
         for m in models:
             m.__dict__.pop("_sa_instance_state", None)
         return models
-    
-
-

@@ -24,15 +24,16 @@ class DineinOrder(Base):
     created_by = Column(String, nullable=True)
     updated_by = Column(String, nullable=True)
     created_at = Column(DateTime, default=datetime.datetime.utcnow)
-    updated_at = Column(DateTime, default=datetime.datetime.utcnow, onupdate=datetime.datetime.utcnow)
+    updated_at = Column(DateTime, default=datetime.datetime.utcnow,
+                        onupdate=datetime.datetime.utcnow)
     status = Column(String, nullable=True)
-    items = relationship("OrderItem", backref="order", cascade="all, delete-orphan")
-
+    items = relationship("OrderItem", backref="order",
+                         cascade="all, delete-orphan")
 
     @staticmethod
     def copyToModel(dineinOrder):
         """Convert SQLAlchemy DineinOrders entities into Pydantic models."""
-        dineinOrderModel = DineinOrderModel(**order.__dict__)
+        dineinOrderModel = DineinOrderModel(**dineinOrder.__dict__)
         dineinOrderModel.__dict__.pop("_sa_instance_state", None)
         return dineinOrderModel
 
@@ -44,7 +45,8 @@ class DineinOrder(Base):
     @staticmethod
     def copyToModels(dinein_orders):
         """Convert SQLAlchemy DineinOrders entities into Pydantic models."""
-        dineinOrdersModels = [DineinOrderModel(**order.__dict__) for order in dinein_orders]
+        dineinOrdersModels = [DineinOrderModel(
+            **order.__dict__) for order in dinein_orders]
 
         # Remove SQLAlchemy metadata (_sa_instance_state)
         for model in dineinOrdersModels:
@@ -58,8 +60,6 @@ class DineinOrder(Base):
         return [DineinOrder(**model.dict(exclude_unset=True)) for model in dinein_orders_models]
 
 
-
-
 # OrderItems Table
 class OrderItem(Base):
     __tablename__ = "order_item"
@@ -67,7 +67,7 @@ class OrderItem(Base):
     id = Column(Integer, primary_key=True)
     client_id = Column(String, nullable=True)
     order_id = Column(Integer, ForeignKey("dinein_order.id"))
-    item_id = Column(String, nullable=True)
+    item_id = Column(Integer, nullable=True)
     quantity = Column(Integer, nullable=True)
     status = Column(String, nullable=True)
 
@@ -86,7 +86,8 @@ class OrderItem(Base):
     @staticmethod
     def copyToModels(order_items):
         """Convert SQLAlchemy OrderItems entities into Pydantic models."""
-        orderItemModels = [OrderItemModel(**item.__dict__) for item in order_items]
+        orderItemModels = [OrderItemModel(**item.__dict__)
+                           for item in order_items]
         for model in orderItemModels:
             model.__dict__.pop("_sa_instance_state", None)
         return orderItemModels
@@ -94,5 +95,4 @@ class OrderItem(Base):
     @staticmethod
     def copyFromModels(order_item_models):
         """Convert Pydantic OrderItems models into SQLAlchemy entities."""
-        return [OrderItems(**model.dict(exclude_unset=True)) for model in order_item_models]
-
+        return [OrderItem(**model.dict(exclude_unset=True)) for model in order_item_models]

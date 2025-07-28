@@ -1,6 +1,6 @@
-from fastapi import APIRouter, Depends, HTTPException
+from fastapi import APIRouter, Depends, HTTPException, Query
 from sqlalchemy.orm import Session
-from typing import List
+from typing import List, Optional
 from database.postgres import get_db
 from models.inventory_model import Inventory
 from entity.inventory_entity import InventoryEntity
@@ -9,6 +9,7 @@ from entity.inventory_entity import CategoryEntity
 from models.response_model import ResponseModel
 from models.saas_context import SaasContext
 from utils.auth import verify_token
+from app.services import service
 
 router = APIRouter()
 
@@ -56,11 +57,14 @@ def delete_inventory(client_id: str, item: Inventory, context: SaasContext = Dep
 
 # -------------------- CATEGORY ROUTES --------------------
 
-@router.get("/read_category", response_model=ResponseModel[List[Category]])
-def read_categories(client_id: str, context: SaasContext = Depends(verify_token), db: Session = Depends(get_db)):
+@router.get("/read_category", response_model=ResponseModel)
+def read_categories(client_id: str, category_id: Optional[str] = Query(None), context: SaasContext = Depends(verify_token), db: Session = Depends(get_db)):
     records = db.query(CategoryEntity).filter(CategoryEntity.client_id == client_id).all()
     models = CategoryEntity.copyToModels(records)
-    return ResponseModel[List[Category]](screen_id=context.screen_id, status="success", message="Fetched categories", data=models)
+    print("models - ", models)
+    categoryTree = service.build_category_tree(models, category_id)
+    print("categoryTree - ", categoryTree)
+    return ResponseModel(screen_id=context.screen_id, status="success", message="Fetched categories", data=categoryTree)
 
 @router.post("/create_category", response_model=ResponseModel[Category])
 def create_category(category: Category, client_id: str, context: SaasContext = Depends(verify_token), db: Session = Depends(get_db)):
