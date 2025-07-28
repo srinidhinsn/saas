@@ -1,4 +1,4 @@
-sCREATE TABLE dinein_order (
+CREATE TABLE dinein_order (
     id bigint NOT NULL,
     client_id text,
     dinein_order_id text,
@@ -146,43 +146,45 @@ ALTER TABLE client OWNER TO postgres;
 
 
 
-CREATE TABLE "Person" (
+CREATE TABLE person (
     id text NOT NULL,
-    "firstName" text,
-    "lastName" text,
+    first_name text,
+    last_name text,
     dob text,
     email text,
     phone text,
-    "personType" text,
-    "savedAddressIds" bigint[],
-    "createdDateTime" TIMESTAMP DEFAULT CURRENT_TIMESTAMP,
-    "updatedDateTime" TIMESTAMP DEFAULT CURRENT_TIMESTAMP
+    person_type text,
+    saved_address_ids bigint[],
+    created_by text,
+    updated_by text,
+    created_at TIMESTAMP DEFAULT CURRENT_TIMESTAMP,
+    updated_at TIMESTAMP DEFAULT CURRENT_TIMESTAMP
 );
 
 
-ALTER TABLE "Person" OWNER TO postgres;
+ALTER TABLE person OWNER TO postgres;
 
 
 
 
-CREATE TABLE "Address" (
+CREATE TABLE "address" (
     id bigint NOT NULL,
-    "addressLine1" text,
-    "addressLine2" text,
+    address_line1 text,
+    address_line2 text,
     city text,
     country text,
     "state" text,
     pincode text,
-    "contactName" text,
-    "contactNumber" text,
-    "createdDateTime" TIMESTAMP DEFAULT CURRENT_TIMESTAMP,
-    "updatedDateTime" TIMESTAMP DEFAULT CURRENT_TIMESTAMP
+    contact_name text,
+    contact_number text,
+    created_at TIMESTAMP DEFAULT CURRENT_TIMESTAMP,
+    updated_at TIMESTAMP DEFAULT CURRENT_TIMESTAMP
 );
 
 
-ALTER TABLE "Address" OWNER TO postgres;
+ALTER TABLE "address" OWNER TO postgres;
 
-ALTER TABLE "Address" ALTER COLUMN id ADD GENERATED ALWAYS AS IDENTITY (
+ALTER TABLE "address" ALTER COLUMN id ADD GENERATED ALWAYS AS IDENTITY (
     SEQUENCE NAME address_id_seq
     START WITH 1000
     INCREMENT BY 1
@@ -198,8 +200,8 @@ CREATE TABLE category (
     description text,
     sub_categories text[],
     slug text,
-    created_by bigint,
-    updated_by bigint,
+    created_by text,
+    updated_by text,
     created_at TIMESTAMP DEFAULT CURRENT_TIMESTAMP,
     updated_at TIMESTAMP DEFAULT CURRENT_TIMESTAMP
 );
@@ -219,8 +221,8 @@ CREATE TABLE document (
     url text,
     path text,
     is_active boolean,
-    created_by bigint,
-    last_read_by bigint,
+    created_by text,
+    last_read_by text,
     created_date_time TIMESTAMP DEFAULT CURRENT_TIMESTAMP,
     last_read_date_time TIMESTAMP DEFAULT CURRENT_TIMESTAMP
 );
@@ -234,6 +236,7 @@ CREATE TABLE document_version (
     url text,
     path text,
     status text,
+    category_id text,
     created_by bigint,
     last_read_by bigint,
     created_date_time TIMESTAMP DEFAULT CURRENT_TIMESTAMP,
@@ -319,6 +322,11 @@ INSERT INTO "user" (username, hashed_password, id, client_id, roles, grants) OVE
 
 
 INSERT INTO category (id, client_id, name, description, sub_categories, created_by, updated_by) OVERRIDING SYSTEM VALUE VALUES 
+('dietery', 'easyfood', 'Dietery', 'Dietry type', '{"dietery_01", "dietery_02", "dietery_03", "dietery_04"}', '1000', '1000'),
+('dietery_01', 'easyfood', 'Veg', 'Veg only', null, '1000', '1000'),
+('dietery_02', 'easyfood', 'Non-Veg', 'Non veg', null, '1000', '1000'),
+('dietery_03', 'easyfood', 'Vegan', 'Jain food', null, '1000', '1000'),
+('dietery_04', 'easyfood', 'Eggeterian', 'Egg food', null, '1000', '1000'),
 ('chinese_01', 'easyfood', 'Chinese', 'Chinese delicious', '{"chinese_02", "chinese_03"}', '1000', '1000'),
 ('chinese_02', 'easyfood', 'Noodles', 'Noodles special delicious',null, '1000', '1000'),
 ('chinese_03', 'easyfood', 'Soups', 'Soups special delicious',null, '1000', '1000'),

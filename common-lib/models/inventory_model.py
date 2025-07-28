@@ -1,7 +1,9 @@
-from typing import Optional, List
+from typing import Optional, List, TypeVar, Generic
 from pydantic import BaseModel
 from datetime import datetime
 
+# Define a generic type variable
+Q = TypeVar("Q")
 
 class Inventory(BaseModel):
     id: Optional[int] = None
@@ -33,12 +35,12 @@ class Inventory(BaseModel):
         orm_mode = True
 
 
-class Category(BaseModel):
+class Category(BaseModel, Generic[Q]):
     id: Optional[str] = None
     client_id: Optional[str] = None
     name: Optional[str] = None
     description: Optional[str] = None
-    sub_categories: Optional[List[str]] = None
+    sub_categories: Optional[List[Q]] = None
     slug: Optional[str] = None
     created_by: Optional[str] = None
     updated_by: Optional[str] = None
