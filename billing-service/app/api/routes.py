@@ -9,7 +9,9 @@ from database.postgres import get_db
 from ..services.billing_service import (
     create_billing_document,
     get_billing_document_by_id,
-    get_billing_documents
+    get_billing_documents,
+    soft_delete_billing_document,
+    update_billing_document_service
 )
 
 router = APIRouter()
