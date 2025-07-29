@@ -952,8 +952,6 @@
 //
 
 
-
-
 import React, { useEffect, useState } from "react";
 import axios from "axios";
 import { FaEdit, FaTrash } from "react-icons/fa";
@@ -974,6 +972,8 @@ function CategoryList({ onCategorySelect }) {
   const [newSubcategories, setNewSubcategories] = useState([]);
   const [deleteTarget, setDeleteTarget] = useState(null);
   const [newId, setNewId] = useState(""); const [activeCategory, setActiveCategory] = useState(null);
+  const [expandedCategoryIds, setExpandedCategoryIds] = useState([]);
+
 
   const { clientId } = useParams();
   const token = localStorage.getItem("access_token");
@@ -986,15 +986,97 @@ function CategoryList({ onCategorySelect }) {
         Authorization: `Bearer ${token}`,
       },
     })
-      .then(res => {
+      .then((res) => {
+        const rawCategories = res.data.data;
+
+        // Get all subcategory IDs
+        const subCategoryIds = new Set();
+        rawCategories.forEach(cat => {
+          cat.subCategories?.forEach(sub => subCategoryIds.add(sub.id));
+        });
+
+        // Filter top-level categories (exclude subcategories)
+        const topLevelCategories = rawCategories.filter(cat => !subCategoryIds.has(cat.id));
+
         const allCategory = { id: "all", name: "All" };
-        const filteredCategories = res.data.data.filter(cat => cat.name?.toLowerCase() !== "all");
-        setCategories([allCategory, ...filteredCategories]);
+        setCategories([allCategory, ...topLevelCategories]);
         setActiveCategory("all");
       })
-
-      .catch(err => console.error("❌ Error fetching categories:", err));
+      .catch((err) => console.error("❌ Error fetching categories:", err));
   }, [clientId, token]);
+
+
+  const toggleCategoryExpand = (id) => {
+    setExpandedCategoryIds(prev =>
+      prev.includes(id) ? prev.filter(i => i !== id) : [...prev, id]
+    );
+  };
+
+  const renderCategory = (category, level = 0) => {
+    const isParent = level === 0;
+
+    return (
+      <div key={category.id} style={{ marginLeft: level * 5 }}>
+        <div className="category-item" style={{ display: "flex", alignItems: "center" }}>
+          <span
+            onClick={() => onCategorySelect(category)}
+            style={{
+              cursor: "pointer",
+              fontWeight: "bold",
+              flexGrow: 1,
+              color: isParent ? "#003366" : "#444444"
+            }}
+          >
+            {category.name}
+          </span>
+
+          {/* Dropdown symbol */}
+          {category.subCategories?.length > 0 && (
+            <span
+              onClick={(e) => {
+                e.stopPropagation();
+                toggleCategoryExpand(category.id);
+              }}
+              style={{ cursor: "pointer", marginLeft: 8 }}
+            >
+              ▾
+            </span>
+          )}
+
+          {/* Show Edit/Delete only for subcategories (not parent categories) */}
+          <>
+            <button
+              className="btn-edit"
+              onClick={(e) => {
+                e.stopPropagation();
+                startEdit(category);
+              }}
+            >
+              <FaEdit />
+            </button>
+            <button
+              className="btn-delete"
+              onClick={(e) => {
+                e.stopPropagation();
+                setDeleteTarget(category);
+              }}
+            >
+              <FaTrash />
+            </button>
+          </>
+        </div>
+
+        {/* Recursive rendering of subcategories */}
+        {expandedCategoryIds.includes(category.id) &&
+          category.subCategories?.map((sub) =>
+            renderCategory(sub, level + 1)
+          )}
+      </div>
+    );
+  };
+
+
+
 
   const toggleSubcategory = (id, isEdit = false) => {
     const state = isEdit ? editSubcategories : newSubcategories;
@@ -1006,6 +1088,31 @@ function CategoryList({ onCategorySelect }) {
         : [...state, id]
     );
   };
+
+  const slumCreating = (categoryIdOrParentId, nameOverride = null) => {
+    const path = [];
+
+    const findPath = (currentId) => {
+      const current = categories.find(cat => cat.id === currentId);
+      if (!current) return;
+      if (current.parent_id) findPath(current.parent_id); // go up the tree first
+      path.push(current.name.trim().replace(/\s+/g, "_")); // add this category
+    };
+
+    if (categoryIdOrParentId) {
+      findPath(categoryIdOrParentId);
+    }
+
+    if (nameOverride) {
+      path.push(nameOverride.trim().replace(/\s+/g, "_"));
+    }
+
+    return `_${path.join(" ")}`;
+  };
+
+
+
+
 
   const handleAddCategory = async () => {
     if (!newId.trim() || !newName.trim()) {
@@ -1032,6 +1139,7 @@ function CategoryList({ onCategorySelect }) {
       sub_categories: newSubcategories,
       created_by: createdBy,
       updated_by: updatedBy,
+      slug: slumCreating(newSubcategories[0], newName)
     };
 
     try {
@@ -1098,17 +1206,15 @@ function CategoryList({ onCategorySelect }) {
   };
 
 
-  const handleDelete = async (categoryId) => {
-    const category = categories.find((cat) => cat.id === categoryId);
-    if (!category) return;
+  const handleDelete = async () => {
+    if (!deleteTarget) return;
+    const category = deleteTarget;
+    console.log("Deleting category ID:", category.id);
 
     try {
       const res = await axios.post(
         `http://localhost:8002/saas/${clientId}/inventory/delete_category`,
-        {
-          id: category.id,
-          name: category.name, // optional, included for clarity
-        },
+        { id: category.id },
         {
           headers: {
             Authorization: `Bearer ${token}`,
@@ -1117,16 +1223,16 @@ function CategoryList({ onCategorySelect }) {
         }
       );
 
-      // Update UI
-      const updatedCategories = categories.filter((c) => c.id !== category.id);
-      setCategories(updatedCategories);
-      setDeleteTarget(null); // close modal
+      // Remove from state
+      setCategories(categories.filter((c) => c.id !== category.id));
+      setDeleteTarget(null);
       alert(res.data.message || "Category deleted successfully");
     } catch (err) {
       console.error("Delete error:", err.response?.data || err);
       alert(err.response?.data?.detail || "Failed to delete category");
     }
   };
+
 
 
 
@@ -1141,30 +1247,9 @@ function CategoryList({ onCategorySelect }) {
       </div>
 
       <ul className="category-list">
-        {categories.map((cat) => (
-          <li
-            key={cat.id}
-            className="category-item"
-            onClick={() => onCategorySelect(cat)}
-          >
-            {cat.name}
-            <span className="category-name"></span>
-            {cat.name !== "All" && (
-              <div className="category-actions">
-
-                <button onClick={() => startEdit(cat)} className="edit-btn">
-                  <FaEdit />
-                </button>
-                <button
-                  onClick={() => setDeleteTarget(cat)}
-                  className="delete-btn"
-                >
-                  <FaTrash />
-                </button>
-              </div>
-            )}
-          </li>
-        ))}
+        {categories.map((cat) =>
+          cat.name === "All" ? null : renderCategory(cat)
+        )}
       </ul>
 
       {/* Add Modal */}

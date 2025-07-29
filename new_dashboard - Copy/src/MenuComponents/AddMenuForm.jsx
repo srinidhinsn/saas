@@ -897,6 +897,30 @@ function AddInventoryItemForm({ onItemCreated }) {
   const [categories, setCategories] = useState([]);
   const [lineItems, setLineItems] = useState([]);
 
+  const buildCategoryPath = (categoryId) => {
+    const path = [];
+    let currentId = categoryId;
+
+    while (currentId) {
+      const current = categories.find(cat => cat.id === currentId);
+      if (!current) break;
+      path.unshift(current.name.trim().replace(/\s+/g, "_"));
+      currentId = current.parent_id;
+    }
+
+    return path;
+  };
+
+  const generateSlug = (categoryId, itemName) => {
+    const catPath = buildCategoryPath(categoryId);
+    const item = itemName?.trim().replace(/\s+/g, "_") || "";
+    if (!catPath.includes(item)) catPath.push(item);
+
+    return `_${catPath.join("_")}`;
+  };
+
+
+
   useEffect(() => {
     if (!token || !clientId) return;
 
@@ -927,6 +951,14 @@ function AddInventoryItemForm({ onItemCreated }) {
   const handleChange = (index, field, value) => {
     const updated = [...items];
     updated[index][field] = value ?? "";
+
+    //slug generating code 
+    const name = field === "name" ? value : updated[index].name;
+    const catId = field === "category_id" ? value : updated[index].category_id;
+
+    if (name && catId) {
+      updated[index].slug = generateSlug(catId, name);
+    }
     setItems(updated);
   };
 

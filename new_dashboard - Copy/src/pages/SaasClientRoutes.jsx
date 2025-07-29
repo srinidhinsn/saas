@@ -20,6 +20,8 @@ import KitchenDisplay from "../KDS/KitchenDisplay";
 import InvoicePage from "../InvoiceComponents/InvoicePage";
 import ReportsPage from "../ReportComponents/ReportsPage";
 import TableOverview from "../TableOverviewComponents/TableOverview";
+import Documents from "../DocumentsComponents/Documents";
+import BillingPage from "../BillingComponent/BillingPage";
 
 const SaasClientRoutes = ({
     selectedTableId,
@@ -83,7 +85,7 @@ const SaasClientRoutes = ({
     }, [clientId]);
 
     return (
-        <div style={{ display: "flex"  }}>
+        <div style={{ display: "flex" }}>
             {!hideNavbar && <Navbar />}
             <div style={{ flex: 1 }}>
                 <Routes>
@@ -93,7 +95,7 @@ const SaasClientRoutes = ({
                     {/* <Route path="dinein-page" element={<MenuManager clientId={clientId} />} /> */}
                     <Route path="swiggy-page" element={<SwiggyMenuManager clientId={clientId} />} />
                     <Route path="zomato-page" element={<ZomatoMenuManager clientId={clientId} />} />
-                    <Route path="menu-page" element={<MenuManager clientId={clientId} />} />
+                    <Route path="menu-page/*" element={<MenuManager clientId={clientId} />} />
                     <Route
                         path="table-selection"
                         element={
@@ -117,6 +119,8 @@ const SaasClientRoutes = ({
                     <Route path="orders-view" element={<OrdersVisiblePage latestOrder={latestOrder} />} />
                     <Route path="combo-page" element={<ComboPage />} />
                     <Route path="kds-page" element={<KitchenDisplay />} />
+                    <Route path="documents" element={<Documents />} />
+                    <Route path="billing" element={<BillingPage />} />
                     <Route path="invoice" element={<InvoicePage />} />
                     <Route path="report-page" element={<ReportsPage />} />
                     <Route path="add-users" element={<ReportsPage />} />

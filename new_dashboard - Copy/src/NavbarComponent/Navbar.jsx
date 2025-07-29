@@ -142,7 +142,7 @@ import { MdOutlineMenuBook, MdOutlineRateReview, MdOutlineTableBar } from "react
 import { FcComboChart } from "react-icons/fc";
 import { FaKitchenSet, FaFileInvoiceDollar, FaUserPlus, FaTableCells } from "react-icons/fa6";
 import { MdKeyboardArrowRight } from "react-icons/md";
-
+import { IoDocumentTextOutline } from "react-icons/io5";
 const Navbar = () => {
     const navigate = useNavigate();
     const location = useLocation();
@@ -231,6 +231,14 @@ const Navbar = () => {
                 <li title="Invoice" onClick={() => go('/invoice')} className={isActive('/main/invoice') ? 'page-active' : ''}>
                     <FaFileInvoiceDollar /><span>Invoice</span>
                     {!isActive('/main/invoice') && <span className="arrow-indicator"><MdKeyboardArrowRight /></span>}
+                </li>
+                {/* <li title="Documents" onClick={() => go('/documents')} className={isActive('/main/documents') ? 'page-active' : ''}>
+                    <IoDocumentTextOutline /><span>Documents</span>
+                    {!isActive('/main/documents') && <span className="arrow-indicator"><MdKeyboardArrowRight /></span>}
+                </li> */}
+                <li title="Billing" onClick={() => go('/billing')} className={isActive('/main/billing') ? 'page-active' : ''}>
+                    <IoDocumentTextOutline /><span>Billing</span>
+                    {!isActive('/main/billing') && <span className="arrow-indicator"><MdKeyboardArrowRight /></span>}
                 </li>
                 <li title="Add Users" onClick={() => go('/add-users')} className={isActive('/main/add-users') ? 'page-active' : ''}>
                     <FaUserPlus /><span>Add Users</span>
