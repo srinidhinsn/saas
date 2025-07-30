@@ -347,7 +347,9 @@ const BillingPage = () => {
 
     useEffect(() => {
         fetchRecords(); fetchOrders(); fetchTables()
-    }, []);
+    }, []); useEffect(() => {
+        console.log("Fetched orders:", orders);
+    }, [orders]);
     const fetchTables = async () => {
         try {
             const res = await axios.get(`http://localhost:8001/saas/${clientId}/tables/read`, { headers });
@@ -403,7 +405,11 @@ const BillingPage = () => {
                         }}
                     >
                         <option value="">Select Table</option>
-                        {[...new Set(orders.map((o) => o.table_id))].map((tid) => {
+                        {[...new Set(
+                            orders
+                                .filter((order) => order.status?.trim().toLowerCase() === "served")
+                                .map((o) => o.table_id)
+                        )].map((tid) => {
                             const table = tables.find((t) => t.id === tid);
                             return (
                                 <option key={tid} value={tid}>
@@ -411,6 +417,8 @@ const BillingPage = () => {
                                 </option>
                             );
                         })}
+
+
                     </select>
 
 

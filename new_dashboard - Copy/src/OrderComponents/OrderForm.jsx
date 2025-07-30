@@ -79,9 +79,9 @@ const OrderForm = ({ table, onOrderCreated }) => {
 
     const generateNextInvoiceId = () => {
         let count = parseInt(localStorage.getItem("invoice_id_counter") || "0", 10); // Start from 0
-        count += 1; // First will be 1
+        count += 1;
         localStorage.setItem("invoice_id_counter", count);
-        return `${count}`;  // Just numbers: 1, 2, 3, ...
+        return `${count}`;
     };
 
 
@@ -92,35 +92,38 @@ const OrderForm = ({ table, onOrderCreated }) => {
 
     useEffect(() => {
         const handleAddItem = (e) => {
-          const { item, addonItem } = e.detail;
-      
-          const updatedOrder = [...orderItems];
-      
-          // Add main item
-          const existingMain = updatedOrder.find(i => i.id === item.id);
-          if (existingMain) {
-            existingMain.quantity += 1;
-          } else {
-            updatedOrder.push({ ...item, quantity: 1, note: "" });
-          }
-      
-          // Add add-on item (if selected)
-          if (addonItem) {
-            const existingAddon = updatedOrder.find(i => i.id === addonItem.id);
-            if (existingAddon) {
-              existingAddon.quantity += 1;
+            const { item, addonItem } = e.detail;
+
+            const updatedOrder = [...orderItems];
+
+            // Add main item
+            const existingMain = updatedOrder.find(i => i.id === item.id);
+            if (existingMain) {
+                existingMain.quantity += 1;
             } else {
-              updatedOrder.push({ ...addonItem, quantity: 1, note: "" });
+                updatedOrder.push({ ...item, quantity: 1, note: "" });
             }
-          }
-      
-          setOrderItems(updatedOrder);
+
+            // Add add-on item (if selected)
+            if (addonItem) {
+                const existingAddon = updatedOrder.find(i => i.id === addonItem.id);
+                if (existingAddon) {
+                    existingAddon.quantity += 1;
+                } else {
+                    updatedOrder.push({
+                        ...addonItem, quantity: 1, note: "",
+                        slug: item.slug || generateSlug(item.name),
+                    });
+                }
+            }
+
+            setOrderItems(updatedOrder);
         };
-      
+
         document.addEventListener("add-item", handleAddItem);
         return () => document.removeEventListener("add-item", handleAddItem);
-      }, [orderItems]);
-      
+    }, [orderItems]);
+
 
     const openNoteEditor = (item) => {
         setCurrentItemForNote(item);
@@ -151,6 +154,13 @@ const OrderForm = ({ table, onOrderCreated }) => {
     //     if (mode === "Delivery" || mode === "Pick Up") total += 10;
     //     return total.toFixed(2);
     // };
+    const generateSlug = (text) =>
+        "_" +
+        text
+            .trim()
+            .replace(/[^a-zA-Z0-9\s]/g, "")
+            .replace(/\s+/g, "_");
+
 
     const handlePlaceOrder = () => {
         if (!selectedTable && mode === "Dine In") {
@@ -197,7 +207,9 @@ const OrderForm = ({ table, onOrderCreated }) => {
                 item_id: Number(item.id),
                 quantity: Number(item.quantity),
                 status: item.status || "new",
-                note: item.note || ""
+                note: item.note || "",
+                item_name: item.name,
+                slug: item.slug || generateSlug(item.name),
             }))
         };
 

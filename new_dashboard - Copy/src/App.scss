@@ -2651,3 +2651,500 @@ body.theme-dark {
         color: #66b2ff;
     }
 }
+
+//  ========================================================= //
+// =========================================================== Document Services Stylings ================================================================================ //
+
+.document-manager {
+    padding: 20px;
+    font-family: Arial, sans-serif;
+
+    h2,
+    h3 {
+        margin-bottom: 10px;
+    }
+
+    .form-section {
+        margin-bottom: 20px;
+
+        .File-Upload {
+            height: 30px;
+            width: 300px;
+            background: white;
+
+        }
+
+        input {
+            margin-right: 10px;
+            padding: 6px;
+            outline: none;
+        }
+
+        .btn {
+            padding: 6px 12px;
+            border: none;
+            color: white;
+            cursor: pointer;
+            margin-right: 10px;
+
+            &.upload-btn {
+                background-color: #4caf50;
+            }
+
+            &.replace-btn {
+                background-color: #2196f3;
+            }
+        }
+    }
+
+    .table-container {
+        overflow-x: auto;
+
+        table {
+            width: 100%;
+            min-width: 800px;
+            border-collapse: collapse;
+            font-size: 14px;
+
+            th,
+            td {
+                border: 1px solid #ddd;
+                padding: 8px;
+                text-align: left;
+            }
+
+            thead {
+                background-color: #f2f2f2;
+            }
+
+            .btn {
+                padding: 4px 8px;
+                border: none;
+                margin-right: 5px;
+                color: white;
+                cursor: pointer;
+
+                &.download-btn {
+                    background-color: lightgreen;
+                }
+
+                &.replace-action-btn {
+                    background-color: red;
+                }
+            }
+        }
+
+        @media screen and (max-width: 768px) {
+
+            .table-container table,
+            .table-container thead,
+            .table-container tbody,
+            .table-container th,
+            .table-container td,
+            .table-container tr {
+                display: block;
+                width: 100%;
+            }
+
+            .table-container thead {
+                display: none;
+            }
+
+            .table-container tr {
+                margin-bottom: 15px;
+                border: 1px solid #ccc;
+                padding: 10px;
+                border-radius: 8px;
+                background-color: #fff;
+            }
+
+            .table-container td {
+                padding: 10px;
+                text-align: left;
+                position: relative;
+            }
+
+            .table-container td::before {
+                content: attr(data-label);
+                position: absolute;
+                left: 10px;
+                top: 10px;
+                font-weight: bold;
+                color: #555;
+            }
+
+            .table-container td {
+                padding-left: 120px;
+                /* space for label */
+            }
+
+            .table-container .btn {
+                width: 100%;
+                margin-top: 5px;
+            }
+        }
+
+    }
+}
+
+
+
+
+// ========================================================== Billing StyleSheet ===================================================== //
+// .billing-page {
+//     max-width: 960px;
+//     margin: 2rem auto;
+//     padding: 2.5rem;
+//     background: #ffffff;
+//     border-radius: 16px;
+//     box-shadow: 0 8px 24px rgba(0, 0, 0, 0.06);
+//     font-family: 'Segoe UI', sans-serif;
+//     height: 95vh;
+//     overflow-y: auto;
+//     color: #212529;
+
+//     h2 {
+//         text-align: center;
+//         font-size: 2.25rem;
+//         font-weight: 600;
+//         margin-bottom: 2.5rem;
+//         color: #0d6efd;
+//     }
+
+//     .billing-form {
+//         display: grid;
+//         grid-template-columns: repeat(auto-fit, minmax(280px, 1fr));
+//         gap: 1.75rem;
+//     }
+
+//     .form-group {
+//         position: relative;
+
+//         label {
+//             position: absolute;
+//             top: 1.1rem;
+//             left: 1rem;
+//             font-size: 1rem;
+//             color: #6c757d;
+//             transition: all 0.2s ease;
+//             background: #fff;
+//             padding: 0 0.3rem;
+//             pointer-events: none;
+//         }
+
+//         input,
+//         select,
+//         textarea {
+//             width: 100%;
+//             font-size: 1rem;
+//             padding: 1.4rem 1rem 0.5rem;
+//             border: 1px solid #dee2e6;
+//             border-radius: 8px;
+//             background: #f8f9fa;
+//             transition: border 0.25s, background 0.25s;
+
+//             &:focus {
+//                 border-color: #0d6efd;
+//                 background: #fff;
+//             }
+
+//             &:focus+label,
+//             &:not(:placeholder-shown)+label,
+//             &.filled+label {
+//                 top: 0.3rem;
+//                 left: 0.75rem;
+//                 font-size: 0.75rem;
+//                 color: #0d6efd;
+//                 background: #fff;
+//             }
+//         }
+
+//         textarea {
+//             resize: vertical;
+//             min-height: 100px;
+//         }
+
+//         select {
+//             appearance: none;
+
+//             &+label {
+//                 top: 0.3rem;
+//                 left: 0.75rem;
+//                 font-size: 0.75rem;
+//                 color: #0d6efd;
+//             }
+//         }
+//     }
+
+//     button[type='submit'] {
+//         margin-top: 2rem;
+//         grid-column: span 2;
+//         padding: 0.9rem 2rem;
+//         background: #0d6efd;
+//         color: white;
+//         border: none;
+//         font-size: 1rem;
+//         font-weight: 600;
+//         border-radius: 10px;
+//         cursor: pointer;
+//         justify-self: end;
+//         box-shadow: 0 4px 10px rgba(13, 110, 253, 0.25);
+//         transition: background 0.3s, transform 0.2s;
+
+//         &:hover {
+//             background: #0b5ed7;
+//             transform: translateY(-1px);
+//         }
+
+//         &:active {
+//             transform: scale(0.98);
+//         }
+//     }
+
+//     .billing-list {
+//         margin-top: 3rem;
+//         list-style: none;
+//         padding: 0;
+
+//         li {
+//             background: #f1f3f5;
+//             padding: 1.5rem;
+//             border-left: 5px solid #0d6efd;
+//             border-radius: 10px;
+//             margin-bottom: 1rem;
+//             box-shadow: 0 3px 8px rgba(0, 0, 0, 0.05);
+//             transition: transform 0.2s;
+
+//             &:hover {
+//                 transform: translateY(-2px);
+//                 background: #e9ecef;
+//             }
+
+//             strong {
+//                 display: block;
+//                 margin-bottom: 0.5rem;
+//                 font-size: 1.1rem;
+//                 color: #212529;
+//             }
+
+//             button {
+//                 margin-top: 0.5rem;
+//                 margin-right: 0.5rem;
+//                 background: #dee2e6;
+//                 border: none;
+//                 padding: 0.5rem 1.1rem;
+//                 font-weight: 500;
+//                 border-radius: 6px;
+//                 cursor: pointer;
+//                 transition: background 0.2s;
+
+//                 &:hover {
+//                     background: #ced4da;
+//                 }
+//             }
+//         }
+//     }
+
+//     @media (max-width: 768px) {
+//         margin: 1rem;
+//         padding: 1.5rem;
+//     }
+
+//     @media (max-width: 600px) {
+//         .billing-form {
+//             grid-template-columns: 1fr;
+//         }
+
+//         button[type='submit'] {
+//             justify-self: center;
+//             width: 100%;
+//         }
+//     }
+// }
+
+//
+
+.billing-page {
+    padding: 2rem;
+    height: 100vh;
+    overflow-y: auto;
+    background: linear-gradient(to bottom right, #fdfdff, #f5f7fa);
+    animation: fadeIn 0.6s ease;
+    font-family: 'Segoe UI', sans-serif;
+    color: #212529;
+
+    h2 {
+        font-size: 2rem;
+        font-weight: 700;
+        margin-bottom: 1.5rem;
+        color: #0d6efd;
+        animation: slideDown 0.5s ease;
+    }
+
+    .billing-form {
+        display: grid;
+        grid-template-columns: repeat(auto-fit, minmax(260px, 1fr));
+        gap: 1.2rem;
+        animation: fadeInUp 0.6s ease;
+    }
+
+    .form-group {
+        position: relative;
+        display: flex;
+        flex-direction: column;
+        padding: 1rem;
+        background: #ffffff;
+        border-radius: 10px;
+        border: 1px solid #e0e0e0;
+        transition: all 0.3s ease;
+        box-shadow: 0 1px 3px rgba(0, 0, 0, 0.05);
+
+        &:hover {
+            box-shadow: 0 2px 6px rgba(0, 0, 0, 0.08);
+        }
+
+        label {
+            font-weight: 600;
+            margin-bottom: 0.5rem;
+            color: #555;
+            font-size: 0.875rem;
+        }
+
+        input,
+        select,
+        textarea {
+            padding: 0.75rem 1rem;
+            font-size: 1rem;
+            border: 1px solid #ced4da;
+            border-radius: 8px;
+            background: #f8f9fa;
+            transition: border 0.3s ease, box-shadow 0.3s ease;
+
+            &:focus {
+                border-color: #0d6efd;
+                box-shadow: 0 0 0 3px rgba(13, 110, 253, 0.15);
+                outline: none;
+            }
+        }
+
+        textarea {
+            resize: vertical;
+            min-height: 100px;
+        }
+    }
+
+    button[type="submit"] {
+        margin-top: 1.5rem;
+        padding: 0.9rem 2rem;
+        background: #0d6efd;
+        color: white;
+        border: none;
+        border-radius: 8px;
+        font-weight: 600;
+        font-size: 1rem;
+        cursor: pointer;
+        transition: background 0.3s ease, transform 0.2s ease;
+        justify-self: start;
+
+        &:hover {
+            background: #0b5ed7;
+            transform: translateY(-2px);
+        }
+
+        &:active {
+            transform: scale(0.97);
+        }
+    }
+
+    .billing-list {
+        margin-top: 2rem;
+        animation: fadeInUp 0.5s ease;
+        list-style: none;
+        padding: 0;
+
+        li {
+            background: #f8f9fa;
+            padding: 1rem 1.5rem;
+            border-left: 4px solid #0d6efd;
+            border-radius: 8px;
+            margin-bottom: 1rem;
+            transition: all 0.3s;
+
+            &:hover {
+                background: #e9ecef;
+                transform: translateY(-2px);
+            }
+
+            strong {
+                display: block;
+                font-size: 1rem;
+                margin-bottom: 0.5rem;
+            }
+
+            button {
+                background: #dee2e6;
+                border: none;
+                padding: 0.4rem 1rem;
+                font-weight: 500;
+                border-radius: 6px;
+                cursor: pointer;
+                margin-right: 0.5rem;
+                transition: background 0.2s;
+
+                &:hover {
+                    background: #ced4da;
+                }
+            }
+        }
+    }
+
+    // Responsive adjustments
+    @media (max-width: 768px) {
+        padding: 1rem;
+    }
+
+    @media (max-width: 500px) {
+        .billing-form {
+            grid-template-columns: 1fr;
+        }
+
+        button[type="submit"] {
+            width: 100%;
+        }
+    }
+}
+
+// Animations
+@keyframes fadeIn {
+    from {
+        opacity: 0;
+    }
+
+    to {
+        opacity: 1;
+    }
+}
+
+@keyframes fadeInUp {
+    from {
+        transform: translateY(20px);
+        opacity: 0;
+    }
+
+    to {
+        transform: translateY(0);
+        opacity: 1;
+    }
+}
+
+@keyframes slideDown {
+    from {
+        transform: translateY(-10px);
+        opacity: 0;
+    }
+
+    to {
+        transform: translateY(0);
+        opacity: 1;
+    }
+}

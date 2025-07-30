@@ -391,7 +391,7 @@ const OrdersVisiblePage = () => {
                     id: orderId,
                     client_id: clientId,
                     status: newStatus,
-                    invoice_status: newStatus === "served" ? "paid" : undefined,
+                    // invoice_status: newStatus === "served" ? "paid" : undefined,
                 },
                 {
                     headers: {
@@ -579,28 +579,6 @@ const OrdersVisiblePage = () => {
 
     // --------------------------------------------------------------------------- //
 
-    useEffect(() => {
-        if (!token || !clientId) return;
-
-        axios
-            .get(`http://localhost:8002/saas/${clientId}/inventory/read`, {
-                headers: { Authorization: `Bearer ${token}` },
-            })
-            .then((res) => {
-                const items = res.data.data || [];
-                console.log("📦 Inventory fetched:", items);
-                const map = {};
-                items.forEach((item) => {
-                    map[item.id] = item.name;
-
-                });
-                console.log("🧭 inventoryMap:", map);
-                setInventoryMap(map);
-            })
-            .catch((err) => {
-                console.error("Failed to load inventory for mapping:", err);
-            });
-    }, [clientId]);
     return (
         <div className="orders-page">
             <div className="orders-container">
@@ -623,7 +601,7 @@ const OrdersVisiblePage = () => {
                                     <th>Table</th>
                                     <th>Items</th>
                                     <th>Total</th>
-                                    <th>Invoice Status</th>
+
                                     <th>Status</th>
                                     <th>Date</th>
                                     <th>Action</th>
@@ -641,28 +619,16 @@ const OrdersVisiblePage = () => {
                                             <tr className="order-row">
                                                 <td data-label="#"> {index + 1} </td>
                                                 <td data-label="Table">{tablesMap[order.table_id] || order.table_id}</td>
-
-                                                <td data-label="Items">
-                                                    {order.items?.map((item) => inventoryMap[item.item_id] || item.item_id).join(", ") || "-"}
-                                                </td>
-
+                                                <td>{order.items.length} items</td>
                                                 <td data-label="Total"> ₹{parseFloat(order.total_price || 0).toFixed(2)} </td>
-                                                <td data-label="Invoice Status"> {order.invoice_status || "-"} </td>
-                                                <td data-label="Status" className={`status ${order.status?.toLowerCase()}`}>
-                                                    {order.status}
-                                                </td>
+                                                <td data-label="Status" className={`status ${order.status?.toLowerCase()}`}>  {order.status}  </td>
                                                 <td data-label="Date"> {new Date(order.created_at).toLocaleDateString()} </td>
                                                 <td data-label="Action">
-                                                    <button
-                                                        className="btn toggle"
-                                                        onClick={() => toggleExpand(index)}
-                                                    >
+                                                    <button className="btn toggle" onClick={() => toggleExpand(index)} >
                                                         {expandedOrderIndex === index ? "Hide" : "View"}
                                                     </button>
                                                 </td>
                                             </tr>
-
-
                                             {expandedOrderIndex === index && (
                                                 <tr>
                                                     <td colSpan="7" className="order-details">
@@ -674,10 +640,7 @@ const OrdersVisiblePage = () => {
                                                                         console.log("Clicked delete for", order.id);
                                                                         setOrderToDelete(order.id);
                                                                         setShowDeleteModal(true);
-                                                                    }}
-
-                                                                >
-                                                                    Delete Order
+                                                                    }} > Delete Order
                                                                 </button>
 
                                                                 {["pending", "preparing", "served"].map((status) => (
@@ -706,7 +669,8 @@ const OrdersVisiblePage = () => {
                                                                     {order.items?.map((item, idx) => (
 
                                                                         <tr key={idx}>
-                                                                            <td data-label="Item(s)">{inventoryMap[item.item_id] || item.item_id}</td>
+                                                                            <td data-label="Item(s)">{item.item_name || item.item_id}</td>
+
                                                                             {/* <td data-label="Order ID">{item?.order_id ?? order.id}</td> */}
                                                                             {/* <td data-label="Table">{tablesMap[order.table_id] || order.table_id}</td> */}
                                                                             <td data-label="Quantity">
