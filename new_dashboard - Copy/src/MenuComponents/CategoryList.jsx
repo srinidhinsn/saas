@@ -996,16 +996,23 @@ function CategoryList({ onCategorySelect }) {
       .then((res) => {
         const rawCategories = res.data.data;
 
-        // STEP 1: Build parent map
+        // ✅ New: Recursive function to build parent map
         const tempParentMap = {};
-        rawCategories.forEach((cat) => {
-          cat.subCategories?.forEach((sub) => {
-            tempParentMap[sub.id] = cat.id;
-          });
-        });
-        setParentMap(tempParentMap); // store in useState
+        const traverseAndBuildMap = (cats, parentId = null) => {
+          for (const cat of cats) {
+            if (parentId) {
+              tempParentMap[cat.id] = parentId;
+            }
+            if (cat.subCategories && cat.subCategories.length > 0) {
+              traverseAndBuildMap(cat.subCategories, cat.id);
+            }
+          }
+        };
 
-        // STEP 2: Build top-level categories
+        traverseAndBuildMap(rawCategories);
+        setParentMap(tempParentMap);
+
+        // ✅ Preserve your existing logic for top-level detection
         const subCategoryIds = new Set(Object.keys(tempParentMap));
         const topLevelCategories = rawCategories.filter(
           (cat) => !subCategoryIds.has(cat.id)
@@ -1015,6 +1022,7 @@ function CategoryList({ onCategorySelect }) {
         setCategories([allCategory, ...topLevelCategories]);
         setActiveCategory("all");
       })
+
       .catch((err) => console.error("❌ Error fetching categories:", err));
   }, [clientId, token]);
 
@@ -1105,33 +1113,37 @@ function CategoryList({ onCategorySelect }) {
   const generateSlugFromParents = (categoryId, currentName) => {
     const path = [];
 
-    // Build a map of all categories (top-level + subcategories)
+    // Step 1: Flatten all categories into a map
     const categoryMap = {};
-    categories.forEach(cat => {
-      categoryMap[cat.id] = cat;
-      if (cat.subCategories) {
-        cat.subCategories.forEach(sub => {
-          categoryMap[sub.id] = sub;
-        });
+    const buildMap = (cats) => {
+      for (const cat of cats) {
+        categoryMap[cat.id] = cat;
+        if (cat.subCategories) {
+          buildMap(cat.subCategories);
+        }
       }
-    });
+    };
+    buildMap(categories);
 
-    // Traverse up the chain using parentMap
+    // Step 2: Walk up using parentMap
     let currentId = categoryId;
-    while (currentId) {
+    const visited = new Set(); // to prevent infinite loops
+    while (currentId && !visited.has(currentId)) {
+      visited.add(currentId);
       const currentCat = categoryMap[currentId];
       if (!currentCat) break;
       path.unshift(currentCat.name.trim().replace(/\s+/g, "_"));
-      currentId = parentMap[currentId]; // go to parent
+      currentId = parentMap[currentId]; // move to parent
     }
 
-    // Add the current category being added/edited
+    // Step 3: Add current name at the end
     if (currentName) {
       path.push(currentName.trim().replace(/\s+/g, "_"));
     }
 
     return "_" + path.join(" _");
   };
+
 
 
 
@@ -1154,7 +1166,8 @@ function CategoryList({ onCategorySelect }) {
     let finalSubcategories = [...newSubcategories];
 
     // STEP 1: If user entered a new subcategory name, create it
-
+    const subId = `sub_${Date.now()}`;
+    const tempParentMap = { [subId]: newId.trim() };
     if (newSubcategoryName.trim()) {
       const newSubPayload = {
         id: `sub_${Date.now()}`,
@@ -1164,7 +1177,7 @@ function CategoryList({ onCategorySelect }) {
         sub_categories: [],
         created_by: createdBy,
         updated_by: updatedBy,
-        slug: generateSlugFromParents(null, newSubcategoryName.trim(), newName.trim()),
+        slug: generateSlugFromParents(newId.trim(), newSubcategoryName.trim(), tempParentMap),
       };
 
       try {
