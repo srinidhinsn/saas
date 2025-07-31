@@ -10,7 +10,7 @@ app = FastAPI()
 logging.config.dictConfig(LOGGING_CONFIG)
 logger = logging.getLogger(__name__)
 
-app.include_router(table_router, prefix="/saas/{client_id}/tables")
+app.include_router(table_router, prefix="/saas/{client_id}/invoice")
 
 @app.middleware("http")
 async def log_requests(request: Request, call_next):
@@ -21,13 +21,13 @@ async def log_requests(request: Request, call_next):
     logger.info(f"Request processed time: {request.method} {request.url} - Response: {response.status_code} - Time: {process_time: .4f}s")
     return response
 
-@app.get("/saas/{client_id}/tables/")
+@app.get("/saas/{client_id}/invoice/")
 async def read_root():
-    return {"message": "tables Service is Running"}
+    return {"message": "billing Service is Running"}
 
 if __name__ == "__main__":
     import uvicorn
-    uvicorn.run(app, host="127.0.0.1", port=8001)
+    uvicorn.run(app, host="127.0.0.1", port=8002)
 
 
 
