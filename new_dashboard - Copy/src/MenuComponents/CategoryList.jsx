@@ -978,7 +978,7 @@ function CategoryList({ onCategorySelect }) {
 
   const [newParentCategory, setNewParentCategory] = useState("");
 
-
+  /////////////////////////////////////// /////////////
 
 
   const { clientId } = useParams();
@@ -1110,39 +1110,94 @@ function CategoryList({ onCategorySelect }) {
         : [...state, id]
     );
   };
-  const generateSlugFromParents = (categoryId, currentName) => {
+  const getAllAncestors = (categoryId, parentMap) => {
+    const ancestors = [];
+    let currentId = categoryId;
+
+    while (parentMap[currentId]) {
+      const parentId = parentMap[currentId];
+      ancestors.unshift(parentId);
+      currentId = parentId;
+    }
+
+    return ancestors;
+  };
+  const buildParentMap = (categories) => {
+    const map = {};
+    const dfs = (nodes, parent = null) => {
+      nodes.forEach((node) => {
+        if (parent) map[node.id] = parent;
+        if (node.subCategories?.length) dfs(node.subCategories, node.id);
+      });
+    };
+    dfs(categories);
+    return map;
+  };
+
+  const generateSlugFromParents = (categoryId, currentName, overrideParentMap = null) => {
     const path = [];
 
-    // Step 1: Flatten all categories into a map
+    // Build quick map for category lookup
     const categoryMap = {};
     const buildMap = (cats) => {
       for (const cat of cats) {
         categoryMap[cat.id] = cat;
-        if (cat.subCategories) {
-          buildMap(cat.subCategories);
-        }
+        if (cat.subCategories) buildMap(cat.subCategories);
       }
     };
     buildMap(categories);
 
-    // Step 2: Walk up using parentMap
+    const mapToUse = overrideParentMap || parentMap;
+
     let currentId = categoryId;
-    const visited = new Set(); // to prevent infinite loops
-    while (currentId && !visited.has(currentId)) {
-      visited.add(currentId);
-      const currentCat = categoryMap[currentId];
-      if (!currentCat) break;
-      path.unshift(currentCat.name.trim().replace(/\s+/g, "_"));
-      currentId = parentMap[currentId]; // move to parent
+    const ancestors = [];
+    while (mapToUse[currentId]) {
+      const parentId = mapToUse[currentId];
+      ancestors.unshift(parentId);
+      currentId = parentId;
     }
 
-    // Step 3: Add current name at the end
+    // Add ancestor names slugified (in order)
+    ancestors.forEach(id => {
+      const cat = categoryMap[id];
+      if (cat) path.push(cat.name.trim().replace(/\s+/g, "_"));
+    });
+
+    // Add current category name slugified
     if (currentName) {
       path.push(currentName.trim().replace(/\s+/g, "_"));
+    } else {
+      const cat = categoryMap[categoryId];
+      if (cat) path.push(cat.name.trim().replace(/\s+/g, "_"));
     }
 
     return "_" + path.join(" _");
   };
+
+  const refreshCategoriesAndParentMap = async () => {
+    try {
+      const response = await axios.get(
+        `http://localhost:8002/saas/${clientId}/inventory/read_category`,
+        { headers: { Authorization: `Bearer ${token}` } }
+      );
+
+      const rawCategories = response.data.data;
+
+      // Detect top-level categories (those without any parent)
+      const subCategoryIds = new Set();
+      rawCategories.forEach(cat => {
+        cat.subCategories?.forEach(sub => subCategoryIds.add(sub.id));
+      });
+      const topLevelCategories = rawCategories.filter(cat => !subCategoryIds.has(cat.id));
+
+      setCategories([{ id: "all", name: "All" }, ...topLevelCategories]);
+      setParentMap(buildParentMap(rawCategories));
+    } catch (error) {
+      console.error("Error refreshing categories:", error);
+    }
+  };
+
+
 
 
 
@@ -1152,9 +1207,9 @@ function CategoryList({ onCategorySelect }) {
       alert("ID and Name are required");
       return;
     }
+
     let createdBy = "null";
     let updatedBy = "null";
-
     try {
       const decoded = jwtDecode(token);
       createdBy = String(decoded.user_id);
@@ -1165,32 +1220,28 @@ function CategoryList({ onCategorySelect }) {
 
     let finalSubcategories = [...newSubcategories];
 
-    // STEP 1: If user entered a new subcategory name, create it
-    const subId = `sub_${Date.now()}`;
-    const tempParentMap = { [subId]: newId.trim() };
+    // STEP: Create new subcategory if entered
     if (newSubcategoryName.trim()) {
+      const subId = `sub_${Date.now()}`;
+      const tempParentMap = { [subId]: newId.trim() }; // new subcategory's parent is newId
+
       const newSubPayload = {
-        id: `sub_${Date.now()}`,
+        id: subId,
         client_id: clientId,
         name: newSubcategoryName.trim(),
         description: "",
         sub_categories: [],
         created_by: createdBy,
         updated_by: updatedBy,
-        slug: generateSlugFromParents(newId.trim(), newSubcategoryName.trim(), tempParentMap),
+        slug: generateSlugFromParents(subId, newSubcategoryName.trim(), tempParentMap),
       };
 
       try {
         const subRes = await axios.post(
           `http://localhost:8002/saas/${clientId}/inventory/create_category`,
           newSubPayload,
-          {
-            headers: {
-              Authorization: `Bearer ${token}`,
-            },
-          }
+          { headers: { Authorization: `Bearer ${token}` } }
         );
-
         const newSubId = subRes.data.data.id;
         finalSubcategories.push(newSubId);
       } catch (err) {
@@ -1200,8 +1251,12 @@ function CategoryList({ onCategorySelect }) {
       }
     }
 
+    // STEP: Generate slug for main new category (after parentMap is initialized)
+    // Refresh categories & parentMap before slugging (to ensure latest info)
+    await refreshCategoriesAndParentMap();
 
-    // STEP 2: Now create the main category with the new + existing subcategories
+    const slug = generateSlugFromParents(newId.trim(), newName.trim());
+
     const mainPayload = {
       id: newId.trim(),
       client_id: clientId,
@@ -1210,41 +1265,20 @@ function CategoryList({ onCategorySelect }) {
       sub_categories: finalSubcategories,
       created_by: createdBy,
       updated_by: updatedBy,
-      slug: generateSlugFromParents(editingId, newName),
+      slug,
     };
 
     try {
-      const res = await axios.post(
+      await axios.post(
         `http://localhost:8002/saas/${clientId}/inventory/create_category`,
         mainPayload,
-        {
-          headers: {
-            Authorization: `Bearer ${token}`,
-          },
-        }
+        { headers: { Authorization: `Bearer ${token}` } }
       );
 
-      // STEP 3: Refresh category list
-      const response = await axios.get(
-        `http://localhost:8002/saas/${clientId}/inventory/read_category`,
-        {
-          headers: {
-            Authorization: `Bearer ${token}`,
-          },
-        }
-      );
+      // Refresh after creation to update UI and parentMap
+      await refreshCategoriesAndParentMap();
 
-      const rawCategories = response.data.data;
-      const subCategoryIds = new Set();
-      rawCategories.forEach(cat => {
-        cat.subCategories?.forEach(sub => subCategoryIds.add(sub.id));
-      });
-      const topLevelCategories = rawCategories.filter(cat => !subCategoryIds.has(cat.id));
-      const allCategory = { id: "all", name: "All" };
-      setCategories([allCategory, ...topLevelCategories]);
-      setActiveCategory("all");
-
-      // Reset form
+      // Reset form & UI
       setNewId("");
       setNewName("");
       setNewDescription("");
@@ -1270,43 +1304,42 @@ function CategoryList({ onCategorySelect }) {
   const handleEditSave = async () => {
     let finalEditSubcategories = [...editSubcategories];
 
-    // Optional: create new subcategory
-    if (editNewSubcategoryName.trim()) {
-      let createdBy = "null";
-      let updatedBy = "null";
+    if (!editingId) return;
 
-      try {
-        const decoded = jwtDecode(token);
-        createdBy = String(decoded.user_id);
-        updatedBy = String(decoded.user_id);
-      } catch (err) {
-        console.error("Token decode failed:", err);
-      }
+    let createdBy = "null";
+    let updatedBy = "null";
+    try {
+      const decoded = jwtDecode(token);
+      createdBy = String(decoded.user_id);
+      updatedBy = String(decoded.user_id);
+    } catch (err) {
+      console.error("Token decode failed:", err);
+    }
+
+    // Handle optional new subcategory creation
+    if (editNewSubcategoryName.trim()) {
+      const newSubId = `subcat_${Date.now()}`;
+      const tempParentMap = { [newSubId]: editingId };
 
       const newSubPayload = {
-        id: `subcat_${Date.now()}`,
+        id: newSubId,
         client_id: clientId,
         name: editNewSubcategoryName.trim(),
         description: "",
         sub_categories: [],
         created_by: createdBy,
         updated_by: updatedBy,
-        slug: generateSlugFromParents(editingId, editNewSubcategoryName),
-
+        slug: generateSlugFromParents(newSubId, editNewSubcategoryName.trim(), tempParentMap),
       };
 
       try {
         const subRes = await axios.post(
           `http://localhost:8002/saas/${clientId}/inventory/create_category`,
           newSubPayload,
-          {
-            headers: {
-              Authorization: `Bearer ${token}`,
-            },
-          }
+          { headers: { Authorization: `Bearer ${token}` } }
         );
-        const newSubId = subRes.data.data.id;
-        finalEditSubcategories.push(newSubId);
+        const createdSubId = subRes.data.data.id;
+        finalEditSubcategories.push(createdSubId);
         finalEditSubcategories = [...new Set(finalEditSubcategories)];
       } catch (err) {
         console.error("Error creating subcategory:", err.response?.data || err);
@@ -1315,22 +1348,21 @@ function CategoryList({ onCategorySelect }) {
       }
     }
 
-    // 🟡 Add to existing subcategories instead of replacing them
+    // Refresh categories & parentMap before generating slug to ensure up-to-date parentMap
+    await refreshCategoriesAndParentMap();
+
+    // Generate updated slug for edited category
+    const slug = generateSlugFromParents(editingId, editName.trim());
+
+    // Add existing subcategories if not included already
     try {
-      // Fetch current subcategories of the parent
       const currentCatRes = await axios.get(
         `http://localhost:8002/saas/${clientId}/inventory/read_category`,
-        {
-          headers: {
-            Authorization: `Bearer ${token}`,
-          },
-        }
+        { headers: { Authorization: `Bearer ${token}` } }
       );
-
       const rawCategories = currentCatRes.data.data;
       const parentCategory = rawCategories.find(cat => cat.id === editingId);
       const currentSubIds = parentCategory?.subCategories?.map(sub => sub.id) || [];
-
       finalEditSubcategories = [...new Set([...currentSubIds, ...finalEditSubcategories])];
     } catch (err) {
       console.error("Error fetching existing subcategories:", err.response?.data || err);
@@ -1341,10 +1373,11 @@ function CategoryList({ onCategorySelect }) {
       name: editName.trim(),
       description: editDescription.trim(),
       sub_categories: finalEditSubcategories,
+      slug,
     };
 
     try {
-      const res = await axios.post(
+      await axios.post(
         `http://localhost:8002/saas/${clientId}/inventory/update_category`,
         payload,
         {
@@ -1355,25 +1388,8 @@ function CategoryList({ onCategorySelect }) {
         }
       );
 
-      // Refresh categories after edit
-      const response = await axios.get(
-        `http://localhost:8002/saas/${clientId}/inventory/read_category`,
-        {
-          headers: {
-            Authorization: `Bearer ${token}`,
-          },
-        }
-      );
-
-      const rawCategories = response.data.data;
-      const subCategoryIds = new Set();
-      rawCategories.forEach(cat => {
-        cat.subCategories?.forEach(sub => subCategoryIds.add(sub.id));
-      });
-      const topLevelCategories = rawCategories.filter(cat => !subCategoryIds.has(cat.id));
-      const allCategory = { id: "all", name: "All" };
-      setCategories([allCategory, ...topLevelCategories]);
-      setActiveCategory("all");
+      // Refresh categories and parentMap after updating
+      await refreshCategoriesAndParentMap();
 
       setEditingId(null);
       setEditNewSubcategoryName("");
@@ -1383,8 +1399,6 @@ function CategoryList({ onCategorySelect }) {
       alert("Failed to update category.");
     }
   };
-
-
 
 
 
@@ -1617,3 +1631,7 @@ function CategoryList({ onCategorySelect }) {
 }
 
 export default CategoryList;
+
+
+/////////////////////////////////////////////// /
+///////////////////////////////////////////////// /
