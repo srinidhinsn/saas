@@ -23,4 +23,6 @@ class Table(BaseModel):
     updated_at:    Optional[datetime] = None
 
     class Config:
-        orm_mode = True
+        orm_mode=True
+        extend_existing=True
+        from_attribute = True
