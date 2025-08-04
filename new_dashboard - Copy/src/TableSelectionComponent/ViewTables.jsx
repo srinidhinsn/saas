@@ -718,7 +718,7 @@ const ViewTables = ({ onOrderUpdate }) => {
             {selectedTable && (
                 <div className="order-overlay">
                     <div className="order-content">
-                        <div className="category-pane full-height">
+                        <div className="category-list-container">
                             <div className="search-bar">
                                 <FiSearch className="search-icon" />
                                 <input
@@ -732,26 +732,28 @@ const ViewTables = ({ onOrderUpdate }) => {
 
 
                                 {categories.map(cat => (
-                                    <li
+                                    <div className="category-item">
+                                        <li
                                         key={cat.id}
                                         className={cat.name === activeCategory ? "active" : ""}
                                         onClick={() => setActiveCategory(cat.name)} // ✅ use name
                                     >
                                         {cat.name}
                                     </li>
+                                    </div>
                                 ))}
                             </ul>
                         </div>
 
                         <div className="item-pane">
-                            <div className="items-grid">
+                            <div className="grid-layout">
                                 {getFilteredItems().map(item => (
                                     <div
                                         key={item.id}
-                                        className={getItemClass(item)}
+                                        className="grids"
                                         onClick={() => handleItemClick(item)}
                                     >
-                                        <div className="item-name">{item.name}</div>
+                                        <h4>{item.name}</h4>
                                         <div className="item-price">₹{item.unit_price}</div>
                                     </div>
                                 ))}
