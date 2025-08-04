@@ -1,0 +1,367 @@
+@import url('https://fonts.googleapis.com/css2?family=Montserrat:wght@400;600;700&display=swap');
+
+.login-page {
+    min-height: 100vh;
+    display: flex;
+    align-items: center;
+    justify-content: center;
+    background: rgb(244, 242, 239);
+    padding: 20px;
+    font-family: 'Montserrat', sans-serif;
+}
+
+.login-card {
+    background: rgba(255, 255, 255, 0.25);
+    backdrop-filter: blur(10px);
+    border-radius: 16px;
+    padding: 40px 30px;
+    width: 100%;
+    max-width: 400px;
+    box-shadow: 0 8px 32px rgba(0, 0, 0, 0.35);
+    position: relative;
+    text-align: center;
+}
+
+.avatar-circle {
+    width: 70px;
+    height: 70px;
+    background: rgb(255, 199, 206);
+    border-radius: 50%;
+    display: flex;
+    align-items: center;
+    justify-content: center;
+    color: rgb(226, 104, 118);
+    font-size: 28px;
+    margin: 0 auto 30px auto;
+}
+
+.input-group {
+    position: relative;
+    margin-bottom: 20px;
+}
+
+.input-group input {
+    width: 100%;
+    padding: 12px 12px 12px 40px;
+    border-radius: 6px;
+    border: none;
+    background: rgba(255, 199, 206, 0.3);
+    color: rgb(30, 58, 138);
+    font-size: 14px;
+    outline: none;
+}
+
+.input-icon {
+    position: absolute;
+    top: 50%;
+    left: 12px;
+    transform: translateY(-50%);
+    color: rgb(226, 104, 118);
+    font-size: 14px;
+}
+
+.options-row {
+    display: flex;
+    justify-content: space-between;
+    align-items: center;
+    font-size: 13px;
+    color: #1e3a8a;
+    margin-bottom: 15px;
+}
+
+.options-row input[type="checkbox"] {
+    margin-right: 6px;
+}
+
+.forgot-link {
+    cursor: pointer;
+    color: #1e3a8a;
+    text-decoration: underline;
+}
+
+.login-button {
+    width: 100%;
+    background: linear-gradient(20deg,
+            rgb(242, 80, 201),
+            rgb(149, 125, 206));
+    color: white;
+    border: none;
+    padding: 12px;
+    border-radius: 10px;
+    font-weight: 600;
+    text-transform: uppercase;
+    letter-spacing: 1px;
+    cursor: pointer;
+    transition: all 0.2s ease;
+}
+
+.login-button:hover {
+    background-color: rgb(219, 24, 47);
+}
+
+.error {
+    background-color: crimson;
+    color: white;
+    padding: 5px 10px;
+    border-radius: 10px;
+    font-size: 14px;
+    margin-bottom: 10px;
+}
+
+.forgot-row {
+    display: flex;
+    justify-content: flex-end;
+    margin-bottom: 15px;
+}
+
+.forgot-link {
+    cursor: pointer;
+    color: rgb(226, 104, 118);
+    font-size: 13px;
+    font-weight: 500;
+    opacity: 0.8;
+    transition: opacity 0.2s ease;
+}
+
+.forgot-link:hover {
+    opacity: 1;
+    text-decoration: underline;
+}
+
+.login-link span {
+    text-decoration: underline;
+    color: rgb(226, 104, 118);
+    cursor: pointer;
+}
+
+/* Responsive */
+@media screen and (max-width: 480px) {
+    .login-card {
+        padding: 30px 20px;
+    }
+
+    .avatar-circle {
+        width: 60px;
+        height: 60px;
+        font-size: 24px;
+    }
+
+    .input-group input {
+        font-size: 13px;
+    }
+
+    .options-row {
+        font-size: 12px;
+    }
+
+    .login-button {
+        font-size: 13px;
+    }
+}
+
+
+
+
+/* Register .css file */
+
+
+
+.login-page {
+    min-height: 100vh;
+    display: flex;
+    align-items: center;
+    justify-content: center;
+    background: rgb(244, 242, 239);
+    padding: 10px;
+    font-family: 'Montserrat', sans-serif;
+}
+
+.login-card {
+    background: rgba(255, 255, 255, 0.25);
+    backdrop-filter: blur(10px);
+    border-radius: 16px;
+    padding: 40px 30px;
+    width: 100%;
+    max-width: 420px;
+    box-shadow: 0 8px 32px rgba(0, 0, 0, 0.35);
+    position: relative;
+    text-align: center;
+}
+
+.avatar-circle {
+    width: 70px;
+    height: 70px;
+    background: rgb(255, 199, 206);
+    border-radius: 50%;
+    display: flex;
+    align-items: center;
+    justify-content: center;
+    color: rgb(226, 104, 118);
+    font-size: 28px;
+    margin: 0 auto 30px auto;
+}
+
+.input-group {
+    position: relative;
+    margin-bottom: 20px;
+}
+
+.input-group input {
+    width: 100%;
+    padding: 12px 12px 12px 40px;
+    border-radius: 6px;
+    border: none;
+    background: rgba(255, 199, 206, 0.3);
+    color: rgb(30, 58, 138);
+    font-size: 14px;
+    outline: none;
+}
+
+.input-icon {
+    position: absolute;
+    top: 50%;
+    left: 12px;
+    transform: translateY(-50%);
+    color: rgb(226, 104, 118);
+    font-size: 14px;
+}
+
+label {
+    text-align: left;
+    display: block;
+    margin-bottom: 6px;
+    font-size: 13px;
+    color: #1e3a8a;
+    font-weight: 500;
+}
+
+/* Styled dropdown to match input */
+.login-card select {
+    width: 100%;
+    padding: 12px 12px 12px 40px;
+    border-radius: 6px;
+    border: none;
+    background: rgba(255, 199, 206, 0.3);
+    color: rgb(30, 58, 138);
+    font-size: 14px;
+    outline: none;
+    appearance: none;
+    /* removes native arrow */
+    -webkit-appearance: none;
+    -moz-appearance: none;
+    background-image: url("data:image/svg+xml;charset=US-ASCII,%3Csvg width='14' height='10' viewBox='0 0 14 10' xmlns='http://www.w3.org/2000/svg'%3E%3Cpath d='M7 10L0.937823 0.5L13.0622 0.5L7 10Z' fill='%23E26876'/%3E%3C/svg%3E");
+    background-repeat: no-repeat;
+    background-position: right 12px center;
+    background-size: 12px;
+    cursor: pointer;
+}
+
+select:focus {
+    outline: none;
+    box-shadow: none;
+    background-color: rgba(255, 199, 206, 0.4);
+}
+
+/* Grants Checkboxes - Styled horizontally with animation */
+.checkbox-group {
+    display: flex;
+    flex-wrap: wrap;
+    gap: 10px;
+    margin-bottom: 20px;
+    font-size: 13px;
+    color: #1e3a8a;
+    justify-content: flex-start;
+}
+
+.checkbox-group label {
+    background: rgba(255, 199, 206, 0.3);
+    border-radius: 20px;
+    padding: 6px 12px;
+    display: flex;
+    align-items: center;
+    gap: 6px;
+    cursor: pointer;
+    transition: all 0.2s ease;
+}
+
+.checkbox-group input[type="checkbox"] {
+    accent-color: rgb(226, 104, 118);
+    transform: scale(1);
+    transition: transform 0.2s ease;
+}
+
+.checkbox-group input[type="checkbox"]:checked {
+    transform: scale(1.2);
+}
+
+/* 
+.login-button {
+    width: 100%;
+    background: rgb(255, 199, 206);
+    color: rgb(226, 104, 118);
+    border: none;
+    padding: 12px;
+    border-radius: 10px;
+    font-weight: 600;
+    text-transform: uppercase;
+    letter-spacing: 1px;
+    cursor: pointer;
+    transition: all 0.2s ease, background-color 1s ease, color 1s ease;
+} */
+
+.login-button:hover {
+    background-color: rgb(219, 24, 47);
+    color: white;
+}
+
+/* 
+.error {
+    color: rgb(178, 234, 242);
+    font-size: 14px;
+    margin-bottom: 10px;
+} */
+
+.login-link {
+    text-align: center;
+    font-size: 13px;
+    margin-top: 15px;
+}
+
+.login-link a {
+    text-decoration: underline;
+    color: rgb(226, 104, 118);
+    cursor: pointer;
+    font-weight: 500;
+}
+
+.login-link a:hover {
+    opacity: 0.9;
+}
+
+/* Responsive */
+@media screen and (max-width: 480px) {
+    .login-card {
+        padding: 30px 20px;
+    }
+
+    .avatar-circle {
+        width: 60px;
+        height: 60px;
+        font-size: 24px;
+    }
+
+    .input-group input,
+    select {
+        font-size: 13px;
+        padding-left: 40px;
+    }
+
+    .checkbox-group {
+        font-size: 12px;
+        gap: 8px;
+    }
+
+    .login-button {
+        font-size: 13px;
+    }
+}

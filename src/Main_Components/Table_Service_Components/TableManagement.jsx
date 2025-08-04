@@ -1,0 +1,552 @@
+import React, { useEffect, useState } from "react";
+import { FiSun, FiMoon } from "react-icons/fi";
+import { useTheme } from "../../ThemeChangerComponent/ThemeProvider";
+import { FaEdit, FaTrash, FaCheck, FaTimes } from "react-icons/fa";
+import tableServicesPort from "../../Backend_Port_Files/TableServices";
+import { useParams } from 'react-router-dom';
+
+const TableManagement = () => {
+    // --------------------Get client ID from route URL ---------------------------------- //
+    const { clientId } = useParams();
+    // ---------------------Theme Changer ------------------------------------------------ //
+    const { darkMode, toggleTheme } = useTheme();
+    const [tableRanges, setTableRanges] = useState([]);
+    const [tables, setTables] = useState([]);
+    const [originalTables, setOriginalTables] = useState([]);
+    const [fieldErrors, setFieldErrors] = useState([]);
+    const [showAddTable, setShowAddTable] = useState(false);
+    const [editRowId, setEditRowId] = useState(null);
+    const [highlightRow, setHighlightRow] = useState(null);
+    const [noChangeRowId, setNoChangeRowId] = useState(null);
+    const [showConfirmDelete, setShowConfirmDelete] = useState(false);
+    const [deleteTableId, setDeleteTableId] = useState(null);
+    const [addRowError, setAddRowError] = useState("");
+    const token = localStorage.getItem("access_token");
+
+
+    // ----------------------- Fetch the tables only clientid is available ----------------- //
+    useEffect(() => {
+        if (clientId) fetchTables();
+    }, [clientId]);
+
+    // ----------------------- Fetch the tables from the backend API ----------------------- //
+    const fetchTables = async () => {
+        if (!clientId) return;
+        try {
+            const res = await tableServicesPort.get(`/${clientId}/tables/read`,
+                {
+                    headers: {
+                        Authorization: `Bearer ${token}`,
+                    },
+                });
+
+
+            const result = res.data;
+            const tableList = Array.isArray(result?.data) ? result.data : [];
+            tableList.sort((a, b) => a.name.localeCompare(b.name, undefined, { numeric: true }));
+            setTables(tableList);
+            setOriginalTables(tableList);
+
+
+        } catch (error) {
+            console.error("❌ Error fetching tables:", error);
+        }
+    };
+    // --------------- Parse the table range input into an array of table name -------------- //
+    const parseTableRange = (rangeStr) => {
+        const parts = rangeStr.split(",");
+        const tables = [];
+
+        for (let part of parts) {
+            part = part.trim();
+            if (!part) continue;
+
+            if (part.includes(":")) {
+                const [startStr, endStr] = part.split(":");
+                const prefixStart = startStr.match(/[A-Za-z]+/);
+                const startNum = startStr.match(/\d+/);
+                const endNum = endStr.match(/\d+/);
+
+                if (!prefixStart || !startNum || !endNum) continue;
+
+                const prefix = prefixStart[0].toUpperCase();
+                const start = parseInt(startNum[0]);
+                const end = parseInt(endNum[0]);
+
+                for (let i = start; i <= end; i++) {
+                    tables.push(`${prefix}${i.toString().padStart(2, "0")}`);
+                }
+            } else {
+                const prefix = part.match(/[A-Za-z]+/);
+                const num = part.match(/\d+/);
+                if (!prefix || !num) continue;
+                const formatted = `${prefix[0].toUpperCase()}${parseInt(num[0]).toString().padStart(2, "0")}`;
+                tables.push(formatted);
+            }
+        }
+        return tables;
+    };
+
+    //  ----------------- Generate tables based on the user input ----------------- //
+    // ----------------- This function validates the input,parses the range,sends the data to the backend and reset the form
+    const generateTables = async () => {
+        const newErrors = tableRanges.map(row => ({
+            range: !row.range,
+            table_type: !row.table_type,
+            type: !row.type
+        }));
+        setFieldErrors(newErrors);
+
+        const validRows = tableRanges.filter((row, index) => !newErrors[index].range && !newErrors[index].table_type && !newErrors[index].type);
+        if (validRows.length === 0) return;
+        const payload = [];
+        for (let row of validRows) {
+            const tableNumbers = parseTableRange(row.range);
+            tableNumbers.forEach(num => {
+                payload.push({
+                    client_id: clientId,
+                    name: num,
+                    table_type: row.table_type.toString(),
+                    status: row.remark || "Vacant",
+                    location_zone: row.type,
+                    description: row.description,
+                    section: row.section,
+                    sort_order: row.sort_order ? parseInt(row.sort_order) : null,
+                    is_active: row.is_active, qr_code_url: row.qr_code_url || "",
+                    slug: `${clientId}-${(row.slug || num).toLowerCase().replace(/[^a-z0-9-]/g, '')}`
+                });
+            });
+        }
+
+        try {
+            for (let data of payload) {
+
+                await tableServicesPort.post(
+                    `/${clientId}/tables/create`,
+                    data,
+                    {
+                        headers: {
+                            Authorization: `Bearer ${token}`,
+                        },
+                    }
+                );
+            }
+            fetchTables();
+            setShowAddTable(false);
+            setTableRanges([]);
+            setFieldErrors([]);
+        } catch (err) {
+            console.error("Error generating tables", err);
+        }
+    };
+    // ---------------- Handling the edit functionality for a table row ----------------- //
+    const handleEditChange = (id, field, value) => {
+        setTables(prev =>
+            prev.map(table => (table.id === id ? { ...table, [field]: value } : table))
+        );
+    };
+
+    // ------------ Save the edited table data to the backend and update the state ------ //
+    const saveEdit = async (table) => {
+        const original = originalTables.find(t => t.id === table.id);
+        const hasChanged = (
+            original?.table_type?.toString() !== table.table_type?.toString() ||
+            original?.location_zone !== table.location_zone ||
+            (original?.status || "") !== (table.status || "")
+        );
+
+        if (!hasChanged) {
+            setNoChangeRowId(table.id);
+            setTimeout(() => {
+                setNoChangeRowId(null);
+                setEditRowId(null);
+            }, 2000);
+            return;
+        }
+
+        try {
+            await tableServicesPort.post(`/${clientId}/tables/update`, table,
+                {
+                    headers: {
+                        Authorization: `Bearer ${token}`,  // ✅ Pass token here
+                    },
+                });
+            setEditRowId(null);
+            setHighlightRow(table.id);
+            setTimeout(() => setHighlightRow(null), 3000);
+            fetchTables();
+        } catch (err) {
+            console.error("Error updating table");
+        }
+    };
+    // ---------------- Cancel the edit and reset the state ------------------ //
+    const cancelEdit = () => {
+        setEditRowId(null);
+        setNoChangeRowId(null);
+        fetchTables();
+    };
+    // ------------------ Handle the delete functionality for a table row --------------- //
+    const confirmDelete = async () => {
+        try {
+            await tableServicesPort.post(`/${clientId}/tables/delete`, {
+                id: deleteTableId,
+                client_id: clientId,
+                name: "",
+                table_type: "",
+                location_zone: "",
+            },
+                {
+                    headers: {
+                        Authorization: `Bearer ${token}`,
+                    },
+                });
+
+            fetchTables();
+        } catch (err) {
+            console.error("Error deleting table");
+        } finally {
+            setShowConfirmDelete(false);
+            setDeleteTableId(null);
+        }
+    };
+    // ==================================================================================================================================== //
+    return (
+        // ------------------------------- Main COmponent Structure ------------------------------- //
+
+        <div className={`table-selection ${darkMode ? "dark" : ""}`}>  {/*Theme changer */}
+            <div className="header">
+                <h2>Table Management</h2> {/*Header section start*/}
+                <button className="theme-toggle" onClick={toggleTheme}>
+                    {darkMode ? <FiSun /> : <FiMoon />}
+                </button>
+            </div>{/*Header section end*/}
+
+            <div className="add-tables-section"> {/*Add Table Section  */}
+                <h3>Add New Tables</h3>
+                {!showAddTable && (
+                    <button className="btn-primary" onClick={() => {
+                        setShowAddTable(true);
+                        setTableRanges([...tableRanges, { range: "", table_type: "", type: "", remark: "", is_active: false }]);
+                        setFieldErrors([{}]);
+                    }}>
+                        + Add Table
+                    </button>
+                )}    {/* Add table BUtton */}
+                {/*show the form to add nnew tables (dynamically after clicking the add table button)*/}
+                {showAddTable && (
+                    <>
+                        {tableRanges.map((row, index) => (
+                            <div className="form-grid" key={index}>
+                                <div className="field-block">
+                                    <label>Table Range</label>
+                                    {/* Table Range Input */}
+                                    <input
+                                        value={row.range}
+                                        onChange={(e) => {
+                                            const updated = [...tableRanges];
+                                            updated[index].range = e.target.value;
+                                            setTableRanges(updated);
+                                        }}
+                                        className={fieldErrors[index]?.range ? "error-field" : ""}
+                                    />
+                                    {fieldErrors[index]?.range && <div className="error-text">Enter table range</div>}
+                                </div>
+
+                                <div className="field-block">
+                                    <label>No of Seating</label>
+                                    {/* No of seating Input */}
+                                    <input
+                                        type="number"
+                                        value={row.table_type}
+                                        onChange={(e) => {
+                                            const updated = [...tableRanges];
+                                            updated[index].table_type = e.target.value;
+                                            setTableRanges(updated);
+                                        }}
+                                        className={fieldErrors[index]?.table_type ? "error-field" : ""}
+                                    />
+                                    {fieldErrors[index]?.table_type && <div className="error-text">Enter seating</div>}
+                                </div>
+
+                                <div className="field-block">
+                                    <label>Type</label>
+                                    {/* Table type Input (AC or Non-AC ) */}
+                                    <select
+                                        value={row.type}
+                                        onChange={(e) => {
+                                            const updated = [...tableRanges];
+                                            updated[index].type = e.target.value;
+                                            setTableRanges(updated);
+                                        }}
+                                        className={fieldErrors[index]?.type ? "error-field" : ""}
+                                    >
+                                        <option value="">Select</option>
+                                        <option value="AC">AC</option>
+                                        <option value="Non-AC">Non-AC</option>
+                                    </select>
+                                    {fieldErrors[index]?.type && <div className="error-text">Select type</div>}
+                                </div>
+
+                                <div className="field-block">
+                                    <label>Remark</label>
+                                    {/* Remark or any specification Input */}
+                                    <select
+                                        value={row.remark}
+                                        onChange={(e) => {
+                                            const updated = [...tableRanges];
+                                            updated[index].remark = e.target.value;
+                                            setTableRanges(updated);
+                                        }}
+                                    >
+                                        <option value="Vacant">Vacant</option>
+                                        <option value="Occupied">Occupied</option>
+                                        <option value="Reserved">Reserved</option>
+                                    </select>
+                                </div>
+                                <div className="field-block">
+                                    <label>QR Code URL</label>
+                                    {/* QR code Input(optional) */}
+                                    <input
+                                        type="text"
+                                        value={row.qr_code_url || ""}
+                                        onChange={(e) => {
+                                            const updated = [...tableRanges];
+                                            updated[index].qr_code_url = e.target.value;
+                                            setTableRanges(updated);
+                                        }}
+                                        placeholder="Enter QR code URL"
+                                    />
+                                </div>
+                                <div className="field-block">
+                                    <label>Description</label>
+                                    {/* Description Input (optional) */}
+                                    <input
+                                        value={row.description}
+                                        onChange={(e) => {
+                                            const updated = [...tableRanges];
+                                            updated[index].description = e.target.value;
+                                            setTableRanges(updated);
+                                        }}
+                                    />
+                                </div>
+                                <div className="field-block">
+                                    <label>Slug</label>
+                                    {/* Slug Input (optional) */}
+                                    <input
+                                        type="text"
+                                        value={row.slug || ""}
+                                        onChange={(e) => {
+                                            const updated = [...tableRanges];
+                                            updated[index].slug = e.target.value;
+                                            setTableRanges(updated);
+                                        }}
+                                        placeholder="Enter slug"
+                                    />
+                                </div>
+
+                                <div className="field-block">
+                                    <label>Section</label>
+                                    {/* Section Input (optional) */}
+                                    <input
+                                        value={row.section}
+                                        onChange={(e) => {
+                                            const updated = [...tableRanges];
+                                            updated[index].section = e.target.value;
+                                            setTableRanges(updated);
+                                        }}
+                                    />
+                                </div>
+
+                                <div className="field-block">
+                                    <label>Sort Order</label>
+                                    {/* Sort-order Input (optional) */}
+                                    <input
+                                        type="number"
+                                        value={row.sort_order}
+                                        onChange={(e) => {
+                                            const updated = [...tableRanges];
+                                            updated[index].sort_order = e.target.value;
+                                            setTableRanges(updated);
+                                        }}
+                                    />
+                                </div>
+
+                                <div className="field-block checkbox-field">
+                                    <label>
+                                        {/* Active or not marking Input (optional) */}
+                                        <input
+                                            type="checkbox"
+                                            checked={row.is_active}
+                                            onChange={(e) => {
+                                                const updated = [...tableRanges];
+                                                updated[index].is_active = e.target.checked;
+                                                setTableRanges(updated);
+                                            }}
+                                        />
+                                        Active
+                                    </label>
+                                </div>
+
+                            </div>
+                        ))}
+                        {/* Example Text for creating tables (for user references) */}
+                        <div className="example-text">
+                            Example:<br />
+                            a) Table Range: T01:T10<br />
+                            b) Multi-Table Range: A01:A10,B01:B05
+                        </div>
+
+                        {addRowError && <div className="error">{addRowError}</div>}
+
+                        <button className="btn-warning" onClick={() => {
+                            const emptyRows = tableRanges.filter(
+                                row => !row.range || !row.table_type || !row.type
+                            );
+                            if (emptyRows.length >= 3) {
+                                setAddRowError("Please fill the existing rows first.");
+                                return;
+                            }
+                            setAddRowError("");
+                            setTableRanges([...tableRanges, { range: "", table_type: "", type: "", remark: "", is_active: false }]);
+                            setFieldErrors([...fieldErrors, {}]);
+                        }}>
+                            + Add Row
+                        </button>
+
+                        <button className="btn-info" onClick={generateTables}>Generate Table</button>
+                    </>
+                )}
+            </div>
+
+            <div className="edit-tables-section">
+                <h3>Edit Tables</h3>
+                <div className="grid-layout">
+                    {tables.map((table) => (
+                        <React.Fragment key={table.id}>
+                            <div
+                                className={`grids ${highlightRow === table.id ? "glow-effect" : ""} ${noChangeRowId === table.id ? "no-change-row" : ""
+                                    }`}
+                            >
+                                {noChangeRowId === table.id ? (
+                                    <div className="info-message full-row">
+                                        <p>⚠️ No changes made!!!</p>
+                                    </div>
+                                ) : (
+                                    <>
+                                        <div className="field-block">
+                                            <label>Table No</label>
+                                            <div>{table.name}</div>
+                                        </div>
+
+                                        {editRowId === table.id ? (
+                                            <>
+                                                <div className="field-block">
+                                                    <label>No of Seating</label>
+                                                    <input
+                                                        type="number"
+                                                        value={table.table_type}
+                                                        onChange={(e) =>
+                                                            handleEditChange(table.id, "table_type", e.target.value)
+                                                        }
+                                                    />
+                                                </div>
+                                                <div className="field-block">
+                                                    <label>Type</label>
+                                                    <select
+                                                        value={table.location_zone}
+                                                        onChange={(e) =>
+                                                            handleEditChange(table.id, "location_zone", e.target.value)
+                                                        }
+                                                    >
+                                                        <option value="AC">AC</option>
+                                                        <option value="Non-AC">Non-AC</option>
+                                                    </select>
+                                                </div>
+                                                <div className="field-block">
+                                                    <label>Remark</label>
+                                                    <input
+                                                        value={table.status || ""}
+                                                        onChange={(e) =>
+                                                            handleEditChange(table.id, "status", e.target.value)
+                                                        }
+                                                    />
+                                                </div>
+                                                <div className="btn-block">
+                                                    <button className="btn-primary" onClick={() => saveEdit(table)}>
+                                                        <FaCheck />
+                                                    </button>
+                                                    <button className="btn-warning" onClick={cancelEdit}>
+                                                        <FaTimes />
+                                                    </button>
+                                                </div>
+                                            </>
+                                        ) : (
+                                            <>
+                                                <div className="field-block">
+                                                    <label>No of Seating</label>
+                                                    <div>{table.table_type}</div>
+                                                </div>
+                                                <div className="field-block">
+                                                    <label>Type</label>
+                                                    <div>{table.location_zone}</div>
+                                                </div>
+                                                <div className="field-block">
+                                                    <label>Remark</label>
+                                                    <div>{table.status || "-"}</div>
+                                                </div>
+                                                <div className="btn-block">
+                                                    <button
+                                                        className="btn-edit"
+                                                        onClick={() => setEditRowId(table.id)}
+                                                    >
+                                                        <FaEdit />
+                                                    </button>
+                                                    <button
+                                                        className="btn-delete"
+                                                        onClick={() => {
+                                                            setDeleteTableId(table.id);
+                                                            setShowConfirmDelete(true);
+                                                        }}
+                                                    >
+                                                        <FaTrash />
+                                                    </button>
+                                                </div>
+                                            </>
+                                        )}
+                                    </>
+                                )}
+                            </div>
+
+                        </React.Fragment>
+
+                    ))}
+
+                </div>
+            </div>
+
+            {showConfirmDelete && (
+                <div className="confirm-overlay">
+                    <div className="confirm-box">
+                        <p>
+                            Delete table{" "}
+                            <strong>
+                                {
+                                    tables.find((t) => t.id === deleteTableId)?.name ||
+                                    "this table"
+                                }
+                            </strong>
+                            ?
+                        </p>
+                        <div className="buttons">
+                            <button className="btn-danger" onClick={confirmDelete}>Yes</button>
+                            <button className="btn-info" onClick={() => setShowConfirmDelete(false)}>No</button>
+                        </div>
+                    </div>
+                </div>
+            )}
+
+        </div>
+    );
+};
+
+export default TableManagement;
