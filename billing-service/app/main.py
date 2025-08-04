@@ -15,8 +15,7 @@ app.include_router(table_router, prefix="/saas/{client_id}/tables")
 
 app.add_middleware(
     CORSMiddleware,
-    allow_methods=["*",
-                   ],
+    allow_methods=["*"],
     allow_credentials=True,
     allow_origins=["*"],
     allow_headers=["*"]

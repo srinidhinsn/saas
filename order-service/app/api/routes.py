@@ -24,7 +24,8 @@ def create_order(client_id: str, order: DineinOrderModel, context: SaasContext =
     db.flush()
     for item in order.items:
         db_item = DBOrderItem(order_id=db_order.id, client_id=client_id,
-                              item_id=item.item_id, quantity=item.quantity, status=item.status or OrderStatusEnum.new)
+                              item_id=item.item_id,  item_name=item.item_name,
+                              slug=item.slug,     quantity=item.quantity, status=item.status or OrderStatusEnum.new)
         db.add(db_item)
     db.commit()
     db.refresh(db_order)
@@ -119,7 +120,7 @@ def update_order_status(client_id: str, body: DineinOrderModel, context: SaasCon
 
 
 @router.post("/order_item/update")
-def update_order_items(client_id: str, body: DineinOrderModel, context: SaasContext = Depends(verify_token), db: Session = Depends(get_db)):
+def update_order_items(client_id: str, body: OrderItemModel, context: SaasContext = Depends(verify_token), db: Session = Depends(get_db)):
 
     order = db.query(DBOrder).filter(DBOrder.id == str(
         body.dinein_order_id), DBOrder.client_id == client_id).first()
