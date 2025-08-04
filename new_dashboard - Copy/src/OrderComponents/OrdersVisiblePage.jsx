@@ -145,12 +145,14 @@ const OrdersVisiblePage = () => {
         }
     };
     const cancelItem = async (orderId, itemId) => {
-        if (!itemId || itemId === "None") return;
+        const order = orders.find(o => o.id === orderId);
+        const item = order?.items.find(i => i.item_id === itemId);
+
+        if (!item?.id) return;
 
         try {
             await axios.delete(`http://localhost:8003/saas/${clientId}/order_item/delete`, {
-                params: { order_item_id: itemId },
-
+                params: { order_item_id: item.id },
                 headers: {
                     Authorization: `Bearer ${token}`,
                 },
@@ -177,7 +179,6 @@ const OrdersVisiblePage = () => {
 
     //-------------------------------------------------- //
     const updateOrderItems = async (orderId, items) => {
-        // Step 1: Recalculate total based on quantity and item prices (from inventoryMap)
         let updatedTotal = 0;
         items.forEach(item => {
             const price = inventoryMap[item.item_id]?.price || 0;
@@ -186,27 +187,28 @@ const OrdersVisiblePage = () => {
 
         try {
             const response = await axios.post(
-                `http://localhost:8003/saas/${clientId}/order_item/update`,
-                {
-                    dinein_order_id: String(orderId),
-                    items: items.map(item => ({
-                        item_id: item.item_id,
-                        quantity: item.quantity
-                    })),
-                    total_price: updatedTotal, // Include total
-                },
+                `http://localhost:8003/saas/${clientId}/order_items/update?order_id=${orderId}`,
+                items.map(item => ({
+                    item_id: item.item_id,
+                    quantity: item.quantity,
+                    client_id: clientId,
+                    order_id: orderId,
+                    status: item.status || "new",
+                })),
                 {
                     headers: {
                         Authorization: `Bearer ${token}`,
                     },
                 }
             );
-            toast.success("✅ Order items updated");
 
-            // Update state after backend update
+            toast.success("Order items updated");
+
             setOrders((prev) =>
                 prev.map((o) =>
-                    o.id === orderId ? { ...o, items, total_price: updatedTotal } : o
+                    o.id === orderId
+                        ? { ...o, items, total_price: updatedTotal }
+                        : o
                 )
             );
         } catch (error) {
@@ -215,6 +217,7 @@ const OrdersVisiblePage = () => {
             toast.error(msg);
         }
     };
+
 
 
     // ----------------------------------------------------- //
@@ -412,7 +415,7 @@ const OrdersVisiblePage = () => {
                                                                                     onClick={() => cancelItem(order.id, item.item_id)}
                                                                                     disabled={item.status === "cancelled"}
                                                                                 >
-                                                                                    Cancel
+                                                                                    Delete
                                                                                 </button>
                                                                             </td>
                                                                         </tr>
