@@ -144,17 +144,16 @@ const OrdersVisiblePage = () => {
             console.error("❌ Failed to update item status", err);
         }
     };
-
     const cancelItem = async (orderId, itemId) => {
+        if (!itemId || itemId === "None") return;
+
         try {
-            await axios.post(`http://localhost:8003/saas/${clientId}/dinein/item/update`, {
-                order_id: orderId,
-                item_id: itemId,
-                status: "cancelled"
-            }, {
+            await axios.delete(`http://localhost:8003/saas/${clientId}/order_item/delete`, {
+                params: { order_item_id: itemId },
+
                 headers: {
                     Authorization: `Bearer ${token}`,
-                }
+                },
             });
 
             setOrders((prev) =>
@@ -173,9 +172,9 @@ const OrdersVisiblePage = () => {
             const msg = err?.response?.data?.detail || "❌ Failed to cancel item.";
             console.error(msg, err);
             toast.error(msg);
-
         }
     };
+
     //-------------------------------------------------- //
     const updateOrderItems = async (orderId, items) => {
         // Step 1: Recalculate total based on quantity and item prices (from inventoryMap)
