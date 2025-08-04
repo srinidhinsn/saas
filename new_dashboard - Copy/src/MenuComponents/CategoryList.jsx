@@ -951,6 +951,11 @@
 
 //
 
+
+
+
+
+
 import React, { useEffect, useState } from "react";
 import axios from "axios";
 import { FaEdit, FaTrash } from "react-icons/fa";
@@ -1448,10 +1453,6 @@ function CategoryList({ onCategorySelect }) {
       alert(err.response?.data?.detail || "Failed to delete category");
     }
   };
-
-
-
-
 
 
   return (

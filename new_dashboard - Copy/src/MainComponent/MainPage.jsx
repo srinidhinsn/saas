@@ -206,59 +206,65 @@ const MainPage = () => {
 
                     </div>
 
-                    <div className="stats">
-                        <div className="stat-card">
-                            <div className="flexible"><div className="card-icons"><FaHamburger /></div>
-                                <div><div className="value">{totalOrders}</div><div className="title">Total Orders</div></div>
-                            </div><div className="sub">Active: {totalOrders}</div>
+                    <div className="grid-layout">
+                        <div className="grids">
+                            
+                                <div className="card-icons"><FaHamburger /></div>
+                                <div><div className="value">{totalOrders}</div>
+                                <div className="title">Total Orders</div></div>
+                            <div className="sub">Active: {totalOrders}</div>
                         </div>
 
-                        <div className="stat-card">
-                            <div className="flexible"><div className="card-icons"><PiHamburgerThin /></div>
-                                <div><div className="value">{pendingOrders}</div><div className="title">Pending Orders</div></div>
-                            </div><div className="sub">Active: {pendingOrders}</div>
+                        <div className="grids">
+                                <div className="card-icons"><PiHamburgerThin /></div>
+                                <div><div className="value">{pendingOrders}</div>
+                                <div className="title">Pending Orders</div></div>
+                            <div className="sub">Active: {pendingOrders}</div>
                         </div>
 
-                        <div className="stat-card">
-                            <div className="flexible"><div className="card-icons"><RiMoneyRupeeCircleLine /></div>
+                        <div className="grids">
+                                <div className="card-icons"><RiMoneyRupeeCircleLine /></div>
                                 <div><div className="value">₹{totalEarnings}</div>
                                     <div className="title">Total Earnings</div></div>
-                            </div><div className="sub">Bill</div>
+                            
+                            <div className="sub">Bill</div>
                         </div>
 
-                        <div className="stat-card">
-                            <div className="flexible"><div className="card-icons"><BsPersonCheck /></div>
+                        <div className="grids">
+                            
+                                <div className="card-icons"><BsPersonCheck /></div>
                                 <div><div className="value">{totalCustomers}</div><div className="title">Customers</div></div>
-                            </div><div className="sub">Active: {totalCustomers}</div>
+                            
+                            <div className="sub">Active: {totalCustomers}</div>
                         </div>
 
-                        <div className="stat-card">
-                            <div className="flexible"><div className="card-icons"><MdOutlineTableBar /></div>
+                        <div className="grids">
+                            <div className="card-icons"><MdOutlineTableBar /></div>
                                 <div><div className="value">{newOrders}</div><div className="title">New</div></div>
-                            </div><div className="sub">Active: {newOrders}</div>
+                            <div className="sub">Active: {newOrders}</div>
                         </div>
 
-                        <div className="stat-card">
-                            <div className="flexible"><div className="card-icons"><MdOutlineSoupKitchen /></div>
+                        <div className="grids">
+                            <div className="card-icons"><MdOutlineSoupKitchen /></div>
                                 <div><div className="value">{preparingOrders}</div><div className="title">Preparing</div></div>
-                            </div><div className="sub">Active: {preparingOrders}</div>
+                            <div className="sub">Active: {preparingOrders}</div>
                         </div>
 
-                        <div className="stat-card">
-                            <div className="flexible"><div className="card-icons"><TbToolsKitchen3 /></div>
+                        <div className="grids">
+                            <div className="card-icons"><TbToolsKitchen3 /></div>
                                 <div><div className="value">{servedOrders}</div><div className="title">Served</div></div>
-                            </div><div className="sub">Active: {servedOrders}</div>
+                            <div className="sub">Active: {servedOrders}</div>
                         </div>
-                        <div className="stat-card">
-                            <div className="flexible"><div className="card-icons"><GoPackageDependents /></div>
+                        <div className="grids">
+                            <div className="card-icons"><GoPackageDependents /></div>
                                 <div><div className="value">0</div><div className="title">Take away</div></div>
-                            </div><div className="sub">Active:0(under progress)</div>
+                            <div className="sub">Active:0(under progress)</div>
                         </div>
 
-                        <div className="stat-card">
-                            <div className="flexible"><div className="card-icons"><MdDeliveryDining /></div>
+                        <div className="grids">
+                            <div className="card-icons"><MdDeliveryDining /></div>
                                 <div><div className="value">0</div><div className="title">Delivery</div></div>
-                            </div><div className="sub">Active:0(under progress)</div>
+                            <div className="sub">Active:0(under progress)</div>
                         </div>
 
                     </div>

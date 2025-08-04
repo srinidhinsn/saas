@@ -1626,6 +1626,7 @@
 import React, { useEffect, useState } from "react";
 import axios from "axios";
 import AddMenuForm from './AddMenuForm'; import { useParams } from "react-router-dom";
+import { FaEdit,FaTrash } from "react-icons/fa";
 
 function InventoryItemList({ selectedCategory }) {
   const [items, setItems] = useState([]);
@@ -1754,19 +1755,17 @@ function InventoryItemList({ selectedCategory }) {
         </button>
       </div>
 
-      <div className="menu-grid-container">
+      <div className="grid-layout ">
         {items.length === 0 ? (
           <p className="no-items">No inventory found.</p>
         ) : (
           items.map((item) => (
-            <div className="menu-grid-card" key={item.inventory_id}>
-              <div className="menu-card-body">
+            <div className="grids" key={item.inventory_id}>
                 <h4>{item.name}</h4>
                 <p className="menu-card-price">₹{item.unit_price}</p>
-              </div>
-              <div className="menu-card-footer">
-                <button className="btn-edit" onClick={() => handleEdit(item)}>Edit</button>
-                <button className="btn-delete" onClick={() => setDeleteTarget(item)}>Delete</button>
+                <div className="menu-card-footer">
+                <button className="btn-edit" onClick={() => handleEdit(item)}><FaEdit/></button>
+                <button className="btn-delete" onClick={() => setDeleteTarget(item)}><FaTrash/></button>
               </div>
             </div>
           ))

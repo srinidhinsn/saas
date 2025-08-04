@@ -322,12 +322,10 @@ function MenuManager() {
       <div className="tab-content">
         {activeTab === "Categories/Items" && (
           <div className="menu-manager-item-view">
-            <div className="menu-category-sidebar">
               <CategoryList
                 clientId={clientId}
                 onCategorySelect={handleCategorySelect}
               />
-            </div>
             <div className="menu-items-panel">
               <MenuItemList
                 clientId={clientId}

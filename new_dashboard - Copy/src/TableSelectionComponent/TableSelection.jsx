@@ -851,11 +851,11 @@ const TableSelection = () => {
 
             <div className="edit-tables-section">
                 <h3>Edit Tables</h3>
-                <div className="edit-grid">
+                <div className="grid-layout">
                     {tables.map((table) => (
                         <React.Fragment key={table.id}>
                             <div
-                                className={`form-grid ${highlightRow === table.id ? "glow-effect" : ""} ${noChangeRowId === table.id ? "no-change-row" : ""
+                                className={`grids ${highlightRow === table.id ? "glow-effect" : ""} ${noChangeRowId === table.id ? "no-change-row" : ""
                                     }`}
                             >
                                 {noChangeRowId === table.id ? (
