@@ -1,5 +1,4 @@
 import React, { useEffect, useState } from "react";
-import axios from "axios";
 import { FaEdit, FaTrash } from "react-icons/fa";
 import { jwtDecode } from "jwt-decode";
 import { useParams } from "react-router-dom";
@@ -158,6 +157,7 @@ function CategoryList({ onCategorySelect }) {
                 : [...state, id]
         );
     };
+
     const getAllAncestors = (categoryId, parentMap) => {
         const ancestors = [];
         let currentId = categoryId;
@@ -170,6 +170,7 @@ function CategoryList({ onCategorySelect }) {
 
         return ancestors;
     };
+
     const buildParentMap = (categories) => {
         const map = {};
         const dfs = (nodes, parent = null) => {
@@ -243,6 +244,23 @@ function CategoryList({ onCategorySelect }) {
         } catch (error) {
             console.error("Error refreshing categories:", error);
         }
+    };
+
+
+    const getAllCategoriesRecursive = (categoryList) => {
+        const result = [];
+
+        const traverse = (cats) => {
+            for (const cat of cats) {
+                result.push(cat);
+                if (cat.subCategories && cat.subCategories.length > 0) {
+                    traverse(cat.subCategories);
+                }
+            }
+        };
+
+        traverse(categoryList);
+        return result;
     };
 
 
@@ -550,7 +568,7 @@ function CategoryList({ onCategorySelect }) {
 
                         <label>Assign as Subcategory under:</label>
                         <div className="subcategory-checkboxes">
-                            {categories.map((cat) => (
+                            {getAllCategoriesRecursive(categories).map((cat) => (
                                 <label key={cat.id}>
                                     <input
                                         type="checkbox"
@@ -611,7 +629,7 @@ function CategoryList({ onCategorySelect }) {
 
                         <label>Subcategories:</label>
                         <div className="subcategory-checkboxes">
-                            {categories
+                            {getAllCategoriesRecursive(categories)
                                 .filter((cat) => cat.id !== editingId)
                                 .map((cat) => (
                                     <label key={cat.id}>
