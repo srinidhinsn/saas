@@ -20,8 +20,7 @@ body {
             rgb(243, 240, 250) 100%);
     --sidebar-bg: linear-gradient(to left,
             rgb(243, 240, 250) 0%,
-            rgb(233, 230, 249) 20%,
-            rgb(221, 233, 249) 50%,
+            rgb(233, 230, 249) 20%, App.css.map rgb(221, 233, 249) 50%,
             rgb(233, 230, 249) 80%,
             rgb(243, 240, 250) 100%);
     --text-color: rgb(56, 47, 108);
@@ -2710,7 +2709,7 @@ body.sidebar-minimized .sidebar li .arrow-indicator {
     }
 }
 
-/*# sourceMappingURL=App.css.map */
+
 
 
 

@@ -19,6 +19,7 @@ import DashBoardPage from "./DashBoardPage";
 import Invoice_Page from "../Main_Components/Invoice_Services_Components/Invoice_Page";
 // import ComboPage from "../ComboComponents/ComboPage";
 import KitchenDisplay from "../Main_Components/Order_Service_Components/KDS_Component/KitchenDisplay";
+import Add_user from "../Main_Components/Add_Users/Add_user";
 // import InvoicePage from "../InvoiceComponents/InvoicePage";
 // import ReportsPage from "../ReportComponents/ReportsPage";
 // import TableOverview from "../TableOverviewComponents/TableOverview";
@@ -122,6 +123,7 @@ const SaasClientRoutes = ({
                     <Route path="invoice" element={<Invoice_Page />} />
                     {/* <Route path="combo-page" element={<ComboPage />} /> */}
                     <Route path="kds-page" element={<KitchenDisplay />} />
+                    <Route path="add-users" element={<Add_user />} />
                     {/* <Route path="documents" element={<Documents />} />
                     <Route path="billing" element={<BillingPage />} />
                     <Route path="invoice" element={<InvoicePage />} />
