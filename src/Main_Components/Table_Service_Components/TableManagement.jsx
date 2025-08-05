@@ -216,9 +216,9 @@ const TableManagement = () => {
         <div className={`table-selection ${darkMode ? "dark" : ""}`}>  {/*Theme changer */}
             <div className="header">
                 <h2>Table Management</h2> {/*Header section start*/}
-                <button className="theme-toggle" onClick={toggleTheme}>
+                {/* <button className="theme-toggle" onClick={toggleTheme}>
                     {darkMode ? <FiSun /> : <FiMoon />}
-                </button>
+                </button> */}
             </div>{/*Header section end*/}
 
             <div className="add-tables-section"> {/*Add Table Section  */}

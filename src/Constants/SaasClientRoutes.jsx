@@ -21,6 +21,7 @@ import Invoice_Page from "../Main_Components/Invoice_Services_Components/Invoice
 import KitchenDisplay from "../Main_Components/Order_Service_Components/KDS_Component/KitchenDisplay";
 import Add_user from "../Main_Components/Add_Users/Add_user";
 import HeaderBar from "./HeaderPage";
+import ReportService from "../Main_Components/Report_Service_Components/ReportService";
 // import InvoicePage from "../InvoiceComponents/InvoicePage";
 // import ReportsPage from "../ReportComponents/ReportsPage";
 // import TableOverview from "../TableOverviewComponents/TableOverview";
@@ -92,9 +93,9 @@ const SaasClientRoutes = ({
         <>
 
             <HeaderBar />
-            <div style={{ display: "flex" }}>
+            <div className="app-wrapper" style={{ display: "flex" }}>
                 {!hideNavbar && <Navbar />}
-                <div style={{ flex: 1 }}>
+                <div className="main-layout" style={{ flex: 1, overflowY: "auto" }}>
                     <Routes>
                         <Route path="/" element={<DashBoardPage />} />
                         {/* <Route path="update-profile" element={<UpdateProfile />} />
@@ -125,7 +126,7 @@ const SaasClientRoutes = ({
                         />
                         <Route path="orders-view" element={<OrdersVisiblePage latestOrder={latestOrder} />} />
                         <Route path="invoice" element={<Invoice_Page />} />
-                        {/* <Route path="combo-page" element={<ComboPage />} /> */}
+                        <Route path="reports" element={<ReportService />} />
                         <Route path="kds-page" element={<KitchenDisplay />} />
                         <Route path="add-users" element={<Add_user />} />
                         {/* <Route path="documents" element={<Documents />} />
@@ -141,6 +142,7 @@ const SaasClientRoutes = ({
                     </Routes>
                 </div>
             </div>
+
         </>
 
     );
