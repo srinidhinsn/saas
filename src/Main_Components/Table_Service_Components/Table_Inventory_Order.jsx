@@ -280,8 +280,6 @@ const Table_Inventory_Order = ({ onOrderUpdate }) => {
                                 />
                             </div>
                             <ul className="category-list">
-
-
                                 {categories.map(cat => (
                                     <div key={cat.id} className="category-item">
                                         <li
