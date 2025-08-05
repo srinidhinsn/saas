@@ -3,6 +3,7 @@ import axios from "axios";
 import { FaEdit, FaTrash } from "react-icons/fa";
 import { jwtDecode } from "jwt-decode";
 import { useParams } from "react-router-dom";
+import inventoryServicesPort from '../../Backend_Port_Files/InventoryServices'
 
 
 function CategoryList({ onCategorySelect }) {
@@ -34,8 +35,8 @@ function CategoryList({ onCategorySelect }) {
     useEffect(() => {
         if (!token || !clientId) return;
 
-        axios
-            .get(`http://localhost:8002/saas/${clientId}/inventory/read_category`, {
+        inventoryServicesPort
+            .get(`/${clientId}/inventory/read_category`, {
                 headers: {
                     Authorization: `Bearer ${token}`,
                 },
@@ -223,8 +224,8 @@ function CategoryList({ onCategorySelect }) {
 
     const refreshCategoriesAndParentMap = async () => {
         try {
-            const response = await axios.get(
-                `http://localhost:8002/saas/${clientId}/inventory/read_category`,
+            const response = await inventoryServicesPort.get(
+                `/${clientId}/inventory/read_category`,
                 { headers: { Authorization: `Bearer ${token}` } }
             );
 
@@ -284,8 +285,8 @@ function CategoryList({ onCategorySelect }) {
             };
 
             try {
-                const subRes = await axios.post(
-                    `http://localhost:8002/saas/${clientId}/inventory/create_category`,
+                const subRes = await inventoryServicesPort.post(
+                    `/${clientId}/inventory/create_category`,
                     newSubPayload,
                     { headers: { Authorization: `Bearer ${token}` } }
                 );
@@ -316,8 +317,8 @@ function CategoryList({ onCategorySelect }) {
         };
 
         try {
-            await axios.post(
-                `http://localhost:8002/saas/${clientId}/inventory/create_category`,
+            await inventoryServicesPort.post(
+                `/${clientId}/inventory/create_category`,
                 mainPayload,
                 { headers: { Authorization: `Bearer ${token}` } }
             );
@@ -380,8 +381,8 @@ function CategoryList({ onCategorySelect }) {
             };
 
             try {
-                const subRes = await axios.post(
-                    `http://localhost:8002/saas/${clientId}/inventory/create_category`,
+                const subRes = await inventoryServicesPort.post(
+                    `/${clientId}/inventory/create_category`,
                     newSubPayload,
                     { headers: { Authorization: `Bearer ${token}` } }
                 );
@@ -403,8 +404,8 @@ function CategoryList({ onCategorySelect }) {
 
         // Add existing subcategories if not included already
         try {
-            const currentCatRes = await axios.get(
-                `http://localhost:8002/saas/${clientId}/inventory/read_category`,
+            const currentCatRes = await inventoryServicesPort.get(
+                `/${clientId}/inventory/read_category`,
                 { headers: { Authorization: `Bearer ${token}` } }
             );
             const rawCategories = currentCatRes.data.data;
@@ -424,8 +425,8 @@ function CategoryList({ onCategorySelect }) {
         };
 
         try {
-            await axios.post(
-                `http://localhost:8002/saas/${clientId}/inventory/update_category`,
+            await inventoryServicesPort.post(
+                `/${clientId}/inventory/update_category`,
                 payload,
                 {
                     headers: {
@@ -455,8 +456,8 @@ function CategoryList({ onCategorySelect }) {
         console.log("Deleting category ID:", category.id);
 
         try {
-            const res = await axios.post(
-                `http://localhost:8002/saas/${clientId}/inventory/delete_category`,
+            const res = await inventoryServicesPort.post(
+                `/${clientId}/inventory/delete_category`,
                 { id: category.id },
                 {
                     headers: {
@@ -467,8 +468,8 @@ function CategoryList({ onCategorySelect }) {
             );
 
             //  Refetch categories after deletion
-            const response = await axios.get(
-                `http://localhost:8002/saas/${clientId}/inventory/read_category`,
+            const response = await inventoryServicesPort.get(
+                `/${clientId}/inventory/read_category`,
                 {
                     headers: {
                         Authorization: `Bearer ${token}`,

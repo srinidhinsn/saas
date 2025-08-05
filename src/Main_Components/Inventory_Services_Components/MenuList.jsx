@@ -1,9 +1,10 @@
-import React, { useEffect, useState } from "react";
+import React, { useEffect, useState, useRef } from "react";
 import axios from "axios";
 import AddMenuForm from './AddInventoryItemForm'; import { useParams } from "react-router-dom";
 import { FaEdit, FaTrash } from "react-icons/fa";
+import inventoryServicesPort from "../../Backend_Port_Files/InventoryServices";
 
-function MenuList({ selectedCategory }) {
+function InventoryItemList({ selectedCategory }) {
     const [items, setItems] = useState([]);
     const [editingItem, setEditingItem] = useState(null);
     const [showEditModal, setShowEditModal] = useState(false);
@@ -19,7 +20,7 @@ function MenuList({ selectedCategory }) {
     useEffect(() => {
         if (!token || !clientId) return;
 
-        axios.get(`http://localhost:8002/saas/${clientId}/inventory/read_category`, {
+        inventoryServicesPort.get(`/${clientId}/inventory/read_category`, {
             headers: { Authorization: `Bearer ${token}` },
         })
             .then((res) => {
@@ -33,8 +34,8 @@ function MenuList({ selectedCategory }) {
     useEffect(() => {
         if (!clientId || !token) return;
 
-        axios
-            .get(`http://localhost:8002/saas/${clientId}/inventory/read`, { headers })
+        inventoryServicesPort
+            .get(`/${clientId}/inventory/read`, { headers })
             .then((res) => {
                 console.log("fetched items  :", res.data.data)
                 setItems(res.data.data || []);
@@ -77,8 +78,8 @@ function MenuList({ selectedCategory }) {
         };
 
         try {
-            const res = await axios.post(
-                `http://localhost:8002/saas/${clientId}/inventory/update`,
+            const res = await inventoryServicesPort.post(
+                `/${clientId}/inventory/update`,
                 updatedItem,
                 { headers }
             );
@@ -99,8 +100,8 @@ function MenuList({ selectedCategory }) {
 
     const handleDelete = async (id) => {
         try {
-            await axios.post(
-                `http://localhost:8002/saas/${clientId}/inventory/delete`,
+            await inventoryServicesPort.post(
+                `/${clientId}/inventory/delete`,
                 { id }, // ✅ backend expects { id: value }
                 { headers }
             );
@@ -119,6 +120,73 @@ function MenuList({ selectedCategory }) {
         setShowAddModal(false);
     };
 
+
+    const getLineItemDetails = (lineItemIds) => {
+        if (!Array.isArray(lineItemIds)) return { names: "No linked items", totalPrice: 0 };
+
+        let totalPrice = 0;
+
+        const names = lineItemIds.map((id) => {
+            const match = items.find((i) => i.id === id || i.line_item_id === id); // fallback match
+            if (match) {
+                totalPrice += match.unit_price || 0;
+                return `${match.name} (₹${match.unit_price})`;
+            }
+            return "Unknown";
+        });
+
+        return { names: names.join(", "), totalPrice };
+    };
+
+    const DropdownCheckbox = ({ selected, options, onChange }) => {
+        const [open, setOpen] = useState(false);
+        const ref = useRef(null);
+
+        useEffect(() => {
+            const handleClickOutside = (event) => {
+                if (ref.current && !ref.current.contains(event.target)) {
+                    setOpen(false);
+                }
+            };
+            document.addEventListener("mousedown", handleClickOutside);
+            return () => document.removeEventListener("mousedown", handleClickOutside);
+        }, []);
+
+        const toggleSelect = (id) => {
+            const newSelected = selected.includes(id)
+                ? selected.filter(val => val !== id)
+                : [...selected, id];
+            onChange(newSelected);
+        };
+
+        return (
+            <div ref={ref} className="dropdown-multiselect">
+                <div className="dropdown-header" onClick={() => setOpen(!open)}>
+                    {selected.length > 0
+                        ? `${selected.length} item(s) selected`
+                        : "Select Addon(s)"}
+                    <span className="dropdown-arrow">▾</span>
+                </div>
+                {open && (
+                    <div className="dropdown-list">
+                        {options.map(option => (
+                            <label key={option.id} className="dropdown-item">
+                                <input
+                                    type="checkbox"
+                                    checked={selected.includes(option.id)}
+                                    onChange={() => toggleSelect(option.id)}
+                                />
+                                {option.name}
+                            </label>
+                        ))}
+                    </div>
+                )}
+            </div>
+        );
+    };
+
+
+
     return (
         <div className="menu-items-panel">
             <div className="btns">
@@ -134,17 +202,25 @@ function MenuList({ selectedCategory }) {
                 {items.length === 0 ? (
                     <p className="no-items">No inventory found.</p>
                 ) : (
-                    items.map((item) => (
-                        <div className="grids" key={item.inventory_id}>
-                            <h4>{item.name}</h4>
-                            <p className="menu-card-price">₹{item.unit_price}</p>
-                            <div className="menu-card-footer">
-                                <button className="btn-edit" onClick={() => handleEdit(item)}><FaEdit /></button>
-                                <button className="btn-delete" onClick={() => setDeleteTarget(item)}><FaTrash /></button>
+                    items.map((item) => {
+                        const { names, totalPrice } = getLineItemDetails(item.line_item_id);
+                        const finalPrice = (item.unit_price || 0) + totalPrice;
+
+                        return (
+                            <div className="grids" key={item.inventory_id}>
+                                <h4>{item.name}</h4>
+                                <h4>Line Items: {names}</h4>
+                                <p className="menu-card-price">₹{finalPrice}</p>
+                                <div className="menu-card-footer">
+                                    <button className="btn-edit" onClick={() => handleEdit(item)}><FaEdit /></button>
+                                    <button className="btn-delete" onClick={() => setDeleteTarget(item)}><FaTrash /></button>
+                                </div>
                             </div>
-                        </div>
-                    ))
+                        );
+                    })
+
                 )}
+
             </div>
 
             {showAddModal && (
@@ -184,18 +260,16 @@ function MenuList({ selectedCategory }) {
                                         className="form-input short"
                                         readOnly
                                     />
-                                    <select
-                                        value={editingItem.line_item_id}
-                                        onChange={(e) => setEditingItem({ ...editingItem, line_item_id: e.target.value })}
-                                        className="form-input"
-                                    >
-                                        <option value="">Select Addon</option>
-                                        {items.map((cat) => (
-                                            <option key={cat.id} value={cat.id}>
-                                                {cat.name}
-                                            </option>
-                                        ))}
-                                    </select>
+
+
+                                    <DropdownCheckbox
+                                        selected={Array.isArray(editingItem.line_item_id) ? editingItem.line_item_id : []}
+                                        options={items}
+                                        onChange={(newSelected) =>
+                                            setEditingItem({ ...editingItem, line_item_id: newSelected })
+                                        }
+                                    />
+
 
                                     <label htmlFor="">Name : </label>
                                     <input
@@ -401,4 +475,4 @@ function MenuList({ selectedCategory }) {
     );
 }
 
-export default MenuList;
+export default InventoryItemList;
