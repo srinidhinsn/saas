@@ -2,6 +2,7 @@ import React, { useEffect, useState } from "react";
 import axios from "axios";
 import orderServicesPort from "../../Backend_Port_Files/OrderServices";
 import tableServicesPort from "../../Backend_Port_Files/TableServices";
+import inventoryServicesPort from "../../Backend_Port_Files/InventoryServices";
 import { useParams } from "react-router-dom";
 import { useTheme } from "../../ThemeChangerComponent/ThemeProvider";
 import { toast } from "react-toastify";
@@ -20,12 +21,45 @@ const OrdersVisiblePage = () => {
     const [orderToDelete, setOrderToDelete] = useState(null);
     const [tablesMap, setTablesMap] = useState({});
 
+    const [editOrderId, setEditOrderId] = useState(null);
+    const [showDeleteModals, setShowDeleteModals] = useState(false);
+    const [deleteTarget, setDeleteTarget] = useState({ orderId: null, itemId: null });
 
+    // --------------------------------------------------------------------------- //
+
+    const updateItemQuantity = (orderId, itemId, newQty) => {
+        setOrders(prev =>
+            prev.map(order => {
+                if (order.id !== orderId) return order;
+
+                const updatedItems = order.items.map(item =>
+                    item.item_id === itemId
+                        ? { ...item, quantity: newQty > 0 ? newQty : 1 }
+                        : item
+                );
+
+                const newTotal = updatedItems.reduce((sum, item) => {
+                    const itemPrice = inventoryMap[item.item_id]?.price || 0;
+                    return sum + item.quantity * itemPrice;
+                }, 0);
+
+                return {
+                    ...order,
+                    items: updatedItems,
+                    total_price: newTotal
+                };
+            })
+        );
+    };
+
+
+    // --------------------------------------------------------------------------- //
     //Theme Effect(dark & light theme)
     useEffect(() => {
         document.body.setAttribute("data-theme", darkMode ? "dark" : "light");
     }, [darkMode]);
 
+    // --------------------------------------------------------------------------- //
     //Fetching orders
     useEffect(() => {
         const fetchOrders = async () => {
@@ -64,11 +98,13 @@ const OrdersVisiblePage = () => {
     }, [clientId]);
 
 
+    // --------------------------------------------------------------------------- //
     //Expands/collapses the details for a particular order
     const toggleExpand = (index) => {
         setExpandedOrderIndex(index === expandedOrderIndex ? null : index);
     };
 
+    // --------------------------------------------------------------------------- //
 
     //Change Order Status
     const handleStatusChange = async (orderId, newStatus) => {
@@ -108,9 +144,16 @@ const OrdersVisiblePage = () => {
             // }
             setOrders((prev) =>
                 prev.map((o) =>
-                    o.id === orderId ? { ...o, status: newStatus } : o
+                    o.id === orderId
+                        ? {
+                            ...o,
+                            status: newStatus,
+                            items: o.items.map(item => ({ ...item, status: newStatus === 'served' ? 'served' : item.status }))
+                        }
+                        : o
                 )
             );
+
         } catch (err) {
             const msg = err?.response?.data?.detail || "❌ Failed to update order status.";
             console.error(msg, err);
@@ -118,6 +161,8 @@ const OrdersVisiblePage = () => {
 
         }
     };
+
+    // --------------------------------------------------------------------------- //
     const handleItemStatusChange = async (orderId, itemId, newStatus) => {
         try {
             await orderServicesPort.post(`/${clientId}/dinein/item/update`, {
@@ -146,10 +191,11 @@ const OrdersVisiblePage = () => {
             console.error("❌ Failed to update item status", err);
         }
     };
+
+    // --------------------------------------------------------------------------- //
     const cancelItem = async (orderId, itemId) => {
         const order = orders.find(o => o.id === orderId);
         const item = order?.items.find(i => i.item_id === itemId);
-
         if (!item?.id) return;
 
         try {
@@ -160,24 +206,36 @@ const OrdersVisiblePage = () => {
                 },
             });
 
-            setOrders((prev) =>
-                prev.map((order) =>
-                    order.id === orderId
-                        ? {
-                            ...order,
-                            items: order.items.map((item) =>
-                                item.item_id === itemId ? { ...item, status: "cancelled" } : item
-                            ),
-                        }
-                        : order
-                )
-            );
+            // Update state
+            setOrders((prevOrders) => {
+                return prevOrders.reduce((acc, o) => {
+                    if (o.id !== orderId) {
+                        acc.push(o);
+                        return acc;
+                    }
+
+                    const updatedItems = o.items.map((item) =>
+                        item.item_id === itemId ? { ...item, status: "cancelled" } : item
+                    );
+
+                    const allCancelled = updatedItems.every(item => item.status === "cancelled");
+
+                    if (!allCancelled) {
+                        acc.push({ ...o, items: updatedItems });
+                    } else {
+                        toast.info("All items in the order are cancelled. Order removed.");
+                    }
+
+                    return acc;
+                }, []);
+            });
         } catch (err) {
             const msg = err?.response?.data?.detail || "❌ Failed to cancel item.";
             console.error(msg, err);
             toast.error(msg);
         }
     };
+
 
     //-------------------------------------------------- //
     const updateOrderItems = async (orderId, items) => {
@@ -248,6 +306,7 @@ const OrdersVisiblePage = () => {
         }
     };
 
+    // --------------------------------------------------------------------------- //
     useEffect(() => {
         const fetchTables = async () => {
             try {
@@ -269,6 +328,33 @@ const OrdersVisiblePage = () => {
         fetchTables();
     }, [clientId]);
 
+    // --------------------------------------------------------------------------- //
+    useEffect(() => {
+        const fetchInventory = async () => {
+            if (!token || !clientId) return;
+
+            try {
+                const res = await inventoryServicesPort.get(`/${clientId}/inventory/read`, {
+                    headers: {
+                        Authorization: `Bearer ${token}`
+                    }
+                });
+
+                const inventoryList = res.data?.data || [];
+                const map = {};
+
+                inventoryList.forEach(item => {
+                    map[item.id] = item; // Includes price
+                });
+
+                setInventoryMap(map);
+            } catch (error) {
+                console.error("❌ Failed to fetch inventory:", error);
+            }
+        };
+
+        fetchInventory();
+    }, [clientId]);
 
     // --------------------------------------------------------------------------- //
 
@@ -324,22 +410,24 @@ const OrdersVisiblePage = () => {
                                             </tr>
                                             {expandedOrderIndex === index && (
                                                 <tr>
-                                                    <td colSpan="7" className="order-details">
-                                                        <div className="details-wrapper">
-                                                            <div className="status-buttons">
+                                                    <td colSpan="7" className="expanded-order-row">
+                                                        <div className="modern-order-details-container">
+                                                            <div className="modern-order-status-controls">
                                                                 <button
-                                                                    className="btn delete"
+                                                                    className="modern-order-delete-button"
                                                                     onClick={() => {
                                                                         console.log("Clicked delete for", order.id);
                                                                         setOrderToDelete(order.id);
                                                                         setShowDeleteModal(true);
-                                                                    }} > Delete Order
+                                                                    }}
+                                                                >
+                                                                    Delete Order
                                                                 </button>
 
                                                                 {["pending", "preparing", "served"].map((status) => (
                                                                     <button
                                                                         key={status}
-                                                                        className={`btn status-change ${order.status === status ? "active" : ""}`}
+                                                                        className={`modern-status-toggle-button ${order.status === status ? "modern-active-status" : ""}`}
                                                                         onClick={() => handleStatusChange(order.id, status)}
                                                                         disabled={order.status === "served"}
                                                                     >
@@ -347,114 +435,142 @@ const OrdersVisiblePage = () => {
                                                                     </button>
                                                                 ))}
 
+                                                                <button
+                                                                    className="modern-order-edit-button"
+                                                                    onClick={() => setEditOrderId(prev => prev === order.id ? null : order.id)}
+                                                                >
+                                                                    {editOrderId === order.id ? 'Cancel Edit' : 'Edit'}
+                                                                </button>
                                                             </div>
-                                                            <table className="items-table">
-                                                                <thead>
-                                                                    <tr>
-                                                                        <th>Item(s)</th>
-                                                                        {/* <th>Order ID</th> */}
-                                                                        {/* <th>Table</th> */}
-                                                                        <th>Quantity</th>
-                                                                        <th>Status</th>
-                                                                    </tr>
-                                                                </thead>
-                                                                <tbody>
-                                                                    {order.items?.map((item, idx) => (
 
-                                                                        <tr key={idx}>
-                                                                            <td data-label="Item(s)">{item.item_name || item.item_id}</td>
+                                                            <div className="modern-items-table-wrapper">
+                                                                <table className="modern-items-table">
+                                                                    <thead>
+                                                                        <tr>
+                                                                            <th>Item(s)</th>
+                                                                            <th>Quantity</th>
+                                                                            <th>Status</th>
+                                                                            <th>Actions</th>
+                                                                        </tr>
+                                                                    </thead>
+                                                                    <tbody>
+                                                                        {order.items?.map((item, idx) => (
+                                                                            <tr key={idx}>
+                                                                                <td data-label="Item(s)">
+                                                                                    {item.item_name || item.item_id}
+                                                                                </td>
 
-                                                                            {/* <td data-label="Order ID">{item?.order_id ?? order.id}</td> */}
-                                                                            {/* <td data-label="Table">{tablesMap[order.table_id] || order.table_id}</td> */}
-                                                                            <td data-label="Quantity">
-                                                                                <input
-                                                                                    type="number"
-                                                                                    min="1"
-                                                                                    value={item.quantity}
-                                                                                    onChange={(e) => {
-                                                                                        const newQty = parseInt(e.target.value);
-                                                                                        const currentOrderId = order.id;
+                                                                                <td data-label="Quantity">
+                                                                                    {editOrderId === order.id ? (
+                                                                                        <div className="modern-qty-edit-controls">
+                                                                                            <button
+                                                                                                onClick={() => updateItemQuantity(order.id, item.item_id, item.quantity - 1)}
+                                                                                                disabled={item.quantity <= 1}
+                                                                                            >
+                                                                                                −
+                                                                                            </button>
+                                                                                            <span>{item.quantity}</span>
+                                                                                            <button
+                                                                                                onClick={() => updateItemQuantity(order.id, item.item_id, item.quantity + 1)}
+                                                                                            >
+                                                                                                +
+                                                                                            </button>
+                                                                                        </div>
+                                                                                    ) : (
+                                                                                        <span>{item.quantity}</span>
+                                                                                    )}
+                                                                                </td>
 
-                                                                                        setOrders((prev) =>
-                                                                                            prev.map((o) => {
-                                                                                                if (o.id !== currentOrderId) return o;
+                                                                                <td data-label="Status">
+                                                                                    <span className={`modern-item-status-tag ${item.status}`}>
+                                                                                        {item.status}
+                                                                                    </span>
+                                                                                </td>
 
-                                                                                                const updatedItems = o.items.map((it) =>
-                                                                                                    it.item_id === item.item_id
-                                                                                                        ? { ...it, quantity: newQty }
-                                                                                                        : it
-                                                                                                );
+                                                                                <td data-label="Actions">
+                                                                                    {["new", "preparing", "served"].map((status) => (
+                                                                                        <button
+                                                                                            key={status}
+                                                                                            className={`modern-item-action-button ${item.status === status ? "modern-active-status" : ""}`}
+                                                                                            onClick={() => handleItemStatusChange(order.id, item.item_id, status)}
+                                                                                            disabled={item.status === "served" || item.status === "cancelled"}
+                                                                                        >
+                                                                                            {status}
+                                                                                        </button>
+                                                                                    ))}
 
-                                                                                                const newTotal = updatedItems.reduce((sum, it) => {
-                                                                                                    const price = inventoryMap[it.item_id]?.price || 0;
-                                                                                                    return sum + price * it.quantity;
-                                                                                                }, 0);
-
-                                                                                                return {
-                                                                                                    ...o,
-                                                                                                    items: updatedItems,
-                                                                                                    total_price: newTotal,
-                                                                                                };
-                                                                                            })
-                                                                                        );
-                                                                                    }}
-
-
-                                                                                    style={{ width: "50px" }}
-                                                                                />
-                                                                            </td>
-
-                                                                            <td data-label="Status">
-                                                                                <span className={`tag ${item.status}`}>{item.status}</span>
-                                                                            </td>
-
-
-                                                                            <td data-label="Actions">
-
-                                                                                {["new", "preparing", "served"].map((status) => (
-                                                                                    <button
-                                                                                        key={status}
-                                                                                        className={`btn-sm ${item.status === status ? "active" : ""}`}
-                                                                                        onClick={() => handleItemStatusChange(order.id, item.item_id, status)}
-                                                                                        disabled={item.status === "served" || item.status === "cancelled"}
-                                                                                    >
-                                                                                        {status}
-                                                                                    </button>
-                                                                                ))}
+                                                                                    {editOrderId === order.id && (
+                                                                                        <button
+                                                                                            className="modern-item-delete-button"
+                                                                                            onClick={() => {
+                                                                                                setDeleteTarget({ orderId: order.id, itemId: item.item_id });
+                                                                                                setShowDeleteModals(true);
+                                                                                            }}
+                                                                                            disabled={item.status === "cancelled"}
+                                                                                        >
+                                                                                            Delete
+                                                                                        </button>
+                                                                                    )}
+                                                                                </td>
+                                                                            </tr>
+                                                                        ))}
+                                                                    </tbody>
+                                                                    <tfoot>
+                                                                        <tr>
+                                                                            <td colSpan="4" style={{ textAlign: "right" }}>
                                                                                 <button
-                                                                                    className="btn-sm cancel"
-                                                                                    onClick={() => cancelItem(order.id, item.item_id)}
-                                                                                    disabled={item.status === "cancelled"}
+                                                                                    className="modern-save-items-button"
+                                                                                    onClick={() => updateOrderItems(order.id, order.items)}
                                                                                 >
-                                                                                    Delete
+                                                                                    Save Items
                                                                                 </button>
                                                                             </td>
                                                                         </tr>
-
-                                                                    ))}
-                                                                </tbody>
-                                                                <tfoot>
-                                                                    <tr>
-                                                                        <td colSpan="5" style={{ textAlign: "right" }}>
-                                                                            <button
-                                                                                className="btn save-items"
-                                                                                onClick={() => updateOrderItems(order.id, order.items)}
-                                                                            >
-                                                                                Save Items
-                                                                            </button>
-                                                                        </td>
-                                                                    </tr>
-                                                                </tfoot>
-                                                            </table>
+                                                                    </tfoot>
+                                                                </table>
+                                                            </div>
                                                         </div>
                                                     </td>
                                                 </tr>
+
+
+
                                             )}
+
                                         </React.Fragment>
                                     ))
                                 )}
                             </tbody>
                         </table>
+                        {showDeleteModals && deleteTarget && (
+                            <div className="delete-modal-overlay">
+                                <div className="delete-modal-box">
+                                    <p>Are you sure you want to delete this item?</p>
+                                    <div className="delete-modal-buttons">
+                                        <button
+                                            className="confirm-delete-btn"
+                                            onClick={() => {
+                                                cancelItem(deleteTarget.orderId, deleteTarget.itemId);
+                                                setShowDeleteModals(false);
+                                                setDeleteTarget({ orderId: null, itemId: null });
+                                            }}
+                                        >
+                                            Yes, Delete
+                                        </button>
+                                        <button
+                                            className="cancel-delete-btn"
+                                            onClick={() => {
+                                                setShowDeleteModals(false);
+                                                setDeleteTarget({ orderId: null, itemId: null });
+                                            }}
+                                        >
+                                            Cancel
+                                        </button>
+                                    </div>
+                                </div>
+                            </div>
+                        )}
+
                     </div>
                 )}
 

@@ -667,3 +667,99 @@ body.theme-dark {
 .modal-actions button:nth-child(3):hover {
     background-color: #757575;
 }
+
+/* OrdersvisiblePage stylesheet */
+
+.expanded-order-row {
+    background-color: var(--expanded-bg, #f9f9f9);
+}
+
+.modern-order-details-container {
+    padding: 1.5rem;
+    background: white;
+    border-radius: 12px;
+    box-shadow: 0 0 12px rgba(0, 0, 0, 0.05);
+    margin-top: 1rem;
+}
+
+.modern-order-status-controls {
+    display: flex;
+    flex-wrap: wrap;
+    gap: 0.5rem;
+    margin-bottom: 1rem;
+}
+
+.modern-order-delete-button {
+    background: #ff4d4f;
+    color: white;
+    border: none;
+    padding: 0.6rem 1.2rem;
+    border-radius: 6px;
+    cursor: pointer;
+}
+
+.modern-status-toggle-button {
+    background: #e0e0e0;
+    padding: 0.6rem 1rem;
+    border-radius: 6px;
+    border: none;
+    cursor: pointer;
+}
+
+.modern-active-status {
+    background: #1890ff !important;
+    color: white;
+}
+
+.modern-items-table-wrapper {
+    overflow-x: auto;
+}
+
+.modern-items-table {
+    width: 100%;
+    border-collapse: collapse;
+    margin-top: 1rem;
+}
+
+.modern-items-table th,
+.modern-items-table td {
+    padding: 0.75rem;
+    text-align: left;
+    border-bottom: 1px solid #eaeaea;
+}
+
+.modern-quantity-input {
+    width: 60px;
+    padding: 0.3rem;
+    border-radius: 4px;
+    border: 1px solid #ccc;
+}
+
+.modern-item-status-tag {
+    padding: 0.3rem 0.6rem;
+    border-radius: 5px;
+    background-color: #f0f0f0;
+    text-transform: capitalize;
+    font-size: 0.85rem;
+}
+
+.modern-item-action-button,
+.modern-item-delete-button,
+.modern-save-items-button {
+    padding: 0.4rem 0.8rem;
+    margin-right: 0.5rem;
+    border: none;
+    border-radius: 5px;
+    font-size: 0.85rem;
+    cursor: pointer;
+}
+
+.modern-item-delete-button {
+    background-color: #ff7875;
+    color: white;
+}
+
+.modern-save-items-button {
+    background-color: #52c41a;
+    color: white;
+}
