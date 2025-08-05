@@ -61,7 +61,7 @@ const Navbar = () => {
 
     return (
         <aside className="sidebar">
-            <div className="brand">DineIn Software</div>
+            {/* <div className="brand">DineIn Software</div> */}
             <ul className="menu">
                 <li title="Dashboard" onClick={() => go('/')} className={isActive('/main') ? 'page-active' : ''}>
                     <GiHamburgerMenu />
@@ -85,18 +85,11 @@ const Navbar = () => {
                     <MdOutlineMenuBook /><span>Menu</span>
                     {!isActive('/main/menu-page') && <span className="arrow-indicator"><MdKeyboardArrowRight /></span>}
                 </li>
-                {/* <li title="Combos" onClick={() => go('/combo-page')} className={startsWith('/combo-page') ? 'page-active' : ''}>
-                    <FcComboChart /><span>Combos</span>
-                    {!isActive('/main/orders-view') && <span className="arrow-indicator"><MdKeyboardArrowRight /></span>}
-                </li> */}
                 <li title="KDS" onClick={() => go('/kds-page')} className={isActive('/main/kds-page') ? 'page-active' : ''}>
                     <FaKitchenSet /><span>KDS</span>
                     {!isActive('/main/kds-page') && <span className="arrow-indicator"><MdKeyboardArrowRight /></span>}
                 </li>
-                {/* <li title="Invoice" onClick={() => go('/invoice')} className={isActive('/main/invoice') ? 'page-active' : ''}>
-                    <FaFileInvoiceDollar /><span>Invoice</span>
-                    {!isActive('/main/invoice') && <span className="arrow-indicator"><MdKeyboardArrowRight /></span>}
-                </li> */}
+
                 {/* <li title="Documents" onClick={() => go('/documents')} className={isActive('/main/documents') ? 'page-active' : ''}>
                     <IoDocumentTextOutline /><span>Documents</span>
                     {!isActive('/main/documents') && <span className="arrow-indicator"><MdKeyboardArrowRight /></span>}
@@ -104,6 +97,10 @@ const Navbar = () => {
                 <li title="Invoice" onClick={() => go('/invoice')} className={isActive('/main/invoice') ? 'page-active' : ''}>
                     <IoDocumentTextOutline /><span>Invoice</span>
                     {!isActive('/main/invoice') && <span className="arrow-indicator"><MdKeyboardArrowRight /></span>}
+                </li>
+                <li title="Report" onClick={() => go('/reports')} className={isActive('/main/reports') ? 'page-active' : ''}>
+                    <FaFileInvoiceDollar /><span>Report</span>
+                    {!isActive('/main/reports') && <span className="arrow-indicator"><MdKeyboardArrowRight /></span>}
                 </li>
                 <li title="Add Users" onClick={() => go('/add-users')} className={isActive('/main/add-users') ? 'page-active' : ''}>
                     <FaUserPlus /><span>Add Users</span>

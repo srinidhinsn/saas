@@ -1,150 +1,146 @@
-import React, { useState } from "react";
+import React, { useState } from 'react';
 
-const AddUserPage = () => {
-    const [formData, setFormData] = useState({
-        name: "",
-        email: "",
-        role: "",
-        status: "active",
-        password: "",
-        confirmPassword: "",
-    });
 
+const initialUser = {
+    name: '',
+    email: '',
+    phone: '',
+    address: '',
+    role: '',
+    gender: '',
+    dob: '',
+    password: '',
+    confirmPassword: '',
+};
+
+const AddUsers = () => {
+    const [user, setUser] = useState(initialUser);
     const [users, setUsers] = useState([]);
     const [editIndex, setEditIndex] = useState(null);
+    const [showModal, setShowModal] = useState(false);
+    const [selectedUser, setSelectedUser] = useState(null);
 
     const handleChange = (e) => {
-        setFormData({ ...formData, [e.target.name]: e.target.value });
+        const { name, value } = e.target;
+        setUser((prev) => ({ ...prev, [name]: value }));
     };
 
     const handleSubmit = (e) => {
         e.preventDefault();
         if (editIndex !== null) {
-            const updated = [...users];
-            updated[editIndex] = formData;
-            setUsers(updated);
+            const updatedUsers = [...users];
+            updatedUsers[editIndex] = user;
+            setUsers(updatedUsers);
             setEditIndex(null);
         } else {
-            setUsers([{ ...formData }, ...users]);
+            setUsers([...users, user]);
         }
-        resetForm();
-    };
-
-    const handleEdit = (index) => {
-        setFormData(users[index]);
-        setEditIndex(index);
+        setUser(initialUser);
     };
 
     const handleDelete = (index) => {
-        if (window.confirm("Are you sure you want to delete this user?")) {
-            const updated = users.filter((_, i) => i !== index);
-            setUsers(updated);
-            resetForm();
-        }
+        const updatedUsers = users.filter((_, i) => i !== index);
+        setUsers(updatedUsers);
     };
 
-    const resetForm = () => {
-        setFormData({
-            name: "",
-            email: "",
-            role: "",
-            status: "active",
-            password: "",
-            confirmPassword: "",
-        });
-        setEditIndex(null);
+    const openEditModal = (user, index) => {
+        setSelectedUser({ ...user, index });
+        setShowModal(true);
+    };
+
+    const updateUser = () => {
+        const updatedUsers = [...users];
+        updatedUsers[selectedUser.index] = selectedUser;
+        setUsers(updatedUsers);
+        setShowModal(false);
     };
 
     return (
-        <div className="user-page-container">
-            <h2>{editIndex !== null ? "Edit User" : "Add User"}</h2>
+        <div className="user-management-page">
             <form className="user-form" onSubmit={handleSubmit}>
-                <div className="form-row">
-                    <input
-                        type="text"
-                        name="name"
-                        placeholder="Name"
-                        value={formData.name}
-                        onChange={handleChange}
-                        required
-                    />
-                    <input
-                        type="email"
-                        name="email"
-                        placeholder="Email"
-                        value={formData.email}
-                        onChange={handleChange}
-                        required
-                    />
-                </div>
-                <div className="form-row">
-                    <select name="role" value={formData.role} onChange={handleChange} required>
-                        <option value="">Role</option>
-                        <option value="admin">Admin</option>
-                        <option value="manager">Manager</option>
-                        <option value="staff">Staff</option>
+                <div className="form-grid">
+                    <input name="name" placeholder="Name" value={user.name} onChange={handleChange} required />
+                    <input name="email" placeholder="Email" value={user.email} onChange={handleChange} required />
+                    <input name="phone" placeholder="Phone" value={user.phone} onChange={handleChange} required />
+                    <input name="address" placeholder="Address" value={user.address} onChange={handleChange} />
+
+                    <select name="role" value={user.role} onChange={handleChange} required>
+                        <option value="">Select Role</option>
+                        <option value="Admin">Admin</option>
+                        <option value="Editor">Editor</option>
+                        <option value="Viewer">Viewer</option>
                     </select>
-                    <select name="status" value={formData.status} onChange={handleChange}>
-                        <option value="active">Active</option>
-                        <option value="inactive">Inactive</option>
+
+                    <select name="gender" value={user.gender} onChange={handleChange} required>
+                        <option value="">Select Gender</option>
+                        <option value="Male">Male</option>
+                        <option value="Female">Female</option>
+                        <option value="Other">Other</option>
                     </select>
+
+                    <input name="dob" type="date" placeholder="DOB" value={user.dob} onChange={handleChange} required />
+                    <input name="password" type="password" placeholder="Password" value={user.password} onChange={handleChange} required />
+                    <input name="confirmPassword" type="password" placeholder="Confirm Password" value={user.confirmPassword} onChange={handleChange} required />
                 </div>
-                <div className="form-row">
-                    <input
-                        type="password"
-                        name="password"
-                        placeholder="Password"
-                        value={formData.password}
-                        onChange={handleChange}
-                        required
-                    />
-                    <input
-                        type="password"
-                        name="confirmPassword"
-                        placeholder="Confirm Password"
-                        value={formData.confirmPassword}
-                        onChange={handleChange}
-                        required
-                    />
-                </div>
-                <div className="form-actions">
-                    <button type="submit">{editIndex !== null ? "Save Changes" : "Add User"}</button>
-                    {editIndex !== null && <button type="button" onClick={resetForm}>Cancel</button>}
-                </div>
+                <button type="submit" className="submit-btn">
+                    {editIndex !== null ? 'Update User' : 'Add User'}
+                </button>
             </form>
 
-            {users.length > 0 && (
-                <div className="user-list">
-                    <h3>Existing Users</h3>
-                    <table>
-                        <thead>
-                            <tr>
-                                <th>Name</th>
-                                <th>Email</th>
-                                <th>Role</th>
-                                <th>Status</th>
-                                <th>Actions</th>
-                            </tr>
-                        </thead>
-                        <tbody>
-                            {users.map((u, i) => (
-                                <tr key={i}>
-                                    <td>{u.name}</td>
-                                    <td>{u.email}</td>
-                                    <td>{u.role}</td>
-                                    <td>{u.status}</td>
-                                    <td className="action-cell">
-                                        <button className="edit-btn" onClick={() => handleEdit(i)}>Edit</button>
-                                        <button className="delete-btn" onClick={() => handleDelete(i)}>Delete</button>
-                                    </td>
-                                </tr>
+            <div className="user-grid">
+                {users.map((u, index) => (
+                    <div key={index} className="user-card" onClick={() => openEditModal(u, index)}>
+                        <div className="user-name">{u.name}</div>
+                        <div className="user-role">{u.role}</div>
+                    </div>
+                ))}
+            </div>
+
+            {showModal && (
+                <div className="modal-overlay">
+                    <div className="modal animated-modal">
+                        <h3>Edit User</h3>
+                        <div className="modal-grid">
+                            {Object.keys(initialUser).map((field) => (
+                                field === 'role' || field === 'gender' ? (
+                                    <select
+                                        key={field}
+                                        name={field}
+                                        value={selectedUser[field] || ''}
+                                        onChange={(e) => setSelectedUser((prev) => ({ ...prev, [field]: e.target.value }))}
+                                    >
+                                        <option value="">Select {field[0].toUpperCase() + field.slice(1)}</option>
+                                        {field === 'role' ? (
+                                            ['Admin', 'Editor', 'Viewer']
+                                        ) : (
+                                            ['Male', 'Female', 'Other']
+                                        ).map((opt) => (
+                                            <option key={opt} value={opt}>{opt}</option>
+                                        ))}
+                                    </select>
+                                ) : (
+                                    <input
+                                        key={field}
+                                        type={field.includes('password') ? 'password' : field === 'dob' ? 'date' : 'text'}
+                                        name={field}
+                                        value={selectedUser[field] || ''}
+                                        onChange={(e) =>
+                                            setSelectedUser((prev) => ({ ...prev, [field]: e.target.value }))
+                                        }
+                                    />
+                                )
                             ))}
-                        </tbody>
-                    </table>
+                        </div>
+                        <div className="modal-actions">
+                            <button onClick={updateUser}>Save</button>
+                            <button onClick={() => handleDelete(selectedUser.index)}>Delete</button>
+                            <button onClick={() => setShowModal(false)}>Cancel</button>
+                        </div>
+                    </div>
                 </div>
             )}
         </div>
     );
 };
 
-export default AddUserPage;
+export default AddUsers;

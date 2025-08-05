@@ -158,7 +158,7 @@ const DashBoardPage = () => {
         <div className="dashboard">
             <main className="main">
                 <header className="main-header">
-                    <div className="actions">
+                    {/* <div className="actions">
                         <div className="avatar" onClick={handleAvatarClick} ref={dropdownRef} style={{ cursor: 'pointer', position: 'relative' }}>
                             👤
                             {showDropdown && (
@@ -189,7 +189,7 @@ const DashBoardPage = () => {
                         <div className="theme-toggle-icon" onClick={toggleTheme}>
                             {darkMode ? <FiSun size={20} /> : <FiMoon size={20} />}
                         </div>
-                    </div>
+                    </div> */}
                 </header>
 
                 <div className="main-content">
