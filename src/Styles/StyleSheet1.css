@@ -2723,9 +2723,9 @@ body.sidebar-minimized .sidebar li .arrow-indicator {
     background: #f9fafb;
     border-radius: 12px;
     font-family: 'Segoe UI', sans-serif;
-}
-
-.form-item-block {
+  }
+  
+  .form-item-block {
     border: 1px solid #e5e7eb;
     padding: 16px;
     border-radius: 10px;
@@ -2733,16 +2733,16 @@ body.sidebar-minimized .sidebar li .arrow-indicator {
     display: flex;
     flex-direction: column;
     gap: 12px;
-}
-
-.form-row {
+  }
+  
+  .form-row {
     display: flex;
     gap: 12px;
     flex-wrap: wrap;
     align-items: center;
-}
-
-.form-input {
+  }
+  
+  .form-input {
     padding: 8px 10px;
     font-size: 14px;
     border-radius: 6px;
@@ -2750,29 +2750,29 @@ body.sidebar-minimized .sidebar li .arrow-indicator {
     background-color: #fff;
     min-width: 140px;
     flex: 1;
-}
-
-.short {
+  }
+  
+  .short {
     width: 100px;
-}
-
-.checkbox-group {
+  }
+  
+  .checkbox-group {
     display: flex;
     align-items: center;
     gap: 8px;
-}
-
-.checkbox-group label {
+  }
+  
+  .checkbox-group label {
     font-size: 14px;
     margin-right: 12px;
-}
-
-input[type="checkbox"] {
+  }
+  
+  input[type="checkbox"] {
     transform: scale(1.2);
     margin-right: 4px;
-}
-
-.btn-cancel-row {
+  }
+  
+  .btn-cancel-row {
     padding: 6px 12px;
     font-size: 13px;
     background-color: #f87171;
@@ -2781,165 +2781,221 @@ input[type="checkbox"] {
     border-radius: 6px;
     cursor: pointer;
     white-space: nowrap;
-}
-
-.btn-cancel-row:hover {
+  }
+  
+  .btn-cancel-row:hover {
     background-color: #ef4444;
-}
-
-.form-actions {
+  }
+  
+  .form-actions {
     display: flex;
     justify-content: flex-end;
     gap: 10px;
-}
-
-.btn-add-another,
-.btn-add-item {
+  }
+  
+  .btn-add-another,
+  .btn-add-item {
     padding: 10px 16px;
     font-size: 14px;
     border-radius: 6px;
     border: none;
     cursor: pointer;
-}
-
-.btn-add-another {
+  }
+  
+  .btn-add-another {
     background-color: #c7d2fe;
     color: #1e3a8a;
-}
-
-.btn-add-another:hover {
+  }
+  
+  .btn-add-another:hover {
     background-color: #a5b4fc;
-}
-
-.btn-add-item {
+  }
+  
+  .btn-add-item {
     background-color: #4ade80;
     color: #065f46;
-}
-
-.btn-add-item:hover {
+  }
+  
+  .btn-add-item:hover {
     background-color: #34d399;
-}
-
-.form-entry-wrapper {
+  }
+  
+  .form-entry-wrapper {
     margin-bottom: 20px;
     padding: 10px;
     border: 1px solid #ddd;
     border-radius: 6px;
     background-color: #f9f9f9;
-}
-
-.form-row {
+  }
+  
+  /* Dropdown with Checkboxes Styles */
+  .dropdown-multiselect {
+    position: relative;
+    width: 100%;
+    max-width: 250px;
+    font-family: 'Segoe UI', sans-serif;
+  }
+  
+  .dropdown-header {
+    padding: 10px 14px;
+    background-color: #ffffff;
+    border: 1px solid #ccc;
+    border-radius: 6px;
+    cursor: pointer;
+    font-size: 14px;
+    transition: all 0.2s ease;
+  }
+  
+  .dropdown-header:hover {
+    border-color: #888;
+    background-color: #f9f9f9;
+  }
+  
+  .dropdown-list {
+    position: absolute;
+    width: 100%;
+    background-color: #fff;
+    border: 1px solid #ccc;
+    border-top: none;
+    border-radius: 0 0 6px 6px;
+    max-height: 220px;
+    overflow-y: auto;
+    box-shadow: 0 4px 12px rgba(0, 0, 0, 0.08);
+    z-index: 10;
+  }
+  
+  .dropdown-item {
+    padding: 5px 5px;
+    display: flex;
+    align-items: center;
+    cursor: pointer;
+    transition: background-color 0.2s ease;
+  }
+  
+  .dropdown-item:hover {
+    background-color: #f2f2f2;
+  }
+  
+  .dropdown-item input[type="checkbox"] {
+    margin-right: 10px;
+    accent-color: #007bff;
+    cursor: pointer;
+  }
+  
+  
+  .form-row {
     display: flex;
     flex-wrap: wrap;
     gap: 12px;
     margin-bottom: 10px;
-}
-
-.form-input {
+  }
+  
+  .form-input {
     flex: 1;
     min-width: 120px;
     padding: 8px;
     border: 1px solid #ccc;
     border-radius: 4px;
-}
-
-.form-input.short {
+  }
+  
+  .form-input.short {
     width: 100px;
-}
-
-.checkbox-label {
+  }
+  
+  .checkbox-label {
     display: flex;
     align-items: center;
     gap: 6px;
-}
-
-.btn-cancel-row {
+  }
+  
+  .btn-cancel-row {
     background-color: #f44336;
     color: white;
     border: none;
     padding: 6px 12px;
     border-radius: 4px;
     cursor: pointer;
-}
-
-
-@media (max-width: 1024px) {
+  }
+  
+  
+  @media (max-width: 1024px) {
     .add-category-form {
         max-width: 90%;
     }
-}
-
-@media (max-width: 900px) {
+  }
+  
+  @media (max-width: 900px) {
     .btn-add {
         padding: 10px 20px;
         font-size: 0.95rem;
     }
-}
-
-@media (max-width: 768px) {
+  }
+  
+  @media (max-width: 768px) {
     .add-category-form {
         padding: 14px;
         gap: 10px;
     }
-
+  
     .export-buttons {
         flex-direction: column;
         align-items: stretch;
         gap: 10px;
     }
-
+  
     .btn-add {
         font-size: 0.95rem;
     }
-}
-
-@media (max-width: 600px) {
+  }
+  
+  @media (max-width: 600px) {
     .add-category-form {
         padding: 12px;
     }
-
+  
     .input-field {
         font-size: 0.95rem;
     }
-
+  
     .btn-add {
         font-size: 0.9rem;
         padding: 10px;
     }
-}
-
-@media (max-width: 480px) {
+  }
+  
+  @media (max-width: 480px) {
     .add-category-form {
         padding: 10px;
         margin: 20px auto;
     }
-
+  
     .btn-add {
         font-size: 0.85rem;
         padding: 8px 16px;
     }
-
+  
     .form-actions {
         display: flex;
         justify-content: center;
         gap: 10px;
     }
-}
-
-@media (max-width: 360px) {
+  }
+  
+  @media (max-width: 360px) {
     .add-category-form {
         padding: 8px;
     }
-
+  
     .input-field {
         font-size: 0.9rem;
     }
-
+  
     .btn-add {
         font-size: 0.8rem;
         padding: 6px 12px;
     }
-}
+  }
+  
 
 /* ***************************************************************************************************************** */
 
