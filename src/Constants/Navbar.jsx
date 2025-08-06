@@ -90,10 +90,10 @@ const Navbar = () => {
                     {!isActive('/main/kds-page') && <span className="arrow-indicator"><MdKeyboardArrowRight /></span>}
                 </li>
 
-                {/* <li title="Documents" onClick={() => go('/documents')} className={isActive('/main/documents') ? 'page-active' : ''}>
+                <li title="Documents" onClick={() => go('/documents')} className={isActive('/main/documents') ? 'page-active' : ''}>
                     <IoDocumentTextOutline /><span>Documents</span>
                     {!isActive('/main/documents') && <span className="arrow-indicator"><MdKeyboardArrowRight /></span>}
-                </li> */}
+                </li>
                 <li title="Invoice" onClick={() => go('/invoice')} className={isActive('/main/invoice') ? 'page-active' : ''}>
                     <IoDocumentTextOutline /><span>Invoice</span>
                     {!isActive('/main/invoice') && <span className="arrow-indicator"><MdKeyboardArrowRight /></span>}
