@@ -1,10 +1,11 @@
 import React, { useEffect, useState } from "react";
-import axios from "axios";
 import { useParams } from "react-router-dom";
 import documentServicesPort from "../../Backend_Port_Files/DocumentServices";
+import { useTheme } from "../../ThemeChangerComponent/ThemeProvider";
 
 const DocumentManager = () => {
     const { clientId } = useParams();
+    const { darkMode } = useTheme(); // you can use it if needed
     const token = localStorage.getItem("access_token");
     const userId = localStorage.getItem("user_id") || "system";
 
@@ -16,14 +17,10 @@ const DocumentManager = () => {
     const [selectedDocId, setSelectedDocId] = useState(null);
     const [latestDocId, setLatestDocId] = useState(null);
 
-    const headers = {
-        Authorization: `Bearer ${token}`,
-    };
+    const headers = { Authorization: `Bearer ${token}` };
 
     useEffect(() => {
-        if (clientId && token) {
-            fetchDocuments();
-        }
+        if (clientId && token) fetchDocuments();
     }, [clientId, token]);
 
     const fetchDocuments = async () => {
@@ -54,13 +51,16 @@ const DocumentManager = () => {
                 `/${clientId}/document/upload`,
                 formData,
                 {
-                    headers: { ...headers, "Content-Type": "multipart/form-data" },
+                    headers: {
+                        ...headers,
+                        "Content-Type": "multipart/form-data",
+                    },
                 }
             );
             alert("Upload successful.");
             fetchDocuments();
-            resetForm(); setLatestDocId(null);
-            fetchDocuments();
+            resetForm();
+            setLatestDocId(null);
         } catch (err) {
             alert("Upload failed.");
             console.error(err);
@@ -82,10 +82,12 @@ const DocumentManager = () => {
                 `/${clientId}/document/replace?doc_id=${selectedDocId}`,
                 formData,
                 {
-                    headers: { ...headers, "Content-Type": "multipart/form-data" },
+                    headers: {
+                        ...headers,
+                        "Content-Type": "multipart/form-data",
+                    },
                 }
             );
-
             alert("Document replaced.");
             setSelectedDocId(null);
             fetchDocuments();
@@ -105,7 +107,6 @@ const DocumentManager = () => {
                     responseType: "blob",
                 }
             );
-
             const url = window.URL.createObjectURL(new Blob([res.data]));
             const link = document.createElement("a");
             link.href = url;
@@ -128,15 +129,11 @@ const DocumentManager = () => {
     };
 
     return (
-        <div className="document-manager">
-            <h2>📄 Document Manager</h2>
+        <div className="doc-manager-wrapper">
+            <h2 className="doc-header">📄 Document Manager</h2>
 
-            <div className="form-section">
-                <input
-                    className="File-Upload"
-                    type="file"
-                    onChange={(e) => setFile(e.target.files[0])}
-                />
+            <div className="doc-upload-form">
+                <input type="file" onChange={(e) => setFile(e.target.files[0])} />
                 <input
                     type="text"
                     placeholder="Description"
@@ -155,59 +152,44 @@ const DocumentManager = () => {
                     value={realm}
                     onChange={(e) => setRealm(e.target.value)}
                 />
-
-                <button className="btn upload-btn" onClick={handleUpload}>
-                    Upload
-                </button>
-
-                {selectedDocId && (
-                    <button className="btn replace-btn" onClick={handleReplace}>
-                        Replace
+                <div className="doc-btn-group">
+                    <button className="upload-button" onClick={handleUpload}>
+                        Upload
                     </button>
-                )}
+                    {selectedDocId && (
+                        <button className="replace-button" onClick={handleReplace}>
+                            Replace
+                        </button>
+                    )}
+                </div>
             </div>
 
-            <h3>📁 Available Documents</h3>
-            <div className="table-container">
-                <table>
-                    <thead>
-                        <tr>
-                            <th>Category ID</th>
-                            <th>Name</th>
-                            <th>Description</th>
-                            {/* <th>Filetype</th> */}
-                            <th>Size (KB)</th>
-                            <th>Actions</th>
-                        </tr>
-                    </thead>
-                    <tbody>
-                        {documents
-                            .filter(doc => doc.id === latestDocId || latestDocId === null)
-                            .map((doc) => (
-                                <tr key={doc.id}>
-                                    <td>{doc.category_id}</td>
-                                    <td>{doc.name}</td>
-                                    <td>{doc.description}</td>
-                                    <td>{doc.size_kb}</td>
-                                    <td>
-                                        <button
-                                            className="btn download-btn"
-                                            onClick={() => handleDownload(doc.id)}
-                                        >
-                                            Download
-                                        </button>
-                                        <button
-                                            className="btn replace-action-btn"
-                                            onClick={() => setSelectedDocId(doc.id)}
-                                        >
-                                            Replace
-                                        </button>
-                                    </td>
-                                </tr>
-                            ))}
-                    </tbody>
-
-                </table>
+            <h3 className="doc-subheader">📁 Available Documents</h3>
+            <div className="doc-grid-container">
+                {documents
+                    .filter((doc) => doc.id === latestDocId || latestDocId === null)
+                    .map((doc) => (
+                        <div className="doc-card" key={doc.id}>
+                            <p><strong>📁 {doc.name}</strong></p>
+                            <p>📎 Category: {doc.category_id}</p>
+                            <p>📝 {doc.description}</p>
+                            <p>📦 {doc.size_kb} KB</p>
+                            <div className="doc-actions">
+                                <button
+                                    className="download-button"
+                                    onClick={() => handleDownload(doc.id)}
+                                >
+                                    Download
+                                </button>
+                                <button
+                                    className="replace-button"
+                                    onClick={() => setSelectedDocId(doc.id)}
+                                >
+                                    Replace
+                                </button>
+                            </div>
+                        </div>
+                    ))}
             </div>
         </div>
     );

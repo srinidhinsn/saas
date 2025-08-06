@@ -140,20 +140,7 @@ const OrdersVisiblePage = () => {
             );
             toast.success("Item status updated");
 
-            // if (newStatus === "served") {
-            //     await axios.post(
-            //         `http://localhost:8003/saas/${clientId}/dinein/update`,
-            //         {
-            //             order_id: orderId,
-            //             invoice_status: "paid",
-            //         },
-            //         {
-            //             headers: {
-            //                 Authorization: `Bearer ${token}`,
-            //             },
-            //         }
-            //     );
-            // }
+
             setOrders((prev) =>
                 prev.map((o) =>
                     o.id === orderId
@@ -177,32 +164,47 @@ const OrdersVisiblePage = () => {
     // --------------------------------------------------------------------------- //
     const handleItemStatusChange = async (orderId, itemId, newStatus) => {
         try {
-            await orderServicesPort.post(`/${clientId}/dinein/item/update`, {
-                order_id: orderId,
-                item_id: itemId,
-                status: newStatus
-            }, {
-                headers: {
-                    Authorization: `Bearer ${token}`,
-                }
-            });
+            const order = orders.find(o => o.id === orderId);
+            if (!order) return;
 
-            setOrders((prev) =>
-                prev.map((order) =>
+            const updatedItems = order.items.map(item =>
+                item.item_id === itemId ? { ...item, status: newStatus } : item
+            );
+
+            const totalPrice = updatedItems.reduce((sum, item) => {
+                const price = inventoryMap[item.item_id]?.price || 0;
+                return sum + price * (item.quantity || 1);
+            }, 0);
+
+            const itemToUpdate = updatedItems.find(item => item.item_id === itemId);
+
+            await orderServicesPort.post(
+                `/${clientId}/order_items/update?single_item=true`,
+                [{ id: itemToUpdate.id, status: newStatus }],
+                { headers: { Authorization: `Bearer ${token}` } }
+            );
+
+            await orderServicesPort.post(
+                `/${clientId}/dinein/update`,
+                { id: orderId, total_price: totalPrice },
+                { headers: { Authorization: `Bearer ${token}` } }
+            );
+
+            setOrders(prev =>
+                prev.map(order =>
                     order.id === orderId
-                        ? {
-                            ...order,
-                            items: order.items.map((item) =>
-                                item.item_id === itemId ? { ...item, status: newStatus } : item
-                            ),
-                        }
+                        ? { ...order, items: updatedItems, total_price: totalPrice }
                         : order
                 )
             );
+
         } catch (err) {
             console.error("❌ Failed to update item status", err);
         }
     };
+
+
+
 
     // --------------------------------------------------------------------------- //
     const cancelItem = async (orderId, itemId) => {
@@ -248,46 +250,45 @@ const OrdersVisiblePage = () => {
 
 
     //-------------------------------------------------- //
-    const updateOrderItems = async (orderId, items) => {
-        let updatedTotal = 0;
-        items.forEach(item => {
-            const price = inventoryMap[item.item_id]?.price || 0;
-            updatedTotal += item.quantity * price;
+    //-------------------------------------------------- //
+    //-------------------------------------------------- //
+    //-------------------------------------------------- //
+    const updateOrderItems = async (orderId, updatedItemsWithStatuses) => {
+        const cleanedItems = updatedItemsWithStatuses.map(item => {
+            const { id, ...rest } = item;
+            return {
+                ...rest,
+                status: item.status || "new"
+            };
         });
 
+        const totalPrice = cleanedItems.reduce((sum, item) => {
+            const price = inventoryMap[item.item_id]?.price || 0;
+            return sum + price * (item.quantity || 1);
+        }, 0);
+
         try {
-            const response = await orderServicesPort.post(
-                `/${clientId}/order_items/update?order_id=${orderId}`,
-                items.map(item => ({
-                    item_id: item.item_id,
-                    quantity: item.quantity,
-                    client_id: clientId,
-                    order_id: orderId,
-                    status: item.status || "new",
-                })),
+            await axios.post(
+                `http://localhost:8003/saas/${clientId}/order_items/update?order_id=${orderId}`,
+                cleanedItems,
+                { headers: { Authorization: `Bearer ${token}` } }
+            );
+
+            await axios.post(
+                `http://localhost:8003/saas/${clientId}/dinein/update`,
                 {
-                    headers: {
-                        Authorization: `Bearer ${token}`,
-                    },
-                }
+                    id: orderId,
+                    total_price: totalPrice
+                },
+                { headers: { Authorization: `Bearer ${token}` } }
             );
 
-            toast.success("Order items updated");
-
-            setOrders((prev) =>
-                prev.map((o) =>
-                    o.id === orderId
-                        ? { ...o, items, total_price: updatedTotal }
-                        : o
-                )
-            );
-        } catch (error) {
-            const msg = error?.response?.data?.detail || "❌ Failed to update order items.";
-            console.error(msg, error);
-            toast.error(msg);
+            toast.success("Item statuses & total updated!");
+        } catch (err) {
+            console.error(err);
+            toast.error("Failed to update items or total.");
         }
     };
-
 
 
     // ----------------------------------------------------- //

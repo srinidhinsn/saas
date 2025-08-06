@@ -13,11 +13,16 @@ const HeaderBar = () => {
     const fileInputRef = useRef(null);
     const clickTimeoutRef = useRef(null);
     const navigate = useNavigate();
+    const [showBellShaking, setShowBellShaking] = useState(false);
 
     const { darkMode, toggleTheme } = useTheme();
 
     const token = localStorage.getItem("access_token");
     const [tokenAvailable, setTokenAvailable] = useState(!!token);
+    const addNotification = (message) => {
+        setNotifications(prev => [message, ...prev]); // newest on top
+        setShowBellShaking(true); // trigger bell shake
+    };
 
     useEffect(() => {
         setNotifications([
@@ -79,7 +84,13 @@ const HeaderBar = () => {
             <div className="Right-Side-Header">
                 {/* Notifications */}
                 <div className="left">
-                    <button onClick={() => setShowPopup(!showPopup)} className="icon-button">
+                    <button
+                        onClick={() => {
+                            setShowPopup(!showPopup);
+                            setShowBellShaking(false); // stop shaking when opened
+                        }}
+                        className={`icon-button ${showBellShaking ? "shake" : ""}`}
+                    >
                         <FaBell />
                         {showPopup && (
                             <div className="notification-popup">
@@ -93,6 +104,7 @@ const HeaderBar = () => {
                             </div>
                         )}
                     </button>
+
                 </div>
 
                 {/* Theme Toggle */}
