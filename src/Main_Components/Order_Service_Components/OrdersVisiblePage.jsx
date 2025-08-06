@@ -140,20 +140,7 @@ const OrdersVisiblePage = () => {
             );
             toast.success("Item status updated");
 
-            // if (newStatus === "served") {
-            //     await axios.post(
-            //         `http://localhost:8003/saas/${clientId}/dinein/update`,
-            //         {
-            //             order_id: orderId,
-            //             invoice_status: "paid",
-            //         },
-            //         {
-            //             headers: {
-            //                 Authorization: `Bearer ${token}`,
-            //             },
-            //         }
-            //     );
-            // }
+
             setOrders((prev) =>
                 prev.map((o) =>
                     o.id === orderId
@@ -248,46 +235,48 @@ const OrdersVisiblePage = () => {
 
 
     //-------------------------------------------------- //
-    const updateOrderItems = async (orderId, items) => {
-        let updatedTotal = 0;
-        items.forEach(item => {
-            const price = inventoryMap[item.item_id]?.price || 0;
-            updatedTotal += item.quantity * price;
+    const updateOrderItems = async (orderId, updatedItems) => {
+        const cleanedItems = updatedItems.map(item => {
+            const { id, ...rest } = item;
+            return rest;
         });
 
+        const updatedTotal = cleanedItems.reduce((sum, item) => {
+            const price = inventoryMap[item.item_id]?.price || 0;
+            return sum + item.quantity * price;
+        }, 0);
+
         try {
-            const response = await orderServicesPort.post(
-                `/${clientId}/order_items/update?order_id=${orderId}`,
-                items.map(item => ({
-                    item_id: item.item_id,
-                    quantity: item.quantity,
-                    client_id: clientId,
-                    order_id: orderId,
-                    status: item.status || "new",
-                })),
+            await axios.post(
+                `http://localhost:8003/saas/${clientId}/order_items/update?order_id=${orderId}`,
+                cleanedItems,
                 {
                     headers: {
-                        Authorization: `Bearer ${token}`,
-                    },
+                        Authorization: `Bearer ${token}`
+                    }
                 }
             );
 
-            toast.success("Order items updated");
-
-            setOrders((prev) =>
-                prev.map((o) =>
-                    o.id === orderId
-                        ? { ...o, items, total_price: updatedTotal }
-                        : o
-                )
+            await axios.post(
+                `http://localhost:8003/saas/${clientId}/dinein/update`,
+                {
+                    id: orderId,
+                    total_price: updatedTotal,
+                    status: 'pending'
+                },
+                {
+                    headers: {
+                        Authorization: `Bearer ${token}`
+                    }
+                }
             );
+
+            toast.success("Order updated successfully");
         } catch (error) {
-            const msg = error?.response?.data?.detail || "❌ Failed to update order items.";
-            console.error(msg, error);
-            toast.error(msg);
+            console.error("Update failed", error);
+            toast.error("Failed to update order");
         }
     };
-
 
 
     // ----------------------------------------------------- //
