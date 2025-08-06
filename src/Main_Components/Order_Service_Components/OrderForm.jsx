@@ -94,10 +94,12 @@ const OrderForm = ({ table, onOrderCreated }) => {
 
     useEffect(() => {
         const handleAddItem = (e) => {
-            const { item, addonItem } = e.detail;
-
+            const { item, addonItems = [] } = e.detail;
+            console.log("Adding main item:", item);
+            console.log("Adding add-ons:", addonItems);
+    
             const updatedOrder = [...orderItems];
-
+    
             // Add main item
             const existingMain = updatedOrder.find(i => i.id === item.id);
             if (existingMain) {
@@ -105,26 +107,29 @@ const OrderForm = ({ table, onOrderCreated }) => {
             } else {
                 updatedOrder.push({ ...item, quantity: 1, note: "" });
             }
-
-            // Add add-on item (if selected)
-            if (addonItem) {
-                const existingAddon = updatedOrder.find(i => i.id === addonItem.id);
+    
+            // Add all selected add-ons
+            addonItems.forEach(addon => {
+                const existingAddon = updatedOrder.find(i => i.id === addon.id);
                 if (existingAddon) {
                     existingAddon.quantity += 1;
                 } else {
                     updatedOrder.push({
-                        ...addonItem, quantity: 1, note: "",
-                        slug: item.slug || generateSlug(item.name),
+                        ...addon,
+                        quantity: 1,
+                        note: "",
+                        slug: item.slug || item.name.toLowerCase().replace(/\s+/g, '-')
                     });
                 }
-            }
-
+            });
+    
             setOrderItems(updatedOrder);
         };
-
+    
         document.addEventListener("add-item", handleAddItem);
         return () => document.removeEventListener("add-item", handleAddItem);
     }, [orderItems]);
+    
 
 
     const openNoteEditor = (item) => {

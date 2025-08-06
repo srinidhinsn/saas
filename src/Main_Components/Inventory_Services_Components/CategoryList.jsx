@@ -264,10 +264,7 @@ function CategoryList({ onCategorySelect }) {
     };
 
 
-
-
-
-
+    
     const handleAddCategory = async () => {
         if (!newId.trim() || !newName.trim()) {
             alert("ID and Name are required");

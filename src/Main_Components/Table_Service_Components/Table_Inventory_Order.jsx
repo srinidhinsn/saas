@@ -167,36 +167,51 @@ const Table_Inventory_Order = ({ onOrderUpdate }) => {
     const uniqueZones = Array.from(new Set(tables.map(t => t.location_zone))).filter(Boolean);
 
 
+    // const handleItemClick = (item) => {
+    //     let addonItems = [];
+
+    //     // Treat line_item_id as an array
+    //     const addonIds = Array.isArray(item.line_item_id) ? item.line_item_id : [];
+
+    //     console.log("Item clicked:", item);
+    //     console.log("Add-on IDs:", addonIds);
+
+    //     addonIds.forEach(id => {
+    //         const addon = items.find(m => String(m.id) === String(id));
+    //         if (addon) {
+    //             const confirmAddon = window.confirm(`Do you want to add the add-on: ${addon.name}?`);
+    //             if (confirmAddon) {
+    //                 addonItems.push(addon);
+    //             }
+    //         }
+    //     });
+
+    //     console.log("Final selected add-ons:", addonItems);
+
+    //     // Dispatch main item + all confirmed addons
+    //     document.dispatchEvent(new CustomEvent("add-item", {
+    //         detail: { item, addonItems }
+    //     }));
+    // };
+
     const handleItemClick = (item) => {
-        let addonItem = null;
+        let addonItems = [];
 
-        if (item.line_item_id) {
-            // Find the add-on item from local menuItems list
-            addonItem = items.find(m => String(m.id) === String(item.line_item_id));
+        // Treat line_item_id as an array of IDs
+        const addonIds = Array.isArray(item.line_item_id) ? item.line_item_id : [];
 
-            if (addonItem) {
-                const confirmAddon = window.confirm(`Do you want to add the add-on: ${addonItem.name}?`);
-                if (!confirmAddon) {
-                    addonItem = null; // User declined add-on
-                }
-            }
-        }
+        // Get all matching add-on items directly (no confirmation)
+        addonItems = addonIds
+            .map(id => items.find(m => String(m.id) === String(id)))
+            .filter(Boolean);  // remove any null/undefined
 
-        // Dispatch main item + optional addonItem
+        // Dispatch item + all found add-ons
         document.dispatchEvent(new CustomEvent("add-item", {
-            detail: { item, addonItem }
+            detail: { item, addonItems }
         }));
     };
 
 
-
-    const getItemClass = (item) => {
-        const name = item.name.toLowerCase();
-        if (name.includes("egg")) return "item-card egg";
-        if (["chicken", "mutton", "fish", "keema"].some(w => name.includes(w))) return "item-card non-veg";
-        if (["veg", "paneer", "dal", "juice", "drinks"].some(w => name.includes(w))) return "item-card veg";
-        return "item-card";
-    };
     const getFilteredItems = () => {
         if (activeCategory?.toLowerCase() === "all") {
             return items.filter(i =>
