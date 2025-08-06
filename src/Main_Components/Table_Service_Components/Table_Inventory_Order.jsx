@@ -22,6 +22,8 @@ const Table_Inventory_Order = ({ onOrderUpdate }) => {
     const [activeCategory, setActiveCategory] = useState(null);
     const [searchTerm, setSearchTerm] = useState("");
     const [menuItems, setMenuItems] = useState([]);
+    const [expandedCategories, setExpandedCategories] = useState({});
+
 
 
 
@@ -47,20 +49,6 @@ const Table_Inventory_Order = ({ onOrderUpdate }) => {
             .catch(err => console.error("❌ Error fetching tables:", err));
 
 
-        // Fetch menu categories
-        inventoryServicesPort.get(`/${clientId}/inventory/read_category`, {
-            headers: {
-                Authorization: `Bearer ${token}`,
-            },
-        })
-            .then(res => {
-                const allCategory = { id: "all", name: "All" };
-                const filteredCategories = res.data.data.filter(cat => cat.name?.toLowerCase() !== "all");
-                setCategories([allCategory, ...filteredCategories]);
-                setActiveCategory("all");
-            })
-
-            .catch(err => console.error("❌ Error fetching categories:", err));
 
         // Fetch menu items
         inventoryServicesPort.get(`/${clientId}/inventory/read`, {
@@ -81,9 +69,27 @@ const Table_Inventory_Order = ({ onOrderUpdate }) => {
                     }),
                 ])
                     .then(axios.spread((catRes, itemRes) => {
-                        const allCategory = { id: "all", name: "All" };
-                        const categoryList = catRes.data.data.filter(c => c.name?.toLowerCase() !== "all");
-                        setCategories([allCategory, ...categoryList]);
+                        const allCategory = { id: "all", name: "All", level: 0 };
+                        const fullTree = catRes.data.data.filter(c => c.name?.toLowerCase() !== "all");
+
+                        // 1. Collect all subcategory IDs
+                        const subcategoryIds = new Set();
+                        fullTree.forEach(cat => {
+                            if (cat.subCategories && cat.subCategories.length > 0) {
+                                cat.subCategories.forEach(sub => subcategoryIds.add(sub.id));
+                            }
+                        });
+
+                        // 2. Filter out categories that are subcategories
+                        const topLevelCategories = fullTree.filter(cat => !subcategoryIds.has(cat.id));
+
+                        // 3. Flatten only the top-level categories and their nested children
+                        const flatCategories = flattenCategoryTree(topLevelCategories);
+
+                        // 4. Set state
+                        setCategories([allCategory, ...flatCategories]);
+
+
                         setActiveCategory("all");
 
                         const enriched = itemRes.data.data.map(item => {
@@ -212,6 +218,15 @@ const Table_Inventory_Order = ({ onOrderUpdate }) => {
     };
 
 
+
+
+    const getItemClass = (item) => {
+        const name = item.name.toLowerCase();
+        if (name.includes("egg")) return "item-card egg";
+        if (["chicken", "mutton", "fish", "keema"].some(w => name.includes(w))) return "item-card non-veg";
+        if (["veg", "paneer", "dal", "juice", "drinks"].some(w => name.includes(w))) return "item-card veg";
+        return "item-card";
+    };
     const getFilteredItems = () => {
         if (activeCategory?.toLowerCase() === "all") {
             return items.filter(i =>
@@ -229,6 +244,25 @@ const Table_Inventory_Order = ({ onOrderUpdate }) => {
     const handleModeClick = (mode) => {
         setSearchParams({ mode });
     };
+
+    const flattenCategoryTree = (tree, level = 0) => {
+        let flatList = [];
+
+        tree.forEach(category => {
+            flatList.push({
+                id: category.id,
+                name: category.name,
+                level: level,
+            });
+
+            if (category.subCategories && category.subCategories.length > 0) {
+                flatList = flatList.concat(flattenCategoryTree(category.subCategories, level + 1));
+            }
+        });
+
+        return flatList;
+    };
+
 
     return (
         <div className={`view-tables-wrapper ${darkMode ? "dark" : "light"}`}>
@@ -296,16 +330,17 @@ const Table_Inventory_Order = ({ onOrderUpdate }) => {
                             </div>
                             <ul className="category-list">
                                 {categories.map(cat => (
-                                    <div key={cat.id} className="category-item">
-                                        <li
-                                            className={cat.name === activeCategory ? "active" : ""}
-                                            onClick={() => setActiveCategory(cat.name)} // ✅ use name
-                                        >
-                                            {cat.name}
-                                        </li>
-                                    </div>
+                                    <span
+                                        key={cat.id}
+                                        onClick={() => setActiveCategory(cat.name)}
+                                        className={`category-item ${activeCategory === cat.name ? "active" : ""}`}
+                                        style={{ paddingLeft: `${cat.level * 20}px` }} // 👈 Indent visually
+                                    >
+                                        {cat.name}
+                                        </span>
                                 ))}
                             </ul>
+
                         </div>
 
                         <div className="item-pane">

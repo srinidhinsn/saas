@@ -158,18 +158,6 @@ function CategoryList({ onCategorySelect }) {
         );
     };
 
-    const getAllAncestors = (categoryId, parentMap) => {
-        const ancestors = [];
-        let currentId = categoryId;
-
-        while (parentMap[currentId]) {
-            const parentId = parentMap[currentId];
-            ancestors.unshift(parentId);
-            currentId = parentId;
-        }
-
-        return ancestors;
-    };
 
     const buildParentMap = (categories) => {
         const map = {};
