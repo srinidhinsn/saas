@@ -24,6 +24,7 @@ const OrdersVisiblePage = () => {
     const [editOrderId, setEditOrderId] = useState(null);
     const [showDeleteModals, setShowDeleteModals] = useState(false);
     const [deleteTarget, setDeleteTarget] = useState({ orderId: null, itemId: null });
+    const [editedItemsMap, setEditedItemsMap] = useState({});
 
     // --------------------------------------------------------------------------- //
 
@@ -50,6 +51,17 @@ const OrdersVisiblePage = () => {
                 };
             })
         );
+
+        // Also store this in editable map
+        setEditedItemsMap(prev => {
+            const currentItems = orders.find(o => o.id === orderId)?.items || [];
+            const updated = currentItems.map(item =>
+                item.item_id === itemId
+                    ? { ...item, quantity: newQty > 0 ? newQty : 1 }
+                    : item
+            );
+            return { ...prev, [orderId]: updated };
+        });
     };
 
 
@@ -206,29 +218,27 @@ const OrdersVisiblePage = () => {
                 },
             });
 
-            // Update state
             setOrders((prevOrders) => {
-                return prevOrders.reduce((acc, o) => {
-                    if (o.id !== orderId) {
-                        acc.push(o);
-                        return acc;
-                    }
+                return prevOrders.map(o => {
+                    if (o.id !== orderId) return o;
 
-                    const updatedItems = o.items.map((item) =>
+                    const updatedItems = o.items.map(item =>
                         item.item_id === itemId ? { ...item, status: "cancelled" } : item
                     );
 
-                    const allCancelled = updatedItems.every(item => item.status === "cancelled");
-
-                    if (!allCancelled) {
-                        acc.push({ ...o, items: updatedItems });
-                    } else {
-                        toast.info("All items in the order are cancelled. Order removed.");
-                    }
-
-                    return acc;
-                }, []);
+                    return { ...o, items: updatedItems };
+                });
             });
+
+            // Also update editable map
+            setEditedItemsMap(prev => {
+                const existing = orders.find(o => o.id === orderId)?.items || [];
+                const updated = existing.map(item =>
+                    item.item_id === itemId ? { ...item, status: "cancelled" } : item
+                );
+                return { ...prev, [orderId]: updated };
+            });
+
         } catch (err) {
             const msg = err?.response?.data?.detail || "❌ Failed to cancel item.";
             console.error(msg, err);
@@ -599,96 +609,3 @@ const OrdersVisiblePage = () => {
 export default OrdersVisiblePage;
 
 
-
-
-// import React from 'react'
-// import { CiSearch } from "react-icons/ci";
-// import { CiBellOn } from "react-icons/ci";
-// import { BiExport } from "react-icons/bi"; import { CiCalendarDate } from "react-icons/ci";
-// import { LiaFileExportSolid } from "react-icons/lia"; import { TbDotsVertical } from "react-icons/tb";
-// import { RiExpandUpDownLine } from "react-icons/ri";
-// import { TbMessage } from "react-icons/tb";
-// import '../App.css'
-// const OrdersVisiblePage = () => {
-//     return (
-
-//         <>
-//             <div>
-
-//                 <div className="">
-//                     <div className="Order-Summary-Page">
-//                         {/* Search bar */}
-//                         <div className="Search-bar-container">
-//                             <div className='Search-input'> <CiSearch className='React-search-icon' />    <input type="text" placeholder='Search' /></div>
-//                             <div className='React-bell-icon'><CiBellOn /></div>
-//                         </div>
-//                         {/* Buttons */}
-//                         <div className="">
-//                             <div className="">
-//                                 <h3>Orders</h3>
-//                             </div>
-//                             <div className="">
-//                                 <div>
-//                                     <BiExport />
-//                                     <button>Export</button></div>
-
-//                                 <div><LiaFileExportSolid />
-//                                     <button>Create Order</button>
-//                                 </div>
-//                             </div>
-//                         </div>
-//                         {/* calendar */}
-//                         <div className="">
-//                             <div>
-//                                 <CiCalendarDate />
-//                                 <input type="date" />
-//                             </div>
-//                         </div>
-
-//                         {/* Containers */}
-//                         <div className="">
-//                             {/* Total  */}
-//                             <div className="">
-
-//                             </div>
-//                             {/* New */}
-//                             <div className=""></div>
-//                             {/* Pending */}
-//                             <div className=""></div>
-//                             {/* Served */}
-//                             <div className=""></div>
-//                         </div>
-//                         {/* Order summary */}
-//                         <table>
-//                             <thead>
-//                                 <tr>
-//                                     <th>Order No</th>
-//                                     <th>Date<RiExpandUpDownLine /></th>
-//                                     <th>Items</th>
-//                                     <th>Status</th>
-//                                     <th>Total</th>
-//                                     <th>Action</th>
-//                                 </tr>
-//                                 <tr>
-//                                     <td>1</td>
-//                                     <td> today</td>
-//                                     <td>10</td>
-//                                     <td>pending</td>
-//                                     <td>550</td>
-//                                     <td> <TbMessage /> <TbDotsVertical /></td>
-//                                 </tr>
-//                             </thead>
-//                         </table>
-//                     </div>
-//                 </div>
-
-//             </div>
-
-
-
-//         </>
-
-//     )
-// }
-
-// export default OrdersVisiblePage

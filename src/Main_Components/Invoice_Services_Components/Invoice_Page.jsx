@@ -9,11 +9,10 @@ const Invoice_Page = () => {
     const token = localStorage.getItem("access_token");
     const [orders, setOrders] = useState([]);
     const [tables, setTables] = useState([]);
-
     const [records, setRecords] = useState([]);
     const [selectedId, setSelectedId] = useState(null);
-    const [formData, setFormData] = useState({
 
+    const [formData, setFormData] = useState({
         document_type: "Invoice",
         document_number: "",
         document_date: "",
@@ -30,9 +29,6 @@ const Invoice_Page = () => {
         table_id: ""
     });
 
-
-    const baseURL = `invoiceServicesPort/${clientId}/tables`;
-
     const headers = {
         Authorization: `Bearer ${token}`,
         "Content-Type": "application/json"
@@ -40,7 +36,7 @@ const Invoice_Page = () => {
 
     const fetchRecords = async () => {
         try {
-            const res = await axios.get(`${baseURL}/read`, { headers });
+            const res = await invoiceServicesPort.get(`/${clientId}/invoice/read_document`, { headers });
             setRecords(res.data.data || []);
         } catch (err) {
             toast.error("Failed to fetch billing documents");
@@ -49,30 +45,35 @@ const Invoice_Page = () => {
 
     const fetchById = async (id) => {
         try {
-            const res = await axios.get(`${baseURL}/read/${id}`, { headers });
-            const data = res.data.data;
+            // If single document fetch endpoint exists:
+            // const res = await invoiceServicesPort.get(`/${clientId}/invoice/read_document/${id}`, { headers });
 
-            // Format date to "yyyy-MM-dd"
-            const formattedDate = data.document_date?.split("T")[0] || "";
+            // Workaround: filter from already-fetched records
+            const doc = records.find(r => r.id === id);
+            if (!doc) {
+                toast.error("Document not found locally");
+                return;
+            }
+
+            const formattedDate = doc.document_date?.split("T")[0] || "";
 
             setFormData({
-                id: data.id,
-                document_type: data.document_type || "Invoice",
-                document_number: data.document_number || "",
+                id: doc.id,
+                document_type: doc.document_type || "Invoice",
+                document_number: doc.document_number || "",
                 document_date: formattedDate,
-                customer_id: data.customer_id || "",
-                status: data.status || "Draft",
-                subtotal: data.subtotal || 0,
-                tax_amount: data.tax_amount || 0,
-                discount_amount: data.discount_amount || 0,
-                total_amount: data.total_amount || 0,
-                contact_email: data.contact_email || "",
-                contact_phone: data.contact_phone || "",
-                notes: data.notes || "",
-                order_id: data.order_id || "",
-                table_id: data.table_id || "",
+                customer_id: doc.customer_id || "",
+                status: doc.status || "Draft",
+                subtotal: doc.subtotal || 0,
+                tax_amount: doc.tax_amount || 0,
+                discount_amount: doc.discount_amount || 0,
+                total_amount: doc.total_amount || 0,
+                contact_email: doc.contact_email || "",
+                contact_phone: doc.contact_phone || "",
+                notes: doc.notes || "",
+                order_id: doc.order_id || "",
+                table_id: doc.table_id || "",
             });
-
 
             setSelectedId(id);
         } catch (err) {
@@ -80,11 +81,11 @@ const Invoice_Page = () => {
         }
     };
 
-
     const handleChange = (e) => {
         const { name, value } = e.target;
         setFormData(prev => ({ ...prev, [name]: value }));
     };
+
     const handleSubmit = async (e) => {
         e.preventDefault();
 
@@ -95,36 +96,24 @@ const Invoice_Page = () => {
 
         const isUpdate = selectedId !== null || formData.id;
 
-        if (!isUpdate) {
-            // If creating and missing required info
-            const requiredFields = ["document_number", "document_date", "order_id"];
-            for (let field of requiredFields) {
-                if (!formData[field]) {
-                    toast.error(`Missing required field: ${field}`);
-                    return;
-                }
-            }
-        }
-
         try {
-            const payload = isUpdate
-                ? { ...formData, id: selectedId || formData.id }
-                : {
-                    billing: {
-                        ...formData,
-                        id: undefined,
-                        client_id: clientId
-                    },
-                    items: []
-                };
+            let endpoint = "";
+            let payload = {};
 
-            console.log("Payload for Create Table:", payload);
-            const endpoint = isUpdate ? "update" : "create";
-            const response = await axios.post(
-                `${baseURL}/${endpoint}?client_id=${clientId}`,
-                payload,
-                { headers }
-            );
+            if (isUpdate) {
+                endpoint = `/${clientId}/invoice/update_document`;
+                payload = { ...formData, id: selectedId || formData.id };
+            } else {
+                endpoint = `/${clientId}/invoice/create_document`;
+                payload = {
+                    ...formData,
+                    id: undefined,
+                    client_id: clientId,
+                };
+            }
+
+            const response = await invoiceServicesPort.post(endpoint, payload, { headers });
+
 
             if (response.status === 200) {
                 toast.success(`Billing document ${isUpdate ? "updated" : "created"}`);
@@ -155,36 +144,25 @@ const Invoice_Page = () => {
         }
     };
 
-
-
-
-
     const handleDelete = async (id) => {
         try {
-            await axios.post(`${baseURL}/delete`, { id }, { headers });
+            await invoiceServicesPort.post(`/${clientId}/invoice/delete_document?client_id=${clientId}`, { id }, { headers });
             toast.success("Billing document deleted");
             fetchRecords();
         } catch (err) {
             toast.error("Error deleting document");
         }
     };
+
     const fetchOrders = async () => {
         try {
-            const response = await axios.get(
-                `http://localhost:8003/saas/${clientId}/dinein/table`,
-                { headers }
-            );
+            const response = await axios.get(`http://localhost:8003/saas/${clientId}/dinein/table`, { headers });
             setOrders(response.data.data || []);
         } catch (err) {
             toast.error("Failed to fetch orders");
         }
     };
 
-    useEffect(() => {
-        fetchRecords(); fetchOrders(); fetchTables()
-    }, []); useEffect(() => {
-        console.log("Fetched orders:", orders);
-    }, [orders]);
     const fetchTables = async () => {
         try {
             const res = await axios.get(`http://localhost:8001/saas/${clientId}/tables/read`, { headers });
@@ -193,6 +171,16 @@ const Invoice_Page = () => {
             toast.error("Failed to fetch tables");
         }
     };
+
+    useEffect(() => {
+        fetchRecords();
+        fetchOrders();
+        fetchTables();
+    }, []);
+
+    useEffect(() => {
+        console.log("Fetched orders:", orders);
+    }, [orders]);
 
     return (
         <div className="billing-page">
@@ -203,7 +191,6 @@ const Invoice_Page = () => {
                     <select
                         onChange={(e) => {
                             const tableId = parseInt(e.target.value);
-
                             const latestOrder = orders
                                 .filter((order) => order.table_id === tableId)
                                 .sort((a, b) => new Date(b.created_at) - new Date(a.created_at))[0];
@@ -219,8 +206,7 @@ const Invoice_Page = () => {
                                     const gst = item.gst || 0;
                                     const dis = item.discount || 0;
 
-                                    const itemTotal = price * qty;
-                                    subtotal += itemTotal;
+                                    subtotal += price * qty;
                                     tax += gst;
                                     discount += dis;
                                 });
@@ -234,8 +220,6 @@ const Invoice_Page = () => {
                                     discount_amount: discount,
                                     total_amount: latestOrder.total_price || 0,
                                 }));
-
-                                console.log("Selected table:", latestOrder.table_id);
                             }
                         }}
                     >
@@ -252,11 +236,7 @@ const Invoice_Page = () => {
                                 </option>
                             );
                         })}
-
-
                     </select>
-
-
                 </div>
 
                 {[
@@ -277,7 +257,7 @@ const Invoice_Page = () => {
                             name={field.name}
                             value={formData[field.name]}
                             onChange={handleChange}
-                            required={field.name === "document_type" || field.name === "document_number" || field.name === "document_date"}
+                            required={["document_type", "document_number", "document_date"].includes(field.name)}
                         />
                         <label className={formData[field.name] ? "filled" : ""}>{field.label}</label>
                     </div>
