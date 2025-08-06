@@ -11,7 +11,7 @@ app = FastAPI()
 logging.config.dictConfig(LOGGING_CONFIG)
 logger = logging.getLogger(__name__)
 
-app.include_router(table_router, prefix="/saas/{client_id}/tables")
+app.include_router(table_router, prefix="/saas/{client_id}/invoice")
 
 app.add_middleware(
     CORSMiddleware,
@@ -34,10 +34,10 @@ async def log_requests(request: Request, call_next):
     return response
 
 
-@app.get("/saas/{client_id}/tables/")
+@app.get("/saas/{client_id}/invoice/")
 async def read_root():
-    return {"message": "tables Service is Running"}
+    return {"message": "billing Service is Running"}
 
 if __name__ == "__main__":
     import uvicorn
-    uvicorn.run(app, host="127.0.0.1", port=8001)
+    uvicorn.run(app, host="127.0.0.1", port=8002)

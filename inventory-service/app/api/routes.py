@@ -68,7 +68,7 @@ def delete_inventory(client_id: str, item: Inventory, context: SaasContext = Dep
 @router.get("/read_category", response_model=ResponseModel)
 def read_categories(client_id: str, category_id: Optional[str] = Query(None), context: SaasContext = Depends(verify_token), db: Session = Depends(get_db)):
     records = db.query(CategoryEntity).filter(
-        CategoryEntity.client_id == client_id).all()
+        CategoryEntity.client_id == client_id).order_by(CategoryEntity.slug).all()
     models = CategoryEntity.copyToModels(records)
     print("models - ", models)
     categoryTree = service.build_category_tree(models, category_id)

@@ -1,0 +1,135 @@
+ALTER TABLE tables
+ALTER COLUMN id
+ADD GENERATED ALWAYS AS IDENTITY;
+
+---------------------------------------------------------------------
+
+CREATE TABLE documents (
+    id UUID PRIMARY KEY DEFAULT gen_random_uuid(),
+
+    -- Tenant and Category
+    client_id TEXT,
+    category_id TEXT,
+
+    -- Metadata about the document
+    name TEXT,                      -- Original filename (e.g., MyInvoice.pdf)
+    description TEXT,
+    realm TEXT,                     -- Domain or department
+    filetype TEXT,                  -- MIME type (e.g., application/pdf)
+    extension TEXT,                 -- .pdf, .jpg, .docx, etc.
+    size_kb TEXT,
+
+    -- Security and Status
+    is_protected BOOLEAN,
+    is_active BOOLEAN,
+
+    -- Storage
+    uuid_name TEXT,                 -- The actual saved filename (UUID without extension)
+    path TEXT,                      -- Full path to file on disk or S3 (e.g., uploads/2025/Jul/08/<uuid>)
+    storage_type TEXT,             -- local / s3 / gcs
+    checksum_md5 TEXT,
+
+    -- Audit Trail
+    created_by TEXT,
+    last_read_by TEXT,
+    created_date_time TIMESTAMPTZ DEFAULT CURRENT_TIMESTAMP,
+    last_read_date_time TIMESTAMPTZ DEFAULT CURRENT_TIMESTAMP,
+
+    -- Soft Delete
+    deleted BOOLEAN,
+    deleted_at TIMESTAMPTZ
+);
+
+
+I had to change document to documents in the below code
+---------------------------------------------------------------------
+UPDATE "user"
+SET grants = '{dinein,order,inventory,users,tables,invoice,menu,documents}'
+WHERE id = '461e8cc6-a897-59b3-9f0e-1f2e19cd179c';
+---------------------------------------------------------------------
+UPDATE public.page_definition
+SET module = 'documents'
+WHERE id = '1008';
+---------------------------------------------------------------------
+
+Below modifications for report-service
+---------------------------------------------------------------------
+UPDATE "user"
+SET grants = '{dinein,order,inventory,users,tables,invoice,menu,documents,reports}'
+WHERE id = '461e8cc6-a897-59b3-9f0e-1f2e19cd179c';
+---------------------------------------------------------------------
+
+INSERT INTO public.page_definition (
+    id, client_id, module, role, screen_id, load_type, operations
+)
+OVERRIDING SYSTEM VALUE
+VALUES (
+    1009, 'easyfood', 'reports', 'Admin', 'default_report', 'include', '{ALL}'
+);
+
+---------------------------------------------------------------------
+pip install xlsxwriter
+---------------------------------------------------------------------
+
+---------------------------------------------------------------------
+billing service queries
+---------------------------------------------------------------------
+
+CREATE TABLE billing_documents (
+    id BIGSERIAL PRIMARY KEY,
+    client_id TEXT,
+    document_type TEXT,               -- invoice, quotation, purchase_order, delivery_challan, credit_note
+    document_number TEXT,
+    document_date TIMESTAMP,
+    due_date TIMESTAMP,
+    reference_number TEXT,
+    order_id TEXT,
+    customer_id TEXT,
+    vendor_id TEXT,
+    currency TEXT,
+    status TEXT,
+    contact_email TEXT,
+    contact_phone TEXT,
+    terms TEXT,
+    notes TEXT,
+    subtotal DOUBLE PRECISION,
+    tax_amount DOUBLE PRECISION,
+    discount_amount DOUBLE PRECISION,
+    total_amount DOUBLE PRECISION,
+    linked_document_ids TEXT,         -- comma-separated list of related document IDs or numbers
+    is_active BOOLEAN NOT NULL DEFAULT TRUE,
+    created_by TEXT,
+    updated_by TEXT,
+    created_at TIMESTAMP DEFAULT NOW(),
+    updated_at TIMESTAMP DEFAULT NOW()
+);
+
+---------------------------------------------------------------------
+
+CREATE TABLE billing_document_items (
+    id BIGSERIAL PRIMARY KEY,
+    document_id BIGINT REFERENCES billing_documents(id) ON DELETE CASCADE,
+    item_ref_id TEXT,
+    description TEXT,
+    quantity DOUBLE PRECISION,
+    unit_price DOUBLE PRECISION,
+    discount DOUBLE PRECISION,
+    tax_rate DOUBLE PRECISION,
+    total DOUBLE PRECISION,
+    is_active BOOLEAN NOT NULL DEFAULT TRUE,
+    created_at TIMESTAMP DEFAULT NOW(),
+    updated_at TIMESTAMP DEFAULT NOW()
+);
+
+---------------------------------------------------------------------
+
+
+
+
+
+
+
+
+
+
+

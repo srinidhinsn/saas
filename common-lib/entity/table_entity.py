@@ -1,8 +1,6 @@
 from sqlalchemy import Column, Integer, BigInteger, Boolean, Text, DateTime, func, UniqueConstraint, Identity
 from sqlalchemy.dialects.postgresql import UUID
 import uuid
-
-# common-lib imports
 from database.base import Base
 from models.table_model import Table
 
@@ -10,9 +8,7 @@ from models.table_model import Table
 class DiningTable(Base):
     __tablename__ = "tables"
 
-    # id           = Column(BigInteger, primary_key=True, autoincrement=True)
-    id = Column(BigInteger, Identity(always=True), primary_key=True)
-
+    id = Column(BigInteger, primary_key=True, autoincrement=True)
     client_id = Column(Text, nullable=False)
     name = Column(Text, nullable=False)
     slug = Column(Text, unique=True, nullable=True)
