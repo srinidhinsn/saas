@@ -164,32 +164,47 @@ const OrdersVisiblePage = () => {
     // --------------------------------------------------------------------------- //
     const handleItemStatusChange = async (orderId, itemId, newStatus) => {
         try {
-            await orderServicesPort.post(`/${clientId}/dinein/item/update`, {
-                order_id: orderId,
-                item_id: itemId,
-                status: newStatus
-            }, {
-                headers: {
-                    Authorization: `Bearer ${token}`,
-                }
-            });
+            const order = orders.find(o => o.id === orderId);
+            if (!order) return;
 
-            setOrders((prev) =>
-                prev.map((order) =>
+            const updatedItems = order.items.map(item =>
+                item.item_id === itemId ? { ...item, status: newStatus } : item
+            );
+
+            const totalPrice = updatedItems.reduce((sum, item) => {
+                const price = inventoryMap[item.item_id]?.price || 0;
+                return sum + price * (item.quantity || 1);
+            }, 0);
+
+            const itemToUpdate = updatedItems.find(item => item.item_id === itemId);
+
+            await orderServicesPort.post(
+                `/${clientId}/order_items/update?single_item=true`,
+                [{ id: itemToUpdate.id, status: newStatus }],
+                { headers: { Authorization: `Bearer ${token}` } }
+            );
+
+            await orderServicesPort.post(
+                `/${clientId}/dinein/update`,
+                { id: orderId, total_price: totalPrice },
+                { headers: { Authorization: `Bearer ${token}` } }
+            );
+
+            setOrders(prev =>
+                prev.map(order =>
                     order.id === orderId
-                        ? {
-                            ...order,
-                            items: order.items.map((item) =>
-                                item.item_id === itemId ? { ...item, status: newStatus } : item
-                            ),
-                        }
+                        ? { ...order, items: updatedItems, total_price: totalPrice }
                         : order
                 )
             );
+
         } catch (err) {
             console.error("❌ Failed to update item status", err);
         }
     };
+
+
+
 
     // --------------------------------------------------------------------------- //
     const cancelItem = async (orderId, itemId) => {
@@ -235,46 +250,43 @@ const OrdersVisiblePage = () => {
 
 
     //-------------------------------------------------- //
-    const updateOrderItems = async (orderId, updatedItems) => {
-        const cleanedItems = updatedItems.map(item => {
+    //-------------------------------------------------- //
+    //-------------------------------------------------- //
+    //-------------------------------------------------- //
+    const updateOrderItems = async (orderId, updatedItemsWithStatuses) => {
+        const cleanedItems = updatedItemsWithStatuses.map(item => {
             const { id, ...rest } = item;
-            return rest;
+            return {
+                ...rest,
+                status: item.status || "new"
+            };
         });
 
-        const updatedTotal = cleanedItems.reduce((sum, item) => {
+        const totalPrice = cleanedItems.reduce((sum, item) => {
             const price = inventoryMap[item.item_id]?.price || 0;
-            return sum + item.quantity * price;
+            return sum + price * (item.quantity || 1);
         }, 0);
 
         try {
             await axios.post(
                 `http://localhost:8003/saas/${clientId}/order_items/update?order_id=${orderId}`,
                 cleanedItems,
-                {
-                    headers: {
-                        Authorization: `Bearer ${token}`
-                    }
-                }
+                { headers: { Authorization: `Bearer ${token}` } }
             );
 
             await axios.post(
                 `http://localhost:8003/saas/${clientId}/dinein/update`,
                 {
                     id: orderId,
-                    total_price: updatedTotal,
-                    status: 'pending'
+                    total_price: totalPrice
                 },
-                {
-                    headers: {
-                        Authorization: `Bearer ${token}`
-                    }
-                }
+                { headers: { Authorization: `Bearer ${token}` } }
             );
 
-            toast.success("Order updated successfully");
-        } catch (error) {
-            console.error("Update failed", error);
-            toast.error("Failed to update order");
+            toast.success("Item statuses & total updated!");
+        } catch (err) {
+            console.error(err);
+            toast.error("Failed to update items or total.");
         }
     };
 
