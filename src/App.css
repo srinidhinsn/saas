@@ -670,6 +670,8 @@ body.theme-dark {
 
 /* OrdersvisiblePage stylesheet */
 
+
+
 .expanded-order-row {
     background-color: var(--expanded-bg, #f9f9f9);
 }
@@ -762,4 +764,158 @@ body.theme-dark {
 .modern-save-items-button {
     background-color: #52c41a;
     color: white;
+}
+
+
+/* Document services style sheet */
+:root {
+    --font-family: 'Segoe UI', sans-serif;
+
+    --color-bg: #f5f5f7;
+    --color-card-bg: #ffffff;
+    --color-input-bg: #ffffff;
+
+    --color-text-primary: #222;
+    --color-text-secondary: #555;
+
+    --color-border: #ccc;
+    --color-border-soft: #ddd;
+
+    --color-upload-btn: #28a745;
+    --color-download-btn: #218838;
+    --color-replace-btn: #dc3545;
+
+    --box-shadow: 0 2px 4px rgba(0, 0, 0, 0.08);
+}
+
+body.theme-dark {
+
+    --color-bg: #1f1f1f;
+    --color-card-bg: #2b2b2b;
+    --color-input-bg: #2d2d2d;
+
+    --color-text-primary: #f1f1f1;
+    --color-text-secondary: #ccc;
+
+    --color-border: #444;
+    --color-border-soft: #555;
+
+    --color-upload-btn: #32cd89;
+    --color-download-btn: #28a745;
+    --color-replace-btn: #e35d6a;
+
+    --box-shadow: 0 3px 8px rgba(0, 0, 0, 0.3);
+}
+
+.doc-manager-wrapper {
+    padding: 1rem;
+    margin: auto;
+    min-height: 90.8vh;
+    overflow-y: auto;
+    font-family: var(--font-family);
+    background-color: var(--color-bg);
+    color: var(--color-text-primary);
+}
+
+.doc-header,
+.doc-subheader {
+    font-size: 1.5rem;
+    margin-bottom: 1rem;
+    color: var(--color-text-primary);
+}
+
+.doc-upload-form {
+    display: flex;
+    flex-wrap: wrap;
+    gap: 1rem;
+    margin-bottom: 2rem;
+
+    input[type="text"],
+    input[type="file"] {
+        flex: 1 1;
+        padding: 0.5rem;
+        border: 1px solid var(--color-border);
+        border-radius: 6px;
+        background-color: var(--color-input-bg);
+        color: var(--color-text-primary);
+    }
+
+    .doc-btn-group {
+        display: flex;
+        gap: 0.5rem;
+        align-items: center;
+    }
+
+    .upload-button,
+    .replace-button {
+        padding: 0.6rem 1.2rem;
+        font-weight: bold;
+        border: none;
+        border-radius: 6px;
+        cursor: pointer;
+        color: #fff;
+        transition: background-color 0.2s ease;
+    }
+
+    .upload-button {
+        background-color: var(--color-upload-btn);
+    }
+
+    .replace-button {
+        background-color: var(--color-replace-btn);
+    }
+}
+
+.doc-grid-container {
+    display: grid;
+    grid-template-columns: repeat(auto-fit, minmax(260px, 1fr));
+    gap: 1rem;
+}
+
+.doc-card {
+    background-color: var(--color-card-bg);
+    border: 1px solid var(--color-border-soft);
+    border-radius: 10px;
+    padding: 0.8rem;
+    box-shadow: var(--box-shadow);
+
+    p {
+        margin: 0.5rem 0;
+        color: var(--color-text-secondary);
+        word-break: break-word;
+    }
+
+    .doc-actions {
+        display: flex;
+        justify-content: space-between;
+        margin-top: 1rem;
+
+        .download-button,
+        .replace-button {
+            padding: 0.4rem 1rem;
+            border: none;
+            border-radius: 4px;
+            cursor: pointer;
+            color: white;
+        }
+
+        .download-button {
+            background-color: var(--color-download-btn);
+        }
+
+        .replace-button {
+            background-color: var(--color-replace-btn);
+        }
+    }
+}
+
+@media screen and (max-width: 600px) {
+    .doc-upload-form {
+        flex-direction: column;
+    }
+
+    .doc-btn-group {
+        flex-direction: column;
+        gap: 0.5rem;
+    }
 }
