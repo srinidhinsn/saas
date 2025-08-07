@@ -29,6 +29,9 @@ const OrdersVisiblePage = () => {
     const [itemSearchQuery, setItemSearchQuery] = useState("");
     const [itemSearchResults, setItemSearchResults] = useState([]);
 
+    const todayDate = new Date().toISOString().split("T")[0];
+    const [selectedDate, setSelectedDate] = useState(todayDate);
+
     // --------------------------------------------------------------------------- //
     useEffect(() => {
         axios.get(`http://localhost:8002/saas/${clientId}/inventory/read`, {
@@ -475,6 +478,13 @@ const OrdersVisiblePage = () => {
     }, [clientId]);
 
     // --------------------------------------------------------------------------- //
+    const filteredOrders = selectedDate
+        ? orders.filter(order => {
+            const orderDate = new Date(order.created_at).toISOString().split("T")[0];
+            return orderDate === selectedDate;
+        })
+        : orders;
+
 
     return (
         <div className="orders-page">
@@ -482,6 +492,24 @@ const OrdersVisiblePage = () => {
                 <div className="orders-header">
                     <h2>Table Orders</h2>
                     <div className="orders-actions">
+                        <select
+                            className="date-filter-dropdown"
+                            value={selectedDate}
+                            onChange={(e) => setSelectedDate(e.target.value)}
+                        >
+                            <option value="">All Dates</option>
+                            {[...Array(15)].map((_, i) => {
+                                const d = new Date();
+                                d.setDate(d.getDate() - i);
+                                const dateString = d.toISOString().split("T")[0];
+                                const label = i === 0 ? "Today" : dateString;
+                                return (
+                                    <option key={dateString} value={dateString}>
+                                        {label}
+                                    </option>
+                                );
+                            })}
+                        </select>
                         <button className="btn export">Export</button>
                         <button className="btn create">Create Order</button>
                     </div>
@@ -506,12 +534,12 @@ const OrdersVisiblePage = () => {
                             </thead>
 
                             <tbody>
-                                {orders.length === 0 ? (
+                                {filteredOrders.length === 0 ? (
                                     <tr>
                                         <td colSpan="7" className="no-orders">No orders found.</td>
                                     </tr>
                                 ) : (
-                                    orders.map((order, index) => (
+                                    filteredOrders.map((order, index) => (
                                         <React.Fragment key={order.id || index}>
                                             <tr className="order-row">
                                                 <td data-label="#"> {index + 1} </td>
