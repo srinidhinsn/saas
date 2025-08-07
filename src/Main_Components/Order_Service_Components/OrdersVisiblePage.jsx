@@ -724,7 +724,7 @@ const OrdersVisiblePage = () => {
                         {showDeleteModals && deleteTarget && (
                             <div className="delete-modal-overlay">
                                 <div className="delete-modal-box">
-                                    <p>Are you sure you want to delete this item?</p>
+                                    <p> Delete this item?</p>
                                     <div className="delete-modal-buttons">
                                         <button
                                             className="confirm-delete-btn"
@@ -734,7 +734,7 @@ const OrdersVisiblePage = () => {
                                                 setDeleteTarget({ orderId: null, itemId: null });
                                             }}
                                         >
-                                            Yes, Delete
+                                            Yes
                                         </button>
                                         <button
                                             className="cancel-delete-btn"
@@ -743,7 +743,7 @@ const OrdersVisiblePage = () => {
                                                 setDeleteTarget({ orderId: null, itemId: null });
                                             }}
                                         >
-                                            Cancel
+                                            No
                                         </button>
                                     </div>
                                 </div>
