@@ -3,6 +3,9 @@ import axios from "axios";
 import AddMenuForm from './AddInventoryItemForm'; import { useParams } from "react-router-dom";
 import { FaEdit, FaTrash } from "react-icons/fa";
 import inventoryServicesPort from "../../Backend_Port_Files/InventoryServices";
+import * as XLSX from "xlsx";
+import { saveAs } from "file-saver";
+
 
 function InventoryItemList({ selectedCategory }) {
     const [items, setItems] = useState([]);
@@ -102,7 +105,7 @@ function InventoryItemList({ selectedCategory }) {
         try {
             await inventoryServicesPort.post(
                 `/${clientId}/inventory/delete`,
-                { id }, // ✅ backend expects { id: value }
+                { id },
                 { headers }
             );
 
@@ -127,7 +130,7 @@ function InventoryItemList({ selectedCategory }) {
         let totalPrice = 0;
 
         const names = lineItemIds.map((id) => {
-            const match = items.find((i) => i.id === id || i.line_item_id === id); // fallback match
+            const match = items.find((i) => i.id === id || i.line_item_id === id);
             if (match) {
                 totalPrice += match.unit_price || 0;
                 return `${match.name} (₹${match.unit_price})`;
@@ -186,17 +189,147 @@ function InventoryItemList({ selectedCategory }) {
     };
 
 
+    // const handleExportToExcel = () => {
+    //     const exportData = items.map(item => ({
+    //         ID: item.id || item.inventory_id,
+    //         Name: item.name,
+    //         Description: item.description,
+    //         Category: categories.find(cat => cat.id === item.category_id)?.name || "Unknown",
+    //         Unit: item.unit,
+    //         Unit_Price: item.unit_price,
+    //         Unit_CST: item.unit_cst,
+    //         Unit_GST: item.unit_gst,
+    //         Total_Unit_Price: item.unit_total_price,
+    //         Total_Price: item.total_price,
+    //         CST: item.cst,
+    //         GST: item.gst,
+    //         Discount: item.discount,
+    //         Availability: item.availability,
+    //         Realm: item.realm,
+    //         Dietary: item.dietary_type,
+    //         Slug: item.slug,
+    //         Line_Item_IDs: Array.isArray(item.line_item_id) ? item.line_item_id.join(", ") : item.line_item_id
+    //     }));
+
+    //     const worksheet = XLSX.utils.json_to_sheet(exportData);
+    //     const workbook = XLSX.utils.book_new();
+    //     XLSX.utils.book_append_sheet(workbook, worksheet, "InventoryItems");
+
+    //     const excelBuffer = XLSX.write(workbook, { bookType: "xlsx", type: "array" });
+    //     const data = new Blob([excelBuffer], { type: "application/octet-stream" });
+    //     saveAs(data, "inventory_items.xlsx");
+    // };
+
+    
+
+    // const handleImportFromExcel = async (e) => {
+    //     const file = e.target.files[0];
+    //     if (!file) return;
+    
+    //     let created_by = "unknown", updated_by = "unknown";
+    //     try {
+    //         const decoded = jwtDecode(token);
+    //         created_by = decoded.user_id || "unknown";
+    //         updated_by = decoded.user_id || "unknown";
+    //     } catch {}
+    
+    //     try {
+    //         const reader = new FileReader();
+    //         reader.onload = async (evt) => {
+    //             const data = evt.target.result;
+    //             const workbook = XLSX.read(data, { type: "binary" });
+    //             const sheetName = workbook.SheetNames[0];
+    //             const worksheet = workbook.Sheets[sheetName];
+    //             const parsedData = XLSX.utils.sheet_to_json(worksheet);
+    
+    //             // 🔴 Step 1: Delete all existing items
+    //             await inventoryServicesPort.delete(
+    //                 `/${clientId}/inventory/delete_all`,
+    //                 { headers: { Authorization: `Bearer ${token}` } }
+    //             );
+    
+    //             // ✅ Step 2: Import new items from Excel
+    //             for (const row of parsedData) {
+    //                 const newItem = {
+    //                     client_id: clientId,
+    //                     name: row.Name || "",
+    //                     description: row.Description || "",
+    //                     category_id: getCategoryIdByName(row.Category),
+    //                     realm: row.Realm || "",
+    //                     availability: parseInt(row.Availability || 0),
+    //                     unit: row.Unit || "",
+    //                     unit_price: parseFloat(row.Unit_Price || 0),
+    //                     unit_cst: parseFloat(row.Unit_CST || 0),
+    //                     unit_gst: parseFloat(row.Unit_GST || 0),
+    //                     unit_total_price: parseFloat(row.Total_Unit_Price || 0),
+    //                     price: parseFloat(row.Price || 0),
+    //                     cst: parseFloat(row.CST || 0),
+    //                     gst: parseFloat(row.GST || 0),
+    //                     discount: parseFloat(row.Discount || 0),
+    //                     total_price: parseFloat(row.Total_Price || 0),
+    //                     slug: row.Slug || "",
+    //                     line_item_id: row.Line_Item_IDs
+    //                         ? row.Line_Item_IDs.split(",").map(id => parseInt(id.trim()))
+    //                         : [],
+    //                     created_by,
+    //                     updated_by
+    //                 };
+    
+    //                 await inventoryServicesPort.post(
+    //                     `/${clientId}/inventory/create`,
+    //                     newItem,
+    //                     { headers: { Authorization: `Bearer ${token}` } }
+    //                 );
+    //             }
+    
+    //             alert("Import successful!");
+    //             fetchInventoryItems();
+    //         };
+    
+    //         reader.readAsBinaryString(file);
+    //     } catch (err) {
+    //         console.error("Import Error:", err);
+    //         alert("Import failed. Check console for details.");
+    //     }
+    // };
+    
+    // // Helper function to map category name to ID
+    // const getCategoryIdByName = (name) => {
+    //     const found = categories.find(cat => cat.name.toLowerCase() === name?.toLowerCase());
+    //     return found ? found.id : null;
+    // };
+    
+
 
     return (
         <div className="menu-items-panel">
-            <div className="btns">
-                <button className="btn-add" onClick={() => {
-                    setShowAddModal(true);
-                    setEditingItem(null);
-                }}>
-                    + Add Item
-                </button>
-            </div>
+           <div className="btns">
+  <button className="btn-add" onClick={() => {
+    setShowAddModal(true);
+    setEditingItem(null);
+  }}>
+    + Add Item
+  </button>
+
+  {/* <button className="btn-add" onClick={handleExportToExcel}>
+    ⬇ Export to Excel
+  </button>
+
+  <button className="btn-add" onClick={() => document.getElementById('excelInput').click()}>
+    ⬆ Import from Excel
+  </button>
+
+  <input
+    type="file"
+    id="excelInput"
+    accept=".xlsx, .xls"
+    style={{ display: "none" }}
+    onChange={handleImportFromExcel}
+  /> */}
+  
+</div>
+
+
 
             <div className="grid-layout ">
                 {items.length === 0 ? (
