@@ -165,7 +165,7 @@ const DocumentManager = () => {
             </div>
 
             <h3 className="doc-subheader">📁 Available Documents</h3>
-            <div className="doc-grid-container">
+            <div className="grid-layout">
                 {documents
                     .filter((doc) => doc.id === latestDocId || latestDocId === null)
                     .map((doc) => (
