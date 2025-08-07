@@ -124,13 +124,12 @@ const OrdersVisiblePage = () => {
         if (!order || order.status === "served") return;
 
         try {
-            const response = await orderServicesPort.post(
+            await orderServicesPort.post(
                 `/${clientId}/dinein/update`,
                 {
                     id: orderId,
                     client_id: clientId,
                     status: newStatus,
-                    // invoice_status: newStatus === "served" ? "paid" : undefined,
                 },
                 {
                     headers: {
@@ -138,28 +137,33 @@ const OrdersVisiblePage = () => {
                     },
                 }
             );
-            toast.success("Item status updated");
 
+            toast.success("Order status updated");
 
             setOrders((prev) =>
                 prev.map((o) =>
                     o.id === orderId
                         ? {
                             ...o,
-                            status: newStatus,
-                            items: o.items.map(item => ({ ...item, status: newStatus === 'served' ? 'served' : item.status }))
+                            status: newStatus, // ✅ Only this line changes
+                            // Items remain untouched
                         }
                         : o
                 )
             );
 
+            // Optional: exit edit mode if status is served
+            if (newStatus === "served") {
+                setEditOrderId(null);
+            }
+
         } catch (err) {
             const msg = err?.response?.data?.detail || "❌ Failed to update order status.";
             console.error(msg, err);
             toast.error(msg);
-
         }
     };
+
 
     // --------------------------------------------------------------------------- //
     const handleItemStatusChange = async (orderId, itemId, newStatus) => {
@@ -214,7 +218,7 @@ const OrdersVisiblePage = () => {
 
         try {
             await orderServicesPort.delete(`/${clientId}/order_item/delete`, {
-                params: { order_item_id: item.id },
+                params: { order_item_id: item.id, client_id: clientId, },
                 headers: {
                     Authorization: `Bearer ${token}`,
                 },
@@ -424,34 +428,41 @@ const OrdersVisiblePage = () => {
                                                     <td colSpan="7" className="expanded-order-row">
                                                         <div className="modern-order-details-container">
                                                             <div className="modern-order-status-controls">
-                                                                <button
-                                                                    className="modern-order-delete-button"
-                                                                    onClick={() => {
-                                                                        console.log("Clicked delete for", order.id);
-                                                                        setOrderToDelete(order.id);
-                                                                        setShowDeleteModal(true);
-                                                                    }}
-                                                                >
-                                                                    Delete Order
-                                                                </button>
+                                                                {order.status !== "served" && (
+                                                                    <>
+                                                                        <button
+                                                                            className="modern-order-delete-button"
+                                                                            onClick={() => {
+                                                                                console.log("Clicked delete for", order.id);
+                                                                                setOrderToDelete(order.id);
+                                                                                setShowDeleteModal(true);
+                                                                            }}
+                                                                        >
+                                                                            Delete Order
+                                                                        </button>
 
-                                                                {["pending", "preparing", "served"].map((status) => (
-                                                                    <button
-                                                                        key={status}
-                                                                        className={`modern-status-toggle-button ${order.status === status ? "modern-active-status" : ""}`}
-                                                                        onClick={() => handleStatusChange(order.id, status)}
-                                                                        disabled={order.status === "served"}
-                                                                    >
-                                                                        {status}
-                                                                    </button>
-                                                                ))}
+                                                                        {["pending", "preparing", "served"].map((status) => (
+                                                                            <button
+                                                                                key={status}
+                                                                                className={`modern-status-toggle-button ${order.status === status ? "modern-active-status" : ""}`}
+                                                                                onClick={() => handleStatusChange(order.id, status)}
+                                                                                disabled={order.status === "served"}
+                                                                            >
+                                                                                {status}
+                                                                            </button>
+                                                                        ))}
 
-                                                                <button
-                                                                    className="modern-order-edit-button"
-                                                                    onClick={() => setEditOrderId(prev => prev === order.id ? null : order.id)}
-                                                                >
-                                                                    {editOrderId === order.id ? 'Cancel Edit' : 'Edit'}
-                                                                </button>
+                                                                        <button
+                                                                            className="modern-order-edit-button"
+                                                                            onClick={() =>
+                                                                                setEditOrderId((prev) => (prev === order.id ? null : order.id))
+                                                                            }
+                                                                        >
+                                                                            {editOrderId === order.id ? "Cancel Edit" : "Edit"}
+                                                                        </button>
+                                                                    </>
+                                                                )}
+
                                                             </div>
 
                                                             <div className="modern-items-table-wrapper">
@@ -552,6 +563,7 @@ const OrdersVisiblePage = () => {
                                     ))
                                 )}
                             </tbody>
+
                         </table>
                         {showDeleteModals && deleteTarget && (
                             <div className="delete-modal-overlay">

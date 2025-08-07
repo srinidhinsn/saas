@@ -669,48 +669,54 @@ body.theme-dark {
 }
 
 /* OrdersvisiblePage stylesheet */
-
-
-
-.expanded-order-row {
-    background-color: var(--expanded-bg, #f9f9f9);
+:root {
+    --primary: #007bff;
+    --primary-light: #cce5ff;
+    --background: #ffffff;
+    --background-secondary: #f8f9fa;
+    --border: #ccc;
+    --border-light: #e5e5e5;
+    --success: #28a745;
+    --danger: #dc3545;
 }
 
 .modern-order-details-container {
-    padding: 1.5rem;
-    background: white;
+    padding: 1rem;
+    background-color: var(--background);
     border-radius: 12px;
-    box-shadow: 0 0 12px rgba(0, 0, 0, 0.05);
-    margin-top: 1rem;
+    border: 1px solid var(--border);
 }
 
 .modern-order-status-controls {
     display: flex;
-    flex-wrap: wrap;
-    gap: 0.5rem;
+    gap: 1rem;
     margin-bottom: 1rem;
-}
+    flex-wrap: wrap;
 
-.modern-order-delete-button {
-    background: #ff4d4f;
-    color: white;
-    border: none;
-    padding: 0.6rem 1.2rem;
-    border-radius: 6px;
-    cursor: pointer;
-}
+    .modern-order-delete-button,
+    .modern-order-edit-button,
+    .modern-status-toggle-button {
+        padding: 6px 14px;
+        border-radius: 6px;
+        font-size: 14px;
+        cursor: pointer;
+        border: none;
+        transition: background 0.2s;
 
-.modern-status-toggle-button {
-    background: #e0e0e0;
-    padding: 0.6rem 1rem;
-    border-radius: 6px;
-    border: none;
-    cursor: pointer;
-}
+        &:hover {
+            background-color: var(--primary-light);
+        }
 
-.modern-active-status {
-    background: #1890ff !important;
-    color: white;
+        &.modern-active-status {
+            background-color: var(--primary);
+            color: #fff;
+        }
+
+        &:disabled {
+            opacity: 0.5;
+            cursor: not-allowed;
+        }
+    }
 }
 
 .modern-items-table-wrapper {
@@ -721,49 +727,177 @@ body.theme-dark {
     width: 100%;
     border-collapse: collapse;
     margin-top: 1rem;
+    font-size: 14px;
+
+    th,
+    td {
+        padding: 10px 12px;
+        border-bottom: 1px solid var(--border-light);
+        text-align: left;
+    }
+
+    thead {
+        background-color: var(--background-secondary);
+    }
+
+    tfoot {
+        background-color: transparent;
+
+        .modern-save-items-button {
+            background-color: var(--success);
+            color: #fff;
+            padding: 8px 16px;
+            border: none;
+            border-radius: 8px;
+            cursor: pointer;
+            font-size: 14px;
+
+            &:hover {
+                background-color: darken(var(--success), 10%);
+            }
+        }
+    }
 }
 
-.modern-items-table th,
-.modern-items-table td {
-    padding: 0.75rem;
-    text-align: left;
-    border-bottom: 1px solid #eaeaea;
-}
+.modern-qty-edit-controls {
+    display: flex;
+    align-items: center;
+    gap: 8px;
 
-.modern-quantity-input {
-    width: 60px;
-    padding: 0.3rem;
-    border-radius: 4px;
-    border: 1px solid #ccc;
+    button {
+        padding: 4px 10px;
+        font-size: 16px;
+        border: 1px solid var(--border);
+        border-radius: 4px;
+        background-color: var(--background-secondary);
+        cursor: pointer;
+
+        &:disabled {
+            opacity: 0.4;
+            cursor: not-allowed;
+        }
+
+        &:hover {
+            background-color: var(--primary-light);
+        }
+    }
 }
 
 .modern-item-status-tag {
-    padding: 0.3rem 0.6rem;
-    border-radius: 5px;
-    background-color: #f0f0f0;
+    padding: 4px 10px;
+    border-radius: 12px;
+    font-size: 13px;
     text-transform: capitalize;
-    font-size: 0.85rem;
+
+    &.new {
+        background-color: #f0f0ff;
+        color: #3333cc;
+    }
+
+    &.preparing {
+        background-color: #fff5cc;
+        color: #cc9900;
+    }
+
+    &.served {
+        background-color: #d6f5d6;
+        color: #009900;
+    }
+
+    &.cancelled {
+        background-color: #ffe6e6;
+        color: #cc0000;
+    }
 }
 
 .modern-item-action-button,
-.modern-item-delete-button,
-.modern-save-items-button {
-    padding: 0.4rem 0.8rem;
-    margin-right: 0.5rem;
-    border: none;
-    border-radius: 5px;
-    font-size: 0.85rem;
-    cursor: pointer;
-}
-
 .modern-item-delete-button {
-    background-color: #ff7875;
-    color: white;
+    margin-right: 6px;
+    padding: 4px 10px;
+    border-radius: 6px;
+    border: none;
+    font-size: 13px;
+    cursor: pointer;
+    background-color: var(--background-secondary);
+
+    &:hover {
+        background-color: var(--primary-light);
+    }
+
+    &.modern-active-status {
+        background-color: var(--primary);
+        color: white;
+    }
+
+    &:disabled {
+        opacity: 0.5;
+        cursor: not-allowed;
+    }
+
+    &.modern-item-delete-button {
+        background-color: var(--danger);
+        color: white;
+
+        &:hover {
+            background-color: darken(var(--danger), 10%);
+        }
+    }
 }
 
-.modern-save-items-button {
-    background-color: #52c41a;
-    color: white;
+.delete-modal-overlay {
+    position: fixed;
+    top: 0;
+    left: 0;
+    right: 0;
+    bottom: 0;
+    background-color: rgba(0, 0, 0, 0.4);
+    z-index: 1000;
+    display: flex;
+    justify-content: center;
+    align-items: center;
+}
+
+.delete-modal-box,
+.delete-modal {
+    background-color: var(--background);
+    padding: 1.5rem;
+    border-radius: 10px;
+    box-shadow: 0 0 10px rgba(0, 0, 0, 0.2);
+    text-align: center;
+
+    h3,
+    p {
+        margin-bottom: 1rem;
+    }
+
+    .delete-modal-buttons,
+    .modal-buttons {
+        display: flex;
+        justify-content: center;
+        gap: 1rem;
+
+        .yes,
+        .no,
+        .confirm-delete-btn,
+        .cancel-delete-btn {
+            padding: 8px 16px;
+            border: none;
+            border-radius: 8px;
+            cursor: pointer;
+            font-weight: 500;
+        }
+
+        .yes,
+        .confirm-delete-btn {
+            background-color: var(--danger);
+            color: #fff;
+        }
+
+        .no,
+        .cancel-delete-btn {
+            background-color: #ccc;
+        }
+    }
 }
 
 
