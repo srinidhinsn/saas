@@ -680,6 +680,37 @@ body.theme-dark {
     --danger: #dc3545;
 }
 
+.modern-add-item-section {
+    margin-top: 1rem;
+
+    input {
+        width: 100%;
+        padding: 8px;
+        border-radius: 6px;
+        border: 1px solid #ccc;
+    }
+
+    ul {
+        list-style: none;
+        padding: 0;
+        margin-top: 5px;
+        border: 1px solid #ddd;
+        border-radius: 4px;
+        max-height: 150px;
+        overflow-y: auto;
+        background: white;
+
+        li {
+            padding: 6px 10px;
+            cursor: pointer;
+
+            &:hover {
+                background: #f2f2f2;
+            }
+        }
+    }
+}
+
 .modern-order-details-container {
     padding: 1rem;
     background-color: var(--background);

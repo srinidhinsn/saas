@@ -25,8 +25,78 @@ const OrdersVisiblePage = () => {
     const [showDeleteModals, setShowDeleteModals] = useState(false);
     const [deleteTarget, setDeleteTarget] = useState({ orderId: null, itemId: null });
     const [editedItemsMap, setEditedItemsMap] = useState({});
+    const [allInventoryItems, setAllInventoryItems] = useState([]);
+    const [itemSearchQuery, setItemSearchQuery] = useState("");
+    const [itemSearchResults, setItemSearchResults] = useState([]);
 
     // --------------------------------------------------------------------------- //
+    useEffect(() => {
+        axios.get(`http://localhost:8002/saas/${clientId}/inventory/read`, {
+            headers: { Authorization: `Bearer ${token}` }
+        })
+            .then(res => {
+                setAllInventoryItems(res.data.data || []); console.log("✅ All inventory items:", res.data.data);
+            })
+            .catch(err => {
+                console.error("Failed to load inventory:", err);
+            });
+    }, []);
+    useEffect(() => {
+        if (!expandedOrderIndex || !orders[expandedOrderIndex]) {
+            setItemSearchResults([]);
+            return;
+        }
+
+        const currentOrderItems = orders[expandedOrderIndex].items.map(i => i.item_id);
+
+        const filtered = allInventoryItems
+            .filter(item =>
+                (item.name || "").toLowerCase().includes(itemSearchQuery.toLowerCase())
+            )
+            .filter(item => !currentOrderItems.includes(item.id)); // 🔥 Exclude already added items
+
+        setItemSearchResults(filtered);
+    }, [itemSearchQuery, allInventoryItems, expandedOrderIndex, orders]);
+
+    const addItemToOrder = (orderId, selectedItem) => {
+        console.log("🟢 Adding item to order:", selectedItem);
+
+        let targetItems = [];
+
+        setOrders(prevOrders => {
+            return prevOrders.map(order => {
+                if (order.id !== orderId) return order;
+
+                const newItem = {
+                    item_id: selectedItem.id,
+                    item_name: selectedItem.name,
+                    quantity: 1,
+                    price: selectedItem.price,
+                    status: "new",
+                    note: "",
+                    slug: selectedItem.slug || generateSlug(selectedItem.name)
+                };
+
+                const newItems = [...order.items, newItem];
+                targetItems = newItems; // 🟢 store for use after state update
+
+                return {
+                    ...order,
+                    items: newItems
+                };
+            });
+        });
+
+        // ✅ Do this OUTSIDE of setOrders to avoid duplication
+        setTimeout(() => {
+            updateOrderItems(orderId, targetItems);
+        }, 0);
+
+        setItemSearchQuery("");
+        setItemSearchResults([]);
+    };
+
+
 
     const updateItemQuantity = (orderId, itemId, newQty) => {
         setOrders(prev =>
@@ -217,34 +287,55 @@ const OrdersVisiblePage = () => {
         if (!item?.id) return;
 
         try {
+            // 1. Delete item from DB
             await orderServicesPort.delete(`/${clientId}/order_item/delete`, {
-                params: { order_item_id: item.id, client_id: clientId, },
-                headers: {
-                    Authorization: `Bearer ${token}`,
-                },
+                params: { order_item_id: item.id, client_id: clientId },
+                headers: { Authorization: `Bearer ${token}` },
             });
 
-            setOrders((prevOrders) => {
-                return prevOrders.map(o => {
-                    if (o.id !== orderId) return o;
+            // 2. Remove item from local state
+            const updatedOrders = orders.map(o => {
+                if (o.id !== orderId) return o;
 
-                    const updatedItems = o.items.map(item =>
-                        item.item_id === itemId ? { ...item, status: "cancelled" } : item
-                    );
+                const updatedItems = o.items.filter(i => i.item_id !== itemId);
+                const newTotal = updatedItems.reduce((sum, item) => {
+                    const price = inventoryMap[item.item_id]?.price || item.price || 0;
+                    return sum + (item.quantity || 1) * price;
+                }, 0);
 
-                    return { ...o, items: updatedItems };
-                });
+                return {
+                    ...o,
+                    items: updatedItems,
+                    total_price: newTotal
+                };
             });
 
-            // Also update editable map
-            setEditedItemsMap(prev => {
-                const existing = orders.find(o => o.id === orderId)?.items || [];
-                const updated = existing.map(item =>
-                    item.item_id === itemId ? { ...item, status: "cancelled" } : item
+            setOrders(updatedOrders);
+
+            // 3. Update backend total_price
+            const newOrder = updatedOrders.find(o => o.id === orderId);
+            if (newOrder) {
+                await orderServicesPort.post(
+                    `/${clientId}/dinein/update`,
+                    {
+                        id: orderId,
+                        total_price: newOrder.total_price
+                    },
+                    {
+                        headers: {
+                            Authorization: `Bearer ${token}`,
+                        },
+                    }
                 );
+            }
+
+            // 4. Update editable map (optional)
+            setEditedItemsMap(prev => {
+                const updated = (prev[orderId] || []).filter(i => i.item_id !== itemId);
                 return { ...prev, [orderId]: updated };
             });
 
+            toast.success("Item cancelled and total updated");
         } catch (err) {
             const msg = err?.response?.data?.detail || "❌ Failed to cancel item.";
             console.error(msg, err);
@@ -258,20 +349,27 @@ const OrdersVisiblePage = () => {
     //-------------------------------------------------- //
     //-------------------------------------------------- //
     const updateOrderItems = async (orderId, updatedItemsWithStatuses) => {
-        const cleanedItems = updatedItemsWithStatuses.map(item => {
-            const { id, ...rest } = item;
-            return {
-                ...rest,
-                status: item.status || "new"
-            };
-        });
+        const cleanedItems = updatedItemsWithStatuses.map(item => ({
+            item_id: item.item_id || item.inventory_id, // fallback
+            item_name: item.name || item.item_name,
+            quantity: item.quantity || 1,
+            status: item.status || "new",
+            note: item.note || "",
+            slug: item.slug || "",
+            price: item.price || inventoryMap[item.item_id || item.inventory_id]?.price || 0,
+            client_id: clientId,
+            order_id: orderId
+        }));
+
+        console.log("📤 Final payload to order_items/update:");
+        cleanedItems.forEach((item, i) => console.log(`Item ${i + 1}:`, item));
 
         const totalPrice = cleanedItems.reduce((sum, item) => {
-            const price = inventoryMap[item.item_id]?.price || 0;
-            return sum + price * (item.quantity || 1);
+            return sum + item.price * item.quantity;
         }, 0);
 
         try {
+            // ✅ Use query param for order_id
             await axios.post(
                 `http://localhost:8003/saas/${clientId}/order_items/update?order_id=${orderId}`,
                 cleanedItems,
@@ -289,10 +387,15 @@ const OrdersVisiblePage = () => {
 
             toast.success("Item statuses & total updated!");
         } catch (err) {
-            console.error(err);
+            console.error("❌ Failed to update order items:", err);
+            if (err.response?.data) {
+                console.error("🚨 Response data:", err.response.data);
+            }
             toast.error("Failed to update items or total.");
         }
     };
+
+
 
 
     // ----------------------------------------------------- //
@@ -462,7 +565,6 @@ const OrdersVisiblePage = () => {
                                                                         </button>
                                                                     </>
                                                                 )}
-
                                                             </div>
 
                                                             <div className="modern-items-table-wrapper">
@@ -536,7 +638,35 @@ const OrdersVisiblePage = () => {
                                                                                 </td>
                                                                             </tr>
                                                                         ))}
+
+                                                                        {/* ✅ Add Item Input (valid table row) */}
+                                                                        {editOrderId === order.id && order.status !== "served" && (
+                                                                            <tr>
+                                                                                <td colSpan="4">
+                                                                                    <div className="modern-add-item-section">
+                                                                                        <input
+                                                                                            type="text"
+                                                                                            className="modern-item-search-input"
+                                                                                            placeholder="Search item to add..."
+                                                                                            value={itemSearchQuery}
+                                                                                            onChange={(e) => setItemSearchQuery(e.target.value)}
+                                                                                        />
+
+                                                                                        {itemSearchResults.length > 0 && (
+                                                                                            <ul className="modern-item-search-results">
+                                                                                                {itemSearchResults.map(item => (
+                                                                                                    <li key={item.id} onClick={() => addItemToOrder(order.id, item)}>
+                                                                                                        {item.name} - ₹{item.price}
+                                                                                                    </li>
+                                                                                                ))}
+                                                                                            </ul>
+                                                                                        )}
+                                                                                    </div>
+                                                                                </td>
+                                                                            </tr>
+                                                                        )}
                                                                     </tbody>
+
                                                                     <tfoot>
                                                                         <tr>
                                                                             <td colSpan="4" style={{ textAlign: "right" }}>
@@ -554,10 +684,8 @@ const OrdersVisiblePage = () => {
                                                         </div>
                                                     </td>
                                                 </tr>
-
-
-
                                             )}
+
 
                                         </React.Fragment>
                                     ))
