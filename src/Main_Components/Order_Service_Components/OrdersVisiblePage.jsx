@@ -480,7 +480,7 @@ const OrdersVisiblePage = () => {
     // --------------------------------------------------------------------------- //
     const filteredOrders = selectedDate
         ? orders.filter(order => {
-            const orderDate = new Date(order.created_at).toISOString().split("T")[0];
+            const orderDate = new Date(order.created_at).toLocaleDateString("en-CA");
             return orderDate === selectedDate;
         })
         : orders;
@@ -501,7 +501,7 @@ const OrdersVisiblePage = () => {
                             {[...Array(15)].map((_, i) => {
                                 const d = new Date();
                                 d.setDate(d.getDate() - i);
-                                const dateString = d.toISOString().split("T")[0];
+                                const dateString = d.toLocaleDateString("en-CA");
                                 const label = i === 0 ? "Today" : dateString;
                                 return (
                                     <option key={dateString} value={dateString}>
@@ -558,13 +558,13 @@ const OrdersVisiblePage = () => {
                                                 <tr>
                                                     <td colSpan="7" className="expanded-order-row">
                                                         <div className="modern-order-details-container">
+                                                            {/* Order-level controls */}
                                                             <div className="modern-order-status-controls">
                                                                 {order.status !== "served" && (
                                                                     <>
                                                                         <button
                                                                             className="modern-order-delete-button"
                                                                             onClick={() => {
-                                                                                console.log("Clicked delete for", order.id);
                                                                                 setOrderToDelete(order.id);
                                                                                 setShowDeleteModal(true);
                                                                             }}
@@ -577,7 +577,6 @@ const OrdersVisiblePage = () => {
                                                                                 key={status}
                                                                                 className={`modern-status-toggle-button ${order.status === status ? "modern-active-status" : ""}`}
                                                                                 onClick={() => handleStatusChange(order.id, status)}
-                                                                                disabled={order.status === "served"}
                                                                             >
                                                                                 {status}
                                                                             </button>
@@ -595,6 +594,7 @@ const OrdersVisiblePage = () => {
                                                                 )}
                                                             </div>
 
+                                                            {/* Item table */}
                                                             <div className="modern-items-table-wrapper">
                                                                 <table className="modern-items-table">
                                                                     <thead>
@@ -640,6 +640,7 @@ const OrdersVisiblePage = () => {
                                                                                 </td>
 
                                                                                 <td data-label="Actions">
+                                                                                    {/* ✅ Always show item actions regardless of order status */}
                                                                                     {["new", "preparing", "served"].map((status) => (
                                                                                         <button
                                                                                             key={status}
@@ -667,7 +668,7 @@ const OrdersVisiblePage = () => {
                                                                             </tr>
                                                                         ))}
 
-                                                                        {/* ✅ Add Item Input (valid table row) */}
+                                                                        {/* Add Item row */}
                                                                         {editOrderId === order.id && order.status !== "served" && (
                                                                             <tr>
                                                                                 <td colSpan="4">
@@ -713,6 +714,7 @@ const OrdersVisiblePage = () => {
                                                     </td>
                                                 </tr>
                                             )}
+
 
 
                                         </React.Fragment>

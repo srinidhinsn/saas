@@ -669,6 +669,47 @@ body.theme-dark {
 }
 
 /* OrdersvisiblePage stylesheet */
+:root {
+    --primary: #007bff;
+    --primary-light: #cce5ff;
+    --background: #ffffff;
+    --background-secondary: #f8f9fa;
+    --border: #ccc;
+    --border-light: #e5e5e5;
+    --success: #28a745;
+    --danger: #dc3545;
+}
+
+.modern-add-item-section {
+    margin-top: 1rem;
+
+    input {
+        width: 100%;
+        padding: 8px;
+        border-radius: 6px;
+        border: 1px solid #ccc;
+    }
+
+    ul {
+        list-style: none;
+        padding: 0;
+        margin-top: 5px;
+        border: 1px solid #ddd;
+        border-radius: 4px;
+        max-height: 150px;
+        overflow-y: auto;
+        background: white;
+
+        li {
+            padding: 6px 10px;
+            cursor: pointer;
+
+            &:hover {
+                background: #f2f2f2;
+            }
+        }
+    }
+}
 
 .modern-order-details-container {
     padding: 1rem;
@@ -888,6 +929,36 @@ body.theme-dark {
             background-color: #ccc;
         }
     }
+}
+
+.date-filter-dropdown {
+    padding: 8px 12px;
+    font-size: 14px;
+    border: 1px solid var(--border-color, #ccc);
+    border-radius: 6px;
+    background-color: var(--bg-color, #fff);
+    color: var(--text-color, #333);
+    cursor: pointer;
+    transition: all 0.2s ease-in-out;
+    appearance: none;
+    outline: none;
+    margin-right: 12px;
+    min-width: 160px;
+}
+
+.date-filter-dropdown:hover {
+    border-color: var(--accent-color, #007bff);
+}
+
+.date-filter-dropdown:focus {
+    box-shadow: 0 0 0 2px rgba(0, 123, 255, 0.3);
+    border-color: var(--accent-color, #007bff);
+}
+
+body[data-theme="dark"] .date-filter-dropdown {
+    background-color: #2b2b2b;
+    color: #f0f0f0;
+    border-color: #444;
 }
 
 
