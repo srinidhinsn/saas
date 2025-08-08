@@ -56,7 +56,7 @@ const AddUsers = () => {
     };
 
     return (
-        <div className="user-management-page">
+        <div className="add-user-page">
             <form className="user-form" onSubmit={handleSubmit}>
                 <div className="form-grid">
                     <input name="name" placeholder="Name" value={user.name} onChange={handleChange} required />
