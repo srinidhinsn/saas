@@ -126,6 +126,8 @@ def update_order_status(client_id: str, body: DineinOrderModel, context: SaasCon
 
     if not order:
         raise HTTPException(status_code=404, detail="Order not found")
+    if body.total_price is not None:
+        order.total_price = body.total_price
 
     order.status = body.status.value
     if body.status == OrderStatusEnum.served:
@@ -143,39 +145,49 @@ def update_order_items(
     client_id: str,
     order_id: Optional[str] = Query(None),
     body: Optional[List[OrderItemModel]] = None,
+    single_item: Optional[bool] = Query(False),
     context: SaasContext = Depends(verify_token),
     db: Session = Depends(get_db)
 ):
-    if not order_id:
-        raise HTTPException(status_code=400, detail="Missing order_id")
-
-    # Delete old items
-    db.query(DBOrderItem).filter(DBOrderItem.order_id == order_id).delete()
-
-    enriched_items = []
-    for item in body:
-        inventory = db.query(InventoryEntity).filter_by(
-            id=item.item_id, client_id=client_id).first()
-        if not inventory:
+    if single_item:
+        # Single item update
+        if not body or not isinstance(body, list) or len(body) != 1:
             raise HTTPException(
-                status_code=404, detail=f"Item not found: {item.item_id}")
+                status_code=400, detail="Single item update requires exactly one item")
 
-        enriched_item = DBOrderItem(
-            item_id=item.item_id,
-            order_id=order_id,
-            client_id=client_id,
-            quantity=item.quantity,
-            status=item.status or "new",
-            item_name=inventory.name,
-            slug=inventory.slug,
-            price=inventory.price,
-        )
-        enriched_items.append(enriched_item)
+        item = body[0]
+        if not item.id:
+            raise HTTPException(
+                status_code=400, detail="Order item ID is required")
 
-    db.add_all(enriched_items)
-    db.commit()
+        db_item = db.query(DBOrderItem).filter(
+            DBOrderItem.id == item.id,
+            DBOrderItem.client_id == client_id
+        ).first()
 
-    return ResponseModel(screen_id=context.screen_id, data={"message": "Order items updated successfully"})
+        if not db_item:
+            raise HTTPException(status_code=404, detail="Order item not found")
+
+        if item.status:
+            db_item.status = item.status
+        if item.quantity is not None:
+            db_item.quantity = item.quantity
+
+        db.commit()
+        return ResponseModel(screen_id=context.screen_id, data={"message": "Order item updated successfully"})
+
+    else:
+        # Full list update
+        if not order_id:
+            raise HTTPException(status_code=400, detail="Missing order_id")
+
+        db.query(DBOrderItem).filter(DBOrderItem.order_id == order_id).delete()
+        latest_order_item_list = DBOrderItem.copyFromModels(body)
+        db.add_all(latest_order_item_list)
+        db.commit()
+        return ResponseModel(screen_id=context.screen_id, data={"message": "Order items updated successfully"})
+
+# ------------------------------------------------------------------------------------------------------- #
 
 
 @router.delete("/order_item/delete")

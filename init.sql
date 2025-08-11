@@ -254,6 +254,7 @@ CREATE TABLE IF NOT EXISTS public.tables (
     client_id      TEXT NOT NULL,
     name           TEXT NOT NULL,
     slug           TEXT UNIQUE,
+    table_type     TEXT ,
     qr_code_url    TEXT,
     description    TEXT,
     status         TEXT DEFAULT 'Vacant',

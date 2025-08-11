@@ -4,6 +4,8 @@ from models.billing_model import BillingDocument, BillingDocumentItem
 from enum import Enum
 
 # Enum for payment status
+
+
 class PaymentStatusEnum(str, Enum):
     pending = "Pending"
     paid = "Paid"
@@ -11,12 +13,16 @@ class PaymentStatusEnum(str, Enum):
     overdue = "Overdue"
 
 # Enum for approval status
+
+
 class ApprovalStatusEnum(str, Enum):
     pending = "Pending"
     approved = "Approved"
     rejected = "Rejected"
 
 # billing_entity.py
+
+
 class BillingDocumentEntity(Base):
     __tablename__ = "billing_documents"
 
@@ -48,11 +54,13 @@ class BillingDocumentEntity(Base):
     updated_at = Column(DateTime, default=func.now(), onupdate=func.now())
 
     # New columns added
-    payment_status = Column(Text, nullable=True, default=PaymentStatusEnum.pending)
+    payment_status = Column(Text, nullable=True,
+                            default=PaymentStatusEnum.pending)
     payment_due_date = Column(DateTime, nullable=True)
     payment_method = Column(Text, nullable=True)
     payment_reference = Column(Text, nullable=True)
-    approval_status = Column(Text, nullable=True, default=ApprovalStatusEnum.pending)
+    approval_status = Column(
+        Text, nullable=True, default=ApprovalStatusEnum.pending)
     approved_by = Column(Text, nullable=True)
     approval_date = Column(DateTime, nullable=True)
     gl_account_code = Column(Text, nullable=True)
@@ -81,21 +89,23 @@ class BillingDocumentEntity(Base):
             m.__dict__.pop("_sa_instance_state", None)
         return models
 
+
 class BillingDocumentItemEntity(Base):
     __tablename__ = "billing_document_items"
 
-    id            = Column(BigInteger, Identity(always=True), primary_key=True)
-    document_id   = Column(BigInteger, ForeignKey("billing_documents.id", ondelete="CASCADE"), nullable=True)
-    item_ref_id   = Column(Text, nullable=True)
-    description   = Column(Text, nullable=True)
-    quantity      = Column(Float, nullable=True)
-    unit_price    = Column(Float, nullable=True)
-    discount      = Column(Float, nullable=True)
-    tax_rate      = Column(Float, nullable=True)
-    total         = Column(Float, nullable=True)
-    is_active     = Column(Boolean, nullable=False, default=True)
-    created_at    = Column(DateTime, default=func.now())
-    updated_at    = Column(DateTime, default=func.now(), onupdate=func.now())
+    id = Column(BigInteger, Identity(always=True), primary_key=True)
+    document_id = Column(BigInteger, ForeignKey(
+        "billing_documents.id", ondelete="CASCADE"), nullable=True)
+    item_ref_id = Column(Text, nullable=True)
+    description = Column(Text, nullable=True)
+    quantity = Column(Float, nullable=True)
+    unit_price = Column(Float, nullable=True)
+    discount = Column(Float, nullable=True)
+    tax_rate = Column(Float, nullable=True)
+    total = Column(Float, nullable=True)
+    is_active = Column(Boolean, nullable=False, default=True)
+    created_at = Column(DateTime, default=func.now())
+    updated_at = Column(DateTime, default=func.now(), onupdate=func.now())
 
     # New columns added
     unit_of_measure: Column = Column(Text, nullable=True, default="Unit")
