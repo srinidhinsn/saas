@@ -129,67 +129,69 @@ const DocumentManager = () => {
     };
 
     return (
-        <div className="doc-manager-wrapper">
-            <h2 className="doc-header">📄 Document Manager</h2>
+        <div className="Document-Manager-container">
+            <div className="doc-manager-wrapper">
+                <h2 className="doc-header">📄 Document Manager</h2>
 
-            <div className="doc-upload-form">
-                <input type="file" onChange={(e) => setFile(e.target.files[0])} />
-                <input
-                    type="text"
-                    placeholder="Description"
-                    value={description}
-                    onChange={(e) => setDescription(e.target.value)}
-                />
-                <input
-                    type="text"
-                    placeholder="Category ID"
-                    value={categoryId}
-                    onChange={(e) => setCategoryId(e.target.value)}
-                />
-                <input
-                    type="text"
-                    placeholder="Realm"
-                    value={realm}
-                    onChange={(e) => setRealm(e.target.value)}
-                />
-                <div className="doc-btn-group">
-                    <button className="upload-button" onClick={handleUpload}>
-                        Upload
-                    </button>
-                    {selectedDocId && (
-                        <button className="replace-button" onClick={handleReplace}>
-                            Replace
+                <div className="doc-upload-form">
+                    <input type="file" onChange={(e) => setFile(e.target.files[0])} />
+                    <input
+                        type="text"
+                        placeholder="Description"
+                        value={description}
+                        onChange={(e) => setDescription(e.target.value)}
+                    />
+                    <input
+                        type="text"
+                        placeholder="Category ID"
+                        value={categoryId}
+                        onChange={(e) => setCategoryId(e.target.value)}
+                    />
+                    <input
+                        type="text"
+                        placeholder="Realm"
+                        value={realm}
+                        onChange={(e) => setRealm(e.target.value)}
+                    />
+                    <div className="doc-btn-group">
+                        <button className="upload-button" onClick={handleUpload}>
+                            Upload
                         </button>
-                    )}
+                        {selectedDocId && (
+                            <button className="replace-button" onClick={handleReplace}>
+                                Replace
+                            </button>
+                        )}
+                    </div>
                 </div>
-            </div>
 
-            <h3 className="doc-subheader">📁 Available Documents</h3>
-            <div className="grid-layout">
-                {documents
-                    .filter((doc) => doc.id === latestDocId || latestDocId === null)
-                    .map((doc) => (
-                        <div className="doc-card" key={doc.id}>
-                            <p><strong>📁 {doc.name}</strong></p>
-                            <p>📎 Category: {doc.category_id}</p>
-                            <p>📝 {doc.description}</p>
-                            <p>📦 {doc.size_kb} KB</p>
-                            <div className="doc-actions">
-                                <button
-                                    className="download-button"
-                                    onClick={() => handleDownload(doc.id)}
-                                >
-                                    Download
-                                </button>
-                                <button
-                                    className="replace-button"
-                                    onClick={() => setSelectedDocId(doc.id)}
-                                >
-                                    Replace
-                                </button>
+                <h3 className="doc-subheader">📁 Available Documents</h3>
+                <div className="grid-layout">
+                    {documents
+                        .filter((doc) => doc.id === latestDocId || latestDocId === null)
+                        .map((doc) => (
+                            <div className="doc-card" key={doc.id}>
+                                <p><strong>📁 {doc.name}</strong></p>
+                                <p>📎 Category: {doc.category_id}</p>
+                                <p>📝 {doc.description}</p>
+                                <p>📦 {doc.size_kb} KB</p>
+                                <div className="doc-actions">
+                                    <button
+                                        className="download-button"
+                                        onClick={() => handleDownload(doc.id)}
+                                    >
+                                        Download
+                                    </button>
+                                    <button
+                                        className="replace-button"
+                                        onClick={() => setSelectedDocId(doc.id)}
+                                    >
+                                        Replace
+                                    </button>
+                                </div>
                             </div>
-                        </div>
-                    ))}
+                        ))}
+                </div>
             </div>
         </div>
     );

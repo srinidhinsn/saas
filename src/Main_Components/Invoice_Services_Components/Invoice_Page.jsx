@@ -183,113 +183,115 @@ const Invoice_Page = () => {
     }, [orders]);
 
     return (
-        <div className="billing-page">
-            <h2>Billing Manager</h2>
-            <form onSubmit={handleSubmit} className="billing-form">
-                <div className="form-group">
-                    <label className="filled">Select Order</label>
-                    <select
-                        onChange={(e) => {
-                            const tableId = parseInt(e.target.value);
-                            const latestOrder = orders
-                                .filter((order) => order.table_id === tableId)
-                                .sort((a, b) => new Date(b.created_at) - new Date(a.created_at))[0];
+        <div className="Invoice-Manage-container">
+            <div className="billing-page">
+                <h2>Billing Manager</h2>
+                <form onSubmit={handleSubmit} className="billing-form">
+                    <div className="form-group">
+                        <label className="filled">Select Order</label>
+                        <select
+                            onChange={(e) => {
+                                const tableId = parseInt(e.target.value);
+                                const latestOrder = orders
+                                    .filter((order) => order.table_id === tableId)
+                                    .sort((a, b) => new Date(b.created_at) - new Date(a.created_at))[0];
 
-                            if (latestOrder) {
-                                let subtotal = 0;
-                                let tax = 0;
-                                let discount = 0;
+                                if (latestOrder) {
+                                    let subtotal = 0;
+                                    let tax = 0;
+                                    let discount = 0;
 
-                                latestOrder.items.forEach((item) => {
-                                    const price = item.price || 0;
-                                    const qty = item.quantity || 1;
-                                    const gst = item.gst || 0;
-                                    const dis = item.discount || 0;
+                                    latestOrder.items.forEach((item) => {
+                                        const price = item.price || 0;
+                                        const qty = item.quantity || 1;
+                                        const gst = item.gst || 0;
+                                        const dis = item.discount || 0;
 
-                                    subtotal += price * qty;
-                                    tax += gst;
-                                    discount += dis;
-                                });
+                                        subtotal += price * qty;
+                                        tax += gst;
+                                        discount += dis;
+                                    });
 
-                                setFormData((prev) => ({
-                                    ...prev,
-                                    order_id: String(latestOrder.id),
-                                    table_id: latestOrder.table_id,
-                                    subtotal,
-                                    tax_amount: tax,
-                                    discount_amount: discount,
-                                    total_amount: latestOrder.total_price || 0,
-                                }));
-                            }
-                        }}
-                    >
-                        <option value="">Select Table</option>
-                        {[...new Set(
-                            orders
-                                .filter((order) => order.status?.trim().toLowerCase() === "served")
-                                .map((o) => o.table_id)
-                        )].map((tid) => {
-                            const table = tables.find((t) => t.id === tid);
-                            return (
-                                <option key={tid} value={tid}>
-                                    {table ? table.name : `Table ${tid}`}
-                                </option>
-                            );
-                        })}
-                    </select>
-                </div>
-
-                {[
-                    { name: "document_type", type: "text", label: "Document Type" },
-                    { name: "document_number", type: "text", label: "Document Number" },
-                    { name: "document_date", type: "date", label: "Document Date" },
-                    { name: "customer_id", type: "text", label: "Customer ID" },
-                    { name: "subtotal", type: "number", label: "Subtotal" },
-                    { name: "tax_amount", type: "number", label: "Tax Amount" },
-                    { name: "discount_amount", type: "number", label: "Discount Amount" },
-                    { name: "total_amount", type: "number", label: "Total Amount" },
-                    { name: "contact_email", type: "email", label: "Contact Email" },
-                    { name: "contact_phone", type: "text", label: "Contact Phone" },
-                ].map(field => (
-                    <div className="form-group" key={field.name}>
-                        <input
-                            type={field.type}
-                            name={field.name}
-                            value={formData[field.name]}
-                            onChange={handleChange}
-                            required={["document_type", "document_number", "document_date"].includes(field.name)}
-                        />
-                        <label className={formData[field.name] ? "filled" : ""}>{field.label}</label>
+                                    setFormData((prev) => ({
+                                        ...prev,
+                                        order_id: String(latestOrder.id),
+                                        table_id: latestOrder.table_id,
+                                        subtotal,
+                                        tax_amount: tax,
+                                        discount_amount: discount,
+                                        total_amount: latestOrder.total_price || 0,
+                                    }));
+                                }
+                            }}
+                        >
+                            <option value="">Select Table</option>
+                            {[...new Set(
+                                orders
+                                    .filter((order) => order.status?.trim().toLowerCase() === "served")
+                                    .map((o) => o.table_id)
+                            )].map((tid) => {
+                                const table = tables.find((t) => t.id === tid);
+                                return (
+                                    <option key={tid} value={tid}>
+                                        {table ? table.name : `Table ${tid}`}
+                                    </option>
+                                );
+                            })}
+                        </select>
                     </div>
-                ))}
 
-                <div className="form-group">
-                    <select name="status" value={formData.status} onChange={handleChange}>
-                        <option value="Draft">Draft</option>
-                        <option value="Pending">Pending</option>
-                        <option value="Paid">Paid</option>
-                    </select>
-                    <label className="filled">Status</label>
-                </div>
+                    {[
+                        { name: "document_type", type: "text", label: "Document Type" },
+                        { name: "document_number", type: "text", label: "Document Number" },
+                        { name: "document_date", type: "date", label: "Document Date" },
+                        { name: "customer_id", type: "text", label: "Customer ID" },
+                        { name: "subtotal", type: "number", label: "Subtotal" },
+                        { name: "tax_amount", type: "number", label: "Tax Amount" },
+                        { name: "discount_amount", type: "number", label: "Discount Amount" },
+                        { name: "total_amount", type: "number", label: "Total Amount" },
+                        { name: "contact_email", type: "email", label: "Contact Email" },
+                        { name: "contact_phone", type: "text", label: "Contact Phone" },
+                    ].map(field => (
+                        <div className="form-group" key={field.name}>
+                            <input
+                                type={field.type}
+                                name={field.name}
+                                value={formData[field.name]}
+                                onChange={handleChange}
+                                required={["document_type", "document_number", "document_date"].includes(field.name)}
+                            />
+                            <label className={formData[field.name] ? "filled" : ""}>{field.label}</label>
+                        </div>
+                    ))}
 
-                <div className="form-group">
-                    <textarea name="notes" value={formData.notes} onChange={handleChange} required />
-                    <label className={formData.notes ? "filled" : ""}>Notes</label>
-                </div>
+                    <div className="form-group">
+                        <select name="status" value={formData.status} onChange={handleChange}>
+                            <option value="Draft">Draft</option>
+                            <option value="Pending">Pending</option>
+                            <option value="Paid">Paid</option>
+                        </select>
+                        <label className="filled">Status</label>
+                    </div>
 
-                <button type="submit">{selectedId ? "Update" : "Create"}</button>
-            </form>
+                    <div className="form-group">
+                        <textarea name="notes" value={formData.notes} onChange={handleChange} required />
+                        <label className={formData.notes ? "filled" : ""}>Notes</label>
+                    </div>
 
-            <ul className="billing-list">
-                {records.map(doc => (
-                    <li key={doc.id}>
-                        <strong>{doc.document_type} #{doc.document_number}</strong> — ₹{doc.total_amount} on {doc.document_date?.slice(0, 10)}
-                        <br />
-                        <button onClick={() => fetchById(doc.id)}>Edit</button>
-                        <button onClick={() => handleDelete(doc.id)}>Delete</button>
-                    </li>
-                ))}
-            </ul>
+                    <button type="submit">{selectedId ? "Update" : "Create"}</button>
+                </form>
+
+                <ul className="billing-list">
+                    {records.map(doc => (
+                        <li key={doc.id}>
+                            <strong>{doc.document_type} #{doc.document_number}</strong> — ₹{doc.total_amount} on {doc.document_date?.slice(0, 10)}
+                            <br />
+                            <button onClick={() => fetchById(doc.id)}>Edit</button>
+                            <button onClick={() => handleDelete(doc.id)}>Delete</button>
+                        </li>
+                    ))}
+                </ul>
+            </div>
         </div>
     );
 };

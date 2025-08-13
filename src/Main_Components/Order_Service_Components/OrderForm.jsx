@@ -97,9 +97,9 @@ const OrderForm = ({ table, onOrderCreated }) => {
             const { item, addonItems = [] } = e.detail;
             console.log("Adding main item:", item);
             console.log("Adding add-ons:", addonItems);
-    
+
             const updatedOrder = [...orderItems];
-    
+
             // Add main item
             const existingMain = updatedOrder.find(i => i.id === item.id);
             if (existingMain) {
@@ -107,7 +107,7 @@ const OrderForm = ({ table, onOrderCreated }) => {
             } else {
                 updatedOrder.push({ ...item, quantity: 1, note: "" });
             }
-    
+
             // Add all selected add-ons
             addonItems.forEach(addon => {
                 const existingAddon = updatedOrder.find(i => i.id === addon.id);
@@ -122,14 +122,14 @@ const OrderForm = ({ table, onOrderCreated }) => {
                     });
                 }
             });
-    
+
             setOrderItems(updatedOrder);
         };
-    
+
         document.addEventListener("add-item", handleAddItem);
         return () => document.removeEventListener("add-item", handleAddItem);
     }, [orderItems]);
-    
+
 
 
     const openNoteEditor = (item) => {
@@ -234,7 +234,7 @@ const OrderForm = ({ table, onOrderCreated }) => {
 
                 console.log("Order placed:", res.data);
                 onOrderCreated?.(res.data);
-                navigate(`/saas/${clientId}/main/kds-page`, {
+                navigate(`/saas/${clientId}/main/orders-view`, {
                     state: {
                         table_number: selectedTable?.table_number || selectedTable?.id,
                         order_id: res.data.data.id,

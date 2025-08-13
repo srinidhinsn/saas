@@ -213,338 +213,340 @@ const TableManagement = () => {
     return (
         // ------------------------------- Main COmponent Structure ------------------------------- //
 
-        <div className={`table-selection ${darkMode ? "dark" : ""}`}>  {/*Theme changer */}
-            <div className="header">
-                <h2>Table Management</h2> {/*Header section start*/}
-                {/* <button className="theme-toggle" onClick={toggleTheme}>
+        <div className="Table-Management-container">
+            <div className={`table-selection ${darkMode ? "dark" : ""}`}>  {/*Theme changer */}
+                <div className="header">
+                    <h2>Table Management</h2> {/*Header section start*/}
+                    {/* <button className="theme-toggle" onClick={toggleTheme}>
                     {darkMode ? <FiSun /> : <FiMoon />}
                 </button> */}
-            </div>{/*Header section end*/}
+                </div>{/*Header section end*/}
 
-            <div className="add-tables-section"> {/*Add Table Section  */}
-                <h3>Add New Tables</h3>
-                {!showAddTable && (
-                    <button className="btn-primary" onClick={() => {
-                        setShowAddTable(true);
-                        setTableRanges([...tableRanges, { range: "", table_type: "", type: "", remark: "", is_active: false }]);
-                        setFieldErrors([{}]);
-                    }}>
-                        + Add Table
-                    </button>
-                )}    {/* Add table BUtton */}
-                {/*show the form to add nnew tables (dynamically after clicking the add table button)*/}
-                {showAddTable && (
-                    <>
-                        {tableRanges.map((row, index) => (
-                            <div className="form-grid" key={index}>
-                                <div className="field-block">
-                                    <label>Table Range</label>
-                                    {/* Table Range Input */}
-                                    <input
-                                        value={row.range}
-                                        onChange={(e) => {
-                                            const updated = [...tableRanges];
-                                            updated[index].range = e.target.value;
-                                            setTableRanges(updated);
-                                        }}
-                                        className={fieldErrors[index]?.range ? "error-field" : ""}
-                                    />
-                                    {fieldErrors[index]?.range && <div className="error-text">Enter table range</div>}
-                                </div>
-
-                                <div className="field-block">
-                                    <label>No of Seating</label>
-                                    {/* No of seating Input */}
-                                    <input
-                                        type="number"
-                                        value={row.table_type}
-                                        onChange={(e) => {
-                                            const updated = [...tableRanges];
-                                            updated[index].table_type = e.target.value;
-                                            setTableRanges(updated);
-                                        }}
-                                        className={fieldErrors[index]?.table_type ? "error-field" : ""}
-                                    />
-                                    {fieldErrors[index]?.table_type && <div className="error-text">Enter seating</div>}
-                                </div>
-
-                                <div className="field-block">
-                                    <label>Type</label>
-                                    {/* Table type Input (AC or Non-AC ) */}
-                                    <select
-                                        value={row.type}
-                                        onChange={(e) => {
-                                            const updated = [...tableRanges];
-                                            updated[index].type = e.target.value;
-                                            setTableRanges(updated);
-                                        }}
-                                        className={fieldErrors[index]?.type ? "error-field" : ""}
-                                    >
-                                        <option value="">Select</option>
-                                        <option value="AC">AC</option>
-                                        <option value="Non-AC">Non-AC</option>
-                                    </select>
-                                    {fieldErrors[index]?.type && <div className="error-text">Select type</div>}
-                                </div>
-
-                                <div className="field-block">
-                                    <label>Remark</label>
-                                    {/* Remark or any specification Input */}
-                                    <select
-                                        value={row.remark}
-                                        onChange={(e) => {
-                                            const updated = [...tableRanges];
-                                            updated[index].remark = e.target.value;
-                                            setTableRanges(updated);
-                                        }}
-                                    >
-                                        <option value="Vacant">Vacant</option>
-                                        <option value="Occupied">Occupied</option>
-                                        <option value="Reserved">Reserved</option>
-                                    </select>
-                                </div>
-                                <div className="field-block">
-                                    <label>QR Code URL</label>
-                                    {/* QR code Input(optional) */}
-                                    <input
-                                        type="text"
-                                        value={row.qr_code_url || ""}
-                                        onChange={(e) => {
-                                            const updated = [...tableRanges];
-                                            updated[index].qr_code_url = e.target.value;
-                                            setTableRanges(updated);
-                                        }}
-                                        placeholder="Enter QR code URL"
-                                    />
-                                </div>
-                                <div className="field-block">
-                                    <label>Description</label>
-                                    {/* Description Input (optional) */}
-                                    <input
-                                        value={row.description}
-                                        onChange={(e) => {
-                                            const updated = [...tableRanges];
-                                            updated[index].description = e.target.value;
-                                            setTableRanges(updated);
-                                        }}
-                                    />
-                                </div>
-                                <div className="field-block">
-                                    <label>Slug</label>
-                                    {/* Slug Input (optional) */}
-                                    <input
-                                        type="text"
-                                        value={row.slug || ""}
-                                        onChange={(e) => {
-                                            const updated = [...tableRanges];
-                                            updated[index].slug = e.target.value;
-                                            setTableRanges(updated);
-                                        }}
-                                        placeholder="Enter slug"
-                                    />
-                                </div>
-
-                                <div className="field-block">
-                                    <label>Section</label>
-                                    {/* Section Input (optional) */}
-                                    <input
-                                        value={row.section}
-                                        onChange={(e) => {
-                                            const updated = [...tableRanges];
-                                            updated[index].section = e.target.value;
-                                            setTableRanges(updated);
-                                        }}
-                                    />
-                                </div>
-
-                                <div className="field-block">
-                                    <label>Sort Order</label>
-                                    {/* Sort-order Input (optional) */}
-                                    <input
-                                        type="number"
-                                        value={row.sort_order}
-                                        onChange={(e) => {
-                                            const updated = [...tableRanges];
-                                            updated[index].sort_order = e.target.value;
-                                            setTableRanges(updated);
-                                        }}
-                                    />
-                                </div>
-
-                                <div className="field-block checkbox-field">
-                                    <label>
-                                        {/* Active or not marking Input (optional) */}
+                <div className="add-tables-section"> {/*Add Table Section  */}
+                    <h3>Add New Tables</h3>
+                    {!showAddTable && (
+                        <button className="btn-primary" onClick={() => {
+                            setShowAddTable(true);
+                            setTableRanges([...tableRanges, { range: "", table_type: "", type: "", remark: "", is_active: false }]);
+                            setFieldErrors([{}]);
+                        }}>
+                            + Add Table
+                        </button>
+                    )}    {/* Add table BUtton */}
+                    {/*show the form to add nnew tables (dynamically after clicking the add table button)*/}
+                    {showAddTable && (
+                        <>
+                            {tableRanges.map((row, index) => (
+                                <div className="form-grid" key={index}>
+                                    <div className="field-block">
+                                        <label>Table Range</label>
+                                        {/* Table Range Input */}
                                         <input
-                                            type="checkbox"
-                                            checked={row.is_active}
+                                            value={row.range}
                                             onChange={(e) => {
                                                 const updated = [...tableRanges];
-                                                updated[index].is_active = e.target.checked;
+                                                updated[index].range = e.target.value;
+                                                setTableRanges(updated);
+                                            }}
+                                            className={fieldErrors[index]?.range ? "error-field" : ""}
+                                        />
+                                        {fieldErrors[index]?.range && <div className="error-text">Enter table range</div>}
+                                    </div>
+
+                                    <div className="field-block">
+                                        <label>No of Seating</label>
+                                        {/* No of seating Input */}
+                                        <input
+                                            type="number"
+                                            value={row.table_type}
+                                            onChange={(e) => {
+                                                const updated = [...tableRanges];
+                                                updated[index].table_type = e.target.value;
+                                                setTableRanges(updated);
+                                            }}
+                                            className={fieldErrors[index]?.table_type ? "error-field" : ""}
+                                        />
+                                        {fieldErrors[index]?.table_type && <div className="error-text">Enter seating</div>}
+                                    </div>
+
+                                    <div className="field-block">
+                                        <label>Type</label>
+                                        {/* Table type Input (AC or Non-AC ) */}
+                                        <select
+                                            value={row.type}
+                                            onChange={(e) => {
+                                                const updated = [...tableRanges];
+                                                updated[index].type = e.target.value;
+                                                setTableRanges(updated);
+                                            }}
+                                            className={fieldErrors[index]?.type ? "error-field" : ""}
+                                        >
+                                            <option value="">Select</option>
+                                            <option value="AC">AC</option>
+                                            <option value="Non-AC">Non-AC</option>
+                                        </select>
+                                        {fieldErrors[index]?.type && <div className="error-text">Select type</div>}
+                                    </div>
+
+                                    <div className="field-block">
+                                        <label>Remark</label>
+                                        {/* Remark or any specification Input */}
+                                        <select
+                                            value={row.remark}
+                                            onChange={(e) => {
+                                                const updated = [...tableRanges];
+                                                updated[index].remark = e.target.value;
+                                                setTableRanges(updated);
+                                            }}
+                                        >
+                                            <option value="Vacant">Vacant</option>
+                                            <option value="Occupied">Occupied</option>
+                                            <option value="Reserved">Reserved</option>
+                                        </select>
+                                    </div>
+                                    <div className="field-block">
+                                        <label>QR Code URL</label>
+                                        {/* QR code Input(optional) */}
+                                        <input
+                                            type="text"
+                                            value={row.qr_code_url || ""}
+                                            onChange={(e) => {
+                                                const updated = [...tableRanges];
+                                                updated[index].qr_code_url = e.target.value;
+                                                setTableRanges(updated);
+                                            }}
+                                            placeholder="Enter QR code URL"
+                                        />
+                                    </div>
+                                    <div className="field-block">
+                                        <label>Description</label>
+                                        {/* Description Input (optional) */}
+                                        <input
+                                            value={row.description}
+                                            onChange={(e) => {
+                                                const updated = [...tableRanges];
+                                                updated[index].description = e.target.value;
                                                 setTableRanges(updated);
                                             }}
                                         />
-                                        Active
-                                    </label>
+                                    </div>
+                                    <div className="field-block">
+                                        <label>Slug</label>
+                                        {/* Slug Input (optional) */}
+                                        <input
+                                            type="text"
+                                            value={row.slug || ""}
+                                            onChange={(e) => {
+                                                const updated = [...tableRanges];
+                                                updated[index].slug = e.target.value;
+                                                setTableRanges(updated);
+                                            }}
+                                            placeholder="Enter slug"
+                                        />
+                                    </div>
+
+                                    <div className="field-block">
+                                        <label>Section</label>
+                                        {/* Section Input (optional) */}
+                                        <input
+                                            value={row.section}
+                                            onChange={(e) => {
+                                                const updated = [...tableRanges];
+                                                updated[index].section = e.target.value;
+                                                setTableRanges(updated);
+                                            }}
+                                        />
+                                    </div>
+
+                                    <div className="field-block">
+                                        <label>Sort Order</label>
+                                        {/* Sort-order Input (optional) */}
+                                        <input
+                                            type="number"
+                                            value={row.sort_order}
+                                            onChange={(e) => {
+                                                const updated = [...tableRanges];
+                                                updated[index].sort_order = e.target.value;
+                                                setTableRanges(updated);
+                                            }}
+                                        />
+                                    </div>
+
+                                    <div className="field-block checkbox-field">
+                                        <label>
+                                            {/* Active or not marking Input (optional) */}
+                                            <input
+                                                type="checkbox"
+                                                checked={row.is_active}
+                                                onChange={(e) => {
+                                                    const updated = [...tableRanges];
+                                                    updated[index].is_active = e.target.checked;
+                                                    setTableRanges(updated);
+                                                }}
+                                            />
+                                            Active
+                                        </label>
+                                    </div>
+
+                                </div>
+                            ))}
+                            {/* Example Text for creating tables (for user references) */}
+                            <div className="example-text">
+                                Example:<br />
+                                a) Table Range: T01:T10<br />
+                                b) Multi-Table Range: A01:A10,B01:B05
+                            </div>
+
+                            {addRowError && <div className="error">{addRowError}</div>}
+
+                            <button className="btn-warning" onClick={() => {
+                                const emptyRows = tableRanges.filter(
+                                    row => !row.range || !row.table_type || !row.type
+                                );
+                                if (emptyRows.length >= 3) {
+                                    setAddRowError("Please fill the existing rows first.");
+                                    return;
+                                }
+                                setAddRowError("");
+                                setTableRanges([...tableRanges, { range: "", table_type: "", type: "", remark: "", is_active: false }]);
+                                setFieldErrors([...fieldErrors, {}]);
+                            }}>
+                                + Add Row
+                            </button>
+
+                            <button className="btn-info" onClick={generateTables}>Generate Table</button>
+                        </>
+                    )}
+                </div>
+
+                <div className="edit-tables-section">
+                    <h3>Edit Tables</h3>
+                    <div className="grid-layout">
+                        {tables.map((table) => (
+                            <React.Fragment key={table.id}>
+                                <div
+                                    className={`grids ${highlightRow === table.id ? "glow-effect" : ""} ${noChangeRowId === table.id ? "no-change-row" : ""
+                                        }`}
+                                >
+                                    {noChangeRowId === table.id ? (
+                                        <div className="info-message full-row">
+                                            <p>⚠️ No changes made!!!</p>
+                                        </div>
+                                    ) : (
+                                        <>
+                                            <div className="field-block">
+                                                <label>Table No</label>
+                                                <div>{table.name}</div>
+                                            </div>
+
+                                            {editRowId === table.id ? (
+                                                <>
+                                                    <div className="field-block">
+                                                        <label>No of Seating</label>
+                                                        <input
+                                                            type="number"
+                                                            value={table.table_type}
+                                                            onChange={(e) =>
+                                                                handleEditChange(table.id, "table_type", e.target.value)
+                                                            }
+                                                        />
+                                                    </div>
+                                                    <div className="field-block">
+                                                        <label>Type</label>
+                                                        <select
+                                                            value={table.location_zone}
+                                                            onChange={(e) =>
+                                                                handleEditChange(table.id, "location_zone", e.target.value)
+                                                            }
+                                                        >
+                                                            <option value="AC">AC</option>
+                                                            <option value="Non-AC">Non-AC</option>
+                                                        </select>
+                                                    </div>
+                                                    <div className="field-block">
+                                                        <label>Remark</label>
+                                                        <input
+                                                            value={table.status || ""}
+                                                            onChange={(e) =>
+                                                                handleEditChange(table.id, "status", e.target.value)
+                                                            }
+                                                        />
+                                                    </div>
+                                                    <div className="btn-block">
+                                                        <button className="btn-primary" onClick={() => saveEdit(table)}>
+                                                            <FaCheck />
+                                                        </button>
+                                                        <button className="btn-warning" onClick={cancelEdit}>
+                                                            <FaTimes />
+                                                        </button>
+                                                    </div>
+                                                </>
+                                            ) : (
+                                                <>
+                                                    <div className="field-block">
+                                                        <label>No of Seating</label>
+                                                        <div>{table.table_type}</div>
+                                                    </div>
+                                                    <div className="field-block">
+                                                        <label>Type</label>
+                                                        <div>{table.location_zone}</div>
+                                                    </div>
+                                                    <div className="field-block">
+                                                        <label>Remark</label>
+                                                        <div>{table.status || "-"}</div>
+                                                    </div>
+                                                    <div className="btn-block">
+                                                        <button
+                                                            className="btn-edit"
+                                                            onClick={() => setEditRowId(table.id)}
+                                                        >
+                                                            <FaEdit />
+                                                        </button>
+                                                        <button
+                                                            className="btn-delete"
+                                                            onClick={() => {
+                                                                setDeleteTableId(table.id);
+                                                                setShowConfirmDelete(true);
+                                                            }}
+                                                        >
+                                                            <FaTrash />
+                                                        </button>
+                                                    </div>
+                                                </>
+                                            )}
+                                        </>
+                                    )}
                                 </div>
 
-                            </div>
+                            </React.Fragment>
+
                         ))}
-                        {/* Example Text for creating tables (for user references) */}
-                        <div className="example-text">
-                            Example:<br />
-                            a) Table Range: T01:T10<br />
-                            b) Multi-Table Range: A01:A10,B01:B05
-                        </div>
 
-                        {addRowError && <div className="error">{addRowError}</div>}
-
-                        <button className="btn-warning" onClick={() => {
-                            const emptyRows = tableRanges.filter(
-                                row => !row.range || !row.table_type || !row.type
-                            );
-                            if (emptyRows.length >= 3) {
-                                setAddRowError("Please fill the existing rows first.");
-                                return;
-                            }
-                            setAddRowError("");
-                            setTableRanges([...tableRanges, { range: "", table_type: "", type: "", remark: "", is_active: false }]);
-                            setFieldErrors([...fieldErrors, {}]);
-                        }}>
-                            + Add Row
-                        </button>
-
-                        <button className="btn-info" onClick={generateTables}>Generate Table</button>
-                    </>
-                )}
-            </div>
-
-            <div className="edit-tables-section">
-                <h3>Edit Tables</h3>
-                <div className="grid-layout">
-                    {tables.map((table) => (
-                        <React.Fragment key={table.id}>
-                            <div
-                                className={`grids ${highlightRow === table.id ? "glow-effect" : ""} ${noChangeRowId === table.id ? "no-change-row" : ""
-                                    }`}
-                            >
-                                {noChangeRowId === table.id ? (
-                                    <div className="info-message full-row">
-                                        <p>⚠️ No changes made!!!</p>
-                                    </div>
-                                ) : (
-                                    <>
-                                        <div className="field-block">
-                                            <label>Table No</label>
-                                            <div>{table.name}</div>
-                                        </div>
-
-                                        {editRowId === table.id ? (
-                                            <>
-                                                <div className="field-block">
-                                                    <label>No of Seating</label>
-                                                    <input
-                                                        type="number"
-                                                        value={table.table_type}
-                                                        onChange={(e) =>
-                                                            handleEditChange(table.id, "table_type", e.target.value)
-                                                        }
-                                                    />
-                                                </div>
-                                                <div className="field-block">
-                                                    <label>Type</label>
-                                                    <select
-                                                        value={table.location_zone}
-                                                        onChange={(e) =>
-                                                            handleEditChange(table.id, "location_zone", e.target.value)
-                                                        }
-                                                    >
-                                                        <option value="AC">AC</option>
-                                                        <option value="Non-AC">Non-AC</option>
-                                                    </select>
-                                                </div>
-                                                <div className="field-block">
-                                                    <label>Remark</label>
-                                                    <input
-                                                        value={table.status || ""}
-                                                        onChange={(e) =>
-                                                            handleEditChange(table.id, "status", e.target.value)
-                                                        }
-                                                    />
-                                                </div>
-                                                <div className="btn-block">
-                                                    <button className="btn-primary" onClick={() => saveEdit(table)}>
-                                                        <FaCheck />
-                                                    </button>
-                                                    <button className="btn-warning" onClick={cancelEdit}>
-                                                        <FaTimes />
-                                                    </button>
-                                                </div>
-                                            </>
-                                        ) : (
-                                            <>
-                                                <div className="field-block">
-                                                    <label>No of Seating</label>
-                                                    <div>{table.table_type}</div>
-                                                </div>
-                                                <div className="field-block">
-                                                    <label>Type</label>
-                                                    <div>{table.location_zone}</div>
-                                                </div>
-                                                <div className="field-block">
-                                                    <label>Remark</label>
-                                                    <div>{table.status || "-"}</div>
-                                                </div>
-                                                <div className="btn-block">
-                                                    <button
-                                                        className="btn-edit"
-                                                        onClick={() => setEditRowId(table.id)}
-                                                    >
-                                                        <FaEdit />
-                                                    </button>
-                                                    <button
-                                                        className="btn-delete"
-                                                        onClick={() => {
-                                                            setDeleteTableId(table.id);
-                                                            setShowConfirmDelete(true);
-                                                        }}
-                                                    >
-                                                        <FaTrash />
-                                                    </button>
-                                                </div>
-                                            </>
-                                        )}
-                                    </>
-                                )}
-                            </div>
-
-                        </React.Fragment>
-
-                    ))}
-
-                </div>
-            </div>
-
-            {showConfirmDelete && (
-                <div className="confirm-overlay">
-                    <div className="confirm-box">
-                        <p>
-                            Delete table{" "}
-                            <strong>
-                                {
-                                    tables.find((t) => t.id === deleteTableId)?.name ||
-                                    "this table"
-                                }
-                            </strong>
-                            ?
-                        </p>
-                        <div className="buttons">
-                            <button className="btn-danger" onClick={confirmDelete}>Yes</button>
-                            <button className="btn-info" onClick={() => setShowConfirmDelete(false)}>No</button>
-                        </div>
                     </div>
                 </div>
-            )}
 
+                {showConfirmDelete && (
+                    <div className="confirm-overlay">
+                        <div className="confirm-box">
+                            <p>
+                                Delete table{" "}
+                                <strong>
+                                    {
+                                        tables.find((t) => t.id === deleteTableId)?.name ||
+                                        "this table"
+                                    }
+                                </strong>
+                                ?
+                            </p>
+                            <div className="buttons">
+                                <button className="btn-danger" onClick={confirmDelete}>Yes</button>
+                                <button className="btn-info" onClick={() => setShowConfirmDelete(false)}>No</button>
+                            </div>
+                        </div>
+                    </div>
+                )}
+
+            </div>
         </div>
     );
 };

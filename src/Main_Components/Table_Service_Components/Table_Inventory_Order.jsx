@@ -265,16 +265,17 @@ const Table_Inventory_Order = ({ onOrderUpdate }) => {
 
 
     return (
-        <div className={`view-tables-wrapper ${darkMode ? "dark" : "light"}`}>
-            {!selectedTable && (
-                <div className="viewmode-tabs">
-                    <button
-                        className={modeFromParams === "table" ? "active" : ""}
-                        onClick={() => setSearchParams({})}
-                    >
-                        Table
-                    </button>
-                    {/* <button
+        <div className="Table-Selection-container">
+            <div className={`view-tables-wrapper ${darkMode ? "dark" : "light"}`}>
+                {!selectedTable && (
+                    <div className="viewmode-tabs">
+                        <button
+                            className={modeFromParams === "table" ? "active" : ""}
+                            onClick={() => setSearchParams({})}
+                        >
+                            Table
+                        </button>
+                        {/* <button
                         className={modeFromParams === "pickup" ? "active" : ""}
                         onClick={() => handleModeClick("pickup")}
                     >
@@ -286,112 +287,113 @@ const Table_Inventory_Order = ({ onOrderUpdate }) => {
                     >
                         Delivery
                     </button> */}
-                </div>
-            )}
+                    </div>
+                )}
 
-            {!selectedTable && (
-                <div className="tables-view">
-                    <h2>Table Reservation</h2>
-                    {uniqueZones.map(zone => (
-                        <div className="zone-group" key={zone}>
-                            <h3 className="zone-title">{zone}</h3>
-                            <div className="zone-section">
+                {!selectedTable && (
+                    <div className="tables-view">
+                        <h2>Table Reservation</h2>
+                        {uniqueZones.map(zone => (
+                            <div className="zone-group" key={zone}>
+                                <h3 className="zone-title">{zone}</h3>
+                                <div className="zone-section">
 
-                                {tables.filter(t => t.location_zone === zone).map(table => (
-                                    <div
-                                        key={table.id}
-                                        className="table-card"
-                                        onClick={() => navigate(`${table.id}`)
-                                        }
+                                    {tables.filter(t => t.location_zone === zone).map(table => (
+                                        <div
+                                            key={table.id}
+                                            className="table-card"
+                                            onClick={() => navigate(`${table.id}`)
+                                            }
 
-                                    >
-                                        <div className="table-number">{table.table_number}</div>
-                                        {/* <div className="table-status">{table.status}</div> */}
-                                    </div>
-                                ))}
+                                        >
+                                            <div className="table-number">{table.table_number}</div>
+                                            {/* <div className="table-status">{table.status}</div> */}
+                                        </div>
+                                    ))}
+                                </div>
                             </div>
-                        </div>
-                    ))}
-                </div>
-            )}
+                        ))}
+                    </div>
+                )}
 
-            {selectedTable && (
-                <div className="order-overlay">
-                    <div className="order-content">
-                        <div className="category-list-container">
-                            <div className="search-bar">
-                                <FiSearch className="search-icon" />
-                                <input
-                                    type="text"
-                                    placeholder="Search items..."
-                                    value={searchTerm}
-                                    onChange={(e) => setSearchTerm(e.target.value)}
+                {selectedTable && (
+                    <div className="order-overlay">
+                        <div className="order-content">
+                            <div className="category-list-container">
+                                <div className="search-bar">
+                                    <FiSearch className="search-icon" />
+                                    <input
+                                        type="text"
+                                        placeholder="Search items..."
+                                        value={searchTerm}
+                                        onChange={(e) => setSearchTerm(e.target.value)}
+                                    />
+                                </div>
+                                <ul className="category-list">
+                                    {categories.map(cat => (
+                                        <span
+                                            key={cat.id}
+                                            onClick={() => setActiveCategory(cat.name)}
+                                            className={`category-item ${activeCategory === cat.name ? "active" : ""}`}
+                                            style={{ paddingLeft: `${cat.level * 20}px` }} // 👈 Indent visually
+                                        >
+                                            {cat.name}
+                                        </span>
+                                    ))}
+                                </ul>
+
+                            </div>
+
+                            <div className="item-pane">
+                                <div className="grid-layout">
+                                    {getFilteredItems().map(item => (
+                                        <div
+                                            key={item.id}
+                                            className="grids"
+                                            onClick={() => handleItemClick(item)}
+                                        >
+                                            <h4>{item.name}</h4>
+                                            <div className="item-price">₹{item.unit_price}</div>
+                                        </div>
+                                    ))}
+                                </div>
+                            </div>
+
+                            <div className="order-section">
+                                <OrderForm
+                                    table={selectedTable}
+                                    mode={selectedTable.mode || "Dine In"}
+                                    onOrderCreated={(latestOrder) => {
+                                        navigate('/view-tables');
+                                        setSearchParams({});
+                                        tableServicesPort
+                                            .get(`/${clientId}/tables/read`, {
+                                                headers: {
+                                                    Authorization: `Bearer ${token}`,
+                                                },
+                                            })
+                                            .then((res) => {
+                                                const responseData = Array.isArray(res.data)
+                                                    ? res.data
+                                                    : res.data?.data || [];
+
+                                                setTables(responseData);
+                                            })
+                                            .catch((err) => {
+                                                console.error("Failed to fetch tables:", err);
+                                                setTables([]); // fallback to empty array
+                                            });
+
+                                        onOrderUpdate?.(latestOrder);
+                                        setSelectedTable(null);
+                                        document.body.classList.remove("sidebar-minimized");
+                                    }}
                                 />
                             </div>
-                            <ul className="category-list">
-                                {categories.map(cat => (
-                                    <span
-                                        key={cat.id}
-                                        onClick={() => setActiveCategory(cat.name)}
-                                        className={`category-item ${activeCategory === cat.name ? "active" : ""}`}
-                                        style={{ paddingLeft: `${cat.level * 20}px` }} // 👈 Indent visually
-                                    >
-                                        {cat.name}
-                                        </span>
-                                ))}
-                            </ul>
-
-                        </div>
-
-                        <div className="item-pane">
-                            <div className="grid-layout">
-                                {getFilteredItems().map(item => (
-                                    <div
-                                        key={item.id}
-                                        className="grids"
-                                        onClick={() => handleItemClick(item)}
-                                    >
-                                        <h4>{item.name}</h4>
-                                        <div className="item-price">₹{item.unit_price}</div>
-                                    </div>
-                                ))}
-                            </div>
-                        </div>
-
-                        <div className="order-section">
-                            <OrderForm
-                                table={selectedTable}
-                                mode={selectedTable.mode || "Dine In"}
-                                onOrderCreated={(latestOrder) => {
-                                    navigate('/view-tables');
-                                    setSearchParams({});
-                                    tableServicesPort
-                                        .get(`/${clientId}/tables/read`, {
-                                            headers: {
-                                                Authorization: `Bearer ${token}`,
-                                            },
-                                        })
-                                        .then((res) => {
-                                            const responseData = Array.isArray(res.data)
-                                                ? res.data
-                                                : res.data?.data || [];
-
-                                            setTables(responseData);
-                                        })
-                                        .catch((err) => {
-                                            console.error("Failed to fetch tables:", err);
-                                            setTables([]); // fallback to empty array
-                                        });
-
-                                    onOrderUpdate?.(latestOrder);
-                                    setSelectedTable(null);
-                                    document.body.classList.remove("sidebar-minimized");
-                                }}
-                            />
                         </div>
                     </div>
-                </div>
-            )}
+                )}
+            </div>
         </div>
     );
 };

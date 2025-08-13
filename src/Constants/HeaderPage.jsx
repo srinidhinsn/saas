@@ -4,6 +4,7 @@ import { HiOutlineSun } from "react-icons/hi";
 import { PiMoonThin } from "react-icons/pi";
 import { useTheme } from "../ThemeChangerComponent/ThemeProvider";
 import { useNavigate } from "react-router-dom";
+import ClickSpark from "../Sub_Components/SparkArrow";
 
 const HeaderBar = () => {
     const [notifications, setNotifications] = useState([]);
@@ -76,71 +77,82 @@ const HeaderBar = () => {
     };
 
     return (
-        <div className="header-bar">
-            <div className="Left-Side-bar">
-                <h5>Saas Application</h5>
-            </div>
-
-            <div className="Right-Side-Header">
-                {/* Notifications */}
-                <div className="left">
-                    <button
-                        onClick={() => {
-                            setShowPopup(!showPopup);
-                            setShowBellShaking(false); // stop shaking when opened
-                        }}
-                        className={`icon-button ${showBellShaking ? "shake" : ""}`}
-                    >
-                        <FaBell />
-                        {showPopup && (
-                            <div className="notification-popup">
-                                {notifications.length ? (
-                                    notifications.map((note, idx) => (
-                                        <div key={idx} className="notification-item">{note}</div>
-                                    ))
-                                ) : (
-                                    <div>No notifications</div>
-                                )}
-                            </div>
-                        )}
-                    </button>
-
+        <div className="header-bar-container">
+            <div className="header-bar">
+                <div className="Left-Side-bar">
+                    <h5>Saas Application</h5>
                 </div>
 
-                {/* Theme Toggle */}
-                <div className="middle">
-                    <span onClick={toggleTheme} className="theme-toggle-button">
-                        {darkMode ? <PiMoonThin /> : <HiOutlineSun />}
-                    </span>
-                </div>
+                <div className="Right-Side-Header">
+                    {/* Notifications */}
+                    <ClickSpark>
+                        <div className="left">
 
-                {/* Profile */}
-                <div className="right">
-                    {tokenAvailable ? (
-                        <div className="profile-container">
-                            <input
-                                type="file"
-                                accept="image/*"
-                                onChange={handleImageChange}
-                                ref={fileInputRef}
-                                style={{ display: "none" }}
-                            />
-                            <div onClick={handleImageClick} className="profile-image-wrapper">
-                                {profileImage ? (
-                                    <img src={profileImage} alt="Profile" className="profile-image" />
-                                ) : (
-                                    <FaUserCircle className="profile-placeholder-icon" />
+                            <button
+                                onClick={() => {
+                                    setShowPopup(!showPopup);
+                                    setShowBellShaking(false); // stop shaking when opened
+                                }}
+                                className={`icon-button ${showBellShaking ? "shake" : ""}`}
+                            >
+                                <FaBell />
+                                {showPopup && (
+                                    <div className="notification-popup">
+                                        {notifications.length ? (
+                                            notifications.map((note, idx) => (
+                                                <div key={idx} className="notification-item">{note}</div>
+                                            ))
+                                        ) : (
+                                            <div>No notifications</div>
+                                        )}
+                                    </div>
                                 )}
-                            </div>
-                            {showDropdown && (
-                                <div className="dropdown-menu">
-                                    <div onClick={handleSignOut} className="dropdown-item">Sign Out</div>
+                            </button>
+
+
+
+                        </div>
+                    </ClickSpark>
+                    {/* Theme Toggle */}
+
+                    <ClickSpark>
+                        <div className="middle">
+                            <span onClick={toggleTheme} className="theme-toggle-button">
+                                {darkMode ? <PiMoonThin /> : <HiOutlineSun />}
+                            </span>
+                        </div>
+                    </ClickSpark>
+                    {/* Profile */}
+                    <ClickSpark>
+                        <div className="right">
+                            {tokenAvailable ? (
+                                <div className="profile-container">
+                                    <input
+                                        type="file"
+                                        accept="image/*"
+                                        onChange={handleImageChange}
+                                        ref={fileInputRef}
+                                        style={{ display: "none" }}
+                                    />
+                                    <div onClick={handleImageClick} className="profile-image-wrapper">
+                                        {profileImage ? (
+                                            <img src={profileImage} alt="Profile" className="profile-image" />
+                                        ) : (
+                                            <FaUserCircle className="profile-placeholder-icon" />
+                                        )}
+                                    </div>
+                                    {showDropdown && (
+                                        <div className="dropdown-menu">
+                                            <div onClick={handleSignOut} className="dropdown-item">Sign Out</div>
+                                        </div>
+                                    )}
                                 </div>
+                            ) : (
+                                <button onClick={handleSignOut}>Sign Out</button>
                             )}
                         </div>
-                    ) : (
-                        <button onClick={handleSignOut}>Sign Out</button>
-                    )}
+                    </ClickSpark>
+
                 </div>
             </div>
         </div>
