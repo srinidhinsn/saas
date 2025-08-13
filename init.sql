@@ -319,9 +319,10 @@ INSERT INTO page_definition (id, client_id, module, role, screen_id, load_type, 
 INSERT INTO page_definition (id, client_id, module, role, screen_id, load_type, operations) OVERRIDING SYSTEM VALUE VALUES (1007, 'easyfood', 'menu', 'Admin', 'default_menu', 'include', '{ALL}');
 INSERT INTO page_definition (id, client_id, module, role, screen_id, load_type, operations) OVERRIDING SYSTEM VALUE VALUES (1008, 'easyfood', 'document', 'Admin', 'default_document', 'include', '{ALL}');
 INSERT INTO page_definition (id, client_id, module, role, screen_id, load_type, operations) OVERRIDING SYSTEM VALUE VALUES (1009, 'easyfood', 'order_item', 'Admin', 'default_order_items', 'include', '{ALL}');
+INSERT INTO page_definition (id, client_id, module, role, screen_id, load_type, operations) OVERRIDING SYSTEM VALUE VALUES (1010, 'easyfood', 'order_items', 'Admin', 'default_order_items', 'include', '{ALL}');
 
 
-INSERT INTO "user" (username, hashed_password, id, client_id, roles, grants) OVERRIDING SYSTEM VALUE VALUES ('admin', '$2b$12$NcusUR2dTlmL/bwUYamZt.QOrGW9.ksrmFSQyx32Lc15VtWfyDPFC', '461e8cc6-a897-59b3-9f0e-1f2e19cd179c', 'easyfood', '{Admin}', '{dinein,order,inventory,users,tables,invoice,menu,document,order_item}');
+INSERT INTO "user" (username, hashed_password, id, client_id, roles, grants) OVERRIDING SYSTEM VALUE VALUES ('admin', '$2b$12$NcusUR2dTlmL/bwUYamZt.QOrGW9.ksrmFSQyx32Lc15VtWfyDPFC', '461e8cc6-a897-59b3-9f0e-1f2e19cd179c', 'easyfood', '{Admin}', '{dinein,order,inventory,users,tables,invoice,menu,document,order_item,order_items}');
 
 
 INSERT INTO category (id, client_id, name, description, sub_categories, created_by, updated_by, slug) OVERRIDING SYSTEM VALUE VALUES 

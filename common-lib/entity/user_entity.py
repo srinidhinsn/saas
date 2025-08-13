@@ -1,7 +1,29 @@
 import uuid
 from database.postgres import Base
-from sqlalchemy import Column , Integer, String, ARRAY, UUID, event
+from sqlalchemy import Column , Integer, String, ARRAY, UUID, event, Date
 from models.user_model import UserModel, PageDefinitionModel
+
+
+
+class Person(Base):
+    __tablename__ = "person"
+    id = Column(UUID(as_uuid=True), primary_key=True, default=uuid.uuid4)
+    first_name = Column(String, index=True, nullable=False)
+    last_name = Column(String, nullable=True)
+    dob = Column(Date, nullable=True)
+    email = Column(String, nullable=True)
+    phone = Column(String, nullable=True)
+
+
+    def generate_uuid(first_name: str, client_id: str) -> uuid.UUID:
+        namespace = uuid.UUID("6ba7b810-9dad-11d1-80b4-00c04fd430c8")  # DNS namespace
+        combined_key = f"{username}-{client_id}"
+        return uuid.uuid5(namespace, combined_key)
+
+    @staticmethod
+    def copyFromModel(personModel):
+        """Convert a single Pydantic DineinOrders model into a SQLAlchemy entity."""
+        return Person(**personModel.dict(exclude_unset=True))
 
 
 class User(Base):

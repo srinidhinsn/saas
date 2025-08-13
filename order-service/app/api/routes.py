@@ -139,6 +139,22 @@ def update_order_items(client_id: str, order_id: Optional[str] = Query(None), bo
     return response
 
 
+@router.post("/order_item/update")
+def update_order_items(client_id: str, order_id: Optional[str] = Query(None), order_item: Optional[OrderItemModel] = None, context: SaasContext = Depends(verify_token), db: Session = Depends(get_db)):
+    if not order_id or not order_item or not order_item.id:
+        raise HTTPException(status_code=400, detail="Missing order_id or order_item_id")
+
+    existing_item = db.query(DBOrderItem).filter(DBOrderItem.id == order_item.id, DBOrderItem.order_id == order_id).first()
+
+    updated_item = DBOrderItem.copyFromModel(order_item)
+    for attr, value in updated_item.__dict__.items():
+        if attr != "_sa_instance_state":
+            setattr(existing_item, attr, value)
+
+    db.commit()
+    response = ResponseModel(screen_id=context.screen_id, data={"message": "Order items updated successfully"})
+    return response
+
 
 @router.delete("/order_item/delete")
 def delete_order_items(client_id: str, order_item_id: Optional[str] = Query(None), context: SaasContext = Depends(verify_token), db: Session = Depends(get_db)):
