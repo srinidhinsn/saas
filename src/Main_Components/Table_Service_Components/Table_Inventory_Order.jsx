@@ -170,7 +170,7 @@ const Table_Inventory_Order = ({ onOrderUpdate }) => {
         items: menuItems.filter(item => item.category_id === cat.id)
     }));
 
-    
+
 
     const uniqueZones = Array.from(new Set(tables.map(t => t.location_zone))).filter(Boolean);
 
@@ -392,8 +392,6 @@ const Table_Inventory_Order = ({ onOrderUpdate }) => {
                                     }}
                                 />
                             </div>
-<<<<<<< HEAD
-=======
                             <ul className="category-list">
                                 {categories.map(cat => (
                                     <span
@@ -403,7 +401,7 @@ const Table_Inventory_Order = ({ onOrderUpdate }) => {
                                         style={{ paddingLeft: `${cat.level * 20}px` }} // 👈 Indent visually
                                     >
                                         {cat.name}
-                                        </span>
+                                    </span>
                                 ))}
                             </ul>
 
@@ -424,7 +422,7 @@ const Table_Inventory_Order = ({ onOrderUpdate }) => {
                             </div>
                         </div>
 
-{/* <div className="item-pane">
+                        {/* <div className="item-pane">
   <div className="grid-layout">
     {activeCategory?.toLowerCase() === "all" ? (
       <>
@@ -487,7 +485,7 @@ const Table_Inventory_Order = ({ onOrderUpdate }) => {
 
 
 
-                    
+
 
                         <div className="order-section">
                             <OrderForm
@@ -519,7 +517,6 @@ const Table_Inventory_Order = ({ onOrderUpdate }) => {
                                     document.body.classList.remove("sidebar-minimized");
                                 }}
                             />
->>>>>>> 87b84cf76bde80fe03ebf051705745739613331c
                         </div>
                     </div>
                 )}
