@@ -112,7 +112,6 @@ function CategoryList({ onCategorySelect }) {
                         </span>
                     )}
 
-                    {/* Show Edit/Delete only for subcategories (not parent categories) */}
                     <>
                         <button
                             className="btn-edit"
@@ -135,7 +134,6 @@ function CategoryList({ onCategorySelect }) {
                     </>
                 </div>
 
-                {/* Recursive rendering of subcategories */}
                 {expandedCategoryIds.includes(category.id) &&
                     category.subCategories?.map((sub) =>
                         renderCategory(sub, level + 1)
@@ -143,8 +141,6 @@ function CategoryList({ onCategorySelect }) {
             </div>
         );
     };
-
-
 
 
     const toggleSubcategory = (id, isEdit = false) => {
@@ -252,7 +248,7 @@ function CategoryList({ onCategorySelect }) {
     };
 
 
-    
+
     const handleAddCategory = async () => {
         if (!newId.trim() || !newName.trim()) {
             alert("ID and Name are required");
@@ -347,9 +343,16 @@ function CategoryList({ onCategorySelect }) {
         setEditingId(cat.id);
         setEditName(cat.name);
         setEditDescription(cat.description);
-        setEditSubcategories(cat.sub_categories || []);
+
+        // Map from subCategories array of objects to IDs if needed
+        const subcatIds = cat.sub_categories
+            ? cat.sub_categories // already IDs
+            : (cat.subCategories?.map(sub => sub.id) || []);
+
+        setEditSubcategories(subcatIds);
         setShowEditModal(true);
     };
+
 
 
     const handleEditSave = async () => {

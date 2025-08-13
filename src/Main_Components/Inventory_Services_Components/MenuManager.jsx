@@ -39,7 +39,7 @@ function MenuManager() {
 
     return (
         <div className="menu-manager-container">
-            <div className="tab-buttons">
+            {/* <div className="tab-buttons">
                 {["Categories/Items", "addons", "combo"].map(tab => (
                     <button
                         key={tab}
@@ -49,7 +49,7 @@ function MenuManager() {
                         {tab === "Categories/Items" ? "Categories/Items" : tab === "addons" ? "Addons" : "Combo"}
                     </button>
                 ))}
-            </div>
+            </div> */}
 
             <div className="tab-content">
                 {activeTab === "Categories/Items" && (

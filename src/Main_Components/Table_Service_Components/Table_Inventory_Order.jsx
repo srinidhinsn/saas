@@ -170,6 +170,8 @@ const Table_Inventory_Order = ({ onOrderUpdate }) => {
         items: menuItems.filter(item => item.category_id === cat.id)
     }));
 
+    
+
     const uniqueZones = Array.from(new Set(tables.map(t => t.location_zone))).filter(Boolean);
 
 
@@ -357,6 +359,71 @@ const Table_Inventory_Order = ({ onOrderUpdate }) => {
                                 ))}
                             </div>
                         </div>
+
+{/* <div className="item-pane">
+  <div className="grid-layout">
+    {activeCategory?.toLowerCase() === "all" ? (
+      <>
+     
+        {categories
+          .filter(c => c.id !== "all")
+          .map(cat => {
+            const catItems = items.filter(item => item.category_id === cat.id)
+                                   .filter(item => item.name.toLowerCase().includes(searchTerm.toLowerCase()));
+            if (catItems.length === 0) return null;
+
+            return (
+              <React.Fragment key={cat.id}>
+               <div className="layout">
+                 <div className="grids" style={{ width: "100%", pointerEvents: "none", background: "transparent", boxShadow: "none" }}>
+                  <strong>{cat.name}</strong>
+                </div>
+                {catItems.map(item => (
+                  <div key={item.id} className="grids" onClick={() => handleItemClick(item)}>
+                    <h4>{item.name}</h4>
+                    <div className="item-price">₹{item.unit_price}</div>
+                  </div>
+                ))}
+               </div>
+              </React.Fragment>
+            );
+          })}
+
+        {(() => {
+          const uncategorizedItems = items.filter(item => !categories.some(c => c.id === item.category_id) || !item.category_id)
+                                          .filter(item => item.name.toLowerCase().includes(searchTerm.toLowerCase()));
+
+          if (uncategorizedItems.length === 0) return null;
+
+          return (
+            <React.Fragment key="uncategorized">
+              <div className="grids" style={{ width: "100%", pointerEvents: "none", background: "transparent", boxShadow: "none" }}>
+                <strong>Uncategorized</strong>
+              </div>
+              {uncategorizedItems.map(item => (
+                <div key={item.id} className="grids" onClick={() => handleItemClick(item)}>
+                  <h4>{item.name}</h4>
+                  <div className="item-price">₹{item.unit_price}</div>
+                </div>
+              ))}
+            </React.Fragment>
+          );
+        })()}
+      </>
+    ) : (
+      getFilteredItems().map(item => (
+        <div key={item.id} className="grids" onClick={() => handleItemClick(item)}>
+          <h4>{item.name}</h4>
+          <div className="item-price">₹{item.unit_price}</div>
+        </div>
+      ))
+    )}
+  </div>
+</div> */}
+
+
+
+                    
 
                         <div className="order-section">
                             <OrderForm
