@@ -170,6 +170,8 @@ const Table_Inventory_Order = ({ onOrderUpdate }) => {
         items: menuItems.filter(item => item.category_id === cat.id)
     }));
 
+    
+
     const uniqueZones = Array.from(new Set(tables.map(t => t.location_zone))).filter(Boolean);
 
 
@@ -390,6 +392,134 @@ const Table_Inventory_Order = ({ onOrderUpdate }) => {
                                     }}
                                 />
                             </div>
+<<<<<<< HEAD
+=======
+                            <ul className="category-list">
+                                {categories.map(cat => (
+                                    <span
+                                        key={cat.id}
+                                        onClick={() => setActiveCategory(cat.name)}
+                                        className={`category-item ${activeCategory === cat.name ? "active" : ""}`}
+                                        style={{ paddingLeft: `${cat.level * 20}px` }} // 👈 Indent visually
+                                    >
+                                        {cat.name}
+                                        </span>
+                                ))}
+                            </ul>
+
+                        </div>
+
+                        <div className="item-pane">
+                            <div className="grid-layout">
+                                {getFilteredItems().map(item => (
+                                    <div
+                                        key={item.id}
+                                        className="grids"
+                                        onClick={() => handleItemClick(item)}
+                                    >
+                                        <h4>{item.name}</h4>
+                                        <div className="item-price">₹{item.unit_price}</div>
+                                    </div>
+                                ))}
+                            </div>
+                        </div>
+
+{/* <div className="item-pane">
+  <div className="grid-layout">
+    {activeCategory?.toLowerCase() === "all" ? (
+      <>
+     
+        {categories
+          .filter(c => c.id !== "all")
+          .map(cat => {
+            const catItems = items.filter(item => item.category_id === cat.id)
+                                   .filter(item => item.name.toLowerCase().includes(searchTerm.toLowerCase()));
+            if (catItems.length === 0) return null;
+
+            return (
+              <React.Fragment key={cat.id}>
+               <div className="layout">
+                 <div className="grids" style={{ width: "100%", pointerEvents: "none", background: "transparent", boxShadow: "none" }}>
+                  <strong>{cat.name}</strong>
+                </div>
+                {catItems.map(item => (
+                  <div key={item.id} className="grids" onClick={() => handleItemClick(item)}>
+                    <h4>{item.name}</h4>
+                    <div className="item-price">₹{item.unit_price}</div>
+                  </div>
+                ))}
+               </div>
+              </React.Fragment>
+            );
+          })}
+
+        {(() => {
+          const uncategorizedItems = items.filter(item => !categories.some(c => c.id === item.category_id) || !item.category_id)
+                                          .filter(item => item.name.toLowerCase().includes(searchTerm.toLowerCase()));
+
+          if (uncategorizedItems.length === 0) return null;
+
+          return (
+            <React.Fragment key="uncategorized">
+              <div className="grids" style={{ width: "100%", pointerEvents: "none", background: "transparent", boxShadow: "none" }}>
+                <strong>Uncategorized</strong>
+              </div>
+              {uncategorizedItems.map(item => (
+                <div key={item.id} className="grids" onClick={() => handleItemClick(item)}>
+                  <h4>{item.name}</h4>
+                  <div className="item-price">₹{item.unit_price}</div>
+                </div>
+              ))}
+            </React.Fragment>
+          );
+        })()}
+      </>
+    ) : (
+      getFilteredItems().map(item => (
+        <div key={item.id} className="grids" onClick={() => handleItemClick(item)}>
+          <h4>{item.name}</h4>
+          <div className="item-price">₹{item.unit_price}</div>
+        </div>
+      ))
+    )}
+  </div>
+</div> */}
+
+
+
+                    
+
+                        <div className="order-section">
+                            <OrderForm
+                                table={selectedTable}
+                                mode={selectedTable.mode || "Dine In"}
+                                onOrderCreated={(latestOrder) => {
+                                    navigate('/view-tables');
+                                    setSearchParams({});
+                                    tableServicesPort
+                                        .get(`/${clientId}/tables/read`, {
+                                            headers: {
+                                                Authorization: `Bearer ${token}`,
+                                            },
+                                        })
+                                        .then((res) => {
+                                            const responseData = Array.isArray(res.data)
+                                                ? res.data
+                                                : res.data?.data || [];
+
+                                            setTables(responseData);
+                                        })
+                                        .catch((err) => {
+                                            console.error("Failed to fetch tables:", err);
+                                            setTables([]); // fallback to empty array
+                                        });
+
+                                    onOrderUpdate?.(latestOrder);
+                                    setSelectedTable(null);
+                                    document.body.classList.remove("sidebar-minimized");
+                                }}
+                            />
+>>>>>>> 87b84cf76bde80fe03ebf051705745739613331c
                         </div>
                     </div>
                 )}
