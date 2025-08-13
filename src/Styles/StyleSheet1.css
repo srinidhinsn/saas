@@ -17,7 +17,7 @@ body {
 
 .app-wrapper {
     display: flex;
-    height: calc(100vh - 67px);
+    height: calc(100vh - 75px);
     overflow: hidden;
 }
 
@@ -39,9 +39,43 @@ body {
     --bg-text-color: rgb(5, 5, 62);
     /* Text color for numbers */
     --bg-number-color: rgb(19, 6, 49);
+    /* Dashboard icons */
+    --dash-icon-color: rgb(82, 192, 181);
+    /* Delete icon */
+    --delete-icon-bg: rgb(223, 176, 176);
+    --delete-icon: rgb(145, 47, 47);
+    --delete-icon-hover: red;
+    /* edit icon */
+    --edit-icon-bg: rgb(137, 137, 223);
+    --edit-icon: rgb(47, 47, 244);
+    --edit-icon-hover: blue;
+    /* View button */
+    --view-button-bg: rgb(193, 242, 190);
+    --view-button: rgb(38, 36, 36);
+    /* Delete button */
+    --delete-btn-bg: red;
+    --delete-btn: white;
+    /* Pending */
+    --status-pending-bg: blue;
+    --status-pending: white;
+    /* preparing */
+    --status-active-bg: rgb(14, 127, 6);
+    --status-active: white;
+    /* served */
+    /* Edit button */
+    /* Save button */
+
+    /* pop-up delete windows */
+    --delete-yes-btn-bg: red;
+    --delete-yes-btn: white;
+    --delete-no-btn-bg: darkgray;
+    --delete-no-btn: white;
+
+
+
     --sidebar-bg: linear-gradient(to left,
             rgb(243, 240, 250) 0%,
-            rgb(233, 230, 249) 20%, App.css.map rgb(221, 233, 249) 50%,
+            rgb(233, 230, 249) 20%, rgb(221, 233, 249) 50%,
             rgb(233, 230, 249) 80%,
             rgb(243, 240, 250) 100%);
     --text-color: rgb(56, 47, 108);
@@ -66,6 +100,11 @@ body.theme-dark {
     --bg-chart-container: rgb(39, 38, 38);
     --bg-text-color: rgb(172, 170, 170);
     --bg-number-color: rgb(234, 232, 232);
+    --dash-icon-color: rgb(48, 211, 195);
+    --delete-icon-bg: rgb(223, 176, 176);
+    --delete-icon: rgb(145, 47, 47);
+    --edit-icon-bg: rgb(137, 137, 223);
+    --edit-icon: blue;
     --sidebar-bg: rgb(30, 30, 30);
     --text-color: rgb(224, 224, 224);
     --brand-color: rgb(0, 207, 200);
@@ -87,7 +126,7 @@ body.theme-dark {
 }
 
 .view-tables-wrapper.dark {
-    background: rgb(77, 77, 77);
+    background: var(--bg-color);
     color: rgb(167, 177, 197);
     --category-bg: rgb(7, 7, 7);
     --category-text: rgb(240, 240, 245);
@@ -279,7 +318,7 @@ body.sidebar-minimized .sidebar li .arrow-indicator {
 
 .dash-cards .card-icons {
     font-size: 18px;
-    color: var(--card-icon);
+    color: var(--dash-icon-color);
 }
 
 .dashboard .main {
@@ -513,7 +552,7 @@ body.sidebar-minimized .sidebar li .arrow-indicator {
 }
 
 .table-selection.dark {
-    background: var(--bg-dark);
+    background: var(--bg-color);
     color: var(--text-dark);
 }
 
@@ -1051,10 +1090,12 @@ body.sidebar-minimized .sidebar li .arrow-indicator {
 .view-tables-wrapper .order-overlay .item-pane .items-grid .item-card:hover {
     transform: scale(1.03);
 }
-.layout{
+
+.layout {
     display: flex;
     flex-direction: column;
 }
+
 /* .view-tables-wrapper .order-overlay .item-pane .items-grid .item-card .item-name {
   font-weight: 600;
   font-size: 0.95rem;
@@ -1968,7 +2009,7 @@ body.sidebar-minimized .sidebar li .arrow-indicator {
     display: flex;
     flex-direction: column;
     height: 89vh;
-    background: var(--order-bg);
+    background: var(--bg-container);
     padding: 1rem;
     box-sizing: border-box;
     overflow: hidden;
@@ -2057,7 +2098,7 @@ body.sidebar-minimized .sidebar li .arrow-indicator {
     padding: 0.5rem;
     font-weight: bold;
     font-size: 14px;
-    background: var(--table-header-bg);
+    /* background: var(--table-header-bg); */
     border-radius: 5px;
     color: var(--bg-text-color);
     border-bottom: 1px solid black;
@@ -3121,20 +3162,30 @@ input[type="checkbox"] {
     cursor: pointer;
 }
 
+.category-item .btn-edit {
+    background: var(--edit-icon-bg);
+    color: var(--edit-icon);
+}
+
+.category-item .btn-edit:hover {
+    color: var(--edit-icon-hover);
+}
+
+.category-item .btn-delete {
+    background: var(--delete-icon-bg);
+    color: var(--delete-icon);
+}
+
+.category-item .btn-delete:hover {
+    color: var(--delete-icon-hover);
+}
+
 .category-actions {
     display: flex;
     justify-content: right;
 }
 
-.edit-btn:hover {
-    background-color: rgb(244, 176, 132);
-    color: black;
-}
 
-.delete-btn:hover {
-    background-color: rgb(255, 199, 206);
-    color: rgb(255, 96, 96);
-}
 
 .save-btn {
     background-color: rgb(198, 224, 180);
@@ -3696,6 +3747,9 @@ input[type="checkbox"] {
 }
 
 /* Panel where active component (CategoryList, MenuItemList, etc.) is shown */
+.Inventory-Services-component {
+    padding-right: 5px;
+}
 
 .menu-manager-container {
     display: flex;
@@ -3757,7 +3811,7 @@ input[type="checkbox"] {
 .menu-items-panel {
     flex: 1;
     padding: 12px;
-    height: 80vh;
+    height: 86vh;
     overflow-y: auto;
     border-radius: 8px;
 }
@@ -4005,15 +4059,7 @@ input[type="checkbox"] {
     cursor: pointer;
 }
 
-.btn-edit:hover {
-    background-color: #facc15;
-    color: black;
-}
 
-.btn-delete:hover {
-    background-color: #ef4444;
-    color: white;
-}
 
 .btn-save,
 .btn-on {
@@ -4151,6 +4197,26 @@ input[type="checkbox"] {
     border-top: 1px solid #f0f0f0;
 }
 
+.btn-block .btn-delete {
+    background: var(--delete-icon-bg);
+    color: var(--delete-icon);
+}
+
+.btn-block .btn-edit {
+    background: var(--edit-icon-bg);
+    color: var(--edit-icon);
+}
+
+.menu-card-footer .btn-edit {
+    background: var(--edit-icon-bg);
+    color: var(--edit-icon);
+}
+
+.menu-card-footer .btn-delete {
+    background: var(--delete-icon-bg);
+    color: var(--delete-icon);
+}
+
 .btn-edit,
 .btn-delete {
     background: none;
@@ -4201,4 +4267,3 @@ input[type="checkbox"] {
 .btn-add:hover {
     background-color: #e8e8e8;
 }
-

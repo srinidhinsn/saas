@@ -591,7 +591,7 @@ const OrdersVisiblePage = () => {
                                                     {order.status !== "served" && (
                                                         <>
                                                             <button
-                                                                className="btn delete"
+                                                                className="delete-btn"
                                                                 onClick={() => {
                                                                     setOrderToDelete(order.id);
                                                                     setShowDeleteModal(true);

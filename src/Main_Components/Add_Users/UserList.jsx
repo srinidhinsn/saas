@@ -270,7 +270,7 @@ const UsersList = ({ onAddNew }) => {
                         rows={filteredUsers}
                         columns={columns}
                         getRowId={(row) => row.id} // IMPORTANT: identify row by 'id'
-                        pageSizeOptions={[5, 6, 7, 8, 10]}
+                        pageSizeOptions={[5, 6, 7]}
                         initialState={{ pagination: { paginationModel: { pageSize: 7 } } }}
                         checkboxSelection
                         disableRowSelectionOnClick

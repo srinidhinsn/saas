@@ -38,8 +38,9 @@ function MenuManager() {
     if (!clientId) return null;
 
     return (
-        <div className="menu-manager-container">
-            {/* <div className="tab-buttons">
+        <div className="Inventory-Services-component">
+            <div className="menu-manager-container">
+                {/* <div className="tab-buttons">
                 {["Categories/Items", "addons", "combo"].map(tab => (
                     <button
                         key={tab}
@@ -51,23 +52,24 @@ function MenuManager() {
                 ))}
             </div> */}
 
-            <div className="tab-content">
-                {activeTab === "Categories/Items" && (
-                    <div className="menu-manager-item-view">
-                        <CategoryList
-                            clientId={clientId}
-                            onCategorySelect={handleCategorySelect}
-                        />
-                        <div className="menu-items-panel">
-                            <MenuItemList
+                <div className="tab-content">
+                    {activeTab === "Categories/Items" && (
+                        <div className="menu-manager-item-view">
+                            <CategoryList
                                 clientId={clientId}
-                                selectedCategory={selectedCategory}
+                                onCategorySelect={handleCategorySelect}
                             />
+                            <div className="menu-items-panel">
+                                <MenuItemList
+                                    clientId={clientId}
+                                    selectedCategory={selectedCategory}
+                                />
+                            </div>
                         </div>
-                    </div>
-                )}
-                {activeTab === "addons" && <AddonLayout clientId={clientId} />}
-                {activeTab === "combo" && <div>Combo Component</div>}
+                    )}
+                    {activeTab === "addons" && <AddonLayout clientId={clientId} />}
+                    {activeTab === "combo" && <div>Combo Component</div>}
+                </div>
             </div>
         </div>
     );

@@ -392,35 +392,10 @@ const Table_Inventory_Order = ({ onOrderUpdate }) => {
                                     }}
                                 />
                             </div>
-                            <ul className="category-list">
-                                {categories.map(cat => (
-                                    <span
-                                        key={cat.id}
-                                        onClick={() => setActiveCategory(cat.name)}
-                                        className={`category-item ${activeCategory === cat.name ? "active" : ""}`}
-                                        style={{ paddingLeft: `${cat.level * 20}px` }} // 👈 Indent visually
-                                    >
-                                        {cat.name}
-                                    </span>
-                                ))}
-                            </ul>
+
 
                         </div>
 
-                        <div className="item-pane">
-                            <div className="grid-layout">
-                                {getFilteredItems().map(item => (
-                                    <div
-                                        key={item.id}
-                                        className="grids"
-                                        onClick={() => handleItemClick(item)}
-                                    >
-                                        <h4>{item.name}</h4>
-                                        <div className="item-price">₹{item.unit_price}</div>
-                                    </div>
-                                ))}
-                            </div>
-                        </div>
 
                         {/* <div className="item-pane">
   <div className="grid-layout">
@@ -487,37 +462,7 @@ const Table_Inventory_Order = ({ onOrderUpdate }) => {
 
 
 
-                        <div className="order-section">
-                            <OrderForm
-                                table={selectedTable}
-                                mode={selectedTable.mode || "Dine In"}
-                                onOrderCreated={(latestOrder) => {
-                                    navigate('/view-tables');
-                                    setSearchParams({});
-                                    tableServicesPort
-                                        .get(`/${clientId}/tables/read`, {
-                                            headers: {
-                                                Authorization: `Bearer ${token}`,
-                                            },
-                                        })
-                                        .then((res) => {
-                                            const responseData = Array.isArray(res.data)
-                                                ? res.data
-                                                : res.data?.data || [];
 
-                                            setTables(responseData);
-                                        })
-                                        .catch((err) => {
-                                            console.error("Failed to fetch tables:", err);
-                                            setTables([]); // fallback to empty array
-                                        });
-
-                                    onOrderUpdate?.(latestOrder);
-                                    setSelectedTable(null);
-                                    document.body.classList.remove("sidebar-minimized");
-                                }}
-                            />
-                        </div>
                     </div>
                 )}
             </div>
