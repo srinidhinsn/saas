@@ -27,6 +27,15 @@ const UsersList = ({ onAddNew }) => {
     const [isDeleteConfirmOpen, setIsDeleteConfirmOpen] = useState(false);
     const [isChangeRoleConfirmOpen, setIsChangeRoleConfirmOpen] = useState(false);
 
+    const [tableId, setTableId] = useState(null)
+    useEffect(() => {
+        if (tableId) {
+            document.body.classList.add("sidebar-minimized");
+        } else {
+            document.body.classList.remove("sidebar-minimized");
+        }
+    }, [tableId]);
+
     // Load users on mount - assign each user a unique id if missing
     useEffect(() => {
         const savedUsers = JSON.parse(localStorage.getItem("users")) || [];
@@ -270,7 +279,7 @@ const UsersList = ({ onAddNew }) => {
                         rows={filteredUsers}
                         columns={columns}
                         getRowId={(row) => row.id} // IMPORTANT: identify row by 'id'
-                        pageSizeOptions={[5, 6, 7, 8, 10]}
+                        pageSizeOptions={[5, 6, 7]}
                         initialState={{ pagination: { paginationModel: { pageSize: 7 } } }}
                         checkboxSelection
                         disableRowSelectionOnClick

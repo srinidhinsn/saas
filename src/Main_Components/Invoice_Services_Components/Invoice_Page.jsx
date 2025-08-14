@@ -12,6 +12,16 @@ const Invoice_Page = () => {
     const [records, setRecords] = useState([]);
     const [selectedId, setSelectedId] = useState(null);
 
+    const [tableId, setTableId] = useState(null)
+
+    useEffect(() => {
+        if (tableId) {
+            document.body.classList.add("sidebar-minimized");
+        } else {
+            document.body.classList.remove("sidebar-minimized");
+        }
+    }, [tableId]);
+
     const [formData, setFormData] = useState({
         document_type: "Invoice",
         document_number: "",

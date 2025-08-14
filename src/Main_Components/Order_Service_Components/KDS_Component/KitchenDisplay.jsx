@@ -13,8 +13,17 @@ const KitchenDisplay = () => {
     const location = useLocation();
     const recentTable = location.state?.table_number;
     const recentOrderId = location.state?.order_id;
+
+    const [tableId, setTableId] = useState(null)
     // --------------------------------------------------------- //
     const navigate = useNavigate();
+    useEffect(() => {
+        if (tableId) {
+            document.body.classList.add("sidebar-minimized");
+        } else {
+            document.body.classList.remove("sidebar-minimized");
+        }
+    }, [tableId]);
 
     const getPrepTime = (itemName) => {
         const lower = itemName.toLowerCase();

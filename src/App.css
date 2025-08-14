@@ -725,6 +725,36 @@ body.theme-dark {
     }
 }
 
+.order-controls {
+    padding: 5px 10px;
+    display: flex;
+    gap: 10px;
+    background: var(--bg-chart-container);
+}
+
+.save-row {
+    background: var(--bg-chart-container);
+}
+
+.order-controls .delete-btn {
+    background: var(--delete-btn-bg);
+    color: var(--delete-btn);
+    padding: 6px 12px;
+    border: none;
+    border-radius: 5px;
+
+}
+
+.order-controls .btn-delete {
+    background: var(--delete-icon-bg);
+    color: var(--delete-icon);
+}
+
+.order-controls .btn-edit {
+    background: var(--edit-icon-bg);
+    color: var(--edit-icon);
+}
+
 .modern-order-details-container {
     padding: 1rem;
     background-color: var(--background);
@@ -1156,13 +1186,14 @@ body {
    GLOBAL WORDPRESS-STYLE RESET
 ========================================= */
 .Userlist-container {
-    padding-right: 5px;
+    margin-right: 5px;
     border-top-right-radius: 8px;
     background: var(--bg-color);
     border-bottom-right-radius: 8px;
 }
 
 .users-wrapper {
+    width: 98%;
     padding: 16px 24px;
     background-color: var(--bg-color);
     font-family: 'Segoe UI', Tahoma, Geneva, Verdana, sans-serif;
@@ -1327,13 +1358,15 @@ body {
 }
 
 /* AdduserForm stylesheet */
+
+
 .wp-add-user-container {
     max-width: 600px;
-    margin: 24px auto;
-    padding: 24px 30px;
-    background: #fff;
+    margin: 0 auto;
+    padding: 18px 30px;
+    background: var(--bg-color);
     font-family: "Segoe UI", Tahoma, Geneva, Verdana, sans-serif;
-    color: #23282d;
+    color: var(--bg-text-color);
     box-sizing: border-box;
     border: 1px solid #ddd;
     border-radius: 4px;
@@ -1344,11 +1377,11 @@ body {
 .wp-add-user-container h1 {
     font-weight: 400;
     font-size: 26px;
-    margin-bottom: 28px;
+    margin-bottom: 20px;
     user-select: none;
-    color: #32373c;
+    color: var(--bg-text-color);
     border-bottom: 1px solid #f0f0f0;
-    padding-bottom: 10px;
+    padding-bottom: 5px;
 }
 
 .wp-add-user-form {
@@ -1362,15 +1395,15 @@ body {
 .wp-add-user-form label {
     font-weight: 600;
     font-size: 15px;
-    padding-top: 6px;
+    padding-top: 4px;
     user-select: none;
     text-align: right;
-    color: #32373c;
+    color: var(--bg-text-color);
     display: block;
 }
 
 .wp-add-user-form label .required {
-    color: #d63638;
+    color: var(--bg-text-color);
     font-weight: 600;
 }
 
@@ -1385,10 +1418,10 @@ body {
     border-radius: 4px;
     font-size: 15px;
     font-family: inherit;
-    color: #23282d;
+    color: var(--bg-text-color);
     box-sizing: border-box;
     transition: border-color 0.15s ease-in-out, box-shadow 0.15s ease-in-out;
-    background-color: #fff;
+    background-color: var(--bg-container);
     min-height: 36px;
 }
 
@@ -1398,9 +1431,8 @@ body {
 .wp-add-user-form input[type="password"]:focus,
 .wp-add-user-form select:focus {
     outline: none;
-    border-color: #0073aa;
     box-shadow: 0 0 3px 1px rgba(0, 115, 170, 0.4);
-    background-color: #fff;
+    background-color: var(--bg-chart-container);
 }
 
 /* Description text under fields */
@@ -1415,7 +1447,7 @@ body {
 /* Buttons container spans both columns */
 .form-buttons {
     grid-column: 1 / -1;
-    margin-top: 32px;
+    margin-top: 25px;
     display: flex;
     gap: 14px;
 }
@@ -1428,7 +1460,7 @@ body {
     cursor: pointer;
     user-select: none;
     background: #f7f7f7;
-    color: #32373c;
+    color: var(--bg-text-color);
     transition: all 0.2s ease-in-out;
     min-width: 110px;
     font-weight: 600;
@@ -1855,7 +1887,7 @@ Ordersummary sheet */
 
 .orders-page {
     padding: 1.5rem;
-    max-width: 1200px;
+    /* max-width: 1200px; */
     margin: auto;
     height: 89vh;
     overflow-y: auto;
@@ -1942,24 +1974,24 @@ Ordersummary sheet */
 
 .btn.status-toggle,
 .btn.item-status {
-    background: #eaecef;
-    color: #333;
+    background: var(--status-pending-bg);
+    color: var(--status-pending);
 }
 
 .btn.status-toggle.active,
 .btn.item-status.active {
-    background: #2196f3;
-    color: #fff;
+    background: var(--status-active-bg);
+    color: var(--status-active);
 }
 
 .btn.yes {
-    background: #d9534f;
-    color: #fff;
+    background: var(--delete-yes-btn-bg);
+    color: var(--delete-yes-btn);
 }
 
 .btn.no {
-    background: #6c757d;
-    color: #fff;
+    background: var(--delete-no-btn-bg);
+    color: var(--delete-no-btn);
 }
 
 /* ========================
@@ -1994,6 +2026,12 @@ Ordersummary sheet */
 
 .order-col {
     text-align: center;
+}
+
+.order-col .toggle {
+    background: var(--view-button-bg);
+    color: var(--view-button);
+    font-weight: 600;
 }
 
 /* ========================

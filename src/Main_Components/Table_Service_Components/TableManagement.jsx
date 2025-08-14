@@ -23,7 +23,7 @@ const TableManagement = () => {
     const [addRowError, setAddRowError] = useState("");
     const token = localStorage.getItem("access_token");
 
-
+    const [tableId, setTableId] = useState(null)
     // ----------------------- Fetch the tables only clientid is available ----------------- //
     useEffect(() => {
         if (clientId) fetchTables();
@@ -209,6 +209,14 @@ const TableManagement = () => {
             setDeleteTableId(null);
         }
     };
+    useEffect(() => {
+        if (tableId) {
+            document.body.classList.add("sidebar-minimized");
+        } else {
+            document.body.classList.remove("sidebar-minimized");
+        }
+    }, [tableId]);
+
     // ==================================================================================================================================== //
     return (
         // ------------------------------- Main COmponent Structure ------------------------------- //

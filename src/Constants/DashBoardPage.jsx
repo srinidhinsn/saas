@@ -35,6 +35,15 @@ const DashBoardPage = () => {
     const [timeFilter, setTimeFilter] = useState("Daily");
     const token = localStorage.getItem("access_token");
     const [topItemsData, setTopItemsData] = useState([]);
+
+    const [tableId, setTableId] = useState(null)
+    useEffect(() => {
+        if (tableId) {
+            document.body.classList.add("sidebar-minimized");
+        } else {
+            document.body.classList.remove("sidebar-minimized");
+        }
+    }, [tableId]);
     useEffect(() => {
         const body = document.body;
         if (darkMode) {
