@@ -42,8 +42,6 @@ function CategoryList({ onCategorySelect }) {
             })
             .then((res) => {
                 const rawCategories = res.data.data;
-
-                // ✅ New: Recursive function to build parent map
                 const tempParentMap = {};
                 const traverseAndBuildMap = (cats, parentId = null) => {
                     for (const cat of cats) {
@@ -59,7 +57,6 @@ function CategoryList({ onCategorySelect }) {
                 traverseAndBuildMap(rawCategories);
                 setParentMap(tempParentMap);
 
-                // ✅ Preserve your existing logic for top-level detection
                 const subCategoryIds = new Set(Object.keys(tempParentMap));
                 const topLevelCategories = rawCategories.filter(
                     (cat) => !subCategoryIds.has(cat.id)
@@ -99,7 +96,6 @@ function CategoryList({ onCategorySelect }) {
                         {category.name}
                     </span>
 
-                    {/* Dropdown symbol */}
                     {category.subCategories?.length > 0 && (
                         <span
                             onClick={(e) => {
@@ -169,8 +165,6 @@ function CategoryList({ onCategorySelect }) {
 
     const generateSlugFromParents = (categoryId, currentName, overrideParentMap = null) => {
         const path = [];
-
-        // Build quick map for category lookup
         const categoryMap = {};
         const buildMap = (cats) => {
             for (const cat of cats) {
@@ -190,13 +184,11 @@ function CategoryList({ onCategorySelect }) {
             currentId = parentId;
         }
 
-        // Add ancestor names slugified (in order)
         ancestors.forEach(id => {
             const cat = categoryMap[id];
             if (cat) path.push(cat.name.trim().replace(/\s+/g, "_"));
         });
 
-        // Add current category name slugified
         if (currentName) {
             path.push(currentName.trim().replace(/\s+/g, "_"));
         } else {
@@ -216,7 +208,6 @@ function CategoryList({ onCategorySelect }) {
 
             const rawCategories = response.data.data;
 
-            // Detect top-level categories (those without any parent)
             const subCategoryIds = new Set();
             rawCategories.forEach(cat => {
                 cat.subCategories?.forEach(sub => subCategoryIds.add(sub.id));
@@ -267,10 +258,10 @@ function CategoryList({ onCategorySelect }) {
 
         let finalSubcategories = [...newSubcategories];
 
-        // STEP: Create new subcategory if entered
+
         if (newSubcategoryName.trim()) {
             const subId = `sub_${Date.now()}`;
-            const tempParentMap = { [subId]: newId.trim() }; // new subcategory's parent is newId
+            const tempParentMap = { [subId]: newId.trim() };
 
             const newSubPayload = {
                 id: subId,
@@ -298,8 +289,6 @@ function CategoryList({ onCategorySelect }) {
             }
         }
 
-        // STEP: Generate slug for main new category (after parentMap is initialized)
-        // Refresh categories & parentMap before slugging (to ensure latest info)
         await refreshCategoriesAndParentMap();
 
         const slug = generateSlugFromParents(newId.trim(), newName.trim());
@@ -322,10 +311,8 @@ function CategoryList({ onCategorySelect }) {
                 { headers: { Authorization: `Bearer ${token}` } }
             );
 
-            // Refresh after creation to update UI and parentMap
             await refreshCategoriesAndParentMap();
 
-            // Reset form & UI
             setNewId("");
             setNewName("");
             setNewDescription("");
@@ -344,9 +331,8 @@ function CategoryList({ onCategorySelect }) {
         setEditName(cat.name);
         setEditDescription(cat.description);
 
-        // Map from subCategories array of objects to IDs if needed
         const subcatIds = cat.sub_categories
-            ? cat.sub_categories // already IDs
+            ? cat.sub_categories 
             : (cat.subCategories?.map(sub => sub.id) || []);
 
         setEditSubcategories(subcatIds);
@@ -356,7 +342,7 @@ function CategoryList({ onCategorySelect }) {
 
 
     const handleEditSave = async () => {
-        let finalEditSubcategories = [...editSubcategories];
+        let finalEditSubcategories = [...editSubcategories]; 
 
         if (!editingId) return;
 
@@ -370,7 +356,6 @@ function CategoryList({ onCategorySelect }) {
             console.error("Token decode failed:", err);
         }
 
-        // Handle optional new subcategory creation
         if (editNewSubcategoryName.trim()) {
             const newSubId = `subcat_${Date.now()}`;
             const tempParentMap = { [newSubId]: editingId };
@@ -394,7 +379,6 @@ function CategoryList({ onCategorySelect }) {
                 );
                 const createdSubId = subRes.data.data.id;
                 finalEditSubcategories.push(createdSubId);
-                finalEditSubcategories = [...new Set(finalEditSubcategories)];
             } catch (err) {
                 console.error("Error creating subcategory:", err.response?.data || err);
                 alert("Failed to create subcategory");
@@ -402,25 +386,10 @@ function CategoryList({ onCategorySelect }) {
             }
         }
 
-        // Refresh categories & parentMap before generating slug to ensure up-to-date parentMap
+
         await refreshCategoriesAndParentMap();
 
-        // Generate updated slug for edited category
         const slug = generateSlugFromParents(editingId, editName.trim());
-
-        // Add existing subcategories if not included already
-        try {
-            const currentCatRes = await inventoryServicesPort.get(
-                `/${clientId}/inventory/read_category`,
-                { headers: { Authorization: `Bearer ${token}` } }
-            );
-            const rawCategories = currentCatRes.data.data;
-            const parentCategory = rawCategories.find(cat => cat.id === editingId);
-            const currentSubIds = parentCategory?.subCategories?.map(sub => sub.id) || [];
-            finalEditSubcategories = [...new Set([...currentSubIds, ...finalEditSubcategories])];
-        } catch (err) {
-            console.error("Error fetching existing subcategories:", err.response?.data || err);
-        }
 
         const payload = {
             id: editingId,
@@ -428,6 +397,7 @@ function CategoryList({ onCategorySelect }) {
             description: editDescription.trim(),
             sub_categories: finalEditSubcategories,
             slug,
+            overwrite_subcategories: true 
         };
 
         try {
@@ -442,7 +412,6 @@ function CategoryList({ onCategorySelect }) {
                 }
             );
 
-            // Refresh categories and parentMap after updating
             await refreshCategoriesAndParentMap();
 
             setEditingId(null);
@@ -453,6 +422,7 @@ function CategoryList({ onCategorySelect }) {
             alert("Failed to update category.");
         }
     };
+
 
 
 
@@ -473,7 +443,6 @@ function CategoryList({ onCategorySelect }) {
                 }
             );
 
-            //  Refetch categories after deletion
             const response = await inventoryServicesPort.get(
                 `/${clientId}/inventory/read_category`,
                 {
@@ -648,7 +617,6 @@ function CategoryList({ onCategorySelect }) {
                 </div>
             )}
 
-            {/* Delete Modal */}
             {/* Delete Modal */}
             {deleteTarget && (
                 <div className="modal-overlay">

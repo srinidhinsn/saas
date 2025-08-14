@@ -10,7 +10,6 @@
     "preview": "vite preview"
   },
   "dependencies": {
-<<<<<<< HEAD
     "@emotion/react": "^11.14.0",
     "@emotion/styled": "^11.14.1",
     "@mui/icons-material": "^7.3.1",
@@ -19,9 +18,6 @@
     "@tanstack/react-table": "^8.21.3",
     "ag-grid-community": "^34.1.1",
     "ag-grid-enterprise": "^34.1.1",
-=======
-    "ag-grid-community": "^34.1.1",
->>>>>>> 87b84cf76bde80fe03ebf051705745739613331c
     "ag-grid-react": "^34.1.1",
     "axios": "^1.11.0",
     "file-saver": "^2.0.5",
