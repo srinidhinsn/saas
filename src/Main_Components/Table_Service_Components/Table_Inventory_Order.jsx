@@ -392,17 +392,10 @@ const Table_Inventory_Order = ({ onOrderUpdate }) => {
                                     }}
                                 />
                             </div>
-<<<<<<< HEAD
-
-                        </div>
-
-                  
-=======
 
 
                         </div>
 
->>>>>>> 7b9886fa8598048a2053da7cf923406307f6842c
 
                         {/* <div className="item-pane">
   <div className="grid-layout">
@@ -464,15 +457,12 @@ const Table_Inventory_Order = ({ onOrderUpdate }) => {
     )}
   </div>
 </div> */}
-<<<<<<< HEAD
-=======
 
 
 
 
 
 
->>>>>>> 7b9886fa8598048a2053da7cf923406307f6842c
                     </div>
                 )}
             </div>
