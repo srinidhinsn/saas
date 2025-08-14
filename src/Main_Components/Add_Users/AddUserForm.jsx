@@ -11,6 +11,14 @@ const AddUserForm = ({ onCancel, onSave }) => {
         role: "",
     });
 
+    const [tableId, setTableId] = useState(null)
+    useEffect(() => {
+        if (tableId) {
+            document.body.classList.add("sidebar-minimized");
+        } else {
+            document.body.classList.remove("sidebar-minimized");
+        }
+    }, [tableId]);
     const handleChange = (e) => {
         const { name, value } = e.target;
         setFormData((prev) => ({ ...prev, [name]: value }));

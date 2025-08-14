@@ -9,6 +9,15 @@ function MenuManager() {
     const [activeTab, setActiveTab] = useState("Categories/Items");
     const [selectedCategory, setSelectedCategory] = useState(null);
 
+    const [tableId, setTableId] = useState(null)
+    useEffect(() => {
+        if (tableId) {
+            document.body.classList.add("sidebar-minimized");
+        } else {
+            document.body.classList.remove("sidebar-minimized");
+        }
+    }, [tableId]);
+
     useEffect(() => {
         const token = localStorage.getItem("access_token");
         if (token) {

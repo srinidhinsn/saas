@@ -1186,13 +1186,14 @@ body {
    GLOBAL WORDPRESS-STYLE RESET
 ========================================= */
 .Userlist-container {
-    padding-right: 5px;
+    margin-right: 5px;
     border-top-right-radius: 8px;
     background: var(--bg-color);
     border-bottom-right-radius: 8px;
 }
 
 .users-wrapper {
+    width: 98%;
     padding: 16px 24px;
     background-color: var(--bg-color);
     font-family: 'Segoe UI', Tahoma, Geneva, Verdana, sans-serif;

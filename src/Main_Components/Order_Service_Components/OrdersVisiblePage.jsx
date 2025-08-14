@@ -33,9 +33,18 @@ const OrdersVisiblePage = () => {
     const todayDate = new Date().toISOString().split("T")[0];
     const [selectedDate, setSelectedDate] = useState(todayDate);
     const [filterMode, setFilterMode] = useState(0);
+
+    const [tableId, setTableId] = useState(null)
     // 0 = ascending date, 1 = descending date, 2 = new, 3 = preparing, 4 = served
 
     // --------------------------------------------------------------------------- //
+    useEffect(() => {
+        if (tableId) {
+            document.body.classList.add("sidebar-minimized");
+        } else {
+            document.body.classList.remove("sidebar-minimized");
+        }
+    }, [tableId]);
     useEffect(() => {
         axios.get(`http://localhost:8002/saas/${clientId}/inventory/read`, {
             headers: { Authorization: `Bearer ${token}` }
