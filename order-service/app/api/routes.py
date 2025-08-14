@@ -141,51 +141,17 @@ def update_order_status(client_id: str, body: DineinOrderModel, context: SaasCon
 
 
 @router.post("/order_items/update")
-def update_order_items(
-    client_id: str,
-    order_id: Optional[str] = Query(None),
-    body: Optional[List[OrderItemModel]] = None,
-    single_item: Optional[bool] = Query(False),
-    context: SaasContext = Depends(verify_token),
-    db: Session = Depends(get_db)
-):
-    if single_item:
-        # Single item update
-        if not body or not isinstance(body, list) or len(body) != 1:
-            raise HTTPException(
-                status_code=400, detail="Single item update requires exactly one item")
+def update_order_items(client_id: str, order_id: Optional[str] = Query(None), body: Optional[List[OrderItemModel]] = None, context: SaasContext = Depends(verify_token), db: Session = Depends(get_db)):
+    if not order_id:
+        raise HTTPException(status_code=400, detail="Missing order_id")
 
-        item = body[0]
-        if not item.id:
-            raise HTTPException(
-                status_code=400, detail="Order item ID is required")
-
-        db_item = db.query(DBOrderItem).filter(
-            DBOrderItem.id == item.id,
-            DBOrderItem.client_id == client_id
-        ).first()
-
-        if not db_item:
-            raise HTTPException(status_code=404, detail="Order item not found")
-
-        if item.status:
-            db_item.status = item.status
-        if item.quantity is not None:
-            db_item.quantity = item.quantity
-
-        db.commit()
-        return ResponseModel(screen_id=context.screen_id, data={"message": "Order item updated successfully"})
-
-    else:
-        # Full list update
-        if not order_id:
-            raise HTTPException(status_code=400, detail="Missing order_id")
-
-        db.query(DBOrderItem).filter(DBOrderItem.order_id == order_id).delete()
-        latest_order_item_list = DBOrderItem.copyFromModels(body)
-        db.add_all(latest_order_item_list)
-        db.commit()
-        return ResponseModel(screen_id=context.screen_id, data={"message": "Order items updated successfully"})
+    db.query(DBOrderItem).filter(DBOrderItem.order_id == order_id).delete()
+    latest_order_item_list = DBOrderItem.copyFromModels(body)
+    db.add_all(latest_order_item_list)
+    db.commit()
+    response = ResponseModel(screen_id=context.screen_id, data={
+                             "message": "Order items updated successfully"})
+    return response
 
 # ------------------------------------------------------------------------------------------------------- #
 
