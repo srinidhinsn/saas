@@ -1,4 +1,6 @@
-import React, { useState } from "react";
+import React, { useState, useEffect } from "react";
+import { useParams } from "react-router-dom";
+import userServicesPort from "../../Backend_Port_Files/UserServices";
 
 const AddUserForm = ({ onCancel, onSave }) => {
     const [formData, setFormData] = useState({
@@ -6,40 +8,47 @@ const AddUserForm = ({ onCancel, onSave }) => {
         email: "",
         firstName: "",
         lastName: "",
-        website: "",
+        dob: "",
+        phone: "",
         password: "",
-        role: "",
+        role: "Admin",
     });
 
-    const [tableId, setTableId] = useState(null)
-    useEffect(() => {
-        if (tableId) {
-            document.body.classList.add("sidebar-minimized");
-        } else {
-            document.body.classList.remove("sidebar-minimized");
-        }
-    }, [tableId]);
+    const { clientId } = useParams();
+    const token = localStorage.getItem("access_token");
+
     const handleChange = (e) => {
         const { name, value } = e.target;
         setFormData((prev) => ({ ...prev, [name]: value }));
     };
 
-    const handleSubmit = (e) => {
+    const handleSubmit = async (e) => {
         e.preventDefault();
 
-        // Save user logic (example: localStorage)
-        const savedUsers = JSON.parse(localStorage.getItem("users")) || [];
-        savedUsers.push({
+        const payload = {
             username: formData.username,
-            name: `${formData.firstName} ${formData.lastName}`.trim(),
             email: formData.email,
-            role: formData.role,
-            posts: 0,
-            avatar: "",
-        });
-        localStorage.setItem("users", JSON.stringify(savedUsers));
+            first_name: formData.firstName,
+            last_name: formData.lastName,
+            dob: formData.dob || null,
+            phone: formData.phone || null,
+            password: formData.password,
+            // roles: [formData.role], // backend expects an array
+            // grants: [], // you can add UI to set these
+        };
 
-        if (onSave) onSave();
+        try {
+            const res = await userServicesPort.post(`/${clientId}/users/add`, payload, 
+                {
+                headers: { Authorization: `Bearer ${token}` },
+            });
+
+            console.log("User added successfully:", data);
+
+            if (onSave) onSave();
+        } catch (error) {
+            console.error("Failed to add user:", error);
+        }
     };
 
     return (
@@ -53,17 +62,14 @@ const AddUserForm = ({ onCancel, onSave }) => {
                         <label htmlFor="username">
                             Username <span className="required">*</span>
                         </label>
-                        <div>
-                            <input
-                                id="username"
-                                name="username"
-                                type="text"
-                                value={formData.username}
-                                onChange={handleChange}
-                                required
-                            />
-                            <p className="description">Required. The username cannot be changed.</p>
-                        </div>
+                        <input
+                            id="username"
+                            name="username"
+                            type="text"
+                            value={formData.username}
+                            onChange={handleChange}
+                            required
+                        />
                     </div>
 
                     {/* Email */}
@@ -71,95 +77,92 @@ const AddUserForm = ({ onCancel, onSave }) => {
                         <label htmlFor="email">
                             Email <span className="required">*</span>
                         </label>
-                        <div>
-                            <input
-                                id="email"
-                                name="email"
-                                type="email"
-                                value={formData.email}
-                                onChange={handleChange}
-                                required
-                            />
-                        </div>
+                        <input
+                            id="email"
+                            name="email"
+                            type="email"
+                            value={formData.email}
+                            onChange={handleChange}
+                            required
+                        />
                     </div>
 
                     {/* First Name */}
                     <div className="form-row">
                         <label htmlFor="firstName">First Name</label>
-                        <div>
-                            <input
-                                id="firstName"
-                                name="firstName"
-                                type="text"
-                                value={formData.firstName}
-                                onChange={handleChange}
-                            />
-                        </div>
+                        <input
+                            id="firstName"
+                            name="firstName"
+                            type="text"
+                            value={formData.firstName}
+                            onChange={handleChange}
+                        />
                     </div>
 
                     {/* Last Name */}
                     <div className="form-row">
                         <label htmlFor="lastName">Last Name</label>
-                        <div>
-                            <input
-                                id="lastName"
-                                name="lastName"
-                                type="text"
-                                value={formData.lastName}
-                                onChange={handleChange}
-                            />
-                        </div>
+                        <input
+                            id="lastName"
+                            name="lastName"
+                            type="text"
+                            value={formData.lastName}
+                            onChange={handleChange}
+                        />
                     </div>
 
-                    {/* Website */}
+                    {/* DOB */}
                     <div className="form-row">
-                        <label htmlFor="website">Website</label>
-                        <div>
-                            <input
-                                id="website"
-                                name="website"
-                                type="url"
-                                value={formData.website}
-                                onChange={handleChange}
-                            />
-                        </div>
+                        <label htmlFor="dob">Date of Birth</label>
+                        <input
+                            id="dob"
+                            name="dob"
+                            type="date"
+                            value={formData.dob}
+                            onChange={handleChange}
+                        />
+                    </div>
+
+                    {/* Phone */}
+                    <div className="form-row">
+                        <label htmlFor="phone">Phone</label>
+                        <input
+                            id="phone"
+                            name="phone"
+                            type="text"
+                            value={formData.phone}
+                            onChange={handleChange}
+                        />
                     </div>
 
                     {/* Password */}
                     <div className="form-row">
                         <label htmlFor="password">Password</label>
-                        <div>
-                            <input
-                                id="password"
-                                name="password"
-                                type="password"
-                                value={formData.password}
-                                onChange={handleChange}
-                                required
-                            />
-                            <p className="description">
-                                A password will be generated automatically if you leave this blank.
-                            </p>
-                        </div>
+                        <input
+                            id="password"
+                            name="password"
+                            type="password"
+                            value={formData.password}
+                            onChange={handleChange}
+                            required
+                        />
                     </div>
 
                     {/* Role */}
                     <div className="form-row">
                         <label htmlFor="role">Role</label>
-                        <div>
-                            <select
-                                id="role"
-                                name="role"
-                                value={formData.role}
-                                onChange={handleChange}
-                            >
-                                <option value="Admin">Admin</option>
-                                <option value="Receptionist">Receptionist</option>
-                                <option value="Manager">Manager</option>
-                                <option value="Waiter">Waiter</option>
-                                <option value="Chef">Chef</option>
-                            </select>
-                        </div>
+                        <select
+                            id="role"
+                            name="role"
+                            value={formData.role}
+                            onChange={handleChange}
+                        >
+                            <option value="Admin">Admin</option>
+                            <option value="Receptionist">Receptionist</option>
+                            <option value="Manager">Manager</option>
+                            <option value="Waiter">Waiter</option>
+                            <option value="Chef">Chef</option>
+                        </select>
                     </div>
 
                     {/* Buttons */}

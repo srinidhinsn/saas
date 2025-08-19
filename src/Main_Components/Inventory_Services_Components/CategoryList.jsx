@@ -35,7 +35,7 @@ function CategoryList({ onCategorySelect }) {
         if (!token || !clientId) return;
 
         inventoryServicesPort
-            .get(`/${clientId}/inventory/read_category`, {
+            .get(`/${clientId}/inventory/read_category?category_id=dietery`, {
                 headers: {
                     Authorization: `Bearer ${token}`,
                 },

@@ -38,10 +38,7 @@ const UsersList = ({ onAddNew }) => {
 
     // Load users on mount - assign each user a unique id if missing
     useEffect(() => {
-        const savedUsers = JSON.parse(localStorage.getItem("users")) || [];
-        // To ensure unique IDs, add an `id` property if missing, using UUID or index here:
-        const usersWithIds = savedUsers.map((u, index) => ({ id: index, ...u }));
-        setUsers(usersWithIds);
+       
     }, []);
 
     // Filter and keep ids intact
