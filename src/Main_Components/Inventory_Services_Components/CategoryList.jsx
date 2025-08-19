@@ -90,7 +90,7 @@ function CategoryList({ onCategorySelect }) {
                             cursor: "pointer",
                             fontWeight: "bold",
                             flexGrow: 1,
-                            color: isParent ? "#003366" : "#444444"
+                            color: isParent ? "var(--bg-number-color)" : "var(--bg-text-color)"
                         }}
                     >
                         {category.name}
@@ -332,7 +332,7 @@ function CategoryList({ onCategorySelect }) {
         setEditDescription(cat.description);
 
         const subcatIds = cat.sub_categories
-            ? cat.sub_categories 
+            ? cat.sub_categories
             : (cat.subCategories?.map(sub => sub.id) || []);
 
         setEditSubcategories(subcatIds);
@@ -342,7 +342,7 @@ function CategoryList({ onCategorySelect }) {
 
 
     const handleEditSave = async () => {
-        let finalEditSubcategories = [...editSubcategories]; 
+        let finalEditSubcategories = [...editSubcategories];
 
         if (!editingId) return;
 
@@ -397,7 +397,7 @@ function CategoryList({ onCategorySelect }) {
             description: editDescription.trim(),
             sub_categories: finalEditSubcategories,
             slug,
-            overwrite_subcategories: true 
+            overwrite_subcategories: true
         };
 
         try {
