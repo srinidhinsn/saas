@@ -33,18 +33,9 @@ const OrdersVisiblePage = () => {
     const todayDate = new Date().toISOString().split("T")[0];
     const [selectedDate, setSelectedDate] = useState(todayDate);
     const [filterMode, setFilterMode] = useState(0);
-
-    const [tableId, setTableId] = useState(null)
     // 0 = ascending date, 1 = descending date, 2 = new, 3 = preparing, 4 = served
 
     // --------------------------------------------------------------------------- //
-    useEffect(() => {
-        if (tableId) {
-            document.body.classList.add("sidebar-minimized");
-        } else {
-            document.body.classList.remove("sidebar-minimized");
-        }
-    }, [tableId]);
     useEffect(() => {
         axios.get(`http://localhost:8002/saas/${clientId}/inventory/read`, {
             headers: { Authorization: `Bearer ${token}` }
@@ -57,18 +48,21 @@ const OrdersVisiblePage = () => {
             });
     }, []);
     useEffect(() => {
-        if (!expandedOrderIndex || !orders[expandedOrderIndex]) {
+        if (expandedOrderIndex === null || expandedOrderIndex === undefined || !orders[expandedOrderIndex]) {
             setItemSearchResults([]);
             return;
         }
 
-        const currentOrderItems = orders[expandedOrderIndex].items.map(i => i.item_id);
+        const currentOrderItems = orders[expandedOrderIndex].items.map(i => i.item_id.toString());
+
+        console.log("Current order item IDs:", currentOrderItems);
+        console.log("Inventory items IDs for filtering:", allInventoryItems.map(i => ({ id: i.id.toString(), name: i.name })));
 
         const filtered = allInventoryItems
-            .filter(item =>
-                (item.name || "").toLowerCase().includes(itemSearchQuery.toLowerCase())
-            )
-            .filter(item => !currentOrderItems.includes(item.id)); // 🔥 Exclude already added items
+            .filter(item => (item.name || "").toLowerCase().includes(itemSearchQuery.toLowerCase()))
+            .filter(item => !currentOrderItems.includes(item.id.toString()));
+
+        console.log("Filtered items after exclusion:", filtered.map(i => i.name));
 
         setItemSearchResults(filtered);
     }, [itemSearchQuery, allInventoryItems, expandedOrderIndex, orders]);

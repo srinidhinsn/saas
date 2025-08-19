@@ -91,7 +91,7 @@ const HeaderBar = () => {
                             <button
                                 onClick={() => {
                                     setShowPopup(!showPopup);
-                                    setShowBellShaking(false); // stop shaking when opened
+                                    setShowBellShaking(false);
                                 }}
                                 className={`icon-button ${showBellShaking ? "shake" : ""}`}
                             >
@@ -117,14 +117,14 @@ const HeaderBar = () => {
 
                     <ClickSpark>
                         <div className="middle">
-                            <span onClick={toggleTheme} className="theme-toggle-button">
+                            <span onClick={toggleTheme} style={{ cursor: 'pointer' }} className="theme-toggle-button">
                                 {darkMode ? <PiMoonThin /> : <HiOutlineSun />}
                             </span>
                         </div>
                     </ClickSpark>
                     {/* Profile */}
                     <ClickSpark>
-                        <div className="right">
+                        <div className="right" style={{ cursor: 'pointer' }}>
                             {tokenAvailable ? (
                                 <div className="profile-container">
                                     <input

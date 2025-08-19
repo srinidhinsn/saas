@@ -1902,6 +1902,12 @@ Ordersummary sheet */
     justify-content: space-between;
     gap: 1rem;
     margin-bottom: 1rem;
+    position: sticky;
+    top: 0;
+}
+
+.orders-header::after {
+    background: white;
 }
 
 .orders-actions {
@@ -2228,5 +2234,269 @@ Ordersummary sheet */
 @media (max-width: 480px) {
     .grid-row {
         grid-template-columns: 1fr;
+    }
+}
+
+/* ================================= KDS page stylesheet ============================================================================ */
+.KDS-Container {
+    padding-right: 5px;
+    height: 89vh;
+    overflow-y: auto;
+}
+
+/* Container grid */
+.kds-page {
+    border-top-right-radius: 8px;
+    border-bottom-right-radius: 8px;
+    padding: 16px;
+    background: var(--bg-chart-container);
+    display: flex;
+    justify-content: center;
+}
+
+.kds-grid {
+    display: grid;
+    grid-template-columns: repeat(auto-fit, minmax(200px, 1fr));
+    gap: 20px;
+    width: 100%;
+}
+
+/* Card base */
+.kds-card {
+    border-radius: 12px;
+    background: var(--bg-container);
+    display: flex;
+    flex-direction: column;
+    box-shadow: 0 4px 10px rgb(0 0 0 / 0.1);
+    overflow: hidden;
+    user-select: none;
+    min-height: 320px;
+}
+
+/* Header */
+.kds-card-header {
+    padding: 12px 20px;
+    color: var(--bg-number-color);
+    font-weight: bold;
+    display: flex;
+    justify-content: space-between;
+    align-items: center;
+    font-size: 14px;
+    text-transform: capitalize;
+}
+
+.left-header {
+    display: flex;
+    flex-direction: column;
+    gap: 6px;
+    font-weight: 600;
+}
+
+.table-icon {
+    margin-right: 6px;
+}
+
+.table-text {
+    font-size: 16px;
+}
+
+.order-id {
+    font-weight: 600;
+    font-size: 13px;
+    opacity: 0.9;
+}
+
+.right-header {
+    display: flex;
+    flex-direction: column;
+    gap: 4px;
+    font-weight: 500;
+    font-size: 13px;
+    text-align: right;
+}
+
+/* Body: items list */
+.kds-card-body {
+    flex-grow: 1;
+    padding: 20px;
+    background: var(--bg-container);
+    display: flex;
+    flex-direction: column;
+    gap: 10px;
+    font-size: 14px;
+    color: var(--bg-text-color);
+}
+
+.item-row {
+    display: flex;
+    justify-content: space-between;
+    font-weight: 500;
+    line-height: 1.3;
+    align-items: center;
+}
+
+.item-name {
+    flex-grow: 1;
+}
+
+.item-measure {
+    min-width: 40px;
+    text-align: right;
+    margin-left: 10px;
+}
+
+.delete-item-btn {
+    background: transparent;
+    border: none;
+    color: red;
+    cursor: pointer;
+    margin-left: 10px;
+}
+
+/* Footer with buttons */
+.kds-card-footer {
+    padding: 6px 8px;
+    display: flex;
+    gap: 4px;
+    background: var(--bg-container);
+    justify-content: flex-start;
+}
+
+.kds-card-footer button {
+    border: none;
+    border-radius: 6px;
+    padding: 5px 12px;
+    font-size: 14px;
+    font-weight: 600;
+    cursor: pointer;
+    transition: background-color 0.3s ease;
+}
+
+.kds-card-footer button.pending {
+    background-color: var(--status-pending-bg);
+    color: var(--status-pending);
+}
+
+.kds-card-footer button.preparing {
+    background-color: var(--status-prepare-bg);
+    color: var(--status-prepare);
+}
+
+.kds-card-footer button.served {
+    background-color: var(--status-served-bg);
+    color: var(--status-served);
+}
+
+.kds-card-footer button.active {
+    box-shadow: 0 0 6px rgba(0, 0, 0, 0.3);
+}
+
+/* Color variations for cards header */
+.orange {
+    background-color: #fbbf24;
+    /* amber-400 */
+}
+
+.green-light {
+    background-color: #86efac;
+    /* green-300 */
+    color: #065f46;
+}
+
+.red {
+    background-color: #f87171;
+    /* red-400 */
+}
+
+.blue {
+    background-color: #3b82f6;
+    /* blue-500 */
+}
+
+.green-dark {
+    background-color: #22c55e;
+    /* green-500 */
+}
+
+/* Buttons in header */
+.delete-icon {
+    background: transparent;
+    border: none;
+    color: var(--delete-btn-bg);
+    font-size: 18px;
+    cursor: pointer;
+    padding: 2px;
+}
+
+.edit-btn,
+.add-item-btn {
+    background-color: #3b82f6;
+    color: white;
+    border: none;
+    padding: 6px 12px;
+    border-radius: 6px;
+    cursor: pointer;
+    transition: background-color 0.2s ease;
+    font-weight: 600;
+}
+
+.edit-btn:hover,
+.add-item-btn:hover {
+    background-color: #2563eb;
+}
+
+/* Modal styles */
+.modal-overlay {
+    background: rgba(0, 0, 0, 0.45);
+    position: fixed;
+    inset: 0;
+    display: flex;
+    justify-content: center;
+    align-items: center;
+    z-index: 1000;
+}
+
+.modal {
+    background: white;
+    padding: 24px 32px;
+    border-radius: 10px;
+    text-align: center;
+    max-width: 320px;
+}
+
+.modal .btn {
+    margin: 10px 8px 0;
+    cursor: pointer;
+    padding: 8px 20px;
+    border-radius: 6px;
+    border: none;
+    font-weight: 600;
+    min-width: 90px;
+}
+
+.modal .btn.yes {
+    background-color: #ef4444;
+    color: white;
+}
+
+.modal .btn.no {
+    background-color: #9ca3af;
+    color: white;
+}
+
+/* Responsive for small devices */
+@media (max-width: 768px) {
+    .kds-grid {
+        grid-template-columns: repeat(auto-fill, minmax(180px, 1fr));
+    }
+}
+
+@media (max-width: 480px) {
+    .kds-grid {
+        grid-template-columns: 1fr !important;
+    }
+
+    .kds-card-body {
+        padding: 15px 10px;
     }
 }

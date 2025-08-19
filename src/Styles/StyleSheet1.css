@@ -56,12 +56,14 @@ body {
     --delete-btn-bg: red;
     --delete-btn: white;
     /* Pending */
-    --status-pending-bg: blue;
-    --status-pending: white;
+    --status-pending-bg: rgb(227, 214, 149);
+    --status-pending: rgb(238, 221, 113);
     /* preparing */
-    --status-active-bg: rgb(14, 127, 6);
-    --status-active: white;
+    --status-prepare-bg: rgb(58, 98, 218);
+    --status-prepare: rgb(11, 8, 195);
     /* served */
+    --status-served-bg: rgb(142, 226, 164);
+    --status-served: rgb(15, 171, 54);
     /* Edit button */
     /* Save button */
 
@@ -153,7 +155,7 @@ body.theme-dark {
     border-radius: 8px;
     padding: 0.75rem;
     box-shadow: 0 0 4px rgba(0, 0, 0, 0.08);
-    color: var((--bg-text-color));
+    color: var(--bg-text-color);
     cursor: pointer;
     display: flex;
     flex-direction: column;
@@ -389,6 +391,7 @@ body.sidebar-minimized .sidebar li .arrow-indicator {
 
 .dashboard .main .main-content .main-title select {
     font-size: 12px;
+    background: var(--bg-container);
     color: var(--bg-text-color);
 }
 
@@ -444,6 +447,8 @@ body.sidebar-minimized .sidebar li .arrow-indicator {
     border: 1px solid rgb(204, 204, 204);
     border-radius: 6px;
     padding: 5px;
+    background: var(--bg-chart-container);
+    color: var(--bg-text-color);
 }
 
 .dashboard .main .charts .chart .amount {
@@ -1296,6 +1301,21 @@ body.sidebar-minimized .sidebar li .arrow-indicator {
         overflow-y: auto;
     }
 
+    .view-tables-wrapper .zone-group .zone-section {
+        display: flex;
+        flex-wrap: wrap;
+        gap: .8rem;
+    }
+
+    .view-tables-wrapper .zone-group .zone-section .table-card {
+        padding: 2.2rem;
+        width: 90px;
+    }
+
+    .view-tables-wrapper .zone-group .zone-section .table-card .table-number {
+        font-size: .7rem;
+    }
+
     .view-tables-wrapper .order-overlay .item-pane .items-grid {
         display: grid;
         grid-template-columns: repeat(auto-fill, minmax(100px, 2fr));
@@ -1338,7 +1358,16 @@ body.sidebar-minimized .sidebar li .arrow-indicator {
     .view-tables-wrapper .zone-group .zone-section {
         display: flex;
         flex-wrap: wrap;
-        gap: 0.2rem;
+        gap: 0.8rem;
+    }
+
+    .view-tables-wrapper .zone-group .zone-section .table-card {
+        width: 80px;
+        padding: 2rem;
+    }
+
+    .view-tables-wrapper .zone-group .zone-section .table-card .table-number {
+        font-size: .6rem;
     }
 }
 
@@ -3099,7 +3128,7 @@ input[type="checkbox"] {
 }
 
 .add-btn {
-    color: white;
+    background-color: var(--bg-container);
     border: none;
     font-size: 1rem;
     padding: 2px 8px;
@@ -4180,7 +4209,7 @@ input[type="checkbox"] {
 }
 
 .menu-card-price {
-    color: #1a7f5a;
+    color: var(--bg-number-color);
     font-weight: 500;
 }
 
@@ -4255,9 +4284,9 @@ input[type="checkbox"] {
 
 /* Header Buttons */
 .btn-add {
-    background-color: #f5f5f5;
-    border: 1px solid #ccc;
-    color: #333;
+    background-color: var(--bg-container);
+    border: 1px solid white;
+    color: var(--bg-text-color);
     padding: 6px 12px;
     font-size: 0.8rem;
     border-radius: 6px;

@@ -14,9 +14,6 @@ const AddUserForm = ({ onCancel, onSave }) => {
         role: "Admin",
     });
 
-    const { clientId } = useParams();
-    const token = localStorage.getItem("access_token");
-
     const handleChange = (e) => {
         const { name, value } = e.target;
         setFormData((prev) => ({ ...prev, [name]: value }));
