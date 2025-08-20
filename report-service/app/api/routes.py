@@ -11,14 +11,6 @@ from app.services.report_service import generate_order_report, get_dashboard_dat
 
 router = APIRouter()
 
-# Endpoint to generate order report
-# @router.get("/orders", response_class=StreamingResponse)
-# def download_order_report(client_id: str, context: SaasContext = Depends(verify_token), db: Session = Depends(get_db)):
-#     if context.client_id != client_id:
-#         raise HTTPException(status_code=403, detail="Unauthorized")
-#     response = generate_order_report(client_id, db)
-#     return response
-
 @router.get("/orders", response_class=StreamingResponse)
 def download_order_report(client_id: str, date_range: Optional[str] = Query(None, description="e.g. today, last_month"),
     context: SaasContext = Depends(verify_token), db: Session = Depends(get_db)):

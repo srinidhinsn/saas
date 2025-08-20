@@ -14,8 +14,6 @@ from typing import Optional
 
 router = APIRouter()
 
-
-
 @router.post("/dinein/create", response_model=ResponseModel[DineinOrderModel])
 def create_order(client_id: str, order: DineinOrderModel, context: SaasContext = Depends(verify_token), db: Session = Depends(get_db)):
     db_order = DBOrder(client_id=client_id, table_id=order.table_id, status=order.status or OrderStatusEnum.new,
@@ -75,9 +73,6 @@ def get_orders_for_table(client_id: str, table_id: Optional[str] = None, context
 
     response = ResponseModel(screen_id=context.screen_id, data=result)
     return response
-
-
-
 
 
 @router.post("/dinein/update")

@@ -25,7 +25,6 @@ class OrderItemModel(BaseModel):
     class Config:
         orm_mode = True
 
-
 class DineinOrderModel(BaseModel):
     id: Optional[int] = None
     client_id: Optional[str] = None
