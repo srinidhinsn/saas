@@ -34,6 +34,38 @@ def create_order(client_id: str, order: DineinOrderModel, context: SaasContext =
     return response
 
 
+
+@router.get("/dinein/order")
+def get_orders_for_order_id(client_id: str, order_id: Optional[str] = None, context: SaasContext = Depends(verify_token), db: Session = Depends(get_db)):
+    if order_id:
+        order = db.query(DBOrder).filter(
+            DBOrder.client_id == client_id,
+            DBOrder.id == order_id
+        ).first()
+
+        if order:
+            items = order.items
+            item_models = []
+
+            for item in items:
+                item_models.append(DBOrderItem.copyToModel(item))
+   
+    
+    result={
+            "id": order.id,
+            "table_id": order.table_id,
+            "client_id": order.client_id,
+            "status": order.status,
+            "created_at": order.created_at,
+            "items": [i.dict() for i in item_models],
+            "total_price": order.total_price
+    }
+
+    response = ResponseModel(screen_id=context.screen_id, data=result)
+    return response
+
+
+
 @router.get("/dinein/table")
 def get_orders_for_table(client_id: str, table_id: Optional[str] = None, context: SaasContext = Depends(verify_token), db: Session = Depends(get_db)):
     if table_id:
@@ -75,6 +107,10 @@ def get_orders_for_table(client_id: str, table_id: Optional[str] = None, context
     return response
 
 
+<<<<<<< HEAD
+=======
+
+>>>>>>> 5be492b88c1f64739661152f41faf21bb14f61f4
 @router.post("/dinein/update")
 def update_order_status(client_id: str, body: DineinOrderModel, context: SaasContext = Depends(verify_token), db: Session = Depends(get_db)):
     if not body.id:
@@ -89,36 +125,50 @@ def update_order_status(client_id: str, body: DineinOrderModel, context: SaasCon
     response = ResponseModel(screen_id=context.screen_id, data={
                              "message": "Status updated", "new_status": order.status})
     return response
-#
 
-#  -----------------------------
 
-# order_id to dinein_order_id
+@router.post("/order_items/update")
+def update_order_items(client_id: str, order_id: Optional[str] = Query(None), body: Optional[List[OrderItemModel]] = None, context: SaasContext = Depends(verify_token), db: Session = Depends(get_db)):
+    if not order_id:
+        raise HTTPException(status_code=400, detail="Missing order_id")
+
+    db.query(DBOrderItem).filter(DBOrderItem.order_id == order_id).delete()
+    latest_order_item_list = DBOrderItem.copyFromModels(body)
+    db.add_all(latest_order_item_list)
+    db.commit()
+    response = ResponseModel(screen_id=context.screen_id, data={"message": "Order items updated successfully"})
+    return response
 
 
 @router.post("/order_item/update")
-def update_order_items(client_id: str, body: DineinOrderModel, context: SaasContext = Depends(verify_token), db: Session = Depends(get_db)):
+def update_order_items(client_id: str, order_id: Optional[str] = Query(None), order_item: Optional[OrderItemModel] = None, context: SaasContext = Depends(verify_token), db: Session = Depends(get_db)):
+    if not order_id or not order_item or not order_item.id:
+        raise HTTPException(status_code=400, detail="Missing order_id or order_item_id")
 
-    order = db.query(DBOrder).filter(DBOrder.id == str(
-        body.dinein_order_id), DBOrder.client_id == client_id).first()
-    if not order:
-        raise HTTPException(status_code=404, detail="Order not found")
-    if order.status == OrderStatusEnum.served:
-        raise HTTPException(
-            status_code=400, detail="Cannot edit a served order")
+    existing_item = db.query(DBOrderItem).filter(DBOrderItem.id == order_item.id, DBOrderItem.order_id == order_id).first()
 
-    db.query(DBOrderItem).filter(DBOrderItem.order_id == order.id).delete()
-    for item in body.items:
-        if not item.item_id:
-            continue  # Skip empty rows
+    updated_item = DBOrderItem.copyFromModel(order_item)
+    for attr, value in updated_item.__dict__.items():
+        if attr != "_sa_instance_state":
+            setattr(existing_item, attr, value)
 
-        db_item = DBOrderItem(
-            order_id=order.id, item_id=item.item_id, quantity=item.quantity)
-        db.add(db_item)
     db.commit()
+    response = ResponseModel(screen_id=context.screen_id, data={"message": "Order items updated successfully"})
+    return response
 
+
+@router.delete("/order_item/delete")
+def delete_order_items(client_id: str, order_item_id: Optional[str] = Query(None), context: SaasContext = Depends(verify_token), db: Session = Depends(get_db)):
+
+    order_item = db.query(DBOrderItem).filter(DBOrderItem.id == str(
+        order_item_id), DBOrderItem.client_id == client_id).first()
+    if not order_item:
+        raise HTTPException(status_code=404, detail="Order item not found")
+
+    db.delete(order_item)
+    db.commit()
     response = ResponseModel(screen_id=context.screen_id, data={
-                             "message": "Order updated successfully"})
+                             "message": "Order item deleted"})
     return response
 
 
@@ -141,10 +191,10 @@ def delete_order(client_id: str, dinein_order_id: str, context: SaasContext = De
 
 @router.get("/kds/orders")
 def get_kds_orders(client_id: str, context: SaasContext = Depends(verify_token), db: Session = Depends(get_db)):
-    orders = db.query(DBOrder).filter(DBOrder.client_id == str(client_id), DBOrder.status.in_(["pending", "preparing"])
+    orders = db.query(DBOrder).filter(DBOrder.client_id == str(client_id), DBOrder.status.in_([OrderStatusEnum.pending, OrderStatusEnum.preparing])
                                       ).order_by(DBOrder.created_at.asc()).all()
 
-    result = []
+  
     ''''
     for order in orders:
         table        = db.query(DiningTable).filter(DiningTable.id == order.table_id).first()
@@ -162,5 +212,5 @@ def get_kds_orders(client_id: str, context: SaasContext = Depends(verify_token),
         result.append({"order_id": str(order.id), "table_number": table_number, "status": order.status,
                        "created_at": order.created_at.isoformat(), "items": items_list})
     '''
-    response = ResponseModel(screen_id=context.screen_id, data=result)
+    response = ResponseModel(screen_id=context.screen_id, data=orders)
     return response

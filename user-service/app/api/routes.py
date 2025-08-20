@@ -1,11 +1,10 @@
 from fastapi import Depends, HTTPException, APIRouter, Header
 from sqlalchemy.orm import Session
 from database.postgres import get_db
-from models.user_model import LoginRequest
-from entity.user_entity import User
+from entity.user_entity import User, Person
 from utils.auth import hash_password, verify_password, create_access_token, verify_token
 from models.saas_context import SaasContext, saasContext
-from models.user_model import UserModel
+from models.user_model import UserModel, ResetpasswordRequest, LoginRequest
 from models.response_model import ResponseModel
 from sqlalchemy import and_
 
@@ -41,6 +40,25 @@ async def login_user(client_id: str, userReq: LoginRequest, db: Session = Depend
                              "access_token": token, "token_type": "bearer"})
     # response.set_response(screen_id="defaultUser", data={"access_token": token, "token_type": "bearer"})
     return response
+
+
+@router.post("/add")
+async def add_user(client_id: str, userReq: UserModel, db: Session = Depends(get_db)):
+    hashed_pw = hash_password(userReq.password)
+    userReq.client_id = client_id
+    
+    person = Person.copyFromModel(userReq)
+    db.add(person)
+    db.commit()
+    user = User(id=person.id, username=userReq.username, hashed_password=hashed_pw,
+                client_id=userReq.client_id, roles=userReq.roles, grants=userReq.grants)
+    db.add(user)
+    db.commit()
+    return {"message": "User registered successfully"}
+
+@router.post("/reset-password")
+def reset_password(req_data: ResetpasswordRequest):
+    return {"message": "Feel free to build the api"}
 
 
 @router.get("/test")
