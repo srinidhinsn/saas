@@ -523,7 +523,7 @@ function CategoryList({ onCategorySelect }) {
                             className="modal-input"
                         />
 
-                        <label>Assign as Subcategory under:</label>
+                        {/* <label>Assign as Subcategory under:</label>
                         <div className="subcategory-checkboxes">
                             {getAllCategoriesRecursive(categories).map((cat) => (
                                 <label key={cat.id}>
@@ -535,7 +535,10 @@ function CategoryList({ onCategorySelect }) {
                                     {cat.name}
                                 </label>
                             ))}
-                        </div>
+                        </div> */}
+
+
+                        
                         <div className="modal-buttons">
                             <button onClick={handleAddCategory} className="modal-save-btn">
                                 Add
@@ -584,7 +587,7 @@ function CategoryList({ onCategorySelect }) {
                             className="modal-input"
                         />
 
-                        <label>Subcategories:</label>
+                        {/* <label>Subcategories:</label>
                         <div className="subcategory-checkboxes">
                             {getAllCategoriesRecursive(categories)
                                 .filter((cat) => cat.id !== editingId)
@@ -598,7 +601,7 @@ function CategoryList({ onCategorySelect }) {
                                         {cat.name}
                                     </label>
                                 ))}
-                        </div>
+                        </div> */}
                         <div className="modal-buttons">
                             <button onClick={handleEditSave} className="modal-save-btn">
                                 Save

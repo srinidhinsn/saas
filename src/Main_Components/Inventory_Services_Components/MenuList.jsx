@@ -954,9 +954,7 @@ function InventoryItemList({ selectedCategory }) {
 
 
             </div>
-
-
-
+            
             <div className="grid-layout ">
                 {items.length === 0 ? (
                     <p className="no-items">No inventory found.</p>
@@ -968,7 +966,7 @@ function InventoryItemList({ selectedCategory }) {
                         return (
                             <div className="grids" key={item.inventory_id}>
                                 <h4>{item.name}</h4>
-                                <h4>Line Items: {names}</h4>
+                                <h6>Line Items: {names}</h6>
                                 <p className="menu-card-price">₹{finalPrice}</p>
                                 <div className="menu-card-footer">
                                     <button className="btn-edit" onClick={() => handleEdit(item)}><FaEdit /></button>
@@ -1026,6 +1024,7 @@ function InventoryItemList({ selectedCategory }) {
                         <AddMenuForm
                             clientId={clientId}
                             onItemCreated={handleItemCreated}
+                            selectedCategory={selectedCategory}
                         />
                     </div>
                 </div>
@@ -1096,7 +1095,7 @@ function InventoryItemList({ selectedCategory }) {
                                         ))}
                                     </select>
 
-                                    <label htmlFor="">Realm :</label>
+                                    {/* <label htmlFor="">Realm :</label>
                                     <input
                                         value={editingItem.realm}
                                         onChange={(e) => setEditingItem({ ...editingItem, realm: e.target.value })}
@@ -1112,7 +1111,7 @@ function InventoryItemList({ selectedCategory }) {
                                         <option value="">Select Dietary Type</option>
                                         <option value="veg">Veg</option>
                                         <option value="non-veg">NonVeg</option>
-                                    </select>
+                                    </select> */}
 
                                     <label htmlFor="">Availability :</label>
                                     <input
@@ -1142,7 +1141,7 @@ function InventoryItemList({ selectedCategory }) {
                                         className="form-input"
                                     />
 
-                                    <label htmlFor="">CST :</label>
+                                    {/* <label htmlFor="">CST :</label>
                                     <input
                                         type="number"
                                         value={editingItem.unit_cst}
@@ -1197,7 +1196,7 @@ function InventoryItemList({ selectedCategory }) {
                                         onChange={(e) => setEditingItem({ ...editingItem, gst: e.target.value })}
                                         placeholder="GST"
                                         className="form-input short"
-                                    />
+                                    /> */}
 
                                     <label htmlFor="">Discount :</label>
                                     <input
@@ -1208,14 +1207,14 @@ function InventoryItemList({ selectedCategory }) {
                                         className="form-input short"
                                     />
 
-                                    <label htmlFor="">Total Price :</label>
+                                    {/* <label htmlFor="">Total Price :</label>
                                     <input
                                         type="number"
                                         value={editingItem.total_price}
                                         onChange={(e) => setEditingItem({ ...editingItem, total_price: e.target.value })}
                                         placeholder="Total Price"
                                         className="form-input short"
-                                    />
+                                    /> */}
 
                                     <label htmlFor="">Slug :</label>
                                     <input
