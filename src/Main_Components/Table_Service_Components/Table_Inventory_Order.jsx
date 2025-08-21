@@ -50,7 +50,6 @@ const Table_Inventory_Order = ({ onOrderUpdate }) => {
 
 
 
-        // Fetch menu items
         inventoryServicesPort.get(`/${clientId}/inventory/read`, {
             headers: {
                 Authorization: `Bearer ${token}`,
@@ -61,7 +60,7 @@ const Table_Inventory_Order = ({ onOrderUpdate }) => {
                 console.log("Fetched items full:", rawItems);
 
                 axios.all([
-                    inventoryServicesPort.get(`/${clientId}/inventory/read_category`, {
+                    inventoryServicesPort.get(`/${clientId}/inventory/read_category?category_id=dietery`, {
                         headers: { Authorization: `Bearer ${token}` },
                     }),
                     inventoryServicesPort.get(`/${clientId}/inventory/read`, {
@@ -72,7 +71,6 @@ const Table_Inventory_Order = ({ onOrderUpdate }) => {
                         const allCategory = { id: "all", name: "All", level: 0 };
                         const fullTree = catRes.data.data.filter(c => c.name?.toLowerCase() !== "all");
 
-                        // 1. Collect all subcategory IDs
                         const subcategoryIds = new Set();
                         fullTree.forEach(cat => {
                             if (cat.subCategories && cat.subCategories.length > 0) {
@@ -80,13 +78,10 @@ const Table_Inventory_Order = ({ onOrderUpdate }) => {
                             }
                         });
 
-                        // 2. Filter out categories that are subcategories
                         const topLevelCategories = fullTree.filter(cat => !subcategoryIds.has(cat.id));
 
-                        // 3. Flatten only the top-level categories and their nested children
                         const flatCategories = flattenCategoryTree(topLevelCategories);
 
-                        // 4. Set state
                         setCategories([allCategory, ...flatCategories]);
 
 
@@ -140,7 +135,7 @@ const Table_Inventory_Order = ({ onOrderUpdate }) => {
 
     useEffect(() => {
         axios.all([
-            inventoryServicesPort.get(`/${clientId}/inventory/read_category`, {
+            inventoryServicesPort.get(`/${clientId}/inventory/read_category?category_id=dietery`, {
                 headers: { Authorization: `Bearer ${token}` },
             }),
             inventoryServicesPort.get(`/${clientId}/inventory/read`, {

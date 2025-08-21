@@ -1,9 +1,9 @@
 import React, { useState, useEffect, useRef } from "react";
-import {jwtDecode} from "jwt-decode";
+import { jwtDecode } from "jwt-decode";
 import { useParams } from "react-router-dom";
 import inventoryServicesPort from '../../Backend_Port_Files/InventoryServices';
 
-function AddInventoryItemForm({ onItemCreated }) {
+function AddInventoryItemForm({ onItemCreated, selectedCategory }) {
   const { clientId } = useParams();
   const token = localStorage.getItem("access_token");
 
@@ -12,8 +12,8 @@ function AddInventoryItemForm({ onItemCreated }) {
     line_item_id: [],
     name: "",
     description: "",
-    category_id: "",
-    realm: "",
+    category_id: selectedCategory || "",  // auto-picked from CategoryList
+    realm: "food",
     dietary_type: "",
     availability: "",
     unit: "",
@@ -33,13 +33,24 @@ function AddInventoryItemForm({ onItemCreated }) {
   const [categories, setCategories] = useState([]);
   const [lineItems, setLineItems] = useState([]);
 
+  // Whenever selectedCategory changes, update all items
+  useEffect(() => {
+    setItems((prev) =>
+      prev.map((item) => ({
+        ...item,
+        category_id: selectedCategory,
+        slug: generateSlug(selectedCategory, item.name), // auto-generate slug too
+      }))
+    );
+  }, [selectedCategory]);
+
   // Recursive flattening of nested category tree
   const flattenCategories = (categoryTree) => {
     const flat = [];
     const recurse = (nodes) => {
       nodes.forEach(node => {
         if (!node) return;
-        flat.push({ id: node.id, name: node.name });
+        flat.push({ id: node.id, name: node.name, parent_id: node.parent_id });
         if (node.subCategories && node.subCategories.length > 0) {
           recurse(node.subCategories);
         }
@@ -57,7 +68,7 @@ function AddInventoryItemForm({ onItemCreated }) {
       const current = categories.find(cat => cat && cat.id === currentId);
       if (!current) break;
       path.unshift(current.name.trim().replace(/\s+/g, "_"));
-      currentId = current.parent_id; // optional: might be undefined
+      currentId = current.parent_id;
     }
 
     return path;
@@ -73,7 +84,6 @@ function AddInventoryItemForm({ onItemCreated }) {
   useEffect(() => {
     if (!token || !clientId) return;
 
-    // Fetch nested category tree from backend
     inventoryServicesPort.get(`/${clientId}/inventory/read_category?category_id=dietery`, {
       headers: { Authorization: `Bearer ${token}` },
     })
@@ -96,7 +106,7 @@ function AddInventoryItemForm({ onItemCreated }) {
     updated[index][field] = value ?? [];
 
     const name = field === "name" ? value : updated[index].name;
-    const catId = field === "category_id" ? value : updated[index].category_id;
+    const catId = selectedCategory; // always from prop
 
     if (name && catId) {
       updated[index].slug = generateSlug(catId, name);
@@ -105,12 +115,12 @@ function AddInventoryItemForm({ onItemCreated }) {
   };
 
   const handleAddItem = () => {
-    setItems([...items, { ...emptyItem }]);
+    setItems([...items, { ...emptyItem, category_id: selectedCategory }]);
   };
 
   const handleCancel = (index) => {
     if (items.length === 1) {
-      setItems([{ ...emptyItem }]);
+      setItems([{ ...emptyItem, category_id: selectedCategory }]);
     } else {
       const updated = [...items];
       updated.splice(index, 1);
@@ -126,7 +136,7 @@ function AddInventoryItemForm({ onItemCreated }) {
       const decoded = jwtDecode(token);
       created_by = decoded.user_id || "unknown";
       updated_by = decoded.user_id || "unknown";
-    } catch {}
+    } catch { }
 
     try {
       const responses = await Promise.all(
@@ -134,6 +144,7 @@ function AddInventoryItemForm({ onItemCreated }) {
           const payload = {
             ...item,
             client_id: clientId,
+            category_id: selectedCategory ? selectedCategory.id : null, // enforce category
             line_item_id: item.line_item_id.map(id => parseInt(id)),
             availability: parseInt(item.availability) || 0,
             dietary_type: ["veg", "nonveg"].includes(item.dietary_type) ? item.dietary_type : "veg",
@@ -161,7 +172,7 @@ function AddInventoryItemForm({ onItemCreated }) {
       );
 
       responses.forEach((res) => onItemCreated?.(res.data));
-      setItems([{ ...emptyItem }]);
+      setItems([{ ...emptyItem, category_id: selectedCategory }]);
       alert("Inventory item(s) created successfully.");
     } catch (err) {
       console.error("Submit error:", err.response?.data || err);
@@ -256,7 +267,7 @@ function AddInventoryItemForm({ onItemCreated }) {
           </div>
 
           <div className="form-row">
-            <select
+            {/* <select
               value={item.category_id || ""}
               onChange={(e) => handleChange(index, "category_id", e.target.value)}
               className="form-input"
@@ -267,15 +278,15 @@ function AddInventoryItemForm({ onItemCreated }) {
                   {cat.name}
                 </option>
               ))}
-            </select>
+            </select> */}
 
-            <input
+            {/* <input
               value={item.realm || ""}
               onChange={(e) => handleChange(index, "realm", e.target.value)}
               placeholder="Realm"
               className="form-input"
-            />
-            <select
+            /> */}
+            {/* <select
               value={item.dietary_type || ""}
               onChange={(e) => handleChange(index, "dietary_type", e.target.value)}
               className="form-input"
@@ -283,7 +294,7 @@ function AddInventoryItemForm({ onItemCreated }) {
               <option value="">Select Dietary Type</option>
               <option value="veg">Veg</option>
               <option value="nonveg">NonVeg</option>
-            </select>
+            </select> */}
 
             <input
               value={item.availability || ""}
@@ -308,7 +319,7 @@ function AddInventoryItemForm({ onItemCreated }) {
               placeholder="Unit Price"
               className="form-input short"
             />
-            <input
+            {/* <input
               type="number"
               value={item.unit_cst || ""}
               onChange={(e) => handleChange(index, "unit_cst", e.target.value)}
@@ -345,14 +356,14 @@ function AddInventoryItemForm({ onItemCreated }) {
               onChange={(e) => handleChange(index, "cst", e.target.value)}
               placeholder="CST"
               className="form-input short"
-            />
-            <input
+            /> */}
+            {/* <input
               type="number"
               value={item.gst || ""}
               onChange={(e) => handleChange(index, "gst", e.target.value)}
               placeholder="GST"
               className="form-input short"
-            />
+            /> */}
             <input
               type="number"
               value={item.discount || ""}
@@ -360,13 +371,13 @@ function AddInventoryItemForm({ onItemCreated }) {
               placeholder="Discount"
               className="form-input short"
             />
-            <input
+            {/* <input
               type="number"
               value={item.total_price || ""}
               onChange={(e) => handleChange(index, "total_price", e.target.value)}
               placeholder="Total Price"
               className="form-input short"
-            />
+            /> */}
             <input
               value={item.slug || ""}
               onChange={(e) => handleChange(index, "slug", e.target.value)}
