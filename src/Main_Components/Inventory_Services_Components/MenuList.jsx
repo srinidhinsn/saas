@@ -125,6 +125,517 @@
     style={{ display: "none" }}
     onChange={handleImportFromExcel}
   /> */}
+// ***********************************************************************************************************************************************
+
+// import React, { useEffect, useState, useMemo } from "react";
+// import AddMenuForm from './AddInventoryItemForm';
+// import { useParams } from "react-router-dom";
+// import { FaEdit, FaTrash } from "react-icons/fa";
+// import inventoryServicesPort from "../../Backend_Port_Files/InventoryServices";
+// import { ModuleRegistry, AllCommunityModule } from 'ag-grid-community';
+
+// ModuleRegistry.registerModules([AllCommunityModule]);
+// import { AgGridReact } from "ag-grid-react";
+
+// import "ag-grid-community/styles/ag-grid.css";
+// import "ag-grid-community/styles/ag-theme-alpine.css";
+
+// function InventoryItemList({ selectedCategory }) {
+//     const [items, setItems] = useState([]);
+//     const [editingItem, setEditingItem] = useState(null);
+//     const [showEditModal, setShowEditModal] = useState(false);
+//     const [deleteTarget, setDeleteTarget] = useState(null);
+//     const [showAddModal, setShowAddModal] = useState(false);
+//     const [originalItems, setOriginalItems] = useState([]);
+//     const [categories, setCategories] = useState([]);
+
+//     const token = localStorage.getItem("access_token");
+//     const headers = { Authorization: `Bearer ${token}` };
+//     const { clientId } = useParams();
+
+//     // Fetch categories
+//     useEffect(() => {
+//         if (!token || !clientId) return;
+//         inventoryServicesPort.get(`/${clientId}/inventory/read_category`, { headers })
+//             .then(res => setCategories(res.data.data || []))
+//             .catch(err => console.error("Error fetching categories:", err));
+//     }, [clientId, token]);
+
+//     // Fetch inventory items
+//     useEffect(() => {
+//         if (!clientId || !token) return;
+//         inventoryServicesPort.get(`/${clientId}/inventory/read`, { headers })
+//             .then(res => {
+//                 setItems(res.data.data || []);
+//                 setOriginalItems(res.data.data || []);
+//             })
+//             .catch(err => console.error("Failed to load inventory:", err));
+//     }, [clientId, token]);
+
+//     // Filter items by selected category
+//     useEffect(() => {
+//         if (!selectedCategory || selectedCategory.name === "All") {
+//             setItems(originalItems);
+//         } else {
+//             setItems(originalItems.filter(item => item.category_id === selectedCategory.id));
+//         }
+//     }, [selectedCategory, originalItems]);
+
+//     // Get line item details: names concatenated and total price of linked items
+//     const getLineItemDetails = (lineItemIds) => {
+//         if (!Array.isArray(lineItemIds)) return { names: "No linked items", totalPrice: 0 };
+//         let totalPrice = 0;
+//         const names = lineItemIds.map((id) => {
+//             const match = items.find(i => i.id === id || i.line_item_id === id);
+//             if (match) {
+//                 totalPrice += match.unit_price || 0;
+//                 return `${match.name} (₹${match.unit_price})`;
+//             }
+//             return "Unknown";
+//         });
+//         return { names: names.join(", "), totalPrice };
+//     };
+
+//     // Handle edit trigger
+//     const handleEdit = (item) => {
+//         setEditingItem({ ...item });
+//         setShowEditModal(true);
+//     };
+
+//     // Handle save after editing
+//     const handleEditSave = async () => {
+//         if (!editingItem) return;
+
+//         const updatedItem = {
+//             ...editingItem,
+//             client_id: clientId,
+//             line_item_id: Array.isArray(editingItem.line_item_id)
+//                 ? editingItem.line_item_id
+//                 : typeof editingItem.line_item_id === "string"
+//                     ? editingItem.line_item_id
+//                         .split(",")
+//                         .map((s) => parseInt(s.trim()))
+//                         .filter((n) => !isNaN(n))
+//                     : [],
+//         };
+
+//         try {
+//             const res = await inventoryServicesPort.post(
+//                 `/${clientId}/inventory/update`,
+//                 updatedItem,
+//                 { headers }
+//             );
+
+//             setItems((prev) =>
+//                 prev.map((i) =>
+//                     i.inventory_id === updatedItem.inventory_id ? res.data.data : i
+//                 )
+//             );
+//             setShowEditModal(false);
+//             setEditingItem(null);
+//         } catch (err) {
+//             console.error("Edit failed:", err.response?.data || err.message);
+//             alert("Edit failed.");
+//         }
+//     };
+
+//     // Handle deletion
+//     const handleDelete = async (id) => {
+//         try {
+//             await inventoryServicesPort.post(
+//                 `/${clientId}/inventory/delete`,
+//                 { id },
+//                 { headers }
+//             );
+//             setItems((prev) => prev.filter((i) => i.id !== id));
+//         } catch (err) {
+//             console.error("Delete failed:", err);
+//             alert("Delete failed.");
+//         }
+//     };
+
+//     // Handle new item creation
+//     const handleItemCreated = (responseData) => {
+//         if (responseData?.data) {
+//             setItems((prev) => [...prev, responseData.data]);
+//         }
+//         setShowAddModal(false);
+//     };
+
+//     // Actions buttons for each row
+//     // Make it a proper React component
+//     const ActionCellRenderer = ({ data }) => {
+//         return (
+//             <div style={{ display: 'flex', gap: '6px' }}>
+//                 <button className="btn-edit" onClick={() => handleEdit(data)}>
+//                     <FaEdit />
+//                 </button>
+//                 <button className="btn-delete" onClick={() => setDeleteTarget(data)}>
+//                     <FaTrash />
+//                 </button>
+//             </div>
+//         );
+//     };
+
+
+//     // AG Grid column definitions
+//     const columnDefs = useMemo(() => [
+//         { field: "inventory_id", headerName: "Inventory ID", sortable: true, filter: true, width: 120 },
+//         { field: "name", headerName: "Name", sortable: true, filter: true, flex: 1 },
+//         {
+//             headerName: "Line Items",
+//             flex: 2,
+//             valueGetter: (params) => getLineItemDetails(params.data.line_item_id).names,
+//             tooltipValueGetter: (params) => getLineItemDetails(params.data.line_item_id).names,
+//         },
+//         {
+//             headerName: "Total Price (₹)",
+//             valueGetter: (params) => {
+//                 const { totalPrice } = getLineItemDetails(params.data.line_item_id);
+//                 const unitPrice = params.data.unit_price || 0;
+//                 return unitPrice + totalPrice;
+//             },
+//             sortable: true,
+//             filter: true,
+//             width: 150,
+//         },
+//         {
+//             headerName: "Actions",
+//             cellRenderer: ActionCellRenderer,
+//             width: 120,
+//             sortable: false,
+//             filter: false,
+//             cellStyle: { justifyContent: 'center' }
+//         }
+
+
+//     ], [items]);
+
+//     // Default column definition for AG Grid
+//     const defaultColDef = useMemo(() => ({
+//         resizable: true,
+//     }), []);
+
+//     return (
+//         <div className="menu-items-panel">
+//             <div className="btns">
+//                 <button className="btn-add" onClick={() => { setShowAddModal(true); setEditingItem(null); }}>
+//                     + Add Item
+//                 </button>
+//             </div>
+
+//             <div className="ag-theme-alpine" style={{ height: 400, width: "100%" }}>
+//                 <AgGridReact
+//                     rowData={items}
+//                     columnDefs={columnDefs}
+//                     defaultColDef={defaultColDef}
+//                     domLayout="autoHeight"
+//                     suppressRowClickSelection={true}
+//                     rowSelection="single"
+//                 />
+//             </div>
+
+//             {/* Add New Item Modal */}
+//             {showAddModal && (
+//                 <div
+//                     className="modal-overlay"
+//                     onClick={(e) => {
+//                         if (e.target.classList.contains("modal-overlay")) setShowAddModal(false);
+//                     }}
+//                 >
+//                     <div className="menu-modal-content">
+//                         <h3>Add New Inventory Item</h3>
+//                         <AddMenuForm clientId={clientId} onItemCreated={handleItemCreated} />
+//                     </div>
+//                 </div>
+//             )}
+
+//             {/* Edit Item Modal */}
+//             {showEditModal && editingItem && (
+//                 <div
+//                     className="modal-overlay"
+//                     onClick={(e) => {
+//                         if (e.target.classList.contains("modal-overlay")) setShowEditModal(false);
+//                     }}
+//                 >
+//                     <div className="menu-modal-content">
+//                         <h3>Edit Inventory Item</h3>
+//                         <form
+//                             onSubmit={(e) => {
+//                                 e.preventDefault();
+//                                 handleEditSave();
+//                             }}
+//                         >
+//                             <div className="form-entry-wrapper">
+//                                 <div className="form-row">
+//                                     <input
+//                                         type="text"
+//                                         value={editingItem.inventory_id}
+//                                         readOnly
+//                                         className="form-input short"
+//                                     />
+
+//                                     {/* Custom multi-select for line items */}
+//                                     <DropdownCheckbox
+//                                         selected={Array.isArray(editingItem.line_item_id) ? editingItem.line_item_id : []}
+//                                         options={items}
+//                                         onChange={(newSelected) =>
+//                                             setEditingItem({ ...editingItem, line_item_id: newSelected })
+//                                         }
+//                                     />
+
+//                                     <label>Name:</label>
+//                                     <input
+//                                         type="text"
+//                                         value={editingItem.name}
+//                                         onChange={e => setEditingItem({ ...editingItem, name: e.target.value })}
+//                                         className="form-input"
+//                                         required
+//                                     />
+
+//                                     <label>Description:</label>
+//                                     <input
+//                                         type="text"
+//                                         value={editingItem.description}
+//                                         onChange={e => setEditingItem({ ...editingItem, description: e.target.value })}
+//                                         className="form-input"
+//                                     />
+//                                 </div>
+
+//                                 <div className="form-row">
+//                                     <label>Category:</label>
+//                                     <select
+//                                         value={editingItem.category_id}
+//                                         onChange={e => setEditingItem({ ...editingItem, category_id: e.target.value })}
+//                                         className="form-input"
+//                                     >
+//                                         <option value="">Select Category</option>
+//                                         {categories.map(cat => (
+//                                             <option key={cat.id} value={cat.id}>{cat.name}</option>
+//                                         ))}
+//                                     </select>
+
+//                                     <label>Realm:</label>
+//                                     <input
+//                                         type="text"
+//                                         value={editingItem.realm || ""}
+//                                         onChange={e => setEditingItem({ ...editingItem, realm: e.target.value })}
+//                                         className="form-input"
+//                                     />
+
+//                                     <label>Dietary:</label>
+//                                     <select
+//                                         value={editingItem.dietary_type || ""}
+//                                         onChange={e => setEditingItem({ ...editingItem, dietary_type: e.target.value })}
+//                                         className="form-input"
+//                                     >
+//                                         <option value="">Select Dietary Type</option>
+//                                         <option value="veg">Veg</option>
+//                                         <option value="non-veg">NonVeg</option>
+//                                     </select>
+
+//                                     <label>Availability:</label>
+//                                     <input
+//                                         type="number"
+//                                         value={editingItem.availability || ""}
+//                                         onChange={e => setEditingItem({ ...editingItem, availability: e.target.value })}
+//                                         className="form-input short"
+//                                     />
+
+//                                     <label>Units:</label>
+//                                     <input
+//                                         type="text"
+//                                         value={editingItem.unit || ""}
+//                                         onChange={e => setEditingItem({ ...editingItem, unit: e.target.value })}
+//                                         className="form-input short"
+//                                     />
+//                                 </div>
+
+//                                 <div className="form-row">
+//                                     <label>Unit Price:</label>
+//                                     <input
+//                                         type="number"
+//                                         value={editingItem.unit_price || ""}
+//                                         onChange={e => setEditingItem({ ...editingItem, unit_price: e.target.value })}
+//                                         className="form-input"
+//                                     />
+
+//                                     <label>CST:</label>
+//                                     <input
+//                                         type="number"
+//                                         value={editingItem.unit_cst || ""}
+//                                         onChange={e => setEditingItem({ ...editingItem, unit_cst: e.target.value })}
+//                                         className="form-input short"
+//                                     />
+
+//                                     <label>GST:</label>
+//                                     <input
+//                                         type="number"
+//                                         value={editingItem.unit_gst || ""}
+//                                         onChange={e => setEditingItem({ ...editingItem, unit_gst: e.target.value })}
+//                                         className="form-input short"
+//                                     />
+
+//                                     <label>Unit Total Price:</label>
+//                                     <input
+//                                         type="number"
+//                                         value={editingItem.unit_total_price || ""}
+//                                         onChange={e => setEditingItem({ ...editingItem, unit_total_price: e.target.value })}
+//                                         className="form-input short"
+//                                     />
+//                                 </div>
+
+//                                 <div className="form-row">
+//                                     <label>Total Price:</label>
+//                                     <input
+//                                         type="number"
+//                                         value={editingItem.price || ""}
+//                                         onChange={e => setEditingItem({ ...editingItem, price: e.target.value })}
+//                                         className="form-input short"
+//                                     />
+
+//                                     <label>Total CST:</label>
+//                                     <input
+//                                         type="number"
+//                                         value={editingItem.cst || ""}
+//                                         onChange={e => setEditingItem({ ...editingItem, cst: e.target.value })}
+//                                         className="form-input short"
+//                                     />
+
+//                                     <label>Total GST:</label>
+//                                     <input
+//                                         type="number"
+//                                         value={editingItem.gst || ""}
+//                                         onChange={e => setEditingItem({ ...editingItem, gst: e.target.value })}
+//                                         className="form-input short"
+//                                     />
+
+//                                     <label>Discount:</label>
+//                                     <input
+//                                         type="number"
+//                                         value={editingItem.discount || ""}
+//                                         onChange={e => setEditingItem({ ...editingItem, discount: e.target.value })}
+//                                         className="form-input short"
+//                                     />
+
+//                                     <label>Total Price:</label>
+//                                     <input
+//                                         type="number"
+//                                         value={editingItem.total_price || ""}
+//                                         onChange={e => setEditingItem({ ...editingItem, total_price: e.target.value })}
+//                                         className="form-input short"
+//                                     />
+
+//                                     <label>Slug:</label>
+//                                     <input
+//                                         type="text"
+//                                         value={editingItem.slug || ""}
+//                                         onChange={e => setEditingItem({ ...editingItem, slug: e.target.value })}
+//                                         className="form-input"
+//                                     />
+//                                 </div>
+//                             </div>
+
+//                             <div className="form-actions">
+//                                 <button type="submit" className="btn-add">Save</button>
+//                                 <button type="button" className="btn-cancel" onClick={() => setShowEditModal(false)}>Cancel</button>
+//                             </div>
+//                         </form>
+//                     </div>
+//                 </div>
+//             )}
+
+//             {/* Confirm Delete Modal */}
+//             {deleteTarget && (
+//                 <div className="modal-overlay">
+//                     <div className="modal-content">
+//                         <h4>Confirm Delete</h4>
+//                         <p>Delete <strong>{deleteTarget.name}</strong>?</p>
+//                         <div className="modal-buttons">
+//                             <button
+//                                 className="btn-add"
+//                                 onClick={async () => {
+//                                     await handleDelete(deleteTarget.id);
+//                                     setDeleteTarget(null);
+//                                 }}
+//                             >
+//                                 Yes
+//                             </button>
+//                             <button className="btn-cancel" onClick={() => setDeleteTarget(null)}>No</button>
+//                         </div>
+//                     </div>
+//                 </div>
+//             )}
+//         </div>
+//     );
+// }
+
+// // DropdownCheckbox component (copied/adjusted from your previous code)
+// function DropdownCheckbox({ selected, options, onChange }) {
+//     const [open, setOpen] = useState(false);
+//     const ref = React.useRef(null);
+
+//     React.useEffect(() => {
+//         const handleClickOutside = (event) => {
+//             if (ref.current && !ref.current.contains(event.target)) {
+//                 setOpen(false);
+//             }
+//         };
+//         document.addEventListener("mousedown", handleClickOutside);
+//         return () => document.removeEventListener("mousedown", handleClickOutside);
+//     }, []);
+
+//     const toggleSelect = (id) => {
+//         const newSelected = selected.includes(id)
+//             ? selected.filter(val => val !== id)
+//             : [...selected, id];
+//         onChange(newSelected);
+//     };
+
+//     return (
+//         <div ref={ref} className="dropdown-multiselect">
+//             <div className="dropdown-header" onClick={() => setOpen(!open)}>
+//                 {selected.length > 0 ? `${selected.length} item(s) selected` : "Select Addon(s)"}
+//                 <span className="dropdown-arrow">▾</span>
+//             </div>
+//             {open && (
+//                 <div className="dropdown-list">
+//                     {options.map(option => (
+//                         <label key={option.id} className="dropdown-item">
+//                             <input
+//                                 type="checkbox"
+//                                 checked={selected.includes(option.id)}
+//                                 onChange={() => toggleSelect(option.id)}
+//                             />
+//                             {option.name}
+//                         </label>
+//                     ))}
+//                 </div>
+//             )}
+//         </div>
+//     );
+// }
+
+// export default InventoryItemList;
+
+
+
+
+
+
+
+
+
+
+
+
+
+
+
+// **************=========================***********************
+
+
+
 
 
 
@@ -157,6 +668,56 @@ function InventoryItemList({ selectedCategory }) {
 
     const [categories, setCategories] = useState([]);
     const { clientId } = useParams();
+
+
+    const flattenCategories = (categoryTree) => {
+        const flat = [];
+        const recurse = (nodes) => {
+          nodes.forEach(node => {
+            if (!node) return;
+            flat.push({ id: node.id, name: node.name });
+            if (node.subCategories && node.subCategories.length > 0) {
+              recurse(node.subCategories);
+            }
+          });
+        };
+        recurse(categoryTree);
+        return flat;
+      };
+
+      
+  const buildCategoryPath = (categoryId) => {
+    const path = [];
+    let currentId = categoryId;
+
+    while (currentId) {
+      const current = categories.find(cat => cat && cat.id === currentId);
+      if (!current) break;
+      path.unshift(current.name.trim().replace(/\s+/g, "_"));
+      currentId = current.parent_id; // optional: might be undefined
+    }
+
+    return path;
+  };
+
+  
+  useEffect(() => {
+    if (!token || !clientId) return;
+
+    // Fetch nested category tree from backend
+    inventoryServicesPort.get(`/${clientId}/inventory/read_category?category_id=dietery`, {
+      headers: { Authorization: `Bearer ${token}` },
+    })
+      .then((res) => {
+        const tree = res.data.data || [];
+        const flattened = flattenCategories(tree);
+        setCategories(flattened);
+      })
+      .catch((err) => console.error("Error fetching categories:", err));
+  }, [clientId, token]);
+
+
+
     useEffect(() => {
         if (!token || !clientId) return;
 
@@ -707,500 +1268,3 @@ function InventoryItemList({ selectedCategory }) {
 }
 
 export default InventoryItemList;
-
-
-
-
-
-
-
-// import React, { useEffect, useState, useMemo } from "react";
-// import AddMenuForm from './AddInventoryItemForm';
-// import { useParams } from "react-router-dom";
-// import { FaEdit, FaTrash } from "react-icons/fa";
-// import inventoryServicesPort from "../../Backend_Port_Files/InventoryServices";
-// import { ModuleRegistry, AllCommunityModule } from 'ag-grid-community';
-
-// ModuleRegistry.registerModules([AllCommunityModule]);
-// import { AgGridReact } from "ag-grid-react";
-
-// import "ag-grid-community/styles/ag-grid.css";
-// import "ag-grid-community/styles/ag-theme-alpine.css";
-
-// function InventoryItemList({ selectedCategory }) {
-//     const [items, setItems] = useState([]);
-//     const [editingItem, setEditingItem] = useState(null);
-//     const [showEditModal, setShowEditModal] = useState(false);
-//     const [deleteTarget, setDeleteTarget] = useState(null);
-//     const [showAddModal, setShowAddModal] = useState(false);
-//     const [originalItems, setOriginalItems] = useState([]);
-//     const [categories, setCategories] = useState([]);
-
-//     const token = localStorage.getItem("access_token");
-//     const headers = { Authorization: `Bearer ${token}` };
-//     const { clientId } = useParams();
-
-//     // Fetch categories
-//     useEffect(() => {
-//         if (!token || !clientId) return;
-//         inventoryServicesPort.get(`/${clientId}/inventory/read_category`, { headers })
-//             .then(res => setCategories(res.data.data || []))
-//             .catch(err => console.error("Error fetching categories:", err));
-//     }, [clientId, token]);
-
-//     // Fetch inventory items
-//     useEffect(() => {
-//         if (!clientId || !token) return;
-//         inventoryServicesPort.get(`/${clientId}/inventory/read`, { headers })
-//             .then(res => {
-//                 setItems(res.data.data || []);
-//                 setOriginalItems(res.data.data || []);
-//             })
-//             .catch(err => console.error("Failed to load inventory:", err));
-//     }, [clientId, token]);
-
-//     // Filter items by selected category
-//     useEffect(() => {
-//         if (!selectedCategory || selectedCategory.name === "All") {
-//             setItems(originalItems);
-//         } else {
-//             setItems(originalItems.filter(item => item.category_id === selectedCategory.id));
-//         }
-//     }, [selectedCategory, originalItems]);
-
-//     // Get line item details: names concatenated and total price of linked items
-//     const getLineItemDetails = (lineItemIds) => {
-//         if (!Array.isArray(lineItemIds)) return { names: "No linked items", totalPrice: 0 };
-//         let totalPrice = 0;
-//         const names = lineItemIds.map((id) => {
-//             const match = items.find(i => i.id === id || i.line_item_id === id);
-//             if (match) {
-//                 totalPrice += match.unit_price || 0;
-//                 return `${match.name} (₹${match.unit_price})`;
-//             }
-//             return "Unknown";
-//         });
-//         return { names: names.join(", "), totalPrice };
-//     };
-
-//     // Handle edit trigger
-//     const handleEdit = (item) => {
-//         setEditingItem({ ...item });
-//         setShowEditModal(true);
-//     };
-
-//     // Handle save after editing
-//     const handleEditSave = async () => {
-//         if (!editingItem) return;
-
-//         const updatedItem = {
-//             ...editingItem,
-//             client_id: clientId,
-//             line_item_id: Array.isArray(editingItem.line_item_id)
-//                 ? editingItem.line_item_id
-//                 : typeof editingItem.line_item_id === "string"
-//                     ? editingItem.line_item_id
-//                         .split(",")
-//                         .map((s) => parseInt(s.trim()))
-//                         .filter((n) => !isNaN(n))
-//                     : [],
-//         };
-
-//         try {
-//             const res = await inventoryServicesPort.post(
-//                 `/${clientId}/inventory/update`,
-//                 updatedItem,
-//                 { headers }
-//             );
-
-//             setItems((prev) =>
-//                 prev.map((i) =>
-//                     i.inventory_id === updatedItem.inventory_id ? res.data.data : i
-//                 )
-//             );
-//             setShowEditModal(false);
-//             setEditingItem(null);
-//         } catch (err) {
-//             console.error("Edit failed:", err.response?.data || err.message);
-//             alert("Edit failed.");
-//         }
-//     };
-
-//     // Handle deletion
-//     const handleDelete = async (id) => {
-//         try {
-//             await inventoryServicesPort.post(
-//                 `/${clientId}/inventory/delete`,
-//                 { id },
-//                 { headers }
-//             );
-//             setItems((prev) => prev.filter((i) => i.id !== id));
-//         } catch (err) {
-//             console.error("Delete failed:", err);
-//             alert("Delete failed.");
-//         }
-//     };
-
-//     // Handle new item creation
-//     const handleItemCreated = (responseData) => {
-//         if (responseData?.data) {
-//             setItems((prev) => [...prev, responseData.data]);
-//         }
-//         setShowAddModal(false);
-//     };
-
-//     // Actions buttons for each row
-//     // Make it a proper React component
-//     const ActionCellRenderer = ({ data }) => {
-//         return (
-//             <div style={{ display: 'flex', gap: '6px' }}>
-//                 <button className="btn-edit" onClick={() => handleEdit(data)}>
-//                     <FaEdit />
-//                 </button>
-//                 <button className="btn-delete" onClick={() => setDeleteTarget(data)}>
-//                     <FaTrash />
-//                 </button>
-//             </div>
-//         );
-//     };
-
-
-//     // AG Grid column definitions
-//     const columnDefs = useMemo(() => [
-//         { field: "inventory_id", headerName: "Inventory ID", sortable: true, filter: true, width: 120 },
-//         { field: "name", headerName: "Name", sortable: true, filter: true, flex: 1 },
-//         {
-//             headerName: "Line Items",
-//             flex: 2,
-//             valueGetter: (params) => getLineItemDetails(params.data.line_item_id).names,
-//             tooltipValueGetter: (params) => getLineItemDetails(params.data.line_item_id).names,
-//         },
-//         {
-//             headerName: "Total Price (₹)",
-//             valueGetter: (params) => {
-//                 const { totalPrice } = getLineItemDetails(params.data.line_item_id);
-//                 const unitPrice = params.data.unit_price || 0;
-//                 return unitPrice + totalPrice;
-//             },
-//             sortable: true,
-//             filter: true,
-//             width: 150,
-//         },
-//         {
-//             headerName: "Actions",
-//             cellRenderer: ActionCellRenderer,
-//             width: 120,
-//             sortable: false,
-//             filter: false,
-//             cellStyle: { justifyContent: 'center' }
-//         }
-
-
-//     ], [items]);
-
-//     // Default column definition for AG Grid
-//     const defaultColDef = useMemo(() => ({
-//         resizable: true,
-//     }), []);
-
-//     return (
-//         <div className="menu-items-panel">
-//             <div className="btns">
-//                 <button className="btn-add" onClick={() => { setShowAddModal(true); setEditingItem(null); }}>
-//                     + Add Item
-//                 </button>
-//             </div>
-
-//             <div className="ag-theme-alpine" style={{ height: 400, width: "100%" }}>
-//                 <AgGridReact
-//                     rowData={items}
-//                     columnDefs={columnDefs}
-//                     defaultColDef={defaultColDef}
-//                     domLayout="autoHeight"
-//                     suppressRowClickSelection={true}
-//                     rowSelection="single"
-//                 />
-//             </div>
-
-//             {/* Add New Item Modal */}
-//             {showAddModal && (
-//                 <div
-//                     className="modal-overlay"
-//                     onClick={(e) => {
-//                         if (e.target.classList.contains("modal-overlay")) setShowAddModal(false);
-//                     }}
-//                 >
-//                     <div className="menu-modal-content">
-//                         <h3>Add New Inventory Item</h3>
-//                         <AddMenuForm clientId={clientId} onItemCreated={handleItemCreated} />
-//                     </div>
-//                 </div>
-//             )}
-
-//             {/* Edit Item Modal */}
-//             {showEditModal && editingItem && (
-//                 <div
-//                     className="modal-overlay"
-//                     onClick={(e) => {
-//                         if (e.target.classList.contains("modal-overlay")) setShowEditModal(false);
-//                     }}
-//                 >
-//                     <div className="menu-modal-content">
-//                         <h3>Edit Inventory Item</h3>
-//                         <form
-//                             onSubmit={(e) => {
-//                                 e.preventDefault();
-//                                 handleEditSave();
-//                             }}
-//                         >
-//                             <div className="form-entry-wrapper">
-//                                 <div className="form-row">
-//                                     <input
-//                                         type="text"
-//                                         value={editingItem.inventory_id}
-//                                         readOnly
-//                                         className="form-input short"
-//                                     />
-
-//                                     {/* Custom multi-select for line items */}
-//                                     <DropdownCheckbox
-//                                         selected={Array.isArray(editingItem.line_item_id) ? editingItem.line_item_id : []}
-//                                         options={items}
-//                                         onChange={(newSelected) =>
-//                                             setEditingItem({ ...editingItem, line_item_id: newSelected })
-//                                         }
-//                                     />
-
-//                                     <label>Name:</label>
-//                                     <input
-//                                         type="text"
-//                                         value={editingItem.name}
-//                                         onChange={e => setEditingItem({ ...editingItem, name: e.target.value })}
-//                                         className="form-input"
-//                                         required
-//                                     />
-
-//                                     <label>Description:</label>
-//                                     <input
-//                                         type="text"
-//                                         value={editingItem.description}
-//                                         onChange={e => setEditingItem({ ...editingItem, description: e.target.value })}
-//                                         className="form-input"
-//                                     />
-//                                 </div>
-
-//                                 <div className="form-row">
-//                                     <label>Category:</label>
-//                                     <select
-//                                         value={editingItem.category_id}
-//                                         onChange={e => setEditingItem({ ...editingItem, category_id: e.target.value })}
-//                                         className="form-input"
-//                                     >
-//                                         <option value="">Select Category</option>
-//                                         {categories.map(cat => (
-//                                             <option key={cat.id} value={cat.id}>{cat.name}</option>
-//                                         ))}
-//                                     </select>
-
-//                                     <label>Realm:</label>
-//                                     <input
-//                                         type="text"
-//                                         value={editingItem.realm || ""}
-//                                         onChange={e => setEditingItem({ ...editingItem, realm: e.target.value })}
-//                                         className="form-input"
-//                                     />
-
-//                                     <label>Dietary:</label>
-//                                     <select
-//                                         value={editingItem.dietary_type || ""}
-//                                         onChange={e => setEditingItem({ ...editingItem, dietary_type: e.target.value })}
-//                                         className="form-input"
-//                                     >
-//                                         <option value="">Select Dietary Type</option>
-//                                         <option value="veg">Veg</option>
-//                                         <option value="non-veg">NonVeg</option>
-//                                     </select>
-
-//                                     <label>Availability:</label>
-//                                     <input
-//                                         type="number"
-//                                         value={editingItem.availability || ""}
-//                                         onChange={e => setEditingItem({ ...editingItem, availability: e.target.value })}
-//                                         className="form-input short"
-//                                     />
-
-//                                     <label>Units:</label>
-//                                     <input
-//                                         type="text"
-//                                         value={editingItem.unit || ""}
-//                                         onChange={e => setEditingItem({ ...editingItem, unit: e.target.value })}
-//                                         className="form-input short"
-//                                     />
-//                                 </div>
-
-//                                 <div className="form-row">
-//                                     <label>Unit Price:</label>
-//                                     <input
-//                                         type="number"
-//                                         value={editingItem.unit_price || ""}
-//                                         onChange={e => setEditingItem({ ...editingItem, unit_price: e.target.value })}
-//                                         className="form-input"
-//                                     />
-
-//                                     <label>CST:</label>
-//                                     <input
-//                                         type="number"
-//                                         value={editingItem.unit_cst || ""}
-//                                         onChange={e => setEditingItem({ ...editingItem, unit_cst: e.target.value })}
-//                                         className="form-input short"
-//                                     />
-
-//                                     <label>GST:</label>
-//                                     <input
-//                                         type="number"
-//                                         value={editingItem.unit_gst || ""}
-//                                         onChange={e => setEditingItem({ ...editingItem, unit_gst: e.target.value })}
-//                                         className="form-input short"
-//                                     />
-
-//                                     <label>Unit Total Price:</label>
-//                                     <input
-//                                         type="number"
-//                                         value={editingItem.unit_total_price || ""}
-//                                         onChange={e => setEditingItem({ ...editingItem, unit_total_price: e.target.value })}
-//                                         className="form-input short"
-//                                     />
-//                                 </div>
-
-//                                 <div className="form-row">
-//                                     <label>Total Price:</label>
-//                                     <input
-//                                         type="number"
-//                                         value={editingItem.price || ""}
-//                                         onChange={e => setEditingItem({ ...editingItem, price: e.target.value })}
-//                                         className="form-input short"
-//                                     />
-
-//                                     <label>Total CST:</label>
-//                                     <input
-//                                         type="number"
-//                                         value={editingItem.cst || ""}
-//                                         onChange={e => setEditingItem({ ...editingItem, cst: e.target.value })}
-//                                         className="form-input short"
-//                                     />
-
-//                                     <label>Total GST:</label>
-//                                     <input
-//                                         type="number"
-//                                         value={editingItem.gst || ""}
-//                                         onChange={e => setEditingItem({ ...editingItem, gst: e.target.value })}
-//                                         className="form-input short"
-//                                     />
-
-//                                     <label>Discount:</label>
-//                                     <input
-//                                         type="number"
-//                                         value={editingItem.discount || ""}
-//                                         onChange={e => setEditingItem({ ...editingItem, discount: e.target.value })}
-//                                         className="form-input short"
-//                                     />
-
-//                                     <label>Total Price:</label>
-//                                     <input
-//                                         type="number"
-//                                         value={editingItem.total_price || ""}
-//                                         onChange={e => setEditingItem({ ...editingItem, total_price: e.target.value })}
-//                                         className="form-input short"
-//                                     />
-
-//                                     <label>Slug:</label>
-//                                     <input
-//                                         type="text"
-//                                         value={editingItem.slug || ""}
-//                                         onChange={e => setEditingItem({ ...editingItem, slug: e.target.value })}
-//                                         className="form-input"
-//                                     />
-//                                 </div>
-//                             </div>
-
-//                             <div className="form-actions">
-//                                 <button type="submit" className="btn-add">Save</button>
-//                                 <button type="button" className="btn-cancel" onClick={() => setShowEditModal(false)}>Cancel</button>
-//                             </div>
-//                         </form>
-//                     </div>
-//                 </div>
-//             )}
-
-//             {/* Confirm Delete Modal */}
-//             {deleteTarget && (
-//                 <div className="modal-overlay">
-//                     <div className="modal-content">
-//                         <h4>Confirm Delete</h4>
-//                         <p>Delete <strong>{deleteTarget.name}</strong>?</p>
-//                         <div className="modal-buttons">
-//                             <button
-//                                 className="btn-add"
-//                                 onClick={async () => {
-//                                     await handleDelete(deleteTarget.id);
-//                                     setDeleteTarget(null);
-//                                 }}
-//                             >
-//                                 Yes
-//                             </button>
-//                             <button className="btn-cancel" onClick={() => setDeleteTarget(null)}>No</button>
-//                         </div>
-//                     </div>
-//                 </div>
-//             )}
-//         </div>
-//     );
-// }
-
-// // DropdownCheckbox component (copied/adjusted from your previous code)
-// function DropdownCheckbox({ selected, options, onChange }) {
-//     const [open, setOpen] = useState(false);
-//     const ref = React.useRef(null);
-
-//     React.useEffect(() => {
-//         const handleClickOutside = (event) => {
-//             if (ref.current && !ref.current.contains(event.target)) {
-//                 setOpen(false);
-//             }
-//         };
-//         document.addEventListener("mousedown", handleClickOutside);
-//         return () => document.removeEventListener("mousedown", handleClickOutside);
-//     }, []);
-
-//     const toggleSelect = (id) => {
-//         const newSelected = selected.includes(id)
-//             ? selected.filter(val => val !== id)
-//             : [...selected, id];
-//         onChange(newSelected);
-//     };
-
-//     return (
-//         <div ref={ref} className="dropdown-multiselect">
-//             <div className="dropdown-header" onClick={() => setOpen(!open)}>
-//                 {selected.length > 0 ? `${selected.length} item(s) selected` : "Select Addon(s)"}
-//                 <span className="dropdown-arrow">▾</span>
-//             </div>
-//             {open && (
-//                 <div className="dropdown-list">
-//                     {options.map(option => (
-//                         <label key={option.id} className="dropdown-item">
-//                             <input
-//                                 type="checkbox"
-//                                 checked={selected.includes(option.id)}
-//                                 onChange={() => toggleSelect(option.id)}
-//                             />
-//                             {option.name}
-//                         </label>
-//                     ))}
-//                 </div>
-//             )}
-//         </div>
-//     );
-// }
-
-// export default InventoryItemList;

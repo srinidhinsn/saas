@@ -1,172 +1,219 @@
-import React, { useState } from "react";
+import React, { useState, useEffect } from "react";
+import { useParams } from "react-router-dom";
+import axios from "axios";
+import userServicesPort from "../../Backend_Port_Files/UserServices";
 
 const AddUserForm = ({ onCancel, onSave }) => {
-    const [formData, setFormData] = useState({
-        username: "",
-        email: "",
-        firstName: "",
-        lastName: "",
-        website: "",
-        password: "",
-        role: "",
-    });
+  const { clientId } = useParams();
+  const token = localStorage.getItem("access_token");
 
-    const handleChange = (e) => {
-        const { name, value } = e.target;
-        setFormData((prev) => ({ ...prev, [name]: value }));
+  const [formData, setFormData] = useState({
+    username: "",
+    email: "",
+    firstName: "",
+    lastName: "",
+    dob: "",
+    phone: "",
+    password: "",
+    role: "", // default empty
+  });
+
+  const [roles, setRoles] = useState([]); // store roles from API
+
+  useEffect(() => {
+    const fetchRoles = async () => {
+      try {
+        const res = await axios.get(
+          "http://localhost:8002/saas/easyfood/inventory/read_category?category_id=roles",
+          {
+            headers: { Authorization: `Bearer ${token}` },
+          }
+        );
+
+        console.log("Fetched Roles Category:", res.data);
+
+        if (res.data && res.data.data && res.data.data.length > 0) {
+          const rolesCategory = res.data.data[0]; // roles root category
+          setRoles(rolesCategory.subCategories || []);
+        }
+      } catch (err) {
+        console.error("Error fetching roles:", err);
+      }
     };
 
-    const handleSubmit = (e) => {
-        e.preventDefault();
+    fetchRoles();
+  }, [token]);
 
-        // Save user logic (example: localStorage)
-        const savedUsers = JSON.parse(localStorage.getItem("users")) || [];
-        savedUsers.push({
-            username: formData.username,
-            name: `${formData.firstName} ${formData.lastName}`.trim(),
-            email: formData.email,
-            role: formData.role,
-            posts: 0,
-            avatar: "",
-        });
-        localStorage.setItem("users", JSON.stringify(savedUsers));
+  const handleChange = (e) => {
+    const { name, value } = e.target;
+    setFormData((prev) => ({ ...prev, [name]: value }));
+  };
 
-        if (onSave) onSave();
+  const handleSubmit = async (e) => {
+    e.preventDefault();
+
+    const payload = {
+      username: formData.username,
+      email: formData.email,
+      first_name: formData.firstName,
+      last_name: formData.lastName,
+      dob: formData.dob || null,
+      phone: formData.phone || null,
+      password: formData.password,
+      // roles: [formData.role], // uncomment if backend expects array
+      // grants: [],
     };
 
-    return (
-        <div className="Add-userform-container">
-            <div className="wp-add-user-container">
-                <h1>Add New User</h1>
+    try {
+      const res = await userServicesPort.post(
+        `/${clientId}/users/add`,
+        payload,
+        {
+          headers: { Authorization: `Bearer ${token}` },
+        }
+      );
 
-                <form onSubmit={handleSubmit} className="wp-add-user-form">
-                    {/* Username */}
-                    <div className="form-row">
-                        <label htmlFor="username">
-                            Username <span className="required">*</span>
-                        </label>
-                        <div>
-                            <input
-                                id="username"
-                                name="username"
-                                type="text"
-                                value={formData.username}
-                                onChange={handleChange}
-                                required
-                            />
-                            <p className="description">Required. The username cannot be changed.</p>
-                        </div>
-                    </div>
+      console.log("User added successfully:", res.data);
 
-                    {/* Email */}
-                    <div className="form-row">
-                        <label htmlFor="email">
-                            Email <span className="required">*</span>
-                        </label>
-                        <div>
-                            <input
-                                id="email"
-                                name="email"
-                                type="email"
-                                value={formData.email}
-                                onChange={handleChange}
-                                required
-                            />
-                        </div>
-                    </div>
+      if (onSave) onSave();
+    } catch (error) {
+      console.error("Failed to add user:", error);
+    }
+  };
 
-                    {/* First Name */}
-                    <div className="form-row">
-                        <label htmlFor="firstName">First Name</label>
-                        <div>
-                            <input
-                                id="firstName"
-                                name="firstName"
-                                type="text"
-                                value={formData.firstName}
-                                onChange={handleChange}
-                            />
-                        </div>
-                    </div>
+  return (
+    <div className="Add-userform-container">
+      <div className="wp-add-user-container">
+        <h1>Add New User</h1>
 
-                    {/* Last Name */}
-                    <div className="form-row">
-                        <label htmlFor="lastName">Last Name</label>
-                        <div>
-                            <input
-                                id="lastName"
-                                name="lastName"
-                                type="text"
-                                value={formData.lastName}
-                                onChange={handleChange}
-                            />
-                        </div>
-                    </div>
+        <form onSubmit={handleSubmit} className="wp-add-user-form">
+          {/* Username */}
+          <div className="form-row">
+            <label htmlFor="username">
+              Username <span className="required">*</span>
+            </label>
+            <input
+              id="username"
+              name="username"
+              type="text"
+              value={formData.username}
+              onChange={handleChange}
+              required
+            />
+          </div>
 
-                    {/* Website */}
-                    <div className="form-row">
-                        <label htmlFor="website">Website</label>
-                        <div>
-                            <input
-                                id="website"
-                                name="website"
-                                type="url"
-                                value={formData.website}
-                                onChange={handleChange}
-                            />
-                        </div>
-                    </div>
+          {/* Email */}
+          <div className="form-row">
+            <label htmlFor="email">
+              Email <span className="required">*</span>
+            </label>
+            <input
+              id="email"
+              name="email"
+              type="email"
+              value={formData.email}
+              onChange={handleChange}
+              required
+            />
+          </div>
 
-                    {/* Password */}
-                    <div className="form-row">
-                        <label htmlFor="password">Password</label>
-                        <div>
-                            <input
-                                id="password"
-                                name="password"
-                                type="password"
-                                value={formData.password}
-                                onChange={handleChange}
-                                required
-                            />
-                            <p className="description">
-                                A password will be generated automatically if you leave this blank.
-                            </p>
-                        </div>
-                    </div>
+          {/* First Name */}
+          <div className="form-row">
+            <label htmlFor="firstName">First Name</label>
+            <input
+              id="firstName"
+              name="firstName"
+              type="text"
+              value={formData.firstName}
+              onChange={handleChange}
+            />
+          </div>
 
-                    {/* Role */}
-                    <div className="form-row">
-                        <label htmlFor="role">Role</label>
-                        <div>
-                            <select
-                                id="role"
-                                name="role"
-                                value={formData.role}
-                                onChange={handleChange}
-                            >
-                                <option value="Admin">Admin</option>
-                                <option value="Receptionist">Receptionist</option>
-                                <option value="Manager">Manager</option>
-                                <option value="Waiter">Waiter</option>
-                                <option value="Chef">Chef</option>
-                            </select>
-                        </div>
-                    </div>
+          {/* Last Name */}
+          <div className="form-row">
+            <label htmlFor="lastName">Last Name</label>
+            <input
+              id="lastName"
+              name="lastName"
+              type="text"
+              value={formData.lastName}
+              onChange={handleChange}
+            />
+          </div>
 
-                    {/* Buttons */}
-                    <div className="form-buttons">
-                        <button type="submit" className="button button-primary">
-                            Add New User
-                        </button>
-                        <button type="button" className="button" onClick={onCancel}>
-                            Cancel
-                        </button>
-                    </div>
-                </form>
-            </div>
-        </div>
-    );
+          {/* DOB */}
+          <div className="form-row">
+            <label htmlFor="dob">Date of Birth</label>
+            <input
+              id="dob"
+              name="dob"
+              type="date"
+              value={formData.dob}
+              onChange={handleChange}
+            />
+          </div>
+
+          {/* Phone */}
+          <div className="form-row">
+            <label htmlFor="phone">Phone</label>
+            <input
+              id="phone"
+              name="phone"
+              type="text"
+              value={formData.phone}
+              onChange={handleChange}
+            />
+          </div>
+
+          {/* Password */}
+          <div className="form-row">
+            <label htmlFor="password">Password</label>
+            <input
+              id="password"
+              name="password"
+              type="password"
+              value={formData.password}
+              onChange={handleChange}
+              required
+            />
+          </div>
+
+          {/* Role */}
+          <div className="form-row">
+            <label htmlFor="role">Role</label>
+            <select
+              id="role"
+              name="role"
+              value={formData.role}
+              onChange={handleChange}
+              required
+            >
+              <option value="">Select Role</option>
+              {roles.length > 0 ? (
+                roles.map((role) => (
+                  <option key={role.id} value={role.name}>
+                    {role.name}
+                  </option>
+                ))
+              ) : (
+                <option disabled>No roles available</option>
+              )}
+            </select>
+          </div>
+
+          {/* Buttons */}
+          <div className="form-buttons">
+            <button type="submit" className="button button-primary">
+              Add New User
+            </button>
+            <button type="button" className="button" onClick={onCancel}>
+              Cancel
+            </button>
+          </div>
+        </form>
+      </div>
+    </div>
+  );
 };
 
 export default AddUserForm;

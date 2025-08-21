@@ -1,8 +1,7 @@
 import React, { useState, useEffect, useRef } from "react";
-import axios from "axios";
-import { jwtDecode } from "jwt-decode";
+import {jwtDecode} from "jwt-decode";
 import { useParams } from "react-router-dom";
-import inventoryServicesPort from '../../Backend_Port_Files/InventoryServices'
+import inventoryServicesPort from '../../Backend_Port_Files/InventoryServices';
 
 function AddInventoryItemForm({ onItemCreated }) {
   const { clientId } = useParams();
@@ -34,15 +33,31 @@ function AddInventoryItemForm({ onItemCreated }) {
   const [categories, setCategories] = useState([]);
   const [lineItems, setLineItems] = useState([]);
 
+  // Recursive flattening of nested category tree
+  const flattenCategories = (categoryTree) => {
+    const flat = [];
+    const recurse = (nodes) => {
+      nodes.forEach(node => {
+        if (!node) return;
+        flat.push({ id: node.id, name: node.name });
+        if (node.subCategories && node.subCategories.length > 0) {
+          recurse(node.subCategories);
+        }
+      });
+    };
+    recurse(categoryTree);
+    return flat;
+  };
+
   const buildCategoryPath = (categoryId) => {
     const path = [];
     let currentId = categoryId;
 
     while (currentId) {
-      const current = categories.find(cat => cat.id === currentId);
+      const current = categories.find(cat => cat && cat.id === currentId);
       if (!current) break;
       path.unshift(current.name.trim().replace(/\s+/g, "_"));
-      currentId = current.parent_id;
+      currentId = current.parent_id; // optional: might be undefined
     }
 
     return path;
@@ -52,25 +67,29 @@ function AddInventoryItemForm({ onItemCreated }) {
     const catPath = buildCategoryPath(categoryId);
     const item = itemName?.trim().replace(/\s+/g, "_") || "";
     if (!catPath.includes(item)) catPath.push(item);
-
     return `_${catPath.join("_")}`;
   };
 
   useEffect(() => {
     if (!token || !clientId) return;
 
-    inventoryServicesPort.get(`/${clientId}/inventory/read_category`, {
+    // Fetch nested category tree from backend
+    inventoryServicesPort.get(`/${clientId}/inventory/read_category?category_id=dietery`, {
       headers: { Authorization: `Bearer ${token}` },
     })
-      .then((res) => setCategories(res.data.data || []))
+      .then((res) => {
+        const tree = res.data.data || [];
+        const flattened = flattenCategories(tree);
+        setCategories(flattened);
+      })
       .catch((err) => console.error("Error fetching categories:", err));
 
-      inventoryServicesPort.get(`/${clientId}/inventory/read`, {
+    inventoryServicesPort.get(`/${clientId}/inventory/read`, {
       headers: { Authorization: `Bearer ${token}` },
     })
       .then((res) => setLineItems(res.data.data || []))
       .catch((err) => console.error("Error fetching line items:", err));
-  }, [clientId]);
+  }, [clientId, token]);
 
   const handleChange = (index, field, value) => {
     const updated = [...items];
@@ -199,7 +218,7 @@ function AddInventoryItemForm({ onItemCreated }) {
 
   if (!token || !clientId) {
     alert("Session expired. Please log in again.");
-    return;
+    return null;
   }
 
   return (
@@ -243,7 +262,7 @@ function AddInventoryItemForm({ onItemCreated }) {
               className="form-input"
             >
               <option value="">Select Category</option>
-              {categories.map((cat) => (
+              {categories.map(cat => (
                 <option key={cat.id} value={cat.id}>
                   {cat.name}
                 </option>
