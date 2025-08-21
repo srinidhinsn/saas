@@ -186,17 +186,17 @@ function CategoryList({ onCategorySelect }) {
 
         ancestors.forEach(id => {
             const cat = categoryMap[id];
-            if (cat) path.push(cat.name.trim().replace(/\s+/g, "_"));
+            if (cat) path.push(cat.name.trim().replace(/\s+/g, " "));
         });
 
         if (currentName) {
-            path.push(currentName.trim().replace(/\s+/g, "_"));
+            path.push(currentName.trim().replace(/\s+/g, " "));
         } else {
             const cat = categoryMap[categoryId];
-            if (cat) path.push(cat.name.trim().replace(/\s+/g, "_"));
+            if (cat) path.push(cat.name.trim().replace(/\s+/g, " "));
         }
 
-        return "_" + path.join(" _");
+        return " " + path.join(" _");
     };
 
     const refreshCategoriesAndParentMap = async () => {

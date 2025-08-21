@@ -7,6 +7,8 @@ import { useParams } from "react-router-dom";
 import { useTheme } from "../../ThemeChangerComponent/ThemeProvider";
 import { toast } from "react-toastify";
 import "react-toastify/dist/ReactToastify.css";
+import Invoice from "../Invoice_Services_Components/Invoice_Page";
+import InvoiceModal from "../Invoice_Services_Components/Invoice_Page";
 // import SplashCursor from "../../Sub_Components/Arrow";
 
 
@@ -34,8 +36,20 @@ const OrdersVisiblePage = () => {
     const [selectedDate, setSelectedDate] = useState(todayDate);
     const [filterMode, setFilterMode] = useState(0);
     // 0 = ascending date, 1 = descending date, 2 = new, 3 = preparing, 4 = served
+    const [showInvoiceModal, setShowInvoiceModal] = useState(false);
+    const [invoiceOrder, setInvoiceOrder] = useState(null);
 
     // --------------------------------------------------------------------------- //
+
+    const openInvoiceModal = (order) => {
+        setInvoiceOrder(order);
+        setShowInvoiceModal(true);
+    };
+
+    const closeInvoiceModal = () => {
+        setInvoiceOrder(null);
+        setShowInvoiceModal(false);
+    };
     useEffect(() => {
         axios.get(`http://localhost:8002/saas/${clientId}/inventory/read`, {
             headers: { Authorization: `Bearer ${token}` }
@@ -573,7 +587,6 @@ const OrdersVisiblePage = () => {
                                 filteredOrders.map((order, index) => (
                                     <div key={order.id || index} className="order-card">
                                         <div className="order-summary grid-row">
-                                            <div className="order-col">{index + 1}</div>
                                             <div className="order-col">{tablesMap[order.table_id] || order.table_id}</div>
                                             <div className="order-col">{order.items.length} items</div>
                                             <div className="order-col">₹{parseFloat(order.total_price || 0).toFixed(2)}</div>
@@ -581,6 +594,14 @@ const OrdersVisiblePage = () => {
                                                 {order.status}
                                             </div>
                                             <div className="order-col">{new Date(order.created_at).toLocaleDateString()}</div>
+                                            <div className="order-col"><button
+                                                className="btn invoice"
+                                                onClick={() => openInvoiceModal(order)}
+                                            >
+                                                Invoice
+                                            </button>
+
+                                            </div>
                                             <div className="order-col">
                                                 <button className="btn toggle" onClick={() => toggleExpand(index)}>
                                                     {expandedOrderIndex === index ? "Hide" : "View"}
@@ -773,6 +794,10 @@ const OrdersVisiblePage = () => {
                             </div>
                         </div>
                     )}
+                    {showInvoiceModal && invoiceOrder && (
+                        <InvoiceModal order={invoiceOrder} onClose={closeInvoiceModal} />
+                    )}
+
                 </div>
             </div>
         </>

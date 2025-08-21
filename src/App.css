@@ -2274,6 +2274,7 @@ Ordersummary sheet */
     overflow: hidden;
     user-select: none;
     min-height: 320px;
+    width: 300px;
 }
 
 /* Header */

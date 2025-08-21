@@ -108,13 +108,13 @@ const Navbar = () => {
                             {!isActive('/main/documents') && <span className="arrow-indicator"><MdKeyboardArrowRight /></span>}
                         </li>
                     </ClickSpark> */}
-                    <ClickSpark>
+                    {/* <ClickSpark>
 
                         <li title="Invoice" onClick={() => go('/invoice')} className={isActive('/main/invoice') ? 'page-active' : ''}>
                             <IoDocumentTextOutline /><span>Invoice</span>
                             {!isActive('/main/invoice') && <span className="arrow-indicator"><MdKeyboardArrowRight /></span>}
                         </li>
-                    </ClickSpark>
+                    </ClickSpark> */}
                     <ClickSpark>
 
                         <li title="Report" onClick={() => go('/reports')} className={isActive('/main/reports') ? 'page-active' : ''}>

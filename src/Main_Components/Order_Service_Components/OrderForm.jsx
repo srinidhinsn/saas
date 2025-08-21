@@ -234,7 +234,7 @@ const OrderForm = ({ table, onOrderCreated }) => {
 
                 console.log("Order placed:", res.data);
                 onOrderCreated?.(res.data);
-                navigate(`/saas/${clientId}/main/orders-view`, {
+                navigate(`/saas/${clientId}/main/kds-page`, {
                     state: {
                         table_number: selectedTable?.table_number || selectedTable?.id,
                         order_id: res.data.data.id,

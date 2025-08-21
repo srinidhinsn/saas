@@ -57,7 +57,8 @@ const HeaderBar = () => {
         const onOrderCollect = (e) => {
             const { tableName, orderId } = e.detail;
             const message = `Order ${orderId} is ready for collection at ${tableName}`;
-            addNotification(message);
+            const notification = `Order for ${tableName} is ready!!!`
+            addNotification(notification);
         };
 
         window.addEventListener("orderCollect", onOrderCollect);
