@@ -20,19 +20,22 @@ const HeaderBar = () => {
 
     const token = localStorage.getItem("access_token");
     const [tokenAvailable, setTokenAvailable] = useState(!!token);
+
     const addNotification = (message) => {
-        setNotifications(prev => [message, ...prev]); // newest on top
+        setNotifications((prev) => [message, ...prev]); // newest on top
         setShowBellShaking(true); // trigger bell shake
+        setShowPopup(true); // Show popup automatically on new notification
     };
 
-    useEffect(() => {
-        setNotifications([
-            "Order #1001 created",
-            "Order #1001 served",
-            "User logged in",
-            "User logged out",
-        ]);
-    }, []);
+    // useEffect(() => {
+    //     // Initial sample notifications if any
+    //     setNotifications([
+    //         "Order #1001 created",
+    //         "Order #1001 served",
+    //         "User logged in",
+    //         "User logged out",
+    //     ]);
+    // }, []);
 
     useEffect(() => {
         const checkToken = () => {
@@ -43,11 +46,26 @@ const HeaderBar = () => {
             }
         };
 
-        checkToken(); // On load
+        checkToken();
         window.addEventListener("storage", checkToken);
 
         return () => window.removeEventListener("storage", checkToken);
     }, [navigate]);
+
+    // Add event listener for custom 'orderCollect' events for real-time notification
+    useEffect(() => {
+        const onOrderCollect = (e) => {
+            const { tableName, orderId } = e.detail;
+            const message = `Order ${orderId} is ready for collection at ${tableName}`;
+            addNotification(message);
+        };
+
+        window.addEventListener("orderCollect", onOrderCollect);
+
+        return () => {
+            window.removeEventListener("orderCollect", onOrderCollect);
+        };
+    }, []);
 
     const handleImageClick = () => {
         if (clickTimeoutRef.current) {
@@ -56,7 +74,7 @@ const HeaderBar = () => {
             fileInputRef.current.click(); // Double click
         } else {
             clickTimeoutRef.current = setTimeout(() => {
-                setShowDropdown(prev => !prev); // Single click
+                setShowDropdown((prev) => !prev); // Single click toggle
                 clickTimeoutRef.current = null;
             }, 250);
         }
@@ -84,10 +102,8 @@ const HeaderBar = () => {
                 </div>
 
                 <div className="Right-Side-Header">
-                    {/* Notifications */}
                     <ClickSpark>
                         <div className="left">
-
                             <button
                                 onClick={() => {
                                     setShowPopup(!showPopup);
@@ -100,7 +116,9 @@ const HeaderBar = () => {
                                     <div className="notification-popup">
                                         {notifications.length ? (
                                             notifications.map((note, idx) => (
-                                                <div key={idx} className="notification-item">{note}</div>
+                                                <div key={idx} className="notification-item">
+                                                    {note}
+                                                </div>
                                             ))
                                         ) : (
                                             <div>No notifications</div>
@@ -108,23 +126,23 @@ const HeaderBar = () => {
                                     </div>
                                 )}
                             </button>
-
-
-
                         </div>
                     </ClickSpark>
-                    {/* Theme Toggle */}
 
                     <ClickSpark>
                         <div className="middle">
-                            <span onClick={toggleTheme} style={{ cursor: 'pointer' }} className="theme-toggle-button">
+                            <span
+                                onClick={toggleTheme}
+                                style={{ cursor: "pointer" }}
+                                className="theme-toggle-button"
+                            >
                                 {darkMode ? <PiMoonThin /> : <HiOutlineSun />}
                             </span>
                         </div>
                     </ClickSpark>
-                    {/* Profile */}
+
                     <ClickSpark>
-                        <div className="right" style={{ cursor: 'pointer' }}>
+                        <div className="right" style={{ cursor: "pointer" }}>
                             {tokenAvailable ? (
                                 <div className="profile-container">
                                     <input
@@ -143,7 +161,9 @@ const HeaderBar = () => {
                                     </div>
                                     {showDropdown && (
                                         <div className="dropdown-menu">
-                                            <div onClick={handleSignOut} className="dropdown-item">Sign Out</div>
+                                            <div onClick={handleSignOut} className="dropdown-item">
+                                                Sign Out
+                                            </div>
                                         </div>
                                     )}
                                 </div>
@@ -152,7 +172,6 @@ const HeaderBar = () => {
                             )}
                         </div>
                     </ClickSpark>
-
                 </div>
             </div>
         </div>

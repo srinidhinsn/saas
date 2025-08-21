@@ -56,8 +56,8 @@ body {
     --delete-btn-bg: red;
     --delete-btn: white;
     /* Pending */
-    --status-pending-bg: rgb(227, 214, 149);
-    --status-pending: rgb(238, 221, 113);
+    --status-pending-bg: rgb(241, 237, 215);
+    --status-pending: rgb(146, 129, 22);
     /* preparing */
     --status-prepare-bg: rgb(58, 98, 218);
     --status-prepare: rgb(11, 8, 195);
@@ -1426,18 +1426,9 @@ body.sidebar-minimized .sidebar li .arrow-indicator {
     background: #555;
 }
 
-.kds-page {
-    padding: 1rem;
-    min-height: 89vh;
-    overflow-y: auto;
-    display: flex;
-    flex-direction: column;
-    transition: background 0.3s ease, color 0.3s ease;
-    background: var(--bg-color);
-    color: var(--text-color);
-}
 
-.kds-page.theme-light {
+
+/* .kds-page.theme-light {
     --text-color: #111;
     --card-bg: #ffffff;
     --card-text: #222;
@@ -1464,7 +1455,7 @@ body.sidebar-minimized .sidebar li .arrow-indicator {
     --pill-pending-text: #000;
     --serve-btn: #2e7d32;
     --serve-disabled: #555;
-}
+} */
 
 .kds-header {
     display: flex;
@@ -1602,7 +1593,7 @@ body.sidebar-minimized .sidebar li .arrow-indicator {
     --status-new: rgb(220, 38, 38);
     --status-preparing: rgb(193, 156, 9);
     --status-served: rgb(3, 108, 40);
-    --status-pending: rgb(96, 165, 250);
+    /* --status-pending: rgb(96, 165, 250); */
     --status-cancelled: hwb(220 90% 8%);
     --tag-blue: #2563eb;
     --tag-orange: #d97706;

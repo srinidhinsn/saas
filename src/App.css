@@ -2240,18 +2240,21 @@ Ordersummary sheet */
 /* ================================= KDS page stylesheet ============================================================================ */
 .KDS-Container {
     padding-right: 5px;
-    height: 89vh;
-    overflow-y: auto;
 }
 
 /* Container grid */
+
 .kds-page {
+    padding: 1rem;
+    height: 89vh;
+    overflow-y: auto;
+    display: flex;
+    flex-direction: column;
+    transition: background 0.3s ease, color 0.3s ease;
+    background: var(--bg-color);
+    color: var(--text-color);
     border-top-right-radius: 8px;
     border-bottom-right-radius: 8px;
-    padding: 16px;
-    background: var(--bg-chart-container);
-    display: flex;
-    justify-content: center;
 }
 
 .kds-grid {
@@ -2315,16 +2318,73 @@ Ordersummary sheet */
     text-align: right;
 }
 
+/* status updation styles */
+.pending-status {
+    cursor: pointer;
+    font-size: 15px;
+    animation: infinite;
+}
+
+.pending-status.spin {
+    animation: spin 1.5s linear infinite;
+}
+
+.preparing-status {
+    cursor: pointer;
+    font-size: 15px;
+    animation: infinite;
+}
+
+.preparing-status.spin {
+    animation: spin 1.5s linear infinite;
+}
+
+.served-status {
+    cursor: pointer;
+    font-size: 15px;
+    animation: infinite;
+}
+
+.served-status.spin {
+    animation: boom 1.5s linear infinite;
+}
+
+@keyframes spin {
+    0% {
+        transform: rotate(0deg);
+    }
+
+    100% {
+        transform: rotate(360deg);
+    }
+}
+
+@keyframes boom {
+    0% {
+        transform: scale(1.1);
+    }
+
+    50% {
+        transform: scale(1.2);
+    }
+
+    100% {
+        transform: scale(1.3);
+    }
+}
+
 /* Body: items list */
 .kds-card-body {
     flex-grow: 1;
-    padding: 20px;
+    padding: 12px;
     background: var(--bg-container);
     display: flex;
     flex-direction: column;
-    gap: 10px;
+    gap: 12px;
     font-size: 14px;
     color: var(--bg-text-color);
+    height: 160px;
+    overflow: auto;
 }
 
 .item-row {
@@ -2333,6 +2393,7 @@ Ordersummary sheet */
     font-weight: 500;
     line-height: 1.3;
     align-items: center;
+    width: 265px;
 }
 
 .item-name {
@@ -2488,6 +2549,10 @@ Ordersummary sheet */
 @media (max-width: 768px) {
     .kds-grid {
         grid-template-columns: repeat(auto-fill, minmax(180px, 1fr));
+    }
+
+    .kds-card-footer button {
+        padding: 4px 8px;
     }
 }
 
