@@ -673,48 +673,55 @@ function InventoryItemList({ selectedCategory }) {
     const flattenCategories = (categoryTree) => {
         const flat = [];
         const recurse = (nodes) => {
-          nodes.forEach(node => {
-            if (!node) return;
-            flat.push({ id: node.id, name: node.name });
-            if (node.subCategories && node.subCategories.length > 0) {
-              recurse(node.subCategories);
-            }
-          });
+            nodes.forEach(node => {
+                if (!node) return;
+                flat.push({ id: node.id, name: node.name });
+                if (node.subCategories && node.subCategories.length > 0) {
+                    recurse(node.subCategories);
+                }
+            });
         };
         recurse(categoryTree);
         return flat;
-      };
+    };
 
-      
-  const buildCategoryPath = (categoryId) => {
-    const path = [];
-    let currentId = categoryId;
 
-    while (currentId) {
-      const current = categories.find(cat => cat && cat.id === currentId);
-      if (!current) break;
-      path.unshift(current.name.trim().replace(/\s+/g, "_"));
-      currentId = current.parent_id; // optional: might be undefined
-    }
+    // Replace your existing buildCategoryPath with this
+    const buildCategoryPath = (categoryId, itemName = "") => {
+        const path = [];
+        let currentId = categoryId;
 
-    return path;
-  };
+        // walk up categories until root
+        while (currentId) {
+            const current = categories.find(cat => cat && cat.id === currentId);
+            if (!current) break;
+            path.unshift(current.name.trim().replace(/\s+/g, "_"));
+            currentId = current.parent_id;
+        }
 
-  
-  useEffect(() => {
-    if (!token || !clientId) return;
+        // add item name at the end
+        if (itemName) {
+            path.push(itemName.trim().replace(/\s+/g, "_"));
+        }
 
-    // Fetch nested category tree from backend
-    inventoryServicesPort.get(`/${clientId}/inventory/read_category?category_id=dietery`, {
-      headers: { Authorization: `Bearer ${token}` },
-    })
-      .then((res) => {
-        const tree = res.data.data || [];
-        const flattened = flattenCategories(tree);
-        setCategories(flattened);
-      })
-      .catch((err) => console.error("Error fetching categories:", err));
-  }, [clientId, token]);
+        return "_" + path.join(" _");
+    };
+
+
+    useEffect(() => {
+        if (!token || !clientId) return;
+
+        // Fetch nested category tree from backend
+        inventoryServicesPort.get(`/${clientId}/inventory/read_category?category_id=dietery`, {
+            headers: { Authorization: `Bearer ${token}` },
+        })
+            .then((res) => {
+                const tree = res.data.data || [];
+                const flattened = flattenCategories(tree);
+                setCategories(flattened);
+            })
+            .catch((err) => console.error("Error fetching categories:", err));
+    }, [clientId, token]);
 
 
 
@@ -771,12 +778,12 @@ function InventoryItemList({ selectedCategory }) {
             line_item_id: Array.isArray(editingItem.line_item_id)
                 ? editingItem.line_item_id
                 : typeof editingItem.line_item_id === "string"
-                    ? editingItem.line_item_id
-                        .split(",")
-                        .map((s) => parseInt(s.trim()))
-                        .filter((n) => !isNaN(n))
+                    ? editingItem.line_item_id.split(",").map(s => parseInt(s.trim())).filter(n => !isNaN(n))
                     : [],
         };
+
+        // ✅ auto-generate slug from full ancestry
+        updatedItem.slug = buildCategoryPath(updatedItem.category_id, updatedItem.name);
 
         try {
             const res = await inventoryServicesPort.post(
@@ -785,8 +792,8 @@ function InventoryItemList({ selectedCategory }) {
                 { headers }
             );
 
-            setItems((prev) =>
-                prev.map((i) =>
+            setItems(prev =>
+                prev.map(i =>
                     i.inventory_id === updatedItem.inventory_id ? res.data.data : i
                 )
             );
@@ -797,6 +804,7 @@ function InventoryItemList({ selectedCategory }) {
             alert("Edit failed.");
         }
     };
+
 
     const handleDelete = async (id) => {
         try {
@@ -914,31 +922,31 @@ function InventoryItemList({ selectedCategory }) {
 
 
 
-//     const displayedItems = selectedCategory && selectedCategory.name !== "All"
-//     ? originalItems.filter(item => item.category_id === selectedCategory.id)
-//     : originalItems;
+    //     const displayedItems = selectedCategory && selectedCategory.name !== "All"
+    //     ? originalItems.filter(item => item.category_id === selectedCategory.id)
+    //     : originalItems;
 
-// // Group items by existing categories
-// let groupedItems = categories.map(category => ({
-//     ...category,
-//     items: displayedItems.filter(item => item.category_id === category.id)
-// }));
+    // // Group items by existing categories
+    // let groupedItems = categories.map(category => ({
+    //     ...category,
+    //     items: displayedItems.filter(item => item.category_id === category.id)
+    // }));
 
-// // Find items with no category assigned
-// const uncategorizedItems = displayedItems.filter(
-//     item => !item.category_id || !categories.some(cat => cat.id === item.category_id)
-// );
+    // // Find items with no category assigned
+    // const uncategorizedItems = displayedItems.filter(
+    //     item => !item.category_id || !categories.some(cat => cat.id === item.category_id)
+    // );
 
-// // Add "Uncategorized" group if any found
-// if (uncategorizedItems.length > 0) {
-//     groupedItems.push({
-//         id: "uncategorized",
-//         name: "Uncategorized",
-//         items: uncategorizedItems
-//     });
-// }
+    // // Add "Uncategorized" group if any found
+    // if (uncategorizedItems.length > 0) {
+    //     groupedItems.push({
+    //         id: "uncategorized",
+    //         name: "Uncategorized",
+    //         items: uncategorizedItems
+    //     });
+    // }
 
-    
+
 
 
 
@@ -954,7 +962,7 @@ function InventoryItemList({ selectedCategory }) {
 
 
             </div>
-            
+
             <div className="grid-layout ">
                 {items.length === 0 ? (
                     <p className="no-items">No inventory found.</p>

@@ -7,9 +7,7 @@ import { useParams } from "react-router-dom";
 import { useTheme } from "../../ThemeChangerComponent/ThemeProvider";
 import { toast } from "react-toastify";
 import "react-toastify/dist/ReactToastify.css";
-import Invoice from "../Invoice_Services_Components/Invoice_Page";
 import InvoiceModal from "../Invoice_Services_Components/Invoice_Page";
-// import SplashCursor from "../../Sub_Components/Arrow";
 
 
 const OrdersVisiblePage = () => {
@@ -42,7 +40,8 @@ const OrdersVisiblePage = () => {
     // --------------------------------------------------------------------------- //
 
     const openInvoiceModal = (order) => {
-        setInvoiceOrder(order);
+        const tableName = tablesMap[order.table_id] || order.table_id;
+        setInvoiceOrder({ ...order, table_name: tableName });
         setShowInvoiceModal(true);
     };
 
@@ -51,7 +50,7 @@ const OrdersVisiblePage = () => {
         setShowInvoiceModal(false);
     };
     useEffect(() => {
-        axios.get(`http://localhost:8002/saas/${clientId}/inventory/read`, {
+        inventoryServicesPort.get(`/${clientId}/inventory/read`, {
             headers: { Authorization: `Bearer ${token}` }
         })
             .then(res => {

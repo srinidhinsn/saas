@@ -165,6 +165,8 @@ function CategoryList({ onCategorySelect }) {
 
     const generateSlugFromParents = (categoryId, currentName, overrideParentMap = null) => {
         const path = [];
+
+        // Flatten categories into lookup
         const categoryMap = {};
         const buildMap = (cats) => {
             for (const cat of cats) {
@@ -174,21 +176,26 @@ function CategoryList({ onCategorySelect }) {
         };
         buildMap(categories);
 
-        const mapToUse = overrideParentMap || parentMap;
+        // ✅ Merge global parentMap + overrideParentMap
+        const mapToUse = { ...parentMap, ...(overrideParentMap || {}) };
 
         let currentId = categoryId;
         const ancestors = [];
+
+        // Walk upwards until root
         while (mapToUse[currentId]) {
             const parentId = mapToUse[currentId];
             ancestors.unshift(parentId);
             currentId = parentId;
         }
 
+        // Add ancestor names
         ancestors.forEach(id => {
             const cat = categoryMap[id];
             if (cat) path.push(cat.name.trim().replace(/\s+/g, " "));
         });
 
+        // Add current name
         if (currentName) {
             path.push(currentName.trim().replace(/\s+/g, " "));
         } else {
@@ -196,7 +203,8 @@ function CategoryList({ onCategorySelect }) {
             if (cat) path.push(cat.name.trim().replace(/\s+/g, " "));
         }
 
-        return " " + path.join(" _");
+        // ✅ Return proper slug
+        return "_" + path.join(" _");
     };
 
     const refreshCategoriesAndParentMap = async () => {
@@ -538,7 +546,7 @@ function CategoryList({ onCategorySelect }) {
                         </div> */}
 
 
-                        
+
                         <div className="modal-buttons">
                             <button onClick={handleAddCategory} className="modal-save-btn">
                                 Add
