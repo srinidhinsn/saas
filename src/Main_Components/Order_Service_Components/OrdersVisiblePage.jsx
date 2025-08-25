@@ -623,7 +623,7 @@ const OrdersVisiblePage = () => {
                                                                 Delete Order
                                                             </button>
 
-                                                            {["pending", "preparing", "served"].map((status) => (
+                                                            {["served"].map((status) => (
                                                                 <button
                                                                     key={status}
                                                                     className={`btn status-toggle ${order.status === status ? "active" : ""}`}
@@ -680,7 +680,7 @@ const OrdersVisiblePage = () => {
                                                             <span className={`status-tag ${item.status}`}>{item.status}</span>
                                                         </div>
                                                         <div className="actions">
-                                                            {["new", "preparing", "served"].map((status) => (
+                                                            {["served"].map((status) => (
                                                                 <button
                                                                     key={status}
                                                                     className={`btn item-status ${item.status === status ? "active" : ""}`}

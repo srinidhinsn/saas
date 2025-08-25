@@ -69,7 +69,8 @@ const OrderForm = ({ table, onOrderCreated }) => {
         const disc = calculateDiscount();
         const delivery = mode === "Delivery" ? 20 : 0;
         const container = (mode === "Delivery" || mode === "Pick Up") ? 10 : 0;
-        return parseFloat((subtotal + gst + cst + delivery + container - disc).toFixed(2));
+        // return parseFloat((subtotal + gst + cst + delivery + container - disc).toFixed(2));
+        return parseFloat((subtotal).toFixed(2));
     };
 
     const generateNextOrderId = () => {
@@ -435,7 +436,7 @@ const OrderForm = ({ table, onOrderCreated }) => {
                         </button>
                     ))}
                 </div>
-                <div className="charges-inputs" style={{ marginTop: "1rem", color: "#eee" }}>
+                {/* <div className="charges-inputs" style={{ marginTop: "1rem", color: "#eee" }}>
                     <label>
                         GST (%):
                         <input
@@ -463,7 +464,7 @@ const OrderForm = ({ table, onOrderCreated }) => {
                             onChange={e => setDiscount(parseFloat(e.target.value || 0))}
                         />
                     </label>
-                </div>
+                </div> */}
 
                 <div className="action-buttons">
                     <button className="kot">KOT</button>
