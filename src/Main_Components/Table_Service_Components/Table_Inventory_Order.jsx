@@ -238,11 +238,11 @@ const Table_Inventory_Order = ({ onOrderUpdate }) => {
         );
     };
 
-    const handleModeClick = (mode) => {
-        setSearchParams({ mode });
-    };
+    // const handleModeClick = (mode) => {
+    //     setSearchParams({ mode });
+    // };
 
-    const flattenCategoryTree = (tree, level = 0) => {
+    const flattenCategoryTree = (tree, level = 0, parentId = null) => {
         let flatList = [];
 
         tree.forEach(category => {
@@ -250,14 +250,74 @@ const Table_Inventory_Order = ({ onOrderUpdate }) => {
                 id: category.id,
                 name: category.name,
                 level: level,
+                parentId: parentId,
+                hasChildren: category.subCategories && category.subCategories.length > 0,
             });
 
             if (category.subCategories && category.subCategories.length > 0) {
-                flatList = flatList.concat(flattenCategoryTree(category.subCategories, level + 1));
+                flatList = flatList.concat(
+                    flattenCategoryTree(category.subCategories, level + 1, category.id)
+                );
             }
         });
 
         return flatList;
+    };
+
+
+    const CategoryNode = ({
+        category,
+        categories,
+        expandedCategories,
+        setExpandedCategories,
+        activeCategory,
+        setActiveCategory,
+    }) => {
+        const toggleExpand = (e) => {
+            e.stopPropagation();
+            setExpandedCategories(prev => ({
+                ...prev,
+                [category.id]: !prev[category.id],
+            }));
+        };
+
+        const children = categories.filter(c => c.parentId === category.id);
+
+        return (
+            <>
+                <li
+                    className={`category-item ${activeCategory === category.name ? "active" : ""}`}
+                    style={{ paddingLeft: `${category.level * 20}px` }}
+                    onClick={() => setActiveCategory(category.name)}
+                >
+                    {/* Arrow only if subcategories exist */}
+                    {category.name}
+                    {category.hasChildren && (
+                        <span
+                            onClick={toggleExpand}
+                            style={{ cursor: "pointer", marginRight: "5px" }}
+                        >
+                            {expandedCategories[category.id] ? "▼" : "▶"}
+                        </span>
+                    )}
+
+                </li>
+
+                {/* Render children only if expanded */}
+                {expandedCategories[category.id] &&
+                    children.map(child => (
+                        <CategoryNode
+                            key={child.id}
+                            category={child}
+                            categories={categories}
+                            expandedCategories={expandedCategories}
+                            setExpandedCategories={setExpandedCategories}
+                            activeCategory={activeCategory}
+                            setActiveCategory={setActiveCategory}
+                        />
+                    ))}
+            </>
+        );
     };
 
 
@@ -327,17 +387,21 @@ const Table_Inventory_Order = ({ onOrderUpdate }) => {
                                     />
                                 </div>
                                 <ul className="category-list">
-                                    {categories.map(cat => (
-                                        <span
-                                            key={cat.id}
-                                            onClick={() => setActiveCategory(cat.name)}
-                                            className={`category-item ${activeCategory === cat.name ? "active" : ""}`}
-                                            style={{ paddingLeft: `${cat.level * 20}px` }} // 👈 Indent visually
-                                        >
-                                            {cat.name}
-                                        </span>
-                                    ))}
+                                    {categories
+                                        .filter(cat => !cat.parentId) // show only root categories initially
+                                        .map(cat => (
+                                            <CategoryNode
+                                                key={cat.id}
+                                                category={cat}
+                                                categories={categories}
+                                                expandedCategories={expandedCategories}
+                                                setExpandedCategories={setExpandedCategories}
+                                                activeCategory={activeCategory}
+                                                setActiveCategory={setActiveCategory}
+                                            />
+                                        ))}
                                 </ul>
+
 
                             </div>
 
