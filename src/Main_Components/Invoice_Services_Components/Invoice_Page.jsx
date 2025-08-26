@@ -327,8 +327,8 @@ const InvoiceModal = ({ order, onClose }) => {
         (acc, item) => acc + safeNum(item.price) * safeNum(item.quantity),
         0
     );
-    const tax = subtotal * 0.085;
-    const serviceCharge = subtotal * 0.18;
+    const tax = subtotal * 0.065;
+    const serviceCharge = subtotal * 0.10;
     const totalAmount = subtotal + tax + serviceCharge;
 
     // Format order date/time
@@ -373,7 +373,7 @@ const InvoiceModal = ({ order, onClose }) => {
                     onClick={onClose}
                     style={{
                         position: "absolute",
-                        top: "10px",
+                        top: "2px",
                         right: "10px",
                         background: "none",
                         border: "none",
@@ -464,11 +464,11 @@ const InvoiceModal = ({ order, onClose }) => {
                                     <span id="subtotal">₹{subtotal.toFixed(2)}</span>
                                 </div>
                                 <div className="flex-between">
-                                    <span>Tax (8.5%):</span>
+                                    <span>Tax (6.5%):</span>
                                     <span id="tax">₹{tax.toFixed(2)}</span>
                                 </div>
                                 <div className="flex-between">
-                                    <span>Service Charge (18%):</span>
+                                    <span>Service Charge (10%):</span>
                                     <span id="serviceCharge">₹{serviceCharge.toFixed(2)}</span>
                                 </div>
                                 <div className="total-amount">

@@ -2960,23 +2960,7 @@ input[type="checkbox"] {
     z-index: 10;
 }
 
-.dropdown-item {
-    padding: 5px 5px;
-    display: flex;
-    align-items: center;
-    cursor: pointer;
-    transition: background-color 0.2s ease;
-}
 
-.dropdown-item:hover {
-    background-color: #f2f2f2;
-}
-
-.dropdown-item input[type="checkbox"] {
-    margin-right: 10px;
-    accent-color: #007bff;
-    cursor: pointer;
-}
 
 
 .form-row {
