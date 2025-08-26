@@ -495,15 +495,15 @@ body.theme-dark {
 /* DROPDOWN MENU (Sign out) */
 .dropdown-menu {
     position: absolute;
-    top: 30px;
+    top: 25px;
     right: 10px;
     background: var(--popup-bg);
     border: 1px solid var(--popup-border);
-    padding: 0 25px;
+    padding: 8px 18px;
     border-radius: 4px;
     z-index: 10;
     color: var(--text-color);
-    font-size: 12px;
+    font-size: 10px;
 }
 
 .signout-label {
@@ -1880,6 +1880,7 @@ Ordersummary sheet */
 /* ========================
    Layout
 ======================== */
+
 .OrderSummary-container {
     padding-right: 5px;
     color: var(--bg-text-color);
