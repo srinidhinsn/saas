@@ -1678,6 +1678,11 @@
 //========================================== Order Summary Page Updated =============================================== //
 //========================================== Order Summary Page Updated =============================================== //
 //========================================== Order Summary Page Updated =============================================== //
+
+
+
+
+
 import React, { useEffect, useState, useMemo } from "react";
 import {
     DataGrid,
@@ -1698,21 +1703,26 @@ import {
     Delete as DeleteIcon,
     Edit as EditIcon,
     Receipt as InvoiceIcon,
-} from "@mui/icons-material";
+    CheckCircle as MarkServedIcon,
+} from "@mui/icons-material"; // Added icon for status update
 import { useParams } from "react-router-dom";
 import { useTheme } from "../../ThemeChangerComponent/ThemeProvider";
 import { toast } from "react-toastify";
+
 
 import orderServicesPort from "../../Backend_Port_Files/OrderServices";
 import tableServicesPort from "../../Backend_Port_Files/TableServices";
 import inventoryServicesPort from "../../Backend_Port_Files/InventoryServices";
 
+
 import InvoiceModal from "../Invoice_Services_Components/Invoice_Page";
+
 
 const OrdersVisiblePage = () => {
     const { clientId } = useParams();
     const token = localStorage.getItem("access_token");
     const { darkMode } = useTheme();
+
 
     // Order data and tables/inventory maps
     const [orders, setOrders] = useState([]);
@@ -1721,27 +1731,34 @@ const OrdersVisiblePage = () => {
     const [allInventoryItems, setAllInventoryItems] = useState([]);
     const [loading, setLoading] = useState(true);
 
+
     // Date filter and other UI state
     const todayDate = new Date().toISOString().split("T")[0];
     const [selectedDate, setSelectedDate] = useState(todayDate);
+
 
     // Modals and selected entities
     const [showInvoiceModal, setShowInvoiceModal] = useState(false);
     const [invoiceOrder, setInvoiceOrder] = useState(null);
 
+
     const [editOrderId, setEditOrderId] = useState(null);
     const [showEditModal, setShowEditModal] = useState(false);
 
+
     const [showDeleteModal, setShowDeleteModal] = useState(false);
     const [orderToDelete, setOrderToDelete] = useState(null);
+
 
     const [itemSearchQuery, setItemSearchQuery] = useState("");
     const [itemSearchResults, setItemSearchResults] = useState([]);
     const [editedOrderItems, setEditedOrderItems] = useState([]);
 
+
     // --- Fetch tables map
     useEffect(() => {
         if (!clientId || !token) return;
+
 
         const fetchTables = async () => {
             try {
@@ -1758,9 +1775,11 @@ const OrdersVisiblePage = () => {
         fetchTables();
     }, [clientId, token]);
 
+
     // --- Fetch inventory map & all items list
     useEffect(() => {
         if (!clientId || !token) return;
+
 
         const fetchInventory = async () => {
             try {
@@ -1777,12 +1796,15 @@ const OrdersVisiblePage = () => {
             } catch { }
         };
 
+
         fetchInventory();
     }, [clientId, token]);
+
 
     // --- Fetch orders
     useEffect(() => {
         if (!clientId || !token) return;
+
 
         const fetchOrders = async () => {
             setLoading(true);
@@ -1800,6 +1822,7 @@ const OrdersVisiblePage = () => {
         fetchOrders();
     }, [clientId, token]);
 
+
     // Filter orders by selected date
     const filteredOrders = useMemo(() => {
         if (!selectedDate) return orders;
@@ -1808,6 +1831,7 @@ const OrdersVisiblePage = () => {
                 new Date(o.created_at).toLocaleDateString("en-CA") === selectedDate
         );
     }, [orders, selectedDate]);
+
 
     // Prepare rows for DataGrid
     const rows = useMemo(() => filteredOrders.map(order => ({
@@ -1819,6 +1843,35 @@ const OrdersVisiblePage = () => {
         createdAt: new Date(order.created_at).toLocaleDateString(),
         rawOrder: order,
     })), [filteredOrders, tablesMap]);
+
+    // Added status update function
+    const updateOrderStatus = async (orderId, newStatus) => {
+        try {
+            await orderServicesPort.post(
+                `/${clientId}/dinein/update`,
+                {
+                    id: orderId,
+                    client_id: clientId,
+                    status: newStatus
+                },
+                {
+                    headers: { Authorization: `Bearer ${token}` }
+                }
+            );
+            setOrders(prev =>
+                prev.map(order =>
+                    order.id === orderId ? { ...order, status: newStatus } : order
+                )
+            );
+            toast.success("Order status updated");
+            if (editOrderId === orderId && newStatus === "served") {
+                closeEditModal();
+            }
+        } catch (error) {
+            toast.error("Failed to update order status");
+        }
+    };
+
 
     // --- Open invoice modal
     const openInvoiceModal = (order) => {
@@ -1835,6 +1888,7 @@ const OrdersVisiblePage = () => {
         setShowInvoiceModal(false);
     };
 
+
     // --- Open edit modal with order items for editing
     const openEditModal = (order) => {
         setEditOrderId(order.id);
@@ -1850,6 +1904,7 @@ const OrdersVisiblePage = () => {
         setShowEditModal(false);
     };
 
+
     // --- Update item quantity locally while editing
     const updateItemQuantity = (itemId, newQty) => {
         if (newQty < 1) return;
@@ -1858,12 +1913,14 @@ const OrdersVisiblePage = () => {
         );
     };
 
+
     // --- Update item status locally while editing
     const updateItemStatus = (itemId, newStatus) => {
         setEditedOrderItems((prev) =>
             prev.map((item) => (item.item_id === itemId ? { ...item, status: newStatus } : item))
         );
     };
+
 
     // --- Add item to edited order items
     const addItemToOrder = (selectedItem) => {
@@ -1882,14 +1939,17 @@ const OrdersVisiblePage = () => {
         setItemSearchResults([]);
     };
 
+
     // --- Remove item from edited order items
     const removeItemFromOrder = (itemId) => {
         setEditedOrderItems((prev) => prev.filter((item) => item.item_id !== itemId));
     };
 
+
     // --- Save edited order items to backend
     const saveEditedOrderItems = async () => {
         if (!editOrderId) return;
+
 
         // Prepare cleaned items for backend API
         const cleanedItems = editedOrderItems.map((item) => ({
@@ -1904,7 +1964,9 @@ const OrdersVisiblePage = () => {
             order_id: editOrderId,
         }));
 
+
         const totalPrice = cleanedItems.reduce((sum, item) => sum + item.price * item.quantity, 0);
+
 
         try {
             await orderServicesPort.post(
@@ -1913,16 +1975,19 @@ const OrdersVisiblePage = () => {
                 { headers: { Authorization: `Bearer ${token}` } }
             );
 
+
             await orderServicesPort.post(
                 `/${clientId}/dinein/update`,
                 { id: editOrderId, total_price: totalPrice },
                 { headers: { Authorization: `Bearer ${token}` } }
             );
 
+
             // Update state locally
             setOrders((prev) =>
                 prev.map((o) => (o.id === editOrderId ? { ...o, items: editedOrderItems, total_price: totalPrice } : o))
             );
+
 
             toast.success("Order updated successfully");
             closeEditModal();
@@ -1930,6 +1995,7 @@ const OrdersVisiblePage = () => {
             toast.error("Failed to save order changes");
         }
     };
+
 
     // --- Search inventory for adding items to order edit modal
     useEffect(() => {
@@ -1939,14 +2005,17 @@ const OrdersVisiblePage = () => {
         }
         const currentItemIds = editedOrderItems.map((i) => i.item_id);
 
+
         const filtered = allInventoryItems.filter(
             (item) =>
                 item.name.toLowerCase().includes(itemSearchQuery.toLowerCase()) &&
                 !currentItemIds.includes(item.id)
         );
 
+
         setItemSearchResults(filtered);
     }, [itemSearchQuery, allInventoryItems, editedOrderItems, editOrderId]);
+
 
     // --- Delete order handling
     const [showDeleteOrderModal, setShowDeleteOrderModal] = useState(false);
@@ -1966,7 +2035,8 @@ const OrdersVisiblePage = () => {
         }
     };
 
-    // Columns for DataGrid
+
+    // Add status update button to columns actions
     const columns = useMemo(() => [
         { field: "tableName", headerName: "Table", flex: 1, minWidth: 120 },
         { field: "itemsCount", headerName: "Items", width: 90 },
@@ -2001,22 +2071,31 @@ const OrdersVisiblePage = () => {
                         onClick={() => (editOrderId === order.id ? closeEditModal() : openEditModal(order))}
                         showInMenu={false}
                     />,
-                    order.status !== "served" && (
+                    // Status update button if not served
+                    order.status.toLowerCase() !== "served" && (
                         <GridActionsCellItem
-                            key="delete"
-                            icon={<DeleteIcon />}
-                            label="Delete Order"
-                            onClick={() => {
-                                setOrderToDelete(order.id);
-                                setShowDeleteOrderModal(true);
-                            }}
+                            key="mark-served"
+                            icon={<MarkServedIcon />}
+                            label="Mark Served"
+                            onClick={() => updateOrderStatus(order.id, "served")}
                             showInMenu={false}
                         />
                     ),
+                    <GridActionsCellItem
+                        key="delete"
+                        icon={<DeleteIcon />}
+                        label="Delete Order"
+                        onClick={() => {
+                            setOrderToDelete(order.id);
+                            setShowDeleteOrderModal(true);
+                        }}
+                        showInMenu={false}
+                    />,
                 ].filter(Boolean);
             },
         },
     ], [editOrderId, tablesMap, inventoryMap, editedOrderItems]);
+
 
     // Custom toolbar with date filter and export button
     const CustomToolbar = () => (
@@ -2048,11 +2127,13 @@ const OrdersVisiblePage = () => {
         </GridToolbarContainer>
     );
 
+
     return (
         <Box sx={{ p: 1, bgcolor: darkMode ? "background.default" : "#f5f5f5", minHeight: "89vh", overflow: 'scroll', width: 'auto' }}>
             <Typography variant="h4" gutterBottom>
                 Table Orders
             </Typography>
+
 
             <Box sx={{ width: "100%", overflowX: "auto", bgcolor: darkMode ? "background.paper" : "#fff", borderRadius: 1, boxShadow: 2 }}>
                 <DataGrid
@@ -2074,6 +2155,7 @@ const OrdersVisiblePage = () => {
                 />
             </Box>
 
+
             {/* Edit Order Modal */}
             <Modal open={showEditModal} onClose={closeEditModal} aria-labelledby="edit-order-title" aria-describedby="edit-order-description">
                 <Box sx={{
@@ -2084,11 +2166,13 @@ const OrdersVisiblePage = () => {
                         const order = orders.find((o) => o.id === editOrderId);
                         if (!order) return null;
 
+
                         return (
                             <>
                                 <Typography id="edit-order-title" variant="h6" mb={2}>
                                     Edit Order #{order.id} - Table: {tablesMap[order.table_id] || order.table_id}
                                 </Typography>
+
 
                                 <Box component="table" sx={{ width: "100%", borderCollapse: "collapse", mb: 2 }}>
                                     <thead>
@@ -2137,6 +2221,7 @@ const OrdersVisiblePage = () => {
                                     </tbody>
                                 </Box>
 
+
                                 <TextField
                                     fullWidth
                                     size="small"
@@ -2163,6 +2248,7 @@ const OrdersVisiblePage = () => {
                                     </Box>
                                 )}
 
+
                                 <Box mt={2} sx={{ display: "flex", justifyContent: "flex-end", gap: 1 }}>
                                     <Button variant="contained" color="primary" onClick={saveEditedOrderItems}>
                                         Save
@@ -2176,6 +2262,7 @@ const OrdersVisiblePage = () => {
                     })()}
                 </Box>
             </Modal>
+
 
             {/* Delete Order Modal */}
             <Modal
@@ -2198,6 +2285,7 @@ const OrdersVisiblePage = () => {
                 </Box>
             </Modal>
 
+
             {/* Invoice Modal */}
             {showInvoiceModal && invoiceOrder && (
                 <InvoiceModal order={invoiceOrder} onClose={closeInvoiceModal} />
@@ -2206,5 +2294,5 @@ const OrdersVisiblePage = () => {
     );
 };
 
-export default OrdersVisiblePage;
 
+export default OrdersVisiblePage;
