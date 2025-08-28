@@ -1873,9 +1873,24 @@ body {
 /* 
 Ordersummary sheet */
 
+.OrderSummary-Container {
+    min-height: 89vh;
+    overflow: scroll;
+    width: 80vw;
+    padding: 0 20px;
+    min-height: 89vh;
+}
 
+.OrderSummary-second-Container {
+    max-width: 100vw;
+    width: 100%;
+}
 
-
+@media (max-width:768px) {
+    .OrderSummary-second-Container {
+        max-width: 78vw;
+    }
+}
 
 /* ========================
    Layout

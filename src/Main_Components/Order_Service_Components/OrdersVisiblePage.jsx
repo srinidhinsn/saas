@@ -2129,13 +2129,13 @@ const OrdersVisiblePage = () => {
 
 
     return (
-        <Box sx={{ p: 1, bgcolor: darkMode ? "background.default" : "#f5f5f5", minHeight: "89vh", overflow: 'scroll', width: 'auto' }}>
+        <Box className="OrderSummary-Container" >
             <Typography variant="h4" gutterBottom>
                 Table Orders
             </Typography>
 
 
-            <Box sx={{ width: "100%", overflowX: "auto", bgcolor: darkMode ? "background.paper" : "#fff", borderRadius: 1, boxShadow: 2 }}>
+            <Box className="OrderSummary-second-Container" sx={{ overflowX: "auto", borderRadius: 1, boxShadow: 2, }}>
                 <DataGrid
                     rows={rows}
                     columns={columns}
@@ -2266,7 +2266,7 @@ const OrdersVisiblePage = () => {
 
             {/* Delete Order Modal */}
             <Modal
-                open={showDeleteModal}
+                open={showDeleteOrderModal}
                 onClose={() => setShowDeleteOrderModal(false)}
                 aria-labelledby="delete-order-title"
                 aria-describedby="delete-order-description"
