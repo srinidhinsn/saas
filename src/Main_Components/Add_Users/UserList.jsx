@@ -38,7 +38,7 @@ const UsersList = ({ onAddNew }) => {
 
     // Load users on mount - assign each user a unique id if missing
     useEffect(() => {
-       
+
     }, []);
 
     // Filter and keep ids intact
