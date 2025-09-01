@@ -2398,9 +2398,10 @@ Ordersummary sheet */
 /* Body: items list */
 .kds-card-body {
     flex-grow: 1;
-    padding: 12px;
     background: var(--bg-container);
     display: flex;
+    justify-content: center;
+    align-items: center;
     flex-direction: column;
     gap: 12px;
     font-size: 14px;
@@ -4028,7 +4029,6 @@ Ordersummary sheet */
     align-items: center;
     justify-content: space-between;
     padding: 1.5rem;
-    background: #f9fafb;
     border-radius: 0.75rem;
     margin-bottom: 1rem;
     transition: background-color 0.2s;
