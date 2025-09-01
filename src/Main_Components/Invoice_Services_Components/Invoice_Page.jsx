@@ -360,7 +360,7 @@ const InvoiceModal = ({ order, onClose }) => {
                 className="invoice-body"
                 style={{
                     background: "#fff",
-                    padding: "20px",
+                    padding: "15px",
                     borderRadius: "8px",
                     width: "90%",
                     maxWidth: "600px",

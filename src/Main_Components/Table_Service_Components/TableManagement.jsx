@@ -603,7 +603,14 @@ const TableManagement = () => {
     const [modalTable, setModalTable] = useState(null);
 
     const token = localStorage.getItem("access_token");
-
+    const [tableId, setTableId] = useState(null)
+    useEffect(() => {
+        if (tableId) {
+            document.body.classList.add("sidebar-minimized");
+        } else {
+            document.body.classList.remove("sidebar-minimized");
+        }
+    }, [tableId]);
     useEffect(() => {
         if (clientId) fetchTables();
     }, [clientId]);
@@ -777,7 +784,7 @@ const TableManagement = () => {
                 {/* Header */}
                 <main className="tm-main-container">
                     {/* Stats Cards */}
-                    <div className="tm-stats-grid">
+                    {/* <div className="tm-stats-grid">
                         <div className="tm-stats-card">
                             <div className="tm-stats-flex">
                                 <div className="tm-stats-icon-bg tm-stats-icon-green">
@@ -822,7 +829,7 @@ const TableManagement = () => {
                                 </div>
                             </div>
                         </div>
-                    </div>
+                    </div> */}
                     {/* Controls */}
                     <div className="tm-controls-card">
                         <div className="tm-controls-flex">
@@ -1084,11 +1091,16 @@ const TableManagement = () => {
                                             </div>
                                             <div className="tm-edit-modal-field">
                                                 <label>Remark</label>
-                                                <input
+                                                <select
                                                     value={table.status || ""}
                                                     onChange={e => handleEditChange(table.id, "status", e.target.value)}
-                                                />
+                                                >
+                                                    <option value="Vacant">Vacant</option>
+                                                    <option value="Occupied">Occupied</option>
+                                                    <option value="Reserved">Reserved</option>
+                                                </select>
                                             </div>
+
                                             <div className="tm-edit-modal-btns">
                                                 <button className="tm-edit-modal-save" onClick={() => saveEdit(table)}><FaCheck /></button>
                                                 <button className="tm-edit-modal-cancel" onClick={cancelEdit}><FaTimes /></button>

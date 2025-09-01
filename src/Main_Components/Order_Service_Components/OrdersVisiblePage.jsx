@@ -1,817 +1,654 @@
-// import React, { useEffect, useState } from "react";
-// import axios from "axios";
-// import orderServicesPort from "../../Backend_Port_Files/OrderServices";
-// import tableServicesPort from "../../Backend_Port_Files/TableServices";
-// import inventoryServicesPort from "../../Backend_Port_Files/InventoryServices";
-// import { useParams } from "react-router-dom";
-// import { useTheme } from "../../ThemeChangerComponent/ThemeProvider";
-// import { toast } from "react-toastify";
-// import "react-toastify/dist/ReactToastify.css";
-// import InvoiceModal from "../Invoice_Services_Components/Invoice_Page";
-
-
-// const OrdersVisiblePage = () => {
-//     const { clientId } = useParams();                                                            // extract clientId from URL
-//     const [orders, setOrders] = useState([]);                                                    // store orders
-//     const [loading, setLoading] = useState(true);                                                // loader flag
-//     const [expandedOrderIndex, setExpandedOrderIndex] = useState(null);                          // which order is expanded
-//     const { darkMode } = useTheme();                                                             // check if dark mode is enabled
-//     const token = localStorage.getItem("access_token");                                          // get token from local storage
-//     const [inventoryMap, setInventoryMap] = useState({});
-//     const [showDeleteModal, setShowDeleteModal] = useState(false);
-//     const [orderToDelete, setOrderToDelete] = useState(null);
-//     const [tablesMap, setTablesMap] = useState({});
-
-//     const [editOrderId, setEditOrderId] = useState(null);
-//     const [showDeleteModals, setShowDeleteModals] = useState(false);
-//     const [deleteTarget, setDeleteTarget] = useState({ orderId: null, itemId: null });
-//     const [editedItemsMap, setEditedItemsMap] = useState({});
-//     const [allInventoryItems, setAllInventoryItems] = useState([]);
-//     const [itemSearchQuery, setItemSearchQuery] = useState("");
-//     const [itemSearchResults, setItemSearchResults] = useState([]);
-
-//     const todayDate = new Date().toISOString().split("T")[0];
-//     const [selectedDate, setSelectedDate] = useState(todayDate);
-//     const [filterMode, setFilterMode] = useState(0);
-//     // 0 = ascending date, 1 = descending date, 2 = new, 3 = preparing, 4 = served
-//     const [showInvoiceModal, setShowInvoiceModal] = useState(false);
-//     const [invoiceOrder, setInvoiceOrder] = useState(null);
-
-//     // --------------------------------------------------------------------------- //
-
-//     const openInvoiceModal = (order) => {
-//         const tableName = tablesMap[order.table_id] || order.table_id;
-
-//         // 🔑 Enrich order.items with price from inventoryMap
-//         const itemsWithPrice = (order.items || []).map(item => ({
-//             ...item,
-//             price: item.price || inventoryMap[item.item_id]?.price || 0,
-//         }));
-
-//         setInvoiceOrder({ ...order, table_name: tableName, items: itemsWithPrice });
-//         setShowInvoiceModal(true);
-//     };
-
-//     const closeInvoiceModal = () => {
-//         setInvoiceOrder(null);
-//         setShowInvoiceModal(false);
-//     };
-//     useEffect(() => {
-//         inventoryServicesPort.get(`/${clientId}/inventory/read`, {
-//             headers: { Authorization: `Bearer ${token}` }
-//         })
-//             .then(res => {
-//                 setAllInventoryItems(res.data.data || []); console.log("✅ All inventory items:", res.data.data);
-//             })
-//             .catch(err => {
-//                 console.error("Failed to load inventory:", err);
-//             });
-//     }, []);
-//     useEffect(() => {
-//         if (expandedOrderIndex === null || expandedOrderIndex === undefined || !orders[expandedOrderIndex]) {
-//             setItemSearchResults([]);
-//             return;
-//         }
-
-//         const currentOrderItems = orders[expandedOrderIndex].items.map(i => i.item_id.toString());
-
-//         console.log("Current order item IDs:", currentOrderItems);
-//         console.log("Inventory items IDs for filtering:", allInventoryItems.map(i => ({ id: i.id.toString(), name: i.name })));
-
-//         const filtered = allInventoryItems
-//             .filter(item => (item.name || "").toLowerCase().includes(itemSearchQuery.toLowerCase()))
-//             .filter(item => !currentOrderItems.includes(item.id.toString()));
-
-//         console.log("Filtered items after exclusion:", filtered.map(i => i.name));
-
-//         setItemSearchResults(filtered);
-//     }, [itemSearchQuery, allInventoryItems, expandedOrderIndex, orders]);
-
-//     const addItemToOrder = (orderId, selectedItem) => {
-//         console.log("🟢 Adding item to order:", selectedItem);
-
-//         let targetItems = [];
-
-//         setOrders(prevOrders => {
-//             return prevOrders.map(order => {
-//                 if (order.id !== orderId) return order;
-
-//                 const newItem = {
-//                     item_id: selectedItem.id,
-//                     item_name: selectedItem.name,
-//                     quantity: 1,
-//                     price: selectedItem.price,
-//                     status: "new",
-//                     note: "",
-//                     slug: selectedItem.slug || generateSlug(selectedItem.name)
-//                 };
-
-//                 const newItems = [...order.items, newItem];
-//                 targetItems = newItems; // 🟢 store for use after state update
-
-//                 return {
-//                     ...order,
-//                     items: newItems
-//                 };
-//             });
-//         });
-
-//         // ✅ Do this OUTSIDE of setOrders to avoid duplication
-//         setTimeout(() => {
-//             updateOrderItems(orderId, targetItems);
-//         }, 0);
-
-//         setItemSearchQuery("");
-//         setItemSearchResults([]);
-//     };
-
-
-
-//     const updateItemQuantity = (orderId, itemId, newQty) => {
-//         setOrders(prev =>
-//             prev.map(order => {
-//                 if (order.id !== orderId) return order;
-
-//                 const updatedItems = order.items.map(item =>
-//                     item.item_id === itemId
-//                         ? { ...item, quantity: newQty > 0 ? newQty : 1 }
-//                         : item
-//                 );
-
-//                 const newTotal = updatedItems.reduce((sum, item) => {
-//                     const itemPrice = inventoryMap[item.item_id]?.price || 0;
-//                     return sum + item.quantity * itemPrice;
-//                 }, 0);
-
-//                 return {
-//                     ...order,
-//                     items: updatedItems,
-//                     total_price: newTotal
-//                 };
-//             })
-//         );
-
-//         // Also store this in editable map
-//         setEditedItemsMap(prev => {
-//             const currentItems = orders.find(o => o.id === orderId)?.items || [];
-//             const updated = currentItems.map(item =>
-//                 item.item_id === itemId
-//                     ? { ...item, quantity: newQty > 0 ? newQty : 1 }
-//                     : item
-//             );
-//             return { ...prev, [orderId]: updated };
-//         });
-//     };
-
-
-//     // --------------------------------------------------------------------------- //
-//     //Theme Effect(dark & light theme)
-//     useEffect(() => {
-//         document.body.setAttribute("data-theme", darkMode ? "dark" : "light");
-//     }, [darkMode]);
-
-//     // --------------------------------------------------------------------------- //
-//     //Fetching orders
-//     useEffect(() => {
-//         const fetchOrders = async () => {
-//             //no accesstoken no access
-//             if (!token) {
-//                 console.error(" Access token not found");
-//                 setLoading(false);
-//                 return;
-//             }
-
-//             try {
-//                 const response = await orderServicesPort.get(
-//                     `/${clientId}/dinein/table`,
-//                     {
-//                         headers: {
-//                             Authorization: `Bearer ${token}`,
-//                         },
-//                     }
-//                 );
-//                 console.log("Placed Orders:", response.data);
-//                 //on success ...orders are stored in state (orders) else it returns empty array
-//                 setOrders(response.data?.data || []);
-//                 setLoading(false);
-//             } catch (error) {
-//                 const msg = error?.response?.data?.detail || "❌ Failed to fetch dine-in orders.";
-//                 console.error(msg, error);
-//                 toast.error(msg);
-//                 setLoading(false);
-//             }
-
-//         };
-
-//         if (clientId) {
-//             fetchOrders();
-//         }
-//     }, [clientId]);
-
-
-//     // --------------------------------------------------------------------------- //
-//     //Expands/collapses the details for a particular order
-//     const toggleExpand = (index) => {
-//         setExpandedOrderIndex(index === expandedOrderIndex ? null : index);
-//     };
-
-//     // --------------------------------------------------------------------------- //
-
-//     //Change Order Status
-//     const handleStatusChange = async (orderId, newStatus) => {
-//         const order = orders.find((o) => o.id === orderId);
-//         if (!order || order.status === "served") return;
-
-//         try {
-//             await orderServicesPort.post(
-//                 `/${clientId}/dinein/update`,
-//                 {
-//                     id: orderId,
-//                     client_id: clientId,
-//                     status: newStatus,
-//                 },
-//                 {
-//                     headers: {
-//                         Authorization: `Bearer ${token}`,
-//                     },
-//                 }
-//             );
-
-//             toast.success("Order status updated");
-
-//             setOrders((prev) =>
-//                 prev.map((o) =>
-//                     o.id === orderId
-//                         ? {
-//                             ...o,
-//                             status: newStatus, // ✅ Only this line changes
-//                             // Items remain untouched
-//                         }
-//                         : o
-//                 )
-//             );
-
-//             // Optional: exit edit mode if status is served
-//             if (newStatus === "served") {
-//                 setEditOrderId(null);
-//             }
-
-//         } catch (err) {
-//             const msg = err?.response?.data?.detail || "❌ Failed to update order status.";
-//             console.error(msg, err);
-//             toast.error(msg);
-//         }
-//     };
-
-
-//     const handleItemStatusChange = async (orderId, itemId, newStatus) => {
-//         try {
-//             // Get the order from state
-//             const order = orders.find(o => o.id === orderId);
-//             if (!order) {
-//                 toast.error("Order not found in state");
-//                 return;
-//             }
-
-//             // Modify only the item you care about
-//             const updatedItems = order.items.map(item =>
-//                 item.item_id === itemId
-//                     ? { ...item, status: newStatus }
-//                     : item
-//             );
-
-//             // Strip 'id' so backend doesn't try to insert into identity column
-//             const itemsForUpdate = updatedItems.map(({ id, ...rest }) => rest);
-
-//             // Recalculate total price
-//             const totalPrice = updatedItems.reduce(
-//                 (sum, item) =>
-//                     sum + (inventoryMap[item.item_id]?.price || 0) * (item.quantity || 1),
-//                 0
-//             );
-
-//             // Send full updated list without 'id'
-//             await orderServicesPort.post(
-//                 `/${clientId}/order_items/update?order_id=${orderId}`,
-//                 itemsForUpdate,
-//                 { headers: { Authorization: `Bearer ${token}` } }
-//             );
-
-//             // Update order total price in backend
-//             await orderServicesPort.post(
-//                 `/${clientId}/dinein/update`,
-//                 { id: orderId, total_price: totalPrice },
-//                 { headers: { Authorization: `Bearer ${token}` } }
-//             );
-
-//             // Update local state (with id still intact locally)
-//             setOrders(prev =>
-//                 prev.map(o =>
-//                     o.id === orderId
-//                         ? { ...o, items: updatedItems, total_price: totalPrice }
-//                         : o
-//                 )
-//             );
-
-//             toast.success("Item status updated");
-//         } catch (err) {
-//             console.error(err);
-//             toast.error("Failed to update item status");
-//         }
-//     };
-
-
-
-
-//     // --------------------------------------------------------------------------- //
-//     const cancelItem = async (orderId, itemId) => {
-//         const order = orders.find(o => o.id === orderId);
-//         const item = order?.items.find(i => i.item_id === itemId);
-//         if (!item?.id) return;
-
-//         try {
-//             // 1. Delete item from DB
-//             await orderServicesPort.delete(`/${clientId}/order_item/delete`, {
-//                 params: { order_item_id: item.id, client_id: clientId },
-//                 headers: { Authorization: `Bearer ${token}` },
-//             });
-
-//             // 2. Remove item from local state
-//             const updatedOrders = orders.map(o => {
-//                 if (o.id !== orderId) return o;
-
-//                 const updatedItems = o.items.filter(i => i.item_id !== itemId);
-//                 const newTotal = updatedItems.reduce((sum, item) => {
-//                     const price = inventoryMap[item.item_id]?.price || item.price || 0;
-//                     return sum + (item.quantity || 1) * price;
-//                 }, 0);
-
-//                 return {
-//                     ...o,
-//                     items: updatedItems,
-//                     total_price: newTotal
-//                 };
-//             });
-
-//             setOrders(updatedOrders);
-
-//             // 3. Update backend total_price
-//             const newOrder = updatedOrders.find(o => o.id === orderId);
-//             if (newOrder) {
-//                 await orderServicesPort.post(
-//                     `/${clientId}/dinein/update`,
-//                     {
-//                         id: orderId,
-//                         total_price: newOrder.total_price
-//                     },
-//                     {
-//                         headers: {
-//                             Authorization: `Bearer ${token}`,
-//                         },
-//                     }
-//                 );
-//             }
-
-//             // 4. Update editable map (optional)
-//             setEditedItemsMap(prev => {
-//                 const updated = (prev[orderId] || []).filter(i => i.item_id !== itemId);
-//                 return { ...prev, [orderId]: updated };
-//             });
-
-//             toast.success("Item cancelled and total updated");
-//         } catch (err) {
-//             const msg = err?.response?.data?.detail || "❌ Failed to cancel item.";
-//             console.error(msg, err);
-//             toast.error(msg);
-//         }
-//     };
-
-
-//     //-------------------------------------------------- //
-//     //-------------------------------------------------- //
-//     //-------------------------------------------------- //
-//     //-------------------------------------------------- //
-//     const updateOrderItems = async (orderId, updatedItemsWithStatuses) => {
-//         const cleanedItems = updatedItemsWithStatuses.map(item => ({
-//             item_id: item.item_id || item.inventory_id, // fallback
-//             item_name: item.name || item.item_name,
-//             quantity: item.quantity || 1,
-//             status: item.status || "new",
-//             note: item.note || "",
-//             slug: item.slug || "",
-//             price: item.price || inventoryMap[item.item_id || item.inventory_id]?.price || 0,
-//             client_id: clientId,
-//             order_id: orderId
-//         }));
-
-//         console.log("📤 Final payload to order_items/update:");
-//         cleanedItems.forEach((item, i) => console.log(`Item ${i + 1}:`, item));
-
-//         const totalPrice = cleanedItems.reduce((sum, item) => {
-//             return sum + item.price * item.quantity;
-//         }, 0);
-
-//         try {
-//             // ✅ Use query param for order_id
-//             await axios.post(
-//                 `http://localhost:8003/saas/${clientId}/order_items/update?order_id=${orderId}`,
-//                 cleanedItems,
-//                 { headers: { Authorization: `Bearer ${token}` } }
-//             );
-
-//             await axios.post(
-//                 `http://localhost:8003/saas/${clientId}/dinein/update`,
-//                 {
-//                     id: orderId,
-//                     total_price: totalPrice
-//                 },
-//                 { headers: { Authorization: `Bearer ${token}` } }
-//             );
-
-//             toast.success("Item statuses & total updated!");
-//         } catch (err) {
-//             console.error("❌ Failed to update order items:", err);
-//             if (err.response?.data) {
-//                 console.error("🚨 Response data:", err.response.data);
-//             }
-//             toast.error("Failed to update items or total.");
-//         }
-//     };
-
-
-
-
-//     // ----------------------------------------------------- //
-//     const confirmDeleteOrder = async () => {
-//         if (!orderToDelete) return;
-//         try {
-//             await orderServicesPort.delete(`/${clientId}/dinein/delete`, {
-//                 params: {
-//                     dinein_order_id: orderToDelete,
-//                     client_id: clientId,
-//                 },
-//                 headers: {
-//                     Authorization: `Bearer ${token}`,
-//                 },
-//             });
-
-//             setOrders((prev) => prev.filter((o) => o.id !== orderToDelete));
-//             setExpandedOrderIndex(null);
-//             toast.success(" Order deleted");
-//         } catch (err) {
-//             console.error("❌ Failed to delete order", err);
-//             toast.error("❌ Failed to delete order");
-//         } finally {
-//             setShowDeleteModal(false);
-//             setOrderToDelete(null);
-//         }
-//     };
-
-//     // --------------------------------------------------------------------------- //
-//     useEffect(() => {
-//         const fetchTables = async () => {
-//             try {
-//                 const res = await tableServicesPort.get(`/${clientId}/tables/read`, {
-//                     headers: { Authorization: `Bearer ${token}` }
-//                 });
-
-//                 const tableList = res.data?.data || [];
-//                 const map = {};
-//                 tableList.forEach(table => {
-//                     map[table.id] = table.name;
-//                 });
-//                 setTablesMap(map);
-//             } catch (error) {
-//                 console.error("❌ Failed to fetch tables:", error);
-//             }
-//         };
-
-//         fetchTables();
-//     }, [clientId]);
-
-//     // --------------------------------------------------------------------------- //
-//     useEffect(() => {
-//         const fetchInventory = async () => {
-//             if (!token || !clientId) return;
-
-//             try {
-//                 const res = await inventoryServicesPort.get(`/${clientId}/inventory/read`, {
-//                     headers: {
-//                         Authorization: `Bearer ${token}`
-//                     }
-//                 });
-
-//                 const inventoryList = res.data?.data || [];
-//                 const map = {};
-
-//                 inventoryList.forEach(item => {
-//                     map[item.id] = item; // Includes price
-//                 });
-
-//                 setInventoryMap(map);
-//             } catch (error) {
-//                 console.error("❌ Failed to fetch inventory:", error);
-//             }
-//         };
-
-//         fetchInventory();
-//     }, [clientId]);
-
-//     // --------------------------------------------------------------------------- //
-//     let filteredOrders = selectedDate
-//         ? orders.filter(order => {
-//             const orderDate = new Date(order.created_at).toLocaleDateString("en-CA");
-//             return orderDate === selectedDate;
-//         })
-//         : orders;
-
-//     // Now apply filterMode on filteredOrders instead of on all orders again
-//     switch (filterMode) {
-//         case 0: // Ascending date
-//             filteredOrders = [...filteredOrders].sort((a, b) => new Date(a.created_at) - new Date(b.created_at));
-//             break;
-//         case 1: // Descending date
-//             filteredOrders = [...filteredOrders].sort((a, b) => new Date(b.created_at) - new Date(a.created_at));
-//             break;
-//         case 2: // New orders
-//             filteredOrders = filteredOrders.filter(o => o.status?.toLowerCase() === "new");
-//             break;
-//         case 3: // Preparing orders
-//             filteredOrders = filteredOrders.filter(o => o.status?.toLowerCase() === "preparing");
-//             break;
-//         case 4: // Served orders
-//             filteredOrders = filteredOrders.filter(o => o.status?.toLowerCase() === "served");
-//             break;
-//         default:
-//             break;
-//     }
-
-
-//     return (
-//         <>
-//             <div className="OrderSummary-container">
-//                 <div className="orders-page">
-//                     <div className="orders-header">
-//                         <h2>Table Orders</h2>
-//                         <div className="orders-actions">
-//                             <select
-//                                 className="date-filter"
-//                                 value={selectedDate}
-//                                 onChange={(e) => setSelectedDate(e.target.value)}
-//                             >
-//                                 <option value="">All Dates</option>
-//                                 {[...Array(15)].map((_, i) => {
-//                                     const d = new Date();
-//                                     d.setDate(d.getDate() - i);
-//                                     const dateString = d.toLocaleDateString("en-CA");
-//                                     const label = i === 0 ? "Today" : dateString;
-//                                     return (
-//                                         <option key={dateString} value={dateString}>
-//                                             {label}
-//                                         </option>
-//                                     );
-//                                 })}
-//                             </select>
-//                             <button className="btn export">Export</button>
-//                             <button
-//                                 className="btn filter"
-//                                 onClick={() => setFilterMode((prev) => (prev + 1) % 5)}
-//                             >
-//                                 Filter
-//                             </button>
-
-//                         </div>
-//                     </div>
-
-//                     {loading ? (
-//                         <div className="loading">Loading orders...</div>
-//                     ) : (
-//                         <div className="orders-list">
-//                             {filteredOrders.length === 0 ? (
-//                                 <div className="no-orders">No orders found.</div>
-//                             ) : (
-//                                 filteredOrders.map((order, index) => (
-//                                     <div key={order.id || index} className="order-card">
-//                                         <div className="order-summary grid-row">
-//                                             <div className="order-col">{tablesMap[order.table_id] || order.table_id}</div>
-//                                             <div className="order-col">{order.items.length} items</div>
-//                                             <div className="order-col">₹{parseFloat(order.total_price || 0).toFixed(2)}</div>
-//                                             <div className={`order-col status ${order.status?.toLowerCase()}`}>
-//                                                 {order.status}
-//                                             </div>
-//                                             <div className="order-col">{new Date(order.created_at).toLocaleDateString()}</div>
-//                                             <div className="order-col"><button
-//                                                 className="btn invoice"
-//                                                 onClick={() => openInvoiceModal(order)}
-//                                             >
-//                                                 Invoice
-//                                             </button>
-
-//                                             </div>
-//                                             <div className="order-col">
-//                                                 <button className="btn toggle" onClick={() => toggleExpand(index)}>
-//                                                     {expandedOrderIndex === index ? "Hide" : "View"}
-//                                                 </button>
-//                                             </div>
-//                                         </div>
-
-//                                         {expandedOrderIndex === index && (
-//                                             <div className="order-details">
-//                                                 <div className="order-controls">
-//                                                     {order.status !== "served" && (
-//                                                         <>
-//                                                             <button
-//                                                                 className="delete-btn"
-//                                                                 onClick={() => {
-//                                                                     setOrderToDelete(order.id);
-//                                                                     setShowDeleteModal(true);
-//                                                                 }}
-//                                                             >
-//                                                                 Delete Order
-//                                                             </button>
-
-//                                                             {["served"].map((status) => (
-//                                                                 <button
-//                                                                     key={status}
-//                                                                     className={`btn status-toggle ${order.status === status ? "active" : ""}`}
-//                                                                     onClick={() => handleStatusChange(order.id, status)}
-//                                                                 >
-//                                                                     {status}
-//                                                                 </button>
-//                                                             ))}
-
-//                                                             <button
-//                                                                 className="btn edit"
-//                                                                 onClick={() =>
-//                                                                     setEditOrderId((prev) => (prev === order.id ? null : order.id))
-//                                                                 }
-//                                                             >
-//                                                                 {editOrderId === order.id ? "Cancel Edit" : "Edit"}
-//                                                             </button>
-//                                                         </>
-//                                                     )}
-//                                                 </div>
-
-//                                                 {/* Items grid */}
-//                                                 <div className="items-grid-header grid-row">
-//                                                     <div>Item(s)</div>
-//                                                     <div>Quantity</div>
-//                                                     <div>Status</div>
-//                                                     <div>Actions</div>
-//                                                 </div>
-
-//                                                 {order.items?.map((item, idx) => (
-//                                                     <div key={idx} className="items-grid-row grid-row">
-//                                                         <div>{item.item_name || item.item_id}</div>
-//                                                         <div>
-//                                                             {editOrderId === order.id ? (
-//                                                                 <div className="qty-controls">
-//                                                                     <button
-//                                                                         onClick={() => updateItemQuantity(order.id, item.item_id, item.quantity - 1)}
-//                                                                         disabled={item.quantity <= 1}
-//                                                                     >
-//                                                                         −
-//                                                                     </button>
-//                                                                     <span>{item.quantity}</span>
-//                                                                     <button
-//                                                                         onClick={() => updateItemQuantity(order.id, item.item_id, item.quantity + 1)}
-//                                                                     >
-//                                                                         +
-//                                                                     </button>
-//                                                                 </div>
-//                                                             ) : (
-//                                                                 <span>{item.quantity}</span>
-//                                                             )}
-//                                                         </div>
-//                                                         <div>
-//                                                             <span className={`status-tag ${item.status}`}>{item.status}</span>
-//                                                         </div>
-//                                                         <div className="actions">
-//                                                             {["served"].map((status) => (
-//                                                                 <button
-//                                                                     key={status}
-//                                                                     className={`btn item-status ${item.status === status ? "active" : ""}`}
-//                                                                     onClick={() => handleItemStatusChange(order.id, item.item_id, status)}
-//                                                                     disabled={item.status === "served" || item.status === "cancelled"}
-//                                                                 >
-//                                                                     {status}
-//                                                                 </button>
-//                                                             ))}
-
-//                                                             {editOrderId === order.id && (
-//                                                                 <button
-//                                                                     className="btn delete"
-//                                                                     onClick={() => {
-//                                                                         setDeleteTarget({ orderId: order.id, itemId: item.item_id });
-//                                                                         setShowDeleteModals(true);
-//                                                                     }}
-//                                                                     disabled={item.status === "cancelled"}
-//                                                                 >
-//                                                                     Delete
-//                                                                 </button>
-//                                                             )}
-//                                                         </div>
-//                                                     </div>
-//                                                 ))}
-
-//                                                 {editOrderId === order.id && order.status !== "served" && (
-//                                                     <div className="add-item-row">
-//                                                         <input
-//                                                             type="text"
-//                                                             className="item-search"
-//                                                             placeholder="Search item to add..."
-//                                                             value={itemSearchQuery}
-//                                                             onChange={(e) => setItemSearchQuery(e.target.value)}
-//                                                         />
-//                                                         {itemSearchResults.length > 0 && (
-//                                                             <ul className="search-results">
-//                                                                 {itemSearchResults.map(item => (
-//                                                                     <li key={item.id} onClick={() => addItemToOrder(order.id, item)}>
-//                                                                         {item.name} - ₹{item.price}
-//                                                                     </li>
-//                                                                 ))}
-//                                                             </ul>
-//                                                         )}
-//                                                     </div>
-//                                                 )}
-
-//                                                 <div className="save-row">
-//                                                     <button
-//                                                         className="btn save"
-//                                                         onClick={() => updateOrderItems(order.id, order.items)}
-//                                                     >
-//                                                         Save Items
-//                                                     </button>
-//                                                 </div>
-//                                             </div>
-//                                         )}
-//                                     </div>
-//                                 ))
-//                             )}
-//                         </div>
-//                     )}
-
-//                     {/* Modals */}
-//                     {showDeleteModals && deleteTarget && (
-//                         <div className="modal-overlay">
-//                             <div className="modal">
-//                                 <p>Delete this item?</p>
-//                                 <div className="modal-buttons">
-//                                     <button
-//                                         className="btn yes"
-//                                         onClick={() => {
-//                                             cancelItem(deleteTarget.orderId, deleteTarget.itemId);
-//                                             setShowDeleteModals(false);
-//                                             setDeleteTarget({ orderId: null, itemId: null });
-//                                         }}
-//                                     >
-//                                         Yes
-//                                     </button>
-//                                     <button
-//                                         className="btn no"
-//                                         onClick={() => {
-//                                             setShowDeleteModals(false);
-//                                             setDeleteTarget({ orderId: null, itemId: null });
-//                                         }}
-//                                     >
-//                                         No
-//                                     </button>
-//                                 </div>
-//                             </div>
-//                         </div>
-//                     )}
-
-//                     {showDeleteModal && (
-//                         <div className="modal-overlay">
-//                             <div className="modal">
-//                                 <h3>Delete this order?</h3>
-//                                 <div className="modal-buttons">
-//                                     <button className="btn yes" onClick={confirmDeleteOrder}>Yes</button>
-//                                     <button
-//                                         className="btn no"
-//                                         onClick={() => {
-//                                             setShowDeleteModal(false);
-//                                             setOrderToDelete(null);
-//                                         }}
-//                                     >
-//                                         No
-//                                     </button>
-//                                 </div>
-//                             </div>
-//                         </div>
-//                     )}
-//                     {showInvoiceModal && invoiceOrder && (
-//                         <InvoiceModal order={invoiceOrder} onClose={closeInvoiceModal} />
-//                     )}
-
-//                 </div>
-//             </div>
-//         </>
-
-//     );
-// };
-
-// export default OrdersVisiblePage;
+import React, { useEffect, useState } from "react";
+import orderServicesPort from "../../Backend_Port_Files/OrderServices";
+import tableServicesPort from "../../Backend_Port_Files/TableServices";
+import inventoryServicesPort from "../../Backend_Port_Files/InventoryServices";
+import { useParams } from "react-router-dom";
+import { useTheme } from "../../ThemeChangerComponent/ThemeProvider";
+import { toast } from "react-toastify";
+import InvoiceModal from "../Invoice_Services_Components/Invoice_Page";
+import { MdOutlineKeyboardDoubleArrowDown } from "react-icons/md";
+
+
+const OrdersVisiblePage = () => {
+    const { clientId } = useParams();
+    const [orders, setOrders] = useState([]);
+    const [loading, setLoading] = useState(true);
+    const [expandedOrderIndex, setExpandedOrderIndex] = useState(null);
+    const [servedClickCountMap, setServedClickCountMap] = useState({});
+    const { darkMode } = useTheme();
+    const token = localStorage.getItem("access_token");
+    const [inventoryMap, setInventoryMap] = useState({});
+    const [showDeleteModal, setShowDeleteModal] = useState(false);
+    const [orderToDelete, setOrderToDelete] = useState(null);
+    const [tablesMap, setTablesMap] = useState({});
+    const [editOrderId, setEditOrderId] = useState(null);
+    const [showDeleteModals, setShowDeleteModals] = useState(false);
+    const [deleteTarget, setDeleteTarget] = useState({ orderId: null, itemId: null });
+    const [editedItemsMap, setEditedItemsMap] = useState({});
+    const [allInventoryItems, setAllInventoryItems] = useState([]);
+    const [itemSearchQuery, setItemSearchQuery] = useState("");
+    const [itemSearchResults, setItemSearchResults] = useState([]);
+    const todayDate = new Date().toISOString().split("T")[0];
+    const [selectedDate, setSelectedDate] = useState(todayDate);
+    const [filterMode, setFilterMode] = useState(0);
+    const [showInvoiceModal, setShowInvoiceModal] = useState(false);
+    const [invoiceOrder, setInvoiceOrder] = useState(null);
+    const [tableId, setTableId] = useState(null)
+    useEffect(() => {
+        if (tableId) {
+            document.body.classList.add("sidebar-minimized");
+        } else {
+            document.body.classList.remove("sidebar-minimized");
+        }
+    }, [tableId]);
+
+    const statusColorMap = {
+        pending: "blue",
+        served: "var(--status-served-bg)",
+        new: "red",
+    };
+
+    const openInvoiceModal = (order) => {
+        const tableName = tablesMap[order.table_id] || order.table_id;
+        const itemsWithPrice = (order.items || []).map((item) => ({
+            ...item,
+            price: item.price || inventoryMap[item.item_id]?.price || 0,
+        }));
+        setInvoiceOrder({ ...order, table_name: tableName, items: itemsWithPrice });
+        setShowInvoiceModal(true);
+    };
+
+    const closeInvoiceModal = () => {
+        setInvoiceOrder(null);
+        setShowInvoiceModal(false);
+    };
+
+    useEffect(() => {
+        inventoryServicesPort
+            .get(`/${clientId}/inventory/read`, {
+                headers: { Authorization: `Bearer ${token}` },
+            })
+            .then((res) => {
+                setAllInventoryItems(res.data.data || []);
+            })
+            .catch(() => { });
+    }, [clientId, token]);
+
+    useEffect(() => {
+        if (
+            expandedOrderIndex === null ||
+            expandedOrderIndex === undefined ||
+            !orders[expandedOrderIndex] ||
+            itemSearchQuery.trim() === ""
+        ) {
+            setItemSearchResults([]);
+            return;
+        }
+        const currentOrderItems = orders[expandedOrderIndex].items.map((i) =>
+            i.item_id.toString()
+        );
+        const filtered = allInventoryItems
+            .filter((item) =>
+                (item.name || "").toLowerCase().includes(itemSearchQuery.toLowerCase())
+            )
+            .filter((item) => !currentOrderItems.includes(item.id.toString()));
+        setItemSearchResults(filtered);
+    }, [itemSearchQuery, allInventoryItems, expandedOrderIndex, orders]);
+
+    const addItemToOrder = (orderId, selectedItem) => {
+        let targetItems = [];
+        setOrders((prevOrders) => {
+            return prevOrders.map((order) => {
+                if (order.id !== orderId) return order;
+                const newItem = {
+                    item_id: selectedItem.id,
+                    item_name: selectedItem.name,
+                    quantity: 1,
+                    price: selectedItem.price,
+                    status: "new",
+                    note: "",
+                    slug: selectedItem.slug || selectedItem.name.replace(/[\s]+/g, "-").toLowerCase(),
+                };
+                const newItems = [...order.items, newItem];
+                targetItems = newItems;
+                return {
+                    ...order,
+                    items: newItems,
+                };
+            });
+        });
+        setTimeout(() => {
+            updateOrderItems(orderId, targetItems);
+        }, 0);
+        setItemSearchQuery("");
+        setItemSearchResults([]);
+    };
+
+    const updateItemQuantity = (orderId, itemId, newQty) => {
+        setOrders((prev) =>
+            prev.map((order) => {
+                if (order.id !== orderId) return order;
+                const updatedItems = order.items.map((item) =>
+                    item.item_id === itemId ? { ...item, quantity: newQty > 0 ? newQty : 1 } : item
+                );
+                const newTotal = updatedItems.reduce((sum, item) => {
+                    const itemPrice = inventoryMap[item.item_id]?.price || 0;
+                    return sum + item.quantity * itemPrice;
+                }, 0);
+                return {
+                    ...order,
+                    items: updatedItems,
+                    total_price: newTotal,
+                };
+            })
+        );
+        setEditedItemsMap((prev) => {
+            const currentItems = orders.find((o) => o.id === orderId)?.items || [];
+            const updated = currentItems.map((item) =>
+                item.item_id === itemId ? { ...item, quantity: newQty > 0 ? newQty : 1 } : item
+            );
+            return { ...prev, [orderId]: updated };
+        });
+    };
+
+    useEffect(() => {
+        document.body.setAttribute("data-theme", darkMode ? "dark" : "light");
+    }, [darkMode]);
+
+    useEffect(() => {
+        const fetchOrders = async () => {
+            if (!token) {
+                setLoading(false);
+                return;
+            }
+            try {
+                const response = await orderServicesPort.get(`/${clientId}/dinein/table`, {
+                    headers: { Authorization: `Bearer ${token}` },
+                });
+                setOrders(response.data?.data || []);
+                setLoading(false);
+            } catch (error) {
+                toast.error("❌ Failed to fetch dine-in orders.");
+                setLoading(false);
+            }
+        };
+        if (clientId) {
+            fetchOrders();
+        }
+    }, [clientId, token]);
+
+    // ONLY ONE container expands at a time
+    const toggleExpand = (index) => {
+        setExpandedOrderIndex((prev) => (prev === index ? null : index));
+    };
+
+    // Click three times to mark served
+    const handleContainerClick = (orderId) => {
+        const count = servedClickCountMap[orderId] || 0;
+        const newCount = count + 1;
+        setServedClickCountMap((prev) => ({ ...prev, [orderId]: newCount }));
+        if (newCount >= 3) {
+            handleStatusChange(orderId, "served");
+            setServedClickCountMap((prev) => ({ ...prev, [orderId]: 0 }));
+        }
+    };
+    const handleStatusChange = async (orderId, newStatus) => {
+        const order = orders.find((o) => o.id === orderId);
+        if (!order || order.status === "served") return;
+
+        try {
+            // 1. Update order status
+            await orderServicesPort.post(
+                `/${clientId}/dinein/update`,
+                { id: orderId, client_id: clientId, status: newStatus },
+                { headers: { Authorization: `Bearer ${token}` } }
+            );
+
+            // 2. If served, also free the table
+            if (newStatus === "served") {
+                await tableServicesPort.post(
+                    `/${clientId}/tables/update`,
+                    {
+                        id: order.table_id,
+                        client_id: clientId, // ✅ required by backend
+                        name: tablesMap[order.table_id] || `Table ${order.table_id}`,
+                        table_type: "Standard", // or use your real type if available
+                        status: "Vacant",
+                        location_zone: null
+                    },
+                    { headers: { Authorization: `Bearer ${token}` } }
+                );
+
+                // ✅ update local table state so UI reflects immediately
+                setTablesMap((prev) => ({
+                    ...prev,
+                    [order.table_id]: tablesMap[order.table_id] || `Table ${order.table_id}`
+                }));
+            }
+
+            toast.success("Order status updated");
+
+            // update orders state
+            setOrders((prev) =>
+                prev.map((o) => (o.id === orderId ? { ...o, status: newStatus } : o))
+            );
+
+            if (newStatus === "served") setEditOrderId(null);
+        } catch (err) {
+            toast.error("❌ Failed to update order status.");
+        }
+    };
+
+
+
+    const handleItemStatusChange = async (orderId, itemId, newStatus) => {
+        try {
+            const order = orders.find((o) => o.id === orderId);
+            if (!order) return toast.error("Order not found in state");
+            const updatedItems = order.items.map((item) =>
+                item.item_id === itemId ? { ...item, status: newStatus } : item
+            );
+            const itemsForUpdate = updatedItems.map(({ id, ...rest }) => rest);
+            const totalPrice = updatedItems.reduce(
+                (sum, item) => sum + (inventoryMap[item.item_id]?.price || 0) * (item.quantity || 1),
+                0
+            );
+            await orderServicesPort.post(
+                `/${clientId}/order_items/update?order_id=${orderId}`,
+                itemsForUpdate,
+                { headers: { Authorization: `Bearer ${token}` } }
+            );
+            await orderServicesPort.post(
+                `/${clientId}/dinein/update`,
+                { id: orderId, total_price: totalPrice },
+                { headers: { Authorization: `Bearer ${token}` } }
+            );
+            setOrders((prev) =>
+                prev.map((o) => (o.id === orderId ? { ...o, items: updatedItems, total_price: totalPrice } : o))
+            );
+            toast.success("Item status updated");
+        } catch (err) {
+            toast.error("Failed to update item status");
+        }
+    };
+
+    const cancelItem = async (orderId, itemId) => {
+        const order = orders.find((o) => o.id === orderId);
+        const item = order?.items.find((i) => i.item_id === itemId);
+        if (!item?.id) return;
+        try {
+            await orderServicesPort.delete(`/${clientId}/order_item/delete`, {
+                params: { order_item_id: item.id, client_id: clientId },
+                headers: { Authorization: `Bearer ${token}` },
+            });
+            const updatedOrders = orders.map((o) => {
+                if (o.id !== orderId) return o;
+                const updatedItems = o.items.filter((i) => i.item_id !== itemId);
+                const newTotal = updatedItems.reduce((sum, item) => {
+                    const price = inventoryMap[item.item_id]?.price || item.price || 0;
+                    return sum + (item.quantity || 1) * price;
+                }, 0);
+                return { ...o, items: updatedItems, total_price: newTotal };
+            });
+            setOrders(updatedOrders);
+            const newOrder = updatedOrders.find((o) => o.id === orderId);
+            if (newOrder) {
+                await orderServicesPort.post(
+                    `/${clientId}/dinein/update`,
+                    { id: orderId, total_price: newOrder.total_price },
+                    { headers: { Authorization: `Bearer ${token}` } }
+                );
+            }
+            setEditedItemsMap((prev) => {
+                const updated = (prev[orderId] || []).filter((i) => i.item_id !== itemId);
+                return { ...prev, [orderId]: updated };
+            });
+            toast.success("Item cancelled and total updated");
+        } catch (err) {
+            toast.error("❌ Failed to cancel item.");
+        }
+    };
+
+    const updateOrderItems = async (orderId, updatedItemsWithStatuses) => {
+        const cleanedItems = updatedItemsWithStatuses.map((item) => ({
+            item_id: item.item_id || item.inventory_id,
+            item_name: item.name || item.item_name,
+            quantity: item.quantity || 1,
+            status: item.status || "new",
+            note: item.note || "",
+            slug: item.slug || "",
+            price: item.price || inventoryMap[item.item_id || item.inventory_id]?.price || 0,
+            client_id: clientId,
+            order_id: orderId,
+        }));
+        const totalPrice = cleanedItems.reduce((sum, item) => sum + item.price * item.quantity, 0);
+        try {
+            await orderServicesPort.post(
+                `/${clientId}/order_items/update?order_id=${orderId}`,
+                cleanedItems,
+                { headers: { Authorization: `Bearer ${token}` } }
+            );
+            await orderServicesPort.post(
+                `/${clientId}/dinein/update`,
+                { id: orderId, total_price: totalPrice },
+                { headers: { Authorization: `Bearer ${token}` } }
+            );
+            toast.success("Item statuses & total updated!");
+        } catch (err) {
+            toast.error("Failed to update items or total.");
+        }
+    };
+
+    const confirmDeleteOrder = async () => {
+        if (!orderToDelete) return;
+        try {
+            await orderServicesPort.delete(`/${clientId}/dinein/delete`, {
+                params: { dinein_order_id: orderToDelete, client_id: clientId },
+                headers: { Authorization: `Bearer ${token}` },
+            });
+            setOrders((prev) => prev.filter((o) => o.id !== orderToDelete));
+            setExpandedOrderIndex(null);
+            toast.success("Order deleted");
+        } catch (err) {
+            toast.error("❌ Failed to delete order");
+        } finally {
+            setShowDeleteModal(false);
+            setOrderToDelete(null);
+        }
+    };
+
+    useEffect(() => {
+        const fetchTables = async () => {
+            try {
+                const res = await tableServicesPort.get(`/${clientId}/tables/read`, {
+                    headers: { Authorization: `Bearer ${token}` },
+                });
+                const tableList = res.data?.data || [];
+                const map = {};
+                tableList.forEach((table) => {
+                    map[table.id] = table.name;
+                });
+                setTablesMap(map);
+            } catch (error) { }
+        };
+        fetchTables();
+    }, [clientId, token]);
+
+    useEffect(() => {
+        const fetchInventory = async () => {
+            if (!token || !clientId) return;
+            try {
+                const res = await inventoryServicesPort.get(`/${clientId}/inventory/read`, {
+                    headers: { Authorization: `Bearer ${token}` },
+                });
+                const inventoryList = res.data?.data || [];
+                const map = {};
+                inventoryList.forEach((item) => {
+                    map[item.id] = item; // Includes price
+                });
+                setInventoryMap(map);
+            } catch (error) { }
+        };
+        fetchInventory();
+    }, [clientId, token]);
+
+    let filteredOrders = selectedDate
+        ? orders.filter((order) => {
+            const orderDate = new Date(order.created_at).toLocaleDateString("en-CA");
+            return orderDate === selectedDate;
+        })
+        : orders;
+
+    switch (filterMode) {
+        case 0: // Ascending date
+            filteredOrders = [...filteredOrders].sort((a, b) => new Date(a.created_at) - new Date(b.created_at));
+            break;
+        case 1: // Descending date
+            filteredOrders = [...filteredOrders].sort((a, b) => new Date(b.created_at) - new Date(a.created_at));
+            break;
+        case 2: // New orders
+            filteredOrders = filteredOrders.filter((o) => o.status?.toLowerCase() === "new");
+            break;
+        case 3: // Preparing orders
+            filteredOrders = filteredOrders.filter((o) => o.status?.toLowerCase() === "preparing");
+            break;
+        case 4: // Served orders
+            filteredOrders = filteredOrders.filter((o) => o.status?.toLowerCase() === "served");
+            break;
+        default:
+            break;
+    }
+
+    return (
+        <div className="OrderSummary-Page-Container"><div className="orders-visible-root">
+            <div className="orders-visible-content">
+                <div className="orders-visible-header">
+                    <h2>Table Orders</h2>
+                    <div className="orders-visible-actions">
+                        <select
+                            className="orders-visible-date-filter"
+                            value={selectedDate}
+                            onChange={(e) => setSelectedDate(e.target.value)}
+                        >
+                            <option value="">All Dates</option>
+                            {[...Array(15)].map((_, i) => {
+                                const d = new Date();
+                                d.setDate(d.getDate() - i);
+                                const dateString = d.toLocaleDateString("en-CA");
+                                const label = i === 0 ? "Today" : dateString;
+                                return (
+                                    <option key={dateString} value={dateString}>
+                                        {label}
+                                    </option>
+                                );
+                            })}
+                        </select>
+                        <button className="orders-visible-btn orders-visible-export-btn">Export</button>
+                        <button
+                            className="orders-visible-btn orders-visible-filter-btn"
+                            onClick={() => setFilterMode((prev) => (prev + 1) % 5)}
+                        >
+                            Filter
+                        </button>
+                    </div>
+                </div>
+
+                {loading ? (
+                    <div className="orders-visible-loading">Loading orders...</div>
+                ) : (
+                    <div className="orders-visible-order-grid">
+                        {filteredOrders.length === 0 ? (
+                            <div className="orders-visible-no-orders">No orders found.</div>
+                        ) : (
+                            filteredOrders.map((order, index) => (
+                                <div
+                                    key={order.id || index}
+                                    className={`orders-visible-order-card${expandedOrderIndex === index ? " expanded" : ""}`}
+                                    style={{
+                                        backgroundColor: statusColorMap[order.status?.toLowerCase()] || "var(--status-prepare-bg)",
+                                    }}
+                                    onClick={() => handleContainerClick(order.id)}
+                                >
+                                    <div className="orders-visible-card-top-row">
+                                        <span className="orders-visible-tablename">{tablesMap[order.table_id] || order.table_id}</span>
+                                        <span className="orders-visible-items-count">{order.items.length} items</span>
+                                        <button className="orders-visible-invoice-btn" onClick={(e) => { e.stopPropagation(); openInvoiceModal(order); }}>
+                                            Invoice
+                                        </button>
+                                        <button
+                                            className="orders-visible-expand-btn"
+                                            onClick={(e) => {
+                                                e.stopPropagation();
+                                                toggleExpand(index);
+                                            }}
+                                        >
+                                            <span className={`orders-visible-arrow-icon${expandedOrderIndex === index ? " " : "up"}`}>
+                                                <MdOutlineKeyboardDoubleArrowDown />
+                                            </span>
+                                        </button>
+                                    </div>
+
+                                    <div
+                                        className="orders-visible-card-expand-section"
+                                        style={{
+                                            display: expandedOrderIndex === index ? "block" : "none",
+                                        }}
+                                        onClick={(e) => e.stopPropagation()}
+                                    >
+                                        <div className="orders-visible-expanded-info">
+                                            <span>Date: {new Date(order.created_at).toLocaleDateString()}</span>
+                                            <span>Price: ₹{parseFloat(order.total_price || 0).toFixed(2)}</span>
+                                        </div>
+                                        <div className="orders-visible-expanded-actions">
+                                            {editOrderId === order.id ? (
+                                                <button
+                                                    className="orders-visible-btn orders-visible-edit-btn active"
+                                                    onClick={() => setEditOrderId((prev) => (prev === order.id ? null : order.id))}
+                                                >
+                                                    Done Editing
+                                                </button>
+                                            ) : (
+                                                <button className="orders-visible-btn orders-visible-edit-btn" onClick={() => setEditOrderId(order.id)}>
+                                                    Edit
+                                                </button>
+                                            )}
+                                            <button
+                                                className="orders-visible-btn orders-visible-served-btn"
+                                                disabled={order.status === "served"}
+                                                onClick={() => handleStatusChange(order.id, "served")}
+                                            >
+                                                Served
+                                            </button>
+                                            <button
+                                                className="orders-visible-btn orders-visible-delete-btn"
+                                                onClick={() => {
+                                                    setOrderToDelete(order.id);
+                                                    setShowDeleteModal(true);
+                                                }}
+                                            >
+                                                Delete
+                                            </button>
+                                        </div>
+
+                                        {editOrderId === order.id && (
+                                            <div className="orders-visible-edit-panel">
+                                                <div className="orders-visible-edit-items-list">
+                                                    {order.items.map((item, idx) => (
+                                                        <div key={idx} className="orders-visible-edit-item-row">
+                                                            <span>{item.item_name || item.item_id}</span>
+                                                            <div className="orders-visible-edit-qty-controls">
+                                                                <button
+                                                                    onClick={() => updateItemQuantity(order.id, item.item_id, item.quantity - 1)}
+                                                                    disabled={item.quantity <= 1}
+                                                                >
+                                                                    −
+                                                                </button>
+                                                                <span>{item.quantity}</span>
+                                                                <button onClick={() => updateItemQuantity(order.id, item.item_id, item.quantity + 1)}>+</button>
+                                                            </div>
+                                                            <button
+                                                                className="orders-visible-btn orders-visible-edit-delete-btn"
+                                                                onClick={() => {
+                                                                    setDeleteTarget({ orderId: order.id, itemId: item.item_id });
+                                                                    setShowDeleteModals(true);
+                                                                }}
+                                                                disabled={item.status === "cancelled"}
+                                                            >
+                                                                Delete
+                                                            </button>
+                                                        </div>
+                                                    ))}
+                                                </div>
+                                                <div className="orders-visible-add-item-row">
+                                                    <input
+                                                        type="text"
+                                                        className="orders-visible-item-search"
+                                                        placeholder="Search item to add..."
+                                                        value={itemSearchQuery}
+                                                        onChange={(e) => setItemSearchQuery(e.target.value)}
+                                                    />
+                                                    {itemSearchResults.length > 0 && (
+                                                        <ul className="orders-visible-search-results">
+                                                            {itemSearchResults.map((item) => (
+                                                                <li key={item.id} onClick={() => addItemToOrder(order.id, item)}>
+                                                                    {item.name} - ₹{item.price}
+                                                                </li>
+                                                            ))}
+                                                        </ul>
+                                                    )}
+                                                </div>
+                                                <div className="orders-visible-save-row">
+                                                    <button className="orders-visible-btn orders-visible-save-btn" onClick={() => updateOrderItems(order.id, order.items)}>
+                                                        Save Items
+                                                    </button>
+                                                </div>
+                                            </div>
+                                        )}
+                                    </div>
+                                </div>
+                            ))
+                        )}
+                    </div>
+                )}
+
+                {showDeleteModals && deleteTarget && (
+                    <div className="orders-visible-modal-overlay">
+                        <div className="orders-visible-modal orders-visible-delete-modal">
+                            <p>Delete this item?</p>
+                            <div className="orders-visible-modal-buttons">
+                                <button
+                                    className="orders-visible-btn orders-visible-modal-yes"
+                                    onClick={() => {
+                                        cancelItem(deleteTarget.orderId, deleteTarget.itemId);
+                                        setShowDeleteModals(false);
+                                        setDeleteTarget({ orderId: null, itemId: null });
+                                    }}
+                                >
+                                    Yes
+                                </button>
+                                <button
+                                    className="orders-visible-btn orders-visible-modal-no"
+                                    onClick={() => {
+                                        setShowDeleteModals(false);
+                                        setDeleteTarget({ orderId: null, itemId: null });
+                                    }}
+                                >
+                                    No
+                                </button>
+                            </div>
+                        </div>
+                    </div>
+                )}
+
+                {showDeleteModal && (
+                    <div className="orders-visible-modal-overlay">
+                        <div className="orders-visible-modal orders-visible-confirm-delete-modal">
+                            <h3>Delete this order?</h3>
+                            <div className="orders-visible-modal-buttons">
+                                <button className="orders-visible-btn orders-visible-modal-yes" onClick={confirmDeleteOrder}>
+                                    Yes
+                                </button>
+                                <button
+                                    className="orders-visible-btn orders-visible-modal-no"
+                                    onClick={() => {
+                                        setShowDeleteModal(false);
+                                        setOrderToDelete(null);
+                                    }}
+                                >
+                                    No
+                                </button>
+                            </div>
+                        </div>
+                    </div>
+                )}
+
+                {showInvoiceModal && invoiceOrder && <InvoiceModal order={invoiceOrder} onClose={closeInvoiceModal} />}
+            </div>
+        </div></div>
+    );
+};
+
+export default OrdersVisiblePage;
 
 
 // =================================================================================================================== //
@@ -2308,1043 +2145,1043 @@
 
 
 
-import React, { useEffect, useState, useMemo, useCallback } from "react";
-import { useParams } from "react-router-dom";
-import { useTheme } from "../../ThemeChangerComponent/ThemeProvider";
-import { toast } from "react-toastify";
-
-import orderServicesPort from "../../Backend_Port_Files/OrderServices";
-import tableServicesPort from "../../Backend_Port_Files/TableServices";
-import inventoryServicesPort from "../../Backend_Port_Files/InventoryServices";
-import InvoiceModal from "../Invoice_Services_Components/Invoice_Page";
-
-const OrdersVisiblePage = () => {
-    const { clientId } = useParams();
-    const token = localStorage.getItem("access_token");
-    const { darkMode } = useTheme();
-
-    // Order data and tables/inventory maps
-    const [orders, setOrders] = useState([]);
-    const [tablesMap, setTablesMap] = useState({});
-    const [inventoryMap, setInventoryMap] = useState({});
-    const [allInventoryItems, setAllInventoryItems] = useState([]);
-    const [loading, setLoading] = useState(true);
-
-    // Date filter and other UI state
-    const todayDate = new Date().toISOString().split("T")[0];
-    const [selectedDate, setSelectedDate] = useState(todayDate);
-    const [searchTerm, setSearchTerm] = useState('');
-    const [statusFilter, setStatusFilter] = useState('all');
-    const [currentView, setCurrentView] = useState('dashboard');
-    const [selectedOrder, setSelectedOrder] = useState(null);
-
-    // Modals and selected entities
-    const [showInvoiceModal, setShowInvoiceModal] = useState(false);
-    const [invoiceOrder, setInvoiceOrder] = useState(null);
-    const [editOrderId, setEditOrderId] = useState(null);
-    const [showEditModal, setShowEditModal] = useState(false);
-    const [showDeleteModal, setShowDeleteModal] = useState(false);
-    const [orderToDelete, setOrderToDelete] = useState(null);
-    const [itemSearchQuery, setItemSearchQuery] = useState("");
-    const [itemSearchResults, setItemSearchResults] = useState([]);
-    const [editedOrderItems, setEditedOrderItems] = useState([]);
-
-    // Status configurations
-    const statusConfig = {
-        pending: {
-            color: 'from-amber-400 to-orange-500',
-            textColor: 'text-amber-800',
-            bgColor: 'bg-amber-50',
-            icon: 'fas fa-clock',
-            label: 'Pending',
-            description: 'Order received, awaiting confirmation'
-        },
-        preparing: {
-            color: 'from-blue-400 to-indigo-500',
-            textColor: 'text-blue-800',
-            bgColor: 'bg-blue-50',
-            icon: 'fas fa-utensils',
-            label: 'Preparing',
-            description: 'Kitchen is preparing your order'
-        },
-        delivering: {
-            color: 'from-purple-400 to-pink-500',
-            textColor: 'text-purple-800',
-            bgColor: 'bg-purple-50',
-            icon: 'fas fa-truck',
-            label: 'Delivering',
-            description: 'On the way to your location'
-        },
-        served: {
-            color: 'from-green-400 to-emerald-500',
-            textColor: 'text-green-800',
-            bgColor: 'bg-green-50',
-            icon: 'fas fa-check-circle',
-            label: 'Served',
-            description: 'Successfully served'
-        }
-    };
-
-    // Priority configurations
-    const priorityConfig = {
-        low: { color: 'priority-low', icon: 'fas fa-arrow-down' },
-        medium: { color: 'priority-medium', icon: 'fas fa-minus' },
-        high: { color: 'priority-high', icon: 'fas fa-arrow-up' }
-    };
-
-    // Calculate order totals
-    const calculateOrderTotal = useCallback((order) => {
-        if (!order.items || !Array.isArray(order.items)) return order.total_price || 0;
-        const subtotal = order.items.reduce((sum, item) => sum + ((item.price || 0) * (item.quantity || 0)), 0);
-        return subtotal;
-    }, []);
-
-    // --- Fetch tables map
-    useEffect(() => {
-        if (!clientId || !token) return;
-
-        const fetchTables = async () => {
-            try {
-                const res = await tableServicesPort.get(`/${clientId}/tables/read`, {
-                    headers: { Authorization: `Bearer ${token}` },
-                });
-                const map = {};
-                (res.data?.data || []).forEach((t) => {
-                    map[t.id] = t.name;
-                });
-                setTablesMap(map);
-            } catch { }
-        };
-        fetchTables();
-    }, [clientId, token]);
-
-    // --- Fetch inventory map & all items list
-    useEffect(() => {
-        if (!clientId || !token) return;
-
-        const fetchInventory = async () => {
-            try {
-                const res = await inventoryServicesPort.get(
-                    `/${clientId}/inventory/read`,
-                    { headers: { Authorization: `Bearer ${token}` } }
-                );
-                const invMap = {};
-                (res.data?.data || []).forEach((item) => {
-                    invMap[item.id] = item;
-                });
-                setInventoryMap(invMap);
-                setAllInventoryItems(res.data?.data || []);
-            } catch { }
-        };
-
-        fetchInventory();
-    }, [clientId, token]);
-
-    // --- Fetch orders
-    useEffect(() => {
-        if (!clientId || !token) return;
-
-        const fetchOrders = async () => {
-            setLoading(true);
-            try {
-                const res = await orderServicesPort.get(`/${clientId}/dinein/table`, {
-                    headers: { Authorization: `Bearer ${token}` },
-                });
-                setOrders(res.data?.data || []);
-            } catch {
-                toast.error("Failed to fetch dine-in orders");
-            } finally {
-                setLoading(false);
-            }
-        };
-        fetchOrders();
-    }, [clientId, token]);
-
-    // Filter orders based on search, status, and date
-    const filteredOrders = useMemo(() => {
-        return orders.filter(order => {
-            const matchesSearch = (tablesMap[order.table_id] || '').toLowerCase().includes(searchTerm.toLowerCase()) ||
-                order.id.toString().toLowerCase().includes(searchTerm.toLowerCase());
-            const matchesStatus = statusFilter === 'all' || (order.status || '').toLowerCase() === statusFilter.toLowerCase();
-            const matchesDate = !selectedDate || new Date(order.created_at).toLocaleDateString("en-CA") === selectedDate;
-            return matchesSearch && matchesStatus && matchesDate;
-        });
-    }, [orders, searchTerm, statusFilter, selectedDate, tablesMap]);
-
-    // Statistics
-    const stats = useMemo(() => {
-        const total = filteredOrders.length;
-        const completed = filteredOrders.filter(o => (o.status || '').toLowerCase() === 'served').length;
-        const pending = filteredOrders.filter(o => ['pending', 'preparing', 'new'].includes((o.status || '').toLowerCase())).length;
-        const revenue = filteredOrders.reduce((sum, order) => sum + calculateOrderTotal(order), 0);
-        const avgRating = 4.5; // Since we don't have ratings in the order data
-
-        return { total, completed, pending, revenue, avgRating };
-    }, [filteredOrders, calculateOrderTotal]);
-
-    // Status update function
-    const updateOrderStatus = async (orderId, newStatus) => {
-        try {
-            await orderServicesPort.post(
-                `/${clientId}/dinein/update`,
-                {
-                    id: orderId,
-                    client_id: clientId,
-                    status: newStatus
-                },
-                {
-                    headers: { Authorization: `Bearer ${token}` }
-                }
-            );
-            setOrders(prev =>
-                prev.map(order =>
-                    order.id === orderId ? { ...order, status: newStatus } : order
-                )
-            );
-            toast.success("Order status updated");
-            if (editOrderId === orderId && newStatus === "served") {
-                closeEditModal();
-            }
-        } catch (error) {
-            toast.error("Failed to update order status");
-        }
-    };
-
-    // --- Open invoice modal
-    const openInvoiceModal = (order) => {
-        const tableName = tablesMap[order.table_id] || order.table_id;
-        const itemsWithPrice = (order.items || []).map((item) => ({
-            ...item,
-            price: item.price || inventoryMap[item.item_id]?.price || 0,
-        }));
-        setInvoiceOrder({ ...order, table_name: tableName, items: itemsWithPrice });
-        setShowInvoiceModal(true);
-    };
-
-    const closeInvoiceModal = () => {
-        setInvoiceOrder(null);
-        setShowInvoiceModal(false);
-    };
-
-    // --- Open edit modal with order items for editing
-    const openEditModal = (order) => {
-        setEditOrderId(order.id);
-        setEditedOrderItems(JSON.parse(JSON.stringify(order.items || [])));
-        setItemSearchQuery("");
-        setItemSearchResults([]);
-        setShowEditModal(true);
-    };
-
-    const closeEditModal = () => {
-        setEditOrderId(null);
-        setEditedOrderItems([]);
-        setShowEditModal(false);
-    };
-
-    // --- Update item quantity locally while editing
-    const updateItemQuantity = (itemId, newQty) => {
-        if (newQty < 1) return;
-        setEditedOrderItems((prev) =>
-            prev.map((item) => (item.item_id === itemId ? { ...item, quantity: newQty } : item))
-        );
-    };
-
-    // --- Update item status locally while editing
-    const updateItemStatus = (itemId, newStatus) => {
-        setEditedOrderItems((prev) =>
-            prev.map((item) => (item.item_id === itemId ? { ...item, status: newStatus } : item))
-        );
-    };
-
-    // --- Add item to edited order items
-    const addItemToOrder = (selectedItem) => {
-        if (editedOrderItems.find((i) => i.item_id === selectedItem.id)) return;
-        const newItem = {
-            item_id: selectedItem.id,
-            item_name: selectedItem.name,
-            quantity: 1,
-            price: selectedItem.price,
-            status: "new",
-            note: "",
-            slug: selectedItem.slug || selectedItem.name.toLowerCase().replace(/\s+/g, "-"),
-        };
-        setEditedOrderItems((prev) => [...prev, newItem]);
-        setItemSearchQuery("");
-        setItemSearchResults([]);
-    };
-
-    // --- Remove item from edited order items
-    const removeItemFromOrder = (itemId) => {
-        setEditedOrderItems((prev) => prev.filter((item) => item.item_id !== itemId));
-    };
-
-    // --- Save edited order items to backend
-    const saveEditedOrderItems = async () => {
-        if (!editOrderId) return;
-
-        const cleanedItems = editedOrderItems.map((item) => ({
-            item_id: item.item_id,
-            item_name: item.item_name,
-            quantity: item.quantity,
-            status: item.status || "new",
-            note: item.note || "",
-            slug: item.slug || "",
-            price: item.price || inventoryMap[item.item_id]?.price || 0,
-            client_id: clientId,
-            order_id: editOrderId,
-        }));
-
-        const totalPrice = cleanedItems.reduce((sum, item) => sum + item.price * item.quantity, 0);
-
-        try {
-            await orderServicesPort.post(
-                `/${clientId}/order_items/update?order_id=${editOrderId}`,
-                cleanedItems,
-                { headers: { Authorization: `Bearer ${token}` } }
-            );
-
-            await orderServicesPort.post(
-                `/${clientId}/dinein/update`,
-                { id: editOrderId, total_price: totalPrice },
-                { headers: { Authorization: `Bearer ${token}` } }
-            );
-
-            setOrders((prev) =>
-                prev.map((o) => (o.id === editOrderId ? { ...o, items: editedOrderItems, total_price: totalPrice } : o))
-            );
-
-            toast.success("Order updated successfully");
-            closeEditModal();
-        } catch {
-            toast.error("Failed to save order changes");
-        }
-    };
-
-    // --- Search inventory for adding items to order edit modal
-    useEffect(() => {
-        if (!itemSearchQuery.trim() || !editOrderId) {
-            setItemSearchResults([]);
-            return;
-        }
-        const currentItemIds = editedOrderItems.map((i) => i.item_id);
-
-        const filtered = allInventoryItems.filter(
-            (item) =>
-                item.name.toLowerCase().includes(itemSearchQuery.toLowerCase()) &&
-                !currentItemIds.includes(item.id)
-        );
-
-        setItemSearchResults(filtered);
-    }, [itemSearchQuery, allInventoryItems, editedOrderItems, editOrderId]);
-
-    // --- Delete order handling
-    const confirmDeleteOrder = async () => {
-        if (!orderToDelete) return;
-        try {
-            await orderServicesPort.delete(`/${clientId}/dinein/delete`, {
-                params: { dinein_order_id: orderToDelete, client_id: clientId },
-                headers: { Authorization: `Bearer ${token}` },
-            });
-            setOrders((prev) => prev.filter((o) => o.id !== orderToDelete));
-            toast.success("Order deleted");
-            setShowDeleteModal(false);
-            setOrderToDelete(null);
-        } catch {
-            toast.error("Failed to delete order");
-        }
-    };
-
-    // Header Component
-    // const Header = () => (
-    //     <header className="header">
-    //         <div className="header-container">
-    //             <div className="header-content">
-    //                 <div className="header-left">
-    //                     <div className="header-brand">
-    //                         <div className="brand-icon">
-    //                             <i className="fas fa-shopping-cart"></i>
-    //                         </div>
-    //                         <div className="brand-text">
-    //                             <h1>Orders Hub</h1>
-    //                             <p>Management System</p>
-    //                         </div>
-    //                     </div>
-    //                 </div>
-
-    //                 <div className="header-right">
-    //                     {currentView === 'detail' && (
-    //                         <button
-    //                             onClick={() => setCurrentView('dashboard')}
-    //                             className="btn-secondary"
-    //                         >
-    //                             <i className="fas fa-arrow-left"></i>
-    //                             <span>Back</span>
-    //                         </button>
-    //                     )}
-
-    //                     <div className="user-profile">
-    //                         <div className="user-avatar">
-    //                             <i className="fas fa-user"></i>
-    //                         </div>
-    //                         <div className="user-info">
-    //                             <p className="user-name">Admin</p>
-    //                             <p className="user-role">Manager</p>
-    //                         </div>
-    //                     </div>
-    //                 </div>
-    //             </div>
-    //         </div>
-    //     </header>
-    // );
-
-    // Stats Cards Component
-    const StatsCards = () => (
-        <div className="stats-grid">
-            <div className="stat-card animate-fade-in">
-                <div className="stat-content">
-                    <div className="stat-text">
-                        <p className="stat-label">Total Orders</p>
-                        <p className="stat-value">{stats.total}</p>
-                        <p className="stat-change positive">
-                            <i className="fas fa-arrow-up"></i>+12% from last week
-                        </p>
-                    </div>
-                    <div className="stat-icon blue">
-                        <i className="fas fa-shopping-bag"></i>
-                    </div>
-                </div>
-            </div>
-
-            <div className="stat-card animate-fade-in" style={{ animationDelay: '0.1s' }}>
-                <div className="stat-content">
-                    <div className="stat-text">
-                        <p className="stat-label">Completed</p>
-                        <p className="stat-value">{stats.completed}</p>
-                        <p className="stat-change positive">
-                            <i className="fas fa-check"></i>{stats.total > 0 ? ((stats.completed / stats.total) * 100).toFixed(0) : 0}% success rate
-                        </p>
-                    </div>
-                    <div className="stat-icon green">
-                        <i className="fas fa-check-circle"></i>
-                    </div>
-                </div>
-            </div>
-
-            <div className="stat-card animate-fade-in" style={{ animationDelay: '0.2s' }}>
-                <div className="stat-content">
-                    <div className="stat-text">
-                        <p className="stat-label">Pending</p>
-                        <p className="stat-value">{stats.pending}</p>
-                        <p className="stat-change warning">
-                            <i className="fas fa-clock"></i>Needs attention
-                        </p>
-                    </div>
-                    <div className="stat-icon orange">
-                        <i className="fas fa-clock"></i>
-                    </div>
-                </div>
-            </div>
-
-            <div className="stat-card animate-fade-in" style={{ animationDelay: '0.3s' }}>
-                <div className="stat-content">
-                    <div className="stat-text">
-                        <p className="stat-label">Revenue</p>
-                        <p className="stat-value">₹{stats.revenue.toFixed(0)}</p>
-                        <p className="stat-change positive">
-                            <i className="fas fa-trending-up"></i>+8% this month
-                        </p>
-                    </div>
-                    <div className="stat-icon purple">
-                        <i className="fas fa-dollar-sign"></i>
-                    </div>
-                </div>
-            </div>
-
-            <div className="stat-card animate-fade-in" style={{ animationDelay: '0.4s' }}>
-                <div className="stat-content">
-                    <div className="stat-text">
-                        <p className="stat-label">Avg Rating</p>
-                        <p className="stat-value">{stats.avgRating.toFixed(1)}</p>
-                        <div className="rating-stars">
-                            {[...Array(5)].map((_, i) => (
-                                <i key={i} className={`fas fa-star ${i < Math.floor(stats.avgRating) ? 'active' : ''}`}></i>
-                            ))}
-                        </div>
-                    </div>
-                    <div className="stat-icon yellow">
-                        <i className="fas fa-star"></i>
-                    </div>
-                </div>
-            </div>
-        </div>
-    );
-
-    // Search and Filter Component
-    const SearchAndFilter = () => (
-        <div className="search-filter-container animate-fade-in">
-            <div className="search-filter-content">
-                <div className="search-box">
-                    <div className="search-input-wrapper">
-                        <i className="fas fa-search search-icon"></i>
-                        <input
-                            type="text"
-                            placeholder="Search orders by table name or order ID..."
-                            value={searchTerm}
-                            onChange={(e) => setSearchTerm(e.target.value)}
-                            className="search-input"
-                        />
-                    </div>
-                </div>
-
-                <div className="filter-controls">
-                    <select
-                        value={selectedDate}
-                        onChange={(e) => setSelectedDate(e.target.value)}
-                        className="filter-select"
-                    >
-                        <option value="">All Dates</option>
-                        {[...Array(15)].map((_, i) => {
-                            const d = new Date();
-                            d.setDate(d.getDate() - i);
-                            const dateString = d.toLocaleDateString("en-CA");
-                            const label = i === 0 ? "Today" : dateString;
-                            return (
-                                <option key={dateString} value={dateString}>
-                                    {label}
-                                </option>
-                            );
-                        })}
-                    </select>
-
-                    <select
-                        value={statusFilter}
-                        onChange={(e) => setStatusFilter(e.target.value)}
-                        className="filter-select"
-                    >
-                        <option value="all">All Status</option>
-                        <option value="pending">Pending</option>
-                        <option value="preparing">Preparing</option>
-                        <option value="new">New</option>
-                        <option value="served">Served</option>
-                        <option value="cancelled">Cancelled</option>
-                    </select>
-
-                    <button className="btn-primary">
-                        <i className="fas fa-filter"></i>
-                        Filter
-                    </button>
-                </div>
-            </div>
-        </div>
-    );
-
-    // Order Card Component
-    const OrderCard = ({ order }) => {
-        const config = statusConfig[order.status?.toLowerCase()] || statusConfig.pending;
-        const total = calculateOrderTotal(order);
-
-        return (
-            <div className="order-card card-hover animate-fade-in">
-                <div className="card-header">
-                    <div className="card-header-left">
-                        <div className="customer-avatar">
-                            {tablesMap[order.table_id]?.charAt(0) || 'T'}
-                        </div>
-                        <div className="order-info">
-                            <h3 className="order-id">#{order.id}</h3>
-                            <p className="table-name">{tablesMap[order.table_id] || `Table ${order.table_id}`}</p>
-                        </div>
-                    </div>
-
-                    <div className="card-header-right">
-                        <span className="priority-badge priority-medium">
-                            <i className="fas fa-minus"></i>
-                            medium
-                        </span>
-                    </div>
-                </div>
-
-                <div className={`status-badge status-${order.status?.toLowerCase() || 'pending'}`}>
-                    <i className={config.icon}></i>
-                    {config.label}
-                </div>
-
-                <div className="order-details">
-                    <div className="detail-row">
-                        <span className="detail-label">
-                            <i className="fas fa-calendar"></i>
-                            {new Date(order.created_at).toLocaleDateString()}
-                        </span>
-                        <span className="detail-label">
-                            <i className="fas fa-clock"></i>
-                            {new Date(order.created_at).toLocaleTimeString()}
-                        </span>
-                    </div>
-
-                    <div className="detail-row">
-                        <span className="detail-label">
-                            <i className="fas fa-shopping-bag"></i>
-                            {order.items?.length || 0} items
-                        </span>
-                        <span className="order-total">
-                            ₹{total.toFixed(2)}
-                        </span>
-                    </div>
-
-                    {order.items && order.items.length > 0 && (
-                        <div className="items-preview">
-                            <span className="items-label">Items:</span>
-                            <div className="items-tags">
-                                {order.items.slice(0, 3).map((item, index) => (
-                                    <span key={index} className="item-tag">
-                                        {item.item_name || `Item ${item.item_id}`}
-                                    </span>
-                                ))}
-                                {order.items.length > 3 && (
-                                    <span className="item-tag">
-                                        +{order.items.length - 3} more
-                                    </span>
-                                )}
-                            </div>
-                        </div>
-                    )}
-                </div>
-
-                <div className="card-footer">
-                    <button
-                        onClick={() => {
-                            setSelectedOrder(order);
-                            setCurrentView('detail');
-                        }}
-                        className="btn-primary full-width"
-                    >
-                        <i className="fas fa-eye"></i>
-                        View Details & Manage
-                    </button>
-                </div>
-            </div>
-        );
-    };
-
-    // Orders Grid Component
-    const OrdersGrid = () => (
-        <div className="orders-grid">
-            {loading ? (
-                <div className="loading-container">
-                    <div className="loading-spinner"></div>
-                    <p>Loading orders...</p>
-                </div>
-            ) : filteredOrders.length > 0 ? (
-                filteredOrders.map((order, index) => (
-                    <div key={order.id} style={{ animationDelay: `${index * 0.1}s` }}>
-                        <OrderCard order={order} />
-                    </div>
-                ))
-            ) : (
-                <div className="no-orders-container">
-                    <div className="no-orders-icon">
-                        <i className="fas fa-search"></i>
-                    </div>
-                    <h3>No orders found</h3>
-                    <p>Try adjusting your search or filter criteria</p>
-                </div>
-            )}
-        </div>
-    );
-
-    // Order Detail View Component
-    const OrderDetailView = () => {
-        if (!selectedOrder) return null;
-
-        const config = statusConfig[selectedOrder.status?.toLowerCase()] || statusConfig.pending;
-        const subtotal = selectedOrder.items?.reduce((sum, item) => sum + ((item.price || 0) * (item.quantity || 0)), 0) || 0;
-        const total = calculateOrderTotal(selectedOrder);
-
-        return (
-            <div className="order-detail-view animate-fade-in">
-                {/* Order Header */}
-                <div className="detail-header">
-                    <div className={`detail-header-gradient ${config.color}`}>
-                        <div className="detail-header-content">
-                            <div className="detail-header-left">
-                                <h1 className="detail-order-id">#{selectedOrder.id}</h1>
-                                <p>Placed on {new Date(selectedOrder.created_at).toLocaleDateString()} at {new Date(selectedOrder.created_at).toLocaleTimeString()}</p>
-                                <p>Table: {tablesMap[selectedOrder.table_id] || selectedOrder.table_id}</p>
-                            </div>
-                            <div className="detail-header-right">
-                                <select
-                                    value={selectedOrder.status || 'pending'}
-                                    onChange={(e) => updateOrderStatus(selectedOrder.id, e.target.value)}
-                                    className="status-select"
-                                >
-                                    <option value="pending">Pending</option>
-                                    <option value="preparing">Preparing</option>
-                                    <option value="new">New</option>
-                                    <option value="served">Served</option>
-                                    <option value="cancelled">Cancelled</option>
-                                </select>
-                            </div>
-                        </div>
-                    </div>
-
-                    <div className="detail-info-grid">
-                        <div className="customer-info-section">
-                            <h3 className="section-title">
-                                <i className="fas fa-user"></i>
-                                Table Information
-                            </h3>
-                            <div className="info-card">
-                                <div className="customer-details">
-                                    <div className="customer-avatar-large">
-                                        {tablesMap[selectedOrder.table_id]?.charAt(0) || 'T'}
-                                    </div>
-                                    <div className="customer-text">
-                                        <p className="customer-name">{tablesMap[selectedOrder.table_id] || `Table ${selectedOrder.table_id}`}</p>
-                                        <p className="customer-detail">Dine-in Order</p>
-                                    </div>
-                                </div>
-                            </div>
-                        </div>
-
-                        <div className="payment-info-section">
-                            <h3 className="section-title">
-                                <i className="fas fa-credit-card"></i>
-                                Order Summary
-                            </h3>
-                            <div className="info-card">
-                                <div className="payment-status">
-                                    <span className="payment-method">Total Amount</span>
-                                    <span className="payment-amount">₹{total.toFixed(2)}</span>
-                                </div>
-                                <div className="status-indicator">
-                                    <span className={`status-badge-small status-${selectedOrder.status?.toLowerCase() || 'pending'}`}>
-                                        {config.label}
-                                    </span>
-                                </div>
-                            </div>
-                        </div>
-                    </div>
-                </div>
-
-                {/* Order Items */}
-                <div className="detail-section">
-                    <div className="section-header">
-                        <h3 className="section-title">
-                            <i className="fas fa-shopping-bag"></i>
-                            Order Items ({selectedOrder.items?.length || 0})
-                        </h3>
-                        <button
-                            onClick={() => openEditModal(selectedOrder)}
-                            className="btn-primary"
-                        >
-                            <i className="fas fa-edit"></i>
-                            Edit Order
-                        </button>
-                    </div>
-
-                    <div className="items-list">
-                        {selectedOrder.items && selectedOrder.items.length > 0 ? (
-                            selectedOrder.items.map((item, index) => (
-                                <div key={item.item_id || index} className="item-row">
-                                    <div className="item-info">
-                                        <div className="item-icon">
-                                            <i className="fas fa-utensils"></i>
-                                        </div>
-                                        <div className="item-details">
-                                            <h4 className="item-name">{item.item_name || `Item ${item.item_id}`}</h4>
-                                            <p className="item-description">{inventoryMap[item.item_id]?.description || 'No description'}</p>
-                                            <div className="item-badges">
-                                                <span className="quantity-badge">
-                                                    Qty: {item.quantity || 1}
-                                                </span>
-                                                <span className={`status-badge-small status-${item.status?.toLowerCase() || 'new'}`}>
-                                                    {item.status || 'New'}
-                                                </span>
-                                            </div>
-                                        </div>
-                                    </div>
-                                    <div className="item-price">
-                                        <div className="price-info">
-                                            <p className="total-price">₹{((item.price || 0) * (item.quantity || 1)).toFixed(2)}</p>
-                                            <p className="unit-price">₹{(item.price || 0).toFixed(2)} each</p>
-                                        </div>
-                                        <button
-                                            onClick={() => {
-                                                if (window.confirm('Delete this item?')) {
-                                                    const updatedItems = selectedOrder.items.filter(i => i.item_id !== item.item_id);
-                                                    const updatedOrder = { ...selectedOrder, items: updatedItems };
-                                                    const updatedOrders = orders.map(o =>
-                                                        o.id === selectedOrder.id ? updatedOrder : o
-                                                    );
-                                                    setOrders(updatedOrders);
-                                                    setSelectedOrder(updatedOrder);
-                                                }
-                                            }}
-                                            className="btn-delete"
-                                        >
-                                            <i className="fas fa-trash"></i>
-                                        </button>
-                                    </div>
-                                </div>
-                            ))
-                        ) : (
-                            <div className="no-items">
-                                <p>No items in this order</p>
-                            </div>
-                        )}
-                    </div>
-                </div>
-
-                {/* Order Summary */}
-                <div className="detail-section">
-                    <div className="section-header">
-                        <h3 className="section-title">
-                            <i className="fas fa-calculator"></i>
-                            Order Summary
-                        </h3>
-                    </div>
-
-                    <div className="summary-container">
-                        <div className="summary-rows">
-                            <div className="summary-row">
-                                <span>Subtotal</span>
-                                <span className="summary-value">₹{subtotal.toFixed(2)}</span>
-                            </div>
-                            <div className="summary-row">
-                                <span>Tax & Fees</span>
-                                <span className="summary-value">₹0.00</span>
-                            </div>
-                            <div className="summary-row total-row">
-                                <span className="total-label">Total Amount</span>
-                                <span className="total-amount">₹{total.toFixed(2)}</span>
-                            </div>
-                        </div>
-                    </div>
-                </div>
-
-                {/* Action Buttons */}
-                <div className="detail-section">
-                    <div className="action-buttons">
-                        <button
-                            onClick={() => window.print()}
-                            className="btn-success"
-                        >
-                            <i className="fas fa-print"></i>
-                            Print Invoice
-                        </button>
-
-                        <button
-                            onClick={() => openEditModal(selectedOrder)}
-                            className="btn-primary"
-                        >
-                            <i className="fas fa-edit"></i>
-                            Edit Order
-                        </button>
-
-                        <button
-                            onClick={() => openInvoiceModal(selectedOrder)}
-                            className="btn-info"
-                        >
-                            <i className="fas fa-receipt"></i>
-                            View Invoice
-                        </button>
-
-                        <button
-                            onClick={() => {
-                                if (window.confirm('Delete this order permanently?')) {
-                                    setOrderToDelete(selectedOrder.id);
-                                    confirmDeleteOrder();
-                                    setCurrentView('dashboard');
-                                }
-                            }}
-                            className="btn-danger"
-                        >
-                            <i className="fas fa-trash"></i>
-                            Delete Order
-                        </button>
-                    </div>
-                </div>
-            </div>
-        );
-    };
-
-    // Edit Order Modal Component
-    const EditOrderModal = () => {
-        if (!showEditModal || !editOrderId) return null;
-
-        const order = orders.find((o) => o.id === editOrderId);
-        if (!order) return null;
-
-        return (
-            <div className="modal-backdrop" onClick={closeEditModal}>
-                <div className="modal-content" onClick={(e) => e.stopPropagation()}>
-                    <div className="modal-header">
-                        <h3>Edit Order #{order.id} - Table: {tablesMap[order.table_id] || order.table_id}</h3>
-                        <button onClick={closeEditModal} className="modal-close">
-                            <i className="fas fa-times"></i>
-                        </button>
-                    </div>
-
-                    <div className="modal-body">
-                        <div className="edit-items-table">
-                            <table>
-                                <thead>
-                                    <tr>
-                                        <th>Item</th>
-                                        <th>Qty</th>
-                                        <th>Status</th>
-                                        <th>Actions</th>
-                                    </tr>
-                                </thead>
-                                <tbody>
-                                    {editedOrderItems.map((item) => (
-                                        <tr key={item.item_id}>
-                                            <td>{item.item_name || item.item_id}</td>
-                                            <td>
-                                                <div className="quantity-controls">
-                                                    <button
-                                                        disabled={item.quantity <= 1}
-                                                        onClick={() => updateItemQuantity(item.item_id, item.quantity - 1)}
-                                                        className="qty-btn"
-                                                    >
-                                                        -
-                                                    </button>
-                                                    <span className="qty-value">{item.quantity}</span>
-                                                    <button
-                                                        onClick={() => updateItemQuantity(item.item_id, item.quantity + 1)}
-                                                        className="qty-btn"
-                                                    >
-                                                        +
-                                                    </button>
-                                                </div>
-                                            </td>
-                                            <td>
-                                                <select
-                                                    value={item.status || 'new'}
-                                                    onChange={(e) => updateItemStatus(item.item_id, e.target.value)}
-                                                    className="status-select-small"
-                                                >
-                                                    <option value="new">New</option>
-                                                    <option value="preparing">Preparing</option>
-                                                    <option value="served">Served</option>
-                                                    <option value="cancelled">Cancelled</option>
-                                                </select>
-                                            </td>
-                                            <td>
-                                                {item.status !== "cancelled" && (
-                                                    <button
-                                                        onClick={() => removeItemFromOrder(item.item_id)}
-                                                        className="btn-delete-small"
-                                                    >
-                                                        Delete
-                                                    </button>
-                                                )}
-                                            </td>
-                                        </tr>
-                                    ))}
-                                </tbody>
-                            </table>
-                        </div>
-
-                        <div className="add-item-section">
-                            <div className="search-input-wrapper">
-                                <input
-                                    type="text"
-                                    placeholder="Search items to add..."
-                                    value={itemSearchQuery}
-                                    onChange={(e) => setItemSearchQuery(e.target.value)}
-                                    className="search-input"
-                                />
-                            </div>
-
-                            {itemSearchResults.length > 0 && (
-                                <div className="search-results">
-                                    {itemSearchResults.map((item) => (
-                                        <div
-                                            key={item.id}
-                                            className="search-result-item"
-                                            onClick={() => addItemToOrder(item)}
-                                        >
-                                            {item.name} - ₹{item.price}
-                                        </div>
-                                    ))}
-                                </div>
-                            )}
-                        </div>
-                    </div>
-
-                    <div className="modal-footer">
-                        <button onClick={saveEditedOrderItems} className="btn-primary">
-                            Save Changes
-                        </button>
-                        <button onClick={closeEditModal} className="btn-secondary">
-                            Cancel
-                        </button>
-                    </div>
-                </div>
-            </div>
-        );
-    };
-
-    // Delete Order Modal Component
-    const DeleteOrderModal = () => {
-        if (!showDeleteModal) return null;
-
-        return (
-            <div className="modal-backdrop" onClick={() => setShowDeleteModal(false)}>
-                <div className="modal-content small" onClick={(e) => e.stopPropagation()}>
-                    <div className="modal-header">
-                        <h3>Delete Order</h3>
-                    </div>
-                    <div className="modal-body text-center">
-                        <p>Delete this order permanently?</p>
-                    </div>
-                    <div className="modal-footer">
-                        <button onClick={confirmDeleteOrder} className="btn-danger">
-                            Yes, Delete
-                        </button>
-                        <button onClick={() => setShowDeleteModal(false)} className="btn-secondary">
-                            Cancel
-                        </button>
-                    </div>
-                </div>
-            </div>
-        );
-    };
-
-    // Main render
-    return (
-        <div className="orders-app">
-
-            <main className="main-content">
-                {currentView === 'dashboard' ? (
-                    <>
-                        {/* <StatsCards /> */}
-                        <SearchAndFilter />
-                        <OrdersGrid />
-                    </>
-                ) : (
-                    <OrderDetailView />
-                )}
-            </main>
-
-            {/* Modals */}
-            <EditOrderModal />
-            <DeleteOrderModal />
-
-            {/* Invoice Modal */}
-            {showInvoiceModal && invoiceOrder && (
-                <InvoiceModal order={invoiceOrder} onClose={closeInvoiceModal} />
-            )}
-
-            {/* Floating Action Button */}
-            <div className="floating-action">
-                <button className="fab">
-                    <i className="fas fa-plus"></i>
-                </button>
-            </div>
-        </div>
-    );
-};
-
-export default OrdersVisiblePage;
+// import React, { useEffect, useState, useMemo, useCallback } from "react";
+// import { useParams } from "react-router-dom";
+// import { useTheme } from "../../ThemeChangerComponent/ThemeProvider";
+// import { toast } from "react-toastify";
+
+// import orderServicesPort from "../../Backend_Port_Files/OrderServices";
+// import tableServicesPort from "../../Backend_Port_Files/TableServices";
+// import inventoryServicesPort from "../../Backend_Port_Files/InventoryServices";
+// import InvoiceModal from "../Invoice_Services_Components/Invoice_Page";
+
+// const OrdersVisiblePage = () => {
+//     const { clientId } = useParams();
+//     const token = localStorage.getItem("access_token");
+//     const { darkMode } = useTheme();
+
+//     // Order data and tables/inventory maps
+//     const [orders, setOrders] = useState([]);
+//     const [tablesMap, setTablesMap] = useState({});
+//     const [inventoryMap, setInventoryMap] = useState({});
+//     const [allInventoryItems, setAllInventoryItems] = useState([]);
+//     const [loading, setLoading] = useState(true);
+
+//     // Date filter and other UI state
+//     const todayDate = new Date().toISOString().split("T")[0];
+//     const [selectedDate, setSelectedDate] = useState(todayDate);
+//     const [searchTerm, setSearchTerm] = useState('');
+//     const [statusFilter, setStatusFilter] = useState('all');
+//     const [currentView, setCurrentView] = useState('dashboard');
+//     const [selectedOrder, setSelectedOrder] = useState(null);
+
+//     // Modals and selected entities
+//     const [showInvoiceModal, setShowInvoiceModal] = useState(false);
+//     const [invoiceOrder, setInvoiceOrder] = useState(null);
+//     const [editOrderId, setEditOrderId] = useState(null);
+//     const [showEditModal, setShowEditModal] = useState(false);
+//     const [showDeleteModal, setShowDeleteModal] = useState(false);
+//     const [orderToDelete, setOrderToDelete] = useState(null);
+//     const [itemSearchQuery, setItemSearchQuery] = useState("");
+//     const [itemSearchResults, setItemSearchResults] = useState([]);
+//     const [editedOrderItems, setEditedOrderItems] = useState([]);
+
+//     // Status configurations
+//     const statusConfig = {
+//         pending: {
+//             color: 'from-amber-400 to-orange-500',
+//             textColor: 'text-amber-800',
+//             bgColor: 'bg-amber-50',
+//             icon: 'fas fa-clock',
+//             label: 'Pending',
+//             description: 'Order received, awaiting confirmation'
+//         },
+//         preparing: {
+//             color: 'from-blue-400 to-indigo-500',
+//             textColor: 'text-blue-800',
+//             bgColor: 'bg-blue-50',
+//             icon: 'fas fa-utensils',
+//             label: 'Preparing',
+//             description: 'Kitchen is preparing your order'
+//         },
+//         delivering: {
+//             color: 'from-purple-400 to-pink-500',
+//             textColor: 'text-purple-800',
+//             bgColor: 'bg-purple-50',
+//             icon: 'fas fa-truck',
+//             label: 'Delivering',
+//             description: 'On the way to your location'
+//         },
+//         served: {
+//             color: 'from-green-400 to-emerald-500',
+//             textColor: 'text-green-800',
+//             bgColor: 'bg-green-50',
+//             icon: 'fas fa-check-circle',
+//             label: 'Served',
+//             description: 'Successfully served'
+//         }
+//     };
+
+//     // Priority configurations
+//     const priorityConfig = {
+//         low: { color: 'priority-low', icon: 'fas fa-arrow-down' },
+//         medium: { color: 'priority-medium', icon: 'fas fa-minus' },
+//         high: { color: 'priority-high', icon: 'fas fa-arrow-up' }
+//     };
+
+//     // Calculate order totals
+//     const calculateOrderTotal = useCallback((order) => {
+//         if (!order.items || !Array.isArray(order.items)) return order.total_price || 0;
+//         const subtotal = order.items.reduce((sum, item) => sum + ((item.price || 0) * (item.quantity || 0)), 0);
+//         return subtotal;
+//     }, []);
+
+//     // --- Fetch tables map
+//     useEffect(() => {
+//         if (!clientId || !token) return;
+
+//         const fetchTables = async () => {
+//             try {
+//                 const res = await tableServicesPort.get(`/${clientId}/tables/read`, {
+//                     headers: { Authorization: `Bearer ${token}` },
+//                 });
+//                 const map = {};
+//                 (res.data?.data || []).forEach((t) => {
+//                     map[t.id] = t.name;
+//                 });
+//                 setTablesMap(map);
+//             } catch { }
+//         };
+//         fetchTables();
+//     }, [clientId, token]);
+
+//     // --- Fetch inventory map & all items list
+//     useEffect(() => {
+//         if (!clientId || !token) return;
+
+//         const fetchInventory = async () => {
+//             try {
+//                 const res = await inventoryServicesPort.get(
+//                     `/${clientId}/inventory/read`,
+//                     { headers: { Authorization: `Bearer ${token}` } }
+//                 );
+//                 const invMap = {};
+//                 (res.data?.data || []).forEach((item) => {
+//                     invMap[item.id] = item;
+//                 });
+//                 setInventoryMap(invMap);
+//                 setAllInventoryItems(res.data?.data || []);
+//             } catch { }
+//         };
+
+//         fetchInventory();
+//     }, [clientId, token]);
+
+//     // --- Fetch orders
+//     useEffect(() => {
+//         if (!clientId || !token) return;
+
+//         const fetchOrders = async () => {
+//             setLoading(true);
+//             try {
+//                 const res = await orderServicesPort.get(`/${clientId}/dinein/table`, {
+//                     headers: { Authorization: `Bearer ${token}` },
+//                 });
+//                 setOrders(res.data?.data || []);
+//             } catch {
+//                 toast.error("Failed to fetch dine-in orders");
+//             } finally {
+//                 setLoading(false);
+//             }
+//         };
+//         fetchOrders();
+//     }, [clientId, token]);
+
+//     // Filter orders based on search, status, and date
+//     const filteredOrders = useMemo(() => {
+//         return orders.filter(order => {
+//             const matchesSearch = (tablesMap[order.table_id] || '').toLowerCase().includes(searchTerm.toLowerCase()) ||
+//                 order.id.toString().toLowerCase().includes(searchTerm.toLowerCase());
+//             const matchesStatus = statusFilter === 'all' || (order.status || '').toLowerCase() === statusFilter.toLowerCase();
+//             const matchesDate = !selectedDate || new Date(order.created_at).toLocaleDateString("en-CA") === selectedDate;
+//             return matchesSearch && matchesStatus && matchesDate;
+//         });
+//     }, [orders, searchTerm, statusFilter, selectedDate, tablesMap]);
+
+//     // Statistics
+//     const stats = useMemo(() => {
+//         const total = filteredOrders.length;
+//         const completed = filteredOrders.filter(o => (o.status || '').toLowerCase() === 'served').length;
+//         const pending = filteredOrders.filter(o => ['pending', 'preparing', 'new'].includes((o.status || '').toLowerCase())).length;
+//         const revenue = filteredOrders.reduce((sum, order) => sum + calculateOrderTotal(order), 0);
+//         const avgRating = 4.5; // Since we don't have ratings in the order data
+
+//         return { total, completed, pending, revenue, avgRating };
+//     }, [filteredOrders, calculateOrderTotal]);
+
+//     // Status update function
+//     const updateOrderStatus = async (orderId, newStatus) => {
+//         try {
+//             await orderServicesPort.post(
+//                 `/${clientId}/dinein/update`,
+//                 {
+//                     id: orderId,
+//                     client_id: clientId,
+//                     status: newStatus
+//                 },
+//                 {
+//                     headers: { Authorization: `Bearer ${token}` }
+//                 }
+//             );
+//             setOrders(prev =>
+//                 prev.map(order =>
+//                     order.id === orderId ? { ...order, status: newStatus } : order
+//                 )
+//             );
+//             toast.success("Order status updated");
+//             if (editOrderId === orderId && newStatus === "served") {
+//                 closeEditModal();
+//             }
+//         } catch (error) {
+//             toast.error("Failed to update order status");
+//         }
+//     };
+
+//     // --- Open invoice modal
+//     const openInvoiceModal = (order) => {
+//         const tableName = tablesMap[order.table_id] || order.table_id;
+//         const itemsWithPrice = (order.items || []).map((item) => ({
+//             ...item,
+//             price: item.price || inventoryMap[item.item_id]?.price || 0,
+//         }));
+//         setInvoiceOrder({ ...order, table_name: tableName, items: itemsWithPrice });
+//         setShowInvoiceModal(true);
+//     };
+
+//     const closeInvoiceModal = () => {
+//         setInvoiceOrder(null);
+//         setShowInvoiceModal(false);
+//     };
+
+//     // --- Open edit modal with order items for editing
+//     const openEditModal = (order) => {
+//         setEditOrderId(order.id);
+//         setEditedOrderItems(JSON.parse(JSON.stringify(order.items || [])));
+//         setItemSearchQuery("");
+//         setItemSearchResults([]);
+//         setShowEditModal(true);
+//     };
+
+//     const closeEditModal = () => {
+//         setEditOrderId(null);
+//         setEditedOrderItems([]);
+//         setShowEditModal(false);
+//     };
+
+//     // --- Update item quantity locally while editing
+//     const updateItemQuantity = (itemId, newQty) => {
+//         if (newQty < 1) return;
+//         setEditedOrderItems((prev) =>
+//             prev.map((item) => (item.item_id === itemId ? { ...item, quantity: newQty } : item))
+//         );
+//     };
+
+//     // --- Update item status locally while editing
+//     const updateItemStatus = (itemId, newStatus) => {
+//         setEditedOrderItems((prev) =>
+//             prev.map((item) => (item.item_id === itemId ? { ...item, status: newStatus } : item))
+//         );
+//     };
+
+//     // --- Add item to edited order items
+//     const addItemToOrder = (selectedItem) => {
+//         if (editedOrderItems.find((i) => i.item_id === selectedItem.id)) return;
+//         const newItem = {
+//             item_id: selectedItem.id,
+//             item_name: selectedItem.name,
+//             quantity: 1,
+//             price: selectedItem.price,
+//             status: "new",
+//             note: "",
+//             slug: selectedItem.slug || selectedItem.name.toLowerCase().replace(/\s+/g, "-"),
+//         };
+//         setEditedOrderItems((prev) => [...prev, newItem]);
+//         setItemSearchQuery("");
+//         setItemSearchResults([]);
+//     };
+
+//     // --- Remove item from edited order items
+//     const removeItemFromOrder = (itemId) => {
+//         setEditedOrderItems((prev) => prev.filter((item) => item.item_id !== itemId));
+//     };
+
+//     // --- Save edited order items to backend
+//     const saveEditedOrderItems = async () => {
+//         if (!editOrderId) return;
+
+//         const cleanedItems = editedOrderItems.map((item) => ({
+//             item_id: item.item_id,
+//             item_name: item.item_name,
+//             quantity: item.quantity,
+//             status: item.status || "new",
+//             note: item.note || "",
+//             slug: item.slug || "",
+//             price: item.price || inventoryMap[item.item_id]?.price || 0,
+//             client_id: clientId,
+//             order_id: editOrderId,
+//         }));
+
+//         const totalPrice = cleanedItems.reduce((sum, item) => sum + item.price * item.quantity, 0);
+
+//         try {
+//             await orderServicesPort.post(
+//                 `/${clientId}/order_items/update?order_id=${editOrderId}`,
+//                 cleanedItems,
+//                 { headers: { Authorization: `Bearer ${token}` } }
+//             );
+
+//             await orderServicesPort.post(
+//                 `/${clientId}/dinein/update`,
+//                 { id: editOrderId, total_price: totalPrice },
+//                 { headers: { Authorization: `Bearer ${token}` } }
+//             );
+
+//             setOrders((prev) =>
+//                 prev.map((o) => (o.id === editOrderId ? { ...o, items: editedOrderItems, total_price: totalPrice } : o))
+//             );
+
+//             toast.success("Order updated successfully");
+//             closeEditModal();
+//         } catch {
+//             toast.error("Failed to save order changes");
+//         }
+//     };
+
+//     // --- Search inventory for adding items to order edit modal
+//     useEffect(() => {
+//         if (!itemSearchQuery.trim() || !editOrderId) {
+//             setItemSearchResults([]);
+//             return;
+//         }
+//         const currentItemIds = editedOrderItems.map((i) => i.item_id);
+
+//         const filtered = allInventoryItems.filter(
+//             (item) =>
+//                 item.name.toLowerCase().includes(itemSearchQuery.toLowerCase()) &&
+//                 !currentItemIds.includes(item.id)
+//         );
+
+//         setItemSearchResults(filtered);
+//     }, [itemSearchQuery, allInventoryItems, editedOrderItems, editOrderId]);
+
+//     // --- Delete order handling
+//     const confirmDeleteOrder = async () => {
+//         if (!orderToDelete) return;
+//         try {
+//             await orderServicesPort.delete(`/${clientId}/dinein/delete`, {
+//                 params: { dinein_order_id: orderToDelete, client_id: clientId },
+//                 headers: { Authorization: `Bearer ${token}` },
+//             });
+//             setOrders((prev) => prev.filter((o) => o.id !== orderToDelete));
+//             toast.success("Order deleted");
+//             setShowDeleteModal(false);
+//             setOrderToDelete(null);
+//         } catch {
+//             toast.error("Failed to delete order");
+//         }
+//     };
+
+//     // Header Component
+//     // const Header = () => (
+//     //     <header className="header">
+//     //         <div className="header-container">
+//     //             <div className="header-content">
+//     //                 <div className="header-left">
+//     //                     <div className="header-brand">
+//     //                         <div className="brand-icon">
+//     //                             <i className="fas fa-shopping-cart"></i>
+//     //                         </div>
+//     //                         <div className="brand-text">
+//     //                             <h1>Orders Hub</h1>
+//     //                             <p>Management System</p>
+//     //                         </div>
+//     //                     </div>
+//     //                 </div>
+
+//     //                 <div className="header-right">
+//     //                     {currentView === 'detail' && (
+//     //                         <button
+//     //                             onClick={() => setCurrentView('dashboard')}
+//     //                             className="btn-secondary"
+//     //                         >
+//     //                             <i className="fas fa-arrow-left"></i>
+//     //                             <span>Back</span>
+//     //                         </button>
+//     //                     )}
+
+//     //                     <div className="user-profile">
+//     //                         <div className="user-avatar">
+//     //                             <i className="fas fa-user"></i>
+//     //                         </div>
+//     //                         <div className="user-info">
+//     //                             <p className="user-name">Admin</p>
+//     //                             <p className="user-role">Manager</p>
+//     //                         </div>
+//     //                     </div>
+//     //                 </div>
+//     //             </div>
+//     //         </div>
+//     //     </header>
+//     // );
+
+//     // Stats Cards Component
+//     const StatsCards = () => (
+//         <div className="stats-grid">
+//             <div className="stat-card animate-fade-in">
+//                 <div className="stat-content">
+//                     <div className="stat-text">
+//                         <p className="stat-label">Total Orders</p>
+//                         <p className="stat-value">{stats.total}</p>
+//                         <p className="stat-change positive">
+//                             <i className="fas fa-arrow-up"></i>+12% from last week
+//                         </p>
+//                     </div>
+//                     <div className="stat-icon blue">
+//                         <i className="fas fa-shopping-bag"></i>
+//                     </div>
+//                 </div>
+//             </div>
+
+//             <div className="stat-card animate-fade-in" style={{ animationDelay: '0.1s' }}>
+//                 <div className="stat-content">
+//                     <div className="stat-text">
+//                         <p className="stat-label">Completed</p>
+//                         <p className="stat-value">{stats.completed}</p>
+//                         <p className="stat-change positive">
+//                             <i className="fas fa-check"></i>{stats.total > 0 ? ((stats.completed / stats.total) * 100).toFixed(0) : 0}% success rate
+//                         </p>
+//                     </div>
+//                     <div className="stat-icon green">
+//                         <i className="fas fa-check-circle"></i>
+//                     </div>
+//                 </div>
+//             </div>
+
+//             <div className="stat-card animate-fade-in" style={{ animationDelay: '0.2s' }}>
+//                 <div className="stat-content">
+//                     <div className="stat-text">
+//                         <p className="stat-label">Pending</p>
+//                         <p className="stat-value">{stats.pending}</p>
+//                         <p className="stat-change warning">
+//                             <i className="fas fa-clock"></i>Needs attention
+//                         </p>
+//                     </div>
+//                     <div className="stat-icon orange">
+//                         <i className="fas fa-clock"></i>
+//                     </div>
+//                 </div>
+//             </div>
+
+//             <div className="stat-card animate-fade-in" style={{ animationDelay: '0.3s' }}>
+//                 <div className="stat-content">
+//                     <div className="stat-text">
+//                         <p className="stat-label">Revenue</p>
+//                         <p className="stat-value">₹{stats.revenue.toFixed(0)}</p>
+//                         <p className="stat-change positive">
+//                             <i className="fas fa-trending-up"></i>+8% this month
+//                         </p>
+//                     </div>
+//                     <div className="stat-icon purple">
+//                         <i className="fas fa-dollar-sign"></i>
+//                     </div>
+//                 </div>
+//             </div>
+
+//             <div className="stat-card animate-fade-in" style={{ animationDelay: '0.4s' }}>
+//                 <div className="stat-content">
+//                     <div className="stat-text">
+//                         <p className="stat-label">Avg Rating</p>
+//                         <p className="stat-value">{stats.avgRating.toFixed(1)}</p>
+//                         <div className="rating-stars">
+//                             {[...Array(5)].map((_, i) => (
+//                                 <i key={i} className={`fas fa-star ${i < Math.floor(stats.avgRating) ? 'active' : ''}`}></i>
+//                             ))}
+//                         </div>
+//                     </div>
+//                     <div className="stat-icon yellow">
+//                         <i className="fas fa-star"></i>
+//                     </div>
+//                 </div>
+//             </div>
+//         </div>
+//     );
+
+//     // Search and Filter Component
+//     const SearchAndFilter = () => (
+//         <div className="search-filter-container animate-fade-in">
+//             <div className="search-filter-content">
+//                 <div className="search-box">
+//                     <div className="search-input-wrapper">
+//                         <i className="fas fa-search search-icon"></i>
+//                         <input
+//                             type="text"
+//                             placeholder="Search orders by table name or order ID..."
+//                             value={searchTerm}
+//                             onChange={(e) => setSearchTerm(e.target.value)}
+//                             className="search-input"
+//                         />
+//                     </div>
+//                 </div>
+
+//                 <div className="filter-controls">
+//                     <select
+//                         value={selectedDate}
+//                         onChange={(e) => setSelectedDate(e.target.value)}
+//                         className="filter-select"
+//                     >
+//                         <option value="">All Dates</option>
+//                         {[...Array(15)].map((_, i) => {
+//                             const d = new Date();
+//                             d.setDate(d.getDate() - i);
+//                             const dateString = d.toLocaleDateString("en-CA");
+//                             const label = i === 0 ? "Today" : dateString;
+//                             return (
+//                                 <option key={dateString} value={dateString}>
+//                                     {label}
+//                                 </option>
+//                             );
+//                         })}
+//                     </select>
+
+//                     <select
+//                         value={statusFilter}
+//                         onChange={(e) => setStatusFilter(e.target.value)}
+//                         className="filter-select"
+//                     >
+//                         <option value="all">All Status</option>
+//                         <option value="pending">Pending</option>
+//                         <option value="preparing">Preparing</option>
+//                         <option value="new">New</option>
+//                         <option value="served">Served</option>
+//                         <option value="cancelled">Cancelled</option>
+//                     </select>
+
+//                     <button className="btn-primary">
+//                         <i className="fas fa-filter"></i>
+//                         Filter
+//                     </button>
+//                 </div>
+//             </div>
+//         </div>
+//     );
+
+//     // Order Card Component
+//     const OrderCard = ({ order }) => {
+//         const config = statusConfig[order.status?.toLowerCase()] || statusConfig.pending;
+//         const total = calculateOrderTotal(order);
+
+//         return (
+//             <div className="order-card card-hover animate-fade-in">
+//                 <div className="card-header">
+//                     <div className="card-header-left">
+//                         <div className="customer-avatar">
+//                             {tablesMap[order.table_id]?.charAt(0) || 'T'}
+//                         </div>
+//                         <div className="order-info">
+//                             <h3 className="order-id">#{order.id}</h3>
+//                             <p className="table-name">{tablesMap[order.table_id] || `Table ${order.table_id}`}</p>
+//                         </div>
+//                     </div>
+
+//                     <div className="card-header-right">
+//                         <span className="priority-badge priority-medium">
+//                             <i className="fas fa-minus"></i>
+//                             medium
+//                         </span>
+//                     </div>
+//                 </div>
+
+//                 <div className={`status-badge status-${order.status?.toLowerCase() || 'pending'}`}>
+//                     <i className={config.icon}></i>
+//                     {config.label}
+//                 </div>
+
+//                 <div className="order-details">
+//                     <div className="detail-row">
+//                         <span className="detail-label">
+//                             <i className="fas fa-calendar"></i>
+//                             {new Date(order.created_at).toLocaleDateString()}
+//                         </span>
+//                         <span className="detail-label">
+//                             <i className="fas fa-clock"></i>
+//                             {new Date(order.created_at).toLocaleTimeString()}
+//                         </span>
+//                     </div>
+
+//                     <div className="detail-row">
+//                         <span className="detail-label">
+//                             <i className="fas fa-shopping-bag"></i>
+//                             {order.items?.length || 0} items
+//                         </span>
+//                         <span className="order-total">
+//                             ₹{total.toFixed(2)}
+//                         </span>
+//                     </div>
+
+//                     {order.items && order.items.length > 0 && (
+//                         <div className="items-preview">
+//                             <span className="items-label">Items:</span>
+//                             <div className="items-tags">
+//                                 {order.items.slice(0, 3).map((item, index) => (
+//                                     <span key={index} className="item-tag">
+//                                         {item.item_name || `Item ${item.item_id}`}
+//                                     </span>
+//                                 ))}
+//                                 {order.items.length > 3 && (
+//                                     <span className="item-tag">
+//                                         +{order.items.length - 3} more
+//                                     </span>
+//                                 )}
+//                             </div>
+//                         </div>
+//                     )}
+//                 </div>
+
+//                 <div className="card-footer">
+//                     <button
+//                         onClick={() => {
+//                             setSelectedOrder(order);
+//                             setCurrentView('detail');
+//                         }}
+//                         className="btn-primary full-width"
+//                     >
+//                         <i className="fas fa-eye"></i>
+//                         View Details & Manage
+//                     </button>
+//                 </div>
+//             </div>
+//         );
+//     };
+
+//     // Orders Grid Component
+//     const OrdersGrid = () => (
+//         <div className="orders-grid">
+//             {loading ? (
+//                 <div className="loading-container">
+//                     <div className="loading-spinner"></div>
+//                     <p>Loading orders...</p>
+//                 </div>
+//             ) : filteredOrders.length > 0 ? (
+//                 filteredOrders.map((order, index) => (
+//                     <div key={order.id} style={{ animationDelay: `${index * 0.1}s` }}>
+//                         <OrderCard order={order} />
+//                     </div>
+//                 ))
+//             ) : (
+//                 <div className="no-orders-container">
+//                     <div className="no-orders-icon">
+//                         <i className="fas fa-search"></i>
+//                     </div>
+//                     <h3>No orders found</h3>
+//                     <p>Try adjusting your search or filter criteria</p>
+//                 </div>
+//             )}
+//         </div>
+//     );
+
+//     // Order Detail View Component
+//     const OrderDetailView = () => {
+//         if (!selectedOrder) return null;
+
+//         const config = statusConfig[selectedOrder.status?.toLowerCase()] || statusConfig.pending;
+//         const subtotal = selectedOrder.items?.reduce((sum, item) => sum + ((item.price || 0) * (item.quantity || 0)), 0) || 0;
+//         const total = calculateOrderTotal(selectedOrder);
+
+//         return (
+//             <div className="order-detail-view animate-fade-in">
+//                 {/* Order Header */}
+//                 <div className="detail-header">
+//                     <div className={`detail-header-gradient ${config.color}`}>
+//                         <div className="detail-header-content">
+//                             <div className="detail-header-left">
+//                                 <h1 className="detail-order-id">#{selectedOrder.id}</h1>
+//                                 <p>Placed on {new Date(selectedOrder.created_at).toLocaleDateString()} at {new Date(selectedOrder.created_at).toLocaleTimeString()}</p>
+//                                 <p>Table: {tablesMap[selectedOrder.table_id] || selectedOrder.table_id}</p>
+//                             </div>
+//                             <div className="detail-header-right">
+//                                 <select
+//                                     value={selectedOrder.status || 'pending'}
+//                                     onChange={(e) => updateOrderStatus(selectedOrder.id, e.target.value)}
+//                                     className="status-select"
+//                                 >
+//                                     <option value="pending">Pending</option>
+//                                     <option value="preparing">Preparing</option>
+//                                     <option value="new">New</option>
+//                                     <option value="served">Served</option>
+//                                     <option value="cancelled">Cancelled</option>
+//                                 </select>
+//                             </div>
+//                         </div>
+//                     </div>
+
+//                     <div className="detail-info-grid">
+//                         <div className="customer-info-section">
+//                             <h3 className="section-title">
+//                                 <i className="fas fa-user"></i>
+//                                 Table Information
+//                             </h3>
+//                             <div className="info-card">
+//                                 <div className="customer-details">
+//                                     <div className="customer-avatar-large">
+//                                         {tablesMap[selectedOrder.table_id]?.charAt(0) || 'T'}
+//                                     </div>
+//                                     <div className="customer-text">
+//                                         <p className="customer-name">{tablesMap[selectedOrder.table_id] || `Table ${selectedOrder.table_id}`}</p>
+//                                         <p className="customer-detail">Dine-in Order</p>
+//                                     </div>
+//                                 </div>
+//                             </div>
+//                         </div>
+
+//                         <div className="payment-info-section">
+//                             <h3 className="section-title">
+//                                 <i className="fas fa-credit-card"></i>
+//                                 Order Summary
+//                             </h3>
+//                             <div className="info-card">
+//                                 <div className="payment-status">
+//                                     <span className="payment-method">Total Amount</span>
+//                                     <span className="payment-amount">₹{total.toFixed(2)}</span>
+//                                 </div>
+//                                 <div className="status-indicator">
+//                                     <span className={`status-badge-small status-${selectedOrder.status?.toLowerCase() || 'pending'}`}>
+//                                         {config.label}
+//                                     </span>
+//                                 </div>
+//                             </div>
+//                         </div>
+//                     </div>
+//                 </div>
+
+//                 {/* Order Items */}
+//                 <div className="detail-section">
+//                     <div className="section-header">
+//                         <h3 className="section-title">
+//                             <i className="fas fa-shopping-bag"></i>
+//                             Order Items ({selectedOrder.items?.length || 0})
+//                         </h3>
+//                         <button
+//                             onClick={() => openEditModal(selectedOrder)}
+//                             className="btn-primary"
+//                         >
+//                             <i className="fas fa-edit"></i>
+//                             Edit Order
+//                         </button>
+//                     </div>
+
+//                     <div className="items-list">
+//                         {selectedOrder.items && selectedOrder.items.length > 0 ? (
+//                             selectedOrder.items.map((item, index) => (
+//                                 <div key={item.item_id || index} className="item-row">
+//                                     <div className="item-info">
+//                                         <div className="item-icon">
+//                                             <i className="fas fa-utensils"></i>
+//                                         </div>
+//                                         <div className="item-details">
+//                                             <h4 className="item-name">{item.item_name || `Item ${item.item_id}`}</h4>
+//                                             <p className="item-description">{inventoryMap[item.item_id]?.description || 'No description'}</p>
+//                                             <div className="item-badges">
+//                                                 <span className="quantity-badge">
+//                                                     Qty: {item.quantity || 1}
+//                                                 </span>
+//                                                 <span className={`status-badge-small status-${item.status?.toLowerCase() || 'new'}`}>
+//                                                     {item.status || 'New'}
+//                                                 </span>
+//                                             </div>
+//                                         </div>
+//                                     </div>
+//                                     <div className="item-price">
+//                                         <div className="price-info">
+//                                             <p className="total-price">₹{((item.price || 0) * (item.quantity || 1)).toFixed(2)}</p>
+//                                             <p className="unit-price">₹{(item.price || 0).toFixed(2)} each</p>
+//                                         </div>
+//                                         <button
+//                                             onClick={() => {
+//                                                 if (window.confirm('Delete this item?')) {
+//                                                     const updatedItems = selectedOrder.items.filter(i => i.item_id !== item.item_id);
+//                                                     const updatedOrder = { ...selectedOrder, items: updatedItems };
+//                                                     const updatedOrders = orders.map(o =>
+//                                                         o.id === selectedOrder.id ? updatedOrder : o
+//                                                     );
+//                                                     setOrders(updatedOrders);
+//                                                     setSelectedOrder(updatedOrder);
+//                                                 }
+//                                             }}
+//                                             className="btn-delete"
+//                                         >
+//                                             <i className="fas fa-trash"></i>
+//                                         </button>
+//                                     </div>
+//                                 </div>
+//                             ))
+//                         ) : (
+//                             <div className="no-items">
+//                                 <p>No items in this order</p>
+//                             </div>
+//                         )}
+//                     </div>
+//                 </div>
+
+//                 {/* Order Summary */}
+//                 <div className="detail-section">
+//                     <div className="section-header">
+//                         <h3 className="section-title">
+//                             <i className="fas fa-calculator"></i>
+//                             Order Summary
+//                         </h3>
+//                     </div>
+
+//                     <div className="summary-container">
+//                         <div className="summary-rows">
+//                             <div className="summary-row">
+//                                 <span>Subtotal</span>
+//                                 <span className="summary-value">₹{subtotal.toFixed(2)}</span>
+//                             </div>
+//                             <div className="summary-row">
+//                                 <span>Tax & Fees</span>
+//                                 <span className="summary-value">₹0.00</span>
+//                             </div>
+//                             <div className="summary-row total-row">
+//                                 <span className="total-label">Total Amount</span>
+//                                 <span className="total-amount">₹{total.toFixed(2)}</span>
+//                             </div>
+//                         </div>
+//                     </div>
+//                 </div>
+
+//                 {/* Action Buttons */}
+//                 <div className="detail-section">
+//                     <div className="action-buttons">
+//                         <button
+//                             onClick={() => window.print()}
+//                             className="btn-success"
+//                         >
+//                             <i className="fas fa-print"></i>
+//                             Print Invoice
+//                         </button>
+
+//                         <button
+//                             onClick={() => openEditModal(selectedOrder)}
+//                             className="btn-primary"
+//                         >
+//                             <i className="fas fa-edit"></i>
+//                             Edit Order
+//                         </button>
+
+//                         <button
+//                             onClick={() => openInvoiceModal(selectedOrder)}
+//                             className="btn-info"
+//                         >
+//                             <i className="fas fa-receipt"></i>
+//                             View Invoice
+//                         </button>
+
+//                         <button
+//                             onClick={() => {
+//                                 if (window.confirm('Delete this order permanently?')) {
+//                                     setOrderToDelete(selectedOrder.id);
+//                                     confirmDeleteOrder();
+//                                     setCurrentView('dashboard');
+//                                 }
+//                             }}
+//                             className="btn-danger"
+//                         >
+//                             <i className="fas fa-trash"></i>
+//                             Delete Order
+//                         </button>
+//                     </div>
+//                 </div>
+//             </div>
+//         );
+//     };
+
+//     // Edit Order Modal Component
+//     const EditOrderModal = () => {
+//         if (!showEditModal || !editOrderId) return null;
+
+//         const order = orders.find((o) => o.id === editOrderId);
+//         if (!order) return null;
+
+//         return (
+//             <div className="modal-backdrop" onClick={closeEditModal}>
+//                 <div className="modal-content" onClick={(e) => e.stopPropagation()}>
+//                     <div className="modal-header">
+//                         <h3>Edit Order #{order.id} - Table: {tablesMap[order.table_id] || order.table_id}</h3>
+//                         <button onClick={closeEditModal} className="modal-close">
+//                             <i className="fas fa-times"></i>
+//                         </button>
+//                     </div>
+
+//                     <div className="modal-body">
+//                         <div className="edit-items-table">
+//                             <table>
+//                                 <thead>
+//                                     <tr>
+//                                         <th>Item</th>
+//                                         <th>Qty</th>
+//                                         <th>Status</th>
+//                                         <th>Actions</th>
+//                                     </tr>
+//                                 </thead>
+//                                 <tbody>
+//                                     {editedOrderItems.map((item) => (
+//                                         <tr key={item.item_id}>
+//                                             <td>{item.item_name || item.item_id}</td>
+//                                             <td>
+//                                                 <div className="quantity-controls">
+//                                                     <button
+//                                                         disabled={item.quantity <= 1}
+//                                                         onClick={() => updateItemQuantity(item.item_id, item.quantity - 1)}
+//                                                         className="qty-btn"
+//                                                     >
+//                                                         -
+//                                                     </button>
+//                                                     <span className="qty-value">{item.quantity}</span>
+//                                                     <button
+//                                                         onClick={() => updateItemQuantity(item.item_id, item.quantity + 1)}
+//                                                         className="qty-btn"
+//                                                     >
+//                                                         +
+//                                                     </button>
+//                                                 </div>
+//                                             </td>
+//                                             <td>
+//                                                 <select
+//                                                     value={item.status || 'new'}
+//                                                     onChange={(e) => updateItemStatus(item.item_id, e.target.value)}
+//                                                     className="status-select-small"
+//                                                 >
+//                                                     <option value="new">New</option>
+//                                                     <option value="preparing">Preparing</option>
+//                                                     <option value="served">Served</option>
+//                                                     <option value="cancelled">Cancelled</option>
+//                                                 </select>
+//                                             </td>
+//                                             <td>
+//                                                 {item.status !== "cancelled" && (
+//                                                     <button
+//                                                         onClick={() => removeItemFromOrder(item.item_id)}
+//                                                         className="btn-delete-small"
+//                                                     >
+//                                                         Delete
+//                                                     </button>
+//                                                 )}
+//                                             </td>
+//                                         </tr>
+//                                     ))}
+//                                 </tbody>
+//                             </table>
+//                         </div>
+
+//                         <div className="add-item-section">
+//                             <div className="search-input-wrapper">
+//                                 <input
+//                                     type="text"
+//                                     placeholder="Search items to add..."
+//                                     value={itemSearchQuery}
+//                                     onChange={(e) => setItemSearchQuery(e.target.value)}
+//                                     className="search-input"
+//                                 />
+//                             </div>
+
+//                             {itemSearchResults.length > 0 && (
+//                                 <div className="search-results">
+//                                     {itemSearchResults.map((item) => (
+//                                         <div
+//                                             key={item.id}
+//                                             className="search-result-item"
+//                                             onClick={() => addItemToOrder(item)}
+//                                         >
+//                                             {item.name} - ₹{item.price}
+//                                         </div>
+//                                     ))}
+//                                 </div>
+//                             )}
+//                         </div>
+//                     </div>
+
+//                     <div className="modal-footer">
+//                         <button onClick={saveEditedOrderItems} className="btn-primary">
+//                             Save Changes
+//                         </button>
+//                         <button onClick={closeEditModal} className="btn-secondary">
+//                             Cancel
+//                         </button>
+//                     </div>
+//                 </div>
+//             </div>
+//         );
+//     };
+
+//     // Delete Order Modal Component
+//     const DeleteOrderModal = () => {
+//         if (!showDeleteModal) return null;
+
+//         return (
+//             <div className="modal-backdrop" onClick={() => setShowDeleteModal(false)}>
+//                 <div className="modal-content small" onClick={(e) => e.stopPropagation()}>
+//                     <div className="modal-header">
+//                         <h3>Delete Order</h3>
+//                     </div>
+//                     <div className="modal-body text-center">
+//                         <p>Delete this order permanently?</p>
+//                     </div>
+//                     <div className="modal-footer">
+//                         <button onClick={confirmDeleteOrder} className="btn-danger">
+//                             Yes, Delete
+//                         </button>
+//                         <button onClick={() => setShowDeleteModal(false)} className="btn-secondary">
+//                             Cancel
+//                         </button>
+//                     </div>
+//                 </div>
+//             </div>
+//         );
+//     };
+
+//     // Main render
+//     return (
+//         <div className="orders-app">
+
+//             <main className="main-content">
+//                 {currentView === 'dashboard' ? (
+//                     <>
+//                         {/* <StatsCards /> */}
+//                         <SearchAndFilter />
+//                         <OrdersGrid />
+//                     </>
+//                 ) : (
+//                     <OrderDetailView />
+//                 )}
+//             </main>
+
+//             {/* Modals */}
+//             <EditOrderModal />
+//             <DeleteOrderModal />
+
+//             {/* Invoice Modal */}
+//             {showInvoiceModal && invoiceOrder && (
+//                 <InvoiceModal order={invoiceOrder} onClose={closeInvoiceModal} />
+//             )}
+
+//             {/* Floating Action Button */}
+//             <div className="floating-action">
+//                 <button className="fab">
+//                     <i className="fas fa-plus"></i>
+//                 </button>
+//             </div>
+//         </div>
+//     );
+// };
+
+// export default OrdersVisiblePage;

@@ -5,8 +5,14 @@ import { useNavigate, useParams, useSearchParams } from "react-router-dom";
 import { FiSearch } from "react-icons/fi";
 import tableServicesPort from "../../Backend_Port_Files/TableServices";
 import inventoryServicesPort from "../../Backend_Port_Files/InventoryServices"; import axios from "axios";
+import { FaCheck, FaUsers, FaClock, FaChartLine } from "react-icons/fa";
+import { toast } from 'react-toastify';
 
-
+const statusConfig = {
+    Vacant: { card: "tm-status-card-available", icon: <FaCheck className="tm-status-icon tm-available" />, label: "Available" },
+    Occupied: { card: "tm-status-card-occupied", icon: <FaUsers className="tm-status-icon tm-occupied" />, label: "Occupied" },
+    Reserved: { card: "tm-status-card-reserved", icon: <FaClock className="tm-status-icon tm-reserved" />, label: "Reserved" }
+};
 
 const Table_Inventory_Order = ({ onOrderUpdate }) => {
     const { darkMode } = useTheme();
@@ -28,6 +34,19 @@ const Table_Inventory_Order = ({ onOrderUpdate }) => {
 
 
     const token = localStorage.getItem("access_token");
+
+    const available = tables.filter(t => t.status === 'Vacant').length;
+    const occupied = tables.filter(t => t.status === 'Occupied').length;
+    const reserved = tables.filter(t => t.status === 'Reserved').length;
+    const total = tables.length;
+    const [tableIds, setTableId] = useState(null)
+    useEffect(() => {
+        if (tableIds) {
+            document.body.classList.add("sidebar-minimized");
+        } else {
+            document.body.classList.remove("sidebar-minimized");
+        }
+    }, [tableIds]);
     useEffect(() => {
         if (!clientId) return;
 
@@ -88,7 +107,7 @@ const Table_Inventory_Order = ({ onOrderUpdate }) => {
                         setActiveCategory("all");
 
                         const enriched = itemRes.data.data.map(item => {
-                            const cat = categoryList.find(c => c.id === item.category_id);
+                            const cat = categories.find(c => c.id === item.category_id);
                             return {
                                 ...item,
                                 category: cat ? cat.name : "Uncategorized"
@@ -215,6 +234,19 @@ const Table_Inventory_Order = ({ onOrderUpdate }) => {
     };
 
 
+    const fetchTables = async () => {
+        try {
+            const res = await tableServicesPort.get(
+                `/${clientId}/tables/read`,
+                { headers: { Authorization: `Bearer ${token}` } }
+            );
+            if (res.data?.data) {
+                setTables(res.data.data);
+            }
+        } catch (error) {
+            console.error("Error fetching tables", error);
+        }
+    };
 
 
     const getItemClass = (item) => {
@@ -323,8 +355,10 @@ const Table_Inventory_Order = ({ onOrderUpdate }) => {
 
     return (
         <div className="Table-Selection-container">
+
             <div className={`view-tables-wrapper ${darkMode ? "dark" : "light"}`}>
-                {!selectedTable && (
+
+                {/* {!selectedTable && (
                     <div className="viewmode-tabs">
                         <button
                             className={modeFromParams === "table" ? "active" : ""}
@@ -332,7 +366,7 @@ const Table_Inventory_Order = ({ onOrderUpdate }) => {
                         >
                             Table
                         </button>
-                        {/* <button
+                        <button
                         className={modeFromParams === "pickup" ? "active" : ""}
                         onClick={() => handleModeClick("pickup")}
                     >
@@ -343,34 +377,89 @@ const Table_Inventory_Order = ({ onOrderUpdate }) => {
                         onClick={() => handleModeClick("delivery")}
                     >
                         Delivery
-                    </button> */}
+                    </button>
                     </div>
-                )}
+                )} */}
 
                 {!selectedTable && (
-                    <div className="tables-view">
-                        <h2>Table Reservation</h2>
-                        {uniqueZones.map(zone => (
-                            <div className="zone-group" key={zone}>
-                                <h3 className="zone-title">{zone}</h3>
-                                <div className="zone-section">
 
-                                    {tables.filter(t => t.location_zone === zone).map(table => (
-                                        <div
-                                            key={table.id}
-                                            className="table-card"
-                                            onClick={() => navigate(`${table.id}`)
-                                            }
+                    <>
 
-                                        >
-                                            <div className="table-number">{table.table_number}</div>
-                                            {/* <div className="table-status">{table.status}</div> */}
-                                        </div>
-                                    ))}
+
+                        <div className="tm-stats-grid">
+                            <div className="tm-stats-card">
+                                <div className="tm-stats-flex">
+                                    <div className="tm-stats-icon-bg tm-stats-icon-green">
+                                        <FaCheck className="tm-icon-available" />
+                                    </div>
+                                    <div className="tm-stats-text-group">
+                                        <p className="tm-stats-label">Available</p>
+                                        <p className="tm-stats-value">{available}</p>
+                                    </div>
                                 </div>
                             </div>
-                        ))}
-                    </div>
+                            <div className="tm-stats-card">
+                                <div className="tm-stats-flex">
+                                    <div className="tm-stats-icon-bg tm-stats-icon-blue">
+                                        <FaUsers className="tm-icon-occupied" />
+                                    </div>
+                                    <div className="tm-stats-text-group">
+                                        <p className="tm-stats-label">Occupied</p>
+                                        <p className="tm-stats-value">{occupied}</p>
+                                    </div>
+                                </div>
+                            </div>
+                            <div className="tm-stats-card">
+                                <div className="tm-stats-flex">
+                                    <div className="tm-stats-icon-bg tm-stats-icon-yellow">
+                                        <FaClock className="tm-icon-reserved" />
+                                    </div>
+                                    <div className="tm-stats-text-group">
+                                        <p className="tm-stats-label">Reserved</p>
+                                        <p className="tm-stats-value">{reserved}</p>
+                                    </div>
+                                </div>
+                            </div>
+                            <div className="tm-stats-card">
+                                <div className="tm-stats-flex">
+                                    <div className="tm-stats-icon-bg tm-stats-icon-purple">
+                                        <FaChartLine className="tm-icon-total" />
+                                    </div>
+                                    <div className="tm-stats-text-group">
+                                        <p className="tm-stats-label">Total Tables</p>
+                                        <p className="tm-stats-value">{total}</p>
+                                    </div>
+                                </div>
+                            </div>
+                        </div>
+                        <div className="tables-view">
+                            <h2>Table Reservation</h2>
+                            {uniqueZones.map(zone => (
+                                <div className="zone-group" key={zone}>
+                                    <h3 className="zone-title">{zone}</h3>
+                                    <div className="zone-section">
+
+                                        {tables
+                                            .filter((t) => t.location_zone === zone && (t.status === "Vacant" || t.status === "Available"))
+                                            .map((table) => (
+                                                <div
+                                                    key={table.id}
+                                                    className="table-card"
+                                                    onClick={() => navigate(`${table.id}`)}
+                                                >
+                                                    <div className="table-number">{table.table_number}</div>
+                                                    <div className={`table-status-label tm-status-card-${table.status?.toLowerCase()}`}>
+                                                        {table.status}
+                                                    </div>
+                                                </div>
+                                            ))}
+
+                                    </div>
+                                </div>
+                            ))}
+                        </div>
+                    </>
+
                 )}
 
                 {selectedTable && (
@@ -423,33 +512,54 @@ const Table_Inventory_Order = ({ onOrderUpdate }) => {
                             <div className="order-section">
                                 <OrderForm
                                     table={selectedTable}
-                                    mode={selectedTable.mode || "Dine In"}
-                                    onOrderCreated={(latestOrder) => {
-                                        navigate('/view-tables');
-                                        setSearchParams({});
-                                        tableServicesPort
-                                            .get(`/${clientId}/tables/read`, {
-                                                headers: {
-                                                    Authorization: `Bearer ${token}`,
+                                    mode={selectedTable?.mode || "Dine In"}
+                                    onOrderCreated={async (latestOrder) => {
+                                        try {
+                                            if (!selectedTable?.id) {
+                                                console.error("❌ No table_id found in selectedTable");
+                                                toast.error("No table selected!");
+                                                return;
+                                            }
+
+                                            // ✅ Update table status to Occupied after order placement
+                                            await tableServicesPort.post(
+                                                `/${clientId}/tables/update`,
+                                                {
+                                                    id: selectedTable.id, // ✅ actual DB id
+                                                    client_id: clientId,
+                                                    name: selectedTable?.name || selectedTable?.table_number,
+                                                    table_type: selectedTable?.table_type || "Standard",
+                                                    status: "Occupied", // ✅ correct table status
+                                                    location_zone: selectedTable?.location_zone || null,
                                                 },
-                                            })
-                                            .then((res) => {
-                                                const responseData = Array.isArray(res.data)
-                                                    ? res.data
-                                                    : res.data?.data || [];
+                                                {
+                                                    headers: { Authorization: `Bearer ${token}` },
+                                                }
+                                            );
 
-                                                setTables(responseData);
-                                            })
-                                            .catch((err) => {
-                                                console.error("Failed to fetch tables:", err);
-                                                setTables([]); // fallback to empty array
-                                            });
+                                            // ✅ Refresh the tables list
+                                            await fetchTables();
 
-                                        onOrderUpdate?.(latestOrder);
-                                        setSelectedTable(null);
-                                        document.body.classList.remove("sidebar-minimized");
+                                            // ✅ Navigate back and reset state
+                                            navigate("/view-tables");
+                                            setSearchParams({});
+                                            setSelectedTable(null);
+                                            document.body.classList.remove("sidebar-minimized");
+
+                                            // ✅ Propagate latest order with table_id
+                                            if (latestOrder) {
+                                                onOrderUpdate?.({
+                                                    ...latestOrder,
+                                                    table_id: selectedTable.id, // ensure table_id is included
+                                                });
+                                            }
+                                        } catch (error) {
+                                            console.error("❌ Failed to update table status", error);
+                                            toast.error("Failed to update table status");
+                                        }
                                     }}
                                 />
+
                             </div>
 
 

@@ -1456,7 +1456,14 @@ const KitchenDisplay = () => {
 
     const [itemSearchQuery, setItemSearchQuery] = useState("");
     const [itemSearchResults, setItemSearchResults] = useState([]);
-
+    const [tableIds, setTableId] = useState(null)
+    useEffect(() => {
+        if (tableIds) {
+            document.body.classList.add("sidebar-minimized");
+        } else {
+            document.body.classList.remove("sidebar-minimized");
+        }
+    }, [tableIds]);
     // Fetch tables
     useEffect(() => {
         if (!token || !clientId) return;
