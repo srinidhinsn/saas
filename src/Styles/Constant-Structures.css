@@ -1,0 +1,52 @@
+* {
+    margin: 0;
+    padding: 0;
+    box-sizing: border-box;
+}
+
+*::-webkit-scrollbar {
+    display: none;
+}
+
+body {
+    font-family: 'Segoe UI', Tahoma, Geneva, Verdana, sans-serif;
+    transition: all;
+}
+
+.app-wrapper {
+    display: flex;
+    height: calc(100vh - 75px);
+    overflow: hidden;
+}
+
+/* =================== Grid Structure constant========================== */
+.grid-layout {
+    display: grid;
+    grid-template-columns: repeat(auto-fill, minmax(180px, 1fr));
+    gap: 1rem;
+    margin: 15px 0px;
+}
+
+.grids {
+    background: var(--bg-container);
+    border-radius: 8px;
+    padding: 0.75rem;
+    box-shadow: 0 0 4px rgba(0, 0, 0, 0.08);
+    color: var(--bg-text-color);
+    cursor: pointer;
+    display: flex;
+    flex-direction: column;
+    justify-content: space-between;
+    border-left: 6px solid transparent;
+    transition: all 0.2s ease;
+}
+
+/* ======================== Padding ======================== */
+:root {
+    /* Header Padding */
+    --header-padding: 20px 20px;
+    /* Left Sidebar Padding */
+    --left-sidebar-padding: 5px;
+    /* Main Page padding */
+    --main-page-padding: 5px;
+}

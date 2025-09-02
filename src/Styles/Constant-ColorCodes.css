@@ -1,0 +1,98 @@
+:root {
+    /* background color  */
+    --bg-color: linear-gradient(to bottom,
+            rgb(243, 240, 250) 0%,
+            rgb(233, 230, 249) 20%,
+            rgb(221, 233, 249) 50%,
+            rgb(233, 230, 249) 80%,
+            rgb(243, 240, 250) 100%);
+
+    /* container color */
+    --bg-container: rgb(237, 237, 237);
+    /* chart containers */
+    --bg-chart-container: rgb(250, 245, 245);
+    /* Text color for characters */
+    --bg-text-color: rgb(5, 5, 62);
+    /* Text color for numbers */
+    --bg-number-color: rgb(19, 6, 49);
+    /* Dashboard icons */
+    --dash-icon-color: rgb(82, 192, 181);
+    /* Delete icon */
+    --delete-icon-bg: rgb(223, 176, 176);
+    --delete-icon: rgb(145, 47, 47);
+    --delete-icon-hover: red;
+    /* edit icon */
+    --edit-icon-bg: rgb(137, 137, 223);
+    --edit-icon: rgb(47, 47, 244);
+    --edit-icon-hover: blue;
+    /* View button */
+    --view-button-bg: rgb(193, 242, 190);
+    --view-button: rgb(38, 36, 36);
+    /* Delete button */
+    --delete-btn-bg: red;
+    --delete-btn: white;
+    /* Pending */
+    --status-pending-bg: rgb(241, 237, 215);
+    --status-pending: rgb(146, 129, 22);
+    /* preparing */
+    --status-prepare-bg: rgb(58, 98, 218);
+    --status-prepare: rgb(11, 8, 195);
+    /* served */
+    --status-served-bg: rgb(142, 226, 164);
+    --status-served: rgb(15, 171, 54);
+    /* Edit button */
+    /* Save button */
+    --notification-icon: gray;
+    --popup-bg: white;
+    /* pop-up delete windows */
+    --delete-yes-btn-bg: red;
+    --delete-yes-btn: white;
+    --delete-no-btn-bg: darkgray;
+    --delete-no-btn: white;
+    --sidebar-bg: linear-gradient(to left,
+            rgb(243, 240, 250) 0%,
+            rgb(233, 230, 249) 20%, rgb(221, 233, 249) 50%,
+            rgb(233, 230, 249) 80%,
+            rgb(243, 240, 250) 100%);
+    --text-color: rgb(56, 47, 108);
+    --brand-color: #4C4C63;
+    --active-bg: rgb(216, 243, 237);
+    --active-text: rgb(21, 175, 163);
+    --hover-bg: rgb(241, 241, 241);
+    --card-bg: rgb(108, 25, 25);
+    --card-back: linear-gradient(to right, rgb(228, 225, 249), rgb(213, 208, 248), rgb(229, 227, 248));
+    --card-icon: rgb(159, 149, 251);
+    --value-color: rgb(159, 149, 251);
+    --growth-color: green;
+    --placeholder-bg: rgb(240, 240, 240);
+    --placeholder-color: rgb(170, 170, 170);
+    --grids: white;
+
+}
+
+body.theme-dark {
+    --bg-color: rgb(18, 18, 18);
+    --bg-container: rgb(58, 58, 58);
+    --bg-chart-container: rgb(39, 38, 38);
+    --bg-text-color: rgb(172, 170, 170);
+    --bg-number-color: rgb(234, 232, 232);
+    --dash-icon-color: rgb(48, 211, 195);
+    --delete-icon-bg: rgb(223, 176, 176);
+    --delete-icon: rgb(145, 47, 47);
+    --edit-icon-bg: rgb(137, 137, 223);
+    --edit-icon: blue;
+    --sidebar-bg: rgb(30, 30, 30);
+    --text-color: rgb(224, 224, 224);
+    --brand-color: rgb(0, 207, 200);
+    --active-bg: rgb(38, 50, 56);
+    --active-text: rgb(0, 207, 200);
+    --card-back: rgb(31, 31, 31);
+    --hover-bg: rgb(44, 44, 44);
+    --card-bg: rgb(31, 31, 31);
+    --card-icon: rgb(21, 175, 163);
+    --value-color: rgb(21, 175, 163);
+    --growth-color: green;
+    --placeholder-bg: rgb(240, 240, 240);
+    --placeholder-color: rgb(170, 170, 170);
+    --grids: gray
+}
