@@ -348,7 +348,6 @@ function CategoryList({ onCategorySelect }) {
     };
 
 
-
     const handleEditSave = async () => {
         let finalEditSubcategories = [...editSubcategories];
 
@@ -430,8 +429,6 @@ function CategoryList({ onCategorySelect }) {
             alert("Failed to update category.");
         }
     };
-
-
 
 
     const handleDelete = async () => {
@@ -544,7 +541,6 @@ function CategoryList({ onCategorySelect }) {
                                 </label>
                             ))}
                         </div> */}
-
 
 
                         <div className="modal-buttons">

@@ -107,7 +107,7 @@ const Table_Inventory_Order = ({ onOrderUpdate }) => {
                         setActiveCategory("all");
 
                         const enriched = itemRes.data.data.map(item => {
-                            const cat = categories.find(c => c.id === item.category_id);
+                            const cat = flatCategories.find(c => c.id === item.category_id);
                             return {
                                 ...item,
                                 category: cat ? cat.name : "Uncategorized"
@@ -152,36 +152,37 @@ const Table_Inventory_Order = ({ onOrderUpdate }) => {
         }
     }, [tableId, tables, modeFromParams]);
 
-    useEffect(() => {
-        axios.all([
-            inventoryServicesPort.get(`/${clientId}/inventory/read_category?category_id=dietery`, {
-                headers: { Authorization: `Bearer ${token}` },
-            }),
-            inventoryServicesPort.get(`/${clientId}/inventory/read`, {
-                headers: { Authorization: `Bearer ${token}` },
-            }),
-        ])
-            .then(axios.spread((catRes, itemRes) => {
-                const allCategory = { id: "all", name: "All" };
-                const categoryList = catRes.data.data.filter(c => c.name?.toLowerCase() !== "all");
-                setCategories([allCategory, ...categoryList]);
-                setActiveCategory("all");
+    // useEffect(() => {
+    //     axios.all([
+    //         inventoryServicesPort.get(`/${clientId}/inventory/read_category?category_id=dietery`, {
+    //             headers: { Authorization: `Bearer ${token}` },
+    //         }),
+    //         inventoryServicesPort.get(`/${clientId}/inventory/read`, {
+    //             headers: { Authorization: `Bearer ${token}` },
+    //         }),
+    //     ])
+    //         .then(axios.spread((catRes, itemRes) => {
+    //             const allCategory = { id: "all", name: "All" };
+    //             const categoryList = catRes.data.data.filter(c => c.name?.toLowerCase() !== "all");
+    //             setCategories([allCategory, ...categoryList]);
+    //             setActiveCategory("all");
 
-                const enriched = itemRes.data.data.map(item => {
-                    const cat = categoryList.find(c => c.id === item.category_id);
-                    return {
-                        ...item,
-                        category: cat ? cat.name : "Uncategorized"
-                    };
-                });
+    //             const enriched = itemRes.data.data.map(item => {
+    //                 const cat = categoryList.find(c => c.id === item.category_id);
+    //                 return {
+    //                     ...item,
+    //                     category: cat ? cat.name : "Uncategorized"
+    //                 };
+    //             });
 
-                setItems(enriched);
-            }))
+    //             setItems(enriched);
+    //         }))
 
-    }, []);
+    // }, []);
+    
     const groupedItems = categories.map(cat => ({
         categoryName: cat.name,
-        items: menuItems.filter(item => item.category_id === cat.id)
+        items: items.filter(item => item.category_id === cat.id)
     }));
 
 
@@ -477,7 +478,7 @@ const Table_Inventory_Order = ({ onOrderUpdate }) => {
                                 </div>
                                 <ul className="category-list">
                                     {categories
-                                        .filter(cat => !cat.parentId) // show only root categories initially
+                                        .filter(cat => !cat.parentId) 
                                         .map(cat => (
                                             <CategoryNode
                                                 key={cat.id}
@@ -487,6 +488,7 @@ const Table_Inventory_Order = ({ onOrderUpdate }) => {
                                                 setExpandedCategories={setExpandedCategories}
                                                 activeCategory={activeCategory}
                                                 setActiveCategory={setActiveCategory}
+                                                
                                             />
                                         ))}
                                 </ul>
