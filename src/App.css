@@ -2382,9 +2382,7 @@ body[data-theme="dark"] .date-filter-dropdown {
 }
 
 @media (max-width: 768px) {
-    .main-content {
-        padding: 1rem;
-    }
+
 
     .stats-grid {
         grid-template-columns: 1fr;

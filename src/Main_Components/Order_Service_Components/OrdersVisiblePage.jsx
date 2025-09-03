@@ -510,8 +510,16 @@ const OrdersVisiblePage = () => {
                                     >
                                         <div className="orders-visible-expanded-info">
                                             <span>Date: {new Date(order.created_at).toLocaleDateString()}</span>
-                                            <span>Price: ₹{parseFloat(order.total_price || 0).toFixed(2)}</span>
+                                            <span>
+                                                Total: ₹{order.items.reduce(
+                                                    (sum, item) =>
+                                                        sum +
+                                                        ((inventoryMap[item.item_id]?.price || item.price || 0) * (item.quantity || 1)),
+                                                    0
+                                                ).toFixed(2)}
+                                            </span>
                                         </div>
+
                                         <div className="orders-visible-expanded-actions">
                                             {editOrderId === order.id ? (
                                                 <button

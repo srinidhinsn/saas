@@ -44,7 +44,7 @@ body {
 /* ======================== Padding ======================== */
 :root {
     /* Header Padding */
-    --header-padding: 20px 20px;
+    --header-padding: 20px;
     /* Left Sidebar Padding */
     --left-sidebar-padding: 5px;
     /* Main Page padding */
