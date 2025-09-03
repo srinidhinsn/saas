@@ -523,36 +523,32 @@ const Table_Inventory_Order = ({ onOrderUpdate }) => {
                                                 return;
                                             }
 
-                                            // ✅ Update table status to Occupied after order placement
+                                            const tableObj = tables?.find(t => t.id === selectedTable.id);
+
                                             await tableServicesPort.post(
                                                 `/${clientId}/tables/update`,
                                                 {
-                                                    id: selectedTable.id, // ✅ actual DB id
+                                                    id: selectedTable.id,
                                                     client_id: clientId,
-                                                    name: selectedTable?.name || selectedTable?.table_number,
-                                                    table_type: selectedTable?.table_type || "Standard",
-                                                    status: "Occupied", // ✅ correct table status
-                                                    location_zone: selectedTable?.location_zone || null,
+                                                    name: tableObj?.name || tablesMap[selectedTable.id] || `Table ${selectedTable.id}`,
+                                                    table_type: tableObj?.table_type, // Preserve actual table_type
+                                                    status: "Occupied",               // Correct status set to Occupied
+                                                    location_zone: tableObj?.location_zone
                                                 },
-                                                {
-                                                    headers: { Authorization: `Bearer ${token}` },
-                                                }
+                                                { headers: { Authorization: `Bearer ${token}` } }
                                             );
 
-                                            // ✅ Refresh the tables list
                                             await fetchTables();
 
-                                            // ✅ Navigate back and reset state
                                             navigate("/view-tables");
                                             setSearchParams({});
                                             setSelectedTable(null);
                                             document.body.classList.remove("sidebar-minimized");
 
-                                            // ✅ Propagate latest order with table_id
                                             if (latestOrder) {
                                                 onOrderUpdate?.({
                                                     ...latestOrder,
-                                                    table_id: selectedTable.id, // ensure table_id is included
+                                                    table_id: selectedTable.id,
                                                 });
                                             }
                                         } catch (error) {
@@ -561,6 +557,7 @@ const Table_Inventory_Order = ({ onOrderUpdate }) => {
                                         }
                                     }}
                                 />
+
 
                             </div>
 
