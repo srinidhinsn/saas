@@ -9,6 +9,7 @@ import Register from './Main_Components/User_Services_Components/RegisterPage';
 import ForgotPassword from './Main_Components/User_Services_Components/ForgotPasswordPage';
 import ProtectedRoute from './Constants/ProtectedRoute';
 import SaasClientRoutes from './Constants/SaasClientRoutes';
+import ResetPassword from './Main_Components/User_Services_Components/ResetPassword';
 
 const App = () => {
   const [tables, setTables] = useState([]);
@@ -28,7 +29,7 @@ const App = () => {
           <Route path="/saas/:clientId/login" element={<Login />} />
           <Route path="/saas/:clientId/register" element={<Register />} />
           <Route path="/saas/:clientId/forgot" element={<ForgotPassword />} />
-
+          <Route path="/saas/:clientId/reset" element={<ResetPassword />} />
           {/* Protected routes with accessToken in URL */}
           <Route
             path="/saas/:clientId/:pageName/*"

@@ -666,7 +666,7 @@ const OrdersVisiblePage = () => {
                 {showInvoiceModal && invoiceOrder && <InvoiceModal order={invoiceOrder} onClose={closeInvoiceModal} />}
             </div>
             <div style={{ position: 'absolute', bottom: '15px', right: '10px' }}>
-                <p>
+                <p style={{ color: 'var(--bg-number-color)' }}>
                     <span
                         style={{
                             display: "inline-block",
@@ -679,7 +679,7 @@ const OrdersVisiblePage = () => {
                     ></span>
                     Ready
                 </p>
-                <p>
+                <p style={{ color: 'var(--bg-number-color)' }}>
                     <span
                         style={{
                             display: "inline-block",
@@ -692,7 +692,7 @@ const OrdersVisiblePage = () => {
                     ></span>
                     Served
                 </p>
-                <p>
+                <p style={{ color: 'var(--bg-number-color)' }}>
                     <span
                         style={{
                             display: "inline-block",
@@ -705,7 +705,7 @@ const OrdersVisiblePage = () => {
                     ></span>
                     Preparing
                 </p>
-                <p>
+                <p style={{ color: 'var(--bg-number-color)' }}>
                     <span
                         style={{
                             display: "inline-block",

@@ -48,16 +48,44 @@
 
 .notification-popup {
     position: absolute;
-    top: 30px;
-    right: 20px;
-    background: var(--bg-chart-container);
-    border: 1px solid var(--popup-border);
+    top: 25px;
+    right: 15px;
+    background: var(--bg-container);
+    border: 1px solid white;
     width: 150px;
     padding: 5px;
     box-shadow: 0px 2px 6px var(--popup-shadow);
     z-index: 100;
     color: var(--bg-number-color);
     font-size: 12px;
+    border-top-left-radius: 15px;
+    border-bottom-right-radius: 15px;
+}
+
+.notification-popup hr {
+    border: 0;
+    border-top: 1px solid var(--bg-text-color);
+}
+
+.notification-popup a {
+    color: var(--bg-number-color);
+    font-size: 11px;
+    text-decoration: none;
+    padding: 5px 0;
+}
+
+.notification-popup a:hover {
+    text-decoration: underline;
+}
+
+.Right-Arrow-Icon {
+    font-size: 12px;
+    vertical-align: middle;
+    color: var(--bg-number-color);
+}
+
+.no-notification {
+    padding: 5px;
 }
 
 .notification-item {
@@ -1219,7 +1247,7 @@ body.sidebar-minimized .sidebar li .arrow-indicator {
 
     .view-tables-wrapper .order-overlay .item-pane {
         flex: 1;
-        padding: .5rem 1rem 0 1rem;
+        padding: 1rem 3rem 0 1.5rem;
         min-height: 70vh;
         height: 88vh;
         overflow-y: auto;
@@ -1944,6 +1972,9 @@ body.sidebar-minimized .sidebar li .arrow-indicator {
     flex-direction: column;
     height: 89vh;
     overflow-y: auto;
+    background: var(--bg-color);
+    border-top-right-radius: 8px;
+    border-bottom-right-radius: 8px;
 }
 
 /* Responsive padding for smaller screens */
@@ -2065,7 +2096,7 @@ body.sidebar-minimized .sidebar li .arrow-indicator {
 
 /* === Controls (Search, Filter, Add) === */
 .tm-controls-card {
-    background: var(--bg-container);
+    background: var(--bg-color);
     border-radius: 8px;
     box-shadow: 0 1px 5px rgba(0, 0, 0, .04);
     border: 1px solid #eee;
@@ -2095,7 +2126,7 @@ body.sidebar-minimized .sidebar li .arrow-indicator {
     top: 50%;
     left: 9px;
     transform: translateY(-50%);
-    color: var(--bg-text-color);
+    color: var(--bg-number-color);
     font-size: 15px;
 }
 
@@ -2109,6 +2140,10 @@ body.sidebar-minimized .sidebar li .arrow-indicator {
     font-size: 15px;
     width: 170px;
     box-sizing: border-box;
+}
+
+.tm-search-input:focus {
+    outline: none;
 }
 
 @media (max-width: 480px) {
@@ -2131,13 +2166,13 @@ body.sidebar-minimized .sidebar li .arrow-indicator {
 .tm-filter-select {
     padding: 8px 10px;
     border-radius: 7px;
-    border: 1px solid #ddd;
+    border: 1px solid rgb(221, 221, 221);
     font-size: 15px;
 }
 
 .tm-add-table-btn {
-    background: #2563eb;
-    color: #fff;
+    background: var(--view-button-bg);
+    color: var(--view-button);
     border-radius: 8px;
     padding: 10px 19px;
     font-weight: 600;
@@ -2150,7 +2185,7 @@ body.sidebar-minimized .sidebar li .arrow-indicator {
 }
 
 .tm-add-table-btn:hover {
-    background: #1746a2;
+    color: white;
 }
 
 .tm-add-icon {
@@ -2160,7 +2195,7 @@ body.sidebar-minimized .sidebar li .arrow-indicator {
 
 /* === Table Grid Section === */
 .tm-table-grid-card {
-    background: #fff;
+    background: var(--bg-color);
     border-radius: 8px;
     box-shadow: 0 1px 5px rgba(0, 0, 0, .03);
     border: 1px solid #eee;
@@ -2242,7 +2277,7 @@ body.sidebar-minimized .sidebar li .arrow-indicator {
     font-weight: 600;
     font-size: 1rem;
     margin-bottom: 6px;
-    color: #333;
+    color: var(--bg-number-color);
 }
 
 .tm-edit-modal-field input[type="number"],
@@ -2250,15 +2285,16 @@ body.sidebar-minimized .sidebar li .arrow-indicator {
     padding: 8px 12px;
     font-size: 1rem;
     border-radius: 6px;
-    border: 1.5px solid #d6dee4;
+    border: 1.5px solid rgb(214, 222, 228);
     outline: none;
     transition: border-color 0.25s ease;
-    color: #333;
+    color: var(--bg-text-color);
+    background: var(--bg-chart-container);
 }
 
 .tm-edit-modal-field input[type="number"]:focus,
 .tm-edit-modal-field select:focus {
-    border-color: #299eff;
+    border-color: var(--border-occupied);
     box-shadow: 0 0 8px rgba(41, 158, 255, 0.3);
 }
 
@@ -2280,25 +2316,7 @@ body.sidebar-minimized .sidebar li .arrow-indicator {
     align-items: center;
     justify-content: center;
     transition: background-color 0.25s ease;
-    color: white;
-}
 
-.tm-edit-modal-save {
-    background-color: #4caf50;
-    /* Green */
-}
-
-.tm-edit-modal-save:hover {
-    background-color: #43a047;
-}
-
-.tm-edit-modal-cancel {
-    background-color: #e5534b;
-    /* Red */
-}
-
-.tm-edit-modal-cancel:hover {
-    background-color: #d0453a;
 }
 
 /* Responsive */
@@ -2321,21 +2339,21 @@ body.sidebar-minimized .sidebar li .arrow-indicator {
 }
 
 .tm-status-card-available {
-    background: rgb(233, 251, 233);
-    color: rgb(22, 163, 74);
-    border-color: #a7f3d0;
+    background: var(--bg-vacant);
+    color: var(--text-vacant);
+    border-color: var(--border-vacant);
 }
 
 .tm-status-card-occupied {
-    background: #e3edfc;
-    color: #2563eb;
-    border-color: #c7d2fe;
+    background: var(--bg-occupied);
+    color: var(--text-occupied);
+    border-color: var(--border-occupied);
 }
 
 .tm-status-card-reserved {
-    background: #fff9db;
-    color: #d97706;
-    border-color: #fde68a;
+    background: var(--bg-reserved);
+    color: var(--text-reserved);
+    border-color: var(--border-reserved);
 }
 
 .tm-table-card-actions {
@@ -2346,20 +2364,30 @@ body.sidebar-minimized .sidebar li .arrow-indicator {
 
 .tm-edit-btn,
 .tm-delete-btn {
-    border: none;
     border-radius: 5px;
-    background: #eee;
     padding: 5px 7px;
     cursor: pointer;
-    font-size: 14px;
+    font-size: 12px;
 }
 
 .tm-edit-btn {
-    color: #2563eb;
+    color: var(--edit-icon);
+    background: var(--edit-icon-bg);
+}
+
+.tm-edit-btn:hover {
+    color: var(--edit-icon-hover);
+    transform: scale(1.1);
 }
 
 .tm-delete-btn {
-    color: #dc2626;
+    color: var(--delete-icon);
+    background: var(--delete-icon-bg);
+}
+
+.tm-delete-btn:hover {
+    color: var(--delete-icon-hover);
+    transform: scale(1.1);
 }
 
 .tm-edit-btn:active,
@@ -2384,7 +2412,7 @@ body.sidebar-minimized .sidebar li .arrow-indicator {
 .tm-modal-card,
 .tm-edit-modal-card,
 .tm-confirm-modal-card {
-    background: #fff;
+    background: var(--bg-color);
     border-radius: 14px;
     padding: 24px 18px;
     box-shadow: 0 8px 24px rgba(0, 0, 0, .11);
@@ -2397,13 +2425,14 @@ body.sidebar-minimized .sidebar li .arrow-indicator {
     display: flex;
     justify-content: space-between;
     align-items: center;
+    color: var(--bg-text-color);
 }
 
 .tm-modal-close,
 .tm-edit-modal-close {
     background: none;
     border: none;
-    color: #999;
+    color: var(--bg-number-color);
     font-size: 17px;
     cursor: pointer;
 }
@@ -2418,6 +2447,7 @@ body.sidebar-minimized .sidebar li .arrow-indicator {
     grid-template-columns: 1fr 1fr;
     gap: 12px;
     margin-bottom: 8px;
+    background: var(--bg-chart-container);
 }
 
 @media (max-width: 540px) {
@@ -2477,7 +2507,7 @@ body.sidebar-minimized .sidebar li .arrow-indicator {
     border: none;
 }
 
-.tm-modal-generate-table {
+/* .tm-modal-generate-table {
     background: #22c55e;
     border-radius: 7px;
     color: #fff;
@@ -2485,7 +2515,7 @@ body.sidebar-minimized .sidebar li .arrow-indicator {
     padding: 8px 16px;
     border: none;
     margin-top: 8px;
-}
+} */
 
 .tm-edit-modal-btns {
     display: flex;
@@ -2493,21 +2523,28 @@ body.sidebar-minimized .sidebar li .arrow-indicator {
 }
 
 .tm-edit-modal-save {
-    background: #22c55e;
-    color: #fff;
+    background: var(--yes-btn-bg);
+    color: var(--yes-btn-text);
     border-radius: 6px;
     font-size: 15px;
     padding: 7px 16px;
     border: none;
 }
 
+
+
 .tm-edit-modal-cancel {
-    background: #ef4444;
-    color: #fff;
+    background: var(--no-btn-bg);
+    color: var(--no-btn-text);
     border-radius: 6px;
     font-size: 15px;
     padding: 7px 16px;
     border: none;
+}
+
+.tm-edit-modal-save:hover,
+.tm-edit-modal-cancel:hover {
+    color: white;
 }
 
 .tm-confirm-modal-btns {
@@ -2517,8 +2554,8 @@ body.sidebar-minimized .sidebar li .arrow-indicator {
 }
 
 .tm-confirm-danger {
-    background: #dc2626;
-    color: #fff;
+    background: var(--yes-btn-bg);
+    color: var(--yes-btn-text);
     font-weight: 600;
     border-radius: 5px;
     padding: 7px 15px;
@@ -2526,8 +2563,8 @@ body.sidebar-minimized .sidebar li .arrow-indicator {
 }
 
 .tm-confirm-cancel {
-    background: #2563eb;
-    color: #fff;
+    background: var(--no-btn-bg);
+    color: var(--no-btn-text);
     font-weight: 600;
     border-radius: 5px;
     padding: 7px 15px;
@@ -2557,7 +2594,7 @@ body.sidebar-minimized .sidebar li .arrow-indicator {
 .tm-dark-mode .tm-stats-card,
 .tm-dark-mode .tm-controls-card,
 .tm-dark-mode .tm-table-grid-card {
-    background: var(--bg-chart-container);
+    background: var(--bg-color);
     color: var(--bg-text-color);
     border-color: #424242;
 }
@@ -2569,8 +2606,8 @@ body.sidebar-minimized .sidebar li .arrow-indicator {
 .tm-dark-mode .tm-modal-card,
 .tm-dark-mode .tm-edit-modal-card,
 .tm-dark-mode .tm-confirm-modal-card {
-    background: #222;
-    color: #fafafa;
+    background: var(--bg-chart-container);
+    color: var(--bg-number-color);
 }
 
 /*======================================================================================================================================== */
@@ -2851,7 +2888,7 @@ input[type="checkbox"] {
     height: 89vh;
     overflow-y: auto;
     box-sizing: border-box;
-    padding: 20px;
+    padding: 20px 10px;
 
 }
 
@@ -2882,7 +2919,7 @@ input[type="checkbox"] {
     list-style: none;
     padding: 0;
     margin: 0;
-    width: 180px;
+    width: 170px;
 }
 
 .category-list1 {
@@ -2899,10 +2936,11 @@ input[type="checkbox"] {
     margin-bottom: 0.8rem;
     /* background: white; */
     color: var(--bg-text-color);
-    padding: 0.6rem;
+    padding: 0.6rem .2rem;
     border-radius: 6px;
     box-shadow: 0 1px 2px rgba(0, 0, 0, 0.1);
     cursor: pointer;
+    width: 150px;
 }
 
 /* Text */
@@ -3353,6 +3391,10 @@ input[type="checkbox"] {
     background-color: #888;
 }
 
+.Items-Orderform-Containers {
+    display: flex;
+    flex-direction: row;
+}
 
 @media (max-width: 768px) {
     .menu-item-grid {

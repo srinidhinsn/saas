@@ -15,6 +15,7 @@ import {
 
 import { useNavigate, useParams } from 'react-router-dom';
 import axios from 'axios';
+import NotificationPanel from './Notifications';
 
 const DashBoardPage = () => {
     const nav = useNavigate();
@@ -481,6 +482,7 @@ const DashBoardPage = () => {
                     </div>
                 </main>
             </div>
+            <NotificationPanel />
         </div>
     );
 };

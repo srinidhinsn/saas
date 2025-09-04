@@ -99,9 +99,13 @@ export default function Login() {
                             required
                         />
                     </div>
-
-                    <div className="options-row">
-                        <span onClick={() => navigate(`/saas/${clientId}/forgot`)}>Forgot Password?</span>
+                    <div style={{ display: 'flex', justifyContent: 'space-between' }}>
+                        <div className="options-row">
+                            <span onClick={() => navigate(`/saas/${clientId}/reset`)}>Reset Password?</span>
+                        </div>
+                        <div className="options-row">
+                            <span onClick={() => navigate(`/saas/${clientId}/forgot`)}>Forgot Password?</span>
+                        </div>
                     </div>
 
                     {/* {error && <p className="error">{error}</p>} */}
