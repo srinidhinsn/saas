@@ -11,8 +11,8 @@ import MenuManager from "../Main_Components/Inventory_Services_Components/MenuMa
 // import SwiggyMenuManager from "../MenuComponents/SwiggyMenuManager";
 // import ZomatoMenuManager from "../MenuComponents/ZomatoManager";
 // import MenuTypeSelector from "../MenuComponents/MenuTypeSelector";
-import TableSelection from "../Main_Components/Inventory_Services_Components/Table_Wrapper";
 import ViewTables from "../Main_Components/Table_Service_Components/Table_Inventory_Order";
+import TableManagement from "../Main_Components/Table_Service_Components/TableManagement";
 import OrderForm from "../Main_Components/Order_Service_Components/OrderForm";
 import OrdersVisiblePage from "../Main_Components/Order_Service_Components/OrdersVisiblePage";
 import DashBoardPage from "./DashBoardPage";
@@ -111,7 +111,7 @@ const SaasClientRoutes = ({
                         <Route
                             path="table-selection"
                             element={
-                                <TableSelection
+                                <TableManagement
                                     clientId={clientId}
                                     onTableAdded={(newTable) => {
                                         setSelectedTableId(newTable.table_number);
