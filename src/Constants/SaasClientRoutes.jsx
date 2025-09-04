@@ -11,7 +11,7 @@ import MenuManager from "../Main_Components/Inventory_Services_Components/MenuMa
 // import SwiggyMenuManager from "../MenuComponents/SwiggyMenuManager";
 // import ZomatoMenuManager from "../MenuComponents/ZomatoManager";
 // import MenuTypeSelector from "../MenuComponents/MenuTypeSelector";
-import TableSelection from "../Main_Components/Table_Service_Components/TableManagement";
+import TableSelection from "../Main_Components/Inventory_Services_Components/Table_Wrapper";
 import ViewTables from "../Main_Components/Table_Service_Components/Table_Inventory_Order";
 import OrderForm from "../Main_Components/Order_Service_Components/OrderForm";
 import OrdersVisiblePage from "../Main_Components/Order_Service_Components/OrdersVisiblePage";
