@@ -1,15 +1,16 @@
 import React, { useState } from "react";
 import { useNavigate, useParams } from "react-router-dom";
-import { FaUser, FaLock } from "react-icons/fa";
+import { FaLock, FaUser } from "react-icons/fa";
 import { toast } from "react-toastify";
 import "react-toastify/dist/ReactToastify.css";
 import userServicesPort from "../../Backend_Port_Files/UserServices";
 
-export default function ForgotPassword() {
+export default function ResetPassword() {
     const navigate = useNavigate();
     const { clientId } = useParams();
     const [form, setForm] = useState({
         username: "",
+        old_password: "",
         new_password: "",
         confirm_password: ""
     });
@@ -21,7 +22,7 @@ export default function ForgotPassword() {
         setForm((prev) => ({ ...prev, [name]: value }));
     };
 
-    const handleForgotPassword = async (e) => {
+    const handleResetPassword = async (e) => {
         e.preventDefault();
         setError("");
 
@@ -34,26 +35,26 @@ export default function ForgotPassword() {
         setLoading(true);
 
         try {
-            await userServicesPort.post(`/${clientId}/users/forgot-password`, {
+            await userServicesPort.post(`/${clientId}/users/reset-password`, {
                 username: form.username,
-                client_id: clientId,
+                old_password: form.old_password,
                 new_password: form.new_password,
-                confirm_password: form.confirm_password,
             });
 
-            toast.success("Password reset successfully");
+            toast.success("Password changed successfully. Please login again.");
             navigate(`/saas/${clientId}/login`);
         } catch (err) {
-            console.error("Forgot password failed:", err);
+            console.error("Reset password failed:", err);
 
             let msg = "An unexpected error occurred";
             const status = err?.response?.status;
             const detail = err?.response?.data?.detail;
 
-            if (status === 404) {
-                msg = detail || "User not found";
-            } else if (status === 400) {
-                msg = detail || "Invalid request";
+            if (status === 400) {
+                msg = detail || "Invalid old password";
+            } else if (status === 401) {
+                msg = "Unauthorized. Please login again.";
+                navigate(`/saas/${clientId}/login`);
             } else if (status === 500) {
                 msg = "Internal Server Error. Please try again later.";
             } else if (detail && typeof detail === "string") {
@@ -71,10 +72,10 @@ export default function ForgotPassword() {
         <div className="login-page">
             <div className="login-card">
                 <div className="avatar-circle">
-                    <FaUser className="avatar-icon" />
+                    <FaLock className="avatar-icon" />
                 </div>
 
-                <form onSubmit={handleForgotPassword}>
+                <form onSubmit={handleResetPassword}>
                     <div className="input-group">
                         <FaUser className="input-icon" />
                         <input
@@ -82,6 +83,18 @@ export default function ForgotPassword() {
                             name="username"
                             placeholder="Username"
                             value={form.username}
+                            onChange={handleChange}
+                            required
+                        />
+                    </div>
+
+                    <div className="input-group">
+                        <FaLock className="input-icon" />
+                        <input
+                            type="password"
+                            name="old_password"
+                            placeholder="Old Password"
+                            value={form.old_password}
                             onChange={handleChange}
                             required
                         />
@@ -118,8 +131,8 @@ export default function ForgotPassword() {
                     </button>
 
                     <p className="login-link">
-                        Remembered your password?{" "}
-                        <span onClick={() => navigate(`/saas/${clientId}/login`)}>Login here</span>
+                        Forgot your old password?{" "}
+                        <span onClick={() => navigate(`/saas/${clientId}/forgot`)}>Click here</span>
                     </p>
                 </form>
             </div>

@@ -11,8 +11,8 @@ import MenuManager from "../Main_Components/Inventory_Services_Components/MenuMa
 // import SwiggyMenuManager from "../MenuComponents/SwiggyMenuManager";
 // import ZomatoMenuManager from "../MenuComponents/ZomatoManager";
 // import MenuTypeSelector from "../MenuComponents/MenuTypeSelector";
-import TableSelection from "../Main_Components/Inventory_Services_Components/Table_Wrapper";
 import ViewTables from "../Main_Components/Table_Service_Components/Table_Inventory_Order";
+import TableManagement from "../Main_Components/Table_Service_Components/TableManagement";
 import OrderForm from "../Main_Components/Order_Service_Components/OrderForm";
 import OrdersVisiblePage from "../Main_Components/Order_Service_Components/OrdersVisiblePage";
 import DashBoardPage from "./DashBoardPage";
@@ -24,6 +24,8 @@ import HeaderBar from "./HeaderPage";
 import ReportService from "../Main_Components/Report_Service_Components/ReportService";
 import DocumentManager from "../Main_Components/Document_Service_Components/Document";
 import OrderSummary from "../Main_Components/Order_Service_Components/OrderSummary";
+import Notifications from "./Notifications";
+import ResetPassword from "../Main_Components/User_Services_Components/ResetPassword";
 // import InvoicePage from "../InvoiceComponents/InvoicePage";
 // import ReportsPage from "../ReportComponents/ReportsPage";
 // import TableOverview from "../TableOverviewComponents/TableOverview";
@@ -109,7 +111,7 @@ const SaasClientRoutes = ({
                         <Route
                             path="table-selection"
                             element={
-                                <TableSelection
+                                <TableManagement
                                     clientId={clientId}
                                     onTableAdded={(newTable) => {
                                         setSelectedTableId(newTable.table_number);
@@ -130,7 +132,9 @@ const SaasClientRoutes = ({
                         <Route path="invoice" element={<Invoice_Page />} />
                         <Route path="reports" element={<ReportService />} />
                         <Route path="kds-page" element={<KitchenDisplay />} />
+                        <Route path="notifications" element={<Notifications />} />
                         <Route path="add-users" element={<Add_user />} /><Route path="documents" element={<OrderSummary />} />
+
                         {/* <Route path="documents" element={<Documents />} />
                     <Route path="billing" element={<BillingPage />} />
                     <Route path="invoice" element={<InvoicePage />} />

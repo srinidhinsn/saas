@@ -3,8 +3,9 @@ import { FaBell, FaUserCircle } from "react-icons/fa";
 import { HiOutlineSun } from "react-icons/hi";
 import { PiMoonThin } from "react-icons/pi";
 import { useTheme } from "../ThemeChangerComponent/ThemeProvider";
-import { useNavigate } from "react-router-dom";
+import { useNavigate, useParams } from "react-router-dom";
 import ClickSpark from "../Sub_Components/SparkArrow";
+import { MdKeyboardDoubleArrowRight } from "react-icons/md";
 
 const HeaderBar = () => {
     const [notifications, setNotifications] = useState([]);
@@ -15,9 +16,9 @@ const HeaderBar = () => {
     const clickTimeoutRef = useRef(null);
     const navigate = useNavigate();
     const [showBellShaking, setShowBellShaking] = useState(false);
-
+    const nav = useNavigate()
     const { darkMode, toggleTheme } = useTheme();
-
+    const { clientId } = useParams()
     const token = localStorage.getItem("access_token");
     const [tokenAvailable, setTokenAvailable] = useState(!!token);
 
@@ -95,6 +96,10 @@ const HeaderBar = () => {
         navigate("/login");
     };
 
+    function notificationsPage() {
+        navigate(`/saas/${clientId}/main/notifications`);
+    }
+
     return (
         <div className="header-bar-container">
             <div className="header-bar">
@@ -122,8 +127,10 @@ const HeaderBar = () => {
                                                 </div>
                                             ))
                                         ) : (
-                                            <div>No notifications</div>
+                                            <div className="no-notification">No notifications</div>
                                         )}
+                                        <hr />
+                                        <a href="#" onClick={notificationsPage}>show all notifications <MdKeyboardDoubleArrowRight className="Right-Arrow-Icon" /> </a>
                                     </div>
                                 )}
                             </button>
