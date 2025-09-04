@@ -1219,7 +1219,7 @@ body.sidebar-minimized .sidebar li .arrow-indicator {
 
     .view-tables-wrapper .order-overlay .item-pane {
         flex: 1;
-        padding: 1rem 3rem 0 1.5rem;
+        padding: .5rem 1rem 0 1rem;
         min-height: 70vh;
         height: 88vh;
         overflow-y: auto;
@@ -3529,7 +3529,6 @@ input[type="checkbox"] {
     height: 89vh;
     border-top-right-radius: 8px;
     border-bottom-right-radius: 8px;
-    padding: 16px;
     box-sizing: border-box;
     font-family: 'Segoe UI', sans-serif;
 }
@@ -3581,7 +3580,7 @@ input[type="checkbox"] {
 
 .menu-items-panel {
     flex: 1;
-    padding: 12px;
+    padding: 5px 2px;
     height: 86vh;
     overflow-y: auto;
     border-radius: 8px;
@@ -3591,7 +3590,11 @@ input[type="checkbox"] {
 /* ************************************** res  */
 @media (max-width: 480px) {
     .menu-items-panel {
-        padding: 0;
+        padding: 5px 5px 0 0;
+    }
+
+    .grid-layout {
+        grid-template-columns: repeat(auto-fill, minmax(150px, 1fr));
     }
 }
 
