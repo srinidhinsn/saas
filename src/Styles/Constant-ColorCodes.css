@@ -16,7 +16,8 @@
     /* Text color for numbers */
     --bg-number-color: rgb(19, 6, 49);
     /* Dashboard icons */
-    --dash-icon-color: rgb(82, 192, 181);
+    --dash-icon-color: rgb(108, 99, 255);
+    --dash-cards-bg: white;
     /* Delete icon */
     --delete-icon-bg: rgb(223, 176, 176);
     --delete-icon: rgb(145, 47, 47);
@@ -99,6 +100,7 @@ body.theme-dark {
     --delete-icon: rgb(145, 47, 47);
     --edit-icon-bg: rgb(137, 137, 223);
     --edit-icon: blue;
+    --dash-cards-bg: rgb(58, 58, 58);
     --sidebar-bg: rgb(30, 30, 30);
     --text-color: rgb(224, 224, 224);
     --brand-color: rgb(0, 207, 200);

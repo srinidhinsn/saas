@@ -99,7 +99,9 @@ const HeaderBar = () => {
     function notificationsPage() {
         navigate(`/saas/${clientId}/main/notifications`);
     }
-
+    function addUserDetails() {
+        navigate(`/saas/${clientId}/main/user-details`)
+    }
     return (
         <div className="header-bar-container">
             <div className="header-bar">
@@ -169,14 +171,20 @@ const HeaderBar = () => {
                                     </div>
                                     {showDropdown && (
                                         <div className="dropdown-menu">
+                                            <div className="dropdown-item" onClick={addUserDetails}>Add Details</div>
                                             <div onClick={handleSignOut} className="dropdown-item">
                                                 Sign Out
                                             </div>
+
                                         </div>
                                     )}
                                 </div>
                             ) : (
-                                <button onClick={handleSignOut}>Sign Out</button>
+                                <>
+
+                                    <button onClick={addUserDetails}>Add Details</button>
+                                    <button onClick={handleSignOut}>Sign Out</button>
+                                </>
                             )}
                         </div>
                     </ClickSpark>

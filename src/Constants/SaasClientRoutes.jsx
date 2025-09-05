@@ -26,6 +26,7 @@ import DocumentManager from "../Main_Components/Document_Service_Components/Docu
 import OrderSummary from "../Main_Components/Order_Service_Components/OrderSummary";
 import Notifications from "./Notifications";
 import ResetPassword from "../Main_Components/User_Services_Components/ResetPassword";
+import PersonForm from "../Util_Components/PersonForm";
 // import InvoicePage from "../InvoiceComponents/InvoicePage";
 // import ReportsPage from "../ReportComponents/ReportsPage";
 // import TableOverview from "../TableOverviewComponents/TableOverview";
@@ -134,6 +135,7 @@ const SaasClientRoutes = ({
                         <Route path="kds-page" element={<KitchenDisplay />} />
                         <Route path="notifications" element={<Notifications />} />
                         <Route path="add-users" element={<Add_user />} /><Route path="documents" element={<OrderSummary />} />
+                        <Route path="user-details" element={<PersonForm />} />
 
                         {/* <Route path="documents" element={<Documents />} />
                     <Route path="billing" element={<BillingPage />} />

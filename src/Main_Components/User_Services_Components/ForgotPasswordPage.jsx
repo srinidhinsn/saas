@@ -1,6 +1,6 @@
 import React, { useState } from "react";
 import { useNavigate, useParams } from "react-router-dom";
-import { FaUser, FaLock } from "react-icons/fa";
+import { FaUser, FaLock, FaKey } from "react-icons/fa";
 import { toast } from "react-toastify";
 import "react-toastify/dist/ReactToastify.css";
 import userServicesPort from "../../Backend_Port_Files/UserServices";
@@ -8,11 +8,15 @@ import userServicesPort from "../../Backend_Port_Files/UserServices";
 export default function ForgotPassword() {
     const navigate = useNavigate();
     const { clientId } = useParams();
+
     const [form, setForm] = useState({
         username: "",
+        otp: "",
         new_password: "",
         confirm_password: ""
     });
+
+    const [step, setStep] = useState(1); // 1 = request OTP, 2 = verify OTP & reset
     const [error, setError] = useState("");
     const [loading, setLoading] = useState(false);
 
@@ -21,7 +25,31 @@ export default function ForgotPassword() {
         setForm((prev) => ({ ...prev, [name]: value }));
     };
 
-    const handleForgotPassword = async (e) => {
+    // Step 1: Request OTP
+    const handleRequestOtp = async (e) => {
+        e.preventDefault();
+        setError("");
+        setLoading(true);
+
+        try {
+            await userServicesPort.post(`/${clientId}/users/forgot-password`, {
+                username: form.username
+            });
+
+            toast.success("OTP sent to your registered email");
+            setStep(2);
+        } catch (err) {
+            console.error("OTP request failed:", err);
+            let msg = err?.response?.data?.detail || "Failed to send OTP";
+            setError(msg);
+            toast.error(msg);
+        } finally {
+            setLoading(false);
+        }
+    };
+
+    // Step 2: Reset Password with OTP
+    const handleResetPassword = async (e) => {
         e.preventDefault();
         setError("");
 
@@ -34,9 +62,9 @@ export default function ForgotPassword() {
         setLoading(true);
 
         try {
-            await userServicesPort.post(`/${clientId}/users/forgot-password`, {
+            await userServicesPort.post(`/${clientId}/users/reset-password`, {
                 username: form.username,
-                client_id: clientId,
+                otp: form.otp,
                 new_password: form.new_password,
                 confirm_password: form.confirm_password,
             });
@@ -44,22 +72,8 @@ export default function ForgotPassword() {
             toast.success("Password reset successfully");
             navigate(`/saas/${clientId}/login`);
         } catch (err) {
-            console.error("Forgot password failed:", err);
-
-            let msg = "An unexpected error occurred";
-            const status = err?.response?.status;
-            const detail = err?.response?.data?.detail;
-
-            if (status === 404) {
-                msg = detail || "User not found";
-            } else if (status === 400) {
-                msg = detail || "Invalid request";
-            } else if (status === 500) {
-                msg = "Internal Server Error. Please try again later.";
-            } else if (detail && typeof detail === "string") {
-                msg = detail;
-            }
-
+            console.error("Reset password failed:", err);
+            let msg = err?.response?.data?.detail || "Failed to reset password";
             setError(msg);
             toast.error(msg);
         } finally {
@@ -74,54 +88,76 @@ export default function ForgotPassword() {
                     <FaUser className="avatar-icon" />
                 </div>
 
-                <form onSubmit={handleForgotPassword}>
-                    <div className="input-group">
-                        <FaUser className="input-icon" />
-                        <input
-                            type="text"
-                            name="username"
-                            placeholder="Username"
-                            value={form.username}
-                            onChange={handleChange}
-                            required
-                        />
-                    </div>
+                {step === 1 ? (
+                    <form onSubmit={handleRequestOtp}>
+                        <div className="input-group">
+                            <FaUser className="input-icon" />
+                            <input
+                                type="text"
+                                name="username"
+                                placeholder="Username"
+                                value={form.username}
+                                onChange={handleChange}
+                                required
+                            />
+                        </div>
 
-                    <div className="input-group">
-                        <FaLock className="input-icon" />
-                        <input
-                            type="password"
-                            name="new_password"
-                            placeholder="New Password"
-                            value={form.new_password}
-                            onChange={handleChange}
-                            required
-                        />
-                    </div>
+                        {error && <p className="error-text">{error}</p>}
 
-                    <div className="input-group">
-                        <FaLock className="input-icon" />
-                        <input
-                            type="password"
-                            name="confirm_password"
-                            placeholder="Confirm Password"
-                            value={form.confirm_password}
-                            onChange={handleChange}
-                            required
-                        />
-                    </div>
+                        <button type="submit" className="login-button" disabled={loading}>
+                            {loading ? "Sending OTP..." : "SEND OTP"}
+                        </button>
+                    </form>
+                ) : (
+                    <form onSubmit={handleResetPassword}>
+                        <div className="input-group">
+                            <FaKey className="input-icon" />
+                            <input
+                                type="text"
+                                name="otp"
+                                placeholder="Enter OTP"
+                                value={form.otp}
+                                onChange={handleChange}
+                                required
+                            />
+                        </div>
 
-                    {error && <p className="error-text">{error}</p>}
+                        <div className="input-group">
+                            <FaLock className="input-icon" />
+                            <input
+                                type="password"
+                                name="new_password"
+                                placeholder="New Password"
+                                value={form.new_password}
+                                onChange={handleChange}
+                                required
+                            />
+                        </div>
 
-                    <button type="submit" className="login-button" disabled={loading}>
-                        {loading ? "Resetting..." : "RESET PASSWORD"}
-                    </button>
+                        <div className="input-group">
+                            <FaLock className="input-icon" />
+                            <input
+                                type="password"
+                                name="confirm_password"
+                                placeholder="Confirm Password"
+                                value={form.confirm_password}
+                                onChange={handleChange}
+                                required
+                            />
+                        </div>
 
-                    <p className="login-link">
-                        Remembered your password?{" "}
-                        <span onClick={() => navigate(`/saas/${clientId}/login`)}>Login here</span>
-                    </p>
-                </form>
+                        {error && <p className="error-text">{error}</p>}
+
+                        <button type="submit" className="login-button" disabled={loading}>
+                            {loading ? "Resetting..." : "RESET PASSWORD"}
+                        </button>
+                    </form>
+                )}
+
+                <p className="login-link">
+                    Remembered your password?{" "}
+                    <span onClick={() => navigate(`/saas/${clientId}/login`)}>Login here</span>
+                </p>
             </div>
         </div>
     );

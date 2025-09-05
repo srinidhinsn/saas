@@ -22,9 +22,10 @@ export default function Register() {
 
         if (name === "role") {
             const defaultGrants =
-                value === "admin"
+                value === "Admin"
                     ? ['invoice', 'inventory', 'billing', 'tables', 'order', 'menu', 'users', 'document']
                     : [];
+
 
             setForm((prev) => ({
                 ...prev,
@@ -46,7 +47,6 @@ export default function Register() {
             return { ...prev, grants };
         });
     };
-
     const handleRegister = async (e) => {
         e.preventDefault();
         setError("");
@@ -61,7 +61,9 @@ export default function Register() {
                 username: form.username,
                 password: form.password,
                 roles: [form.role],
-                grants: form.grants
+                grants: form.grants,
+                client_id: clientId,
+                first_name: form.username
             };
 
             const response = await userServicesPort.post(
@@ -69,10 +71,10 @@ export default function Register() {
                 payload
             );
 
-            alert("\uD83C\uDF89 Registered successfully!");
+            alert("🎉 Registered successfully!");
             navigate(`/saas/${clientId}/login`);
         } catch (err) {
-            console.error("\u274C Registration failed:", err?.response?.data);
+            console.error("❌ Registration failed:", err?.response?.data);
             const detail = err?.response?.data?.detail;
             setError(Array.isArray(detail) ? detail[0]?.msg : detail || "Registration failed.");
         }

@@ -619,14 +619,14 @@ const TableManagement = () => {
         if (!clientId) return;
         try {
             const res = await tableServicesPort.get(`/${clientId}/tables/read`, {
-                headers: { Authorization: `Bearer ${token}`}
+                headers: { Authorization: `Bearer ${token}` }
             });
             const result = res.data;
-            if(result.screen_id==="default_tables"){
-            const tableList = Array.isArray(result?.data) ? result.data : [];
-            tableList.sort((a, b) => a.name.localeCompare(b.name, undefined, { numeric: true }));
-            setTables(tableList);
-            setOriginalTables(tableList);
+            if (result.screen_id === "default_tables") {
+                const tableList = Array.isArray(result?.data) ? result.data : [];
+                tableList.sort((a, b) => a.name.localeCompare(b.name, undefined, { numeric: true }));
+                setTables(tableList);
+                setOriginalTables(tableList);
             }
         } catch (error) {
             console.error("❌ Error fetching tables:", error);
@@ -876,7 +876,7 @@ const TableManagement = () => {
                                         <div className="tm-table-card-header">
                                             <div>
                                                 <div className="tm-table-card-title">{table.name}</div>
-                                                <div className="tm-table-card-capacity">Capacity: {table.table_type}</div>
+                                                <div className="tm-table-card-capacity">Capacity: <span>{table.table_type}</span></div>
                                             </div>
                                             {config.icon}
                                         </div>
