@@ -1,12 +1,137 @@
-# React + Vite
+This project is built with:
 
-This template provides a minimal setup to get React working in Vite with HMR and some ESLint rules.
+               > Vite + React
 
-Currently, two official plugins are available:
+               > Material UI (@mui/material, @mui/icons-material, @mui/x-data-grid)
 
-- [@vitejs/plugin-react](https://github.com/vitejs/vite-plugin-react/blob/main/packages/plugin-react) uses [Babel](https://babeljs.io/) for Fast Refresh
-- [@vitejs/plugin-react-swc](https://github.com/vitejs/vite-plugin-react/blob/main/packages/plugin-react-swc) uses [SWC](https://swc.rs/) for Fast Refresh
+               > React Router (react-router-dom)
 
-## Expanding the ESLint configuration
+               > Axios (API calls)
 
-If you are developing a production application, we recommend using TypeScript with type-aware lint rules enabled. Check out the [TS template](https://github.com/vitejs/vite/tree/main/packages/create-vite/template-react-ts) for information on how to integrate TypeScript and [`typescript-eslint`](https://typescript-eslint.io) in your project.
+               > JWT Decode (authentication)
+
+               > React Toastify (notifications)
+
+               > React Icons (icons)
+
+               > Recharts / React Charts / React Minimal Pie Chart (charts & graphs)
+
+               > XLSX + File Saver + Export-to-CSV (Excel/CSV import-export)
+
+               > Material React Table / TanStack React Table (data tables)
+
+               > Emotion (@emotion/react, @emotion/styled) (styling)
+
+
+
+Installation : git clone <https://github.com/srinidhinsn/saas.git>
+               cd <Project Name>
+               npm install                             (Inbuilt and nm dependencies will be installed)
+               npm run dev ==> localhost//5173         (Before this install dependencies)
+
+               
+Dependencies installation : npm install react-router-dom
+                            npm install react-charts
+                            npm install react-icons
+                            npm install axios
+                            npm install jwt-decode
+                            npm install xlsx file-saver
+                            npm install react-toastify
+
+
+
+File-Structure  :  
+
+
+├── node_modules/
+├── public/
+├── src/
+│   ├── Backend_Port_Files/  =====>  our Standard url ports 
+
+│   ├── Constants/          
+│   │   ├── DashBoardPage.jsx   =====> Dashbord
+│   │   ├── HeaderPage.jsx      =====> Header
+│   │   ├── Navbar.jsx          =====> Navbar
+│   │   ├── Notifications.jsx   =====> Notifications
+│   │   ├── ProtectedRoute.jsx  =====> Out Navigation routes
+│   │   └── SaasClientRoutes.jsx
+
+│   ├── Main_Components/
+│   │   ├── Add_Users/
+│   │   │   ├── Add_user.jsx
+│   │   │   ├── AddUserForm.jsx
+│   │   │   └── UserList.jsx
+
+│   │   ├── Document_Service_Components/     =====> COmponents Related to the Document Service
+│   │   │   └── Document.jsx
+
+│   │   ├── Inventory_Services_Components/   =====> Components Related to the Menu Service
+│   │   │   ├── AddInventoryItemForm.jsx
+│   │   │   ├── CategoryList.jsx
+│   │   │   ├── MenuList.jsx
+│   │   │   └── MenuManager.jsx
+
+│   │   ├── Invoice_Services_Components/     =====> Components related to our Billing services
+│   │   │   └── Invoice_Page.jsx
+
+│   │   ├── Order_Service_Components/        =====> Components related Payment Page
+│   │   │   ├── KDS_Component/
+│   │   │   ├── OrderForm.jsx
+│   │   │   ├── OrderManager.jsx
+│   │   │   ├── OrderSummary.jsx
+│   │   │   └── OrdersVisiblePage.jsx
+
+│   │   ├── Report_Service_Components/        =====> Components related reports
+│   │   │   └── ReportService.jsx
+
+│   │   ├── Table_Service_Components/         =====> Components related to the Table Management
+│   │   │   ├── Table_Inventory_Order.jsx
+│   │   │   ├── Table_Wrapper.jsx
+│   │   │   ├── TableManagement.jsx
+│   │   │   └── Waiter_table.jsx
+
+│   │   └── User_Services_Components/         =====> Components related to the User login,register,forget password, reset password
+│   │       ├── ForgotPasswordPage.jsx
+│   │       ├── LoginPage.jsx
+│   │       ├── RegisterPage.jsx
+│   │       └── ResetPassword.jsx
+
+│   ├── Styles/                                =====> Css Stylings
+│   │   ├── Constant-ColorCodes.css            
+│   │   ├── Constant-Structures.css
+│   │   └── StyleSheet1.css
+
+│   ├── Sub_Components/
+│   ├── ThemeChangerComponent/
+│   ├── Util_Components/
+│   ├── App.css
+│   ├── App.jsx
+│   ├── index.css
+│   └── main.jsx
+├── .gitignore
+├── eslint.config.js
+├── index.html
+├── package-lock.json
+├── package.json
+
+
+
+Features  :
+
+          > Authentication & Authorization (JWT-based)
+
+          
+
+          > Category & Menu Management with nested structure
+
+          > Order Management (create, view, KDS, Order summary)
+
+          > Table Management (AC & Non-AC differentiation)
+
+          > Invoice Generation
+
+          > Excel Import & Export
+
+          > Notifications System
+
+          > Theme Changer
