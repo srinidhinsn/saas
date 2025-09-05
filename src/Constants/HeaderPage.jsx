@@ -16,7 +16,6 @@ const HeaderBar = () => {
     const clickTimeoutRef = useRef(null);
     const navigate = useNavigate();
     const [showBellShaking, setShowBellShaking] = useState(false);
-    const nav = useNavigate()
     const { darkMode, toggleTheme } = useTheme();
     const { clientId } = useParams()
     const token = localStorage.getItem("access_token");
@@ -97,7 +96,7 @@ const HeaderBar = () => {
     };
 
     function notificationsPage() {
-        navigate(`/saas/${clientId}/main/notifications`);
+        navigate(`/saas/${clientId}/main/all-notifications`);
     }
     function addUserDetails() {
         navigate(`/saas/${clientId}/main/user-details`)

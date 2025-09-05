@@ -121,7 +121,7 @@ const OrdersVisiblePage = () => {
                     item_id: selectedItem.id,
                     item_name: selectedItem.name,
                     quantity: 1,
-                    price: selectedItem.price,
+                    price: selectedItem.unit_price,
                     status: "new",
                     note: "",
                     slug: selectedItem.slug || selectedItem.name.replace(/[\s]+/g, "-").toLowerCase(),
@@ -149,7 +149,7 @@ const OrdersVisiblePage = () => {
                     item.item_id === itemId ? { ...item, quantity: newQty > 0 ? newQty : 1 } : item
                 );
                 const newTotal = updatedItems.reduce((sum, item) => {
-                    const itemPrice = inventoryMap[item.item_id]?.price || 0;
+                    const itemPrice = inventoryMap[item.item_id]?.unit_price || 0;
                     return sum + item.quantity * itemPrice;
                 }, 0);
                 return {
@@ -263,7 +263,7 @@ const OrdersVisiblePage = () => {
             );
             const itemsForUpdate = updatedItems.map(({ id, ...rest }) => rest);
             const totalPrice = updatedItems.reduce(
-                (sum, item) => sum + (inventoryMap[item.item_id]?.price || 0) * (item.quantity || 1),
+                (sum, item) => sum + (inventoryMap[item.item_id]?.unit_price || 0) * (item.quantity || 1),
                 0
             );
             await orderServicesPort.post(
@@ -592,7 +592,7 @@ const OrdersVisiblePage = () => {
                                                         <ul className="orders-visible-search-results">
                                                             {itemSearchResults.map((item) => (
                                                                 <li key={item.id} onClick={() => addItemToOrder(order.id, item)}>
-                                                                    {item.name} - ₹{item.price}
+                                                                    {item.name} - ₹{item.unit_price}
                                                                 </li>
                                                             ))}
                                                         </ul>
