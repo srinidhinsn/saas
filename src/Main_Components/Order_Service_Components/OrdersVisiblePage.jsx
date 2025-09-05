@@ -330,11 +330,11 @@ const OrdersVisiblePage = () => {
             status: item.status || "new",
             note: item.note || "",
             slug: item.slug || "",
-            price: item.price || inventoryMap[item.item_id || item.inventory_id]?.price || 0,
+            price: item.unit_price || inventoryMap[item.item_id || item.inventory_id]?.price || 0,
             client_id: clientId,
             order_id: orderId,
         }));
-        const totalPrice = cleanedItems.reduce((sum, item) => sum + item.price * item.quantity, 0);
+        const totalPrice = cleanedItems.reduce((sum, item) => sum + item.unit_price * item.quantity, 0);
         try {
             await orderServicesPort.post(
                 `/${clientId}/order_items/update?order_id=${orderId}`,
