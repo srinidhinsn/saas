@@ -21,7 +21,7 @@ Saas application
     username: str
 
 
-class ResetPasswordRequest(BaseModel):
+   class ResetPasswordRequest(BaseModel):
     username: str
     otp: str
     new_password: str
@@ -30,4 +30,14 @@ class ResetPasswordRequest(BaseModel):
     4) in user entity class person ===> added clientId,createdat,updtaedat
 
 
-    4) inserted client_id column in person table
+    5) inserted client_id column in person table
+
+    6) inventory-services added new route
+
+    7) created forgot and reset password routes in user-service 
+
+    8) updated login-service in user-service/routes.py
+
+    9) common-lib ---> utils added a newfile  send_email_otp.py for generating emailOtp
+
+    10) addPersonDetails and getPersonDetails routes added in user-services 

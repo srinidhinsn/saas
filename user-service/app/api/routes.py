@@ -10,8 +10,6 @@ from models.response_model import ResponseModel
 from sqlalchemy import and_
 
 import random
-import smtplib
-from email.mime.text import MIMEText
 from datetime import datetime, timedelta
 
 router = APIRouter()
