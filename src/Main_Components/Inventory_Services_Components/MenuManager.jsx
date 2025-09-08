@@ -1,7 +1,6 @@
 import React, { useState, useEffect } from "react";
 import CategoryList from "./CategoryList";
 import MenuItemList from "./MenuList";
-// import AddonLayout from "./AddOnLayout";
 import { jwtDecode } from "jwt-decode";
 
 function MenuManager() {

@@ -3150,7 +3150,7 @@ input[type="checkbox"] {
 }
 
 /* ************************************************************************************************ */
-
+/* 
 .menu-item-list {
     padding: 16px;
     display: flex;
@@ -3314,7 +3314,236 @@ input[type="checkbox"] {
 
 .btn-add:hover {
     background-color: #21867a;
+} */
+
+
+
+
+.menu-container {
+    max-width: 1200px;
+    margin: 0 auto;
+    padding: 20px;
+    font-family: 'Inter', sans-serif;
 }
+
+.menu-header {
+    display: flex;
+    justify-content: space-between;
+    align-items: flex-start;
+    flex-wrap: wrap;
+    gap: 10px;
+    margin-bottom: 20px;
+}
+
+.menu-header h1 {
+    font-size: 28px;
+    margin-bottom: 5px;
+}
+
+.menu-header p {
+    color: #555;
+}
+
+.btn-add {
+    background-color: #2563eb;
+    color: #fff;
+    padding: 10px 20px;
+    border-radius: 12px;
+    border: none;
+    cursor: pointer;
+}
+
+.btn-add:hover {
+    background-color: #1e40af;
+}
+
+.btn-clear {
+    background-color: #e5e7eb;
+    color: #333;
+    padding: 10px 20px;
+    border-radius: 8px;
+    border: none;
+    cursor: pointer;
+    margin-left: 5px;
+}
+
+.btn-clear:hover {
+    background-color: #d1d5db;
+}
+
+/* Filters */
+.menu-filters {
+    display: flex;
+    flex-wrap: wrap;
+    gap: 10px;
+    margin-bottom: 20px;
+    align-items: center;
+}
+
+.input-search,
+.select-filter {
+    padding: 10px;
+    border-radius: 8px;
+    border: 1px solid #ccc;
+    flex: 1;
+    min-width: 150px;
+}
+
+.item-count {
+    padding: 10px;
+    background-color: #f3f4f6;
+    border-radius: 8px;
+}
+
+/* Grid */
+.menu-grid {
+    display: grid;
+    grid-template-columns: repeat(auto-fit, minmax(210px, 0fr));
+    gap: 20px;
+}
+
+.menu-card {
+    background: #fff;
+    border: 1px solid #e5e7eb;
+    border-radius: 16px;
+    padding: 20px;
+    transition: transform 0.3s;
+}
+
+.menu-card:hover {
+    transform: translateY(-5px);
+}
+
+.card-header {
+    display: flex;
+    justify-content: space-between;
+    align-items: flex-start;
+}
+
+.category-icon {
+    width: 48px;
+    height: 48px;
+    border-radius: 12px;
+    display: flex;
+    align-items: center;
+    justify-content: center;
+    font-size: 20px;
+    margin-right: 10px;
+}
+
+.card-actions button {
+    margin-left: 5px;
+    cursor: pointer;
+    background: none;
+    border: none;
+    font-size: 16px;
+}
+
+.line-items {
+    margin-top: 10px;
+    color: #555;
+    font-size: 14px;
+}
+
+.card-footer {
+    display: flex;
+    justify-content: space-between;
+    align-items: center;
+    flex-wrap: wrap;
+    gap: 5px;
+    margin-top: 10px;
+}
+
+.price {
+    font-size: 20px;
+    font-weight: bold;
+    color: #2563eb;
+}
+
+.category-name {
+    font-size: 12px;
+    background-color: #f3f4f6;
+    padding: 2px 8px;
+    border-radius: 12px;
+    color: #555;
+}
+
+.tags {
+    display: flex;
+    gap: 5px;
+    flex-wrap: wrap;
+}
+
+.tag {
+    font-size: 12px;
+    background-color: #dbeafe;
+    padding: 2px 6px;
+    border-radius: 12px;
+    color: #1e40af;
+}
+
+/* Category colors */
+.category-green {
+    background-color: #d1fae5;
+    color: #047857;
+    border: 1px solid #a7f3d0;
+}
+
+.category-red {
+    background-color: #fee2e2;
+    color: #b91c1c;
+    border: 1px solid #fecaca;
+}
+
+.category-pink {
+    background-color: #fce7f3;
+    color: #be185d;
+    border: 1px solid #fbcfe8;
+}
+
+.category-blue {
+    background-color: #dbeafe;
+    color: #1e3a8a;
+    border: 1px solid #bfdbfe;
+}
+
+/* Status badges */
+.status-available {
+    background-color: #d1fae5;
+    color: #047857;
+    border-radius: 12px;
+    padding: 2px 6px;
+    font-size: 12px;
+}
+
+.status-unavailable {
+    background-color: #fee2e2;
+    color: #b91c1c;
+    border-radius: 12px;
+    padding: 2px 6px;
+    font-size: 12px;
+}
+
+.status-seasonal {
+    background-color: #fef9c3;
+    color: #78350f;
+    border-radius: 12px;
+    padding: 2px 6px;
+    font-size: 12px;
+}
+
+/* Empty state */
+.empty-state {
+    text-align: center;
+    padding: 50px 20px;
+    color: #555;
+}
+
+.empty-state h3 {
+    font-size: 24px;
+    margin: 10px 0;
+}
+
 
 /* Modal styles */
 .modal-overlay {
@@ -4893,7 +5122,7 @@ input[type="checkbox"] {
 
 
 /* (****************************** New categorylist Styles****************************************88 */
-body {
+/* body {
     font-family: 'Inter', sans-serif;
     background: #f7f7f7;
 }
@@ -5177,7 +5406,7 @@ body {
     background: #d1d5db;
 }
 
-*/
+*/ */
 /* **********************************New Dashboard Styles****************************************** */
 
 
@@ -5271,3 +5500,9 @@ body {
     color: #888;
     font-size: 14px;
 }
+
+
+/* ********************************************* New menu Styles */
+
+/* General */
+
