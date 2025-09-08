@@ -3,6 +3,7 @@ from sqlalchemy.orm import Session
 from database.postgres import get_db
 from entity.user_entity import User, Person
 from utils.auth import hash_password, verify_password, create_access_token, verify_token
+from utils.send_email_otp import otpEmailService, otp_store
 from models.saas_context import SaasContext, saasContext
 from models.user_model import UserModel, ResetPasswordRequest, LoginRequest, ForgotPasswordRequest, PersonModel
 from models.response_model import ResponseModel
@@ -146,34 +147,11 @@ async def add_user(client_id: str, userReq: UserModel, db: Session = Depends(get
 
 
 # Forgot password
-otp_store = {}
-
-
-def otpEmailService(to_email: str, otp: str) -> bool:
-    try:
-        senderEmail = "magizhchisk@gmail.com"
-        gmailAppPassword = "avqkjxqzjsrnqims"
-
-        # MIMEText is used to format the body of the email
-        msg = MIMEText(f"Your OTP is {otp}.", "plain")
-        msg["Subject"] = "Password Reset OTP"
-        msg["From"] = senderEmail
-        msg["To"] = to_email
-
-        with smtplib.SMTP("smtp.gmail.com", 587) as server:
-            server.starttls()
-            server.login(senderEmail, gmailAppPassword)
-            server.send_message(msg)  # simpler than sendmail()
-
-        return True
-    except Exception as e:
-        print("Error sending email:", e)
-        return False
 
 
 @router.post("/forgot-password")
 async def forgotPassword(
-    client_id: str = Path(..., description="Client ID from URL path"),
+    client_id: str = Path(...),
     req_data: ForgotPasswordRequest = Body(),
     db: Session = Depends(get_db)
 ):
