@@ -26,7 +26,7 @@ This project is built with:
 
 Installation : git clone <https://github.com/srinidhinsn/saas.git>
                cd <Project Name>
-               npm install                             (Inbuilt and nm dependencies will be installed)
+               npm install                             (Inbuilt and npm dependencies will be installed)
                npm run dev ==> localhost//5173         (Before this install dependencies)
 
                
