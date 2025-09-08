@@ -23,7 +23,7 @@ export default function Register() {
         if (name === "role") {
             const defaultGrants =
                 value === "Admin"
-                    ? ['invoice', 'inventory', 'billing', 'tables', 'users', 'menu', 'order_items', 'document', 'order', 'kds', 'dinein']
+                    ? ['dinein', 'order', 'inventory', 'users', 'tables', 'invoice', 'menu', 'document', 'kds', 'order_items', 'reports', 'order_item']
                     : [];
 
 
@@ -136,7 +136,7 @@ export default function Register() {
 
                     <label>Grants Service:</label>
                     <div className="checkbox-group">
-                        {['invoice', 'inventory', 'billing', 'tables', 'users', 'menu', 'order_items', 'document', 'order', 'kds', 'dinein'].map((g) => (
+                        {['dinein', 'order', 'inventory', 'users', 'tables', 'invoice', 'menu', 'document', 'kds', 'order_items', 'reports', 'order_item'].map((g) => (
                             <label key={g}>
                                 <input
                                     type="checkbox"
