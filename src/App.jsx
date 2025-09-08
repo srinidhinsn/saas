@@ -18,7 +18,15 @@ const App = () => {
 
   const location = useLocation();
   const hideNavbar = /\/saas\/[^/]+\/(login|register|forgot)/.test(location.pathname);
+  const [tick, setTick] = useState(0);
 
+  useEffect(() => {
+    const interval = setInterval(() => {
+      setTick(prev => prev + 1);
+    }, 60 * 1000);
+
+    return () => clearInterval(interval); // cleanup on unmount
+  }, []);
 
   return (
     <div style={{ display: 'flex' }}>
@@ -42,7 +50,7 @@ const App = () => {
                   setLatestOrder={setLatestOrder}
                   tables={tables}
                   setTables={setTables}
-                  hideNavbar={hideNavbar}
+                  hideNavbar={hideNavbar} tick={tick}
                 />
               </ProtectedRoute>
             }

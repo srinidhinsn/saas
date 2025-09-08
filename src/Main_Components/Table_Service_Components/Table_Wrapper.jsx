@@ -1,7 +1,7 @@
 import React, { useEffect, useState } from "react";
 import { useParams } from "react-router-dom";
 import tableServicesPort from "../../Backend_Port_Files/TableServices";
-import TableManagement from "../Table_Service_Components/TableManagement";
+import TableManagement from "./TableManagement";
 import TableManagementWaiter from "./Waiter_table";
 
 const TableManagementWrapper = () => {
@@ -36,7 +36,7 @@ const TableManagementWrapper = () => {
     case "waiter_table":
       return <TableManagementWaiter />;
     default:
-        return <TableManagement />;
+      return <TableManagement />;
   }
 };
 
