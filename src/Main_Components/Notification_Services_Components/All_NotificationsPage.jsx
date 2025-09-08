@@ -1,5 +1,6 @@
 
 import React, { useState } from "react";
+import { CiSearch } from "react-icons/ci";
 
 // Sample notification data for table display
 const notificationsTable = [
@@ -7,7 +8,7 @@ const notificationsTable = [
         id: 1,
         starred: false,
         read: false,
-        message: "We're pleased to inform you that a new customer has registered! Please follow up promptly by contacting.",
+        message: "Your order is ready...come and pick it up!!!",
         time: "Just Now",
         date: "Just Now",
     },
@@ -15,7 +16,7 @@ const notificationsTable = [
         id: 2467,
         starred: true,
         read: false,
-        message: "Hello Sales Marketing Team, We have a special offer for our customers! Enjoy a 20% discount on selected...",
+        message: "New orders updated...!",
         time: "30 menit ago",
         date: "30 menit ago",
     },
@@ -23,15 +24,15 @@ const notificationsTable = [
         id: 34364,
         starred: false,
         read: true,
-        message: "Hello Sales Marketing Team, This is a reminder to achieve this month's sales target. Currently, we've...",
-        time: "2 days ago",
-        date: "2 days ago",
+        message: "New Tables created by the admin!!!",
+        time: "Morning",
+        date: "Morning",
     },
     {
         id: 16578,
         starred: false,
         read: false,
-        message: "We're pleased to inform you that a new customer has registered! Please follow up promptly by contacting.",
+        message: "Your order is ready...come and pick it up!!!",
         time: "Just Now",
         date: "Just Now",
     },
@@ -39,7 +40,7 @@ const notificationsTable = [
         id: 2547,
         starred: true,
         read: false,
-        message: "Hello Sales Marketing Team, We have a special offer for our customers! Enjoy a 20% discount on selected...",
+        message: "New orders updated...!",
         time: "30 menit ago",
         date: "30 menit ago",
     },
@@ -47,15 +48,15 @@ const notificationsTable = [
         id: 354646,
         starred: false,
         read: true,
-        message: "Hello Sales Marketing Team, This is a reminder to achieve this month's sales target. Currently, we've...",
-        time: "2 days ago",
-        date: "2 days ago",
+        message: "New Tables created by the admin!!!",
+        time: "Morning",
+        date: "Morning",
     },
     {
         id: 16786,
         starred: false,
         read: false,
-        message: "We're pleased to inform you that a new customer has registered! Please follow up promptly by contacting.",
+        message: "Your order is ready...come and pick it up!!!",
         time: "Just Now",
         date: "Just Now",
     },
@@ -63,7 +64,7 @@ const notificationsTable = [
         id: 2567,
         starred: true,
         read: false,
-        message: "Hello Sales Marketing Team, We have a special offer for our customers! Enjoy a 20% discount on selected...",
+        message: "New orders updated...!",
         time: "30 menit ago",
         date: "30 menit ago",
     },
@@ -71,15 +72,15 @@ const notificationsTable = [
         id: 33545,
         starred: false,
         read: true,
-        message: "Hello Sales Marketing Team, This is a reminder to achieve this month's sales target. Currently, we've...",
-        time: "2 days ago",
-        date: "2 days ago",
+        message: "New Tables created by the admin!!!",
+        time: "Morning",
+        date: "Morning",
     },
     {
         id: 11213,
         starred: false,
         read: false,
-        message: "We're pleased to inform you that a new customer has registered! Please follow up promptly by contacting.",
+        message: "Your order is ready...come and pick it up!!!",
         time: "Just Now",
         date: "Just Now",
     },
@@ -87,7 +88,7 @@ const notificationsTable = [
         id: 2221,
         starred: true,
         read: false,
-        message: "Hello Sales Marketing Team, We have a special offer for our customers! Enjoy a 20% discount on selected...",
+        message: "New orders updated...!",
         time: "30 menit ago",
         date: "30 menit ago",
     },
@@ -95,15 +96,15 @@ const notificationsTable = [
         id: 1111,
         starred: false,
         read: true,
-        message: "Hello Sales Marketing Team, This is a reminder to achieve this month's sales target. Currently, we've...",
-        time: "2 days ago",
-        date: "2 days ago",
+        message: "New Tables created by the admin!!!",
+        time: "Morning",
+        date: "Morning",
     },
     {
         id: 11213,
         starred: false,
         read: false,
-        message: "We're pleased to inform you that a new customer has registered! Please follow up promptly by contacting.",
+        message: "Your order is ready...come and pick it up!!!",
         time: "Just Now",
         date: "Just Now",
     },
@@ -111,7 +112,7 @@ const notificationsTable = [
         id: 2221,
         starred: true,
         read: false,
-        message: "Hello Sales Marketing Team, We have a special offer for our customers! Enjoy a 20% discount on selected...",
+        message: "New orders updated...!",
         time: "30 menit ago",
         date: "30 menit ago",
     },
@@ -119,15 +120,15 @@ const notificationsTable = [
         id: 1111,
         starred: false,
         read: true,
-        message: "Hello Sales Marketing Team, This is a reminder to achieve this month's sales target. Currently, we've...",
-        time: "2 days ago",
-        date: "2 days ago",
+        message: "New Tables created by the admin!!!",
+        time: "Morning",
+        date: "Morning",
     },
     {
         id: 11213,
         starred: false,
         read: false,
-        message: "We're pleased to inform you that a new customer has registered! Please follow up promptly by contacting.",
+        message: "Your order is ready...come and pick it up!!!",
         time: "Just Now",
         date: "Just Now",
     },
@@ -135,7 +136,7 @@ const notificationsTable = [
         id: 2221,
         starred: true,
         read: false,
-        message: "Hello Sales Marketing Team, We have a special offer for our customers! Enjoy a 20% discount on selected...",
+        message: "New orders updated...!",
         time: "30 menit ago",
         date: "30 menit ago",
     },
@@ -143,15 +144,15 @@ const notificationsTable = [
         id: 1111,
         starred: false,
         read: true,
-        message: "Hello Sales Marketing Team, This is a reminder to achieve this month's sales target. Currently, we've...",
-        time: "2 days ago",
-        date: "2 days ago",
+        message: "New Tables created by the admin!!!",
+        time: "Morning",
+        date: "Morning",
     },
     {
         id: 11213,
         starred: false,
         read: false,
-        message: "We're pleased to inform you that a new customer has registered! Please follow up promptly by contacting.",
+        message: "Your order is ready...come and pick it up!!!",
         time: "Just Now",
         date: "Just Now",
     },
@@ -159,7 +160,7 @@ const notificationsTable = [
         id: 2221,
         starred: true,
         read: false,
-        message: "Hello Sales Marketing Team, We have a special offer for our customers! Enjoy a 20% discount on selected...",
+        message: "New orders updated...!",
         time: "30 menit ago",
         date: "30 menit ago",
     },
@@ -167,15 +168,15 @@ const notificationsTable = [
         id: 1111,
         starred: false,
         read: true,
-        message: "Hello Sales Marketing Team, This is a reminder to achieve this month's sales target. Currently, we've...",
-        time: "2 days ago",
-        date: "2 days ago",
+        message: "New Tables created by the admin!!!",
+        time: "Morning",
+        date: "Morning",
     },
     {
         id: 11213,
         starred: false,
         read: false,
-        message: "We're pleased to inform you that a new customer has registered! Please follow up promptly by contacting.",
+        message: "Your order is ready...come and pick it up!!!",
         time: "Just Now",
         date: "Just Now",
     },
@@ -183,7 +184,7 @@ const notificationsTable = [
         id: 2221,
         starred: true,
         read: false,
-        message: "Hello Sales Marketing Team, We have a special offer for our customers! Enjoy a 20% discount on selected...",
+        message: "New orders updated...!",
         time: "30 menit ago",
         date: "30 menit ago",
     },
@@ -192,8 +193,8 @@ const notificationsTable = [
         starred: false,
         read: true,
         message: "Hello Shanmugam develop Team, This is a reminder to achieve this month's sales target. Currently, we've...",
-        time: "2 days ago",
-        date: "2 days ago",
+        time: "Morning",
+        date: "Morning",
     },
 
     // Add additional mock notifications as needed...
@@ -222,7 +223,7 @@ export default function NotificationTable() {
                                 value={search}
                                 onChange={e => setSearch(e.target.value)}
                             />
-                            <span className="notiflayout-search-icon">🔍</span>
+                            <span className="notiflayout-search-icon"> <CiSearch /> </span>
                         </div>
                     </div>
                     <div className="notiflayout-tabs">
@@ -230,10 +231,10 @@ export default function NotificationTable() {
                             <span className="notiflayout-tab-badge">20</span> All
                         </div>
                         <div className={`notiflayout-tab ${tab === "archive" ? "active" : ""}`} onClick={() => setTab("archive")}>
-                            10 Archive
+                            Recent
                         </div>
                         <div className={`notiflayout-tab ${tab === "favorite" ? "active" : ""}`} onClick={() => setTab("favorite")}>
-                            17 Favorite
+                            Pending Orders
                         </div>
                     </div>
                     <div className="notiflayout-table">

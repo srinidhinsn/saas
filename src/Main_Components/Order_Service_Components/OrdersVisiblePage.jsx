@@ -54,7 +54,7 @@ const OrdersVisiblePage = () => {
         const tableName = tablesMap[order.table_id] || order.table_id;
         const itemsWithPrice = (order.items || []).map((item) => ({
             ...item,
-            price: item.price || inventoryMap[item.item_id]?.price || 0,
+            price: item.unit_price || inventoryMap[item.item_id]?.unit_price || 0,
         }));
         setInvoiceOrder({ ...order, table_name: tableName, items: itemsWithPrice });
         setShowInvoiceModal(true);
@@ -298,17 +298,17 @@ const OrdersVisiblePage = () => {
                 if (o.id !== orderId) return o;
                 const updatedItems = o.items.filter((i) => i.item_id !== itemId);
                 const newTotal = updatedItems.reduce((sum, item) => {
-                    const price = inventoryMap[item.item_id]?.price || item.price || 0;
+                    const price = inventoryMap[item.item_id]?.unit_price || item.price || 0;
                     return sum + (item.quantity || 1) * price;
                 }, 0);
-                return { ...o, items: updatedItems, total_price: newTotal };
+                return { ...o, items: updatedItems, unit_price: newTotal };
             });
             setOrders(updatedOrders);
             const newOrder = updatedOrders.find((o) => o.id === orderId);
             if (newOrder) {
                 await orderServicesPort.post(
                     `/${clientId}/dinein/update`,
-                    { id: orderId, total_price: newOrder.total_price },
+                    { id: orderId, total_price: newOrder.unit_price },
                     { headers: { Authorization: `Bearer ${token}` } }
                 );
             }
@@ -330,7 +330,7 @@ const OrdersVisiblePage = () => {
             status: item.status || "new",
             note: item.note || "",
             slug: item.slug || "",
-            price: item.unit_price || inventoryMap[item.item_id || item.inventory_id]?.price || 0,
+            price: item.unit_price || inventoryMap[item.item_id || item.inventory_id]?.unit_price || 0,
             client_id: clientId,
             order_id: orderId,
         }));

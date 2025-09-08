@@ -133,11 +133,11 @@ const initialNotifications = [
     {
         id: 1,
         type: "ready",
-        orderId: "ORD-006",
-        table: "Table 7",
-        message: "ORD-006 is ready for pickup",
+        orderId: "#1007",
+        table: "A-05",
+        message: "A05 is ready",
         time: "12:55 PM",
-        items: ["Pasta Primavera", "Garlic Bread"]
+        items: ["Apple Juice", "Orange Juice"]
     }
 ];
 
