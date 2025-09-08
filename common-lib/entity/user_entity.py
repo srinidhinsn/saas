@@ -1,22 +1,25 @@
 import uuid
 from database.postgres import Base
-from sqlalchemy import Column , Integer, String, ARRAY, UUID, event, Date
+from sqlalchemy import Column, Integer, String, ARRAY, UUID, event, Date, TIMESTAMP, func
 from models.user_model import UserModel, PageDefinitionModel
-
 
 
 class Person(Base):
     __tablename__ = "person"
     id = Column(UUID(as_uuid=True), primary_key=True, default=uuid.uuid4)
+    client_id = Column(String, nullable=False)
     first_name = Column(String, index=True, nullable=False)
     last_name = Column(String, nullable=True)
     dob = Column(Date, nullable=True)
     email = Column(String, nullable=True)
     phone = Column(String, nullable=True)
-
+    created_at = Column(TIMESTAMP, server_default=func.now())
+    updated_at = Column(
+        TIMESTAMP, server_default=func.now(), onupdate=func.now())
 
     def generate_uuid(first_name: str, client_id: str) -> uuid.UUID:
-        namespace = uuid.UUID("6ba7b810-9dad-11d1-80b4-00c04fd430c8")  # DNS namespace
+        namespace = uuid.UUID(
+            "6ba7b810-9dad-11d1-80b4-00c04fd430c8")  # DNS namespace
         combined_key = f"{username}-{client_id}"
         return uuid.uuid5(namespace, combined_key)
 
@@ -35,12 +38,11 @@ class User(Base):
     roles = Column(ARRAY(String), default=[])
     grants = Column(ARRAY(String), default=[])
 
-
     def generate_uuid(username: str, client_id: str) -> uuid.UUID:
-        namespace = uuid.UUID("6ba7b810-9dad-11d1-80b4-00c04fd430c8")  # DNS namespace
+        namespace = uuid.UUID(
+            "6ba7b810-9dad-11d1-80b4-00c04fd430c8")  # DNS namespace
         combined_key = f"{username}-{client_id}"
         return uuid.uuid5(namespace, combined_key)
-
 
     @staticmethod
     def copyToModel(user):
@@ -53,7 +55,6 @@ class User(Base):
     def copyFromModel(userModel):
         """Convert a single Pydantic DineinOrders model into a SQLAlchemy entity."""
         return User(**userModel.dict(exclude_unset=True))
-
 
     @staticmethod
     def copyToModels(users):
@@ -72,7 +73,6 @@ class User(Base):
         return [User(**model.dict(exclude_unset=True)) for model in userModels]
 
 
-
 @event.listens_for(User, "before_insert")
 def set_uuid(mapper, connection, target):
     if not target.id and target.username and target.client_id:
@@ -81,7 +81,7 @@ def set_uuid(mapper, connection, target):
 
 class PageDefinition(Base):
     __tablename__ = "page_definition"
-    id = Column (Integer, primary_key=True, index=True)
+    id = Column(Integer, primary_key=True, index=True)
     client_id = Column(String)
     role = Column(String)
     module = Column(String)
@@ -92,7 +92,8 @@ class PageDefinition(Base):
     @staticmethod
     def copyToModels(page_definitions):
         """Convert SQLAlchemy PageDefinition entities into Pydantic models, removing metadata."""
-        pageDefinitionModels = [PageDefinitionModel(**page_def.__dict__) for page_def in page_definitions]
+        pageDefinitionModels = [PageDefinitionModel(
+            **page_def.__dict__) for page_def in page_definitions]
 
         # Remove SQLAlchemy metadata (_sa_instance_state)
         for model in pageDefinitionModels:
@@ -107,4 +108,3 @@ class PageDefinition(Base):
             PageDefinition(**model.dict(exclude_unset=True)) for model in page_models
         ]
         return page_definitions
-
