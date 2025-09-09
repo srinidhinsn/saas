@@ -6,14 +6,14 @@ import random
 otp_store = {}
 
 
-def otpEmailService(to_email: str, otp: str) -> bool:
+def otpEmailService(to_email: str, email_body: str) -> bool:
     try:
         senderEmail = "magizhchisk@gmail.com"
         gmailAppPassword = "avqkjxqzjsrnqims"
 
         # MIMEText is used to format the body of the email
-        msg = MIMEText(f"Your OTP is {otp}.", "plain")
-        msg["Subject"] = "Password Reset OTP"
+        msg = MIMEText(email_body, "plain")
+        msg["Subject"] = "Notification"
         msg["From"] = senderEmail
         msg["To"] = to_email
 

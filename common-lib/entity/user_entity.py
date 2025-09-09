@@ -1,6 +1,6 @@
 import uuid
 from database.postgres import Base
-from sqlalchemy import Column, Integer, String, ARRAY, UUID, event, Date, TIMESTAMP, func
+from sqlalchemy import Column, Integer, String, ARRAY, UUID, event, Date, TIMESTAMP, func, JSON
 from models.user_model import UserModel, PageDefinitionModel
 
 
@@ -108,3 +108,19 @@ class PageDefinition(Base):
             PageDefinition(**model.dict(exclude_unset=True)) for model in page_models
         ]
         return page_definitions
+
+
+# Notifications
+
+class Notification(Base):
+    __tablename__ = "notifications"
+
+    id = Column(UUID(as_uuid=True), primary_key=True, default=uuid.uuid4)
+    client_id = Column(String, nullable=False)
+    username = Column(String, nullable=False)
+    notification_body = Column(String, nullable=False)
+    template_name = Column(String, nullable=False)
+    notification_metadata = Column(JSON, nullable=True)
+    created_at = Column(TIMESTAMP, server_default=func.now())
+    updated_at = Column(
+        TIMESTAMP, server_default=func.now(), onupdate=func.now())
