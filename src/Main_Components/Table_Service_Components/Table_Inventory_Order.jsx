@@ -501,7 +501,7 @@ const Table_Inventory_Order = ({ onOrderUpdate }) => {
                                     {getFilteredItems().map(item => (
                                         <div
                                             key={item.id}
-                                            className="grids"
+                                            className="menu-card"
                                             onClick={() => handleItemClick(item)}
                                         >
                                             <h4>{item.name}</h4>
