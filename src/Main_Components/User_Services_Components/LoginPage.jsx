@@ -67,6 +67,33 @@ export default function Login() {
             setLoading(false);
         }
     };
+    const handleLogins = async (e) => {
+        e.preventDefault();
+        setError("");
+        setLoading(true);
+
+        try {
+            // POST credentials; backend sets cookie automatically
+            await userServicesPort.post(`/${clientId}/users/login`, {
+                username: form.username,
+                password: form.password,
+            });
+
+            // Call backend to get user info
+
+            // Assume profileRes.data has user info (username, roles, etc.)
+
+            // Set user context/state here instead of reading token
+            // For example: setUser(profileRes.data);
+
+            toast.success("Login successful");
+            navigate(`/saas/${clientId}/main`);
+        } catch (err) {
+            // Handle errors as before
+        } finally {
+            setLoading(false);
+        }
+    };
 
     return (
         <div className="login-page">
