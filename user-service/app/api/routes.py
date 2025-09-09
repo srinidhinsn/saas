@@ -1,11 +1,11 @@
-from fastapi import Depends, HTTPException, APIRouter, Header, Path, Body
+from fastapi import Depends, HTTPException, APIRouter, Response, Path, Body
 from sqlalchemy.orm import Session
 from database.postgres import get_db
-from entity.user_entity import User, Person
+from entity.user_entity import User, Person, PageDefinition
 from utils.auth import hash_password, verify_password, create_access_token, verify_token
 from utils.send_email_otp import otpEmailService, otp_store
 from models.saas_context import SaasContext, saasContext
-from models.user_model import UserModel, ResetPasswordRequest, LoginRequest, ForgotPasswordRequest, PersonModel
+from models.user_model import UserModel, ResetPasswordRequest, LoginRequest, ForgotPasswordRequest, PersonModel, PageDefinitionModel
 from models.response_model import ResponseModel
 from sqlalchemy import and_
 
@@ -24,6 +24,7 @@ async def register_user(client_id: str, userReq: UserModel, db: Session = Depend
                 client_id=userReq.client_id, roles=userReq.roles, grants=userReq.grants)
     db.add(user)
     db.commit()
+
     return {"message": "User registered successfully"}
 
 # @router.post("/login")
