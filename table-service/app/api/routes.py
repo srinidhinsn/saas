@@ -65,11 +65,13 @@ def delete_table(client_id: str, table: Table, context: SaasContext = Depends(ve
 
     if not db_table:
         raise HTTPException(status_code=404, detail="Table not found")
+    
+    table_model = DiningTable.copyToModel(db_table)
 
     db.delete(db_table)
     db.commit()
 
-    table_model = DiningTable.copyToModel(db_table)
+    
     response    = ResponseModel[Table](screen_id=context.screen_id, status="success", message="Table deleted successfully", data=table_model)
     return response
 
