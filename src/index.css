@@ -788,3 +788,290 @@ input:focus {
         padding: 1rem;
     }
 }
+
+
+/* ===================================================================================================================================== */
+/* ================================================ Profile Page Stylesheet ============================================================ */
+/* ===================================================================================================================================== */
+.Person-information-container {
+    padding-right: 5px;
+    height: 89vh;
+    background: var(--bg-color);
+
+}
+
+/* Container scroll/background */
+.usrprf__container__eg4d8ytwfhsjknq {
+    padding: 1rem .5rem;
+}
+
+/* Header bar */
+.usrprf__hdr__eg4d8ytwfhsjknq {
+    background: var(--bg-chart-container);
+    border-radius: 1rem;
+    box-shadow: 0 1px 4px rgba(0, 0, 0, 0.04);
+    padding: 1rem .2rem;
+    margin: 0 0 1.5rem 0;
+}
+
+/* Header flex row */
+.usrprf__hdrrow__eg4d8ytwfhsjknq {
+    display: flex;
+    flex-direction: column;
+    align-items: center;
+    justify-content: center;
+}
+
+/* Avatar circle */
+.usrprf__avatar__eg4d8ytwfhsjknq {
+    width: 44px;
+    height: 44px;
+    background: var(--dash-icon-color);
+    border-radius: 50%;
+    display: flex;
+    align-items: center;
+    justify-content: center;
+    margin-left: 3.8rem;
+}
+
+/* Avatar icon */
+.usrprf__avatar_icon__eg4d8ytwfhsjknq {
+    width: 23px;
+    height: 23px;
+    color: var(--dash-cards-bg);
+}
+
+/* Header title block */
+.usrprf__hdrlinemeta__eg4d8ytwfhsjknq {
+
+    color: var(--bg-text-color);
+}
+
+/* Title and subtitle */
+.usrprf__hdrtitle__eg4d8ytwfhsjknq {
+    font-size: 1.3rem;
+    font-weight: bold;
+    margin-left: 1rem;
+    color: var(--bg-number-color);
+    margin-bottom: 0.2em;
+}
+
+.usrprf__hdrsubtitle__eg4d8ytwfhsjknq {
+    color: var(--bg-text-color);
+    font-size: 0.98rem;
+}
+
+/* Last updated */
+.usrprf__lastupd__eg4d8ytwfhsjknq {
+    color: var(--dash-icon-color);
+    font-size: 0.96rem;
+}
+
+/* Grid wrapper */
+.usrprf__gridmain__eg4d8ytwfhsjknq {
+    max-width: 900px;
+    margin: 0 auto;
+    padding-bottom: 2.5rem;
+}
+
+/* Cards grid */
+.usrprf__gridcards__eg4d8ytwfhsjknq {
+    display: grid;
+    grid-template-columns: 1fr 1fr;
+    gap: 1.5rem;
+}
+
+@media (max-width: 900px) {
+    .usrprf__gridcards__eg4d8ytwfhsjknq {
+        grid-template-columns: 1fr;
+    }
+}
+
+/* Profile card */
+[class^="usrprf__card__"] {
+    background: #fff;
+    border-radius: 1.1rem;
+    box-shadow: 0 1px 8px rgba(0, 0, 0, 0.08);
+    padding: 1.1rem 1.3rem 1.2rem 1.3rem;
+    display: flex;
+    flex-direction: column;
+    transition: transform .18s cubic-bezier(.3, .7, .4, 1), box-shadow .18s cubic-bezier(.3, .7, .4, 1);
+    will-change: transform;
+}
+
+[class^="usrprf__card__"]:hover {
+    transform: translateY(-2px) scale(1.012);
+    box-shadow: 0 12px 37px rgba(0, 0, 0, 0.10);
+}
+
+/* Card header */
+[class^="usrprf__card_hd__"] {
+    display: flex;
+    align-items: center;
+    justify-content: space-between;
+    margin-bottom: 1.1rem;
+}
+
+/* Card label */
+[class^="usrprf__cardlbltxt__"] {
+    font-size: 1.03rem;
+    color: #273159;
+    font-weight: 500;
+    letter-spacing: 0.02em;
+}
+
+/* Edit button */
+[class^="usrprf__card_editbtn__"] {
+    background: #252f3f;
+    color: #fff;
+    font-size: .97rem;
+    border: none;
+    border-radius: 8px;
+    padding: 0.35em 1.06em 0.38em 0.69em;
+    cursor: pointer;
+    display: flex;
+    align-items: center;
+    transition: background .18s;
+    gap: 0.52em;
+}
+
+[class^="usrprf__card_editbtn__"]:hover {
+    background: #334063;
+}
+
+[class^="edit_icon__"] {
+    font-size: 1.08em;
+    margin-right: 0.34em;
+}
+
+/* Card value area */
+[class^="usrprf__card_valuewrap__"] {
+    padding-left: 0.25rem;
+}
+
+[class^="usrprf__card_value_text_active__"] {
+    color: #1d2330;
+    font-weight: bold;
+    font-size: 1.02rem;
+}
+
+[class^="usrprf__card_value_text_inactive__"] {
+    color: #a0aec0;
+    font-size: 1.02rem;
+}
+
+/* MODAL styles */
+.usrprf__modal_backdrop__eg4d8ytwfhsjknq {
+    position: fixed;
+    inset: 0;
+    background: rgba(0, 0, 0, 0.52);
+    display: flex;
+    align-items: center;
+    justify-content: center;
+    z-index: 1000;
+    animation: usrprf__fadein_anim__eg4d8ytwfhsjknq 0.18s;
+}
+
+/* Modal card */
+.usrprf__modal_card__eg4d8ytwfhsjknq {
+    background: #fff;
+    border-radius: 1.17rem;
+    padding: 2.1rem 1.9rem 1.7rem 1.9rem;
+    min-width: 340px;
+    max-width: 96vw;
+    box-shadow: 0 6px 45px rgba(0, 0, 0, 0.14);
+    animation: usrprf__slideup_anim__eg4d8ytwfhsjknq 0.23s cubic-bezier(.6, .2, .5, 1.13);
+}
+
+/* Modal title */
+.usrprf__modal_title__eg4d8ytwfhsjknq {
+    font-size: 1.18rem;
+    font-weight: bold;
+    color: #25355b;
+    margin-bottom: 1.02rem;
+}
+
+/* Modal input wrapper */
+.usrprf__modal_inputwrap__eg4d8ytwfhsjknq {
+    margin-bottom: 1.35rem;
+}
+
+.usrprf__modal_input__eg4d8ytwfhsjknq {
+    width: 100%;
+    font-size: 1.05rem;
+    border: 1.5px solid #c2cbe0;
+    border-radius: 7px;
+    padding: 0.77em 1.08em 0.77em 1.08em;
+    outline: none;
+    transition: border .16s;
+    box-sizing: border-box;
+    background: #fbfcfe;
+    color: #29324d;
+    min-height: 44px;
+    resize: none;
+}
+
+.usrprf__modal_input__eg4d8ytwfhsjknq:focus {
+    border-color: #6366f1;
+    background: #f5f6fa;
+}
+
+/* Modal button row */
+.usrprf__modal_btnrow__eg4d8ytwfhsjknq {
+    display: flex;
+    gap: 1.2rem;
+    margin-top: 1.6rem;
+}
+
+.usrprf__modal_savebtn__eg4d8ytwfhsjknq,
+.usrprf__modal_cancelbtn__eg4d8ytwfhsjknq {
+    flex: 1;
+    padding: 0.67em 0;
+    font-size: 1rem;
+    border-radius: 8px;
+    border: none;
+    cursor: pointer;
+    font-weight: 500;
+    transition: background .18s, color .18s;
+}
+
+.usrprf__modal_savebtn__eg4d8ytwfhsjknq {
+    background: #252f3f;
+    color: #fff;
+}
+
+.usrprf__modal_savebtn__eg4d8ytwfhsjknq:hover {
+    background: #3c4573;
+}
+
+.usrprf__modal_cancelbtn__eg4d8ytwfhsjknq {
+    background: #edf1fa;
+    color: #273159;
+}
+
+.usrprf__modal_cancelbtn__eg4d8ytwfhsjknq:hover {
+    background: #d2d8e7;
+}
+
+/* Animations */
+@keyframes usrprf__fadein_anim__eg4d8ytwfhsjknq {
+    from {
+        opacity: 0;
+    }
+
+    to {
+        opacity: 1;
+    }
+}
+
+@keyframes usrprf__slideup_anim__eg4d8ytwfhsjknq {
+    from {
+        opacity: 0;
+        transform: translateY(30px) scale(0.97);
+    }
+
+    to {
+        opacity: 1;
+        transform: translateY(0) scale(1);
+    }
+}

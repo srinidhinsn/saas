@@ -121,7 +121,7 @@ const OrdersVisiblePage = () => {
                     item_id: selectedItem.id,
                     item_name: selectedItem.name,
                     quantity: 1,
-                    price: selectedItem.unit_price,
+                    price: selectedItem.total_price,
                     status: "new",
                     note: "",
                     slug: selectedItem.slug || selectedItem.name.replace(/[\s]+/g, "-").toLowerCase(),
@@ -514,7 +514,8 @@ const OrdersVisiblePage = () => {
                                                 Total: ₹{order.items.reduce(
                                                     (sum, item) =>
                                                         sum +
-                                                        ((inventoryMap[item.item_id]?.price || item.price || 0) * (item.quantity || 1)),
+                                                        ((inventoryMap[item.item_id]?.unit_price || item.unit_price || item.price || 0) * (item.quantity || 1))
+                                                    ,
                                                     0
                                                 ).toFixed(2)}
                                             </span>

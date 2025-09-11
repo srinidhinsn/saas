@@ -126,62 +126,222 @@
 //========================================================================================================================== 
 
 
+// import React, { useState, useEffect } from "react";
+// import { useNavigate, useParams } from "react-router-dom";
+
+// const initialNotifications = [
+//     {
+//         id: 1,
+//         type: "ready",
+//         orderId: "#1007",
+//         table: "A-05",
+//         message: "A05 is ready",
+//         time: "12:55 PM",
+//         items: ["Apple Juice", "Orange Juice"]
+//     }
+// ];
+
+// export default function PopupNotification() {
+//     const [notifications, setNotifications] = useState(initialNotifications);
+//     const [isOpen, setIsOpen] = useState(false);
+//     const [bellShake, setBellShake] = useState(false);
+
+//     const nav = useNavigate();
+//     const { clientId } = useParams();
+
+//     const openPanel = () => setIsOpen(true);
+//     const closePanel = () => setIsOpen(false);
+
+//     const removeNotification = (id) => {
+//         setNotifications(notifications.filter(n => n.id !== id));
+//     };
+
+//     const addNotification = (note) => {
+//         setNotifications(prev => [note, ...prev]); // newest on top
+//         setBellShake(true); // shake bell
+//         setIsOpen(true); // open panel automatically
+//         setTimeout(() => setBellShake(false), 1000); // stop shake after 1s
+//     };
+
+//     useEffect(() => {
+//         const onOrderCollect = (e) => {
+//             const { tableName, orderId, items } = e.detail;
+//             const newNotification = {
+//                 id: Date.now(),
+//                 type: "ready",
+//                 orderId,
+//                 table: tableName,
+//                 message: `Order ${orderId} is ready at ${tableName}`,
+//                 time: new Date().toLocaleTimeString([], { hour: "2-digit", minute: "2-digit" }),
+//                 items: items || []
+//             };
+//             addNotification(newNotification);
+//         };
+
+//         window.addEventListener("orderCollect", onOrderCollect);
+
+//         return () => window.removeEventListener("orderCollect", onOrderCollect);
+//     }, []);
+
+//     const clearAll = () => setNotifications([]);
+//     const notificationsPage = () => nav(`/saas/${clientId}/main/all-notifications`);
+
+//     return (
+//         <div>
+//             {/* Floating Button */}
+//             <div className="fixed-btn">
+//                 <button
+//                     className={`notification-btn ${bellShake ? "shake" : ""}`}
+//                     onClick={openPanel}
+//                 >
+//                     <span role="img" aria-label="bell" style={{ fontSize: 18 }}>
+//                         🔔
+//                     </span>
+//                     <span className="notification-btn-text">Notifications</span>
+//                     {notifications.length > 0 && (
+//                         <div className="notification-badge">{notifications.length}</div>
+//                     )}
+//                 </button>
+//             </div>
+
+//             {/* Overlay */}
+//             <div className={`overlays${isOpen ? "" : " hidden"}`} onClick={closePanel}></div>
+
+//             {/* Panel */}
+//             <div className={`notification-panel${isOpen ? " expanded" : " minimized"}`}>
+//                 <div className="panel-header">
+//                     <div>
+//                         <div style={{ display: "flex", alignItems: "center", gap: "8px" }}>
+//                             <span role="img" aria-label="bell" style={{ fontSize: 22 }}>🔔</span>
+//                             <span className="panel-title">Order Notifications</span>
+//                         </div>
+//                         <p className="panel-desc">Real-time order updates</p>
+//                     </div>
+//                     <button className="panel-close" onClick={closePanel}>✖</button>
+//                 </div>
+
+//                 <div className="panel-body">
+//                     {notifications.length === 0 ? (
+//                         <div className="panel-empty">
+//                             <div className="empty-icon">🔕</div>
+//                             <h3>No notifications</h3>
+//                             <p>All orders are up to date!</p>
+//                         </div>
+//                     ) : (
+//                         <div className="notifications-list">
+//                             {notifications.map(n => (
+//                                 <div key={n.id} className="notification-item">
+//                                     <div className="notification-item-icon">
+//                                         {n.type === "ready" ? "🔔" : "✅"}
+//                                     </div>
+//                                     <div className="notification-item-content">
+//                                         <div className="notification-item-row">
+//                                             <span className="notification-order">{n.orderId}</span>
+//                                             <span className="notification-time">{n.time}</span>
+//                                         </div>
+//                                         <div className="notification-table">
+//                                             {n.table} • {n.message}
+//                                         </div>
+//                                         {n.items.length > 0 && (
+//                                             <div className="notification-items">
+//                                                 {n.items.slice(0, 2).join(", ")}
+//                                                 {n.items.length > 2 && ` +${n.items.length - 2} more`}
+//                                             </div>
+//                                         )}
+//                                     </div>
+//                                     <button
+//                                         className="notification-remove"
+//                                         onClick={() => removeNotification(n.id)}
+//                                     >
+//                                         ✖
+//                                     </button>
+//                                 </div>
+//                             ))}
+//                         </div>
+//                     )}
+//                 </div>
+
+//                 <div style={{ display: 'flex', justifyContent: 'space-between' }}>
+//                     <div className="panel-footer">
+//                         <button className="clear-btn" onClick={notificationsPage}>
+//                             View All ...
+//                         </button>
+//                     </div>
+//                     <div className="panel-footer">
+//                         <button className="clear-btn" onClick={clearAll}>
+//                             Clear all notifications
+//                         </button>
+//                     </div>
+//                 </div>
+//             </div>
+//         </div>
+//     );
+// }
+
+
+// ======================================================  ================================ ============================================= //
+
+
+
 import React, { useState, useEffect } from "react";
 import { useNavigate, useParams } from "react-router-dom";
-
-const initialNotifications = [
-    {
-        id: 1,
-        type: "ready",
-        orderId: "#1007",
-        table: "A-05",
-        message: "A05 is ready",
-        time: "12:55 PM",
-        items: ["Apple Juice", "Orange Juice"]
-    }
-];
+import axios from "axios";
+import userServicesPort from "../../Backend_Port_Files/UserServices";
 
 export default function PopupNotification() {
-    const [notifications, setNotifications] = useState(initialNotifications);
+    const [notifications, setNotifications] = useState([]);
     const [isOpen, setIsOpen] = useState(false);
     const [bellShake, setBellShake] = useState(false);
-
     const nav = useNavigate();
     const { clientId } = useParams();
+    const token = localStorage.getItem("access_token")
 
     const openPanel = () => setIsOpen(true);
     const closePanel = () => setIsOpen(false);
 
     const removeNotification = (id) => {
-        setNotifications(notifications.filter(n => n.id !== id));
+        setNotifications(prev => prev.filter(n => n.id !== id));
     };
 
     const addNotification = (note) => {
-        setNotifications(prev => [note, ...prev]); // newest on top
-        setBellShake(true); // shake bell
-        setIsOpen(true); // open panel automatically
-        setTimeout(() => setBellShake(false), 1000); // stop shake after 1s
+        setNotifications(prev => [note, ...prev]);
+        setBellShake(true);
+        setIsOpen(true);
+        setTimeout(() => setBellShake(false), 1000);
     };
 
+    // Fetch notifications periodically
     useEffect(() => {
-        const onOrderCollect = (e) => {
-            const { tableName, orderId, items } = e.detail;
-            const newNotification = {
-                id: Date.now(),
-                type: "ready",
-                orderId,
-                table: tableName,
-                message: `Order ${orderId} is ready at ${tableName}`,
-                time: new Date().toLocaleTimeString([], { hour: "2-digit", minute: "2-digit" }),
-                items: items || []
-            };
-            addNotification(newNotification);
+        const fetchNotifications = async () => {
+            try {
+                const res = await userServicesPort.get(`/${clientId}/users/notifications`, {
+                    headers: {
+                        Authorization: `Bearer ${token}`
+                    }
+                });
+
+                // handle if backend returns array directly or inside data
+                const rawData = Array.isArray(res.data) ? res.data : res.data.data || [];
+
+                const newNotes = rawData.map(n => ({
+                    id: n.id,
+                    type: n.template_name,
+                    message: n.notification_body,
+                    time: n.created_at
+                        ? new Date(n.created_at).toLocaleTimeString([], { hour: "2-digit", minute: "2-digit" })
+                        : ""
+                }));
+                setNotifications(newNotes);
+            } catch (err) {
+                console.error("Error fetching notifications", err);
+            }
         };
 
-        window.addEventListener("orderCollect", onOrderCollect);
 
-        return () => window.removeEventListener("orderCollect", onOrderCollect);
-    }, []);
+        fetchNotifications();
+        const interval = setInterval(fetchNotifications, 5000); // poll every 5s
+        return () => clearInterval(interval);
+    }, [clientId]);
 
     const clearAll = () => setNotifications([]);
     const notificationsPage = () => nav(`/saas/${clientId}/main/all-notifications`);
@@ -194,9 +354,7 @@ export default function PopupNotification() {
                     className={`notification-btn ${bellShake ? "shake" : ""}`}
                     onClick={openPanel}
                 >
-                    <span role="img" aria-label="bell" style={{ fontSize: 18 }}>
-                        🔔
-                    </span>
+                    <span role="img" aria-label="bell" style={{ fontSize: 18 }}>🔔</span>
                     <span className="notification-btn-text">Notifications</span>
                     {notifications.length > 0 && (
                         <div className="notification-badge">{notifications.length}</div>
@@ -213,9 +371,9 @@ export default function PopupNotification() {
                     <div>
                         <div style={{ display: "flex", alignItems: "center", gap: "8px" }}>
                             <span role="img" aria-label="bell" style={{ fontSize: 22 }}>🔔</span>
-                            <span className="panel-title">Order Notifications</span>
+                            <span className="panel-title">Notifications</span>
                         </div>
-                        <p className="panel-desc">Real-time order updates</p>
+                        <p className="panel-desc">Real-time updates</p>
                     </div>
                     <button className="panel-close" onClick={closePanel}>✖</button>
                 </div>
@@ -225,29 +383,21 @@ export default function PopupNotification() {
                         <div className="panel-empty">
                             <div className="empty-icon">🔕</div>
                             <h3>No notifications</h3>
-                            <p>All orders are up to date!</p>
+                            <p>Everything is up to date!</p>
                         </div>
                     ) : (
                         <div className="notifications-list">
                             {notifications.map(n => (
                                 <div key={n.id} className="notification-item">
-                                    <div className="notification-item-icon">
-                                        {n.type === "ready" ? "🔔" : "✅"}
-                                    </div>
+                                    <div className="notification-item-icon">🔔</div>
                                     <div className="notification-item-content">
                                         <div className="notification-item-row">
-                                            <span className="notification-order">{n.orderId}</span>
+                                            <span className="notification-type">{n.type}</span>
                                             <span className="notification-time">{n.time}</span>
                                         </div>
-                                        <div className="notification-table">
-                                            {n.table} • {n.message}
+                                        <div className="notification-message">
+                                            {n.message}
                                         </div>
-                                        {n.items.length > 0 && (
-                                            <div className="notification-items">
-                                                {n.items.slice(0, 2).join(", ")}
-                                                {n.items.length > 2 && ` +${n.items.length - 2} more`}
-                                            </div>
-                                        )}
                                     </div>
                                     <button
                                         className="notification-remove"
