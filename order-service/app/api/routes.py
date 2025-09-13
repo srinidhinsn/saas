@@ -1,4 +1,4 @@
-from fastapi import APIRouter, Depends, HTTPException, Query
+from fastapi import APIRouter, Depends, HTTPException, Query, Request
 from fastapi.responses import FileResponse
 from sqlalchemy.orm import Session
 from typing import List
@@ -16,14 +16,18 @@ router = APIRouter()
 
 @router.post("/dinein/create", response_model=ResponseModel[DineinOrderModel])
 def create_order(client_id: str, order: DineinOrderModel, context: SaasContext = Depends(verify_token), db: Session = Depends(get_db)):
+
+
     db_order = DBOrder(client_id=client_id, table_id=order.table_id, status=order.status or OrderStatusEnum.new,
                        price=order.price, gst=order.gst, cst=order.cst, discount=order.discount, invoice_status=order.invoice_status,
-                       total_price=order.total_price, invoice_id=order.invoice_id, dinein_order_id=order.dinein_order_id, handler_id=order.handler_id, created_by=order.created_by, updated_by=order.updated_by)
+                       total_price=order.total_price, invoice_id=order.invoice_id, dinein_order_id=order.dinein_order_id, 
+                       handler_id=order.handler_id, created_by=order.created_by, updated_by=order.updated_by)
     db.add(db_order)
     db.flush()
     for item in order.items:
-        db_item = DBOrderItem(order_id=db_order.id, client_id=client_id,
-                              item_id=item.item_id, quantity=item.quantity, status=item.status or OrderStatusEnum.new)
+        db_item = DBOrderItem(order_id=db_order.id, client_id=client_id, item_id=item.item_id, item_name=item.item_name,   
+                              slug=item.slug, quantity=item.quantity, unit_price=item.unit_price, line_total=item.line_total, 
+                              status=item.status or OrderStatusEnum.new)
         db.add(db_item)
     db.commit()
     db.refresh(db_order)
@@ -32,8 +36,6 @@ def create_order(client_id: str, order: DineinOrderModel, context: SaasContext =
         created_at=db_order.created_at, items=order.items)
     response = ResponseModel(screen_id=context.screen_id, data=dinein_model)
     return response
-
-
 
 @router.get("/dinein/order")
 def get_orders_for_order_id(client_id: str, order_id: Optional[str] = None, context: SaasContext = Depends(verify_token), db: Session = Depends(get_db)):
@@ -50,7 +52,6 @@ def get_orders_for_order_id(client_id: str, order_id: Optional[str] = None, cont
             for item in items:
                 item_models.append(DBOrderItem.copyToModel(item))
    
-    
     result={
             "id": order.id,
             "table_id": order.table_id,
@@ -63,7 +64,6 @@ def get_orders_for_order_id(client_id: str, order_id: Optional[str] = None, cont
 
     response = ResponseModel(screen_id=context.screen_id, data=result)
     return response
-
 
 
 @router.get("/dinein/table")
@@ -101,30 +101,168 @@ def get_orders_for_table(client_id: str, table_id: Optional[str] = None, context
             "items": [i.dict() for i in item_models],
             "total_price": order.total_price,
             "item_names": item_names
+
         })
 
     response = ResponseModel(screen_id=context.screen_id, data=result)
     return response
 
 
-<<<<<<< HEAD
-=======
+#<<<<<<< HEAD
+#=======
 
->>>>>>> 5be492b88c1f64739661152f41faf21bb14f61f4
+#>>>>>>> 5be492b88c1f64739661152f41faf21bb14f61f4
+
+# @router.post("/dinein/update")
+# def update_order_status(client_id: str, body: DineinOrderModel, context: SaasContext = Depends(verify_token), db: Session = Depends(get_db)):
+#     if not body.id:
+#         raise HTTPException(status_code=400, detail="Order ID is required")
+#     order = db.query(DBOrder).filter(DBOrder.id == str(
+#         body.id), DBOrder.client_id == str(client_id)).first()
+#     if not order:
+#         raise HTTPException(status_code=404, detail="Order not found")
+
+#     order.status = body.status.value
+#     db.commit()
+#     response = ResponseModel(screen_id=context.screen_id, data={
+#                              "message": "Status updated", "new_status": order.status})
+#     return response
+
+# @router.post("/dinein/update")
+# def update_order_status(
+#     client_id: str,
+#     body: DineinOrderModel,
+#     context: SaasContext = Depends(verify_token),
+#     db: Session = Depends(get_db),
+# ):
+#     if not body.id:
+#         raise HTTPException(status_code=400, detail="Order ID is required")
+
+#     order = db.query(DBOrder).filter(
+#         DBOrder.id == str(body.id),
+#         DBOrder.client_id == str(client_id)
+#     ).first()
+#     if not order:
+#         raise HTTPException(status_code=404, detail="Order not found")
+
+#     # 1) Update status
+#     order.status = body.status.value
+#     db.commit()
+#     db.refresh(order)
+
+#     # 2) If served → push immediately to billing-service
+#     billing_sync = None
+#     if body.status == OrderStatusEnum.served:
+#         try:
+#             from app.services.order_service import sync_served_order_to_billing
+#             billing_sync = sync_served_order_to_billing(order)
+#         except Exception as e:
+#             billing_sync = {"error": str(e)}
+
+#     return ResponseModel(
+#         screen_id=context.screen_id,
+#         data={
+#             "message": "Status updated",
+#             "new_status": order.status,
+#             "billing_sync": billing_sync,
+#         },
+#     )
+
+# @router.post("/dinein/update")
+# def update_order_status(
+#     client_id: str,
+#     body: DineinOrderModel,
+#     request: Request,
+#     context: SaasContext = Depends(verify_token),
+#     db: Session = Depends(get_db),
+# ):
+#     if not body.id:
+#         raise HTTPException(status_code=400, detail="Order ID is required")
+
+#     order = db.query(DBOrder).filter(
+#         DBOrder.id == str(body.id),
+#         DBOrder.client_id == str(client_id)
+#     ).first()
+#     if not order:
+#         raise HTTPException(status_code=404, detail="Order not found")
+
+#     # 1) Update status
+#     order.status = body.status.value
+#     db.commit()
+#     db.refresh(order)
+
+#     # 2) If SERVED → push to billing using the user's JWT (public endpoint)
+#     billing_sync = None
+#     if body.status == OrderStatusEnum.served:
+#         try:
+#             from app.services.order_service import sync_served_order_to_billing_public
+#             # context.token should be the same JWT you use for other /saas/... calls
+#             user_jwt = getattr(context, "token", None) or getattr(context, "jwt", None) or ""
+#             billing_sync = sync_served_order_to_billing_public(order, user_jwt)
+#         except Exception as e:
+#             billing_sync = {"error": str(e)}
+
+#     return ResponseModel(
+#         screen_id=context.screen_id,
+#         data={
+#             "message": "Status updated",
+#             "new_status": order.status,
+#             "billing_sync": billing_sync,
+#         },
+#     )
+
+# from fastapi import Request
+
 @router.post("/dinein/update")
-def update_order_status(client_id: str, body: DineinOrderModel, context: SaasContext = Depends(verify_token), db: Session = Depends(get_db)):
+def update_order_status(
+    client_id: str,
+    body: DineinOrderModel,
+    request: Request,  # <-- add this
+    context: SaasContext = Depends(verify_token),
+    db: Session = Depends(get_db),
+):
     if not body.id:
         raise HTTPException(status_code=400, detail="Order ID is required")
-    order = db.query(DBOrder).filter(DBOrder.id == str(
-        body.id), DBOrder.client_id == str(client_id)).first()
+
+    order = db.query(DBOrder).filter(
+        DBOrder.id == str(body.id),
+        DBOrder.client_id == str(client_id)
+    ).first()
     if not order:
         raise HTTPException(status_code=404, detail="Order not found")
 
+    # 1) Update status
     order.status = body.status.value
     db.commit()
-    response = ResponseModel(screen_id=context.screen_id, data={
-                             "message": "Status updated", "new_status": order.status})
-    return response
+    db.refresh(order)
+
+    # 2) Forward the SAME user JWT to billing
+    billing_sync = None
+    if body.status == OrderStatusEnum.served:
+        try:
+            # Extract raw Authorization header from this request
+            auth = request.headers.get("authorization", "")
+            user_jwt = ""
+            if auth and auth.lower().startswith("bearer "):
+                user_jwt = auth.split(" ", 1)[1].strip()
+
+            if not user_jwt:
+                raise ValueError("Missing user JWT in request Authorization header")
+
+            from app.services.order_service import sync_served_order_to_billing_public
+            billing_sync = sync_served_order_to_billing_public(order, user_jwt)
+        except Exception as e:
+            billing_sync = {"error": str(e)}
+
+    return ResponseModel(
+        screen_id=context.screen_id,
+        data={
+            "message": "Status updated",
+            "new_status": order.status,
+            "billing_sync": billing_sync,
+        },
+    )
+
 
 
 @router.post("/order_items/update")
@@ -138,7 +276,6 @@ def update_order_items(client_id: str, order_id: Optional[str] = Query(None), bo
     db.commit()
     response = ResponseModel(screen_id=context.screen_id, data={"message": "Order items updated successfully"})
     return response
-
 
 @router.post("/order_item/update")
 def update_order_items(client_id: str, order_id: Optional[str] = Query(None), order_item: Optional[OrderItemModel] = None, context: SaasContext = Depends(verify_token), db: Session = Depends(get_db)):
@@ -214,3 +351,6 @@ def get_kds_orders(client_id: str, context: SaasContext = Depends(verify_token),
     '''
     response = ResponseModel(screen_id=context.screen_id, data=orders)
     return response
+
+# --------------------------------- for invoice ----------------------------------
+
