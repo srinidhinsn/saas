@@ -3,18 +3,27 @@ from typing import List, Optional
 from uuid import UUID
 from datetime import date
 
-class ResetpasswordRequest(BaseModel):
-    old_password: str
+
+class ForgotPasswordRequest(BaseModel):
+    username: str
+
+
+class ResetPasswordRequest(BaseModel):
+    username: str
+    otp: str
     new_password: str
+    confirm_password: str
+
 
 class LoginRequest(BaseModel):
     username: str
     password: str
 
+
 class PersonModel(BaseModel):
     id: Optional[UUID] = None
     client_id: Optional[str] = None
-    first_name: Optional[str] = None
+    first_name: str
     last_name: Optional[str] = None
     dob: Optional[date] = None
     email: Optional[str] = None
@@ -23,10 +32,11 @@ class PersonModel(BaseModel):
     class Config:
         orm_mode = True
 
+
 class UserModel(PersonModel):
     id: Optional[UUID] = None
     client_id: Optional[str] = None
-    username: Optional[str] = None
+    username: str
     password: Optional[str] = None
     roles: Optional[List[str]] = []
     grants: Optional[List[str]] = []
@@ -34,7 +44,6 @@ class UserModel(PersonModel):
 
     class Config:
         orm_mode = True
-
 
 
 class PageDefinitionModel(BaseModel):
@@ -45,5 +54,3 @@ class PageDefinitionModel(BaseModel):
     role: Optional[str] = None
     screen_id: Optional[str] = None
     load_type: Optional[str] = None
-
-

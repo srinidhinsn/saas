@@ -25,7 +25,6 @@ class DiningTable(Base):
     created_at = Column(DateTime, default=func.now())
     updated_at = Column(DateTime, default=func.now(), onupdate=func.now())
 
-
     @staticmethod
     def copyToModel(table):
         model = Table(**table.__dict__)
