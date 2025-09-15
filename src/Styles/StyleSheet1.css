@@ -4370,9 +4370,10 @@ input[type="checkbox"] {
 
 /* Responsive for small devices */
 @media (max-width: 768px) {
-    .kds-grid {
+    /* .kds-grid {
         grid-template-columns: repeat(auto-fill, minmax(180px, 1fr));
-    }
+    } */
+
 
     .kds-card-footer button {
         padding: 4px 8px;
@@ -4383,6 +4384,14 @@ input[type="checkbox"] {
     .kds-page {
         padding: 10px;
     }
+
+    .kds-card {
+        width: 100%;
+    }
+
+    /* .item-row {
+        width: 320px;
+    } */
 
     .kds-grid {
         grid-template-columns: 1fr !important;
