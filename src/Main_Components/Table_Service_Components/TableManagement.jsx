@@ -1043,7 +1043,7 @@ const TableManagement = () => {
                                         b) Multi-Table Range: A01:A10,B01:B05
                                     </div>
                                     {addRowError && <div className="tm-modal-error">{addRowError}</div>}
-                                    <button className="tm-modal-add-row" onClick={() => {
+                                    {/* <button className="tm-modal-add-row" onClick={() => {
                                         const emptyRows = tableRanges.filter(
                                             row => !row.range || !row.table_type || !row.type
                                         );
@@ -1056,7 +1056,7 @@ const TableManagement = () => {
                                         setFieldErrors([...fieldErrors, {}]);
                                     }}>
                                         + Add Row
-                                    </button>
+                                    </button> */}
                                     <button className="tm-modal-generate-table" onClick={generateTables}>Generate Table</button>
                                 </div>
                             </div>

@@ -126,11 +126,11 @@ export default function Login() {
                             required
                         />
                     </div>
-                    <div style={{ display: 'flex', justifyContent: 'space-between' }}>
-                        <div className="options-row">
+                    <div style={{ display: 'flex', justifyContent: 'space-between', }}>
+                        <div className="options-row login-link">
                             <span onClick={() => navigate(`/saas/${clientId}/reset`)}>Reset Password?</span>
                         </div>
-                        <div className="options-row">
+                        <div className="options-row login-link">
                             <span onClick={() => navigate(`/saas/${clientId}/forgot`)}>Forgot Password?</span>
                         </div>
                     </div>
@@ -141,10 +141,10 @@ export default function Login() {
                         {loading ? "Logging in..." : "LOGIN"}
                     </button>
 
-                    <p className="login-link">
+                    {/* <p className="login-link">
                         Don’t have an account?{" "}
                         <span onClick={() => navigate(`/saas/${clientId}/register`)}>Register here</span>
-                    </p>
+                    </p> */}
                 </form>
             </div>
         </div>
