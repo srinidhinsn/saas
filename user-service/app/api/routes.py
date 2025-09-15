@@ -30,29 +30,25 @@ async def login_user(
     userReq: LoginRequest,
     db: Session = Depends(get_db)
 ):
-    # Find the user with given username + client_id
+
     user = db.query(User).filter(
         and_(User.username == userReq.username, User.client_id == client_id)
     ).first()
 
-    # If no user found → raise 401 immediately
     if not user:
         raise HTTPException(
             status_code=401,
             detail="Invalid username or password"
         )
 
-    # Convert to model (only after we are sure user exists)
     userModel = user.copyToModel(user)
 
-    # Verify password
     if not verify_password(userReq.password, userModel.hashed_password):
         raise HTTPException(
             status_code=401,
             detail="Invalid username or password"
         )
 
-    # Create JWT token
     token = create_access_token({
         "user_id": str(userModel.id),
         "roles": userModel.roles,
@@ -60,7 +56,6 @@ async def login_user(
         "grants": userModel.grants
     })
 
-    # Return standard bearer token response
     return ResponseModel(
         screen_id="default_user",
         data={"access_token": token, "token_type": "bearer"}
