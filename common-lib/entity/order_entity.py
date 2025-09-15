@@ -71,6 +71,8 @@ class OrderItem(Base):
     item_name = Column(String, nullable=True)
     slug = Column(String, nullable=True)
     quantity = Column(Integer, nullable=True)
+    unit_price = Column(Float, nullable=True)   
+    line_total = Column(Float, nullable=True)   
     status = Column(String, nullable=True)
 
     @staticmethod

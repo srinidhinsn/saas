@@ -1,0 +1,7 @@
+-- Run the below line in pgadmin:
+
+ALTER TABLE public.order_item
+  ADD COLUMN IF NOT EXISTS unit_price  double precision NULL,
+  ADD COLUMN IF NOT EXISTS line_total  double precision NULL;
+
+

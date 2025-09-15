@@ -1,4 +1,4 @@
-from fastapi import APIRouter, Depends, HTTPException
+from fastapi import APIRouter, Depends, HTTPException, Query, Header
 from sqlalchemy.orm import Session 
 from typing import List, Dict, Any, Optional
 from uuid import UUID
@@ -9,8 +9,11 @@ from utils.auth import verify_token
 from database.postgres import get_db
 from app.services.billing_service import (
     create_document_service, read_documents_service, update_document_service, delete_document_service,
-    create_items_service, read_items_service, update_items_service, delete_items_service
+    create_items_service, read_items_service, update_items_service, delete_items_service, upsert_from_order_payload,
+    generate_invoice, issue_invoice
 )
+import os
+from datetime import datetime
 
 router = APIRouter()
 
@@ -172,6 +175,109 @@ def delete_billing_items(
         message="Billing items deleted successfully",
         data=deleted_items
     )
+
+# --------------------------------------- invoice generation -------------------------------------------
+
+# ------------------------------ internal intake (order-service -> billing-service) ------------------------------
+
+def _verify_internal_service(authorization: Optional[str] = Header(None)):
+    """
+    Simple internal bearer auth for service-to-service calls.
+    """
+    if not authorization or not authorization.startswith("Bearer "):
+        raise HTTPException(status_code=401, detail="Missing/invalid Authorization")
+    token = authorization.split(" ", 1)[1]
+    if token != os.getenv("BILLING_INT_TOKEN", "change-me"):
+        raise HTTPException(status_code=403, detail="Forbidden")
+    return True
+
+# @router.post("/from-order-service")
+# def intake_from_order_service(
+#     payload: Dict[str, Any],
+#     _ok = Depends(_verify_internal_service),
+#     db: Session = Depends(get_db),
+# ):
+#     try:
+#         result = upsert_from_order_payload(db, payload)
+#         return {"status": "ok", **result}
+#     except HTTPException:
+#         raise
+#     except Exception as e:
+#         raise HTTPException(status_code=400, detail=str(e))
+    
+
+
+# ...
+
+@router.post("/from-order-service", response_model=ResponseModel[dict])
+def intake_from_order_service_public(
+    client_id: str,
+    payload: Dict[str, Any],
+    context: SaasContext = Depends(verify_token),
+    db: Session = Depends(get_db)
+):
+    # AuthZ: client in JWT must match URL tenant
+    if client_id != context.client_id:
+        raise HTTPException(status_code=403, detail="Unauthorized")
+
+    # Enforce the payload also targets the same tenant
+    if payload.get("client_id") != client_id:
+        raise HTTPException(status_code=400, detail="payload.client_id must match path client_id")
+
+    result = upsert_from_order_payload(db, payload)
+    return ResponseModel(
+        screen_id=context.screen_id,
+        status="success",
+        message="Order summary ingested",
+        data=result
+    )
+
+@router.post("/generate", response_model=ResponseModel[dict])
+def generate_invoice_route(
+    client_id: str,
+    invoice_id: int,
+    document_date: Optional[str] = None,   # ISO string, optional
+    due_in_days: int = 0,                  # e.g., 0 for POS, 7/15 for credit terms
+    context: SaasContext = Depends(verify_token),
+    db: Session = Depends(get_db)
+):
+    if client_id != context.client_id:
+        raise HTTPException(status_code=403, detail="Unauthorized")
+
+    try:
+        dt = datetime.fromisoformat(document_date) if document_date else None
+    except Exception:
+        raise HTTPException(status_code=400, detail="Invalid document_date; use ISO format (YYYY-MM-DD or full ISO)")
+
+    try:
+        result = generate_invoice(db, client_id, invoice_id, dt, due_in_days)
+        return ResponseModel(screen_id=context.screen_id, status="success", message="Invoice generated", data=result)
+    except Exception as e:
+        raise HTTPException(status_code=400, detail=str(e))
+    
+
+
+@router.post("/issue", response_model=ResponseModel[dict])
+def issue_invoice_route(
+    client_id: str,
+    invoice_id: int,
+    context: SaasContext = Depends(verify_token),
+    db: Session = Depends(get_db)
+):
+    if client_id != context.client_id:
+        raise HTTPException(status_code=403, detail="Unauthorized")
+    try:
+        result = issue_invoice(db, client_id, invoice_id)
+        return ResponseModel(screen_id=context.screen_id, status="success",
+                             message="Invoice issued", data=result)
+    except Exception as e:
+        raise HTTPException(status_code=400, detail=str(e))
+
+
+
+
+
+
 
 
 

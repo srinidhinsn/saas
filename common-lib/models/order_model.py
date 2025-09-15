@@ -20,11 +20,12 @@ class OrderItemModel(BaseModel):
     item_name: Optional[str] = None
     slug: Optional[str] = None
     quantity: Optional[int] = None
+    unit_price: Optional[float] = None
+    line_total: Optional[float] = None
     status: Optional[OrderStatusEnum] = OrderStatusEnum.new
 
     class Config:
         orm_mode = True
-
 
 class DineinOrderModel(BaseModel):
     id: Optional[int] = None
