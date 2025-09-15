@@ -23,23 +23,43 @@ async def register_user(client_id: str, userReq: UserModel, db: Session = Depend
     return {"message": "User registered successfully"}
 
 
-@router.post("/login")
-async def login_user(client_id: str, userReq: LoginRequest, db: Session = Depends(get_db)):
-    # user = db.query(User).filter(User.username == userReq.username and User.client_id == client_id).first()
-    user = db.query(User).filter(
-        # and_() is a SQLAlchemy construct that creates a SQL AND expression: SELECT * FROM user WHERE username = 'admin' AND client_id = 'easyfood';
-        and_(User.username == userReq.username, User.client_id == client_id)).first()
-    userModel = user.copyToModel(user)
-    print("user model - ", userModel)
 
-    if not userModel or not verify_password(userReq.password, userModel.hashed_password):
-        raise HTTPException(status_code=400, detail="Invalid credentials")
-    token = create_access_token({"user_id": str(userModel.id), "roles": userModel.roles,
-                                "client_id": userModel.client_id, "grants": userModel.grants})
-    response = ResponseModel(screen_id="default_user", data={
-                             "access_token": token, "token_type": "bearer"})
-    # response.set_response(screen_id="defaultUser", data={"access_token": token, "token_type": "bearer"})
-    return response
+@router.post("/login")
+async def login_user(
+    client_id: str,
+    userReq: LoginRequest,
+    db: Session = Depends(get_db)
+):
+
+    user = db.query(User).filter(
+        and_(User.username == userReq.username, User.client_id == client_id)
+    ).first()
+
+    if not user:
+        raise HTTPException(
+            status_code=401,
+            detail="Invalid username or password"
+        )
+
+    userModel = user.copyToModel(user)
+
+    if not verify_password(userReq.password, userModel.hashed_password):
+        raise HTTPException(
+            status_code=401,
+            detail="Invalid username or password"
+        )
+
+    token = create_access_token({
+        "user_id": str(userModel.id),
+        "roles": userModel.roles,
+        "client_id": userModel.client_id,
+        "grants": userModel.grants
+    })
+
+    return ResponseModel(
+        screen_id="default_user",
+        data={"access_token": token, "token_type": "bearer"}
+    )
 
 
 @router.post("/add")
