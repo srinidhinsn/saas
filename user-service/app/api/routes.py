@@ -96,12 +96,6 @@ async def add_user(client_id: str, userReq: UserModel, db: Session = Depends(get
     db.commit()
     return {"message": "User registered successfully"}
 
-
-@router.post("/reset-password")
-def reset_password(req_data: ResetPasswordRequest):
-    return {"message": "Feel free to build the api"}
-
-
 @router.get("/test")
 async def test_msg(client_id: str, context: SaasContext = Depends(verify_token), db: Session = Depends(get_db)):
     print("test context - ", context)
