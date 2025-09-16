@@ -357,15 +357,11 @@ def get_notifications(
         {
             "id": str(n.id),
             "client_id": n.client_id,
-            "username": n.username,
             "notification_body": n.notification_body,
             "template_name": n.template_name,
             "type": n.type,
             "realm": n.realm,
-            "ref_id": n.ref_id,
             "is_read": n.is_read,
-            "is_deleted": n.is_deleted,
-            "read_by": n.read_by,
             "created_at": n.created_at.isoformat() if isinstance(n.created_at, datetime) else n.created_at,
             "updated_at": n.updated_at.isoformat() if isinstance(n.updated_at, datetime) else n.updated_at,
         }
