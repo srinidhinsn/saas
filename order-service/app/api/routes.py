@@ -16,6 +16,57 @@ router = APIRouter()
 
 
 
+# @router.post("/dinein/create", response_model=ResponseModel[DineinOrderModel])
+# def create_order(client_id: str, order: DineinOrderModel, context: SaasContext = Depends(verify_token), db: Session = Depends(get_db)):
+#     db_order = DBOrder(client_id=client_id, table_id=order.table_id, status=order.status or OrderStatusEnum.new,
+#                        price=order.price, gst=order.gst, cst=order.cst, discount=order.discount, invoice_status=order.invoice_status,
+#                        total_price=order.total_price, invoice_id=order.invoice_id, dinein_order_id=order.dinein_order_id, handler_id=order.handler_id, created_by=order.created_by, updated_by=order.updated_by)
+#     db.add(db_order)
+#     db.flush()
+#     for item in order.items:
+#         db_item = DBOrderItem(order_id=db_order.id, client_id=client_id,
+#                               item_id=item.item_id, quantity=item.quantity, status=item.status or OrderStatusEnum.new)
+#         db.add(db_item)
+#     db.commit()
+#     db.refresh(db_order)
+#     dinein_model = DineinOrderModel(
+#         id=db_order.id, table_id=db_order.table_id, client_id=db_order.client_id, status=db_order.status,
+#         created_at=db_order.created_at, items=order.items)
+#     response = ResponseModel(screen_id=context.screen_id, data=dinein_model)
+#     return response
+
+
+
+# @router.get("/dinein/order")
+# def get_orders_for_order_id(client_id: str, order_id: Optional[str] = None, context: SaasContext = Depends(verify_token), db: Session = Depends(get_db)):
+#     if order_id:
+#         order = db.query(DBOrder).filter(
+#             DBOrder.client_id == client_id,
+#             DBOrder.id == order_id
+#         ).first()
+
+#         if order:
+#             items = order.items
+#             item_models = []
+
+#             for item in items:
+#                 item_models.append(DBOrderItem.copyToModel(item))
+   
+    
+#     result={
+#             "id": order.id,
+#             "table_id": order.table_id,
+#             "client_id": order.client_id,
+#             "status": order.status,
+#             "created_at": order.created_at,
+#             "items": [i.dict() for i in item_models],
+#             "total_price": order.total_price
+#     }
+
+#     response = ResponseModel(screen_id=context.screen_id, data=result)
+#     return response
+
+
 @router.post("/dinein/create", response_model=ResponseModel[DineinOrderModel])
 def create_order(client_id: str, order: DineinOrderModel, context: SaasContext = Depends(verify_token), db: Session = Depends(get_db)):
     db_order = DBOrder(client_id=client_id, table_id=order.table_id, status=order.status or OrderStatusEnum.new,
@@ -25,46 +76,55 @@ def create_order(client_id: str, order: DineinOrderModel, context: SaasContext =
     db.flush()
     for item in order.items:
         db_item = DBOrderItem(order_id=db_order.id, client_id=client_id,
-                              item_id=item.item_id, quantity=item.quantity, status=item.status or OrderStatusEnum.new)
+                              item_id=item.item_id, quantity=item.quantity,item_name=item.item_name,slug=item.slug, status=item.status or OrderStatusEnum.new)
         db.add(db_item)
     db.commit()
     db.refresh(db_order)
+
+    db_items = db.query(DBOrderItem).filter(DBOrderItem.order_id == db_order.id).all()
+    order_items = [
+        OrderItemModel(
+            client_id=i.client_id,
+            id=i.id,
+            item_id=i.item_id,
+            order_id=i.order_id,
+            quantity=i.quantity,
+            status=i.status,
+            item_name=i.item_name,
+            slug=i.slug
+        ) for i in db_items
+    ]
     dinein_model = DineinOrderModel(
         id=db_order.id, table_id=db_order.table_id, client_id=db_order.client_id, status=db_order.status,
-        created_at=db_order.created_at, items=order.items)
+        created_at=db_order.created_at, items=order_items)
     response = ResponseModel(screen_id=context.screen_id, data=dinein_model)
     return response
 
 
-
 @router.get("/dinein/order")
 def get_orders_for_order_id(client_id: str, order_id: Optional[str] = None, context: SaasContext = Depends(verify_token), db: Session = Depends(get_db)):
-    if order_id:
-        order = db.query(DBOrder).filter(
-            DBOrder.client_id == client_id,
-            DBOrder.id == order_id
-        ).first()
+    order = db.query(DBOrder).filter(
+        DBOrder.client_id == client_id,
+        DBOrder.id == order_id
+    ).first()
 
-        if order:
-            items = order.items
-            item_models = []
+    if not order:
+        return ResponseModel(screen_id=context.screen_id, data=None, status="not_found")
 
-            for item in items:
-                item_models.append(DBOrderItem.copyToModel(item))
-   
-    
-    result={
-            "id": order.id,
-            "table_id": order.table_id,
-            "client_id": order.client_id,
-            "status": order.status,
-            "created_at": order.created_at,
-            "items": [i.dict() for i in item_models],
-            "total_price": order.total_price
+    db_items = db.query(DBOrderItem).filter(DBOrderItem.order_id == order.id).all()
+    item_models = [DBOrderItem.copyToModel(item) for item in db_items]
+
+    result = {
+        "id": order.id,
+        "table_id": order.table_id,
+        "client_id": order.client_id,
+        "status": order.status,
+        "created_at": order.created_at,
+        "items": [i.dict() for i in item_models],
+        "total_price": order.total_price
     }
 
-    response = ResponseModel(screen_id=context.screen_id, data=result)
-    return response
+    return ResponseModel(screen_id=context.screen_id, data=result)
 
 
 
