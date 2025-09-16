@@ -97,11 +97,6 @@ async def add_user(client_id: str, userReq: UserModel, db: Session = Depends(get
     return {"message": "User registered successfully"}
 
 
-@router.post("/reset-password")
-def reset_password(req_data: ResetPasswordRequest):
-    return {"message": "Feel free to build the api"}
-
-
 @router.get("/test")
 async def test_msg(client_id: str, context: SaasContext = Depends(verify_token), db: Session = Depends(get_db)):
     print("test context - ", context)
@@ -160,10 +155,8 @@ async def forgot_password(client_id: str, req_data: ForgotPasswordRequest, db: S
     create_notification(
         db=db,
         client_id=client_id,
-        username=user.username,
         template_name="forgot_password",
         notification_body=notification_text,
-        notification_metadata=metadata,
         type="template",
         realm="food"
     )
@@ -215,10 +208,8 @@ async def reset_password(
         create_notification(
             db=db,
             client_id=client_id,
-            username=user.username,
             template_name="reset_password_otp",
             notification_body=notification_text,
-            notification_metadata=metadata,
             type="template",
             realm="food"
         )
@@ -236,21 +227,18 @@ async def reset_password(
     db.commit()
     otp_store.pop(user.id, None)
     metadata = {
-        "username": user.username,
         "clientId": client_id
     }
     template_body = get_template_body(
         db, client_id, "reset_password_success", "template")
     if not template_body:
-        template_body = "Dear {username}, your password for {clientId} has been reset successfully."
+        template_body = "Dear user, your password  has been reset successfully."
     notification_text = render_template(template_body, metadata)
     create_notification(
         db=db,
         client_id=client_id,
-        username=user.username,
         template_name="reset_password_success",
         notification_body=notification_text,
-        notification_metadata=metadata,
         type="template",
         realm="food"
     )
@@ -317,7 +305,6 @@ async def add_person_details(
         username=person_req.first_name,
         template_name=template_name,
         notification_body=body,
-        notification_metadata=metadata,
         type="notification",
         realm="food"
     )
@@ -373,7 +360,6 @@ def get_notifications(
             "username": n.username,
             "notification_body": n.notification_body,
             "template_name": n.template_name,
-            "notification_metadata": n.notification_metadata,
             "type": n.type,
             "realm": n.realm,
             "ref_id": n.ref_id,

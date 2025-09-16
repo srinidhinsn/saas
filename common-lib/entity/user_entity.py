@@ -117,31 +117,12 @@ class Notification(Base):
 
     id = Column(UUID(as_uuid=True), primary_key=True, default=uuid.uuid4)
     client_id = Column(String, nullable=False)
-    username = Column(String, nullable=False)
-    notification_body = Column(String, nullable=False)
+    notification_body = Column(String, nullable=True)
     template_name = Column(String, nullable=True)
-    notification_metadata = Column(JSON, nullable=True)
+    template_body = Column(String, nullable=True)
     type = Column(String, nullable=True)
     realm = Column(String, nullable=True)
-    ref_id = Column(String, nullable=True)
-    is_read = Column(Boolean, default=False)
-    is_deleted = Column(Boolean, default=False)
-    read_by = Column(String, nullable=True)
-    created_at = Column(TIMESTAMP, server_default=func.now())
-    updated_at = Column(
-        TIMESTAMP, server_default=func.now(), onupdate=func.now())
-
-
-class NotificationTemplate(Base):
-    __tablename__ = "notification_templates"
-
-    id = Column(UUID(as_uuid=True), primary_key=True, default=uuid.uuid4)
-    client_id = Column(String, nullable=False)
-    template_name = Column(String, nullable=False, index=True)
-    type = Column(String, nullable=False, default="notification")
-    template_body = Column(String, nullable=False)
-    realm = Column(String, nullable=True)
-    is_active = Column(Boolean, default=True)
+    is_read = Column(String, nullable=True)
     created_at = Column(TIMESTAMP, server_default=func.now())
     updated_at = Column(
         TIMESTAMP, server_default=func.now(), onupdate=func.now())
