@@ -124,6 +124,8 @@ async def test_msg(client_id: str, context: SaasContext = Depends(verify_token),
 
 # ---------------- Forgot Password ----------------
 
+# ---------------- Forgot Password ----------------
+
 
 @router.post("/forgot-password")
 async def forgot_password(client_id: str, req_data: ForgotPasswordRequest, db: Session = Depends(get_db)):
@@ -149,24 +151,17 @@ async def forgot_password(client_id: str, req_data: ForgotPasswordRequest, db: S
     template_body = get_template_body(
         db, client_id, "forgot_password", "template")
     if not template_body:
-        template_body = "Dear {username}, your forgot-password OTP for {clientId} is {otp}"
+        template_body = "Hey {username}, your forgot-password OTP for {clientId} is {otp}"
     notification_text = render_template(template_body, metadata)
 
-    create_notification(
-        db=db,
-        client_id=client_id,
-        template_name="forgot_password",
-        notification_body=notification_text,
-        type="template",
-        realm="food"
-    )
+    # Removed create_notification, no DB record created
 
     if not otpEmailService(person.email, notification_text):
         raise HTTPException(status_code=500, detail="Failed to send OTP")
     return {"message": "OTP sent successfully"}
 
-# ---------------- Reset Password ----------------
 
+# ---------------- Reset Password ----------------
 
 @router.post("/reset-password")
 async def reset_password(
@@ -202,17 +197,7 @@ async def reset_password(
             template_body = "Dear {username}, your reset-password OTP for {clientId} is {otp}"
         notification_text = render_template(template_body, metadata)
 
-        print('Template body:', template_body)
-        print('Notification text:', notification_text)
-
-        create_notification(
-            db=db,
-            client_id=client_id,
-            template_name="reset_password_otp",
-            notification_body=notification_text,
-            type="template",
-            realm="food"
-        )
+        # Removed create_notification, no DB record created
         otpEmailService(person.email, notification_text)
         return {"message": "OTP sent successfully"}
 
@@ -232,21 +217,15 @@ async def reset_password(
     template_body = get_template_body(
         db, client_id, "reset_password_success", "template")
     if not template_body:
-        template_body = "Dear user, your password  has been reset successfully."
+        template_body = "Dear user, your password has been reset successfully."
     notification_text = render_template(template_body, metadata)
-    create_notification(
-        db=db,
-        client_id=client_id,
-        template_name="reset_password_success",
-        notification_body=notification_text,
-        type="template",
-        realm="food"
-    )
+
+    # Removed create_notification, no DB record created
     otpEmailService(person.email, notification_text)
     return {"message": "Password reset successfully"}
 
-# --------------------------------- Person Details -----------------------------------------
 
+# --------------------------------- Person Details -----------------------------------------
 
 @router.post("/person-details")
 async def add_person_details(
@@ -291,23 +270,10 @@ async def add_person_details(
     user.username = person_req.first_name
     db.commit()
 
-    metadata = {
-        "username": person_req.first_name,
-        "role": "user",
-        "clientId": client_id,
-        "action": action
-    }
-    template_name = "user_details_update" if action == "updated" else "user_add"
     body = f"Dear {person_req.first_name}, your details for {client_id} have been {action}."
-    create_notification(
-        db=db,
-        client_id=client_id,
-        username=person_req.first_name,
-        template_name=template_name,
-        notification_body=body,
-        type="notification",
-        realm="food"
-    )
+
+    # Removed create_notification, no DB record created
+
     if person_req.email:
         otpEmailService(person_req.email, body)
 
@@ -342,8 +308,7 @@ async def get_person_details(
     }
 
 
-# Notifications
-
+# Notifications endpoint: No DB storage of notifications, return empty or dynamic list
 
 @router.get("/notifications")
 def get_notifications(
@@ -351,23 +316,5 @@ def get_notifications(
     db: Session = Depends(get_db),
     context: SaasContext = Depends(verify_token),
 ):
-    notifications = db.query(Notification).filter_by(
-        client_id=client_id).order_by(Notification.created_at.desc()).all()
-    return [
-        {
-            "id": str(n.id),
-            "client_id": n.client_id,
-            "username": n.username,
-            "notification_body": n.notification_body,
-            "template_name": n.template_name,
-            "type": n.type,
-            "realm": n.realm,
-            "ref_id": n.ref_id,
-            "is_read": n.is_read,
-            "is_deleted": n.is_deleted,
-            "read_by": n.read_by,
-            "created_at": n.created_at.isoformat() if isinstance(n.created_at, datetime) else n.created_at,
-            "updated_at": n.updated_at.isoformat() if isinstance(n.updated_at, datetime) else n.updated_at,
-        }
-        for n in notifications
-    ]
+    # Return empty list or dynamically generate notifications (no DB rows created)
+    return []

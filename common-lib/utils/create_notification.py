@@ -15,7 +15,6 @@ def create_notification(
     db: Session,
     client_id: str,
     template_name: str,
-    notification_body: str,
     type: str = "notification",
     realm: str = "food",
     is_read: bool = False,
@@ -24,7 +23,6 @@ def create_notification(
     notif = Notification(
         client_id=client_id,
         template_name=template_name,
-        notification_body=notification_body,
         type=type,
         realm=realm,
         is_read=is_read,

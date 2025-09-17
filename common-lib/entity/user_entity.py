@@ -117,7 +117,6 @@ class Notification(Base):
 
     id = Column(UUID(as_uuid=True), primary_key=True, default=uuid.uuid4)
     client_id = Column(String, nullable=False)
-    notification_body = Column(String, nullable=True)
     template_name = Column(String, nullable=True)
     template_body = Column(String, nullable=True)
     type = Column(String, nullable=True)
