@@ -29,6 +29,7 @@ import ResetPassword from "../Main_Components/User_Services_Components/ResetPass
 import PersonForm from "../Util_Components/PersonForm";
 import NotificationTable from "../Main_Components/Notification_Services_Components/All_NotificationsPage";
 import PopupNotification from "../Main_Components/Notification_Services_Components/Popup_Notifications";
+import BillingUI from "../Main_Components/Invoice_Services_Components/BillingUI";
 // import InvoicePage from "../InvoiceComponents/InvoicePage";
 // import ReportsPage from "../ReportComponents/ReportsPage";
 // import TableOverview from "../TableOverviewComponents/TableOverview";
@@ -141,6 +142,8 @@ const SaasClientRoutes = ({
 
                         <Route path="all-notifications" element={<NotificationTable />} />
                         <Route path="popup-notifications" element={<PopupNotification />} />
+
+                        <Route path="/billing" element={<BillingUI />} />
 
                         {/* <Route path="documents" element={<Documents />} />
                     <Route path="billing" element={<BillingPage />} />

@@ -312,6 +312,7 @@ export default function PopupNotification() {
 
     // Fetch notifications periodically
     useEffect(() => {
+        // inside useEffect -> fetchNotifications()
         const fetchNotifications = async () => {
             try {
                 const res = await userServicesPort.get(`/${clientId}/users/notifications`, {
@@ -320,22 +321,25 @@ export default function PopupNotification() {
                     }
                 });
 
-                // handle if backend returns array directly or inside data
+
+
                 const rawData = Array.isArray(res.data) ? res.data : res.data.data || [];
 
                 const newNotes = rawData.map(n => ({
                     id: n.id,
                     type: n.template_name,
-                    message: n.notification_body,
+                    message: n.notification_body || "",     // actual notification message
                     time: n.created_at
-                        ? new Date(n.created_at).toLocaleTimeString([], { hour: "2-digit", minute: "2-digit" })
+                        ? new Date(n.created_at).toLocaleString([], { hour: "2-digit", minute: "2-digit", hour12: true })
                         : ""
                 }));
+
                 setNotifications(newNotes);
             } catch (err) {
                 console.error("Error fetching notifications", err);
             }
         };
+
 
 
         fetchNotifications();

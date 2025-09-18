@@ -355,18 +355,46 @@ const OrdersVisiblePage = () => {
     const confirmDeleteOrder = async () => {
         if (!orderToDelete) return;
         try {
+            // Delete the order
             await orderServicesPort.delete(`/${clientId}/dinein/delete`, {
                 params: { dinein_order_id: orderToDelete, client_id: clientId },
                 headers: { Authorization: `Bearer ${token}` },
             });
-            setOrders((prev) => prev.filter((o) => o.id !== orderToDelete));
+
+            // Find the deleted order from current state to get the table_id
+            const deletedOrder = orders.find(o => o.id === orderToDelete);
+            const tableIdOfDeletedOrder = deletedOrder?.table_id;
+
+            if (tableIdOfDeletedOrder) {
+                // Fetch table object for full details (optional but recommended)
+                const tableObj = tables.find(t => t.id === tableIdOfDeletedOrder);
+
+                // Update the table status to Vacant on backend
+                await tableServicesPort.post(
+                    `/${clientId}/tables/update`,
+                    {
+                        id: tableIdOfDeletedOrder,
+                        client_id: clientId,
+                        name: tableObj?.name || "", // preserve name
+                        table_type: tableObj?.table_type || "",
+                        status: "Vacant",
+                        location_zone: tableObj?.location_zone || ""
+                    },
+                    { headers: { Authorization: `Bearer ${token}` } }
+                );
+            }
+
+            // Remove the order from local state and reset UI
+            setOrders(prev => prev.filter(o => o.id !== orderToDelete));
             setExpandedOrderIndex(null);
-            toast.success("Order deleted");
-        } catch (err) {
-            toast.error("❌ Failed to delete order");
-        } finally {
             setShowDeleteModal(false);
             setOrderToDelete(null);
+
+            toast.success("Order deleted and table marked vacant.");
+            // Optionally, refresh tables to reflect the new status
+            fetchTables();
+        } catch (err) {
+            toast.error("❌ Failed to delete order or update table status");
         }
     };
 

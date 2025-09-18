@@ -251,11 +251,171 @@
 //============================================================================================================================================//
 
 
+// import React, { useState, useEffect } from "react";
+// import { toast } from "react-toastify";
+// import userServicesPort from "../Backend_Port_Files/UserServices";
+// import { useParams } from "react-router-dom";
+// import { FaEdit, FaCheckCircle } from "react-icons/fa";
+
+// export default function UserProfileForm() {
+//   const { clientId } = useParams();
+//   const [form, setForm] = useState({
+//     first_name: "",
+//     last_name: "",
+//     email: "",
+//     phone: "",
+//     dob: "",
+//   });
+//   const [loading, setLoading] = useState(false);
+//   const [editMode, setEditMode] = useState({});
+//   const [profileSaved, setProfileSaved] = useState(false);
+//   const token = localStorage.getItem("access_token")
+//   // Fetch user data
+//   useEffect(() => {
+//     fetchProfile();
+//     // eslint-disable-next-line
+//   }, [clientId, profileSaved]);
+
+//   const fetchProfile = async () => {
+//     try {
+//       const res = await userServicesPort.get(
+//         `/${clientId}/users/person-details`, {
+//         headers: {
+//           Authorization: `Bearer ${token}`
+//         }
+//       }
+//       );
+//       if (res.data && res.data.data) {
+//         setForm(res.data.data);
+//         setProfileSaved(true);
+//       }
+//     } catch (err) {
+//       // no profile exists yet
+//     }
+//   };
+
+//   const handleChange = (e) =>
+//     setForm({ ...form, [e.target.name]: e.target.value });
+
+//   const handleEdit = (field) => setEditMode({ ...editMode, [field]: true });
+
+//   const handleSaveEdit = (field) => setEditMode({ ...editMode, [field]: false });
+
+//   const handleSubmit = async (e) => {
+//     e.preventDefault();
+//     setLoading(true);
+//     try {
+//       const res = await userServicesPort.post(
+//         `/${clientId}/users/person-details`,
+//         form, {
+//         headers: {
+//           Authorization: `Bearer ${token}`
+//         }
+//       }
+//       );
+//       toast.success(res.data.message || "Profile saved!");
+//       setProfileSaved(true);
+//       setEditMode({});
+//     } catch (err) {
+//       const detail = err?.response?.data?.detail;
+//       toast.error(detail || "Failed to save user profile");
+//     } finally {
+//       setLoading(false);
+//     }
+//   };
+
+//   const renderField = (field, label, type = "text") => (
+//     <div className="form-group">
+//       <label htmlFor={field}>{label}</label>
+//       <div className="profile-field-row">
+//         {profileSaved && !editMode[field] ? (
+//           <>
+//             <span className="profile-text">{form[field] || "Not set"}</span>
+//             <FaEdit
+//               className="edit-icon"
+//               title="Edit"
+//               onClick={() => handleEdit(field)}
+//             />
+//           </>
+//         ) : (
+//           <>
+//             <input
+//               type={type}
+//               name={field}
+//               id={field}
+//               required={field === "first_name" || field === "last_name" || field === "email"}
+//               value={form[field] || ""}
+//               onChange={handleChange}
+//               placeholder={`Enter ${label.toLowerCase()}`}
+//             />
+//             {editMode[field] && (
+//               <FaCheckCircle
+//                 className="save-icon"
+//                 title="Save"
+//                 onClick={() => handleSaveEdit(field)}
+//               />
+//             )}
+//           </>
+//         )}
+//       </div>
+//     </div>
+//   );
+
+//   return (
+//     <div className="container profile-container">
+//       <div className="form-card profile-card">
+//         <h2>User Profile</h2>
+//         <form className="user-form" onSubmit={handleSubmit}>
+//           <div className="form-columns">
+//             {renderField("first_name", "First Name")}
+//             {renderField("last_name", "Last Name")}
+//           </div>
+
+//           <div className="form-columns">
+//             {renderField("email", "Email Address", "email")}
+//             {renderField("phone", "Phone Number", "tel")}
+//           </div>
+
+//           {renderField("dob", "Date of Birth", "date")}
+
+//           <div className="form-actions">
+//             <button type="submit" disabled={loading}>
+//               {profileSaved
+//                 ? loading
+//                   ? "Updating..."
+//                   : "Update Profile"
+//                 : loading
+//                   ? "Saving..."
+//                   : "Save Profile"}
+//             </button>
+//           </div>
+//         </form>
+//       </div>
+//     </div>
+//   );
+// }
+
+
+// ===================================================================================================================================== 
+// ===================================================================================================================================== 
+// ===================================================================================================================================== 
+
+
 import React, { useState, useEffect } from "react";
+import { FaEdit, FaCheckCircle } from "react-icons/fa";
+import { useParams } from "react-router-dom";
 import { toast } from "react-toastify";
 import userServicesPort from "../Backend_Port_Files/UserServices";
-import { useParams } from "react-router-dom";
-import { FaEdit, FaCheckCircle } from "react-icons/fa";
+
+
+const FIELD_MAP = [
+  { field: "first_name", label: "First Name", type: "text" },
+  { field: "last_name", label: "Last Name", type: "text" },
+  { field: "email", label: "Email", type: "email" },
+  { field: "phone", label: "Phone", type: "tel" },
+  { field: "dob", label: "Date of Birth", type: "date" },
+  { field: "address", label: "Address", type: "text" },
+];
 
 export default function UserProfileForm() {
   const { clientId } = useParams();
@@ -267,39 +427,41 @@ export default function UserProfileForm() {
     dob: "",
   });
   const [loading, setLoading] = useState(false);
-  const [editMode, setEditMode] = useState({});
+  const [editField, setEditField] = useState("");
   const [profileSaved, setProfileSaved] = useState(false);
-  const token = localStorage.getItem("access_token")
-  // Fetch user data
+  const [lastUpdated, setLastUpdated] = useState("Never updated");
+  const token = localStorage.getItem("access_token");
+
   useEffect(() => {
     fetchProfile();
-    // eslint-disable-next-line
   }, [clientId, profileSaved]);
 
   const fetchProfile = async () => {
     try {
       const res = await userServicesPort.get(
-        `/${clientId}/users/person-details`, {
-        headers: {
-          Authorization: `Bearer ${token}`
-        }
-      }
+        `/${clientId}/users/person-details`,
+        { headers: { Authorization: `Bearer ${token}` } }
       );
       if (res.data && res.data.data) {
         setForm(res.data.data);
         setProfileSaved(true);
+        setLastUpdated("Updated at " + new Date().toLocaleTimeString([], { hour: "2-digit", minute: "2-digit" }));
       }
     } catch (err) {
-      // no profile exists yet
+      setProfileSaved(false);
+      setLastUpdated("Never updated");
     }
   };
 
   const handleChange = (e) =>
     setForm({ ...form, [e.target.name]: e.target.value });
 
-  const handleEdit = (field) => setEditMode({ ...editMode, [field]: true });
+  const handleEdit = (field) => setEditField(field);
 
-  const handleSaveEdit = (field) => setEditMode({ ...editMode, [field]: false });
+  const handleSaveEdit = () => {
+    setEditField("");
+    setLastUpdated("Updated at " + new Date().toLocaleTimeString([], { hour: "2-digit", minute: "2-digit" }));
+  };
 
   const handleSubmit = async (e) => {
     e.preventDefault();
@@ -307,86 +469,115 @@ export default function UserProfileForm() {
     try {
       const res = await userServicesPort.post(
         `/${clientId}/users/person-details`,
-        form, {
-        headers: {
-          Authorization: `Bearer ${token}`
-        }
-      }
+        form,
+        { headers: { Authorization: `Bearer ${token}` } }
       );
       toast.success(res.data.message || "Profile saved!");
       setProfileSaved(true);
-      setEditMode({});
+      setEditField("");
+      setLastUpdated("Updated at " + new Date().toLocaleTimeString([], { hour: "2-digit", minute: "2-digit" }));
     } catch (err) {
-      const detail = err?.response?.data?.detail;
-      toast.error(detail || "Failed to save user profile");
+      toast.error("Failed to save user profile");
     } finally {
       setLoading(false);
     }
   };
 
-  const renderField = (field, label, type = "text") => (
-    <div className="form-group">
-      <label htmlFor={field}>{label}</label>
-      <div className="profile-field-row">
-        {profileSaved && !editMode[field] ? (
-          <>
-            <span className="profile-text">{form[field] || "Not set"}</span>
-            <FaEdit
-              className="edit-icon"
-              title="Edit"
-              onClick={() => handleEdit(field)}
-            />
-          </>
+  // Modal for editing fields
+  const EditModal = ({ field, type, value, onChange, onSave, onCancel }) => (
+    <div className="edit-modal-overlay" onClick={onCancel}>
+      <div className="edit-modal" onClick={(e) => e.stopPropagation()}>
+        <h3 className="edit-modal-title">Edit {FIELD_MAP.find(f => f.field === field)?.label}</h3>
+        {type === "textarea" ? (
+          <textarea
+            name={field}
+            className="edit-modal-input"
+            value={value}
+            onChange={onChange}
+            rows={3}
+            placeholder={`Enter your ${field.replace("_", " ")}`}
+            autoFocus
+          />
         ) : (
-          <>
-            <input
-              type={type}
-              name={field}
-              id={field}
-              required={field === "first_name" || field === "last_name" || field === "email"}
-              value={form[field] || ""}
-              onChange={handleChange}
-              placeholder={`Enter ${label.toLowerCase()}`}
-            />
-            {editMode[field] && (
-              <FaCheckCircle
-                className="save-icon"
-                title="Save"
-                onClick={() => handleSaveEdit(field)}
-              />
-            )}
-          </>
+          <input
+            type={type}
+            name={field}
+            className="edit-modal-input"
+            value={value}
+            onChange={onChange}
+            placeholder={`Enter your ${field.replace("_", " ")}`}
+            autoFocus
+          />
         )}
+        <div className="edit-modal-actions">
+          <button type="button" className="btn" onClick={onSave}>
+            Save
+          </button>
+          <button type="button" className="btn cancel" onClick={onCancel}>
+            Cancel
+          </button>
+        </div>
       </div>
     </div>
   );
 
   return (
-    <div className="container profile-container">
-      <div className="form-card profile-card">
-        <h2>User Profile</h2>
-        <form className="user-form" onSubmit={handleSubmit}>
-          <div className="form-columns">
-            {renderField("first_name", "First Name")}
-            {renderField("last_name", "Last Name")}
+    <div className="Profile-page-Container">
+      <div className="profile-page">
+        <div className="profile-header">
+          <div className="profile-header-left">
+            <div className="profile-avatar">
+              {/* Replace with SVG or image as needed */}
+              <span className="profile-avatar-icon"><FaCheckCircle size={28} /></span>
+            </div>
+            <div>
+              <h1 className="profile-title">Profile Settings</h1>
+              <p className="profile-subtitle">Update your personal information</p>
+            </div>
           </div>
-
-          <div className="form-columns">
-            {renderField("email", "Email Address", "email")}
-            {renderField("phone", "Phone Number", "tel")}
+          <div className="profile-header-right">
+            <span className="profile-last-updated">{lastUpdated}</span>
           </div>
+        </div>
 
-          {renderField("dob", "Date of Birth", "date")}
-
-          <div className="form-actions">
-            <button type="submit" disabled={loading}>
+        <form className="profile-card-grid" onSubmit={handleSubmit}>
+          {FIELD_MAP.map(({ field, label, type }) => (
+            <div key={field} className="profile-card card-hover">
+              <div className="profile-card-header">
+                <span className="profile-card-label">{label}</span>
+                <button
+                  type="button"
+                  className="edit-btn"
+                  onClick={() => handleEdit(field)}
+                  tabIndex="0"
+                >
+                  <FaEdit />
+                  Edit
+                </button>
+              </div>
+              <div className="profile-card-value">
+                <span>
+                  {form[field] ? form[field] : "Not set"}
+                </span>
+              </div>
+              {/* Render modal editor for this field */}
+              {editField === field && (
+                <EditModal
+                  field={field}
+                  type={type}
+                  value={form[field] || ""}
+                  onChange={(e) => setForm({ ...form, [field]: e.target.value })}
+                  onSave={handleSaveEdit}
+                  onCancel={() => setEditField("")}
+                />
+              )}
+            </div>
+          ))}
+          <div className="profile-actions">
+            <button type="submit" className="btn" disabled={loading}>
               {profileSaved
-                ? loading
-                  ? "Updating..."
-                  : "Update Profile"
-                : loading
-                  ? "Saving..."
-                  : "Save Profile"}
+                ? loading ? "Updating..." : "Update Profile"
+                : loading ? "Saving..." : "Save Profile"}
             </button>
           </div>
         </form>
