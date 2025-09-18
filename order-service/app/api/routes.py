@@ -6,7 +6,7 @@ from uuid import UUID
 from database.postgres import get_db
 from models.response_model import ResponseModel
 from entity.table_entity import DiningTable
-from entity.order_entity import DineinOrder as DBOrder, OrderItem as DBOrderItem
+from entity.order_entity import DineinOrder as Db_Order_Entity, OrderItem as Db_OrderItem_Entity
 from models.order_model import DineinOrderModel, OrderItemModel, OrderStatusEnum
 from utils.auth import verify_token
 from models.saas_context import SaasContext
@@ -69,19 +69,19 @@ router = APIRouter()
 
 @router.post("/dinein/create", response_model=ResponseModel[DineinOrderModel])
 def create_order(client_id: str, order: DineinOrderModel, context: SaasContext = Depends(verify_token), db: Session = Depends(get_db)):
-    db_order = DBOrder(client_id=client_id, table_id=order.table_id, status=order.status or OrderStatusEnum.new,
+    db_order = Db_Order_Entity(client_id=client_id, table_id=order.table_id, status=order.status or OrderStatusEnum.new,
                        price=order.price, gst=order.gst, cst=order.cst, discount=order.discount, invoice_status=order.invoice_status,
                        total_price=order.total_price, invoice_id=order.invoice_id, dinein_order_id=order.dinein_order_id, handler_id=order.handler_id, created_by=order.created_by, updated_by=order.updated_by)
     db.add(db_order)
     db.flush()
     for item in order.items:
-        db_item = DBOrderItem(order_id=db_order.id, client_id=client_id,
+        db_item = Db_OrderItem_Entity(order_id=db_order.id, client_id=client_id,
                               item_id=item.item_id, quantity=item.quantity,item_name=item.item_name,slug=item.slug, status=item.status or OrderStatusEnum.new)
         db.add(db_item)
     db.commit()
     db.refresh(db_order)
 
-    db_items = db.query(DBOrderItem).filter(DBOrderItem.order_id == db_order.id).all()
+    db_items = db.query(Db_OrderItem_Entity).filter(Db_OrderItem_Entity.order_id == db_order.id).all()
     order_items = [
         OrderItemModel(
             client_id=i.client_id,
@@ -103,16 +103,16 @@ def create_order(client_id: str, order: DineinOrderModel, context: SaasContext =
 
 @router.get("/dinein/order")
 def get_orders_for_order_id(client_id: str, order_id: Optional[str] = None, context: SaasContext = Depends(verify_token), db: Session = Depends(get_db)):
-    order = db.query(DBOrder).filter(
-        DBOrder.client_id == client_id,
-        DBOrder.id == order_id
+    order = db.query(Db_Order_Entity).filter(
+        Db_Order_Entity.client_id == client_id,
+        Db_Order_Entity.id == order_id
     ).first()
 
     if not order:
         return ResponseModel(screen_id=context.screen_id, data=None, status="not_found")
 
-    db_items = db.query(DBOrderItem).filter(DBOrderItem.order_id == order.id).all()
-    item_models = [DBOrderItem.copyToModel(item) for item in db_items]
+    db_items = db.query(Db_OrderItem_Entity).filter(Db_OrderItem_Entity.order_id == order.id).all()
+    item_models = [Db_OrderItem_Entity.copyToModel(item) for item in db_items]
 
     result = {
         "id": order.id,
@@ -131,13 +131,13 @@ def get_orders_for_order_id(client_id: str, order_id: Optional[str] = None, cont
 @router.get("/dinein/table")
 def get_orders_for_table(client_id: str, table_id: Optional[str] = None, context: SaasContext = Depends(verify_token), db: Session = Depends(get_db)):
     if table_id:
-        orders = db.query(DBOrder).filter(
-            DBOrder.client_id == client_id,
-            DBOrder.table_id == table_id
+        orders = db.query(Db_Order_Entity).filter(
+            Db_Order_Entity.client_id == client_id,
+            Db_Order_Entity.table_id == table_id
         ).all()
     else:
-        orders = db.query(DBOrder).filter(
-            DBOrder.client_id == client_id
+        orders = db.query(Db_Order_Entity).filter(
+            Db_Order_Entity.client_id == client_id
         ).all()
 
     result = []
@@ -151,7 +151,7 @@ def get_orders_for_table(client_id: str, table_id: Optional[str] = None, context
                 item_names.append(item.name)
             except:
                 item_names.append("Unknown")
-            item_models.append(DBOrderItem.copyToModel(item))
+            item_models.append(Db_OrderItem_Entity.copyToModel(item))
 
         result.append({
             "id": order.id,
@@ -174,8 +174,8 @@ def get_orders_for_table(client_id: str, table_id: Optional[str] = None, context
 def update_order_status(client_id: str, body: DineinOrderModel, context: SaasContext = Depends(verify_token), db: Session = Depends(get_db)):
     if not body.id:
         raise HTTPException(status_code=400, detail="Order ID is required")
-    order = db.query(DBOrder).filter(DBOrder.id == str(
-        body.id), DBOrder.client_id == str(client_id)).first()
+    order = db.query(Db_Order_Entity).filter(Db_Order_Entity.id == str(
+        body.id), Db_Order_Entity.client_id == str(client_id)).first()
     if not order:
         raise HTTPException(status_code=404, detail="Order not found")
 
@@ -191,8 +191,8 @@ def update_order_items(client_id: str, order_id: Optional[str] = Query(None), bo
     if not order_id:
         raise HTTPException(status_code=400, detail="Missing order_id")
 
-    db.query(DBOrderItem).filter(DBOrderItem.order_id == order_id).delete()
-    latest_order_item_list = DBOrderItem.copyFromModels(body)
+    db.query(Db_OrderItem_Entity).filter(Db_OrderItem_Entity.order_id == order_id).delete()
+    latest_order_item_list = Db_OrderItem_Entity.copyFromModels(body)
     db.add_all(latest_order_item_list)
     db.commit()
     response = ResponseModel(screen_id=context.screen_id, data={"message": "Order items updated successfully"})
@@ -204,9 +204,9 @@ def update_order_items(client_id: str, order_id: Optional[str] = Query(None), or
     if not order_id or not order_item or not order_item.id:
         raise HTTPException(status_code=400, detail="Missing order_id or order_item_id")
 
-    existing_item = db.query(DBOrderItem).filter(DBOrderItem.id == order_item.id, DBOrderItem.order_id == order_id).first()
+    existing_item = db.query(Db_OrderItem_Entity).filter(Db_OrderItem_Entity.id == order_item.id, Db_OrderItem_Entity.order_id == order_id).first()
 
-    updated_item = DBOrderItem.copyFromModel(order_item)
+    updated_item = Db_OrderItem_Entity.copyFromModel(order_item)
     for attr, value in updated_item.__dict__.items():
         if attr != "_sa_instance_state":
             setattr(existing_item, attr, value)
@@ -219,8 +219,8 @@ def update_order_items(client_id: str, order_id: Optional[str] = Query(None), or
 @router.delete("/order_item/delete")
 def delete_order_items(client_id: str, order_item_id: Optional[str] = Query(None), context: SaasContext = Depends(verify_token), db: Session = Depends(get_db)):
 
-    order_item = db.query(DBOrderItem).filter(DBOrderItem.id == str(
-        order_item_id), DBOrderItem.client_id == client_id).first()
+    order_item = db.query(Db_OrderItem_Entity).filter(Db_OrderItem_Entity.id == str(
+        order_item_id), Db_OrderItem_Entity.client_id == client_id).first()
     if not order_item:
         raise HTTPException(status_code=404, detail="Order item not found")
 
@@ -233,8 +233,8 @@ def delete_order_items(client_id: str, order_item_id: Optional[str] = Query(None
 
 @router.delete("/dinein/delete")
 def delete_order(client_id: str, dinein_order_id: str, context: SaasContext = Depends(verify_token), db: Session = Depends(get_db)):
-    order = db.query(DBOrder).filter(DBOrder.id == dinein_order_id,
-                                     DBOrder.client_id == client_id).first()
+    order = db.query(Db_Order_Entity).filter(Db_Order_Entity.id == dinein_order_id,
+                                     Db_Order_Entity.client_id == client_id).first()
     if not order:
         raise HTTPException(status_code=404, detail="Order not found")
     if order.status == OrderStatusEnum.served:
@@ -250,8 +250,8 @@ def delete_order(client_id: str, dinein_order_id: str, context: SaasContext = De
 
 @router.get("/kds/orders")
 def get_kds_orders(client_id: str, context: SaasContext = Depends(verify_token), db: Session = Depends(get_db)):
-    orders = db.query(DBOrder).filter(DBOrder.client_id == str(client_id), DBOrder.status.in_([OrderStatusEnum.pending, OrderStatusEnum.preparing])
-                                      ).order_by(DBOrder.created_at.asc()).all()
+    orders = db.query(Db_Order_Entity).filter(Db_Order_Entity.client_id == str(client_id), Db_Order_Entity.status.in_([OrderStatusEnum.pending, OrderStatusEnum.preparing])
+                                      ).order_by(Db_Order_Entity.created_at.asc()).all()
 
   
     ''''
