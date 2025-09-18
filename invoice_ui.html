@@ -1,0 +1,217 @@
+<!DOCTYPE html>
+<html lang="en">
+<head>
+<meta charset="UTF-8" />
+<meta name="viewport" content="width=device-width, initial-scale=1.0" />
+<title>Simple Invoice UI</title>
+<style>
+  body{font-family:system-ui,Segoe UI,Roboto,Helvetica,Arial,sans-serif;margin:0;background:#0b1220;color:#e5e7eb}
+  .wrap{max-width:800px;margin:32px auto;padding:0 16px}
+  .card{background:#111827;border:1px solid #1f2937;border-radius:14px;padding:16px}
+  label{display:block;font-size:12px;color:#9ca3af;margin-bottom:6px}
+  input{width:100%;padding:10px 12px;border-radius:10px;border:1px solid #1f2937;background:#0b1220;color:#e5e7eb}
+  .row{display:grid;gap:12px;grid-template-columns:1fr}
+  @media(min-width:700px){.row{grid-template-columns:1fr 1fr}}
+  button{padding:10px 14px;border-radius:10px;border:1px solid #1f2937;background:#0b1220;color:#e5e7eb;cursor:pointer}
+  .primary{background:#2563eb;border-color:#1d4ed8}
+  .ok{background:#065f46;border-color:#064e3b}
+  .toast{margin-top:12px;padding:10px 14px;border-radius:10px;font-size:14px}
+  .okMsg{background:#064e3b;color:#d1fae5}
+  .errMsg{background:#7f1d1d;color:#fee2e2}
+  #invoice{background:#fff;color:#111827;border-radius:12px;padding:18px;margin-top:16px}
+  table{width:100%;border-collapse:collapse}
+  th,td{padding:8px;border-bottom:1px dashed #e5e7eb;text-align:left}
+  th{text-transform:uppercase;font-size:12px;color:#6b7280}
+  .right{text-align:right}
+</style>
+<script src="https://cdn.jsdelivr.net/npm/html2canvas@1.4.1/dist/html2canvas.min.js"></script>
+<script src="https://cdn.jsdelivr.net/npm/jspdf@2.5.1/dist/jspdf.umd.min.js"></script>
+</head>
+<body>
+<div class="wrap">
+  <h2 style="margin:0 0 12px 0">Simple Invoice UI</h2>
+  <div class="card">
+    <div class="row">
+      <div>
+        <label>JWT (Bearer)</label>
+        <input id="jwt" placeholder="paste your user JWT here" />
+      </div>
+      <div>
+        <label>ID (Invoice ID or Order ID)</label>
+        <input id="anyId" placeholder="e.g. 5 or 1001" />
+      </div>
+    </div>
+    <div class="row" style="margin-top:12px">
+      <div>
+        <label>Billing Base URL</label>
+        <input id="billingBase" value="http://localhost:8002" />
+      </div>
+      <div>
+        <label>Client ID</label>
+        <input id="clientId" value="easyfood" />
+      </div>
+    </div>
+    <div style="display:flex;gap:10px;flex-wrap:wrap;margin-top:12px">
+      <button class="primary" onclick="generateFlow()">Generate</button>
+      <button class="ok" onclick="issueAndPdf()">Issue & PDF</button>
+    </div>
+    <div id="msg"></div>
+
+    <div id="invoice" style="display:none">
+      <div style="display:flex;justify-content:space-between;gap:12px;align-items:flex-start">
+        <div>
+          <div style="font-weight:800;letter-spacing:.4px">EASYFOOD</div>
+          <div id="meta" style="color:#6b7280;font-size:12px">Invoice • —</div>
+        </div>
+        <div class="right">
+          <div><b>Invoice #</b> <span id="docNo">—</span></div>
+          <div><b>Date</b> <span id="docDate">—</span></div>
+          <div><b>Status</b> <span id="docStatus">—</span></div>
+        </div>
+      </div>
+      <hr/>
+      <div style="display:flex;justify-content:space-between;gap:12px;flex-wrap:wrap">
+        <div>
+          <div style="color:#6b7280">Bill To</div>
+          <div><b id="billTo">Walk-in Guest</b></div>
+          <div style="color:#6b7280;font-size:12px">Table: <span id="tableRef">—</span></div>
+        </div>
+        <div class="right">
+          <div><b>Order ID</b> <span id="orderId">—</span></div>
+          <div><b>Client</b> <span id="client">—</span></div>
+          <div><b>Currency</b> <span id="currency">INR</span></div>
+        </div>
+      </div>
+
+      <table style="margin-top:8px">
+        <thead>
+          <tr><th style="width:40px">#</th><th>Description</th><th class="right">Qty</th><th class="right">Unit Price</th><th class="right">Line Total</th></tr>
+        </thead>
+        <tbody id="lines"><tr><td colspan="5" style="color:#6b7280">No items</td></tr></tbody>
+      </table>
+
+      <div style="display:flex;justify-content:flex-end;margin-top:8px">
+        <div style="min-width:260px">
+          <div style="display:flex;justify-content:space-between;color:#6b7280"><span>Subtotal</span><b id="subTotal">—</b></div>
+          <div style="display:flex;justify-content:space-between;color:#6b7280"><span>Tax</span><b id="tax">—</b></div>
+          <div style="display:flex;justify-content:space-between;color:#6b7280"><span>Discount</span><b id="disc">—</b></div>
+          <hr/>
+          <div style="display:flex;justify-content:space-between;font-size:18px"><span>Total</span><b id="grand">—</b></div>
+        </div>
+      </div>
+    </div>
+  </div>
+</div>
+
+<script>
+const $ = (id)=>document.getElementById(id);
+const money = (v)=> Number(v||0).toLocaleString(undefined,{minimumFractionDigits:2,maximumFractionDigits:2});
+function hdr(){ const t=$('jwt').value.trim(); if(!t) throw new Error('Paste JWT'); return {Authorization:`Bearer ${t}`, 'Content-Type':'application/json'}; }
+function info(msg, ok=true){ const el=$('msg'); el.className=`toast ${ok?'okMsg':'errMsg'}`; el.textContent=msg; }
+
+async function resolveInvoiceId(anyId){
+  const billing = $('billingBase').value.trim(); const client = $('clientId').value.trim();
+  // 1) Try as invoice id directly
+  try{
+    const listUrl = `${billing}/saas/${client}/invoice/read_document`;
+    const res = await fetch(listUrl,{headers:hdr()}); const js = await res.json(); if(!res.ok) throw new Error(js?.detail||JSON.stringify(js));
+    const rows = js?.data||[];
+    const byId = rows.find(r=> String(r.id)===String(anyId));
+    if(byId) return {invoiceId: byId.id, header: byId};
+    // 2) Try as order id
+    const byOrder = rows.find(r=> String(r.order_id)===String(anyId));
+    if(byOrder) return {invoiceId: byOrder.id, header: byOrder};
+  }catch(e){ /* fallthrough */ }
+  throw new Error('Invoice not found by id or order_id');
+}
+
+async function fetchItems(invoiceId){
+  const billing = $('billingBase').value.trim(); const client = $('clientId').value.trim();
+  const url = `${billing}/saas/${client}/invoice/read?document_id=${invoiceId}`;
+  const res = await fetch(url,{headers:hdr()}); const js = await res.json(); if(!res.ok) throw new Error(js?.detail||JSON.stringify(js));
+  return js?.data||[];
+}
+
+function render(header, items){
+  $('invoice').style.display='block';
+  $('docNo').textContent = header.document_number || '—';
+  $('docStatus').textContent = header.status || '—';
+  $('docDate').textContent = (header.document_date||header.created_at) ? new Date(header.document_date||header.created_at).toLocaleDateString() : '—';
+  $('meta').textContent = `Invoice • ${header.status||'—'}`;
+  $('orderId').textContent = header.order_id || '—';
+  $('client').textContent = header.client_id || '—';
+  $('currency').textContent = header.currency || 'INR';
+  $('tableRef').textContent = header.reference_number || '—';
+  $('subTotal').textContent = money(header.subtotal);
+  $('tax').textContent = money(header.tax_amount);
+  $('disc').textContent = money(header.discount_amount);
+  $('grand').textContent = money(header.total_amount);
+
+  const tbody=$('lines'); tbody.innerHTML='';
+  if(!items.length){ const tr=document.createElement('tr'); tr.innerHTML='<td colspan="5" style="color:#6b7280">No items</td>'; tbody.appendChild(tr); return; }
+  items.forEach((r,i)=>{
+    const tr=document.createElement('tr');
+    tr.innerHTML = `<td>${i+1}</td><td>${escapeHtml(r.description||'')}</td><td class="right">${r.quantity??0}</td><td class="right">${money(r.unit_price)}</td><td class="right">${money(r.total)}</td>`;
+    tbody.appendChild(tr);
+  });
+}
+
+function escapeHtml(s){return String(s).replace(/[&<>"']/g,(c)=>({'&':'&amp;','<':'&lt;','>':'&gt;','"':'&quot;','\'':'&#039;'}[c]));}
+
+async function generateFlow(){
+  try{
+    info('Generating…');
+    const idInput = $('anyId').value.trim(); if(!idInput) throw new Error('Enter Invoice ID or Order ID');
+    const { invoiceId } = await resolveInvoiceId(idInput);
+    // Call generate
+    const billing = $('billingBase').value.trim(); const client = $('clientId').value.trim();
+    const genUrl = `${billing}/saas/${client}/invoice/generate?client_id=${client}&invoice_id=${invoiceId}&due_in_days=0`;
+    const genRes = await fetch(genUrl,{method:'POST',headers:hdr()}); const genJs = await genRes.json(); if(!genRes.ok) throw new Error(genJs?.detail||JSON.stringify(genJs));
+    // Reload full header + items
+    const { header } = await resolveInvoiceId(invoiceId);
+    const items = await fetchItems(invoiceId);
+    render(header, items);
+    info(`Generated (ID ${invoiceId})`);
+  }catch(e){ info(e.message,false); }
+}
+
+async function issueAndPdf(){
+  try{
+    info('Issuing…');
+    const idInput = $('anyId').value.trim(); if(!idInput) throw new Error('Enter Invoice ID or Order ID');
+    const { invoiceId } = await resolveInvoiceId(idInput);
+    const billing = $('billingBase').value.trim(); const client = $('clientId').value.trim();
+    const url = `${billing}/saas/${client}/invoice/issue?client_id=${client}&invoice_id=${invoiceId}`;
+    const res = await fetch(url,{method:'POST',headers:hdr()}); const js = await res.json(); if(!res.ok) throw new Error(js?.detail||JSON.stringify(js));
+    // Refresh header/items for issued state
+    const { header } = await resolveInvoiceId(invoiceId);
+    const items = await fetchItems(invoiceId);
+    render(header, items);
+    await downloadPDF();
+    info(`Issued & PDF downloaded (ID ${invoiceId})`);
+  }catch(e){ info(e.message,false); }
+}
+
+async function downloadPDF(){
+  const el = document.getElementById('invoice');
+  const { jsPDF } = window.jspdf;
+  const canvas = await html2canvas(el,{scale:2,backgroundColor:'#ffffff'});
+  const img = canvas.toDataURL('image/png');
+  const pdf = new jsPDF({orientation:'p',unit:'pt',format:'a4'});
+  const pageW = pdf.internal.pageSize.getWidth();
+  const pageH = pdf.internal.pageSize.getHeight();
+  const imgW = pageW - 60; const imgH = (canvas.height * imgW) / canvas.width;
+  if(imgH <= pageH - 60){ pdf.addImage(img,'PNG',30,30,imgW,imgH); }
+  else { let y=30, s=canvas.height*((pageH-60)/imgH), sy=0; while(sy<canvas.height){
+    const c=document.createElement('canvas'); c.width=canvas.width; c.height=Math.min(s,canvas.height-sy);
+    c.getContext('2d').drawImage(canvas,0,sy,canvas.width,c.height,0,0,canvas.width,c.height);
+    const part=c.toDataURL('image/png');
+    pdf.addImage(part,'PNG',30,30,imgW,(c.height*imgW)/canvas.width);
+    sy+=s; if(sy<canvas.height) pdf.addPage();
+  }}
+  const name = (document.getElementById('docNo').textContent || `invoice-${Date.now()}`).replace(/\s+/g,'-');
+  pdf.save(`${name}.pdf`);
+}
+</script>
+</body>
+</html>

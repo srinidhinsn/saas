@@ -6,6 +6,7 @@ REM Activate virtual environment
 REM call dev\Scripts\activate
 
 REM Start user-service
+
 cd user-service
 echo Starting user service...
 call run.bat 8000
@@ -24,7 +25,7 @@ call run.bat 8002
 cd ..
 cd table-service
 echo Starting table service...
-call run.bat 8002
+call run.bat 8003
 
 
 cd ..
