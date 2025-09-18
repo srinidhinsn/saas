@@ -1,6 +1,6 @@
 import uuid
 from database.postgres import Base
-from sqlalchemy import Column , Integer, String, ARRAY, UUID, event, Date
+from sqlalchemy import Column , Integer, String, ARRAY, UUID, event, Date,TIMESTAMP,func
 from models.user_model import UserModel, PageDefinitionModel
 
 
@@ -13,6 +13,9 @@ class Person(Base):
     dob = Column(Date, nullable=True)
     email = Column(String, nullable=True)
     phone = Column(String, nullable=True)
+    created_at = Column(TIMESTAMP, server_default=func.now())
+    updated_at = Column(
+        TIMESTAMP, server_default=func.now(), onupdate=func.now())
 
 
     def generate_uuid(first_name: str, client_id: str) -> uuid.UUID:
@@ -107,4 +110,18 @@ class PageDefinition(Base):
             PageDefinition(**model.dict(exclude_unset=True)) for model in page_models
         ]
         return page_definitions
+
+class Notification(Base):
+    __tablename__ = "notifications"
+
+    id = Column(UUID(as_uuid=True), primary_key=True, default=uuid.uuid4)
+    client_id = Column(String, nullable=False)
+    template_name = Column(String, nullable=True)
+    template_body = Column(String, nullable=True)
+    type = Column(String, nullable=True)
+    realm = Column(String, nullable=True)
+    is_read = Column(String, nullable=True)
+    created_at = Column(TIMESTAMP, server_default=func.now())
+    updated_at = Column(
+        TIMESTAMP, server_default=func.now(), onupdate=func.now())    
 
