@@ -1,4 +1,4 @@
-from fastapi import Depends, HTTPException, APIRouter, Path, Body
+from fastapi import Depends, HTTPException, APIRouter
 from sqlalchemy.orm import Session
 from database.postgres import get_db
 from entity.user_entity import User, Person, Notification
@@ -78,7 +78,6 @@ async def login_user(client_id: str, userReq: LoginRequest, db: Session = Depend
     response = ResponseModel(screen_id="default_user", data={
         "access_token": token, "token_type": "bearer"
     })
-    # response.set_response(screen_id="defaultUser", data={"access_token": token, "token_type": "bearer"})
     return response
 
 
@@ -121,12 +120,6 @@ async def test_msg(client_id: str, context: SaasContext = Depends(verify_token),
                              "message": "Test3 Authentication Service Running in user routes"})
     return response
 # =================================================================================================================================== //
-
-# ---------------- Forgot Password ----------------
-
-# ---------------- Forgot Password ----------------
-
-
 @router.post("/forgot-password")
 async def forgot_password(client_id: str, req_data: ForgotPasswordRequest, db: Session = Depends(get_db)):
     user = db.query(User).filter(
@@ -229,8 +222,8 @@ async def reset_password(
 
 @router.post("/person-details")
 async def add_person_details(
-    client_id: str = Path(...),
-    person_req: PersonModel = Body(...),
+    client_id: str,
+    person_req: PersonModel ,
     db: Session = Depends(get_db)
 ):
     user = db.query(User).filter(User.client_id == client_id).first()
@@ -272,8 +265,6 @@ async def add_person_details(
 
     body = f"Dear {person_req.first_name}, your details for {client_id} have been {action}."
 
-    # Removed create_notification, no DB record created
-
     if person_req.email:
         otpEmailService(person_req.email, body)
 
@@ -308,7 +299,6 @@ async def get_person_details(
     }
 
 
-# Notifications endpoint: No DB storage of notifications, return empty or dynamic list
 
 @router.get("/notifications")
 def get_notifications(
