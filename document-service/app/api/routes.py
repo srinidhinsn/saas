@@ -7,11 +7,10 @@ from pathlib import Path
 import traceback
 from datetime import datetime
 from calendar import monthrange
-
-from fastapi import APIRouter, UploadFile, File, Form, Depends, HTTPException
+from fastapi import APIRouter, UploadFile, File, Form, Depends, HTTPException, Query
 from fastapi.responses import StreamingResponse
 from sqlalchemy.orm import Session
-from typing import List
+from typing import List, Optional
 from database.postgres import get_db
 from models.document_model import Document
 from entity.document_entity import DocumentEntity
