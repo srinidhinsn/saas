@@ -26,53 +26,41 @@ async def register_user(client_id: str, userReq: UserModel, db: Session = Depend
     db.commit()
     return {"message": "User registered successfully"}
 
-
 @router.post("/login")
 async def login_user(client_id: str, userReq: LoginRequest, db: Session = Depends(get_db)):
-    # user = db.query(User).filter(User.username == userReq.username and User.client_id == client_id).first()
     user = db.query(User).filter(
-        # and_() is a SQLAlchemy construct that creates a SQL AND expression: SELECT * FROM user WHERE username = 'admin' AND client_id = 'easyfood';
         and_(User.username == userReq.username, User.client_id == client_id)
     ).first()
 
     if not user or not verify_password(userReq.password, user.hashed_password):
         raise HTTPException(status_code=400, detail="Invalid credentials")
 
-    #  fetch ---create new Person in the person table if not exists
-    person = db.query(Person).filter(Person.id == user.id).first()
+    userModel = User.copyToModel(user)
+
+    person = db.query(Person).filter(Person.id == userModel.id).first()
     if not person:
-    # Person doesn't exist, create it with empty first_name and last_name
-       person = Person(
-        id=user.id,
-        first_name="",  # or None if your schema allows nullable
-        last_name="",   # similarly, empty or None
-        email=user.email if hasattr(user, "email") else None  # assuming User has email attribute
-    )
-       db.add(person)
-       db.commit()
-       db.refresh(person)
+        person = Person(
+            id=userModel.id,
+            first_name="", 
+            last_name="", 
+            email=userModel.email if hasattr(userModel, "email") else None
+        )
+        db.add(person)
+        db.commit()
+        db.refresh(person)
     else:
-    # If person exists, do not update first_name to username
-    # But you can update email from User if desired
-       updated = False
-       if hasattr(user, "email") and user.email != person.email:
-            person.email = user.email
-            updated = True
-       if updated:
+        updated = False
+        if hasattr(userModel, "email") and userModel.email:
+            if userModel.email != person.email:
+               person.email = userModel.email
+               updated = True
+        if updated:
             db.commit()
 
-
-    # Create UserModel
-    userModel = UserModel(
-        id=user.id,
-        client_id=user.client_id,
-        username=user.username,
-        first_name=person.first_name,
-        roles=user.roles,
-        grants=user.grants,
-        hashed_password=user.hashed_password
-    )
-
+    userModel.first_name = person.first_name
+    userModel.last_name = person.last_name
+    userModel.email = person.email
+    userModel.phone = person.phone
     token = create_access_token({
         "user_id": str(userModel.id),
         "roles": userModel.roles,
@@ -80,9 +68,10 @@ async def login_user(client_id: str, userReq: LoginRequest, db: Session = Depend
         "grants": userModel.grants
     })
 
-    response = ResponseModel(screen_id="default_user", data={
-        "access_token": token, "token_type": "bearer"
-    })
+    response = ResponseModel(
+        screen_id="default_user",
+        data={"access_token": token, "token_type": "bearer"}
+    )
     return response
 
 @router.post("/add")
@@ -137,32 +126,35 @@ async def forgot_password(client_id: str, request: Request, db: Session = Depend
     ).first()
     if not user:
         raise HTTPException(status_code=404, detail="User not found")
-    person = db.query(Person).filter(Person.id == user.id).first()
+
+    userModel = User.copyToModel(user)
+    person = db.query(Person).filter(Person.id == userModel.id).first()
     if not person or not person.email:
         raise HTTPException(status_code=404, detail="Email not found")
 
     otp = str(random.randint(100000, 999999))
-    otp_store[user.id] = {"otp": otp,
-                          "expires": datetime.utcnow() + timedelta(minutes=10)}
+    otp_store[userModel.id] = {
+        "otp": otp,
+        "expires": datetime.utcnow() + timedelta(minutes=10)
+    }
+
     metadata = {
-        "username": user.username,
+        "username": userModel.username,
         "clientId": client_id,
         "otp": otp,
         "otp_type": "forgot-password"
     }
 
-    template_body = get_template_body(
-        db, client_id, "forgot_password", "template")
+    template_body = get_template_body(db, client_id, "forgot_password", "template")
     if not template_body:
-        template_body = "Hey {username}, your forgot-password OTP for {clientId} is {otp}"
-    notification_text = render_template(template_body, metadata)
+        template_body = "Dear {username}, your OTP for resetting password in {clientId} is {otp}."
 
+    notification_text = render_template(template_body, metadata)
     if not otpEmailService(person.email, notification_text):
         raise HTTPException(status_code=500, detail="Failed to send OTP")
+
     return {"message": "OTP sent successfully"}
 
-
-# ---------------- Reset Password ---------------
 
 @router.post("/reset-password")
 async def reset_password(
@@ -171,42 +163,41 @@ async def reset_password(
     db: Session = Depends(get_db)
 ):
     user = db.query(User).filter(
-        User.username == req_data.username,
-        User.client_id == client_id
+        and_(User.username == req_data.username, User.client_id == client_id)
     ).first()
     if not user:
         raise HTTPException(status_code=404, detail="User not found")
-    person = db.query(Person).filter(Person.id == user.id).first()
+
+    userModel = User.copyToModel(user)
+    person = db.query(Person).filter(Person.id == userModel.id).first()
     if not person or not person.email:
         raise HTTPException(status_code=404, detail="User email not found")
 
-    # If neither otp nor old_password is provided, send OTP and return
     if not req_data.otp and not req_data.old_password:
         otp = str(random.randint(100000, 999999))
-        otp_store[user.id] = {
+        otp_store[userModel.id] = {
             "otp": otp,
             "expires": datetime.utcnow() + timedelta(minutes=10)
         }
+
         metadata = {
-            "username": user.username,
+            "username": userModel.username,
             "clientId": client_id,
             "otp": otp,
             "otp_type": "reset-password"
         }
 
-        template_body = get_template_body(
-            db, client_id, "reset_password", "template")
-
+        template_body = get_template_body(db, client_id, "reset_password", "template")
         if not template_body:
             template_body = "Dear {username}, your reset-password OTP for {clientId} is {otp}"
-        notification_text = render_template(template_body, metadata)
 
+        notification_text = render_template(template_body, metadata)
         otpEmailService(person.email, notification_text)
+
         return {"message": "OTP sent successfully"}
 
-    # Verify OTP if provided
     if req_data.otp:
-        otp_data = otp_store.get(user.id)
+        otp_data = otp_store.get(userModel.id)
         if not otp_data:
             raise HTTPException(status_code=400, detail="OTP not requested")
         if otp_data["otp"] != req_data.otp:
@@ -214,50 +205,48 @@ async def reset_password(
         if datetime.utcnow() > otp_data["expires"]:
             raise HTTPException(status_code=400, detail="OTP expired")
 
-    # Verify old password if provided
     elif req_data.old_password:
         if not verify_password(req_data.old_password, user.hashed_password):
             raise HTTPException(status_code=400, detail="Invalid old password")
 
-    # Check new password confirmation
     if req_data.new_password != req_data.confirm_password:
         raise HTTPException(status_code=400, detail="Passwords do not match")
 
-    # Update password
     user.hashed_password = hash_password(req_data.new_password)
     db.commit()
-    otp_store.pop(user.id, None)
+    otp_store.pop(userModel.id, None)
 
     metadata = {
+        "username": userModel.username,
         "clientId": client_id
     }
-    template_body = get_template_body(
-        db, client_id, "reset_password_success", "template")
+    template_body = get_template_body(db, client_id, "reset_password_success", "template")
     if not template_body:
-        template_body = "Dear user, your password has been reset successfully."
-    notification_text = render_template(template_body, metadata)
+        template_body = "Dear {username}, your password for {clientId} has been reset successfully."
 
+    notification_text = render_template(template_body, metadata)
     otpEmailService(person.email, notification_text)
+
     return {"message": "Password reset successfully"}
 
-
-# --------------------------------- Person Details -----------------------------------------
 @router.post("/person-details")
-async def add_person_details(
+async def add_edit_person_details(
     client_id: str,
     person_req: PersonModel,
+    context: SaasContext = Depends(verify_token),
     db: Session = Depends(get_db)
 ):
-    user = db.query(User).filter(User.client_id == client_id).first()
+    # Fetch the logged-in user
+    user = db.query(User).filter(User.id == context.user_id, User.client_id == client_id).first()
     if not user:
         raise HTTPException(status_code=404, detail="User not found")
 
-    existing_person = db.query(Person).filter(
-        Person.id == user.id
-    ).first()
+    # Check if a Person entry exists for this user
+    existing_person = db.query(Person).filter(Person.id == user.id).first()
 
     action = "added"
     if existing_person:
+        # Update existing person
         existing_person.first_name = person_req.first_name
         existing_person.last_name = person_req.last_name
         existing_person.dob = person_req.dob
@@ -267,6 +256,7 @@ async def add_person_details(
         db.refresh(existing_person)
         action = "updated"
     else:
+        # Create new person
         person = Person(
             id=user.id,
             first_name=person_req.first_name,
@@ -280,11 +270,9 @@ async def add_person_details(
         db.refresh(person)
         existing_person = person
 
-    # Removed user.username = person_req.first_name to avoid changing username
-
-    body = f"Dear {person_req.first_name}, your details have been {action}."
-
+    # Send notification if email exists
     if person_req.email:
+        body = f"Dear {person_req.first_name}, your details have been {action}."
         otpEmailService(person_req.email, body)
 
     return {"message": f"Person details {action} successfully", "person_id": existing_person.id}
@@ -296,10 +284,8 @@ async def get_person_details(
     context: SaasContext = Depends(verify_token),
     db: Session = Depends(get_db)
 ):
-    person = db.query(Person).filter(
-        Person.id == context.user_id
-    ).first()
-
+    # Always fetch the person for the logged-in user
+    person = db.query(Person).filter(Person.id == context.user_id).first()
     if not person:
         raise HTTPException(status_code=404, detail="Person not found")
 
@@ -320,8 +306,8 @@ async def get_person_details(
 @router.get("/notifications")
 def get_notifications(
     client_id: str,
-    db: Session = Depends(get_db),
     context: SaasContext = Depends(verify_token),
+    db: Session = Depends(get_db),
 ):
-    # Return empty list or dynamically generate notifications (no DB rows created)
+    # Currently returning empty list; can be enhanced later
     return []
