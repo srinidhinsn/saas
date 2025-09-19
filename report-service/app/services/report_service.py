@@ -2,15 +2,14 @@ from sqlalchemy.orm import Session
 from fastapi.responses import StreamingResponse
 from io import BytesIO
 from datetime import datetime, date, timedelta
-from dateutil.relativedelta import relativedelta  # pip install python-dateutil
+from dateutil.relativedelta import relativedelta
 from entity.order_entity import DineinOrder
 from models.order_model import DineinOrderModel
 import pandas as pd
 from typing import Optional
 
-
 def get_date_range_filter(date_range: Optional[str]) -> Optional[tuple[datetime, datetime]]:
-    today = date.today()
+    today        = date.today()
 
     if not date_range:
         return None
@@ -60,61 +59,35 @@ def get_date_range_filter(date_range: Optional[str]) -> Optional[tuple[datetime,
 
 
 def generate_order_report(client_id: str, db: Session, date_range: Optional[str] = None) -> StreamingResponse:
-    """
-    Generate an Excel report of served dine-in orders for a client with optional date filter.
-    """
-
-    # Apply optional date range filter
+   
     date_filter = get_date_range_filter(date_range)
-
-    query = db.query(DineinOrder).filter(
-        DineinOrder.client_id == client_id,
-        DineinOrder.status == "served"
-    )
+    query       = db.query(DineinOrder).filter(DineinOrder.client_id == client_id, DineinOrder.status == "served")
 
     if date_filter:
         start, end = date_filter
-        query = query.filter(DineinOrder.created_at >= start, DineinOrder.created_at <= end)
-
-    orders = query.order_by(DineinOrder.created_at.desc()).all()
+        query      = query.filter(DineinOrder.created_at >= start, DineinOrder.created_at <= end)
+    orders         = query.order_by(DineinOrder.created_at.desc()).all()
 
     if not orders:
         raise Exception("No served dine-in orders found for the selected date range.")
 
-    # Convert to Pydantic models
-    order_models = DineinOrder.copyToModels(orders)
-
-    # Convert to DataFrame
-    df = pd.DataFrame([order.dict() for order in order_models])
-
-    output = BytesIO()
+    order_models   = DineinOrder.copyToModels(orders)
+    df             = pd.DataFrame([order.dict() for order in order_models])
+    output         = BytesIO()
     with pd.ExcelWriter(output, engine="xlsxwriter") as writer:
         df.to_excel(writer, sheet_name="Served Orders", index=False)
 
     output.seek(0)
-    filename = f"order_report_{client_id}_{datetime.now().strftime('%Y%m%d_%H%M%S')}.xlsx"
+    filename       = f"order_report_{client_id}_{datetime.now().strftime('%Y%m%d_%H%M%S')}.xlsx"
 
-    return StreamingResponse(
-        output,
-        media_type="application/vnd.openxmlformats-officedocument.spreadsheetml.sheet",
-        headers={"Content-Disposition": f"attachment; filename={filename}"}
-    )
+    return StreamingResponse(output, media_type="application/vnd.openxmlformats-officedocument.spreadsheetml.sheet",
+                            headers={"Content-Disposition": f"attachment; filename={filename}"})
 
 def get_dashboard_data(client_id: str, db: Session) -> dict:
-    """
-    Return real-time dashboard statistics for the given client.
-    """
+    
     total_orders = db.query(DineinOrder).filter(DineinOrder.client_id == client_id).count()
+    today        = date.today()
+    today_orders = (db.query(DineinOrder).filter(DineinOrder.client_id == client_id) 
+                    .filter(DineinOrder.created_at >= datetime(today.year, today.month, today.day)).count())
 
-    today = date.today()
-    today_orders = (
-        db.query(DineinOrder)
-        .filter(DineinOrder.client_id == client_id)
-        .filter(DineinOrder.created_at >= datetime(today.year, today.month, today.day))
-        .count()
-    )
-
-    return {
-        "total_orders": total_orders,
-        "today_orders": today_orders
-    }
+    return {"total_orders": total_orders, "today_orders": today_orders}

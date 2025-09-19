@@ -24,7 +24,7 @@ app.add_middleware(
 
 @app.get('/')
 def root():
-    return {"Order Service": "Running on 8003"}
+    return {"Order Service": "Running on 8001"}
 
 
 @app.middleware("http")
@@ -45,4 +45,4 @@ async def read_root():
 
 if __name__ == "__main__":
     import uvicorn
-    uvicorn.run(app, host="127.0.0.1", port=8003)
+    uvicorn.run(app, host="127.0.0.1", port=8001)
