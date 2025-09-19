@@ -2,8 +2,8 @@ import os
 from fastapi import FastAPI, Request
 from fastapi.middleware.cors import CORSMiddleware
 from app.api.routes import router as table_router
-
 import logging
+import logging.config
 import time
 from config.settings import LOGGING_CONFIG
 

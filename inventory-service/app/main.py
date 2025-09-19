@@ -3,6 +3,7 @@ from fastapi import FastAPI, Depends, Request
 from sqlalchemy.orm import Session
 from .api import routes
 import logging
+import logging.config
 import time
 from config.settings import LOGGING_CONFIG
 from fastapi.middleware.cors import CORSMiddleware
