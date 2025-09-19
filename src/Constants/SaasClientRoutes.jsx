@@ -3,38 +3,25 @@ import { Routes, Route, useParams, Navigate, useNavigate } from "react-router-do
 import axios from "axios";
 
 import Navbar from "./Navbar";
-
-// import MainPage from "../MainComponent/MainPage";
-// import UpdateProfile from "../MainComponent/UpdateProfile";
-// import Settings from "../MainComponent/Settings";
 import MenuManager from "../Main_Components/Inventory_Services_Components/MenuManager";
-// import SwiggyMenuManager from "../MenuComponents/SwiggyMenuManager";
-// import ZomatoMenuManager from "../MenuComponents/ZomatoManager";
-// import MenuTypeSelector from "../MenuComponents/MenuTypeSelector";
 import ViewTables from "../Main_Components/Table_Service_Components/Table_Inventory_Order";
 import TableManagement from "../Main_Components/Table_Service_Components/TableManagement";
 import OrderForm from "../Main_Components/Order_Service_Components/OrderForm";
 import OrdersVisiblePage from "../Main_Components/Order_Service_Components/OrdersVisiblePage";
 import DashBoardPage from "./DashBoardPage";
 import Invoice_Page from "../Main_Components/Invoice_Services_Components/Invoice_Page";
-// import ComboPage from "../ComboComponents/ComboPage";
 import KitchenDisplay from "../Main_Components/Order_Service_Components/KDS_Component/KitchenDisplay";
 import Add_user from "../Main_Components/Add_Users/Add_user";
 import HeaderBar from "./HeaderPage";
 import ReportService from "../Main_Components/Report_Service_Components/ReportService";
-import DocumentManager from "../Main_Components/Document_Service_Components/Document";
 import OrderSummary from "../Main_Components/Order_Service_Components/OrderSummary";
 import Notifications from "./Notifications";
 import ResetPassword from "../Main_Components/User_Services_Components/ResetPassword";
 import PersonForm from "../Util_Components/PersonForm";
 import NotificationTable from "../Main_Components/Notification_Services_Components/All_NotificationsPage";
 import PopupNotification from "../Main_Components/Notification_Services_Components/Popup_Notifications";
-import BillingUI from "../Main_Components/Invoice_Services_Components/BillingUI";
-// import InvoicePage from "../InvoiceComponents/InvoicePage";
-// import ReportsPage from "../ReportComponents/ReportsPage";
-// import TableOverview from "../TableOverviewComponents/TableOverview";
-// import Documents from "../DocumentsComponents/Documents";
-// import BillingPage from "../BillingComponent/BillingPage";
+import BillingPage from "../Main_Components/Invoice_Services_Components/BillingUI";
+
 
 const SaasClientRoutes = ({
     selectedTableId,
@@ -143,7 +130,7 @@ const SaasClientRoutes = ({
                         <Route path="all-notifications" element={<NotificationTable />} />
                         <Route path="popup-notifications" element={<PopupNotification />} />
 
-                        <Route path="/billing" element={<BillingUI />} />
+                        <Route path="/billing" element={<BillingPage />} />
 
                         {/* <Route path="documents" element={<Documents />} />
                     <Route path="billing" element={<BillingPage />} />

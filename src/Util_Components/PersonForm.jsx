@@ -400,13 +400,11 @@
 // ===================================================================================================================================== 
 // ===================================================================================================================================== 
 
-
 import React, { useState, useEffect } from "react";
 import { FaEdit, FaCheckCircle } from "react-icons/fa";
 import { useParams } from "react-router-dom";
 import { toast } from "react-toastify";
 import userServicesPort from "../Backend_Port_Files/UserServices";
-
 
 const FIELD_MAP = [
   { field: "first_name", label: "First Name", type: "text" },
@@ -414,7 +412,6 @@ const FIELD_MAP = [
   { field: "email", label: "Email", type: "email" },
   { field: "phone", label: "Phone", type: "tel" },
   { field: "dob", label: "Date of Birth", type: "date" },
-  { field: "address", label: "Address", type: "text" },
 ];
 
 export default function UserProfileForm() {
@@ -434,6 +431,7 @@ export default function UserProfileForm() {
 
   useEffect(() => {
     fetchProfile();
+    // eslint-disable-next-line react-hooks/exhaustive-deps
   }, [clientId, profileSaved]);
 
   const fetchProfile = async () => {
@@ -443,9 +441,21 @@ export default function UserProfileForm() {
         { headers: { Authorization: `Bearer ${token}` } }
       );
       if (res.data && res.data.data) {
-        setForm(res.data.data);
+        setForm({
+          first_name: res.data.data.first_name || "",
+          last_name: res.data.data.last_name || "",
+          email: res.data.data.email || "",
+          phone: res.data.data.phone || "",
+          dob: res.data.data.dob || "",
+        });
         setProfileSaved(true);
-        setLastUpdated("Updated at " + new Date().toLocaleTimeString([], { hour: "2-digit", minute: "2-digit" }));
+        setLastUpdated(
+          "Updated at " +
+            new Date().toLocaleTimeString([], {
+              hour: "2-digit",
+              minute: "2-digit",
+            })
+        );
       }
     } catch (err) {
       setProfileSaved(false);
@@ -460,22 +470,36 @@ export default function UserProfileForm() {
 
   const handleSaveEdit = () => {
     setEditField("");
-    setLastUpdated("Updated at " + new Date().toLocaleTimeString([], { hour: "2-digit", minute: "2-digit" }));
+    setLastUpdated(
+      "Updated at " +
+        new Date().toLocaleTimeString([], { hour: "2-digit", minute: "2-digit" })
+    );
   };
 
   const handleSubmit = async (e) => {
     e.preventDefault();
     setLoading(true);
     try {
+      // Send only allowed fields to backend (no client_id or extra props)
+      const payload = {
+        first_name: form.first_name,
+        last_name: form.last_name,
+        email: form.email,
+        phone: form.phone,
+        dob: form.dob,
+      };
       const res = await userServicesPort.post(
         `/${clientId}/users/person-details`,
-        form,
+        payload,
         { headers: { Authorization: `Bearer ${token}` } }
       );
       toast.success(res.data.message || "Profile saved!");
       setProfileSaved(true);
       setEditField("");
-      setLastUpdated("Updated at " + new Date().toLocaleTimeString([], { hour: "2-digit", minute: "2-digit" }));
+      setLastUpdated(
+        "Updated at " +
+          new Date().toLocaleTimeString([], { hour: "2-digit", minute: "2-digit" })
+      );
     } catch (err) {
       toast.error("Failed to save user profile");
     } finally {
@@ -487,7 +511,9 @@ export default function UserProfileForm() {
   const EditModal = ({ field, type, value, onChange, onSave, onCancel }) => (
     <div className="edit-modal-overlay" onClick={onCancel}>
       <div className="edit-modal" onClick={(e) => e.stopPropagation()}>
-        <h3 className="edit-modal-title">Edit {FIELD_MAP.find(f => f.field === field)?.label}</h3>
+        <h3 className="edit-modal-title">
+          Edit {FIELD_MAP.find((f) => f.field === field)?.label}
+        </h3>
         {type === "textarea" ? (
           <textarea
             name={field}
@@ -528,7 +554,9 @@ export default function UserProfileForm() {
           <div className="profile-header-left">
             <div className="profile-avatar">
               {/* Replace with SVG or image as needed */}
-              <span className="profile-avatar-icon"><FaCheckCircle size={28} /></span>
+              <span className="profile-avatar-icon">
+                <FaCheckCircle size={28} />
+              </span>
             </div>
             <div>
               <h1 className="profile-title">Profile Settings</h1>
@@ -539,7 +567,6 @@ export default function UserProfileForm() {
             <span className="profile-last-updated">{lastUpdated}</span>
           </div>
         </div>
-
         <form className="profile-card-grid" onSubmit={handleSubmit}>
           {FIELD_MAP.map(({ field, label, type }) => (
             <div key={field} className="profile-card card-hover">
@@ -556,11 +583,8 @@ export default function UserProfileForm() {
                 </button>
               </div>
               <div className="profile-card-value">
-                <span>
-                  {form[field] ? form[field] : "Not set"}
-                </span>
+                <span>{form[field] ? form[field] : "Not set"}</span>
               </div>
-              {/* Render modal editor for this field */}
               {editField === field && (
                 <EditModal
                   field={field}
@@ -576,8 +600,12 @@ export default function UserProfileForm() {
           <div className="profile-actions">
             <button type="submit" className="btn" disabled={loading}>
               {profileSaved
-                ? loading ? "Updating..." : "Update Profile"
-                : loading ? "Saving..." : "Save Profile"}
+                ? loading
+                  ? "Updating..."
+                  : "Update Profile"
+                : loading
+                ? "Saving..."
+                : "Save Profile"}
             </button>
           </div>
         </form>

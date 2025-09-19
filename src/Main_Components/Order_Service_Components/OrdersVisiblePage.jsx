@@ -7,6 +7,7 @@ import { useTheme } from "../../ThemeChangerComponent/ThemeProvider";
 import { toast } from "react-toastify";
 import InvoiceModal from "../Invoice_Services_Components/Invoice_Page";
 import { MdOutlineKeyboardDoubleArrowDown } from "react-icons/md";
+import invoiceServicesPort from "../../Backend_Port_Files/InvoiceServices";
 
 
 const OrdersVisiblePage = () => {
@@ -212,18 +213,18 @@ const OrdersVisiblePage = () => {
     const handleStatusChange = async (orderId, newStatus) => {
         const order = orders.find((o) => o.id === orderId);
         if (!order || order.status === "served") return;
-
+    
         const tableObj = tables.find((t) => t.id === order.table_id);
-
+    
         try {
-            // Update order status
+            // Update order status in order service
             await orderServicesPort.post(
                 `/${clientId}/dinein/update`,
                 { id: orderId, client_id: clientId, status: newStatus },
                 { headers: { Authorization: `Bearer ${token}` } }
             );
-
-            // If served, free table and keep all table details intact
+    
+            // If served, free the table
             if (newStatus === "served" && tableObj) {
                 await tableServicesPort.post(
                     `/${clientId}/tables/update`,
@@ -238,18 +239,22 @@ const OrdersVisiblePage = () => {
                     { headers: { Authorization: `Bearer ${token}` } }
                 );
             }
-
-            // Update orders and UI state as before
+    
+            // NO BILLING OR INVOICE CALL HERE – moved to BillingPage.jsx
+    
+            // Update UI state orders as before
             toast.success("Order status updated");
             setOrders((prev) =>
                 prev.map((o) => (o.id === orderId ? { ...o, status: newStatus } : o))
             );
-
+    
             if (newStatus === "served") setEditOrderId(null);
         } catch (error) {
             toast.error("❌ Failed to update order status.");
         }
     };
+    
+      
 
 
 

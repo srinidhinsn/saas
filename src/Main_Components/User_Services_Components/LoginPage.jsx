@@ -141,10 +141,10 @@ export default function Login() {
                         {loading ? "Logging in..." : "LOGIN"}
                     </button>
 
-                    {/* <p className="login-link">
+                    <p className="login-link">
                         Don’t have an account?{" "}
                         <span onClick={() => navigate(`/saas/${clientId}/register`)}>Register here</span>
-                    </p> */}
+                    </p>
                 </form>
             </div>
         </div>
