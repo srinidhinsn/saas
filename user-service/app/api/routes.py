@@ -74,21 +74,6 @@ async def login_user(client_id: str, userReq: LoginRequest, db: Session = Depend
     )
     return response
 
-@router.post("/add")
-async def add_user(client_id: str, userReq: UserModel, db: Session = Depends(get_db)):
-    hashed_pw = hash_password(userReq.password)
-    userReq.client_id = client_id
-    
-    person = Person.copyFromModel(userReq)
-    db.add(person)
-    db.commit()
-    user = User(id=person.id, username=userReq.username, hashed_password=hashed_pw,
-                client_id=userReq.client_id, roles=userReq.roles, grants=userReq.grants)
-    db.add(user)
-    db.commit()
-    return {"message": "User registered successfully"}
-
-
 @router.get("/test")
 async def test_msg(client_id: str, context: SaasContext = Depends(verify_token), db: Session = Depends(get_db)):
     print("test context - ", context)
