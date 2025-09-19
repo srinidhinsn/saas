@@ -103,22 +103,17 @@ async def forgot_password(client_id: str, req_data: ResetpasswordRequest, db: Se
     if not req_data.username:
         raise HTTPException(status_code=400, detail="Username is required")
 
-    # Fetch user entity
     user = db.query(User).filter(
         and_(User.username == req_data.username, User.client_id == client_id)
     ).first()
     if not user:
         raise HTTPException(status_code=404, detail="User not found")
 
-    # Copy entity to model
     userModel = User.copyToModel(user)
-
-    # Fetch or create person
     person = db.query(Person).filter(Person.id == userModel.id).first()
     if not person or not person.email:
         raise HTTPException(status_code=404, detail="Email not found")
 
-    # Generate OTP
     otp = str(random.randint(100000, 999999))
     otp_store[userModel.id] = {
         "otp": otp,
@@ -137,7 +132,6 @@ async def forgot_password(client_id: str, req_data: ResetpasswordRequest, db: Se
         template_body = "Dear {username}, your OTP for resetting password in {clientId} is {otp}."
 
     notification_text = render_template(template_body, metadata)
-
     if not otpEmailService(person.email, notification_text):
         raise HTTPException(status_code=500, detail="Failed to send OTP")
 

@@ -7,8 +7,8 @@ class ResetpasswordRequest(BaseModel):
     username: str
     otp: Optional[str] = None
     old_password: Optional[str] = None
-    new_password: str
-    confirm_password: str
+    new_password: Optional[str] = None
+    confirm_password:  Optional[str] = None
    
 class LoginRequest(BaseModel):
     username: str
