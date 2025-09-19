@@ -162,6 +162,7 @@ async def reset_password(
     req_data: ResetpasswordRequest,
     db: Session = Depends(get_db)
 ):
+    # Fetch user
     user = db.query(User).filter(
         and_(User.username == req_data.username, User.client_id == client_id)
     ).first()
@@ -169,11 +170,14 @@ async def reset_password(
         raise HTTPException(status_code=404, detail="User not found")
 
     userModel = User.copyToModel(user)
-    person = db.query(Person).filter(Person.id == userModel.id).first()
-    if not person or not person.email:
-        raise HTTPException(status_code=404, detail="User email not found")
 
+    # ------------------- OTP flow -------------------
     if not req_data.otp and not req_data.old_password:
+        # OTP requires an email
+        person = db.query(Person).filter(Person.id == userModel.id).first()
+        if not person or not person.email:
+            raise HTTPException(status_code=404, detail="User email not found")
+
         otp = str(random.randint(100000, 999999))
         otp_store[userModel.id] = {
             "otp": otp,
@@ -196,6 +200,7 @@ async def reset_password(
 
         return {"message": "OTP sent successfully"}
 
+    # ------------------- OTP verification -------------------
     if req_data.otp:
         otp_data = otp_store.get(userModel.id)
         if not otp_data:
@@ -205,27 +210,33 @@ async def reset_password(
         if datetime.utcnow() > otp_data["expires"]:
             raise HTTPException(status_code=400, detail="OTP expired")
 
+    # ------------------- Old password verification -------------------
     elif req_data.old_password:
         if not verify_password(req_data.old_password, user.hashed_password):
             raise HTTPException(status_code=400, detail="Invalid old password")
 
+    # ------------------- Confirm new password -------------------
     if req_data.new_password != req_data.confirm_password:
         raise HTTPException(status_code=400, detail="Passwords do not match")
 
+    # ------------------- Update password -------------------
     user.hashed_password = hash_password(req_data.new_password)
     db.commit()
     otp_store.pop(userModel.id, None)
 
-    metadata = {
-        "username": userModel.username,
-        "clientId": client_id
-    }
-    template_body = get_template_body(db, client_id, "reset_password_success", "template")
-    if not template_body:
-        template_body = "Dear {username}, your password for {clientId} has been reset successfully."
-
-    notification_text = render_template(template_body, metadata)
-    otpEmailService(person.email, notification_text)
+    # Optional success notification if OTP flow
+    if req_data.otp:
+        person = db.query(Person).filter(Person.id == userModel.id).first()
+        if person and person.email:
+            metadata = {
+                "username": userModel.username,
+                "clientId": client_id
+            }
+            template_body = get_template_body(db, client_id, "reset_password_success", "template")
+            if not template_body:
+                template_body = "Dear {username}, your password for {clientId} has been reset successfully."
+            notification_text = render_template(template_body, metadata)
+            otpEmailService(person.email, notification_text)
 
     return {"message": "Password reset successfully"}
 
