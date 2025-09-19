@@ -5,13 +5,11 @@ from datetime import date
 
 class ResetpasswordRequest(BaseModel):
     username: str
-    otp: str
+    otp: Optional[str] = None
+    old_password: Optional[str] = None
     new_password: str
     confirm_password: str
-
-class ForgotPasswordRequest(BaseModel):
-    username: str    
-
+   
 class LoginRequest(BaseModel):
     username: str
     password: str

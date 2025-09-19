@@ -1,10 +1,10 @@
-from fastapi import Depends, HTTPException, APIRouter, Header
+from fastapi import Depends, HTTPException, APIRouter, Request
 from sqlalchemy.orm import Session
 from database.postgres import get_db
 from entity.user_entity import User, Person
 from utils.auth import hash_password, verify_password, create_access_token, verify_token
-from models.saas_context import SaasContext, saasContext
-from models.user_model import UserModel, ResetpasswordRequest, LoginRequest,PersonModel,ForgotPasswordRequest
+from models.saas_context import SaasContext
+from models.user_model import UserModel, ResetpasswordRequest, LoginRequest,PersonModel
 from models.response_model import ResponseModel
 from sqlalchemy import and_
 from utils.send_email_otp import otpEmailService, otp_store
@@ -125,11 +125,15 @@ async def test_msg(client_id: str, context: SaasContext = Depends(verify_token),
     return response
 
 # ========================================================================================================================== 
-
 @router.post("/forgot-password")
-async def forgot_password(client_id: str, req_data: ForgotPasswordRequest, db: Session = Depends(get_db)):
+async def forgot_password(client_id: str, request: Request, db: Session = Depends(get_db)):
+    body = await request.json()
+    username = body.get("username")
+    if not username:
+        raise HTTPException(status_code=400, detail="Username is required")
+
     user = db.query(User).filter(
-        and_(User.username == req_data.username, User.client_id == client_id)
+        and_(User.username == username, User.client_id == client_id)
     ).first()
     if not user:
         raise HTTPException(status_code=404, detail="User not found")
@@ -152,8 +156,6 @@ async def forgot_password(client_id: str, req_data: ForgotPasswordRequest, db: S
     if not template_body:
         template_body = "Hey {username}, your forgot-password OTP for {clientId} is {otp}"
     notification_text = render_template(template_body, metadata)
-
-    # Removed create_notification, no DB record created
 
     if not otpEmailService(person.email, notification_text):
         raise HTTPException(status_code=500, detail="Failed to send OTP")
@@ -178,17 +180,20 @@ async def reset_password(
     if not person or not person.email:
         raise HTTPException(status_code=404, detail="User email not found")
 
-    otp_data = otp_store.get(user.id)
-    if not otp_data:
+    # If neither otp nor old_password is provided, send OTP and return
+    if not req_data.otp and not req_data.old_password:
         otp = str(random.randint(100000, 999999))
         otp_store[user.id] = {
-            "otp": otp, "expires": datetime.utcnow() + timedelta(minutes=10)}
+            "otp": otp,
+            "expires": datetime.utcnow() + timedelta(minutes=10)
+        }
         metadata = {
             "username": user.username,
             "clientId": client_id,
             "otp": otp,
             "otp_type": "reset-password"
         }
+
         template_body = get_template_body(
             db, client_id, "reset_password", "template")
 
@@ -199,16 +204,30 @@ async def reset_password(
         otpEmailService(person.email, notification_text)
         return {"message": "OTP sent successfully"}
 
-    if otp_data["otp"] != req_data.otp:
-        raise HTTPException(status_code=400, detail="Invalid OTP")
-    if datetime.utcnow() > otp_data["expires"]:
-        raise HTTPException(status_code=400, detail="OTP expired")
+    # Verify OTP if provided
+    if req_data.otp:
+        otp_data = otp_store.get(user.id)
+        if not otp_data:
+            raise HTTPException(status_code=400, detail="OTP not requested")
+        if otp_data["otp"] != req_data.otp:
+            raise HTTPException(status_code=400, detail="Invalid OTP")
+        if datetime.utcnow() > otp_data["expires"]:
+            raise HTTPException(status_code=400, detail="OTP expired")
+
+    # Verify old password if provided
+    elif req_data.old_password:
+        if not verify_password(req_data.old_password, user.hashed_password):
+            raise HTTPException(status_code=400, detail="Invalid old password")
+
+    # Check new password confirmation
     if req_data.new_password != req_data.confirm_password:
         raise HTTPException(status_code=400, detail="Passwords do not match")
 
+    # Update password
     user.hashed_password = hash_password(req_data.new_password)
     db.commit()
     otp_store.pop(user.id, None)
+
     metadata = {
         "clientId": client_id
     }
@@ -218,7 +237,6 @@ async def reset_password(
         template_body = "Dear user, your password has been reset successfully."
     notification_text = render_template(template_body, metadata)
 
-    # Removed create_notification, no DB record created
     otpEmailService(person.email, notification_text)
     return {"message": "Password reset successfully"}
 
