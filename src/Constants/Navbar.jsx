@@ -102,12 +102,12 @@ const Navbar = () => {
                             {!isActive('/main/kds-page') && <span className="arrow-indicator"><MdKeyboardArrowRight /></span>}
                         </li>
                     </ClickSpark>
-                    {/* <ClickSpark>
-                        <li title="Documents" onClick={() => go('/documents')} className={isActive('/main/documents') ? 'page-active' : ''}>
-                            <IoDocumentTextOutline /><span>Summary</span>
-                            {!isActive('/main/documents') && <span className="arrow-indicator"><MdKeyboardArrowRight /></span>}
+                    <ClickSpark>
+                        <li title="Billing" onClick={() => go('/billing')} className={isActive('/main/billing') ? 'page-active' : ''}>
+                            <IoDocumentTextOutline /><span>Billing</span>
+                            {!isActive('/main/billing') && <span className="arrow-indicator"><MdKeyboardArrowRight /></span>}
                         </li>
-                    </ClickSpark> */}
+                    </ClickSpark>
                     {/* <ClickSpark>
 
                         <li title="Invoice" onClick={() => go('/invoice')} className={isActive('/main/invoice') ? 'page-active' : ''}>

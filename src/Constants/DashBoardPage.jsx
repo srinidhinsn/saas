@@ -320,8 +320,8 @@ const DashBoardPage = () => {
               <div className="grids dash-cards">
                 <div className="card-icons"><GoPackageDependents /></div>
                 <div>
-                  <div className="value">0</div>
-                  <div className="title">Take away(working)</div>
+                  <div className="value">Under Progress</div>
+                  <div className="title">Take away</div>
                 </div>
                 {/* <div className="sub">Active:0(under progress)</div> */}
               </div>
@@ -329,7 +329,7 @@ const DashBoardPage = () => {
               <div className="grids dash-cards">
                 <div className="card-icons"><MdDeliveryDining /></div>
                 <div>
-                  <div className="value">0</div>
+                  <div className="value">Under Progress</div>
                   <div className="title">Delivery</div>
                 </div>
                 {/* <div className="sub">Active:0(under progress)</div> */}

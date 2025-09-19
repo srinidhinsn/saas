@@ -4271,8 +4271,9 @@ input[type="checkbox"] {
     justify-content: space-between;
     font-weight: 500;
     line-height: 1.2;
+    font-size: 12px;
     align-items: center;
-    font-family: monospace;
+    font-family: 'Trebuchet MS', 'Lucida Sans Unicode', 'Lucida Grande', 'Lucida Sans', Arial, sans-serif;
     width: 275px;
 }
 
@@ -4381,21 +4382,14 @@ input[type="checkbox"] {
 }
 
 @media (max-width: 480px) {
-    .kds-page {
-        padding: 10px;
-    }
+
 
     .kds-card {
-        width: 100%;
+        width: 280px;
+        margin: 5px 10px 0 0;
     }
 
-    /* .item-row {
-        width: 320px;
-    } */
 
-    .kds-grid {
-        grid-template-columns: 1fr !important;
-    }
 
     .kds-card-body {
         padding: 15px 5px;
