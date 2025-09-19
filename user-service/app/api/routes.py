@@ -28,39 +28,38 @@ async def register_user(client_id: str, userReq: UserModel, db: Session = Depend
 
 @router.post("/login")
 async def login_user(client_id: str, userReq: LoginRequest, db: Session = Depends(get_db)):
+    # 1️⃣ Fetch the user entity
     user = db.query(User).filter(
         and_(User.username == userReq.username, User.client_id == client_id)
     ).first()
 
     if not user or not verify_password(userReq.password, user.hashed_password):
         raise HTTPException(status_code=400, detail="Invalid credentials")
-
     userModel = User.copyToModel(user)
 
     person = db.query(Person).filter(Person.id == userModel.id).first()
     if not person:
         person = Person(
             id=userModel.id,
-            first_name="", 
-            last_name="", 
-            email=userModel.email if hasattr(userModel, "email") else None
+            first_name="",
+            last_name="",
+            email=getattr(userModel, "email", None)
         )
         db.add(person)
         db.commit()
         db.refresh(person)
     else:
         updated = False
-        if hasattr(userModel, "email") and userModel.email:
-            if userModel.email != person.email:
-               person.email = userModel.email
-               updated = True
+        if getattr(userModel, "email", None) and userModel.email != person.email:
+            person.email = userModel.email
+            updated = True
         if updated:
             db.commit()
-
     userModel.first_name = person.first_name
     userModel.last_name = person.last_name
     userModel.email = person.email
     userModel.phone = person.phone
+
     token = create_access_token({
         "user_id": str(userModel.id),
         "roles": userModel.roles,
@@ -100,23 +99,26 @@ async def test_msg(client_id: str, context: SaasContext = Depends(verify_token),
 
 # ========================================================================================================================== 
 @router.post("/forgot-password")
-async def forgot_password(client_id: str, request: Request, db: Session = Depends(get_db)):
-    body = await request.json()
-    username = body.get("username")
-    if not username:
+async def forgot_password(client_id: str, req_data: ResetpasswordRequest, db: Session = Depends(get_db)):
+    if not req_data.username:
         raise HTTPException(status_code=400, detail="Username is required")
 
+    # Fetch user entity
     user = db.query(User).filter(
-        and_(User.username == username, User.client_id == client_id)
+        and_(User.username == req_data.username, User.client_id == client_id)
     ).first()
     if not user:
         raise HTTPException(status_code=404, detail="User not found")
 
+    # Copy entity to model
     userModel = User.copyToModel(user)
+
+    # Fetch or create person
     person = db.query(Person).filter(Person.id == userModel.id).first()
     if not person or not person.email:
         raise HTTPException(status_code=404, detail="Email not found")
 
+    # Generate OTP
     otp = str(random.randint(100000, 999999))
     otp_store[userModel.id] = {
         "otp": otp,
@@ -135,6 +137,7 @@ async def forgot_password(client_id: str, request: Request, db: Session = Depend
         template_body = "Dear {username}, your OTP for resetting password in {clientId} is {otp}."
 
     notification_text = render_template(template_body, metadata)
+
     if not otpEmailService(person.email, notification_text):
         raise HTTPException(status_code=500, detail="Failed to send OTP")
 
