@@ -36,7 +36,6 @@ async def login_user(client_id: str, userReq: LoginRequest, db: Session = Depend
         raise HTTPException(status_code=400, detail="Invalid credentials")
 
     userModel = User.copyToModel(user)
-
     person = db.query(Person).filter(Person.id == userModel.id).first()
     if person:
         personModel = Person.copyToModel(person)
@@ -44,16 +43,14 @@ async def login_user(client_id: str, userReq: LoginRequest, db: Session = Depend
         userModel.last_name = personModel.last_name
         userModel.email = personModel.email
         userModel.phone = personModel.phone
-
     token = create_access_token({
         "user_id": str(userModel.id),
         "roles": userModel.roles,
         "client_id": userModel.client_id,
         "grants": userModel.grants
     })
-
     return ResponseModel(
-        screen_id="default_user_login",
+        screen_id="default_user",
         data={"access_token": token, "token_type": "bearer"}
     )
 
@@ -83,7 +80,7 @@ async def test_msg(client_id: str, context: SaasContext = Depends(verify_token),
 
 # ================== FORGOT PASSWORD ==================
 @router.post("/forgot-password")
-async def forgot_password(client_id: str, req_data: ResetpasswordRequest, db: Session = Depends(get_db)):
+async def forgot_password(client_id: str, req_data: ResetpasswordRequest, context: SaasContext = Depends(verify_token), db: Session = Depends(get_db)):
     if not req_data.username:
         raise HTTPException(status_code=400, detail="Username is required")
 
@@ -109,10 +106,10 @@ async def forgot_password(client_id: str, req_data: ResetpasswordRequest, db: Se
     if not otpEmailService(person.email, notification_text):
         raise HTTPException(status_code=500, detail="Failed to send OTP")
 
-    return ResponseModel(screen_id="default_forgot_password", data={"message": "OTP sent successfully"})
+    return ResponseModel(screen_id=context.screen_id, data={"message": "OTP sent successfully"})
 # ================== RESET PASSWORD ==================
 @router.post("/reset-password")
-async def reset_password(client_id: str, req_data: ResetpasswordRequest, db: Session = Depends(get_db)):
+async def reset_password(client_id: str, req_data: ResetpasswordRequest, context: SaasContext = Depends(verify_token), db: Session = Depends(get_db)):
     user = db.query(User).filter(
         and_(User.username == req_data.username, User.client_id == client_id)
     ).first()
@@ -136,7 +133,7 @@ async def reset_password(client_id: str, req_data: ResetpasswordRequest, db: Ses
 
         otpEmailService(person.email, render_template(template_body, metadata))
 
-        return ResponseModel(screen_id="default_reset_password", data={"message": "OTP sent successfully"})
+        return ResponseModel(screen_id=context.screen_id, data={"message": "OTP sent successfully"})
 
     # OTP verification
     if req_data.otp:
@@ -169,7 +166,7 @@ async def reset_password(client_id: str, req_data: ResetpasswordRequest, db: Ses
                             or "Dear {username}, your password for {clientId} has been reset successfully."
             otpEmailService(person.email, render_template(template_body, metadata))
 
-    return ResponseModel(screen_id="default_reset_password", data={"message": "Password reset successfully"})
+    return ResponseModel(screen_id=context.screen_id, data={"message": "Password reset successfully"})
 # ================== PERSON DETAILS ==================
 @router.post("/person-details")
 async def add_edit_person_details(
@@ -213,7 +210,7 @@ async def add_edit_person_details(
         otpEmailService(person_req.email, body)
 
     return ResponseModel(
-        screen_id="default_person_details",
+        screen_id=context.screen_id,
         data={"message": f"Person details {action} successfully", "person": PersonModel.from_orm(existing_person)}
     )
 
@@ -224,7 +221,7 @@ async def get_person_details(client_id: str, context: SaasContext = Depends(veri
         raise HTTPException(status_code=404, detail="Person not found")
 
     return ResponseModel(
-        screen_id="default_person_details",
+        screen_id=context.screen_id,
         data={"person": PersonModel.from_orm(person)}
     )
 
@@ -235,6 +232,6 @@ def get_notifications(
     db: Session = Depends(get_db),
 ):
     return ResponseModel(
-        screen_id="default_notifications",
+        screen_id=context.screen_id,
         data={"notifications": []}  
     )
