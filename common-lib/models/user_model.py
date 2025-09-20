@@ -23,7 +23,7 @@ class PersonModel(BaseModel):
     phone: Optional[str] = None
 
     class Config:
-        orm_mode = True
+        from_attributes  = True
 
 class UserModel(PersonModel):
     id: Optional[UUID] = None
@@ -35,7 +35,7 @@ class UserModel(PersonModel):
     hashed_password: Optional[str] = None
 
     class Config:
-        orm_mode = True
+        from_attributes  = True
 
 
 

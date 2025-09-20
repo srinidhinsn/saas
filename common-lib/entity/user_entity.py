@@ -1,7 +1,7 @@
 import uuid
 from database.postgres import Base
 from sqlalchemy import Column , Integer, String, ARRAY, UUID, event, Date,TIMESTAMP,func
-from models.user_model import UserModel, PageDefinitionModel
+from models.user_model import UserModel, PageDefinitionModel,PersonModel
 
 
 
@@ -22,6 +22,11 @@ class Person(Base):
         namespace = uuid.UUID("6ba7b810-9dad-11d1-80b4-00c04fd430c8")  # DNS namespace
         combined_key = f"{username}-{client_id}"
         return uuid.uuid5(namespace, combined_key)
+    @staticmethod
+    def copyToModel(person):
+        personModel = PersonModel(**person.__dict__)
+        personModel.__dict__.pop("_sa_instance_state", None)
+        return personModel
 
     @staticmethod
     def copyFromModel(personModel):
