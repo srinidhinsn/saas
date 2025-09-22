@@ -316,29 +316,27 @@ export default function PopupNotification() {
         const fetchNotifications = async () => {
             try {
                 const res = await userServicesPort.get(`/${clientId}/users/notifications`, {
-                    headers: {
-                        Authorization: `Bearer ${token}`
-                    }
+                    headers: { Authorization: `Bearer ${token}` }
                 });
-
-
-
-                const rawData = Array.isArray(res.data) ? res.data : res.data.data || [];
-
+        
+                // Extract the notifications array safely
+                const rawData = res.data?.data?.notifications || [];
+        
                 const newNotes = rawData.map(n => ({
                     id: n.id,
                     type: n.template_name,
-                    message: n.notification_body || "",     // actual notification message
+                    message: n.notification_body || "",
                     time: n.created_at
                         ? new Date(n.created_at).toLocaleString([], { hour: "2-digit", minute: "2-digit", hour12: true })
                         : ""
                 }));
-
+        
                 setNotifications(newNotes);
             } catch (err) {
                 console.error("Error fetching notifications", err);
             }
         };
+        
 
 
 

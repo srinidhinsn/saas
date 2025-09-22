@@ -170,92 +170,89 @@ const OrderForm = ({ table, onOrderCreated }) => {
             .replace(/\s+/g, "_");
 
 
-    const handlePlaceOrder = () => {
-        if (!selectedTable && mode === "Dine In") {
-            alert("Please select a table before placing the order.");
-            return;
-        }
-
-        if (orderItems.length === 0) {
-            alert("Please select at least one item before placing the order.");
-            return;
-        }
-
-        // ✅ Subtotal from unit_price × quantity
-        const subtotal = orderItems.reduce(
-            (sum, item) => sum + (item.unit_price || 0) * (item.quantity || 0),
-            0
-        );
-
-        // ✅ Apply taxes/discounts
-        const gstValue = (subtotal * gstRate) / 100;
-        const cstValue = (subtotal * cstRate) / 100;
-        const discountValue = discount;
-        const delivery = mode === "Delivery" ? 20 : 0;
-        const container = (mode === "Delivery" || mode === "Pick Up") ? 10 : 0;
-
-        // ✅ Final total_price
-        const total_price = subtotal + gstValue + cstValue + delivery + container - discountValue;
-
-        const dinein_order_id = generateNextOrderId();
-        const invoice_id = generateNextInvoiceId();
-        const invoice_status = "unpaid";
-
-        const payload = {
-            client_id: clientId,
-            table_id: selectedTable?.id,
-            status: "new",
-            price: subtotal,          // 👈 base subtotal
-            gst: gstValue,
-            cst: cstValue,
-            discount: discountValue,
-            total_price,              // 👈 final with gst, cst, discount, charges
-            mode,
-            paymentMode,
-            customer,
-            dinein_order_id,
-            invoice_id,
-            invoice_status,
-            items: orderItems.map(item => ({
-                client_id: clientId,
-                item_id: Number(item.id),
-                quantity: Number(item.quantity),
-                status: item.status || "new",
-                note: item.note || "",
-                item_name: item.name,
-                slug: item.slug || generateSlug(item.name),
-                unit_price: item.unit_price || 0,   // 👈 send unit_price too for transparency
-            }))
-        };
-
-        console.log("📦 Sending payload:", JSON.stringify(payload, null, 2));
-
-        orderServicesPort.post(`/${clientId}/dinein/create`, payload, {
-            headers: { Authorization: `Bearer ${token}` }
-        })
-            .then(res => {
-                toast.success("Order created!");
-                console.log("Order placed:", res.data);
-                onOrderCreated?.(res.data);
-
-                navigate(`/saas/${clientId}/main/kds-page`);
-                // navigate(`/saas/${clientId}/main/kds-page`,
-                //     {
-                //         state: {
-                //             table_number: selectedTable?.table_number || selectedTable?.id,
-                //             order_id: res.data.data.id,
-                //         }
-                //     }
-                // );
-            })
-            .catch(err => {
-                console.error("❌ Order failed:", err);
-                if (err.response?.status === 422) {
-                    console.error("🔍 422 Error:", JSON.stringify(err.response.data, null, 2));
+            const handlePlaceOrder = () => {
+                if (!selectedTable && mode === "Dine In") {
+                    alert("Please select a table before placing the order.");
+                    return;
                 }
-                alert("Order failed. Check console.");
-            });
-    };
+            
+                if (orderItems.length === 0) {
+                    alert("Please select at least one item before placing the order.");
+                    return;
+                }
+            
+                // ✅ Subtotal from unit_price × quantity
+                const subtotal = orderItems.reduce(
+                    (sum, item) => sum + (item.unit_price || 0) * (item.quantity || 0),
+                    0
+                );
+            
+                // ✅ Apply taxes/discounts
+                const gstValue = (subtotal * gstRate) / 100;
+                const cstValue = (subtotal * cstRate) / 100;
+                const discountValue = discount;
+                const delivery = mode === "Delivery" ? 20 : 0;
+                const container = (mode === "Delivery" || mode === "Pick Up") ? 10 : 0;
+            
+                // ✅ Final total_price
+                const total_price =
+                    subtotal + gstValue + cstValue + delivery + container - discountValue;
+            
+                const dinein_order_id = generateNextOrderId();
+                const invoice_id = generateNextInvoiceId();
+                const invoice_status = "unpaid";
+            
+                // ✅ Build payload with line_total per item
+                const payload = {
+                    client_id: clientId,
+                    table_id: selectedTable?.id,
+                    status: "new",
+                    price: subtotal,          // 👈 base subtotal
+                    gst: gstValue,
+                    cst: cstValue,
+                    discount: discountValue,
+                    total_price,              // 👈 final with gst, cst, discount, charges
+                    mode,
+                    paymentMode,
+                    customer,
+                    dinein_order_id,
+                    invoice_id,
+                    invoice_status,
+                    items: orderItems.map(item => ({
+                        client_id: clientId,
+                        item_id: Number(item.id),
+                        quantity: Number(item.quantity),
+                        status: item.status || "new",
+                        note: item.note || "",
+                        item_name: item.name,
+                        slug: item.slug || generateSlug(item.name),
+                        unit_price: item.unit_price || 0, // 👈 send unit_price
+                        line_total: (item.unit_price || 0) * (item.quantity || 0), // 👈 added here
+                    })),
+                };
+            
+                console.log("📦 Sending payload:", JSON.stringify(payload, null, 2));
+            
+                orderServicesPort
+                    .post(`/${clientId}/dinein/create`, payload, {
+                        headers: { Authorization: `Bearer ${token}` },
+                    })
+                    .then((res) => {
+                        toast.success("Order created!");
+                        console.log("Order placed:", res.data);
+                        onOrderCreated?.(res.data);
+            
+                        navigate(`/saas/${clientId}/main/kds-page`);
+                    })
+                    .catch((err) => {
+                        console.error("❌ Order failed:", err);
+                        if (err.response?.status === 422) {
+                            console.error("🔍 422 Error:", JSON.stringify(err.response.data, null, 2));
+                        }
+                        alert("Order failed. Check console.");
+                    });
+            };
+            
 
 
 

@@ -14,7 +14,7 @@ import KitchenDisplay from "../Main_Components/Order_Service_Components/KDS_Comp
 import Add_user from "../Main_Components/Add_Users/Add_user";
 import HeaderBar from "./HeaderPage";
 import ReportService from "../Main_Components/Report_Service_Components/ReportService";
-import OrderSummary from "../Main_Components/Order_Service_Components/OrderSummary";
+// import OrderSummary from "../Main_Components/Order_Service_Components/OrderSummary";
 import Notifications from "./Notifications";
 import ResetPassword from "../Main_Components/User_Services_Components/ResetPassword";
 import PersonForm from "../Util_Components/PersonForm";
@@ -124,7 +124,8 @@ const SaasClientRoutes = ({
                         <Route path="reports" element={<ReportService />} />
                         <Route path="kds-page" element={<KitchenDisplay />} />
                         <Route path="notifications" element={<Notifications />} />
-                        <Route path="add-users" element={<Add_user />} /><Route path="documents" element={<OrderSummary />} />
+                        <Route path="add-users" element={<Add_user />} />
+                        {/* <Route path="documents" element={<OrderSummary />} /> */}
                         <Route path="user-details" element={<PersonForm />} />
 
                         <Route path="all-notifications" element={<NotificationTable />} />
