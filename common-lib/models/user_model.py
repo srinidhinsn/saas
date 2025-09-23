@@ -4,16 +4,18 @@ from uuid import UUID
 from datetime import date
 
 class ResetpasswordRequest(BaseModel):
-    old_password: str
-    new_password: str
-
+    username: str
+    otp: Optional[str] = None
+    old_password: Optional[str] = None
+    new_password: Optional[str] = None
+    confirm_password:  Optional[str] = None
+   
 class LoginRequest(BaseModel):
     username: str
     password: str
 
 class PersonModel(BaseModel):
     id: Optional[UUID] = None
-    client_id: Optional[str] = None
     first_name: Optional[str] = None
     last_name: Optional[str] = None
     dob: Optional[date] = None
@@ -21,7 +23,7 @@ class PersonModel(BaseModel):
     phone: Optional[str] = None
 
     class Config:
-        orm_mode = True
+        from_attributes  = True
 
 class UserModel(PersonModel):
     id: Optional[UUID] = None
@@ -33,7 +35,7 @@ class UserModel(PersonModel):
     hashed_password: Optional[str] = None
 
     class Config:
-        orm_mode = True
+        from_attributes  = True
 
 
 

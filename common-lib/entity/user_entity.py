@@ -1,7 +1,7 @@
 import uuid
 from database.postgres import Base
-from sqlalchemy import Column , Integer, String, ARRAY, UUID, event, Date
-from models.user_model import UserModel, PageDefinitionModel
+from sqlalchemy import Column , Integer, String, ARRAY, UUID, event, Date,TIMESTAMP,func
+from models.user_model import UserModel, PageDefinitionModel,PersonModel
 
 
 
@@ -13,12 +13,20 @@ class Person(Base):
     dob = Column(Date, nullable=True)
     email = Column(String, nullable=True)
     phone = Column(String, nullable=True)
+    created_at = Column(TIMESTAMP, server_default=func.now())
+    updated_at = Column(
+        TIMESTAMP, server_default=func.now(), onupdate=func.now())
 
 
     def generate_uuid(first_name: str, client_id: str) -> uuid.UUID:
         namespace = uuid.UUID("6ba7b810-9dad-11d1-80b4-00c04fd430c8")  # DNS namespace
         combined_key = f"{username}-{client_id}"
         return uuid.uuid5(namespace, combined_key)
+    @staticmethod
+    def copyToModel(person):
+        personModel = PersonModel(**person.__dict__)
+        personModel.__dict__.pop("_sa_instance_state", None)
+        return personModel
 
     @staticmethod
     def copyFromModel(personModel):
@@ -107,4 +115,18 @@ class PageDefinition(Base):
             PageDefinition(**model.dict(exclude_unset=True)) for model in page_models
         ]
         return page_definitions
+
+class Notification(Base):
+    __tablename__ = "notifications"
+
+    id = Column(UUID(as_uuid=True), primary_key=True, default=uuid.uuid4)
+    client_id = Column(String, nullable=False)
+    template_name = Column(String, nullable=True)
+    template_body = Column(String, nullable=True)
+    type = Column(String, nullable=True)
+    realm = Column(String, nullable=True)
+    is_read = Column(String, nullable=True)
+    created_at = Column(TIMESTAMP, server_default=func.now())
+    updated_at = Column(
+        TIMESTAMP, server_default=func.now(), onupdate=func.now())    
 
