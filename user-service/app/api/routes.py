@@ -211,7 +211,7 @@ async def add_edit_person_details(
 
     return ResponseModel(
         screen_id=context.screen_id,
-        data={"message": f"Person details {action} successfully", "person": PersonModel.from_orm(existing_person)}
+        data={"message": f"Person details {action} successfully"}
     )
 
 @router.get("/person-details")
