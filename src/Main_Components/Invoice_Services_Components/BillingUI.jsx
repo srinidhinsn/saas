@@ -4093,6 +4093,546 @@ import invoiceServicesPort from "../../Backend_Port_Files/InvoiceServices"; // a
 
 
 
+
+// import React, { useEffect, useState, useRef } from "react";
+// import orderServices from "../../Backend_Port_Files/OrderServices";
+// import tableServices from "../../Backend_Port_Files/TableServices";
+// import inventoryServices from "../../Backend_Port_Files/InventoryServices";
+// import invoiceServices from "../../Backend_Port_Files/InvoiceServices";
+// import { useParams } from "react-router-dom";
+// import { toast } from "react-toastify";
+// import jsPDF from "jspdf";
+// import html2canvas from "html2canvas";
+
+// export default function BillingPage() {
+//   const { clientId } = useParams();
+//   const token = localStorage.getItem("access_token");
+
+//   const [orders, setOrders] = useState([]);
+//   const [tablesMap, setTablesMap] = useState({});
+//   const [inventoryMap, setInventoryMap] = useState({});
+//   const [selectedOrder, setSelectedOrder] = useState(null);
+//   const [taxPercent, setTaxPercent] = useState(18);
+//   const [discount, setDiscount] = useState(0);
+//   const [method, setMethod] = useState("Cash");
+//   const [paymentStatus, setPaymentStatus] = useState("Pending");
+//   const [status, setStatus] = useState("Draft");
+//   const [discountIsPercent, setDiscountIsPercent] = useState(true);
+//   const [loading, setLoading] = useState(true);
+//   const [saving, setSaving] = useState(false);
+//   const [invoiceDraftId, setInvoiceDraftId] = useState(null);
+//   const [documentNumber, setDocumentNumber] = useState("");
+
+//   const [customerId, setCustomerId] = useState("");
+//   const [contactEmail, setContactEmail] = useState("");
+//   const [contactPhone, setContactPhone] = useState("");
+
+//   const invoiceRef = useRef(null);
+
+//   const isToday = (createdAt) => {
+//     const date = new Date(createdAt);
+//     if (!date) return false;
+//     const today = new Date();
+//     return date.getFullYear() === today.getFullYear() &&
+//       date.getMonth() === today.getMonth() &&
+//       date.getDate() === today.getDate();
+//   };
+
+//   useEffect(() => {
+//     async function fetchAll() {
+//       setLoading(true);
+//       try {
+//         const [ordersRes, tablesRes, invRes] = await Promise.all([
+//           orderServices.get(`/${clientId}/dinein/table`, { headers: { Authorization: `Bearer ${token}` } }),
+//           tableServices.get(`/${clientId}/tables/read`, { headers: { Authorization: `Bearer ${token}` } }),
+//           inventoryServices.get(`/${clientId}/inventory/read`, { headers: { Authorization: `Bearer ${token}` } }),
+//         ]);
+//         const served = (ordersRes.data?.data || []).filter(
+//           (o) => o.status?.toLowerCase() === "served" && isToday(o.created_at)
+//         );
+//         setOrders(served);
+//         const tMap = {};
+//         (tablesRes.data?.data || []).forEach((t) => (tMap[t.id] = t.name || t.table_number || `Table ${t.id}`));
+//         setTablesMap(tMap);
+//         const iMap = {};
+//         (invRes.data?.data || []).forEach((i) => (iMap[i.id] = i));
+//         setInventoryMap(iMap);
+//       } catch {
+//         toast.error("Error loading data");
+//       } finally {
+//         setLoading(false);
+//       }
+//     }
+//     fetchAll();
+//   }, [clientId, token]);
+
+//   const fetchInvoiceDraft = async (orderId) => {
+//     try {
+//       const res = await invoiceServices.get(`/${clientId}/invoice/read_document`, {
+//         headers: { Authorization: `Bearer ${token}` },
+//         params: { client_id: clientId, status: "Draft" }
+//       });
+//       const drafts = res.data?.data || [];
+//       const draft = drafts.find(d => d.order_id?.toString() === orderId?.toString());
+//       return draft || {};
+//     } catch (err) {
+//       console.error("Failed to fetch invoice draft", err);
+//       return {};
+//     }
+//   };
+
+//   const enrichItems = (order) =>
+//     (order.items || []).map((item) => {
+//       const inv = inventoryMap[item.item_id] || {};
+//       return {
+//         ...item,
+//         unit_price: item.unit_price ?? item.price ?? inv.unit_price ?? 0,
+//         description: item.description ?? inv.description ?? "",
+//         name: item.item_name ?? inv.name ?? "Unnamed Item",
+//       };
+//     });
+
+//   const subtotal = selectedOrder?.items?.reduce((sum, item) => sum + (item.unit_price ?? 0) * (item.quantity ?? 1), 0) || 0;
+//   const taxAmount = (taxPercent / 100) * subtotal;
+//   const discountAmount = discountIsPercent ? (discount / 100) * subtotal : discount;
+//   const total = subtotal + taxAmount - discountAmount;
+
+//   const saveInvoiceDraft = async () => {
+//     if (!selectedOrder) return toast.error("Select an order first");
+//     if (!selectedOrder.items || selectedOrder.items.length === 0)
+//       return toast.error("Selected order has no items");
+
+//     setSaving(true);
+
+//     try {
+//       const payload = {
+//         client_id: clientId,
+//         document_type: "Invoice",
+//         document_date: new Date().toISOString(),
+//         order_id: selectedOrder.id.toString(),
+//         reference_number: tablesMap[selectedOrder.table_id] || `Table ${selectedOrder.table_id}`,
+//         subtotal: Number(subtotal.toFixed(2)),
+//         tax_amount: Number(taxAmount.toFixed(2)),
+//         discount_amount: Number(discountAmount.toFixed(2)),
+//         total_amount: Number(total.toFixed(2)),
+//         payment_status: paymentStatus,
+//         payment_method: method,
+//         status: status,
+//         customer_id: customerId || "",
+//         contact_email: contactEmail || "",
+//         contact_phone: contactPhone || "",
+//       };
+
+//       let draftId = invoiceDraftId;
+
+//       if (!draftId) {
+//         const res = await invoiceServices.post(`/${clientId}/invoice/create_document`, payload, {
+//           headers: { Authorization: `Bearer ${token}` },
+//         });
+//         draftId = res?.data?.data?.id;
+//         if (!draftId) throw new Error("Draft creation failed");
+//         setInvoiceDraftId(draftId);
+//       } else {
+//         await invoiceServices.post(`/${clientId}/invoice/update_document`, { id: draftId, ...payload }, {
+//           headers: { Authorization: `Bearer ${token}` },
+//         });
+//       }
+
+//       const itemsPayload = selectedOrder.items.map((item) => ({
+//         item_ref_id: item.item_id?.toString(),
+//         description: item.description || "",
+//         quantity: item.quantity || 0,
+//         unit_price: item.unit_price || 0,
+//         total: (item.unit_price || 0) * (item.quantity || 0),
+//       }));
+
+//       await invoiceServices.post(
+//         `/${clientId}/invoice/create?document_id=${draftId}&client_id=${clientId}`,
+//         itemsPayload,
+//         { headers: { Authorization: `Bearer ${token}` } }
+//       );
+
+//       toast.success("Invoice draft saved!");
+//       return draftId;
+//     } catch (err) {
+//       console.error(err);
+//       toast.error("Failed to save invoice draft");
+//       throw err;
+//     } finally {
+//       setSaving(false);
+//     }
+//   };
+
+
+// const printInvoice = async () => {
+//   if (!selectedOrder || !selectedOrder.items || selectedOrder.items.length === 0) return;
+
+//   try {
+//     const draftId = invoiceDraftId || await saveInvoiceDraft();
+//     if (!draftId) return toast.error("Failed to create invoice draft");
+
+//     // Generate invoice
+//     await invoiceServices.post(
+//       `/${clientId}/invoice/generate`,
+//       {},
+//       { headers: { Authorization: `Bearer ${token}` }, params: { client_id: clientId, invoice_id: draftId } }
+//     );
+
+//     // Issue invoice and get document_number
+//     const issueRes = await invoiceServices.post(
+//       `/${clientId}/invoice/issue`,
+//       {},
+//       { headers: { Authorization: `Bearer ${token}` }, params: { client_id: clientId, invoice_id: draftId } }
+//     );
+
+//     const docNum = issueRes?.data?.data?.document_number || "";
+//     setDocumentNumber(docNum); // ✅ update state
+
+//     // Wait for React to render updated documentNumber
+//     setTimeout(async () => {
+//       if (!invoiceRef.current) return;
+
+//       const canvas = await html2canvas(invoiceRef.current, { scale: 2 });
+//       const imgData = canvas.toDataURL("image/png");
+//       const pdf = new jsPDF('p', 'mm', 'a4');
+//       const pdfWidth = pdf.internal.pageSize.getWidth();
+//       const pdfHeight = (canvas.height * pdfWidth) / canvas.width;
+//       pdf.addImage(imgData, 'PNG', 0, 0, pdfWidth, pdfHeight);
+//       pdf.save(`Invoice_${draftId}.pdf`);
+//     }, 50);
+
+//   } catch (err) {
+//     console.error(err);
+//     toast.error("Failed to generate invoice PDF");
+//   }
+// };
+
+//   // useEffect(() => {
+//   //   console.log("Updated documentNumber:", documentNumber);
+//   // }, [documentNumber]);
+  
+//   return (
+//     <div className="billing-page" style={{ fontFamily: "'Segoe UI', Tahoma, Geneva, Verdana, sans-serif", padding: "2rem", background: "#f3f6fb", minHeight: "100vh" }}>
+//       <h1 style={{ fontSize: "2rem", fontWeight: 700, color: "#0747a6", marginBottom: "2rem", borderBottom: "3px solid #0747a6", paddingBottom: "0.5rem" }}>
+//         Billing & Invoices
+//       </h1>
+
+//       {/* Orders Grid */}
+//       <div style={{ display: "grid", gridTemplateColumns: "repeat(auto-fit,minmax(280px,1fr))", gap: "1.5rem", marginBottom: "3rem" }}>
+//         {loading ? (
+//           <p style={{ color: "#555", fontStyle: "italic" }}>Loading...</p>
+//         ) : orders.length === 0 ? (
+//           <p style={{ color: "#888", fontStyle: "italic" }}>No served orders today</p>
+//         ) : (
+//           orders.map((order) => {
+//             const tableName = tablesMap[order.table_id];
+//             const servedTime = new Date(order.created_at);
+//             const orderTotal = enrichItems(order).reduce(
+//               (sum, i) => sum + (i.unit_price ?? 0) * (i.quantity ?? 1),
+//               0
+//             );
+//             return (
+//               <div
+//                 key={order.id}
+//                 onClick={async () => {
+//                   const enrichedItems = enrichItems(order);
+//                   const invoiceDraft = await fetchInvoiceDraft(order.id);
+//                   setCustomerId(invoiceDraft.customer_id || "");
+//                   setContactEmail(invoiceDraft.contact_email || "");
+//                   setContactPhone(invoiceDraft.contact_phone || "");
+//                   setInvoiceDraftId(invoiceDraft.id || null);
+//                   setStatus(invoiceDraft.status || "Draft");
+//                   setSelectedOrder({ ...order, items: enrichedItems });
+//                   setDocumentNumber(invoiceDraft.document_number || "");
+//                   setPaymentStatus(invoiceDraft.payment_status || "Pending");
+//                 }}
+//                 style={{
+//                   padding: "1.5rem",
+//                   background: selectedOrder?.id === order.id ? "#dce6fb" : "#ffffff",
+//                   borderRadius: "12px",
+//                   boxShadow: selectedOrder?.id === order.id ? "0 0 10px rgba(7, 71, 166, 0.3)" : "0 2px 6px rgba(0,0,0,0.1)",
+//                   border: selectedOrder?.id === order.id ? "2px solid #0747a6" : "1px solid #ccd6f6",
+//                   cursor: "pointer",
+//                   transition: "all 0.3s ease",
+//                 }}
+//               >
+//                 <h3 style={{ margin: "0 0 0.2rem 0", color: "#0747a6" }}>
+//                   {tableName || `Table ${order.table_id}`}
+//                 </h3>
+//                 <p style={{ margin: "0 0 0.4rem 0", fontWeight: "600", color: "#0f172a" }}>
+//                   Order #{order.id}
+//                 </p>
+//                 <p style={{ fontWeight: 700, color: "#0747a6", fontSize: "1.2rem", margin: "0 0 0.5rem 0" }}>
+//                   ₹{orderTotal.toFixed(2)}
+//                 </p>
+//                 <small style={{ color: "#64748b" }}>
+//                   Served at: {servedTime.toLocaleTimeString([], { hour: "2-digit", minute: "2-digit" })}
+//                 </small>
+//               </div>
+//             );
+//           })
+//         )}
+//       </div>
+
+//       {/* Invoice Section */}
+//       {selectedOrder && (
+//         <div style={{ display: "flex", gap: "2rem", flexWrap: "wrap" }}>
+//           {/* Left - Invoice Preview */}
+//           <section
+//             ref={invoiceRef}
+//             style={{
+//               fontFamily: "'Arial', sans-serif",
+//               background: "#ffffff",
+//               padding: "40px",
+//               borderRadius: "12px",
+//               boxShadow: "0 10px 30px rgba(7, 71, 166, 0.2)",
+//               color: "#024E89",
+//               maxWidth: "700px",
+//               margin: "auto",
+//             }}
+//           >
+//             <header style={{ display: "flex", justifyContent: "space-between", borderBottom: "3px solid #0747a6", paddingBottom: "10px", marginBottom: "30px" }}>
+//               <h1 style={{ fontWeight: "700", fontSize: "32px", margin: 0 }}>INVOICE</h1>
+//               <div>
+//   <div style={{ fontSize: "14px", color: "#4a90e2", fontWeight: "600" }}>
+//     {documentNumber || "Draft"} {/* ✅ show updated document number */}
+//   </div>
+//   <div style={{ fontSize: "12px", marginTop: "6px", color: "#7b8ea2" }}>
+//     {new Date().toLocaleDateString()}
+//   </div>
+// </div>
+
+
+//             </header>
+//             <div style={{ display: "flex", justifyContent: "center", gap: "6px", marginBottom: "30px" }}>
+//               <span style={{ color: "darkblue",fontFamily:'cursive',fontSize:'20px',textAlign:'center' }}>{clientId}</span>
+//             </div>
+//             <section style={{ display: "flex", justifyContent: "space-between", marginBottom: "30px" }}>
+              
+//               <div style={{ width: "45%" }}>
+//                 <h2 style={{ fontWeight: "700", fontSize: "18px", marginBottom: "10px", borderBottom: "1.5px solid #024E89" }}>Bill To:</h2>
+//                 <p style={{ margin: "0", fontWeight: "600",fontSize:'12px' }}>{customerId || "N/A"}</p>
+//                 <p style={{ margin: "0", color: "#49657a",fontSize:'12px' }}>{contactEmail}</p>
+//               </div>
+//               <div style={{ width: "45%", textAlign: "right" }}>
+//                 <h2 style={{ fontWeight: "700", fontSize: "18px", marginBottom: "10px", borderBottom: "1.5px solid #024E89" }}>Shipping Info:</h2>
+//                 <p style={{ margin: "0", fontWeight: "600" }}>{tablesMap[selectedOrder?.table_id] || "N/A"}</p>
+//                 <p style={{ margin: "0", color: "#49657a",fontSize:'12px' }}>Contact: {contactPhone}</p>
+//               </div>
+//             </section>
+           
+//             <table style={{ width: "100%", borderCollapse: "collapse", fontSize: "14px", color: "#024E89" }}>
+//               <thead>
+//                 <tr style={{ borderBottom: "2px solid #024E89", textTransform: "uppercase", fontWeight: "700" }}>
+//                   <th style={{ padding: "10px 5px", textAlign: "left" }}>Item</th>
+//                   <th style={{ padding: "10px 5px", textAlign: "right" }}>Quantity</th>
+//                   <th style={{ padding: "10px 5px", textAlign: "right" }}>Unit Price</th>
+//                   <th style={{ padding: "10px 5px", textAlign: "right" }}>Amount</th>
+//                 </tr>
+//               </thead>
+//               <tbody>
+//                 {selectedOrder?.items?.map((item, idx) => (
+//                   <tr key={idx} style={{ borderBottom: "1px solid #bfcfe8" }}>
+//                     <td style={{ padding: "10px 5px" }}>{item.name}</td>
+//                     <td style={{ padding: "10px 5px", textAlign: "right" }}>{item.quantity}</td>
+//                     <td style={{ padding: "10px 5px", textAlign: "right" }}>₹{item.unit_price.toFixed(2)}</td>
+//                     <td style={{ padding: "10px 5px", textAlign: "right" }}>₹{(item.unit_price * item.quantity).toFixed(2)}</td>
+//                   </tr>
+//                 ))}
+//                 <tr style={{ fontWeight: "600", fontSize: "16px" }}>
+//                   <td colSpan="3" style={{ padding: "10px 5px", textAlign: "right" }}>Subtotal</td>
+//                   <td style={{ padding: "10px 5px", textAlign: "right" }}>₹{subtotal.toFixed(2)}</td>
+//                 </tr>
+//                 <tr style={{ fontWeight: "600", fontSize: "16px" }}>
+//                   <td colSpan="3" style={{ padding: "10px 5px", textAlign: "right" }}>Discount</td>
+//                   <td style={{ padding: "10px 5px", textAlign: "right" }}>-₹{discountAmount.toFixed(2)}</td>
+//                 </tr>
+//                 <tr style={{ fontWeight: "600", fontSize: "16px" }}>
+//                   <td colSpan="3" style={{ padding: "10px 5px", textAlign: "right" }}>GST</td>
+//                   <td style={{ padding: "10px 5px", textAlign: "right" }}>₹{taxAmount.toFixed(2)}</td>
+//                 </tr>
+//                 <tr style={{ borderTop: "3px solid #0747a6", fontWeight: "900", fontSize: "18px", color: "#0747a6" }}>
+//                   <td colSpan="3" style={{ padding: "10px 5px", textAlign: "right" }}>Total</td>
+//                   <td style={{ padding: "10px 5px", textAlign: "right" }}>₹{total.toFixed(2)}</td>
+//                 </tr>
+//               </tbody>
+//             </table>
+
+//             <footer style={{ marginTop: "30px", fontSize: "12px", color: "#64748b", borderTop: "1px solid #dbeafe", paddingTop: "15px" }}>
+//               <p>Thank you for your business!</p>
+//               <p>This is a computer-generated invoice and does not require a signature.</p>
+//             </footer>
+//           </section>
+
+//           {/* Right - Actions Panel */}
+//           <aside
+//             style={{
+//               flex: "0 1 360px",
+//               backgroundColor: "#ffffff",
+//               padding: "2rem",
+//               borderRadius: "16px",
+//               boxShadow: "0 6px 20px rgba(7,71,166,0.15)",
+//               display: "flex",
+//               flexDirection: "column",
+//               gap: "1.25rem",
+//               height: "fit-content",
+//             }}
+//           >
+//             <h3 style={{ marginBottom: "1rem", color: "#0747a6" }}>Actions</h3>
+
+//             <div>
+//               <label style={{ fontWeight: "600", color: "#334155" }}>GST (%)</label>
+//               <input
+//                 type="number"
+//                 value={taxPercent}
+//                 onChange={(e) => setTaxPercent(Number(e.target.value))}
+//                 style={{ width: "100%", padding: "0.5rem", marginTop: "0.25rem", borderRadius: "6px", border: "1px solid #cbd5e1" }}
+//               />
+//             </div>
+
+//             <div>
+//               <label style={{ fontWeight: "600", color: "#334155" }}>
+//                 Discount {discountIsPercent ? "(%)" : "(₹)"}
+//               </label>
+//               <div style={{ display: "flex", gap: "0.5rem", marginTop: "0.25rem" }}>
+//                 <input
+//                   type="number"
+//                   value={discount}
+//                   onChange={(e) => setDiscount(Number(e.target.value))}
+//                   style={{ flex: 1, padding: "0.5rem", borderRadius: "6px", border: "1px solid #cbd5e1" }}
+//                 />
+//                 <select
+//                   value={discountIsPercent ? "%" : "₹"}
+//                   onChange={(e) => setDiscountIsPercent(e.target.value === "%")}
+//                   style={{ padding: "0.5rem", borderRadius: "6px", border: "1px solid #cbd5e1" }}
+//                 >
+//                   <option value="%">%</option>
+//                   <option value="₹">₹</option>
+//                 </select>
+//               </div>
+//             </div>
+
+//             <div>
+//               <label style={{ fontWeight: "600", color: "#334155" }}>Payment Status</label>
+//               <select
+//                 value={paymentStatus}
+//                 onChange={(e) => setPaymentStatus(e.target.value)}
+//                 style={{ width: "100%", padding: "0.5rem", marginTop: "0.25rem", borderRadius: "6px", border: "1px solid #cbd5e1" }}
+//               >
+//                 {["Pending", "Paid", "Partial", "Due"].map((s) => (
+//                   <option key={s} value={s}>{s}</option>
+//                 ))}
+//               </select>
+//             </div>
+
+//             <div>
+//               <label style={{ fontWeight: "600", color: "#334155" }}>Invoice Status</label>
+//               <select
+//                 value={status}
+//                 onChange={(e) => setStatus(e.target.value)}
+//                 style={{ width: "100%", padding: "0.5rem", marginTop: "0.25rem", borderRadius: "6px", border: "1px solid #cbd5e1" }}
+//               >
+//                 {["Draft", "Created", "Pending", "Issued", "Cancelled"].map((s) => (
+//                   <option key={s} value={s}>{s}</option>
+//                 ))}
+//               </select>
+//             </div>
+
+//             <div>
+//               <label style={{ fontWeight: "600", color: "#334155" }}>Customer ID</label>
+//               <input
+//                 type="text"
+//                 value={customerId}
+//                 onChange={(e) => setCustomerId(e.target.value)}
+//                 style={{ width: "100%", padding: "0.5rem", marginTop: "0.25rem", borderRadius: "6px", border: "1px solid #cbd5e1" }}
+//               />
+//             </div>
+//             <div>
+//               <label style={{ fontWeight: "600", color: "#334155" }}>Contact Email</label>
+//               <input
+//                 type="email"
+//                 value={contactEmail}
+//                 onChange={(e) => setContactEmail(e.target.value)}
+//                 style={{ width: "100%", padding: "0.5rem", marginTop: "0.25rem", borderRadius: "6px", border: "1px solid #cbd5e1" }}
+//               />
+//             </div>
+//             <div>
+//               <label style={{ fontWeight: "600", color: "#334155" }}>Contact Phone</label>
+//               <input
+//                 type="text"
+//                 value={contactPhone}
+//                 onChange={(e) => setContactPhone(e.target.value)}
+//                 style={{ width: "100%", padding: "0.5rem", marginTop: "0.25rem", borderRadius: "6px", border: "1px solid #cbd5e1" }}
+//               />
+//             </div>
+
+//             <button
+//               onClick={saveInvoiceDraft}
+//               disabled={saving}
+//               style={{
+//                 width: "100%",
+//                 padding: "0.75rem",
+//                 backgroundColor: "#0747a6",
+//                 color: "#fff",
+//                 border: "none",
+//                 borderRadius: "8px",
+//                 fontWeight: "600",
+//                 cursor: "pointer",
+//                 boxShadow: "0 4px 6px rgba(7,71,166,0.4)",
+//                 transition: "background-color 0.3s ease",
+//                 marginBottom: "0.75rem",
+//               }}
+//               onMouseEnter={(e) => (e.currentTarget.style.backgroundColor = "#0a549f")}
+//               onMouseLeave={(e) => (e.currentTarget.style.backgroundColor = "#0747a6")}
+//             >
+//               {saving ? "Saving..." : "Save Bill"}
+//             </button>
+
+//             <button
+//               onClick={printInvoice}
+//               disabled={!selectedOrder || !selectedOrder.items || selectedOrder.items.length === 0}
+//               style={{
+//                 width: "100%",
+//                 padding: "0.75rem",
+//                 backgroundColor: "#147d4c",
+//                 color: "#fff",
+//                 border: "none",
+//                 borderRadius: "8px",
+//                 fontWeight: "600",
+//                 cursor: !selectedOrder || !selectedOrder.items || selectedOrder.items.length === 0 ? "not-allowed" : "pointer",
+//                 opacity: !selectedOrder || !selectedOrder.items || selectedOrder.items.length === 0 ? 0.6 : 1,
+//                 boxShadow: "0 4px 6px rgba(20,125,76,0.4)",
+//                 transition: "background-color 0.3s ease",
+//               }}
+//               onMouseEnter={(e) => {
+//                 if (!(!selectedOrder || !selectedOrder.items || selectedOrder.items.length === 0)) {
+//                   e.currentTarget.style.backgroundColor = "#176f41";
+//                 }
+//               }}
+//               onMouseLeave={(e) => {
+//                 if (!(!selectedOrder || !selectedOrder.items || selectedOrder.items.length === 0)) {
+//                   e.currentTarget.style.backgroundColor = "#147d4c";
+//                 }
+//               }}
+//             >
+//               Download PDF / Print
+//             </button>
+//           </aside>
+//         </div>
+//       )}
+//     </div>
+//   );
+// }
+
+
+
+
+
+// ========================================================== 
+// =========================================================================
+
+
+
 import React, { useEffect, useState, useRef } from "react";
 import orderServices from "../../Backend_Port_Files/OrderServices";
 import tableServices from "../../Backend_Port_Files/TableServices";
@@ -4101,7 +4641,6 @@ import invoiceServices from "../../Backend_Port_Files/InvoiceServices";
 import { useParams } from "react-router-dom";
 import { toast } from "react-toastify";
 import jsPDF from "jspdf";
-import html2canvas from "html2canvas";
 
 export default function BillingPage() {
   const { clientId } = useParams();
@@ -4144,20 +4683,25 @@ export default function BillingPage() {
       setLoading(true);
       try {
         const [ordersRes, tablesRes, invRes] = await Promise.all([
-          orderServices.get(`/${clientId}/dinein/table`, { headers: { Authorization: `Bearer ${token}` } }),
-          tableServices.get(`/${clientId}/tables/read`, { headers: { Authorization: `Bearer ${token}` } }),
-          inventoryServices.get(`/${clientId}/inventory/read`, { headers: { Authorization: `Bearer ${token}` } }),
+          orderServices.get(`/${clientId}/dinein/table`, {
+            headers: { Authorization: `Bearer ${token}` },
+          }),
+          tableServices.get(`/${clientId}/tables/read`, {
+            headers: { Authorization: `Bearer ${token}` },
+          }),
+          inventoryServices.get(`/${clientId}/inventory/read`, {
+            headers: { Authorization: `Bearer ${token}` },
+          }),
         ]);
-
         const served = (ordersRes.data?.data || []).filter(
           (o) => o.status?.toLowerCase() === "served" && isToday(o.created_at)
         );
         setOrders(served);
-
         const tMap = {};
-        (tablesRes.data?.data || []).forEach((t) => (tMap[t.id] = t.name || t.table_number || `Table ${t.id}`));
+        (tablesRes.data?.data || []).forEach(
+          (t) => (tMap[t.id] = t.name || t.table_number || `Table ${t.id}`)
+        );
         setTablesMap(tMap);
-
         const iMap = {};
         (invRes.data?.data || []).forEach((i) => (iMap[i.id] = i));
         setInventoryMap(iMap);
@@ -4169,22 +4713,22 @@ export default function BillingPage() {
     }
     fetchAll();
   }, [clientId, token]);
+
   const fetchInvoiceDraft = async (orderId) => {
     try {
       const res = await invoiceServices.get(`/${clientId}/invoice/read_document`, {
         headers: { Authorization: `Bearer ${token}` },
-        params: { client_id: clientId, status: "Draft" } // or filter by order_id if API supports
+        params: { client_id: clientId, status: "Draft" },
       });
       const drafts = res.data?.data || [];
-      // Find draft for this order
-      const draft = drafts.find(d => d.order_id?.toString() === orderId?.toString());
+      const draft = drafts.find((d) => d.order_id?.toString() === orderId?.toString());
       return draft || {};
     } catch (err) {
       console.error("Failed to fetch invoice draft", err);
       return {};
     }
   };
-  
+
   const enrichItems = (order) =>
     (order.items || []).map((item) => {
       const inv = inventoryMap[item.item_id] || {};
@@ -4196,7 +4740,11 @@ export default function BillingPage() {
       };
     });
 
-  const subtotal = selectedOrder?.items?.reduce((sum, item) => sum + (item.unit_price ?? 0) * (item.quantity ?? 1), 0) || 0;
+  const subtotal =
+    selectedOrder?.items?.reduce(
+      (sum, item) => sum + (item.unit_price ?? 0) * (item.quantity ?? 1),
+      0
+    ) || 0;
   const taxAmount = (taxPercent / 100) * subtotal;
   const discountAmount = discountIsPercent ? (discount / 100) * subtotal : discount;
   const total = subtotal + taxAmount - discountAmount;
@@ -4237,9 +4785,13 @@ export default function BillingPage() {
         if (!draftId) throw new Error("Draft creation failed");
         setInvoiceDraftId(draftId);
       } else {
-        await invoiceServices.post(`/${clientId}/invoice/update_document`, { id: draftId, ...payload }, {
-          headers: { Authorization: `Bearer ${token}` },
-        });
+        await invoiceServices.post(
+          `/${clientId}/invoice/update_document`,
+          { id: draftId, ...payload },
+          {
+            headers: { Authorization: `Bearer ${token}` },
+          }
+        );
       }
 
       const itemsPayload = selectedOrder.items.map((item) => ({
@@ -4268,14 +4820,12 @@ export default function BillingPage() {
   };
 
   const printInvoice = async () => {
-    try {
-      const draftId = invoiceDraftId || await saveInvoiceDraft();
-      if (!draftId) {
-        toast.error("Failed to create invoice draft. Cannot generate invoice.");
-        return;
-      }
+    if (!selectedOrder || !selectedOrder.items || selectedOrder.items.length === 0) return;
 
-      // Step 1: Generate invoice (moves status to Created)
+    try {
+      const draftId = invoiceDraftId || (await saveInvoiceDraft());
+      if (!draftId) return toast.error("Failed to create invoice draft");
+
       await invoiceServices.post(
         `/${clientId}/invoice/generate`,
         {},
@@ -4285,7 +4835,6 @@ export default function BillingPage() {
         }
       );
 
-      // Step 2: Issue invoice (assigns document_number and moves status to Issued)
       const issueRes = await invoiceServices.post(
         `/${clientId}/invoice/issue`,
         {},
@@ -4295,24 +4844,29 @@ export default function BillingPage() {
         }
       );
 
-      // Set document number state
-      const docNum = issueRes?.data?.data?.document_number || "N/A";
+      const docNum = issueRes?.data?.data?.document_number || "";
       setDocumentNumber(docNum);
 
-      if (!invoiceRef.current) return;
+      setTimeout(() => {
+        if (!invoiceRef.current) return;
 
-      // Replace placeholder in DOM
-      invoiceRef.current.innerHTML = invoiceRef.current.innerHTML.replace("{{document_number}}", docNum);
+        const pdf = new jsPDF({
+          orientation: "portrait",
+          unit: "pt",
+          format: "a4",
+        });
 
-      // Generate PDF
-      const canvas = await html2canvas(invoiceRef.current, { scale: 2 });
-      const imgData = canvas.toDataURL("image/png");
-      const pdf = new jsPDF('p', 'mm', 'a4');
-      const pdfWidth = pdf.internal.pageSize.getWidth();
-      const pdfHeight = (canvas.height * pdfWidth) / canvas.width;
-      pdf.addImage(imgData, 'PNG', 0, 0, pdfWidth, pdfHeight);
-      pdf.save(`Invoice_${draftId}.pdf`);
-
+        pdf.html(invoiceRef.current, {
+          callback: (doc) => {
+            doc.save(`Invoice_${draftId}.pdf`);
+          },
+          margin: [40, 40, 40, 40],
+          autoPaging: "text",
+          x: 0,
+          y: 0,
+          windowWidth: 800,
+        });
+      }, 100);
     } catch (err) {
       console.error(err);
       toast.error("Failed to generate invoice PDF");
@@ -4320,15 +4874,41 @@ export default function BillingPage() {
   };
 
   return (
-    <div className="billing-page" style={{ padding: "1rem", background: "#f9fafc" }}>
-      <h1 style={{ fontSize: "1.5rem", fontWeight: 700, marginBottom: "1rem" }}>Billing & Invoices</h1>
+    <div
+      className="billing-page"
+      style={{
+        fontFamily: "'Segoe UI', Tahoma, Geneva, Verdana, sans-serif",
+        padding: "2rem",
+        background: "#f3f6fb",
+        minHeight: "100vh",
+      }}
+    >
+      <h1
+        style={{
+          fontSize: "2rem",
+          fontWeight: 700,
+          color: "#0747a6",
+          marginBottom: "2rem",
+          borderBottom: "3px solid #0747a6",
+          paddingBottom: "0.5rem",
+        }}
+      >
+        Billing & Invoices
+      </h1>
 
-      {/* Orders grid */}
-      <div style={{ display: "grid", gridTemplateColumns: "repeat(auto-fit,minmax(280px,1fr))", gap: "1rem", marginBottom: "1.5rem" }}>
+      {/* Orders Grid */}
+      <div
+        style={{
+          display: "grid",
+          gridTemplateColumns: "repeat(auto-fit,minmax(280px,1fr))",
+          gap: "1.5rem",
+          marginBottom: "3rem",
+        }}
+      >
         {loading ? (
-          <p>Loading...</p>
+          <p style={{ color: "#555", fontStyle: "italic" }}>Loading...</p>
         ) : orders.length === 0 ? (
-          <span style={{ color: "#888" }}>No served orders today</span>
+          <p style={{ color: "#888", fontStyle: "italic" }}>No served orders today</p>
         ) : (
           orders.map((order) => {
             const tableName = tablesMap[order.table_id];
@@ -4340,34 +4920,48 @@ export default function BillingPage() {
             return (
               <div
                 key={order.id}
-                style={{
-                  padding: "1rem",
-                  background: "#fff",
-                  borderRadius: "10px",
-                  boxShadow: "0 2px 6px rgba(0,0,0,0.05)",
-                  border: selectedOrder?.id === order.id ? "2px solid #0d6efd" : "1px solid #eee",
-                  cursor: "pointer",
-                }}
                 onClick={async () => {
                   const enrichedItems = enrichItems(order);
-                
-                  // Fetch existing draft for this order
                   const invoiceDraft = await fetchInvoiceDraft(order.id);
-                
                   setCustomerId(invoiceDraft.customer_id || "");
                   setContactEmail(invoiceDraft.contact_email || "");
                   setContactPhone(invoiceDraft.contact_phone || "");
                   setInvoiceDraftId(invoiceDraft.id || null);
                   setStatus(invoiceDraft.status || "Draft");
-                
                   setSelectedOrder({ ...order, items: enrichedItems });
+                  setDocumentNumber(invoiceDraft.document_number || "");
+                  setPaymentStatus(invoiceDraft.payment_status || "Pending");
                 }}
-                
+                style={{
+                  padding: "1.5rem",
+                  background: selectedOrder?.id === order.id ? "#dce6fb" : "#ffffff",
+                  borderRadius: "12px",
+                  boxShadow:
+                    selectedOrder?.id === order.id
+                      ? "0 0 10px rgba(7, 71, 166, 0.3)"
+                      : "0 2px 6px rgba(0,0,0,0.1)",
+                  border: selectedOrder?.id === order.id ? "2px solid #0747a6" : "1px solid #ccd6f6",
+                  cursor: "pointer",
+                  transition: "all 0.3s ease",
+                }}
               >
-                <h3 style={{ margin: 0 }}>{tableName || `Table ${order.table_id}`}</h3>
-                <p style={{ margin: "0.25rem 0", color: "#555" }}>Order #{order.id}</p>
-                <p style={{ fontWeight: 700 }}>₹{orderTotal.toFixed(2)}</p>
-                <small style={{ color: "#666" }}>
+                <h3 style={{ margin: "0 0 0.2rem 0", color: "#0747a6" }}>
+                  {tableName || `Table ${order.table_id}`}
+                </h3>
+                <p style={{ margin: "0 0 0.4rem 0", fontWeight: "600", color: "#0f172a" }}>
+                  Order #{order.id}
+                </p>
+                <p
+                  style={{
+                    fontWeight: 700,
+                    color: "#0747a6",
+                    fontSize: "1.2rem",
+                    margin: "0 0 0.5rem 0",
+                  }}
+                >
+                  ₹{orderTotal.toFixed(2)}
+                </p>
+                <small style={{ color: "#64748b" }}>
                   Served at: {servedTime.toLocaleTimeString([], { hour: "2-digit", minute: "2-digit" })}
                 </small>
               </div>
@@ -4376,113 +4970,347 @@ export default function BillingPage() {
         )}
       </div>
 
-      {/* Invoice / Bill */}
+      {/* Invoice Section */}
       {selectedOrder && (
-        <div style={{ display: "flex", flexWrap: "wrap", gap: "1.5rem" }}>
-          {/* Left: Invoice Preview */}
-          <div ref={invoiceRef} style={{ flex: "1 1 600px", background: "#fff", padding: "1.5rem", borderRadius: "10px", boxShadow: "0 2px 8px rgba(0,0,0,0.05)" }}>
-            <div className="invoice-header">Invoice</div>
-            <div className="meta"><span>Invoice Number:</span> {documentNumber || (invoiceDraftId ? "{{document_number}}" : "Draft")}</div>
-            <div className="meta"><span>Client ID:</span> {clientId}</div>
-            <div className="meta"><span>Order ID:</span> {selectedOrder.id}</div>
-            <div className="meta"><span>Table:</span> {tablesMap[selectedOrder.table_id] || selectedOrder.table_id}</div>
-            <div className="meta"><span>Date:</span> {new Date().toLocaleDateString()}</div>
-            <div className="meta"><span>Status:</span> {status}</div>
-            <div className="meta"><span>Payment Status:</span> {paymentStatus}</div>
-            <div className="meta"><span>Customer ID:</span> {customerId}</div>
-            <div className="meta"><span>Email:</span> {contactEmail}</div>
-            <div className="meta"><span>Phone:</span> {contactPhone}</div>
+        <div style={{ display: "flex", gap: "2rem", flexWrap: "wrap" }}>
+          {/* Left - Invoice Preview */}
+          <section
+            ref={invoiceRef}
+            style={{
+              fontFamily: "'Arial', sans-serif",
+              background: "#ffffff",
+              padding: "40px",
+              borderRadius: "12px",
+              boxShadow: "0 10px 30px rgba(7, 71, 166, 0.2)",
+              color: "#024E89",
+              maxWidth: "700px",
+              margin: "auto",
+            }}
+          >
+            <header
+              style={{
+                display: "flex",
+                justifyContent: "space-between",
+                borderBottom: "3px solid #0747a6",
+                paddingBottom: "10px",
+                marginBottom: "30px",
+              }}
+            >
+              <h1 style={{ fontWeight: "700", fontSize: "32px", margin: 0 }}>INVOICE</h1>
+              <div>
+                <div style={{ fontSize: "14px", color: "#4a90e2", fontWeight: "600" }}>
+                  {documentNumber || "Draft"} {/* show updated document number */}
+                </div>
+                <div style={{ fontSize: "12px", marginTop: "6px", color: "#7b8ea2" }}>
+                  {new Date().toLocaleDateString()}
+                </div>
+              </div>
+            </header>
+            <div
+              style={{
+                display: "flex",
+                justifyContent: "center",
+                gap: "6px",
+                marginBottom: "30px",
+              }}
+            >
+              <span
+                style={{ color: "darkblue", fontFamily: "cursive", fontSize: "20px", textAlign: "center" }}
+              >
+                {clientId}
+              </span>
+            </div>
+            <section
+              style={{
+                display: "flex",
+                justifyContent: "space-between",
+                marginBottom: "30px",
+              }}
+            >
+              <div style={{ width: "45%" }}>
+                <h2
+                  style={{
+                    fontWeight: "700",
+                    fontSize: "18px",
+                    marginBottom: "10px",
+                    borderBottom: "1.5px solid #024E89",
+                  }}
+                >
+                  Bill To:
+                </h2>
+                <p style={{ margin: "0", fontWeight: "600", fontSize: "12px" }}>{customerId || "N/A"}</p>
+                <p style={{ margin: "0", color: "#49657a", fontSize: "12px" }}>{contactEmail}</p>
+              </div>
+              <div style={{ width: "45%", textAlign: "right" }}>
+                <h2
+                  style={{
+                    fontWeight: "700",
+                    fontSize: "18px",
+                    marginBottom: "10px",
+                    borderBottom: "1.5px solid #024E89",
+                  }}
+                >
+                  Shipping Info:
+                </h2>
+                <p style={{ margin: "0", fontWeight: "600" }}>
+                  {tablesMap[selectedOrder?.table_id] || "N/A"}
+                </p>
+                <p style={{ margin: "0", color: "#49657a", fontSize: "12px" }}>
+                  Contact: {contactPhone}
+                </p>
+              </div>
+            </section>
 
-            <table>
+            <table
+              style={{ width: "100%", borderCollapse: "collapse", fontSize: "14px", color: "#024E89" }}
+            >
               <thead>
-                <tr>
-                  <th>Item</th>
-                  <th>Qty</th>
-                  <th>Unit Price</th>
-                  <th>Total</th>
+                <tr
+                  style={{
+                    borderBottom: "2px solid #024E89",
+                    textTransform: "uppercase",
+                    fontWeight: "700",
+                  }}
+                >
+                  <th style={{ padding: "10px 5px", textAlign: "left" }}>Item</th>
+                  <th style={{ padding: "10px 5px", textAlign: "right" }}>Quantity</th>
+                  <th style={{ padding: "10px 5px", textAlign: "right" }}>Unit Price</th>
+                  <th style={{ padding: "10px 5px", textAlign: "right" }}>Amount</th>
                 </tr>
               </thead>
               <tbody>
-                {selectedOrder.items.map((item) => (
-                  <tr key={item.item_id}>
-                    <td>{item.name}</td>
-                    <td>{item.quantity}</td>
-                    <td>₹{item.unit_price.toFixed(2)}</td>
-                    <td>₹{(item.unit_price * item.quantity).toFixed(2)}</td>
+                {selectedOrder?.items?.map((item, idx) => (
+                  <tr key={idx} style={{ borderBottom: "1px solid #bfcfe8" }}>
+                    <td style={{ padding: "10px 5px" }}>{item.name}</td>
+                    <td style={{ padding: "10px 5px", textAlign: "right" }}>{item.quantity}</td>
+                    <td style={{ padding: "10px 5px", textAlign: "right" }}>
+                      ₹{item.unit_price.toFixed(2)}
+                    </td>
+                    <td style={{ padding: "10px 5px", textAlign: "right" }}>
+                      ₹{(item.unit_price * item.quantity).toFixed(2)}
+                    </td>
                   </tr>
                 ))}
-                <tr>
-                  <td colSpan="3" className="total">Subtotal</td>
-                  <td>₹{subtotal.toFixed(2)}</td>
+                <tr style={{ fontWeight: "600", fontSize: "16px" }}>
+                  <td colSpan="3" style={{ padding: "10px 5px", textAlign: "right" }}>
+                    Subtotal
+                  </td>
+                  <td style={{ padding: "10px 5px", textAlign: "right" }}>₹{subtotal.toFixed(2)}</td>
                 </tr>
-                <tr>
-                  <td colSpan="3">Discount</td>
-                  <td>-₹{discountAmount.toFixed(2)}</td>
+                <tr style={{ fontWeight: "600", fontSize: "16px" }}>
+                  <td colSpan="3" style={{ padding: "10px 5px", textAlign: "right" }}>
+                    Discount
+                  </td>
+                  <td style={{ padding: "10px 5px", textAlign: "right" }}>
+                    -₹{discountAmount.toFixed(2)}
+                  </td>
                 </tr>
-                <tr>
-                  <td colSpan="3">GST</td>
-                  <td>₹{taxAmount.toFixed(2)}</td>
+                <tr style={{ fontWeight: "600", fontSize: "16px" }}>
+                  <td colSpan="3" style={{ padding: "10px 5px", textAlign: "right" }}>
+                    GST
+                  </td>
+                  <td style={{ padding: "10px 5px", textAlign: "right" }}>₹{taxAmount.toFixed(2)}</td>
                 </tr>
-                <tr>
-                  <td colSpan="3" className="total">Total</td>
-                  <td>₹{total.toFixed(2)}</td>
+                <tr
+                  style={{
+                    borderTop: "3px solid #0747a6",
+                    fontWeight: "900",
+                    fontSize: "18px",
+                    color: "#0747a6",
+                  }}
+                >
+                  <td colSpan="3" style={{ padding: "10px 5px", textAlign: "right" }}>
+                    Total
+                  </td>
+                  <td style={{ padding: "10px 5px", textAlign: "right" }}>₹{total.toFixed(2)}</td>
                 </tr>
               </tbody>
             </table>
-          </div>
 
-          {/* Right: Actions */}
-          <div style={{ flex: "0 1 320px", background: "#fff", padding: "1.5rem", borderRadius: "10px", boxShadow: "0 2px 8px rgba(0,0,0,0.05)", alignSelf: "flex-start" }}>
-            <h3 style={{ marginBottom: "1rem" }}>Actions</h3>
+            <footer
+              style={{
+                marginTop: "30px",
+                fontSize: "12px",
+                color: "#64748b",
+                borderTop: "1px solid #dbeafe",
+                paddingTop: "15px",
+              }}
+            >
+              <p>Thank you for your business!</p>
+              <p>This is a computer-generated invoice and does not require a signature.</p>
+            </footer>
+          </section>
 
-            <div style={{ marginBottom: "1rem" }}>
-              <label>GST (%)</label>
-              <input type="number" value={taxPercent} onChange={(e) => setTaxPercent(Number(e.target.value))} style={{ width: "100%", marginTop: "0.25rem", padding: "0.5rem" }} />
+          {/* Right - Actions Panel */}
+          <aside
+            style={{
+              flex: "0 1 360px",
+              backgroundColor: "#ffffff",
+              padding: "2rem",
+              borderRadius: "16px",
+              boxShadow: "0 6px 20px rgba(7,71,166,0.15)",
+              display: "flex",
+              flexDirection: "column",
+              gap: "1.25rem",
+              height: "fit-content",
+            }}
+          >
+            <h3 style={{ marginBottom: "1rem", color: "#0747a6" }}>Actions</h3>
+
+            <div>
+              <label style={{ fontWeight: "600", color: "#334155" }}>GST (%)</label>
+              <input
+                type="number"
+                value={taxPercent}
+                onChange={(e) => setTaxPercent(Number(e.target.value))}
+                style={{
+                  width: "100%",
+                  padding: "0.5rem",
+                  marginTop: "0.25rem",
+                  borderRadius: "6px",
+                  border: "1px solid #cbd5e1",
+                }}
+              />
             </div>
 
-            <div style={{ marginBottom: "1rem" }}>
-              <label>Discount {discountIsPercent ? "(%)" : "(₹)"}</label>
+            <div>
+              <label style={{ fontWeight: "600", color: "#334155" }}>
+                Discount {discountIsPercent ? "(%)" : "(₹)"}
+              </label>
               <div style={{ display: "flex", gap: "0.5rem", marginTop: "0.25rem" }}>
-                <input type="number" value={discount} onChange={(e) => setDiscount(Number(e.target.value))} style={{ flex: 1, padding: "0.5rem" }} />
-                <select value={discountIsPercent ? "%" : "₹"} onChange={(e) => setDiscountIsPercent(e.target.value === "%")} style={{ padding: "0.5rem" }}>
+                <input
+                  type="number"
+                  value={discount}
+                  onChange={(e) => setDiscount(Number(e.target.value))}
+                  style={{
+                    flex: 1,
+                    padding: "0.5rem",
+                    borderRadius: "6px",
+                    border: "1px solid #cbd5e1",
+                  }}
+                />
+                <select
+                  value={discountIsPercent ? "%" : "₹"}
+                  onChange={(e) => setDiscountIsPercent(e.target.value === "%")}
+                  style={{
+                    padding: "0.5rem",
+                    borderRadius: "6px",
+                    border: "1px solid #cbd5e1",
+                  }}
+                >
                   <option value="%">%</option>
                   <option value="₹">₹</option>
                 </select>
               </div>
             </div>
 
-            <div style={{ marginBottom: "1rem" }}>
-              <label>Payment Status</label>
-              <select value={paymentStatus} onChange={(e) => setPaymentStatus(e.target.value)} style={{ width: "100%", marginTop: "0.25rem", padding: "0.5rem" }}>
+            <div>
+              <label style={{ fontWeight: "600", color: "#334155" }}>Payment Status</label>
+              <select
+                value={paymentStatus}
+                onChange={(e) => setPaymentStatus(e.target.value)}
+                style={{
+                  width: "100%",
+                  padding: "0.5rem",
+                  marginTop: "0.25rem",
+                  borderRadius: "6px",
+                  border: "1px solid #cbd5e1",
+                }}
+              >
                 {["Pending", "Paid", "Partial", "Due"].map((s) => (
-                  <option key={s} value={s}>{s}</option>
+                  <option key={s} value={s}>
+                    {s}
+                  </option>
                 ))}
               </select>
             </div>
 
-            <div style={{ marginBottom: "1rem" }}>
-              <label>Invoice Status</label>
-              <select value={status} onChange={(e) => setStatus(e.target.value)} style={{ width: "100%", marginTop: "0.25rem", padding: "0.5rem" }}>
+            <div>
+              <label style={{ fontWeight: "600", color: "#334155" }}>Invoice Status</label>
+              <select
+                value={status}
+                onChange={(e) => setStatus(e.target.value)}
+                style={{
+                  width: "100%",
+                  padding: "0.5rem",
+                  marginTop: "0.25rem",
+                  borderRadius: "6px",
+                  border: "1px solid #cbd5e1",
+                }}
+              >
                 {["Draft", "Created", "Pending", "Issued", "Cancelled"].map((s) => (
-                  <option key={s} value={s}>{s}</option>
+                  <option key={s} value={s}>
+                    {s}
+                  </option>
                 ))}
               </select>
             </div>
 
-            <div style={{ marginBottom: "1rem" }}>
-              <label>Customer ID</label>
-              <input type="text" value={customerId} onChange={(e) => setCustomerId(e.target.value)} style={{ width: "100%", marginTop: "0.25rem", padding: "0.5rem" }} />
+            <div>
+              <label style={{ fontWeight: "600", color: "#334155" }}>Customer ID</label>
+              <input
+                type="text"
+                value={customerId}
+                onChange={(e) => setCustomerId(e.target.value)}
+                style={{
+                  width: "100%",
+                  padding: "0.5rem",
+                  marginTop: "0.25rem",
+                  borderRadius: "6px",
+                  border: "1px solid #cbd5e1",
+                }}
+              />
             </div>
-            <div style={{ marginBottom: "1rem" }}>
-              <label>Contact Email</label>
-              <input type="email" value={contactEmail} onChange={(e) => setContactEmail(e.target.value)} style={{ width: "100%", marginTop: "0.25rem", padding: "0.5rem" }} />
+            <div>
+              <label style={{ fontWeight: "600", color: "#334155" }}>Contact Email</label>
+              <input
+                type="email"
+                value={contactEmail}
+                onChange={(e) => setContactEmail(e.target.value)}
+                style={{
+                  width: "100%",
+                  padding: "0.5rem",
+                  marginTop: "0.25rem",
+                  borderRadius: "6px",
+                  border: "1px solid #cbd5e1",
+                }}
+              />
             </div>
-            <div style={{ marginBottom: "1rem" }}>
-              <label>Contact Phone</label>
-              <input type="text" value={contactPhone} onChange={(e) => setContactPhone(e.target.value)} style={{ width: "100%", marginTop: "0.25rem", padding: "0.5rem" }} />
+            <div>
+              <label style={{ fontWeight: "600", color: "#334155" }}>Contact Phone</label>
+              <input
+                type="text"
+                value={contactPhone}
+                onChange={(e) => setContactPhone(e.target.value)}
+                style={{
+                  width: "100%",
+                  padding: "0.5rem",
+                  marginTop: "0.25rem",
+                  borderRadius: "6px",
+                  border: "1px solid #cbd5e1",
+                }}
+              />
             </div>
 
-            <button onClick={saveInvoiceDraft} disabled={saving} style={{ width: "100%", padding: "0.75rem", background: "#0d6efd", color: "#fff", border: "none", borderRadius: "6px", marginBottom: "0.5rem", cursor: "pointer" }}>
+            <button
+              onClick={saveInvoiceDraft}
+              disabled={saving}
+              style={{
+                width: "100%",
+                padding: "0.75rem",
+                backgroundColor: "#0747a6",
+                color: "#fff",
+                border: "none",
+                borderRadius: "8px",
+                fontWeight: "600",
+                cursor: "pointer",
+                boxShadow: "0 4px 6px rgba(7,71,166,0.4)",
+                transition: "background-color 0.3s ease",
+                marginBottom: "0.75rem",
+              }}
+              onMouseEnter={(e) => (e.currentTarget.style.backgroundColor = "#0a549f")}
+              onMouseLeave={(e) => (e.currentTarget.style.backgroundColor = "#0747a6")}
+            >
               {saving ? "Saving..." : "Save Bill"}
             </button>
 
@@ -4492,17 +5320,34 @@ export default function BillingPage() {
               style={{
                 width: "100%",
                 padding: "0.75rem",
-                background: "#198754",
+                backgroundColor: "#147d4c",
                 color: "#fff",
                 border: "none",
-                borderRadius: "6px",
-                cursor: !selectedOrder || !selectedOrder.items || selectedOrder.items.length === 0 ? "not-allowed" : "pointer",
-                opacity: !selectedOrder || !selectedOrder.items || selectedOrder.items.length === 0 ? 0.6 : 1,
+                borderRadius: "8px",
+                fontWeight: "600",
+                cursor:
+                  !selectedOrder || !selectedOrder.items || selectedOrder.items.length === 0
+                    ? "not-allowed"
+                    : "pointer",
+                opacity:
+                  !selectedOrder || !selectedOrder.items || selectedOrder.items.length === 0 ? 0.6 : 1,
+                boxShadow: "0 4px 6px rgba(20,125,76,0.4)",
+                transition: "background-color 0.3s ease",
+              }}
+              onMouseEnter={(e) => {
+                if (!(!selectedOrder || !selectedOrder.items || selectedOrder.items.length === 0)) {
+                  e.currentTarget.style.backgroundColor = "#176f41";
+                }
+              }}
+              onMouseLeave={(e) => {
+                if (!(!selectedOrder || !selectedOrder.items || selectedOrder.items.length === 0)) {
+                  e.currentTarget.style.backgroundColor = "#147d4c";
+                }
               }}
             >
               Download PDF / Print
             </button>
-          </div>
+          </aside>
         </div>
       )}
     </div>

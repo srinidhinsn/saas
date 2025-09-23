@@ -36,9 +36,9 @@ export default function Login() {
             const decoded = jwtDecode(token);
 
             localStorage.setItem("access_token", token);
-            localStorage.setItem("clientId", decoded.client_id);
-            localStorage.setItem("username", decoded.username);
-            localStorage.setItem("grants", JSON.stringify(decoded.grants || []));
+            // localStorage.setItem("clientId", decoded.client_id);
+            // localStorage.setItem("username", decoded.username);
+            // localStorage.setItem("grants", JSON.stringify(decoded.grants || []));
 
             toast.success("Login successful");
 
