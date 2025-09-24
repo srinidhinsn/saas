@@ -36,20 +36,16 @@ async def login_user(client_id: str, userReq: LoginRequest, db: Session = Depend
         raise HTTPException(status_code=400, detail="Invalid credentials")
 
     userModel = User.copyToModel(user)
-    '''
-    person = db.query(Person).filter(Person.id == userModel.id).first()
-    if person:
-        personModel = Person.copyToModel(person)
-        userModel.first_name = personModel.first_name
-        userModel.last_name = personModel.last_name
-        userModel.email = personModel.email
-        userModel.phone = personModel.phone
-    '''
+    
+    client = db.query(Client).filter(Client.id==client_id).first()
+    client_model = Client.copyToModel(client)
+
     token = create_access_token({
         "user_id": str(userModel.id),
         "roles": userModel.roles,
         "client_id": userModel.client_id,
-        "grants": userModel.grants
+        "grants": userModel.grants,
+        "realm": client_model.realm
     })
     return ResponseModel(
         screen_id="default_user",
