@@ -4633,6 +4633,752 @@ import invoiceServicesPort from "../../Backend_Port_Files/InvoiceServices"; // a
 
 
 
+// import React, { useEffect, useState, useRef } from "react";
+// import orderServices from "../../Backend_Port_Files/OrderServices";
+// import tableServices from "../../Backend_Port_Files/TableServices";
+// import inventoryServices from "../../Backend_Port_Files/InventoryServices";
+// import invoiceServices from "../../Backend_Port_Files/InvoiceServices";
+// import { useParams } from "react-router-dom";
+// import { toast } from "react-toastify";
+// import jsPDF from "jspdf";
+
+// export default function BillingPage() {
+//   const { clientId } = useParams();
+//   const token = localStorage.getItem("access_token");
+
+//   const [orders, setOrders] = useState([]);
+//   const [tablesMap, setTablesMap] = useState({});
+//   const [inventoryMap, setInventoryMap] = useState({});
+//   const [selectedOrder, setSelectedOrder] = useState(null);
+//   const [taxPercent, setTaxPercent] = useState(18);
+//   const [discount, setDiscount] = useState(0);
+//   const [method, setMethod] = useState("Cash");
+//   const [paymentStatus, setPaymentStatus] = useState("Pending");
+//   const [status, setStatus] = useState("Draft");
+//   const [discountIsPercent, setDiscountIsPercent] = useState(true);
+//   const [loading, setLoading] = useState(true);
+//   const [saving, setSaving] = useState(false);
+//   const [invoiceDraftId, setInvoiceDraftId] = useState(null);
+//   const [documentNumber, setDocumentNumber] = useState("");
+
+//   const [customerId, setCustomerId] = useState("");
+//   const [contactEmail, setContactEmail] = useState("");
+//   const [contactPhone, setContactPhone] = useState("");
+
+//   const invoiceRef = useRef(null);
+
+//   const isToday = (createdAt) => {
+//     const date = new Date(createdAt);
+//     if (!date) return false;
+//     const today = new Date();
+//     return (
+//       date.getFullYear() === today.getFullYear() &&
+//       date.getMonth() === today.getMonth() &&
+//       date.getDate() === today.getDate()
+//     );
+//   };
+
+//   useEffect(() => {
+//     async function fetchAll() {
+//       setLoading(true);
+//       try {
+//         const [ordersRes, tablesRes, invRes] = await Promise.all([
+//           orderServices.get(`/${clientId}/dinein/table`, {
+//             headers: { Authorization: `Bearer ${token}` },
+//           }),
+//           tableServices.get(`/${clientId}/tables/read`, {
+//             headers: { Authorization: `Bearer ${token}` },
+//           }),
+//           inventoryServices.get(`/${clientId}/inventory/read`, {
+//             headers: { Authorization: `Bearer ${token}` },
+//           }),
+//         ]);
+//         const served = (ordersRes.data?.data || []).filter(
+//           (o) => o.status?.toLowerCase() === "served" && isToday(o.created_at)
+//         );
+//         setOrders(served);
+//         const tMap = {};
+//         (tablesRes.data?.data || []).forEach(
+//           (t) => (tMap[t.id] = t.name || t.table_number || `Table ${t.id}`)
+//         );
+//         setTablesMap(tMap);
+//         const iMap = {};
+//         (invRes.data?.data || []).forEach((i) => (iMap[i.id] = i));
+//         setInventoryMap(iMap);
+//       } catch {
+//         toast.error("Error loading data");
+//       } finally {
+//         setLoading(false);
+//       }
+//     }
+//     fetchAll();
+//   }, [clientId, token]);
+
+//   const fetchInvoiceDraft = async (orderId) => {
+//     try {
+//       const res = await invoiceServices.get(`/${clientId}/invoice/read_document`, {
+//         headers: { Authorization: `Bearer ${token}` },
+//         params: { client_id: clientId, status: "Draft" },
+//       });
+//       const drafts = res.data?.data || [];
+//       const draft = drafts.find((d) => d.order_id?.toString() === orderId?.toString());
+//       return draft || {};
+//     } catch (err) {
+//       console.error("Failed to fetch invoice draft", err);
+//       return {};
+//     }
+//   };
+
+//   const enrichItems = (order) =>
+//     (order.items || []).map((item) => {
+//       const inv = inventoryMap[item.item_id] || {};
+//       return {
+//         ...item,
+//         unit_price: item.unit_price ?? item.price ?? inv.unit_price ?? 0,
+//         description: item.description ?? inv.description ?? "",
+//         name: item.item_name ?? inv.name ?? "Unnamed Item",
+//       };
+//     });
+
+//   const subtotal =
+//     selectedOrder?.items?.reduce(
+//       (sum, item) => sum + (item.unit_price ?? 0) * (item.quantity ?? 1),
+//       0
+//     ) || 0;
+//   const taxAmount = (taxPercent / 100) * subtotal;
+//   const discountAmount = discountIsPercent ? (discount / 100) * subtotal : discount;
+//   const total = subtotal + taxAmount - discountAmount;
+
+//   const saveInvoiceDraft = async () => {
+//     if (!selectedOrder) return toast.error("Select an order first");
+//     if (!selectedOrder.items || selectedOrder.items.length === 0)
+//       return toast.error("Selected order has no items");
+
+//     setSaving(true);
+
+//     try {
+//       const payload = {
+//         client_id: clientId,
+//         document_type: "Invoice",
+//         document_date: new Date().toISOString(),
+//         order_id: selectedOrder.id.toString(),
+//         reference_number: tablesMap[selectedOrder.table_id] || `Table ${selectedOrder.table_id}`,
+//         subtotal: Number(subtotal.toFixed(2)),
+//         tax_amount: Number(taxAmount.toFixed(2)),
+//         discount_amount: Number(discountAmount.toFixed(2)),
+//         total_amount: Number(total.toFixed(2)),
+//         payment_status: paymentStatus,
+//         payment_method: method,
+//         status: status,
+//         customer_id: customerId || "",
+//         contact_email: contactEmail || "",
+//         contact_phone: contactPhone || "",
+//       };
+
+//       let draftId = invoiceDraftId;
+
+//       if (!draftId) {
+//         const res = await invoiceServices.post(`/${clientId}/invoice/create_document`, payload, {
+//           headers: { Authorization: `Bearer ${token}` },
+//         });
+//         draftId = res?.data?.data?.id;
+//         if (!draftId) throw new Error("Draft creation failed");
+//         setInvoiceDraftId(draftId);
+//       } else {
+//         await invoiceServices.post(
+//           `/${clientId}/invoice/update_document`,
+//           { id: draftId, ...payload },
+//           {
+//             headers: { Authorization: `Bearer ${token}` },
+//           }
+//         );
+//       }
+
+//       const itemsPayload = selectedOrder.items.map((item) => ({
+//         item_ref_id: item.item_id?.toString(),
+//         description: item.description || "",
+//         quantity: item.quantity || 0,
+//         unit_price: item.unit_price || 0,
+//         total: (item.unit_price || 0) * (item.quantity || 0),
+//       }));
+
+//       await invoiceServices.post(
+//         `/${clientId}/invoice/create?document_id=${draftId}&client_id=${clientId}`,
+//         itemsPayload,
+//         { headers: { Authorization: `Bearer ${token}` } }
+//       );
+
+//       toast.success("Invoice draft saved!");
+//       return draftId;
+//     } catch (err) {
+//       console.error(err);
+//       toast.error("Failed to save invoice draft");
+//       throw err;
+//     } finally {
+//       setSaving(false);
+//     }
+//   };
+
+//   const printInvoice = async () => {
+//     if (!selectedOrder || !selectedOrder.items || selectedOrder.items.length === 0) return;
+
+//     try {
+//       const draftId = invoiceDraftId || (await saveInvoiceDraft());
+//       if (!draftId) return toast.error("Failed to create invoice draft");
+
+//       await invoiceServices.post(
+//         `/${clientId}/invoice/generate`,
+//         {},
+//         {
+//           headers: { Authorization: `Bearer ${token}` },
+//           params: { client_id: clientId, invoice_id: draftId },
+//         }
+//       );
+
+//       const issueRes = await invoiceServices.post(
+//         `/${clientId}/invoice/issue`,
+//         {},
+//         {
+//           headers: { Authorization: `Bearer ${token}` },
+//           params: { client_id: clientId, invoice_id: draftId },
+//         }
+//       );
+
+//       const docNum = issueRes?.data?.data?.document_number || "";
+//       setDocumentNumber(docNum);
+
+//       setTimeout(() => {
+//         if (!invoiceRef.current) return;
+
+//         const pdf = new jsPDF({
+//           orientation: "portrait",
+//           unit: "pt",
+//           format: "a4",
+//         });
+
+//         pdf.html(invoiceRef.current, {
+//           callback: (doc) => {
+//             doc.save(`Invoice_${draftId}.pdf`);
+//           },
+//           margin: [40, 40, 40, 40],
+//           autoPaging: "text",
+//           x: 0,
+//           y: 0,
+//           windowWidth: 800,
+//         });
+//       }, 100);
+//     } catch (err) {
+//       console.error(err);
+//       toast.error("Failed to generate invoice PDF");
+//     }
+//   };
+
+//   return (
+//     <div
+//       className="billing-page"
+//       style={{
+//         fontFamily: "'Segoe UI', Tahoma, Geneva, Verdana, sans-serif",
+//         padding: "2rem",
+//         background: "#f3f6fb",
+//         minHeight: "100vh",
+//       }}
+//     >
+//       <h1
+//         style={{
+//           fontSize: "2rem",
+//           fontWeight: 700,
+//           color: "#0747a6",
+//           marginBottom: "2rem",
+//           borderBottom: "3px solid #0747a6",
+//           paddingBottom: "0.5rem",
+//         }}
+//       >
+//         Billing & Invoices
+//       </h1>
+
+//       {/* Orders Grid */}
+//       <div
+//         style={{
+//           display: "grid",
+//           gridTemplateColumns: "repeat(auto-fit,minmax(280px,1fr))",
+//           gap: "1.5rem",
+//           marginBottom: "3rem",
+//         }}
+//       >
+//         {loading ? (
+//           <p style={{ color: "#555", fontStyle: "italic" }}>Loading...</p>
+//         ) : orders.length === 0 ? (
+//           <p style={{ color: "#888", fontStyle: "italic" }}>No served orders today</p>
+//         ) : (
+//           orders.map((order) => {
+//             const tableName = tablesMap[order.table_id];
+//             const servedTime = new Date(order.created_at);
+//             const orderTotal = enrichItems(order).reduce(
+//               (sum, i) => sum + (i.unit_price ?? 0) * (i.quantity ?? 1),
+//               0
+//             );
+//             return (
+//               <div
+//                 key={order.id}
+//                 onClick={async () => {
+//                   const enrichedItems = enrichItems(order);
+//                   const invoiceDraft = await fetchInvoiceDraft(order.id);
+//                   setCustomerId(invoiceDraft.customer_id || "");
+//                   setContactEmail(invoiceDraft.contact_email || "");
+//                   setContactPhone(invoiceDraft.contact_phone || "");
+//                   setInvoiceDraftId(invoiceDraft.id || null);
+//                   setStatus(invoiceDraft.status || "Draft");
+//                   setSelectedOrder({ ...order, items: enrichedItems });
+//                   setDocumentNumber(invoiceDraft.document_number || "");
+//                   setPaymentStatus(invoiceDraft.payment_status || "Pending");
+//                 }}
+//                 style={{
+//                   padding: "1.5rem",
+//                   background: selectedOrder?.id === order.id ? "#dce6fb" : "#ffffff",
+//                   borderRadius: "12px",
+//                   boxShadow:
+//                     selectedOrder?.id === order.id
+//                       ? "0 0 10px rgba(7, 71, 166, 0.3)"
+//                       : "0 2px 6px rgba(0,0,0,0.1)",
+//                   border: selectedOrder?.id === order.id ? "2px solid #0747a6" : "1px solid #ccd6f6",
+//                   cursor: "pointer",
+//                   transition: "all 0.3s ease",
+//                 }}
+//               >
+//                 <h3 style={{ margin: "0 0 0.2rem 0", color: "#0747a6" }}>
+//                   {tableName || `Table ${order.table_id}`}
+//                 </h3>
+//                 <p style={{ margin: "0 0 0.4rem 0", fontWeight: "600", color: "#0f172a" }}>
+//                   Order #{order.id}
+//                 </p>
+//                 <p
+//                   style={{
+//                     fontWeight: 700,
+//                     color: "#0747a6",
+//                     fontSize: "1.2rem",
+//                     margin: "0 0 0.5rem 0",
+//                   }}
+//                 >
+//                   ₹{orderTotal.toFixed(2)}
+//                 </p>
+//                 <small style={{ color: "#64748b" }}>
+//                   Served at: {servedTime.toLocaleTimeString([], { hour: "2-digit", minute: "2-digit" })}
+//                 </small>
+//               </div>
+//             );
+//           })
+//         )}
+//       </div>
+
+//       {/* Invoice Section */}
+//       {selectedOrder && (
+//         <div style={{ display: "flex", gap: "2rem", flexWrap: "wrap" }}>
+//           {/* Left - Invoice Preview */}
+//           <section
+//             ref={invoiceRef}
+//             style={{
+//               fontFamily: "'Arial', sans-serif",
+//               background: "#ffffff",
+//               padding: "40px",
+//               borderRadius: "12px",
+//               boxShadow: "0 10px 30px rgba(7, 71, 166, 0.2)",
+//               color: "#024E89",
+//               maxWidth: "700px",
+//               margin: "auto",
+//             }}
+//           >
+//             <header
+//               style={{
+//                 display: "flex",
+//                 justifyContent: "space-between",
+//                 borderBottom: "3px solid #0747a6",
+//                 paddingBottom: "10px",
+//                 marginBottom: "30px",
+//               }}
+//             >
+//               <h1 style={{ fontWeight: "700", fontSize: "32px", margin: 0 }}>INVOICE</h1>
+//               <div>
+//                 <div style={{ fontSize: "14px", color: "#4a90e2", fontWeight: "600" }}>
+//                   {documentNumber || "Draft"} {/* show updated document number */}
+//                 </div>
+//                 <div style={{ fontSize: "12px", marginTop: "6px", color: "#7b8ea2" }}>
+//                   {new Date().toLocaleDateString()}
+//                 </div>
+//               </div>
+//             </header>
+//             <div
+//               style={{
+//                 display: "flex",
+//                 justifyContent: "center",
+//                 gap: "6px",
+//                 marginBottom: "30px",
+//               }}
+//             >
+//               <span
+//                 style={{ color: "darkblue", fontFamily: "cursive", fontSize: "20px", textAlign: "center" }}
+//               >
+//                 {clientId}
+//               </span>
+//             </div>
+//             <section
+//               style={{
+//                 display: "flex",
+//                 justifyContent: "space-between",
+//                 marginBottom: "30px",
+//               }}
+//             >
+//               <div style={{ width: "45%" }}>
+//                 <h2
+//                   style={{
+//                     fontWeight: "700",
+//                     fontSize: "18px",
+//                     marginBottom: "10px",
+//                     borderBottom: "1.5px solid #024E89",
+//                   }}
+//                 >
+//                   Bill To:
+//                 </h2>
+//                 <p style={{ margin: "0", fontWeight: "600", fontSize: "12px" }}>{customerId || "N/A"}</p>
+//                 <p style={{ margin: "0", color: "#49657a", fontSize: "12px" }}>{contactEmail}</p>
+//               </div>
+//               <div style={{ width: "45%", textAlign: "right" }}>
+//                 <h2
+//                   style={{
+//                     fontWeight: "700",
+//                     fontSize: "18px",
+//                     marginBottom: "10px",
+//                     borderBottom: "1.5px solid #024E89",
+//                   }}
+//                 >
+//                   Shipping Info:
+//                 </h2>
+//                 <p style={{ margin: "0", fontWeight: "600" }}>
+//                   {tablesMap[selectedOrder?.table_id] || "N/A"}
+//                 </p>
+//                 <p style={{ margin: "0", color: "#49657a", fontSize: "12px" }}>
+//                   Contact: {contactPhone}
+//                 </p>
+//               </div>
+//             </section>
+
+//             <table
+//               style={{ width: "100%", borderCollapse: "collapse", fontSize: "14px", color: "#024E89" }}
+//             >
+//               <thead>
+//                 <tr
+//                   style={{
+//                     borderBottom: "2px solid #024E89",
+//                     textTransform: "uppercase",
+//                     fontWeight: "700",
+//                   }}
+//                 >
+//                   <th style={{ padding: "10px 5px", textAlign: "left" }}>Item</th>
+//                   <th style={{ padding: "10px 5px", textAlign: "right" }}>Quantity</th>
+//                   <th style={{ padding: "10px 5px", textAlign: "right" }}>Unit Price</th>
+//                   <th style={{ padding: "10px 5px", textAlign: "right" }}>Amount</th>
+//                 </tr>
+//               </thead>
+//               <tbody>
+//                 {selectedOrder?.items?.map((item, idx) => (
+//                   <tr key={idx} style={{ borderBottom: "1px solid #bfcfe8" }}>
+//                     <td style={{ padding: "10px 5px" }}>{item.name}</td>
+//                     <td style={{ padding: "10px 5px", textAlign: "right" }}>{item.quantity}</td>
+//                     <td style={{ padding: "10px 5px", textAlign: "right" }}>
+//                       ₹{item.unit_price.toFixed(2)}
+//                     </td>
+//                     <td style={{ padding: "10px 5px", textAlign: "right" }}>
+//                       ₹{(item.unit_price * item.quantity).toFixed(2)}
+//                     </td>
+//                   </tr>
+//                 ))}
+//                 <tr style={{ fontWeight: "600", fontSize: "16px" }}>
+//                   <td colSpan="3" style={{ padding: "10px 5px", textAlign: "right" }}>
+//                     Subtotal
+//                   </td>
+//                   <td style={{ padding: "10px 5px", textAlign: "right" }}>₹{subtotal.toFixed(2)}</td>
+//                 </tr>
+//                 <tr style={{ fontWeight: "600", fontSize: "16px" }}>
+//                   <td colSpan="3" style={{ padding: "10px 5px", textAlign: "right" }}>
+//                     Discount
+//                   </td>
+//                   <td style={{ padding: "10px 5px", textAlign: "right" }}>
+//                     -₹{discountAmount.toFixed(2)}
+//                   </td>
+//                 </tr>
+//                 <tr style={{ fontWeight: "600", fontSize: "16px" }}>
+//                   <td colSpan="3" style={{ padding: "10px 5px", textAlign: "right" }}>
+//                     GST
+//                   </td>
+//                   <td style={{ padding: "10px 5px", textAlign: "right" }}>₹{taxAmount.toFixed(2)}</td>
+//                 </tr>
+//                 <tr
+//                   style={{
+//                     borderTop: "3px solid #0747a6",
+//                     fontWeight: "900",
+//                     fontSize: "18px",
+//                     color: "#0747a6",
+//                   }}
+//                 >
+//                   <td colSpan="3" style={{ padding: "10px 5px", textAlign: "right" }}>
+//                     Total
+//                   </td>
+//                   <td style={{ padding: "10px 5px", textAlign: "right" }}>₹{total.toFixed(2)}</td>
+//                 </tr>
+//               </tbody>
+//             </table>
+
+//             <footer
+//               style={{
+//                 marginTop: "30px",
+//                 fontSize: "12px",
+//                 color: "#64748b",
+//                 borderTop: "1px solid #dbeafe",
+//                 paddingTop: "15px",
+//               }}
+//             >
+//               <p>Thank you for your business!</p>
+//               <p>This is a computer-generated invoice and does not require a signature.</p>
+//             </footer>
+//           </section>
+
+//           {/* Right - Actions Panel */}
+//           <aside
+//             style={{
+//               flex: "0 1 360px",
+//               backgroundColor: "#ffffff",
+//               padding: "2rem",
+//               borderRadius: "16px",
+//               boxShadow: "0 6px 20px rgba(7,71,166,0.15)",
+//               display: "flex",
+//               flexDirection: "column",
+//               gap: "1.25rem",
+//               height: "fit-content",
+//             }}
+//           >
+//             <h3 style={{ marginBottom: "1rem", color: "#0747a6" }}>Actions</h3>
+
+//             <div>
+//               <label style={{ fontWeight: "600", color: "#334155" }}>GST (%)</label>
+//               <input
+//                 type="number"
+//                 value={taxPercent}
+//                 onChange={(e) => setTaxPercent(Number(e.target.value))}
+//                 style={{
+//                   width: "100%",
+//                   padding: "0.5rem",
+//                   marginTop: "0.25rem",
+//                   borderRadius: "6px",
+//                   border: "1px solid #cbd5e1",
+//                 }}
+//               />
+//             </div>
+
+//             <div>
+//               <label style={{ fontWeight: "600", color: "#334155" }}>
+//                 Discount {discountIsPercent ? "(%)" : "(₹)"}
+//               </label>
+//               <div style={{ display: "flex", gap: "0.5rem", marginTop: "0.25rem" }}>
+//                 <input
+//                   type="number"
+//                   value={discount}
+//                   onChange={(e) => setDiscount(Number(e.target.value))}
+//                   style={{
+//                     flex: 1,
+//                     padding: "0.5rem",
+//                     borderRadius: "6px",
+//                     border: "1px solid #cbd5e1",
+//                   }}
+//                 />
+//                 <select
+//                   value={discountIsPercent ? "%" : "₹"}
+//                   onChange={(e) => setDiscountIsPercent(e.target.value === "%")}
+//                   style={{
+//                     padding: "0.5rem",
+//                     borderRadius: "6px",
+//                     border: "1px solid #cbd5e1",
+//                   }}
+//                 >
+//                   <option value="%">%</option>
+//                   <option value="₹">₹</option>
+//                 </select>
+//               </div>
+//             </div>
+
+//             <div>
+//               <label style={{ fontWeight: "600", color: "#334155" }}>Payment Status</label>
+//               <select
+//                 value={paymentStatus}
+//                 onChange={(e) => setPaymentStatus(e.target.value)}
+//                 style={{
+//                   width: "100%",
+//                   padding: "0.5rem",
+//                   marginTop: "0.25rem",
+//                   borderRadius: "6px",
+//                   border: "1px solid #cbd5e1",
+//                 }}
+//               >
+//                 {["Pending", "Paid", "Partial", "Due"].map((s) => (
+//                   <option key={s} value={s}>
+//                     {s}
+//                   </option>
+//                 ))}
+//               </select>
+//             </div>
+// <div>
+//   <label htmlFor="payment-method" className="input-label">
+//     Payment Method
+//   </label>
+//   <select
+//     id="payment-method"
+//     value={method}
+//     onChange={(e) => setMethod(e.target.value)}
+//     className="input-field"
+//   >
+//     {["Cash", "UPI", "Card", "Due"].map((option) => (
+//       <option key={option} value={option}>
+//         {option}
+//       </option>
+//     ))}
+//   </select>
+// </div>
+
+//             <div>
+//               <label style={{ fontWeight: "600", color: "#334155" }}>Invoice Status</label>
+//               <select
+//                 value={status}
+//                 onChange={(e) => setStatus(e.target.value)}
+//                 style={{
+//                   width: "100%",
+//                   padding: "0.5rem",
+//                   marginTop: "0.25rem",
+//                   borderRadius: "6px",
+//                   border: "1px solid #cbd5e1",
+//                 }}
+//               >
+//                 {["Draft", "Created", "Pending", "Issued", "Cancelled"].map((s) => (
+//                   <option key={s} value={s}>
+//                     {s}
+//                   </option>
+//                 ))}
+//               </select>
+//             </div>
+
+//             <div>
+//               <label style={{ fontWeight: "600", color: "#334155" }}>Customer ID</label>
+//               <input
+//                 type="text"
+//                 value={customerId}
+//                 onChange={(e) => setCustomerId(e.target.value)}
+//                 style={{
+//                   width: "100%",
+//                   padding: "0.5rem",
+//                   marginTop: "0.25rem",
+//                   borderRadius: "6px",
+//                   border: "1px solid #cbd5e1",
+//                 }}
+//               />
+//             </div>
+//             <div>
+//               <label style={{ fontWeight: "600", color: "#334155" }}>Contact Email</label>
+//               <input
+//                 type="email"
+//                 value={contactEmail}
+//                 onChange={(e) => setContactEmail(e.target.value)}
+//                 style={{
+//                   width: "100%",
+//                   padding: "0.5rem",
+//                   marginTop: "0.25rem",
+//                   borderRadius: "6px",
+//                   border: "1px solid #cbd5e1",
+//                 }}
+//               />
+//             </div>
+//             <div>
+//               <label style={{ fontWeight: "600", color: "#334155" }}>Contact Phone</label>
+//               <input
+//                 type="text"
+//                 value={contactPhone}
+//                 onChange={(e) => setContactPhone(e.target.value)}
+//                 style={{
+//                   width: "100%",
+//                   padding: "0.5rem",
+//                   marginTop: "0.25rem",
+//                   borderRadius: "6px",
+//                   border: "1px solid #cbd5e1",
+//                 }}
+//               />
+//             </div>
+
+//             <button
+//               onClick={saveInvoiceDraft}
+//               disabled={saving}
+//               style={{
+//                 width: "100%",
+//                 padding: "0.75rem",
+//                 backgroundColor: "#0747a6",
+//                 color: "#fff",
+//                 border: "none",
+//                 borderRadius: "8px",
+//                 fontWeight: "600",
+//                 cursor: "pointer",
+//                 boxShadow: "0 4px 6px rgba(7,71,166,0.4)",
+//                 transition: "background-color 0.3s ease",
+//                 marginBottom: "0.75rem",
+//               }}
+//               onMouseEnter={(e) => (e.currentTarget.style.backgroundColor = "#0a549f")}
+//               onMouseLeave={(e) => (e.currentTarget.style.backgroundColor = "#0747a6")}
+//             >
+//               {saving ? "Saving..." : "Save Bill"}
+//             </button>
+
+//             <button
+//               onClick={printInvoice}
+//               disabled={!selectedOrder || !selectedOrder.items || selectedOrder.items.length === 0}
+//               style={{
+//                 width: "100%",
+//                 padding: "0.75rem",
+//                 backgroundColor: "#147d4c",
+//                 color: "#fff",
+//                 border: "none",
+//                 borderRadius: "8px",
+//                 fontWeight: "600",
+//                 cursor:
+//                   !selectedOrder || !selectedOrder.items || selectedOrder.items.length === 0
+//                     ? "not-allowed"
+//                     : "pointer",
+//                 opacity:
+//                   !selectedOrder || !selectedOrder.items || selectedOrder.items.length === 0 ? 0.6 : 1,
+//                 boxShadow: "0 4px 6px rgba(20,125,76,0.4)",
+//                 transition: "background-color 0.3s ease",
+//               }}
+//               onMouseEnter={(e) => {
+//                 if (!(!selectedOrder || !selectedOrder.items || selectedOrder.items.length === 0)) {
+//                   e.currentTarget.style.backgroundColor = "#176f41";
+//                 }
+//               }}
+//               onMouseLeave={(e) => {
+//                 if (!(!selectedOrder || !selectedOrder.items || selectedOrder.items.length === 0)) {
+//                   e.currentTarget.style.backgroundColor = "#147d4c";
+//                 }
+//               }}
+//             >
+//               Download PDF / Print
+//             </button>
+//           </aside>
+//         </div>
+//       )}
+//     </div>
+//   );
+// }
+
+
+
+
+// ===================================================================================================================
+
+
+
+
 import React, { useEffect, useState, useRef } from "react";
 import orderServices from "../../Backend_Port_Files/OrderServices";
 import tableServices from "../../Backend_Port_Files/TableServices";
@@ -4643,713 +5389,1035 @@ import { toast } from "react-toastify";
 import jsPDF from "jspdf";
 
 export default function BillingPage() {
-  const { clientId } = useParams();
-  const token = localStorage.getItem("access_token");
+  const { clientId } = useParams();
+  const token = localStorage.getItem("access_token");
 
-  const [orders, setOrders] = useState([]);
-  const [tablesMap, setTablesMap] = useState({});
-  const [inventoryMap, setInventoryMap] = useState({});
-  const [selectedOrder, setSelectedOrder] = useState(null);
-  const [taxPercent, setTaxPercent] = useState(18);
-  const [discount, setDiscount] = useState(0);
-  const [method, setMethod] = useState("Cash");
-  const [paymentStatus, setPaymentStatus] = useState("Pending");
-  const [status, setStatus] = useState("Draft");
-  const [discountIsPercent, setDiscountIsPercent] = useState(true);
-  const [loading, setLoading] = useState(true);
-  const [saving, setSaving] = useState(false);
-  const [invoiceDraftId, setInvoiceDraftId] = useState(null);
-  const [documentNumber, setDocumentNumber] = useState("");
+  const [orders, setOrders] = useState([]);
+  const [tablesMap, setTablesMap] = useState({});
+  const [inventoryMap, setInventoryMap] = useState({});
+  const [selectedOrder, setSelectedOrder] = useState(null);
+  const [taxPercent, setTaxPercent] = useState(18);
+  const [discount, setDiscount] = useState(0);
+  const [method, setMethod] = useState("Cash");
+  const [paymentStatus, setPaymentStatus] = useState("Pending");
+  const [status, setStatus] = useState("Draft");
+  const [discountIsPercent, setDiscountIsPercent] = useState(true);
+  const [loading, setLoading] = useState(true);
+  const [saving, setSaving] = useState(false);
+  const [invoiceDraftId, setInvoiceDraftId] = useState(null);
+  const [documentNumber, setDocumentNumber] = useState("");
+  const [customerId, setCustomerId] = useState("");
+  const [contactEmail, setContactEmail] = useState("");
+  const [contactPhone, setContactPhone] = useState("");
+  const [splitPaymentEnabled, setSplitPaymentEnabled] = useState(false);
+  const [paymentSplits, setPaymentSplits] = useState([{ method: "Cash", amount: 0 }]);
+  const [balanceAmount, setBalanceAmount] = useState(0);
+  const [editingSplitIndex, setEditingSplitIndex] = useState(null);
+  const [singlePaymentAmount, setSinglePaymentAmount] = useState(0);
 
-  const [customerId, setCustomerId] = useState("");
-  const [contactEmail, setContactEmail] = useState("");
-  const [contactPhone, setContactPhone] = useState("");
+  const invoiceRef = useRef(null);
 
-  const invoiceRef = useRef(null);
+  const isToday = (createdAt) => {
+    const date = new Date(createdAt);
+    if (!date) return false;
+    const today = new Date();
+    return (
+      date.getFullYear() === today.getFullYear() &&
+      date.getMonth() === today.getMonth() &&
+      date.getDate() === today.getDate()
+    );
+  };
 
-  const isToday = (createdAt) => {
-    const date = new Date(createdAt);
-    if (!date) return false;
-    const today = new Date();
-    return (
-      date.getFullYear() === today.getFullYear() &&
-      date.getMonth() === today.getMonth() &&
-      date.getDate() === today.getDate()
-    );
-  };
+  useEffect(() => {
+    async function fetchAll() {
+      setLoading(true);
+      try {
+        const [ordersRes, tablesRes, invRes] = await Promise.all([
+          orderServices.get(`/${clientId}/dinein/table`, {
+            headers: { Authorization: `Bearer ${token}` },
+          }),
+          tableServices.get(`/${clientId}/tables/read`, {
+            headers: { Authorization: `Bearer ${token}` },
+          }),
+          inventoryServices.get(`/${clientId}/inventory/read`, {
+            headers: { Authorization: `Bearer ${token}` },
+          }),
+        ]);
+        const served = (ordersRes.data?.data || []).filter(
+          (o) => o.status?.toLowerCase() === "served" && isToday(o.created_at)
+        );
+        setOrders(served);
+        const tMap = {};
+        (tablesRes.data?.data || []).forEach(
+          (t) => (tMap[t.id] = t.name || t.table_number || `Table ${t.id}`)
+        );
+        setTablesMap(tMap);
+        const iMap = {};
+        (invRes.data?.data || []).forEach((i) => (iMap[i.id] = i));
+        setInventoryMap(iMap);
+      } catch {
+        toast.error("Error loading data");
+      } finally {
+        setLoading(false);
+      }
+    }
+    fetchAll();
+  }, [clientId, token]);
 
-  useEffect(() => {
-    async function fetchAll() {
-      setLoading(true);
-      try {
-        const [ordersRes, tablesRes, invRes] = await Promise.all([
-          orderServices.get(`/${clientId}/dinein/table`, {
-            headers: { Authorization: `Bearer ${token}` },
-          }),
-          tableServices.get(`/${clientId}/tables/read`, {
-            headers: { Authorization: `Bearer ${token}` },
-          }),
-          inventoryServices.get(`/${clientId}/inventory/read`, {
-            headers: { Authorization: `Bearer ${token}` },
-          }),
-        ]);
-        const served = (ordersRes.data?.data || []).filter(
-          (o) => o.status?.toLowerCase() === "served" && isToday(o.created_at)
-        );
-        setOrders(served);
-        const tMap = {};
-        (tablesRes.data?.data || []).forEach(
-          (t) => (tMap[t.id] = t.name || t.table_number || `Table ${t.id}`)
-        );
-        setTablesMap(tMap);
-        const iMap = {};
-        (invRes.data?.data || []).forEach((i) => (iMap[i.id] = i));
-        setInventoryMap(iMap);
-      } catch {
-        toast.error("Error loading data");
-      } finally {
-        setLoading(false);
-      }
-    }
-    fetchAll();
-  }, [clientId, token]);
+  const fetchInvoiceDraft = async (orderId) => {
+    try {
+      const res = await invoiceServices.get(`/${clientId}/invoice/read_document`, {
+        headers: { Authorization: `Bearer ${token}` },
+        params: { client_id: clientId, status: "Draft" },
+      });
+      const drafts = res.data?.data || [];
+      const draft = drafts.find((d) => d.order_id?.toString() === orderId?.toString());
+      return draft || {};
+    } catch (err) {
+      console.error("Failed to fetch invoice draft", err);
+      return {};
+    }
+  };
 
-  const fetchInvoiceDraft = async (orderId) => {
-    try {
-      const res = await invoiceServices.get(`/${clientId}/invoice/read_document`, {
-        headers: { Authorization: `Bearer ${token}` },
-        params: { client_id: clientId, status: "Draft" },
-      });
-      const drafts = res.data?.data || [];
-      const draft = drafts.find((d) => d.order_id?.toString() === orderId?.toString());
-      return draft || {};
-    } catch (err) {
-      console.error("Failed to fetch invoice draft", err);
-      return {};
-    }
-  };
+  const enrichItems = (order) =>
+    (order.items || []).map((item) => {
+      const inv = inventoryMap[item.item_id] || {};
+      return {
+        ...item,
+        unit_price: item.unit_price ?? item.price ?? inv.unit_price ?? 0,
+        description: item.description ?? inv.description ?? "",
+        name: item.item_name ?? inv.name ?? "Unnamed Item",
+      };
+    });
 
-  const enrichItems = (order) =>
-    (order.items || []).map((item) => {
-      const inv = inventoryMap[item.item_id] || {};
-      return {
-        ...item,
-        unit_price: item.unit_price ?? item.price ?? inv.unit_price ?? 0,
-        description: item.description ?? inv.description ?? "",
-        name: item.item_name ?? inv.name ?? "Unnamed Item",
-      };
-    });
+  const subtotal =
+    selectedOrder?.items?.reduce(
+      (sum, item) => sum + (item.unit_price ?? 0) * (item.quantity ?? 1),
+      0
+    ) || 0;
+  const taxAmount = (taxPercent / 100) * subtotal;
+  const discountAmount = discountIsPercent ? (discount / 100) * subtotal : discount;
+  const total = Number((subtotal + taxAmount - discountAmount).toFixed(2));
 
-  const subtotal =
-    selectedOrder?.items?.reduce(
-      (sum, item) => sum + (item.unit_price ?? 0) * (item.quantity ?? 1),
-      0
-    ) || 0;
-  const taxAmount = (taxPercent / 100) * subtotal;
-  const discountAmount = discountIsPercent ? (discount / 100) * subtotal : discount;
-  const total = subtotal + taxAmount - discountAmount;
+  // --- Split Payment functions ---
 
-  const saveInvoiceDraft = async () => {
-    if (!selectedOrder) return toast.error("Select an order first");
-    if (!selectedOrder.items || selectedOrder.items.length === 0)
-      return toast.error("Selected order has no items");
+  // Sum all split amounts
+  const sumSplits = (splits) =>
+    splits.reduce((sum, s) => sum + Number(s.amount), 0);
 
-    setSaving(true);
+  // Update split amount and keep total in sync
+  const updateSplitAmount = (index, value) => {
+    let newAmount = Number(value);
+    if (isNaN(newAmount) || newAmount < 0) newAmount = 0;
 
-    try {
-      const payload = {
-        client_id: clientId,
-        document_type: "Invoice",
-        document_date: new Date().toISOString(),
-        order_id: selectedOrder.id.toString(),
-        reference_number: tablesMap[selectedOrder.table_id] || `Table ${selectedOrder.table_id}`,
-        subtotal: Number(subtotal.toFixed(2)),
-        tax_amount: Number(taxAmount.toFixed(2)),
-        discount_amount: Number(discountAmount.toFixed(2)),
-        total_amount: Number(total.toFixed(2)),
-        payment_status: paymentStatus,
-        payment_method: method,
-        status: status,
-        customer_id: customerId || "",
-        contact_email: contactEmail || "",
-        contact_phone: contactPhone || "",
-      };
+    let splits = [...paymentSplits];
+    splits[index].amount = newAmount;
 
-      let draftId = invoiceDraftId;
+    // When editing any split, set last split to remainder
+    if (splits.length > 1) {
+      const sumOthers = splits
+        .filter((_, idx) => idx !== splits.length - 1)
+        .reduce((sum, s) => sum + Number(s.amount), 0);
+      let remainder = Number((total - sumOthers).toFixed(2));
+      splits[splits.length - 1].amount = remainder >= 0 ? remainder : 0;
+    }
 
-      if (!draftId) {
-        const res = await invoiceServices.post(`/${clientId}/invoice/create_document`, payload, {
-          headers: { Authorization: `Bearer ${token}` },
-        });
-        draftId = res?.data?.data?.id;
-        if (!draftId) throw new Error("Draft creation failed");
-        setInvoiceDraftId(draftId);
-      } else {
-        await invoiceServices.post(
-          `/${clientId}/invoice/update_document`,
-          { id: draftId, ...payload },
-          {
-            headers: { Authorization: `Bearer ${token}` },
-          }
-        );
-      }
+    // Prevent overpayment by reducing fields if necessary
+    let sumTotal = sumSplits(splits);
+    while (sumTotal > total) {
+      // Reduce last field until total aligns
+      let excess = sumTotal - total;
+      if (splits[splits.length - 1].amount >= excess) {
+        splits[splits.length - 1].amount -= excess;
+      } else {
+        splits[splits.length - 1].amount = 0;
+      }
+      sumTotal = sumSplits(splits);
+    }
 
-      const itemsPayload = selectedOrder.items.map((item) => ({
-        item_ref_id: item.item_id?.toString(),
-        description: item.description || "",
-        quantity: item.quantity || 0,
-        unit_price: item.unit_price || 0,
-        total: (item.unit_price || 0) * (item.quantity || 0),
-      }));
+    setPaymentSplits(splits);
+    setBalanceAmount(Number((total - sumSplits(splits)).toFixed(2)));
+  };
 
-      await invoiceServices.post(
-        `/${clientId}/invoice/create?document_id=${draftId}&client_id=${clientId}`,
-        itemsPayload,
-        { headers: { Authorization: `Bearer ${token}` } }
-      );
+  // Add new split with remaining balance
+  const addSplitRow = () => {
+    let used = sumSplits(paymentSplits);
+    let remainder = Number((total - used).toFixed(2));
+    setPaymentSplits((prev) => [
+      ...prev,
+      { method: "Cash", amount: remainder >= 0 ? remainder : 0 }
+    ]);
+    setBalanceAmount(Number((0).toFixed(2)));
+  };
 
-      toast.success("Invoice draft saved!");
-      return draftId;
-    } catch (err) {
-      console.error(err);
-      toast.error("Failed to save invoice draft");
-      throw err;
-    } finally {
-      setSaving(false);
-    }
-  };
+  // Remove a split and re-distribute
+  const removeSplitRow = (index) => {
+    if (paymentSplits.length <= 1) return;
+    let updated = paymentSplits.filter((_, idx) => idx !== index);
+    let sum = sumSplits(updated);
+    let remainder = Number((total - sum).toFixed(2));
+    if (updated.length > 0) updated[updated.length - 1].amount += remainder;
+    setPaymentSplits(updated);
+    setBalanceAmount(Number((total - sumSplits(updated)).toFixed(2)));
+  };
 
-  const printInvoice = async () => {
-    if (!selectedOrder || !selectedOrder.items || selectedOrder.items.length === 0) return;
+  // On blur, re-calculate last split
+  const onSplitAmountBlur = (index) => {
+    let splits = [...paymentSplits];
+    if (splits.length > 1) {
+      const sumOthers = splits
+        .filter((_, idx) => idx !== splits.length - 1)
+        .reduce((sum, s) => sum + Number(s.amount), 0);
+      let remainder = Number((total - sumOthers).toFixed(2));
+      splits[splits.length - 1].amount = remainder >= 0 ? remainder : 0;
+    }
+    setPaymentSplits(splits);
+    setBalanceAmount(Number((total - sumSplits(splits)).toFixed(2)));
+  };
 
-    try {
-      const draftId = invoiceDraftId || (await saveInvoiceDraft());
-      if (!draftId) return toast.error("Failed to create invoice draft");
+  const updateSplitMethod = (index, newMethod) => {
+    setPaymentSplits((prevSplits) => {
+      const updated = [...prevSplits];
+      updated[index].method = newMethod;
+      return updated;
+    });
+  };
 
-      await invoiceServices.post(
-        `/${clientId}/invoice/generate`,
-        {},
-        {
-          headers: { Authorization: `Bearer ${token}` },
-          params: { client_id: clientId, invoice_id: draftId },
-        }
-      );
+  useEffect(() => {
+    if (!splitPaymentEnabled) {
+      setSinglePaymentAmount(total);
+      setBalanceAmount(Number((singlePaymentAmount - total).toFixed(2)));
+    } else {
+      // When switching to split, auto fill the entire amount in the first split
+      setPaymentSplits([{ method: "Cash", amount: total }]);
+      setBalanceAmount(0);
+    }
+    // eslint-disable-next-line
+  }, [total, splitPaymentEnabled]);
 
-      const issueRes = await invoiceServices.post(
-        `/${clientId}/invoice/issue`,
-        {},
-        {
-          headers: { Authorization: `Bearer ${token}` },
-          params: { client_id: clientId, invoice_id: draftId },
-        }
-      );
+  const onSinglePaymentAmountChange = (val) => {
+    let amount = Number(val);
+    if (isNaN(amount) || amount < 0) amount = 0;
+    setSinglePaymentAmount(amount);
+    setBalanceAmount(Number((amount - total).toFixed(2)));
+  };
 
-      const docNum = issueRes?.data?.data?.document_number || "";
-      setDocumentNumber(docNum);
+  const saveInvoiceDraft = async () => {
+    if (!selectedOrder) {
+      toast.error("Select an order first");
+      return;
+    }
+    if (!selectedOrder.items || selectedOrder.items.length === 0) {
+      toast.error("Selected order has no items");
+      return;
+    }
 
-      setTimeout(() => {
-        if (!invoiceRef.current) return;
+    if (splitPaymentEnabled) {
+      const sumPayments = paymentSplits.reduce((sum, p) => sum + p.amount, 0);
+      if (Number(sumPayments.toFixed(2)) !== Number(total.toFixed(2))) {
+        toast.error("Split payment amounts do not sum up to the total");
+        return;
+      }
+    } else {
+      if (singlePaymentAmount < total || isNaN(singlePaymentAmount)) {
+        toast.error("Payment amount should be equal or greater than total");
+        return;
+      }
+    }
+const paymentMethodString = splitPaymentEnabled
+  ? paymentSplits
+      .map((p) => `${p.method}(${Number(p.amount).toFixed(2)})`)
+      .join(' & ')
+  : `${method}(${Number(singlePaymentAmount).toFixed(2)})`;
 
-        const pdf = new jsPDF({
-          orientation: "portrait",
-          unit: "pt",
-          format: "a4",
-        });
 
-        pdf.html(invoiceRef.current, {
-          callback: (doc) => {
-            doc.save(`Invoice_${draftId}.pdf`);
-          },
-          margin: [40, 40, 40, 40],
-          autoPaging: "text",
-          x: 0,
-          y: 0,
-          windowWidth: 800,
-        });
-      }, 100);
-    } catch (err) {
-      console.error(err);
-      toast.error("Failed to generate invoice PDF");
-    }
-  };
+    setSaving(true);
+    try {
+      const payload = {
+        client_id: clientId,
+        document_type: "Invoice",
+        document_date: new Date().toISOString(),
+        order_id: selectedOrder.id.toString(),
+        reference_number: tablesMap[selectedOrder.table_id] || `Table ${selectedOrder.table_id}`,
+        subtotal: Number(subtotal.toFixed(2)),
+        tax_amount: Number(taxAmount.toFixed(2)),
+        discount_amount: Number(discountAmount.toFixed(2)),
+        total_amount: Number(total.toFixed(2)),
+        payment_status: paymentStatus,
+       payment_method: paymentMethodString, 
+       payment_splits: splitPaymentEnabled
+    ? paymentSplits.map(({ method, amount }) => ({
+        method,
+        amount: Number(amount.toFixed(2))
+      }))
+    : null,
+        single_payment_amount: splitPaymentEnabled ? null : Number(singlePaymentAmount.toFixed(2)),
+        status: status,
+        customer_id: customerId || "",
+        contact_email: contactEmail || "",
+        contact_phone: contactPhone || "",
+      };
 
-  return (
-    <div
-      className="billing-page"
-      style={{
-        fontFamily: "'Segoe UI', Tahoma, Geneva, Verdana, sans-serif",
-        padding: "2rem",
-        background: "#f3f6fb",
-        minHeight: "100vh",
-      }}
-    >
-      <h1
-        style={{
-          fontSize: "2rem",
-          fontWeight: 700,
-          color: "#0747a6",
-          marginBottom: "2rem",
-          borderBottom: "3px solid #0747a6",
-          paddingBottom: "0.5rem",
-        }}
-      >
-        Billing & Invoices
-      </h1>
+      let draftId = invoiceDraftId;
 
-      {/* Orders Grid */}
-      <div
-        style={{
-          display: "grid",
-          gridTemplateColumns: "repeat(auto-fit,minmax(280px,1fr))",
-          gap: "1.5rem",
-          marginBottom: "3rem",
-        }}
-      >
-        {loading ? (
-          <p style={{ color: "#555", fontStyle: "italic" }}>Loading...</p>
-        ) : orders.length === 0 ? (
-          <p style={{ color: "#888", fontStyle: "italic" }}>No served orders today</p>
-        ) : (
-          orders.map((order) => {
-            const tableName = tablesMap[order.table_id];
-            const servedTime = new Date(order.created_at);
-            const orderTotal = enrichItems(order).reduce(
-              (sum, i) => sum + (i.unit_price ?? 0) * (i.quantity ?? 1),
-              0
-            );
-            return (
-              <div
-                key={order.id}
-                onClick={async () => {
-                  const enrichedItems = enrichItems(order);
-                  const invoiceDraft = await fetchInvoiceDraft(order.id);
-                  setCustomerId(invoiceDraft.customer_id || "");
-                  setContactEmail(invoiceDraft.contact_email || "");
-                  setContactPhone(invoiceDraft.contact_phone || "");
-                  setInvoiceDraftId(invoiceDraft.id || null);
-                  setStatus(invoiceDraft.status || "Draft");
-                  setSelectedOrder({ ...order, items: enrichedItems });
-                  setDocumentNumber(invoiceDraft.document_number || "");
-                  setPaymentStatus(invoiceDraft.payment_status || "Pending");
-                }}
-                style={{
-                  padding: "1.5rem",
-                  background: selectedOrder?.id === order.id ? "#dce6fb" : "#ffffff",
-                  borderRadius: "12px",
-                  boxShadow:
-                    selectedOrder?.id === order.id
-                      ? "0 0 10px rgba(7, 71, 166, 0.3)"
-                      : "0 2px 6px rgba(0,0,0,0.1)",
-                  border: selectedOrder?.id === order.id ? "2px solid #0747a6" : "1px solid #ccd6f6",
-                  cursor: "pointer",
-                  transition: "all 0.3s ease",
-                }}
-              >
-                <h3 style={{ margin: "0 0 0.2rem 0", color: "#0747a6" }}>
-                  {tableName || `Table ${order.table_id}`}
-                </h3>
-                <p style={{ margin: "0 0 0.4rem 0", fontWeight: "600", color: "#0f172a" }}>
-                  Order #{order.id}
-                </p>
-                <p
-                  style={{
-                    fontWeight: 700,
-                    color: "#0747a6",
-                    fontSize: "1.2rem",
-                    margin: "0 0 0.5rem 0",
-                  }}
-                >
-                  ₹{orderTotal.toFixed(2)}
-                </p>
-                <small style={{ color: "#64748b" }}>
-                  Served at: {servedTime.toLocaleTimeString([], { hour: "2-digit", minute: "2-digit" })}
-                </small>
-              </div>
-            );
-          })
-        )}
-      </div>
+      if (!draftId) {
+        const res = await invoiceServices.post(`/${clientId}/invoice/create_document`, payload, {
+          headers: { Authorization: `Bearer ${token}` },
+        });
+        draftId = res?.data?.data?.id;
+        if (!draftId) throw new Error("Draft creation failed");
+        setInvoiceDraftId(draftId);
+      } else {
+        await invoiceServices.post(
+          `/${clientId}/invoice/update_document`,
+          { id: draftId, ...payload },
+          {
+            headers: { Authorization: `Bearer ${token}` },
+          }
+        );
+      }
 
-      {/* Invoice Section */}
-      {selectedOrder && (
-        <div style={{ display: "flex", gap: "2rem", flexWrap: "wrap" }}>
-          {/* Left - Invoice Preview */}
-          <section
-            ref={invoiceRef}
-            style={{
-              fontFamily: "'Arial', sans-serif",
-              background: "#ffffff",
-              padding: "40px",
-              borderRadius: "12px",
-              boxShadow: "0 10px 30px rgba(7, 71, 166, 0.2)",
-              color: "#024E89",
-              maxWidth: "700px",
-              margin: "auto",
-            }}
-          >
-            <header
-              style={{
-                display: "flex",
-                justifyContent: "space-between",
-                borderBottom: "3px solid #0747a6",
-                paddingBottom: "10px",
-                marginBottom: "30px",
-              }}
-            >
-              <h1 style={{ fontWeight: "700", fontSize: "32px", margin: 0 }}>INVOICE</h1>
-              <div>
-                <div style={{ fontSize: "14px", color: "#4a90e2", fontWeight: "600" }}>
-                  {documentNumber || "Draft"} {/* show updated document number */}
-                </div>
-                <div style={{ fontSize: "12px", marginTop: "6px", color: "#7b8ea2" }}>
-                  {new Date().toLocaleDateString()}
-                </div>
-              </div>
-            </header>
-            <div
-              style={{
-                display: "flex",
-                justifyContent: "center",
-                gap: "6px",
-                marginBottom: "30px",
-              }}
-            >
-              <span
-                style={{ color: "darkblue", fontFamily: "cursive", fontSize: "20px", textAlign: "center" }}
-              >
-                {clientId}
-              </span>
-            </div>
-            <section
-              style={{
-                display: "flex",
-                justifyContent: "space-between",
-                marginBottom: "30px",
-              }}
-            >
-              <div style={{ width: "45%" }}>
-                <h2
-                  style={{
-                    fontWeight: "700",
-                    fontSize: "18px",
-                    marginBottom: "10px",
-                    borderBottom: "1.5px solid #024E89",
-                  }}
-                >
-                  Bill To:
-                </h2>
-                <p style={{ margin: "0", fontWeight: "600", fontSize: "12px" }}>{customerId || "N/A"}</p>
-                <p style={{ margin: "0", color: "#49657a", fontSize: "12px" }}>{contactEmail}</p>
-              </div>
-              <div style={{ width: "45%", textAlign: "right" }}>
-                <h2
-                  style={{
-                    fontWeight: "700",
-                    fontSize: "18px",
-                    marginBottom: "10px",
-                    borderBottom: "1.5px solid #024E89",
-                  }}
-                >
-                  Shipping Info:
-                </h2>
-                <p style={{ margin: "0", fontWeight: "600" }}>
-                  {tablesMap[selectedOrder?.table_id] || "N/A"}
-                </p>
-                <p style={{ margin: "0", color: "#49657a", fontSize: "12px" }}>
-                  Contact: {contactPhone}
-                </p>
-              </div>
-            </section>
+      const itemsPayload = selectedOrder.items.map((item) => ({
+        item_ref_id: item.item_id?.toString(),
+        description: item.description || "",
+        quantity: item.quantity || 0,
+        unit_price: item.unit_price || 0,
+        total: (item.unit_price || 0) * (item.quantity || 0),
+      }));
 
-            <table
-              style={{ width: "100%", borderCollapse: "collapse", fontSize: "14px", color: "#024E89" }}
-            >
-              <thead>
-                <tr
-                  style={{
-                    borderBottom: "2px solid #024E89",
-                    textTransform: "uppercase",
-                    fontWeight: "700",
-                  }}
-                >
-                  <th style={{ padding: "10px 5px", textAlign: "left" }}>Item</th>
-                  <th style={{ padding: "10px 5px", textAlign: "right" }}>Quantity</th>
-                  <th style={{ padding: "10px 5px", textAlign: "right" }}>Unit Price</th>
-                  <th style={{ padding: "10px 5px", textAlign: "right" }}>Amount</th>
-                </tr>
-              </thead>
-              <tbody>
-                {selectedOrder?.items?.map((item, idx) => (
-                  <tr key={idx} style={{ borderBottom: "1px solid #bfcfe8" }}>
-                    <td style={{ padding: "10px 5px" }}>{item.name}</td>
-                    <td style={{ padding: "10px 5px", textAlign: "right" }}>{item.quantity}</td>
-                    <td style={{ padding: "10px 5px", textAlign: "right" }}>
-                      ₹{item.unit_price.toFixed(2)}
-                    </td>
-                    <td style={{ padding: "10px 5px", textAlign: "right" }}>
-                      ₹{(item.unit_price * item.quantity).toFixed(2)}
-                    </td>
-                  </tr>
-                ))}
-                <tr style={{ fontWeight: "600", fontSize: "16px" }}>
-                  <td colSpan="3" style={{ padding: "10px 5px", textAlign: "right" }}>
-                    Subtotal
-                  </td>
-                  <td style={{ padding: "10px 5px", textAlign: "right" }}>₹{subtotal.toFixed(2)}</td>
-                </tr>
-                <tr style={{ fontWeight: "600", fontSize: "16px" }}>
-                  <td colSpan="3" style={{ padding: "10px 5px", textAlign: "right" }}>
-                    Discount
-                  </td>
-                  <td style={{ padding: "10px 5px", textAlign: "right" }}>
-                    -₹{discountAmount.toFixed(2)}
-                  </td>
-                </tr>
-                <tr style={{ fontWeight: "600", fontSize: "16px" }}>
-                  <td colSpan="3" style={{ padding: "10px 5px", textAlign: "right" }}>
-                    GST
-                  </td>
-                  <td style={{ padding: "10px 5px", textAlign: "right" }}>₹{taxAmount.toFixed(2)}</td>
-                </tr>
-                <tr
-                  style={{
-                    borderTop: "3px solid #0747a6",
-                    fontWeight: "900",
-                    fontSize: "18px",
-                    color: "#0747a6",
-                  }}
-                >
-                  <td colSpan="3" style={{ padding: "10px 5px", textAlign: "right" }}>
-                    Total
-                  </td>
-                  <td style={{ padding: "10px 5px", textAlign: "right" }}>₹{total.toFixed(2)}</td>
-                </tr>
-              </tbody>
-            </table>
+      await invoiceServices.post(
+        `/${clientId}/invoice/create?document_id=${draftId}&client_id=${clientId}`,
+        itemsPayload,
+        { headers: { Authorization: `Bearer ${token}` } }
+      );
 
-            <footer
-              style={{
-                marginTop: "30px",
-                fontSize: "12px",
-                color: "#64748b",
-                borderTop: "1px solid #dbeafe",
-                paddingTop: "15px",
-              }}
-            >
-              <p>Thank you for your business!</p>
-              <p>This is a computer-generated invoice and does not require a signature.</p>
-            </footer>
-          </section>
+      toast.success("Invoice draft saved!");
+      return draftId;
+    } catch (err) {
+      console.error(err);
+      toast.error("Failed to save invoice draft");
+      throw err;
+    } finally {
+      setSaving(false);
+    }
+  };
 
-          {/* Right - Actions Panel */}
-          <aside
-            style={{
-              flex: "0 1 360px",
-              backgroundColor: "#ffffff",
-              padding: "2rem",
-              borderRadius: "16px",
-              boxShadow: "0 6px 20px rgba(7,71,166,0.15)",
-              display: "flex",
-              flexDirection: "column",
-              gap: "1.25rem",
-              height: "fit-content",
-            }}
-          >
-            <h3 style={{ marginBottom: "1rem", color: "#0747a6" }}>Actions</h3>
+  const printInvoice = async () => {
+    if (!selectedOrder || !selectedOrder.items || selectedOrder.items.length === 0) return;
 
-            <div>
-              <label style={{ fontWeight: "600", color: "#334155" }}>GST (%)</label>
-              <input
-                type="number"
-                value={taxPercent}
-                onChange={(e) => setTaxPercent(Number(e.target.value))}
-                style={{
-                  width: "100%",
-                  padding: "0.5rem",
-                  marginTop: "0.25rem",
-                  borderRadius: "6px",
-                  border: "1px solid #cbd5e1",
-                }}
-              />
-            </div>
+    try {
+      const draftId = invoiceDraftId || (await saveInvoiceDraft());
+      if (!draftId) return toast.error("Failed to create invoice draft");
 
-            <div>
-              <label style={{ fontWeight: "600", color: "#334155" }}>
-                Discount {discountIsPercent ? "(%)" : "(₹)"}
-              </label>
-              <div style={{ display: "flex", gap: "0.5rem", marginTop: "0.25rem" }}>
-                <input
-                  type="number"
-                  value={discount}
-                  onChange={(e) => setDiscount(Number(e.target.value))}
-                  style={{
-                    flex: 1,
-                    padding: "0.5rem",
-                    borderRadius: "6px",
-                    border: "1px solid #cbd5e1",
-                  }}
-                />
-                <select
-                  value={discountIsPercent ? "%" : "₹"}
-                  onChange={(e) => setDiscountIsPercent(e.target.value === "%")}
-                  style={{
-                    padding: "0.5rem",
-                    borderRadius: "6px",
-                    border: "1px solid #cbd5e1",
-                  }}
-                >
-                  <option value="%">%</option>
-                  <option value="₹">₹</option>
-                </select>
-              </div>
-            </div>
+      await invoiceServices.post(
+        `/${clientId}/invoice/generate`,
+        {},
+        {
+          headers: { Authorization: `Bearer ${token}` },
+          params: { client_id: clientId, invoice_id: draftId },
+        }
+      );
 
-            <div>
-              <label style={{ fontWeight: "600", color: "#334155" }}>Payment Status</label>
-              <select
-                value={paymentStatus}
-                onChange={(e) => setPaymentStatus(e.target.value)}
-                style={{
-                  width: "100%",
-                  padding: "0.5rem",
-                  marginTop: "0.25rem",
-                  borderRadius: "6px",
-                  border: "1px solid #cbd5e1",
-                }}
-              >
-                {["Pending", "Paid", "Partial", "Due"].map((s) => (
-                  <option key={s} value={s}>
-                    {s}
-                  </option>
-                ))}
-              </select>
-            </div>
+      const issueRes = await invoiceServices.post(
+        `/${clientId}/invoice/issue`,
+        {},
+        {
+          headers: { Authorization: `Bearer ${token}` },
+          params: { client_id: clientId, invoice_id: draftId },
+        }
+      );
 
-            <div>
-              <label style={{ fontWeight: "600", color: "#334155" }}>Invoice Status</label>
-              <select
-                value={status}
-                onChange={(e) => setStatus(e.target.value)}
-                style={{
-                  width: "100%",
-                  padding: "0.5rem",
-                  marginTop: "0.25rem",
-                  borderRadius: "6px",
-                  border: "1px solid #cbd5e1",
-                }}
-              >
-                {["Draft", "Created", "Pending", "Issued", "Cancelled"].map((s) => (
-                  <option key={s} value={s}>
-                    {s}
-                  </option>
-                ))}
-              </select>
-            </div>
+      const docNum = issueRes?.data?.data?.document_number || "";
+      setDocumentNumber(docNum);
 
-            <div>
-              <label style={{ fontWeight: "600", color: "#334155" }}>Customer ID</label>
-              <input
-                type="text"
-                value={customerId}
-                onChange={(e) => setCustomerId(e.target.value)}
-                style={{
-                  width: "100%",
-                  padding: "0.5rem",
-                  marginTop: "0.25rem",
-                  borderRadius: "6px",
-                  border: "1px solid #cbd5e1",
-                }}
-              />
-            </div>
-            <div>
-              <label style={{ fontWeight: "600", color: "#334155" }}>Contact Email</label>
-              <input
-                type="email"
-                value={contactEmail}
-                onChange={(e) => setContactEmail(e.target.value)}
-                style={{
-                  width: "100%",
-                  padding: "0.5rem",
-                  marginTop: "0.25rem",
-                  borderRadius: "6px",
-                  border: "1px solid #cbd5e1",
-                }}
-              />
-            </div>
-            <div>
-              <label style={{ fontWeight: "600", color: "#334155" }}>Contact Phone</label>
-              <input
-                type="text"
-                value={contactPhone}
-                onChange={(e) => setContactPhone(e.target.value)}
-                style={{
-                  width: "100%",
-                  padding: "0.5rem",
-                  marginTop: "0.25rem",
-                  borderRadius: "6px",
-                  border: "1px solid #cbd5e1",
-                }}
-              />
-            </div>
+      setTimeout(() => {
+        if (!invoiceRef.current) return;
 
-            <button
-              onClick={saveInvoiceDraft}
-              disabled={saving}
-              style={{
-                width: "100%",
-                padding: "0.75rem",
-                backgroundColor: "#0747a6",
-                color: "#fff",
-                border: "none",
-                borderRadius: "8px",
-                fontWeight: "600",
-                cursor: "pointer",
-                boxShadow: "0 4px 6px rgba(7,71,166,0.4)",
-                transition: "background-color 0.3s ease",
-                marginBottom: "0.75rem",
-              }}
-              onMouseEnter={(e) => (e.currentTarget.style.backgroundColor = "#0a549f")}
-              onMouseLeave={(e) => (e.currentTarget.style.backgroundColor = "#0747a6")}
-            >
-              {saving ? "Saving..." : "Save Bill"}
-            </button>
+        const pdf = new jsPDF({
+          orientation: "portrait",
+          unit: "pt",
+          format: "a4",
+        });
 
-            <button
-              onClick={printInvoice}
-              disabled={!selectedOrder || !selectedOrder.items || selectedOrder.items.length === 0}
-              style={{
-                width: "100%",
-                padding: "0.75rem",
-                backgroundColor: "#147d4c",
-                color: "#fff",
-                border: "none",
-                borderRadius: "8px",
-                fontWeight: "600",
-                cursor:
-                  !selectedOrder || !selectedOrder.items || selectedOrder.items.length === 0
-                    ? "not-allowed"
-                    : "pointer",
-                opacity:
-                  !selectedOrder || !selectedOrder.items || selectedOrder.items.length === 0 ? 0.6 : 1,
-                boxShadow: "0 4px 6px rgba(20,125,76,0.4)",
-                transition: "background-color 0.3s ease",
-              }}
-              onMouseEnter={(e) => {
-                if (!(!selectedOrder || !selectedOrder.items || selectedOrder.items.length === 0)) {
-                  e.currentTarget.style.backgroundColor = "#176f41";
-                }
-              }}
-              onMouseLeave={(e) => {
-                if (!(!selectedOrder || !selectedOrder.items || selectedOrder.items.length === 0)) {
-                  e.currentTarget.style.backgroundColor = "#147d4c";
-                }
-              }}
-            >
-              Download PDF / Print
-            </button>
-          </aside>
-        </div>
-      )}
-    </div>
-  );
+        pdf.html(invoiceRef.current, {
+          callback: (doc) => {
+            doc.save(`Invoice_${draftId}.pdf`);
+          },
+          margin: [40, 40, 40, 40],
+          autoPaging: "text",
+          x: 0,
+          y: 0,
+          windowWidth: 800,
+        });
+      }, 100);
+    } catch (err) {
+      console.error(err);
+      toast.error("Failed to generate invoice PDF");
+    }
+  };
+
+  return (
+    <div
+      className="billing-page"
+      style={{
+        fontFamily: "'Segoe UI', Tahoma, Geneva, Verdana, sans-serif",
+        padding: "2rem",
+        background: "#f3f6fb",
+        minHeight: "100vh",
+      }}
+    >
+      <h1
+        style={{
+          fontSize: "2rem",
+          fontWeight: 700,
+          color: "#0747a6",
+          marginBottom: "2rem",
+          borderBottom: "3px solid #0747a6",
+          paddingBottom: "0.5rem",
+        }}
+      >
+        Billing & Invoices
+      </h1>
+      {/* Orders Grid */}
+      <div
+        style={{
+          display: "grid",
+          gridTemplateColumns: "repeat(auto-fit,minmax(280px,1fr))",
+          gap: "1.5rem",
+          marginBottom: "3rem",
+        }}
+      >
+        {loading ? (
+          <p style={{ color: "#555", fontStyle: "italic" }}>Loading...</p>
+        ) : orders.length === 0 ? (
+          <p style={{ color: "#888", fontStyle: "italic" }}>No served orders today</p>
+        ) : (
+          orders.map((order) => {
+            const tableName = tablesMap[order.table_id];
+            const servedTime = new Date(order.created_at);
+            const orderTotal = enrichItems(order).reduce(
+              (sum, i) => sum + (i.unit_price ?? 0) * (i.quantity ?? 1),
+              0
+            );
+            return (
+              <div
+                key={order.id}
+                onClick={async () => {
+                  const enrichedItems = enrichItems(order);
+                  const invoiceDraft = await fetchInvoiceDraft(order.id);
+                  setCustomerId(invoiceDraft.customer_id || "");
+                  setContactEmail(invoiceDraft.contact_email || "");
+                  setContactPhone(invoiceDraft.contact_phone || "");
+                  setInvoiceDraftId(invoiceDraft.id || null);
+                  setStatus(invoiceDraft.status || "Draft");
+                  setSelectedOrder({ ...order, items: enrichedItems });
+                  setDocumentNumber(invoiceDraft.document_number || "");
+                  setPaymentStatus(invoiceDraft.payment_status || "Pending");
+
+                  if (invoiceDraft.payment_splits && invoiceDraft.payment_splits.length > 0) {
+                    setSplitPaymentEnabled(true);
+                    setPaymentSplits(
+                      invoiceDraft.payment_splits.map((split) => ({
+                        method: split.method || "Cash",
+                        amount: split.amount || 0,
+                      }))
+                    );
+                    setBalanceAmount(total - sumSplits(invoiceDraft.payment_splits));
+                  } else {
+                    setSplitPaymentEnabled(false);
+                    setPaymentSplits([{ method: "Cash", amount: total }]);
+                    setMethod(invoiceDraft.payment_method || "Cash");
+                    setSinglePaymentAmount(invoiceDraft.single_payment_amount || total);
+                    setBalanceAmount((invoiceDraft.single_payment_amount || total) - total);
+                  }
+                }}
+                style={{
+                  padding: "1.5rem",
+                  background: selectedOrder?.id === order.id ? "#dce6fb" : "#ffffff",
+                  borderRadius: "12px",
+                  boxShadow:
+                    selectedOrder?.id === order.id
+                      ? "0 0 10px rgba(7, 71, 166, 0.3)"
+                      : "0 2px 6px rgba(0,0,0,0.1)",
+                  border: selectedOrder?.id === order.id ? "2px solid #0747a6" : "1px solid #ccd6f6",
+                  cursor: "pointer",
+                  transition: "all 0.3s ease",
+                }}
+              >
+                <h3 style={{ margin: "0 0 0.2rem 0", color: "#0747a6" }}>
+                  {tableName || `Table ${order.table_id}`}
+                </h3>
+                <p style={{ margin: "0 0 0.4rem 0", fontWeight: "600", color: "#0f172a" }}>
+                  Order #{order.id}
+                </p>
+                <p
+                  style={{
+                    fontWeight: 700,
+                    color: "#0747a6",
+                    fontSize: "1.2rem",
+                    margin: "0 0 0.5rem 0",
+                  }}
+                >
+                  ₹{orderTotal.toFixed(2)}
+                </p>
+                <small style={{ color: "#64748b" }}>
+                  Served at:{" "}
+                  {servedTime.toLocaleTimeString([], { hour: "2-digit", minute: "2-digit" })}
+                </small>
+              </div>
+            );
+          })
+        )}
+      </div>
+      {/* Invoice Section */}
+      {selectedOrder && (
+        <div style={{ display: "flex", gap: "2rem", flexWrap: "wrap" }}>
+          {/* Left - Invoice Preview */}
+          <section
+            ref={invoiceRef}
+            style={{
+              fontFamily: "'Arial', sans-serif",
+              background: "#ffffff",
+              padding: "40px",
+              borderRadius: "12px",
+              boxShadow: "0 10px 30px rgba(7, 71, 166, 0.2)",
+              color: "#024E89",
+              maxWidth: "700px",
+              margin: "auto",
+            }}
+          >
+            <header
+              style={{
+                display: "flex",
+                justifyContent: "space-between",
+                borderBottom: "3px solid #0747a6",
+                paddingBottom: "10px",
+                marginBottom: "30px",
+              }}
+            >
+              <h1 style={{ fontWeight: "700", fontSize: "32px", margin: 0 }}>INVOICE</h1>
+              <div>
+                <div style={{ fontSize: "14px", color: "#4a90e2", fontWeight: "600" }}>
+                  {documentNumber || "Draft"}
+                </div>
+                <div style={{ fontSize: "12px", marginTop: "6px", color: "#7b8ea2" }}>
+                  {new Date().toLocaleDateString()}
+                </div>
+              </div>
+            </header>
+            <div
+              style={{
+                display: "flex",
+                justifyContent: "center",
+                gap: "6px",
+                marginBottom: "30px",
+              }}
+            >
+              <span
+                style={{ color: "darkblue", fontFamily: "cursive", fontSize: "20px", textAlign: "center" }}
+              >
+                {clientId}
+              </span>
+            </div>
+            <section
+              style={{
+                display: "flex",
+                justifyContent: "space-between",
+                marginBottom: "30px",
+              }}
+            >
+              <div style={{ width: "45%" }}>
+                <h2
+                  style={{
+                    fontWeight: "700",
+                    fontSize: "18px",
+                    marginBottom: "10px",
+                    borderBottom: "1.5px solid #024E89",
+                  }}
+                >
+                  Bill To:
+                </h2>
+                <p style={{ margin: "0", fontWeight: "600", fontSize: "12px" }}>{customerId || "N/A"}</p>
+                <p style={{ margin: "0", color: "#49657a", fontSize: "12px" }}>{contactEmail}</p>
+              </div>
+              <div style={{ width: "45%", textAlign: "right" }}>
+                <h2
+                  style={{
+                    fontWeight: "700",
+                    fontSize: "18px",
+                    marginBottom: "10px",
+                    borderBottom: "1.5px solid #024E89",
+                  }}
+                >
+                  Shipping Info:
+                </h2>
+                <p style={{ margin: "0", fontWeight: "600" }}>
+                  {tablesMap[selectedOrder?.table_id] || "N/A"}
+                </p>
+                <p style={{ margin: "0", color: "#49657a", fontSize: "12px" }}>
+                  Contact: {contactPhone}
+                </p>
+              </div>
+            </section>
+            <table
+              style={{ width: "100%", borderCollapse: "collapse", fontSize: "14px", color: "#024E89" }}
+            >
+              <thead>
+                <tr
+                  style={{
+                    borderBottom: "2px solid #024E89",
+                    textTransform: "uppercase",
+                    fontWeight: "700",
+                  }}
+                >
+                  <th style={{ padding: "10px 5px", textAlign: "left" }}>Item</th>
+                  <th style={{ padding: "10px 5px", textAlign: "right" }}>Quantity</th>
+                  <th style={{ padding: "10px 5px", textAlign: "right" }}>Unit Price</th>
+                  <th style={{ padding: "10px 5px", textAlign: "right" }}>Amount</th>
+                </tr>
+              </thead>
+              <tbody>
+                {selectedOrder?.items?.map((item, idx) => (
+                  <tr key={idx} style={{ borderBottom: "1px solid #bfcfe8" }}>
+                    <td style={{ padding: "10px 5px" }}>{item.name}</td>
+                    <td style={{ padding: "10px 5px", textAlign: "right" }}>{item.quantity}</td>
+                    <td style={{ padding: "10px 5px", textAlign: "right" }}>
+                      ₹{item.unit_price.toFixed(2)}
+                    </td>
+                    <td style={{ padding: "10px 5px", textAlign: "right" }}>
+                      ₹{(item.unit_price * item.quantity).toFixed(2)}
+                    </td>
+                  </tr>
+                ))}
+                <tr style={{ fontWeight: "600", fontSize: "16px" }}>
+                  <td colSpan="3" style={{ padding: "10px 5px", textAlign: "right" }}>
+                    Subtotal
+                  </td>
+                  <td style={{ padding: "10px 5px", textAlign: "right" }}>₹{subtotal.toFixed(2)}</td>
+                </tr>
+                <tr style={{ fontWeight: "600", fontSize: "16px" }}>
+                  <td colSpan="3" style={{ padding: "10px 5px", textAlign: "right" }}>
+                    Discount
+                  </td>
+                  <td style={{ padding: "10px 5px", textAlign: "right" }}>
+                    -₹{discountAmount.toFixed(2)}
+                  </td>
+                </tr>
+                <tr style={{ fontWeight: "600", fontSize: "16px" }}>
+                  <td colSpan="3" style={{ padding: "10px 5px", textAlign: "right" }}>
+                    GST
+                  </td>
+                  <td style={{ padding: "10px 5px", textAlign: "right" }}>₹{taxAmount.toFixed(2)}</td>
+                </tr>
+                <tr
+                  style={{
+                    borderTop: "3px solid #0747a6",
+                    fontWeight: "900",
+                    fontSize: "18px",
+                    color: "#0747a6",
+                  }}
+                >
+                  <td colSpan="3" style={{ padding: "10px 5px", textAlign: "right" }}>
+                    Total
+                  </td>
+                  <td style={{ padding: "10px 5px", textAlign: "right" }}>₹{total.toFixed(2)}</td>
+                </tr>
+              </tbody>
+            </table>
+            <footer
+              style={{
+                marginTop: "30px",
+                fontSize: "12px",
+                color: "#64748b",
+                borderTop: "1px solid #dbeafe",
+                paddingTop: "15px",
+              }}
+            >
+              <p>Thank you for your business!</p>
+              <p>This is a computer-generated invoice and does not require a signature.</p>
+            </footer>
+          </section>
+          {/* Right - Actions Panel */}
+          <aside
+            style={{
+              flex: "0 1 360px",
+              backgroundColor: "#ffffff",
+              padding: "2rem",
+              borderRadius: "16px",
+              boxShadow: "0 6px 20px rgba(7,71,166,0.15)",
+              display: "flex",
+              flexDirection: "column",
+              gap: "1.25rem",
+              height: "fit-content",
+            }}
+          >
+            <h3 style={{ marginBottom: "1rem", color: "#0747a6" }}>Actions</h3>
+            <div>
+              <label style={{ fontWeight: "600", color: "#334155" }}>GST (%)</label>
+              <input
+                type="number"
+                value={taxPercent}
+                onChange={(e) => setTaxPercent(Number(e.target.value))}
+                style={{
+                  width: "100%",
+                  padding: "0.5rem",
+                  marginTop: "0.25rem",
+                  borderRadius: "6px",
+                  border: "1px solid #cbd5e1",
+                }}
+              />
+            </div>
+            <div>
+              <label style={{ fontWeight: "600", color: "#334155" }}>
+                Discount {discountIsPercent ? "(%)" : "(₹)"}
+              </label>
+              <div style={{ display: "flex", gap: "0.5rem", marginTop: "0.25rem" }}>
+                <input
+                  type="number"
+                  value={discount}
+                  onChange={(e) => setDiscount(Number(e.target.value))}
+                  style={{
+                    flex: 1,
+                    padding: "0.5rem",
+                    borderRadius: "6px",
+                    border: "1px solid #cbd5e1",
+                  }}
+                />
+                <select
+                  value={discountIsPercent ? "%" : "₹"}
+                  onChange={(e) => setDiscountIsPercent(e.target.value === "%")}
+                  style={{
+                    padding: "0.5rem",
+                    borderRadius: "6px",
+                    border: "1px solid #cbd5e1",
+                  }}
+                >
+                  <option value="%">%</option>
+                  <option value="₹">₹</option>
+                </select>
+              </div>
+            </div>
+            <div>
+              <label style={{ fontWeight: "600", color: "#334155" }}>Payment Status</label>
+              <select
+                value={paymentStatus}
+                onChange={(e) => setPaymentStatus(e.target.value)}
+                style={{
+                  width: "100%",
+                  padding: "0.5rem",
+                  marginTop: "0.25rem",
+                  borderRadius: "6px",
+                  border: "1px solid #cbd5e1",
+                }}
+              >
+                {["Pending", "Paid", "Partial", "Due"].map((s) => (
+                  <option key={s} value={s}>
+                    {s}
+                  </option>
+                ))}
+              </select>
+            </div>
+            {/* Split Payment Toggle */}
+            <div>
+              <label style={{ fontWeight: "600", color: "#334155" }}>
+                <input
+                  type="checkbox"
+                  checked={splitPaymentEnabled}
+                  onChange={() => {
+                    setSplitPaymentEnabled(!splitPaymentEnabled);
+                    if (!splitPaymentEnabled) {
+                      setPaymentSplits([{ method: "Cash", amount: total }]);
+                      setBalanceAmount(0);
+                    } else {
+                      setMethod("Cash");
+                      setPaymentSplits([{ method: "Cash", amount: total }]);
+                      setSinglePaymentAmount(total);
+                      setBalanceAmount(0);
+                    }
+                  }}
+                  style={{ marginRight: "0.5rem" }}
+                />
+                Enable Split Payment
+              </label>
+            </div>
+            {splitPaymentEnabled ? (
+              <div style={{ maxHeight: "250px", overflowY: "auto" }}>
+                {paymentSplits.map((split, idx) => (
+                  <div
+                    key={idx}
+                    style={{
+                      display: "flex",
+                      gap: "0.5rem",
+                      marginBottom: "0.5rem",
+                      alignItems: "center",
+                    }}
+                  >
+                    <select
+                      value={split.method}
+                      onChange={(e) => updateSplitMethod(idx, e.target.value)}
+                      style={{
+                        flex: "1 1 50%",
+                        padding: "0.5rem",
+                        borderRadius: "6px",
+                        border: "1px solid #cbd5e1",
+                      }}
+                    >
+                      {["Cash", "UPI", "Card", "Due"].map((option) => (
+                        <option key={option} value={option}>
+                          {option}
+                        </option>
+                      ))}
+                    </select>
+                    <input
+                      type="number"
+                      min="0"
+                      step="0.01"
+                      value={split.amount}
+                      onChange={(e) => updateSplitAmount(idx, e.target.value)}
+                      onBlur={() => onSplitAmountBlur(idx)}
+                      placeholder={
+                        split.amount === 0
+                          ? idx === paymentSplits.length - 1
+                            ? Number(
+                                (
+                                  total -
+                                  paymentSplits
+                                    .filter((_, i) => i !== paymentSplits.length - 1)
+                                    .reduce((sum, s) => sum + Number(s.amount), 0)
+                                ).toFixed(2)
+                              )
+                            : ""
+                          : ""
+                      }
+                      style={{
+                        flex: "1 1 40%",
+                        padding: "0.5rem",
+                        borderRadius: "6px",
+                        border: "1px solid #cbd5e1",
+                      }}
+                    />
+                    <button
+                      type="button"
+                      onClick={() => removeSplitRow(idx)}
+                      aria-label={`Remove payment split ${idx + 1}`}
+                      style={{
+                        backgroundColor: "#e53e3e",
+                        color: "#fff",
+                        border: "none",
+                        borderRadius: "6px",
+                        padding: "0 0.75rem",
+                        cursor: paymentSplits.length > 1 ? "pointer" : "not-allowed",
+                        opacity: paymentSplits.length > 1 ? 1 : 0.5,
+                        fontWeight: "700",
+                        fontSize: "1.2rem",
+                      }}
+                      disabled={paymentSplits.length <= 1}
+                    >
+                      &times;
+                    </button>
+                  </div>
+                ))}
+                <button
+                  type="button"
+                  onClick={addSplitRow}
+                  style={{
+                    width: "100%",
+                    padding: "0.5rem",
+                    backgroundColor: "#2563eb",
+                    color: "#fff",
+                    border: "none",
+                    borderRadius: "6px",
+                    fontWeight: "600",
+                    cursor: "pointer",
+                  }}
+                >
+                  + Add Payment Method
+                </button>
+                <p style={{ marginTop: "0.5rem", fontWeight: "600", color: "#334155" }}>
+                  Balance: ₹
+                  {balanceAmount < 0
+                    ? (-balanceAmount).toFixed(2) + " remaining"
+                    : balanceAmount.toFixed(2) + " change"}
+                </p>
+              </div>
+            ) : (
+              <>
+                <div>
+                  <label
+                    htmlFor="payment-method"
+                    className="input-label"
+                    style={{ fontWeight: 600, color: "#334155" }}
+                  >
+                    Payment Method
+                  </label>
+                  <select
+                    id="payment-method"
+                    value={method}
+                    onChange={(e) => setMethod(e.target.value)}
+                    className="input-field"
+                    style={{
+                      width: "100%",
+                      padding: "0.5rem",
+                      marginTop: "0.25rem",
+                      borderRadius: "6px",
+                      border: "1px solid #cbd5e1",
+                    }}
+                  >
+                    {["Cash", "UPI", "Card", "Due"].map((option) => (
+                      <option key={option} value={option}>
+                        {option}
+                      </option>
+                    ))}
+                  </select>
+                </div>
+                <div>
+                  <label style={{ fontWeight: "600", color: "#334155" }}>Amount Given</label>
+                  <input
+                    type="number"
+                    min="0"
+                    step="0.01"
+                    value={singlePaymentAmount}
+                    onChange={(e) => onSinglePaymentAmountChange(e.target.value)}
+                    style={{
+                      width: "100%",
+                      padding: "0.5rem",
+                      marginTop: "0.25rem",
+                      borderRadius: "6px",
+                      border: "1px solid #cbd5e1",
+                    }}
+                    placeholder="Enter amount received"
+                  />
+                </div>
+                <p style={{ marginTop: "0.5rem", fontWeight: "600", color: "#334155" }}>
+                  Balance: ₹
+                  {balanceAmount < 0
+                    ? (-balanceAmount).toFixed(2) + " remaining"
+                    : balanceAmount.toFixed(2) + " change"}
+                </p>
+              </>
+            )}
+            <div>
+              <label style={{ fontWeight: "600", color: "#334155" }}>Invoice Status</label>
+              <select
+                value={status}
+                onChange={(e) => setStatus(e.target.value)}
+                style={{
+                  width: "100%",
+                  padding: "0.5rem",
+                  marginTop: "0.25rem",
+                  borderRadius: "6px",
+                  border: "1px solid #cbd5e1",
+                }}
+              >
+                {["Draft", "Created", "Pending", "Issued", "Cancelled"].map((s) => (
+                  <option key={s} value={s}>
+                    {s}
+                  </option>
+                ))}
+              </select>
+            </div>
+            <div>
+              <label style={{ fontWeight: "600", color: "#334155" }}>Customer ID</label>
+              <input
+                type="text"
+                value={customerId}
+                onChange={(e) => setCustomerId(e.target.value)}
+                style={{
+                  width: "100%",
+                  padding: "0.5rem",
+                  marginTop: "0.25rem",
+                  borderRadius: "6px",
+                  border: "1px solid #cbd5e1",
+                }}
+              />
+            </div>
+            <div>
+              <label style={{ fontWeight: "600", color: "#334155" }}>Contact Email</label>
+              <input
+                type="email"
+                value={contactEmail}
+                onChange={(e) => setContactEmail(e.target.value)}
+                style={{
+                  width: "100%",
+                  padding: "0.5rem",
+                  marginTop: "0.25rem",
+                  borderRadius: "6px",
+                  border: "1px solid #cbd5e1",
+                }}
+              />
+            </div>
+            <div>
+              <label style={{ fontWeight: "600", color: "#334155" }}>Contact Phone</label>
+              <input
+                type="text"
+                value={contactPhone}
+                onChange={(e) => setContactPhone(e.target.value)}
+                style={{
+                  width: "100%",
+                  padding: "0.5rem",
+                  marginTop: "0.25rem",
+                  borderRadius: "6px",
+                  border: "1px solid #cbd5e1",
+                }}
+              />
+            </div>
+            <button
+              onClick={saveInvoiceDraft}
+              disabled={saving}
+              style={{
+                width: "100%",
+                padding: "0.75rem",
+                backgroundColor: "#0747a6",
+                color: "#fff",
+                border: "none",
+                borderRadius: "8px",
+                fontWeight: "600",
+                cursor: "pointer",
+                boxShadow: "0 4px 6px rgba(7,71,166,0.4)",
+                transition: "background-color 0.3s ease",
+                marginBottom: "0.75rem",
+              }}
+              onMouseEnter={(e) => (e.currentTarget.style.backgroundColor = "#0a549f")}
+              onMouseLeave={(e) => (e.currentTarget.style.backgroundColor = "#0747a6")}
+            >
+              {saving ? "Saving..." : "Save Bill"}
+            </button>
+            <button
+              onClick={printInvoice}
+              disabled={!selectedOrder || !selectedOrder.items || selectedOrder.items.length === 0}
+              style={{
+                width: "100%",
+                padding: "0.75rem",
+                backgroundColor: "#147d4c",
+                color: "#fff",
+                border: "none",
+                borderRadius: "8px",
+                fontWeight: "600",
+                cursor:
+                  !selectedOrder || !selectedOrder.items || selectedOrder.items.length === 0
+                    ? "not-allowed"
+                    : "pointer",
+                opacity:
+                  !selectedOrder || !selectedOrder.items || selectedOrder.items.length === 0 ? 0.6 : 1,
+                boxShadow: "0 4px 6px rgba(20,125,76,0.4)",
+                transition: "background-color 0.3s ease",
+              }}
+              onMouseEnter={(e) => {
+                if (!(!selectedOrder || !selectedOrder.items || selectedOrder.items.length === 0)) {
+                  e.currentTarget.style.backgroundColor = "#176f41";
+                }
+              }}
+              onMouseLeave={(e) => {
+                if (!(!selectedOrder || !selectedOrder.items || selectedOrder.items.length === 0)) {
+                  e.currentTarget.style.backgroundColor = "#147d4c";
+                }
+              }}
+            >
+              Download PDF / Print
+            </button>
+          </aside>
+        </div>
+      )}
+    </div>
+  );
 }
