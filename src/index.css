@@ -1513,3 +1513,338 @@ input:focus {
         padding: 6px 4px;
     }
 }
+
+
+
+/* =================================================================================================================================== */
+/* =================================================================================================================================== */
+/* =================================================================================================================================== */
+/* =================================================================================================================================== */
+/* =================================================================================================================================== */
+
+
+
+
+.billing-page {
+    font-family: 'Segoe UI', Tahoma, Geneva, Verdana, sans-serif;
+    padding: 1rem;
+    background-color: #f7fafc;
+    min-height: 100vh;
+    box-sizing: border-box;
+  }
+  
+  /* Title */
+  .billing-title {
+    font-size: 2rem;
+    margin-bottom: 1rem;
+    text-align: center;
+    color: #333;
+  }
+  
+  /* Orders Grid */
+  .orders-grid {
+    display: grid;
+    gap: 1rem;
+    grid-template-columns: repeat(auto-fit, minmax(240px, 1fr));
+    margin-bottom: 2rem;
+  }
+  
+  /* Individual order card */
+  .order-item {
+    background: #fff;
+    padding: 1rem;
+    border-radius: 8px;
+    border: 1px solid #ddd;
+    cursor: pointer;
+    box-shadow: 0 1px 3px rgb(0 0 0 / 0.1);
+    transition: box-shadow 0.2s ease, border-color 0.2s ease;
+    outline: none;
+  }
+  .order-item:hover,
+  .order-item:focus {
+    border-color: #3182ce;
+    box-shadow: 0 4px 12px rgb(49 130 206 / 0.3);
+  }
+  .order-item.selected {
+    border-color: #2b6cb0;
+    background-color: #ebf4ff;
+  }
+  .order-item h3 {
+    margin: 0 0 0.5rem 0;
+    color: #2c3e50;
+    font-size: 1.2rem;
+  }
+  .order-item p {
+    margin: 0.25rem 0;
+    color: #555;
+  }
+  .order-total {
+    font-weight: 600;
+    color: #276749;
+  }
+  .served-time {
+    color: #718096;
+    font-size: 0.875rem;
+  }
+  
+  /* Overlay background dim and centering */
+  .invoice-overlay {
+    position: fixed;
+    inset: 0;
+    background-color: rgba(0, 0, 0, 0.6);
+    backdrop-filter: blur(3px);
+    display: flex;
+    justify-content: center;
+    align-items: center;
+    padding: 1rem;
+    z-index: 1000;
+    overflow-y: auto;
+  }
+  
+  /* Invoice container inside overlay */
+  .invoice-section {
+    background: #fff;
+    max-width: 900px;
+    width: 100%;
+    max-height: 90vh;
+    border-radius: 10px;
+    box-shadow: 0 8px 24px rgba(0,0,0,0.3);
+    display: flex;
+    gap: 1.5rem;
+    padding: 1.5rem;
+    flex-wrap: wrap;
+    overflow-y: auto;
+    position: relative;
+  }
+  
+  /* Close button top-right */
+  .btn-close-overlay {
+    position: absolute;
+    top: 0.75rem;
+    right: 1rem;
+    background: transparent;
+    border: none;
+    font-size: 2rem;
+    line-height: 1;
+    color: #718096;
+    cursor: pointer;
+    padding: 0;
+  }
+  .btn-close-overlay:hover,
+  .btn-close-overlay:focus {
+    color: #2b6cb0;
+    outline: none;
+  }
+  
+  /* Invoice preview left side */
+  .invoice-preview {
+    flex: 2;
+    display: flex;
+    flex-direction: column;
+    border-right: 1px solid #e2e8f0;
+    padding-right: 1.5rem;
+  }
+  .invoice-header {
+    border-bottom: 2px solid #3182ce;
+    padding-bottom: 0.5rem;
+    margin-bottom: 1rem;
+  }
+  .invoice-header h1 {
+    margin: 0;
+    color: #2c3e50;
+    font-weight: 700;
+    font-size: 1.5rem;
+  }
+  .document-info {
+    display: flex;
+    justify-content: space-between;
+    font-size: 0.875rem;
+    color: #555;
+    margin-top: 0.25rem;
+  }
+  .bill-shipping-info {
+    display: flex;
+    justify-content: space-between;
+    margin-bottom: 1rem;
+    gap: 1rem;
+    flex-wrap: wrap;
+  }
+  .bill-to, .shipping-info {
+    flex: 1 1 45%;
+    min-width: 200px;
+  }
+  .bill-to h2, .shipping-info h2 {
+    margin-top: 0;
+    font-size: 1.1rem;
+    color: #2c3e50;
+  }
+  .invoice-table {
+    width: 100%;
+    border-collapse: collapse;
+    font-size: 0.9rem;
+    margin-bottom: 1rem;
+  }
+  .invoice-table th, .invoice-table td {
+    padding: 0.5rem 0.75rem;
+    border-bottom: 1px solid #e2e8f0;
+  }
+  .invoice-table th {
+    text-align: left;
+    background-color: #f0f5f9;
+    color: #2c3e50;
+    font-weight: 600;
+  }
+  .right-align {
+    text-align: right;
+  }
+  .summary-row td {
+    font-weight: 600;
+    border-top: 2px solid #3182ce;
+  }
+  .total-row td {
+    background-color: #ebf4ff;
+    font-size: 1.1rem;
+    color: #2b6cb0;
+  }
+  .invoice-footer {
+    font-size: 0.875rem;
+    color: #555;
+    border-top: 1px solid #e2e8f0;
+    padding-top: 0.75rem;
+    margin-top: auto;
+    text-align: center;
+  }
+  
+  /* Actions panel on right side */
+  .actions-panel {
+    flex: 1;
+    display: flex;
+    flex-direction: column;
+    gap: 0.75rem;
+    min-width: 250px;
+    max-width: 300px;
+  }
+  
+  .actions-panel h3 {
+    margin-top: 0;
+    color: #2c3e50;
+    border-bottom: 2px solid #3182ce;
+    padding-bottom: 0.25rem;
+    font-weight: 700;
+  }
+  
+  .input-field {
+    width: 100%;
+    padding: 0.4rem 0.6rem;
+    border: 1px solid #cbd5e0;
+    border-radius: 6px;
+    font-size: 1rem;
+    transition: border-color 0.2s ease;
+  }
+  .input-field:focus {
+    border-color: #3182ce;
+    outline: none;
+  }
+  
+  .discount-control {
+    display: flex;
+    gap: 0.5rem;
+    align-items: center;
+  }
+  
+  .discount-select {
+    max-width: 80px;
+  }
+  
+  .checkbox-label {
+    display: flex;
+    align-items: center;
+    gap: 0.5rem;
+    user-select: none;
+    font-weight: 600;
+    color: #2c3e50;
+  }
+  
+  .btn-primary, .btn-success, .btn-add-split, .btn-remove-split {
+    cursor: pointer;
+    font-weight: 600;
+    border: none;
+    border-radius: 6px;
+    padding: 0.5rem 1rem;
+    transition: background-color 0.2s ease;
+    user-select: none;
+  }
+  
+  .btn-primary {
+    background-color: #3182ce;
+    color: white;
+  }
+  .btn-primary:hover:not(:disabled) {
+    background-color: #2b6cb0;
+  }
+  
+  .btn-success {
+    background-color: #38a169;
+    color: white;
+  }
+  .btn-success:hover:not(:disabled) {
+    background-color: #2f855a;
+  }
+  
+  .btn-add-split {
+    background-color: #e2e8f0;
+    color: #2c3e50;
+    margin-top: 0.25rem;
+  }
+  .btn-add-split:hover {
+    background-color: #cbd5e0;
+  }
+  
+  .btn-remove-split {
+    background-color: transparent;
+    color: #e53e3e;
+    font-size: 1.2rem;
+  }
+  .btn-remove-split:disabled {
+    color: #a0aec0;
+    cursor: not-allowed;
+  }
+  
+  /* Payment splits container */
+  .split-payments-container {
+    display: flex;
+    flex-direction: column;
+    gap: 0.5rem;
+  }
+  
+  /* Balance amount */
+  .balance-amount {
+    margin-top: 0.5rem;
+    font-weight: 600;
+    color: #2c3e50;
+    text-align: right;
+    font-size: 1rem;
+  }
+  
+  /* Responsive */
+  @media (max-width: 768px) {
+    .invoice-section {
+      flex-direction: column;
+      max-height: 80vh;
+    }
+    .invoice-preview {
+      border-right: none;
+      padding-right: 0;
+      margin-bottom: 1rem;
+    }
+    .bill-to, .shipping-info {
+      flex: 1 1 100%;
+    }
+    .actions-panel {
+      max-width: 100%;
+    }
+    .orders-grid {
+      grid-template-columns: 1fr;
+    }
+  }
+  

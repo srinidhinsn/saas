@@ -399,7 +399,6 @@
 // ===================================================================================================================================== 
 // ===================================================================================================================================== 
 // ===================================================================================================================================== 
-
 import React, { useState, useEffect } from "react";
 import { FaEdit, FaCheckCircle } from "react-icons/fa";
 import { useParams } from "react-router-dom";
@@ -451,10 +450,7 @@ export default function UserProfileForm() {
         setProfileSaved(true);
         setLastUpdated(
           "Updated at " +
-            new Date().toLocaleTimeString([], {
-              hour: "2-digit",
-              minute: "2-digit",
-            })
+            new Date().toLocaleTimeString([], { hour: "2-digit", minute: "2-digit" })
         );
       }
     } catch (err) {
@@ -468,7 +464,8 @@ export default function UserProfileForm() {
 
   const handleEdit = (field) => setEditField(field);
 
-  const handleSaveEdit = () => {
+  const handleSaveEdit = (field, value) => {
+    setForm({ ...form, [field]: value });
     setEditField("");
     setLastUpdated(
       "Updated at " +
@@ -480,14 +477,7 @@ export default function UserProfileForm() {
     e.preventDefault();
     setLoading(true);
     try {
-      // Send only allowed fields to backend (no client_id or extra props)
-      const payload = {
-        first_name: form.first_name,
-        last_name: form.last_name,
-        email: form.email,
-        phone: form.phone,
-        dob: form.dob,
-      };
+      const payload = { ...form };
       const res = await userServicesPort.post(
         `/${clientId}/users/person-details`,
         payload,
@@ -507,45 +497,43 @@ export default function UserProfileForm() {
     }
   };
 
-  // Modal for editing fields
-  const EditModal = ({ field, type, value, onChange, onSave, onCancel }) => (
-    <div className="edit-modal-overlay" onClick={onCancel}>
-      <div className="edit-modal" onClick={(e) => e.stopPropagation()}>
-        <h3 className="edit-modal-title">
-          Edit {FIELD_MAP.find((f) => f.field === field)?.label}
-        </h3>
-        {type === "textarea" ? (
-          <textarea
-            name={field}
-            className="edit-modal-input"
-            value={value}
-            onChange={onChange}
-            rows={3}
-            placeholder={`Enter your ${field.replace("_", " ")}`}
-            autoFocus
-          />
-        ) : (
-          <input
-            type={type}
-            name={field}
-            className="edit-modal-input"
-            value={value}
-            onChange={onChange}
-            placeholder={`Enter your ${field.replace("_", " ")}`}
-            autoFocus
-          />
-        )}
-        <div className="edit-modal-actions">
-          <button type="button" className="btn" onClick={onSave}>
-            Save
-          </button>
-          <button type="button" className="btn cancel" onClick={onCancel}>
-            Cancel
-          </button>
+  // Modal component for editing
+  const EditModal = ({ field, type, value, onSave, onCancel }) => {
+    const [localValue, setLocalValue] = useState(value);
+
+    return (
+      <div className="edit-modal-overlay" onClick={onCancel}>
+        <div className="edit-modal" onClick={(e) => e.stopPropagation()}>
+          <h3 className="edit-modal-title">
+            Edit {FIELD_MAP.find((f) => f.field === field)?.label}
+          </h3>
+          {type === "textarea" ? (
+            <textarea
+              value={localValue}
+              onChange={(e) => setLocalValue(e.target.value)}
+              rows={3}
+              autoFocus
+            />
+          ) : (
+            <input
+              type={type}
+              value={localValue}
+              onChange={(e) => setLocalValue(e.target.value)}
+              autoFocus
+            />
+          )}
+          <div className="edit-modal-actions">
+            <button type="button" className="btn" onClick={() => onSave(field, localValue)}>
+              Save
+            </button>
+            <button type="button" className="btn cancel" onClick={onCancel}>
+              Cancel
+            </button>
+          </div>
         </div>
       </div>
-    </div>
-  );
+    );
+  };
 
   return (
     <div className="Profile-page-Container">
@@ -553,7 +541,6 @@ export default function UserProfileForm() {
         <div className="profile-header">
           <div className="profile-header-left">
             <div className="profile-avatar">
-              {/* Replace with SVG or image as needed */}
               <span className="profile-avatar-icon">
                 <FaCheckCircle size={28} />
               </span>
@@ -576,7 +563,6 @@ export default function UserProfileForm() {
                   type="button"
                   className="edit-btn"
                   onClick={() => handleEdit(field)}
-                  tabIndex="0"
                 >
                   <FaEdit />
                   Edit
@@ -590,7 +576,6 @@ export default function UserProfileForm() {
                   field={field}
                   type={type}
                   value={form[field] || ""}
-                  onChange={(e) => setForm({ ...form, [field]: e.target.value })}
                   onSave={handleSaveEdit}
                   onCancel={() => setEditField("")}
                 />
