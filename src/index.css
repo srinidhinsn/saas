@@ -1654,6 +1654,7 @@ input:focus {
     color: #2c3e50;
     font-weight: 700;
     font-size: 1.5rem;
+    text-align: center;
   }
   .document-info {
     display: flex;
@@ -1661,6 +1662,7 @@ input:focus {
     font-size: 0.875rem;
     color: #555;
     margin-top: 0.25rem;
+    padding:0 25px;
   }
   .bill-shipping-info {
     display: flex;
@@ -1848,3 +1850,386 @@ input:focus {
     }
   }
   
+
+
+
+
+  /* ========================================================================================================= */
+  /* ========================================================================================================= */
+  /* ========================================================================================================= */
+  /* ========================================================================================================= */
+  /* ========================================================================================================= */
+.Invoice-container-page{
+    padding-right: 5px;
+}
+
+  .inv--container {
+    font-family: 'Inter', Arial, sans-serif;
+    background: var(--bg-color);
+    min-height: 89vh;
+    padding: 12px 24px;
+    border-top-right-radius: 8px;
+    border-bottom-right-radius: 8px;
+  }
+  .inv--header-row {
+    display: flex;
+    justify-content: space-between;
+    align-items: center;
+    flex-wrap: wrap;
+    margin-bottom: 24px;
+  }
+  .inv--header-l {
+    font-size: 2.0rem;
+    font-weight: 600;
+    color: var(--bg-text-color);
+  }
+  .inv--header-r {
+    display: flex;
+    gap: 12px;
+  }
+  .inv--btn-light {
+    background: var(--bg-chart-container);
+    color: var(--bg-text-color);
+    border: 1px solid #e5e6eb;
+    border-radius: 7px;
+    padding: 8px 16px;
+    font-size: 1rem;
+    cursor: pointer;
+    margin-right: 3px;
+  }
+  .inv--btn-pri {
+    background: #ff643b;
+    color: #FFF;
+    border: none;
+    border-radius: 7px;
+    padding: 8px 22px;
+    font-size: 1.06rem;
+    font-weight: 500;
+    cursor: pointer;
+    box-shadow: 0 1px 3px #efefe0;
+  }
+  .inv--btn-success {
+    background: #39a153;
+    color: white;
+    border: none;
+    border-radius: 7px;
+    padding: 8px 22px;
+    font-size: 1.06rem;
+    font-weight: 500;
+    cursor: pointer;
+    margin-left: 12px;
+    box-shadow: 0 1px 3px rgba(23,75,33,0.8);
+  }
+  
+  .inv--main-row {
+    display: flex;
+    gap: 24px;
+    flex-wrap: nowrap;
+  }
+  .inv--orders-list {
+    flex: 0 0 300px;
+    overflow-y: auto;
+  height: 78vh;
+    background: var(--bg-chart-container);
+    border-radius: 10px;
+    box-shadow: 0 2px 8px #f0f0f3;
+    padding: 16px;
+  }
+  
+  .inv--loading-text,
+  .inv--empty-text {
+    color: #888;
+    font-style: italic;
+    text-align: center;
+    margin-top: 1rem;
+  }
+  
+  .inv--order-card {
+    background: #f9fafc;
+    border-radius: 8px;
+    padding: 14px 16px;
+    margin-bottom: 12px;
+    cursor: pointer;
+    transition: background-color 0.2s ease;
+  }
+  .inv--order-card.selected,
+  .inv--order-card:hover {
+    background: #ffecd8;
+  }
+  .inv--order-card h4 {
+    margin: 0 0 6px 0;
+    font-weight: 600;
+  }
+  .inv--order-total {
+    font-weight: 700;
+    margin-top: 8px;
+  }
+  .inv--served-time {
+    font-size: 0.85rem;
+    color: var(--bg-number-color);
+  }
+  
+  .inv--invoice-panel {
+    flex: 1;
+    background: var(--bg-container);
+    border-radius: 10px;
+    box-shadow: 0 2px 12px #ddd;
+    padding: 24px 32px;
+    display: flex;
+    flex-direction: column;
+    overflow-y: auto;
+    max-height: 75vh;
+  }
+  
+  .inv--invoice-header {
+    display: flex;
+    justify-content: space-between;
+    align-items: center;
+    border-bottom: 2px solid #f1f1f6;
+    margin-bottom: 20px;
+    padding-bottom: 10px;
+  }
+  .inv--invoice-header h1 {
+    font-size: 1.75rem;
+    font-weight: 700;  color: var(--bg-number-color);
+    margin: 0;
+  }
+  .inv--invoice-header h2 {
+    font-size: 1rem;
+    font-weight: 600;
+    margin: 0;
+    color: var(--bg-number-color);
+  }
+  .inv--document-info {
+    text-align: right;
+    font-size: 0.9rem;
+    color: #999;
+  }
+  .inv--document-number {
+    font-weight: 600;
+    color:var(--bg-number-color);
+    display: block;
+    font-size: 1.25rem;
+  }
+  .inv--document-date {
+    margin-top: 4px;
+  }
+  
+  .inv--bill-shipping {
+    display: flex;
+    justify-content: space-between;
+    gap: 32px;
+    margin-bottom: 20px;
+  }
+  .inv--bill-to, .inv--shipping-info {
+    flex: 1;
+  }
+  .inv--bill-to h3, .inv--shipping-info h3 {
+    margin: 0 0 12px 0;
+    color: #ff6637;
+    font-weight: 600;
+  }
+  .inv--bill-to label {
+    display: block;
+    margin-bottom: 12px;
+    font-weight: 500;
+    font-size: 0.95rem;
+    color: #333;
+  }
+  .inv--bill-to input.inv--input {
+    width: 100%;
+    padding: 8px 12px;
+    border: 1px solid #ddd;
+    border-radius: 6px;
+    font-size: 1em;
+    margin-top: 4px;
+    color: #222;
+  }
+  
+  .inv--table {
+    width: 100%;
+    border-collapse: collapse;
+    margin-bottom: 20px;
+    min-width: 600px;
+  }
+  .inv--table th,
+  .inv--table td {
+    padding: 12px 8px;
+    border-bottom: 1px solid #f0f0f5;
+    font-size: 0.95rem;
+  }
+  .inv--table th {
+    background: #fafbfb;
+    font-weight: 600;
+    color: #5c5f6d;
+    text-align: left;
+  }
+  .right-align {
+    text-align: right;
+  }
+  .inv--summary-row {
+    font-weight: 500;
+    color: #4c4c4c;
+  }
+  .inv--total-row {
+    font-weight: 700;
+    font-size: 1.1rem;
+    border-top: 2px solid #ff6637;
+    background: #fff7f1;
+  }
+  
+  .inv--controls {
+    display: flex;
+    gap: 16px;
+    flex-wrap: wrap;
+    margin-bottom: 20px;
+    align-items: flex-end;
+  }
+  .inv--controls label {
+    font-weight: 500;
+    color: #303047;
+    font-size: 0.96rem;
+  }
+  .inv--input,
+  .inv--select {
+    margin-top: 6px;
+    padding: 7px 10px;
+    font-size: 1rem;
+    border-radius: 7px;
+    border: 1px solid #ddd;
+    min-width: 90px;
+  }
+  .discount-input {
+    max-width: 80px;
+  }
+  .inv--checkbox-label {
+    display: flex;
+    align-items: center;
+    gap: 6px;
+    font-weight: 600;
+    color: #ff6637;
+    cursor: pointer;
+    user-select: none;
+  }
+  
+  .inv--split-payments {
+    height: 420px;
+    border: 1px solid #e4e3f1;
+    padding: 10px;
+    border-radius: 7px;
+    margin-bottom: 16px;
+  }
+  .inv--split-row {
+    display: flex;
+    gap: 12px;
+    align-items: center;
+    margin-bottom: 12px;
+  }
+  .split-amount {
+    max-width: 90px;
+  }
+  .inv--btn-remove {
+    background: #ff4b4b;
+    border: none;
+    color: white;
+    border-radius: 50%;
+    width: 28px;
+    height: 28px;
+    font-size: 16px;
+    cursor: pointer;
+  }
+  .inv--btn-remove:disabled {
+    background: #ccc;
+    cursor: not-allowed;
+  }
+  .inv--btn-add {
+    background: #ef4c00;
+    color: white;
+    padding: 8px 16px;
+    border-radius: 7px;
+    border: none;
+    cursor: pointer;
+    font-weight: 600;
+  }
+  
+  .inv--balance {
+    font-weight: 600;
+    font-size: 1rem;
+    color: #ff6637;
+    margin-top: 4px;
+  }
+  
+  .inv--single-payment label {
+    display: block;
+    margin-bottom: 12px;
+    font-weight: 600;
+    color: #303047;
+  }
+  .inv--single-payment .inv--input, .inv--single-payment .inv--select {
+    width: 150px;
+    margin-top: 6px;
+  }
+  
+  .inv--actions {
+    margin-top: auto;
+    display: flex;
+    justify-content: flex-end;
+    gap: 12px;
+    padding-top: 12px;
+    border-top: 1px solid #eee;
+  }
+  
+  .inv--invoice-placeholder {
+    flex: 1;
+    display: flex;
+    justify-content: center;
+    align-items: center;
+    font-style: italic;
+    color: #666;
+    font-size: 1.1rem;
+  }
+  
+  /* Scrollbar for orders list */
+  .inv--orders-list::-webkit-scrollbar {
+    width: 6px;
+  }
+  .inv--orders-list::-webkit-scrollbar-thumb {
+    background-color: #ff6637;
+    border-radius: 3px;
+  }
+  
+  /* Responsive */
+  @media (max-width: 950px) {
+    .inv--main-row {
+      flex-direction: column;
+    }
+    .inv--container{
+        padding: 5px;
+    }
+    .inv--orders-list{
+        width: 260px;
+    }
+    .inv--invoice-panel {
+        width: 270px;
+        padding: 10px;
+    }.inv--document-number{
+        font-size: 12px;
+    }
+    .inv--invoice-header h1,.inv--invoice-header h2 {
+        font-size: 12px;
+    }
+    .inv--orders-list, .inv--invoice-panel {
+      max-height: none;
+      flex: unset;
+    }
+    .inv--table {
+      min-width: 100%;
+    }
+  }
+  
+
+
+
+
+
+/* ========================== =============== */

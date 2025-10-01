@@ -2,13 +2,12 @@ import React, { useEffect, useState } from "react";
 import orderServicesPort from "../../Backend_Port_Files/OrderServices";
 import tableServicesPort from "../../Backend_Port_Files/TableServices";
 import inventoryServicesPort from "../../Backend_Port_Files/InventoryServices";
+import invoiceServicesPort from "../../Backend_Port_Files/InvoiceServices";
 import { useParams } from "react-router-dom";
 import { useTheme } from "../../ThemeChangerComponent/ThemeProvider";
 import { toast } from "react-toastify";
 import InvoiceModal from "../Invoice_Services_Components/Invoice_Page";
 import { MdOutlineKeyboardDoubleArrowDown } from "react-icons/md";
-import invoiceServicesPort from "../../Backend_Port_Files/InvoiceServices";
-
 
 const OrdersVisiblePage = () => {
     const { clientId } = useParams();
@@ -51,6 +50,32 @@ const OrdersVisiblePage = () => {
         new: "rgb(191, 170, 124)",
     };
 
+    // New: Fetch invoice payment_status by order IDs to mark paid visually
+    const fetchInvoicesForOrders = async (ordersList) => {
+        if (!ordersList || ordersList.length === 0) return;
+        try {
+            const orderIds = ordersList.map(o => o.id);
+            // Fetch all invoices for client
+            const res = await invoiceServicesPort.get(`/${clientId}/invoice/read_document`, {
+                headers: { Authorization: `Bearer ${token}` },
+                params: { client_id: clientId },
+            });
+            const invoices = res.data?.data || [];
+            // Map orders with their payment_status from invoices
+            const updatedOrders = ordersList.map(order => {
+                const matchedInvoice = invoices.find(inv => inv.order_id?.toString() === order.id.toString());
+                if (matchedInvoice && matchedInvoice.payment_status?.toLowerCase() === "paid") {
+                    return { ...order, payment_status: "Paid" };
+                }
+                return { ...order, payment_status: order.payment_status || "Pending" };
+            });
+            setOrders(updatedOrders);
+        } catch (error) {
+            // Still set orders even if invoices fail
+            setOrders(ordersList);
+        }
+    };
+
     const openInvoiceModal = (order) => {
         const tableName = tablesMap[order.table_id] || order.table_id;
         const itemsWithPrice = (order.items || []).map((item) => ({
@@ -65,13 +90,17 @@ const OrdersVisiblePage = () => {
         setInvoiceOrder(null);
         setShowInvoiceModal(false);
     };
+
     const fetchTables = async () => {
         try {
             const res = await tableServicesPort.get(`/${clientId}/tables/read`, {
                 headers: { Authorization: `Bearer ${token}` },
             });
             setTables(res.data?.data || []);
-            // Optionally build tablesMap from this as well if still used
+            // Optionally build tablesMap from this as well
+            const map = {};
+            (res.data?.data || []).forEach(t => { map[t.id] = t.name; });
+            setTablesMap(map);
         } catch (error) {
             console.error("Error fetching tables", error);
         }
@@ -88,6 +117,9 @@ const OrdersVisiblePage = () => {
             })
             .then((res) => {
                 setAllInventoryItems(res.data.data || []);
+                const map = {};
+                (res.data.data || []).forEach(item => { map[item.id] = item; });
+                setInventoryMap(map);
             })
             .catch(() => { });
     }, [clientId, token]);
@@ -183,7 +215,8 @@ const OrdersVisiblePage = () => {
                 const response = await orderServicesPort.get(`/${clientId}/dinein/table`, {
                     headers: { Authorization: `Bearer ${token}` },
                 });
-                setOrders(response.data?.data || []);
+                // Fetch invoices info to get payment_status per order
+                await fetchInvoicesForOrders(response.data?.data || []);
                 setLoading(false);
             } catch (error) {
                 toast.error("❌ Failed to fetch dine-in orders.");
@@ -195,12 +228,12 @@ const OrdersVisiblePage = () => {
         }
     }, [clientId, token]);
 
-    // ONLY ONE container expands at a time
+    // Only one expanded order at a time
     const toggleExpand = (index) => {
         setExpandedOrderIndex((prev) => (prev === index ? null : index));
     };
 
-    // Click three times to mark served
+    // Click 3 times to mark served
     const handleContainerClick = (orderId) => {
         const count = servedClickCountMap[orderId] || 0;
         const newCount = count + 1;
@@ -210,12 +243,13 @@ const OrdersVisiblePage = () => {
             setServedClickCountMap((prev) => ({ ...prev, [orderId]: 0 }));
         }
     };
+
     const handleStatusChange = async (orderId, newStatus) => {
         const order = orders.find((o) => o.id === orderId);
         if (!order || order.status === "served") return;
-    
+
         const tableObj = tables.find((t) => t.id === order.table_id);
-    
+
         try {
             // Update order status in order service
             await orderServicesPort.post(
@@ -223,7 +257,7 @@ const OrdersVisiblePage = () => {
                 { id: orderId, client_id: clientId, status: newStatus },
                 { headers: { Authorization: `Bearer ${token}` } }
             );
-    
+
             // If served, free the table
             if (newStatus === "served" && tableObj) {
                 await tableServicesPort.post(
@@ -239,25 +273,18 @@ const OrdersVisiblePage = () => {
                     { headers: { Authorization: `Bearer ${token}` } }
                 );
             }
-    
-            // NO BILLING OR INVOICE CALL HERE – moved to BillingPage.jsx
-    
+
             // Update UI state orders as before
             toast.success("Order status updated");
             setOrders((prev) =>
                 prev.map((o) => (o.id === orderId ? { ...o, status: newStatus } : o))
             );
-    
+
             if (newStatus === "served") setEditOrderId(null);
         } catch (error) {
             toast.error("❌ Failed to update order status.");
         }
     };
-    
-      
-
-
-
 
     const handleItemStatusChange = async (orderId, itemId, newStatus) => {
         try {
@@ -360,27 +387,23 @@ const OrdersVisiblePage = () => {
     const confirmDeleteOrder = async () => {
         if (!orderToDelete) return;
         try {
-            // Delete the order
             await orderServicesPort.delete(`/${clientId}/dinein/delete`, {
                 params: { dinein_order_id: orderToDelete, client_id: clientId },
                 headers: { Authorization: `Bearer ${token}` },
             });
 
-            // Find the deleted order from current state to get the table_id
             const deletedOrder = orders.find(o => o.id === orderToDelete);
             const tableIdOfDeletedOrder = deletedOrder?.table_id;
 
             if (tableIdOfDeletedOrder) {
-                // Fetch table object for full details (optional but recommended)
                 const tableObj = tables.find(t => t.id === tableIdOfDeletedOrder);
 
-                // Update the table status to Vacant on backend
                 await tableServicesPort.post(
                     `/${clientId}/tables/update`,
                     {
                         id: tableIdOfDeletedOrder,
                         client_id: clientId,
-                        name: tableObj?.name || "", // preserve name
+                        name: tableObj?.name || "",
                         table_type: tableObj?.table_type || "",
                         status: "Vacant",
                         location_zone: tableObj?.location_zone || ""
@@ -389,14 +412,12 @@ const OrdersVisiblePage = () => {
                 );
             }
 
-            // Remove the order from local state and reset UI
             setOrders(prev => prev.filter(o => o.id !== orderToDelete));
             setExpandedOrderIndex(null);
             setShowDeleteModal(false);
             setOrderToDelete(null);
 
             toast.success("Order deleted and table marked vacant.");
-            // Optionally, refresh tables to reflect the new status
             fetchTables();
         } catch (err) {
             toast.error("❌ Failed to delete order or update table status");
@@ -430,7 +451,7 @@ const OrdersVisiblePage = () => {
                 const inventoryList = res.data?.data || [];
                 const map = {};
                 inventoryList.forEach((item) => {
-                    map[item.id] = item; // Includes price
+                    map[item.id] = item;
                 });
                 setInventoryMap(map);
             } catch (error) { }
@@ -446,19 +467,19 @@ const OrdersVisiblePage = () => {
         : orders;
 
     switch (filterMode) {
-        case 0: // Ascending date
+        case 0:
             filteredOrders = [...filteredOrders].sort((a, b) => new Date(a.created_at) - new Date(b.created_at));
             break;
-        case 1: // Descending date
+        case 1:
             filteredOrders = [...filteredOrders].sort((a, b) => new Date(b.created_at) - new Date(a.created_at));
             break;
-        case 2: // New orders
+        case 2:
             filteredOrders = filteredOrders.filter((o) => o.status?.toLowerCase() === "new");
             break;
-        case 3: // Preparing orders
+        case 3:
             filteredOrders = filteredOrders.filter((o) => o.status?.toLowerCase() === "preparing");
             break;
-        case 4: // Served orders
+        case 4:
             filteredOrders = filteredOrders.filter((o) => o.status?.toLowerCase() === "served");
             break;
         default:
@@ -506,142 +527,161 @@ const OrdersVisiblePage = () => {
                         {filteredOrders.length === 0 ? (
                             <div className="orders-visible-no-orders">No orders found.</div>
                         ) : (
-                            filteredOrders.map((order, index) => (
-                                <div
-                                    key={order.id || index}
-                                    className={`orders-visible-order-card${expandedOrderIndex === index ? " expanded" : ""}`}
-                                    style={{
-                                        backgroundColor: statusColorMap[order.status?.toLowerCase()] || "var(--status-prepare-bg)",
-                                    }}
-                                    onClick={() => handleContainerClick(order.id)}
-                                >
-                                    <div className="orders-visible-card-top-row">
-                                        <span className="orders-visible-tablename">{tablesMap[order.table_id] || order.table_id}</span>
-                                        <span className="orders-visible-items-count">{order.items.length} items</span>
-                                        <button className="orders-visible-invoice-btn" onClick={(e) => { e.stopPropagation(); openInvoiceModal(order); }}>
-                                            Invoice
-                                        </button>
-                                        <button
-                                            className="orders-visible-expand-btn"
-                                            onClick={(e) => {
-                                                e.stopPropagation();
-                                                toggleExpand(index);
-                                            }}
-                                        >
-                                            <span className={`orders-visible-arrow-icon${expandedOrderIndex === index ? " " : "up"}`}>
-                                                <MdOutlineKeyboardDoubleArrowDown />
-                                            </span>
-                                        </button>
-                                    </div>
-
+                            filteredOrders.map((order, index) => {
+                                const isPaid = order.payment_status?.toLowerCase() === "paid";
+                                return (
                                     <div
-                                        className="orders-visible-card-expand-section"
+                                        key={order.id || index}
+                                        className={`orders-visible-order-card${expandedOrderIndex === index ? " expanded" : ""}`}
                                         style={{
-                                            display: expandedOrderIndex === index ? "block" : "none",
+                                            backgroundColor: statusColorMap[order.status?.toLowerCase()] || "var(--status-prepare-bg)",
+                                            border: isPaid ? "2px dashed red" : undefined,
+                                            position: "relative",
                                         }}
-                                        onClick={(e) => e.stopPropagation()}
+                                        onClick={() => handleContainerClick(order.id)}
                                     >
-                                        <div className="orders-visible-expanded-info">
-                                            <span>Date: {new Date(order.created_at).toLocaleDateString()}</span>
-                                            <span>
-                                                Total: ₹{order.items.reduce(
-                                                    (sum, item) =>
-                                                        sum +
-                                                        ((inventoryMap[item.item_id]?.unit_price || item.unit_price || item.price || 0) * (item.quantity || 1))
-                                                    ,
-                                                    0
-                                                ).toFixed(2)}
-                                            </span>
-                                        </div>
-
-                                        <div className="orders-visible-expanded-actions">
-                                            {editOrderId === order.id ? (
-                                                <button
-                                                    className="orders-visible-btn orders-visible-edit-btn active"
-                                                    onClick={() => setEditOrderId((prev) => (prev === order.id ? null : order.id))}
-                                                >
-                                                    Done Editing
-                                                </button>
-                                            ) : (
-                                                <button className="orders-visible-btn orders-visible-edit-btn" onClick={() => setEditOrderId(order.id)}>
-                                                    Edit
-                                                </button>
-                                            )}
-                                            <button
-                                                className="orders-visible-btn orders-visible-served-btn"
-                                                disabled={order.status === "served"}
-                                                onClick={() => handleStatusChange(order.id, "served")}
-                                            >
-                                                Served
-                                            </button>
-                                            <button
-                                                className="orders-visible-btn orders-visible-delete-btn"
-                                                onClick={() => {
-                                                    setOrderToDelete(order.id);
-                                                    setShowDeleteModal(true);
-                                                }}
-                                            >
-                                                Delete
-                                            </button>
-                                        </div>
-
-                                        {editOrderId === order.id && (
-                                            <div className="orders-visible-edit-panel">
-                                                <div className="orders-visible-edit-items-list">
-                                                    {order.items.map((item, idx) => (
-                                                        <div key={idx} className="orders-visible-edit-item-row">
-                                                            <span>{item.item_name || item.item_id}</span>
-                                                            <div className="orders-visible-edit-qty-controls">
-                                                                <button
-                                                                    onClick={() => updateItemQuantity(order.id, item.item_id, item.quantity - 1)}
-                                                                    disabled={item.quantity <= 1}
-                                                                >
-                                                                    −
-                                                                </button>
-                                                                <span>{item.quantity}</span>
-                                                                <button onClick={() => updateItemQuantity(order.id, item.item_id, item.quantity + 1)}>+</button>
-                                                            </div>
-                                                            <button
-                                                                className="orders-visible-btn orders-visible-edit-delete-btn"
-                                                                onClick={() => {
-                                                                    setDeleteTarget({ orderId: order.id, itemId: item.item_id });
-                                                                    setShowDeleteModals(true);
-                                                                }}
-                                                                disabled={item.status === "cancelled"}
-                                                            >
-                                                                Delete
-                                                            </button>
-                                                        </div>
-                                                    ))}
-                                                </div>
-                                                <div className="orders-visible-add-item-row">
-                                                    <input
-                                                        type="text"
-                                                        className="orders-visible-item-search"
-                                                        placeholder="Search item to add..."
-                                                        value={itemSearchQuery}
-                                                        onChange={(e) => setItemSearchQuery(e.target.value)}
-                                                    />
-                                                    {itemSearchResults.length > 0 && (
-                                                        <ul className="orders-visible-search-results">
-                                                            {itemSearchResults.map((item) => (
-                                                                <li key={item.id} onClick={() => addItemToOrder(order.id, item)}>
-                                                                    {item.name} - ₹{item.unit_price}
-                                                                </li>
-                                                            ))}
-                                                        </ul>
-                                                    )}
-                                                </div>
-                                                <div className="orders-visible-save-row">
-                                                    <button className="orders-visible-btn orders-visible-save-btn" onClick={() => updateOrderItems(order.id, order.items)}>
-                                                        Save Items
-                                                    </button>
-                                                </div>
+                                        {isPaid && (
+                                            <div style={{
+                                                position: "absolute",
+                                                top: 2,
+                                                right: 6,
+                                                fontSize: "24px",
+                                                fontWeight: "bold",
+                                                color: "red",
+                                                userSelect: "none",
+                                                pointerEvents: "none",
+                                            }}>
+                                                ×
                                             </div>
                                         )}
+                                        <div className="orders-visible-card-top-row">
+                                            <span className="orders-visible-tablename">{tablesMap[order.table_id] || order.table_id}</span>
+                                            <span className="orders-visible-items-count">{order.items.length} items</span>
+                                            <button className="orders-visible-invoice-btn" onClick={(e) => { e.stopPropagation(); openInvoiceModal(order); }}>
+                                                Invoice
+                                            </button>
+                                            <button
+                                                className="orders-visible-expand-btn"
+                                                onClick={(e) => {
+                                                    e.stopPropagation();
+                                                    toggleExpand(index);
+                                                }}
+                                            >
+                                                <span className={`orders-visible-arrow-icon${expandedOrderIndex === index ? " " : "up"}`}>
+                                                    <MdOutlineKeyboardDoubleArrowDown />
+                                                </span>
+                                            </button>
+                                        </div>
+
+                                        <div
+                                            className="orders-visible-card-expand-section"
+                                            style={{
+                                                display: expandedOrderIndex === index ? "block" : "none",
+                                            }}
+                                            onClick={(e) => e.stopPropagation()}
+                                        >
+                                            <div className="orders-visible-expanded-info">
+                                                <span>Date: {new Date(order.created_at).toLocaleDateString()}</span>
+                                                <span>
+                                                    Total: ₹{order.items.reduce(
+                                                        (sum, item) =>
+                                                            sum +
+                                                            ((inventoryMap[item.item_id]?.unit_price || item.unit_price || item.price || 0) * (item.quantity || 1))
+                                                        ,
+                                                        0
+                                                    ).toFixed(2)}
+                                                </span>
+                                            </div>
+
+                                            <div className="orders-visible-expanded-actions">
+                                                {editOrderId === order.id ? (
+                                                    <button
+                                                        className="orders-visible-btn orders-visible-edit-btn active"
+                                                        onClick={() => setEditOrderId((prev) => (prev === order.id ? null : order.id))}
+                                                    >
+                                                        Done Editing
+                                                    </button>
+                                                ) : (
+                                                    <button className="orders-visible-btn orders-visible-edit-btn" onClick={() => setEditOrderId(order.id)}>
+                                                        Edit
+                                                    </button>
+                                                )}
+                                                <button
+                                                    className="orders-visible-btn orders-visible-served-btn"
+                                                    disabled={order.status === "served"}
+                                                    onClick={() => handleStatusChange(order.id, "served")}
+                                                >
+                                                    Served
+                                                </button>
+                                                <button
+                                                    className="orders-visible-btn orders-visible-delete-btn"
+                                                    onClick={() => {
+                                                        setOrderToDelete(order.id);
+                                                        setShowDeleteModal(true);
+                                                    }}
+                                                >
+                                                    Delete
+                                                </button>
+                                            </div>
+
+                                            {editOrderId === order.id && (
+                                                <div className="orders-visible-edit-panel">
+                                                    <div className="orders-visible-edit-items-list">
+                                                        {order.items.map((item, idx) => (
+                                                            <div key={idx} className="orders-visible-edit-item-row">
+                                                                <span>{item.item_name || item.item_id}</span>
+                                                                <div className="orders-visible-edit-qty-controls">
+                                                                    <button
+                                                                        onClick={() => updateItemQuantity(order.id, item.item_id, item.quantity - 1)}
+                                                                        disabled={item.quantity <= 1}
+                                                                    >
+                                                                        −
+                                                                    </button>
+                                                                    <span>{item.quantity}</span>
+                                                                    <button onClick={() => updateItemQuantity(order.id, item.item_id, item.quantity + 1)}>+</button>
+                                                                </div>
+                                                                <button
+                                                                    className="orders-visible-btn orders-visible-edit-delete-btn"
+                                                                    onClick={() => {
+                                                                        setDeleteTarget({ orderId: order.id, itemId: item.item_id });
+                                                                        setShowDeleteModals(true);
+                                                                    }}
+                                                                    disabled={item.status === "cancelled"}
+                                                                >
+                                                                    Delete
+                                                                </button>
+                                                            </div>
+                                                        ))}
+                                                    </div>
+                                                    <div className="orders-visible-add-item-row">
+                                                        <input
+                                                            type="text"
+                                                            className="orders-visible-item-search"
+                                                            placeholder="Search item to add..."
+                                                            value={itemSearchQuery}
+                                                            onChange={(e) => setItemSearchQuery(e.target.value)}
+                                                        />
+                                                        {itemSearchResults.length > 0 && (
+                                                            <ul className="orders-visible-search-results">
+                                                                {itemSearchResults.map((item) => (
+                                                                    <li key={item.id} onClick={() => addItemToOrder(order.id, item)}>
+                                                                        {item.name} - ₹{item.unit_price}
+                                                                    </li>
+                                                                ))}
+                                                            </ul>
+                                                        )}
+                                                    </div>
+                                                    <div className="orders-visible-save-row">
+                                                        <button className="orders-visible-btn orders-visible-save-btn" onClick={() => updateOrderItems(order.id, order.items)}>
+                                                            Save Items
+                                                        </button>
+                                                    </div>
+                                                </div>
+                                            )}
+                                        </div>
                                     </div>
-                                </div>
-                            ))
+                                );
+                            })
                         )}
                     </div>
                 )}
@@ -753,14 +793,12 @@ const OrdersVisiblePage = () => {
                     New
                 </p>
             </div>
-
         </div>
         </div>
     );
 };
 
 export default OrdersVisiblePage;
-
 
 // =================================================================================================================== //
 
