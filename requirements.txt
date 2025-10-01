@@ -9,4 +9,4 @@ python-jose
 setuptools
 pytest
 httpx
-common-lib
+-e common-lib
