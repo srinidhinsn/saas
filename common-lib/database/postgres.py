@@ -5,6 +5,7 @@ import pg8000
 
 import sqlalchemy
 
+Base = declarative_base()
 
 def get_db() -> sqlalchemy.engine.base.Engine:
     """
