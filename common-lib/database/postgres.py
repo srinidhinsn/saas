@@ -1,16 +1,18 @@
 from sqlalchemy import create_engine, Column, Integer, String
 from sqlalchemy.ext.declarative import declarative_base
 from sqlalchemy.orm import sessionmaker, session
+import psycopg2
 
-DATABASE_URL = "postgresql://postgres:Saasqa@123@saas-473815:asia-south2:saas:5432/saas"
-
-engine = create_engine(DATABASE_URL)
-SessionLocal = sessionmaker(autocommit=False, autoflush=False, bind=engine)
-Base = declarative_base()
-
+    conn = psycopg2.connect(
+        host="saas-473815:asia-south2:saas", # Or private IP if using private connectivity
+        database="saas",
+        user="postgres",
+        password="Saasqa@123",
+        port="5432" # Default PostgreSQL port
+    )
 
 def get_db():
-    db = SessionLocal()
+    db = conn()
     try:
         yield db  # Yields session instance for request
     finally:
