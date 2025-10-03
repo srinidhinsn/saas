@@ -1,9 +1,8 @@
 import os
-
+import sqlalchemy
+from sqlalchemy.ext.declarative import declarative_base
 from google.cloud.sql.connector import Connector, IPTypes
 import pg8000
-
-import sqlalchemy
 
 Base = declarative_base()
 
