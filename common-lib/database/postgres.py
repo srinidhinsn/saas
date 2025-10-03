@@ -5,7 +5,7 @@ import psycopg2
 
     conn = psycopg2.connect(
         host="saas-473815:asia-south2:saas", # Or private IP if using private connectivity
-        database="postgres",
+        database="saas",
         user="postgres",
         password="Saasqa@123",
         port="5432" # Default PostgreSQL port
