@@ -15,7 +15,7 @@ LOGGING_CONFIG = {
         "file": {
             "class": "logging.FileHandler",
             "formatter": "default",
-            "filename": "/home/srinidhinsn/saas/app.log"
+            "filename": "app.log"
         }
     },
     "root": {
