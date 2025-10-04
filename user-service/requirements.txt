@@ -9,4 +9,4 @@ python-jose
 setuptools
 pytest
 httpx
--e \home\srinidhinsn\saas\common-lib
+-e ./common-lib
