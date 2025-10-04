@@ -10,4 +10,4 @@ setuptools
 pytest
 httpx
 cloud-sql-python-connector[pg8000]
--e "/workspace/common-lib"
+-e common-lib
