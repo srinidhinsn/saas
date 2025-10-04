@@ -1,1 +1,1 @@
-gcloud app deploy user-service/user-service-app.yaml
+gcloud app deploy /home/srinidhinsn/saas/user-service/user-service-app.yaml
