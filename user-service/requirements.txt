@@ -1,0 +1,12 @@
+fastapi
+uvicorn
+psycopg2-binary
+sqlalchemy
+alembic
+passlib
+bcrypt
+python-jose
+setuptools
+pytest
+httpx
+-e common-lib
