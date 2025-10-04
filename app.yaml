@@ -1,0 +1,1 @@
+gcloud app deploy user-service/user-service-app.yaml
