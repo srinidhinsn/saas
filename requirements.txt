@@ -9,5 +9,5 @@ python-jose
 setuptools
 pytest
 httpx
-google-cloud-*
+"cloud-sql-python-connector[pg8000]"
 -e common-lib
