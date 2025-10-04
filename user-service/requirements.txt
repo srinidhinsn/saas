@@ -1,0 +1,13 @@
+fastapi
+uvicorn
+psycopg2-binary
+sqlalchemy
+alembic
+passlib
+bcrypt
+python-jose
+setuptools
+pytest
+httpx
+cloud-sql-python-connector[pg8000]
+-e /home/srinidhinsn/saas/common-lib
