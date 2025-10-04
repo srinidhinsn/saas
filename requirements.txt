@@ -9,4 +9,5 @@ python-jose
 setuptools
 pytest
 httpx
+google-cloud-*
 -e common-lib
