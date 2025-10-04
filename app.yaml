@@ -1,1 +1,5 @@
-gcloud app deploy /home/srinidhinsn/saas/user-service/user-service-app.yaml
+runtime: python311
+entrypoint: python -m uvicorn user-service.app.main:app --host 0.0.0.0 --port 8000 --reload
+handlers:
+- url: /.*
+  script: auto
