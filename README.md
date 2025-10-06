@@ -31,7 +31,7 @@ Installation : git clone <https://github.com/srinidhinsn/saas.git>
 
                
 Dependencies installation : npm install react-router-dom
-                            npm install react-charts
+                            npm install recharts
                             npm install react-icons
                             npm install axios
                             npm install jwt-decode
