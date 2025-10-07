@@ -148,7 +148,7 @@ import { FaLock, FaUser } from "react-icons/fa";
 import { toast } from "react-toastify";
 import "react-toastify/dist/ReactToastify.css";
 import userServicesPort from "../../Backend_Port_Files/UserServices";
-
+import CircularText from '../../Util_Components/CircularText'; 
 export default function ResetPassword() {
   const navigate = useNavigate();
   const { clientId } = useParams();
@@ -253,6 +253,11 @@ export default function ResetPassword() {
       <div className="login-card">
         <div className="avatar-circle">
           <FaLock className="avatar-icon" />
+          <CircularText
+  text={`${clientId.split('').join('★')} ♡ `}
+  spinDuration={20}
+  className="circular-clientId"
+/>
         </div>
 
         {/* Reset Method Selection */}
@@ -339,7 +344,7 @@ export default function ResetPassword() {
             />
           </div>
 
-          <button type="submit" disabled={loading}>
+          <button  className="login-button"  type="submit" disabled={loading}>
             {loading ? "Resetting..." : "RESET PASSWORD"}
           </button>
         </form>

@@ -38,6 +38,7 @@ Dependencies installation : npm install react-router-dom
                             npm install xlsx file-saver
                             npm install react-toastify
                             npm install jspdf jspdf-autotable
+                            npm install motion
 
 
 

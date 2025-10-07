@@ -1,6 +1,5 @@
 import React, { useEffect } from "react";
 import { Routes, Route, useParams, Navigate, useNavigate } from "react-router-dom";
-import axios from "axios";
 
 import Navbar from "./Navbar";
 import MenuManager from "../Main_Components/Inventory_Services_Components/MenuManager";

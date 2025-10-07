@@ -439,14 +439,17 @@ export default function UserProfileForm() {
         `/${clientId}/users/person-details`,
         { headers: { Authorization: `Bearer ${token}` } }
       );
-      if (res.data && res.data.data) {
+      if (res.data && res.data.data && res.data.data.person) {
+        const p = res.data.data.person;
         setForm({
-          first_name: res.data.data.first_name || "",
-          last_name: res.data.data.last_name || "",
-          email: res.data.data.email || "",
-          phone: res.data.data.phone || "",
-          dob: res.data.data.dob || "",
+          first_name: p.first_name || "",
+          last_name: p.last_name || "",
+          email: p.email || "",
+          phone: p.phone || "",
+          dob: p.dob || "",
         });
+      
+      
         setProfileSaved(true);
         setLastUpdated(
           "Updated at " +

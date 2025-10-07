@@ -8,7 +8,9 @@ import { BsPersonCheck } from "react-icons/bs";
 import { MdOutlineTableBar } from "react-icons/md";
 import { GoPackageDependents } from "react-icons/go";
 import { MdOutlineSoupKitchen } from "react-icons/md";
-import { TbToolsKitchen3 } from "react-icons/tb"; import orderServicesPort from "../Backend_Port_Files/OrderServices";
+import { TbToolsKitchen3 } from "react-icons/tb"; 
+import orderServicesPort from "../Backend_Port_Files/OrderServices";
+import userServicesPort from "../Backend_Port_Files/UserServices";
 import {
   LineChart, Line, XAxis, YAxis, CartesianGrid, Tooltip, ResponsiveContainer, BarChart, Bar, RadarChart, Radar, PolarGrid, PolarAngleAxis, PolarRadiusAxis
 } from 'recharts';
@@ -118,7 +120,7 @@ const DashBoardPage = () => {
       if (!token || !clientId) return;
 
       try {
-        const res = await axios.get(`http://localhost:8003/saas/${clientId}/dinein/table`, {
+        const res = await orderServicesPort.get(`/${clientId}/dinein/table`, {
           headers: { Authorization: `Bearer ${token}` }
         });
 

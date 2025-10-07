@@ -1866,8 +1866,7 @@ input:focus {
   .inv--container {
     font-family: 'Inter', Arial, sans-serif;
     background: var(--bg-color);
-    min-height: 89vh;
-    padding: 12px 24px;
+    min-height: 89vh;padding: 5px;
     border-top-right-radius: 8px;
     border-bottom-right-radius: 8px;
   }
@@ -1923,13 +1922,13 @@ input:focus {
   
   .inv--main-row {
     display: flex;
-    gap: 24px;
+    gap: 4px;
     flex-wrap: nowrap;
   }
   .inv--orders-list {
     flex: 0 0 300px;
     overflow-y: auto;
-  height: 78vh;
+  height: 83vh;
     background: var(--bg-chart-container);
     border-radius: 10px;
     box-shadow: 0 2px 8px #f0f0f3;
@@ -1974,11 +1973,11 @@ input:focus {
     background: var(--bg-container);
     border-radius: 10px;
     box-shadow: 0 2px 12px #ddd;
-    padding: 24px 32px;
+    padding: 15px 32px;
     display: flex;
     flex-direction: column;
     overflow-y: auto;
-    max-height: 75vh;
+    max-height:83vh;
   }
   
   .inv--invoice-header {
@@ -2196,6 +2195,38 @@ input:focus {
   .inv--orders-list::-webkit-scrollbar-thumb {
     background-color: #ff6637;
     border-radius: 3px;
+  }
+  .inv--payment-status-buttons {
+    display: flex;
+    align-items: center;
+    gap: 10px;
+    margin-top: 10px;
+    flex-wrap: wrap;
+  }
+  
+  .inv--payment-status-buttons span {
+    font-weight: 500;
+    margin-right: 10px;
+  }
+  
+  .inv--status-btn {
+    padding: 6px 14px;
+    border: 1px solid #ccc;
+    background-color: #f5f5f5;
+    color: #333;
+    cursor: pointer;
+    border-radius: 4px;
+    transition: all 0.2s ease;
+  }
+  
+  .inv--status-btn:hover {
+    background-color: #e0e0e0;
+  }
+  
+  .inv--status-btn.active {
+    background-color: #4caf50;
+    color: #fff;
+    border-color: #4caf50;
   }
   
   /* Responsive */

@@ -4,7 +4,7 @@ import { FaUser, FaLock, FaKey } from "react-icons/fa";
 import { toast } from "react-toastify";
 import "react-toastify/dist/ReactToastify.css";
 import userServicesPort from "../../Backend_Port_Files/UserServices";
-
+import CircularText from '../../Util_Components/CircularText'; 
 export default function ForgotPassword() {
     const navigate = useNavigate();
     const { clientId } = useParams();
@@ -86,6 +86,11 @@ export default function ForgotPassword() {
             <div className="login-card">
                 <div className="avatar-circle">
                     <FaUser className="avatar-icon" />
+                    <CircularText
+  text={`${clientId.split('').join('★')} ♡ `}
+  spinDuration={20}
+  className="circular-clientId"
+/>
                 </div>
 
                 {step === 1 ? (
@@ -154,7 +159,7 @@ export default function ForgotPassword() {
                     </form>
                 )}
 
-                <p className="login-link">
+                <p className="options-row login-link">
                     Remembered your password?{" "}
                     <span onClick={() => navigate(`/saas/${clientId}/login`)}>Login here</span>
                 </p>

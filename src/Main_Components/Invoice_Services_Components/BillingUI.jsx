@@ -3484,107 +3484,152 @@ export default function BillingPage() {
   };
 
   // Updated printInvoice function with cloning and inline stylings
-  const printInvoice = () => {
+  const printInvoice = async () => {
     if (!selectedOrder || !selectedOrder.items?.length) {
       toast.error("No order selected or no items");
       return;
     }
   
-    const pdf = new jsPDF({ unit: "pt", format: "a4" });
-    let y = 40;
+    let currentInvoiceNumber = documentNumber;
+    let currentInvoiceDraftId = invoiceDraftId;
   
-    // RESTAURANT / CLIENT INFO (dynamic)
-    const restaurantName = clientId?.toUpperCase() || "Restaurant";
-    const restaurantAddress = localStorage.getItem("restaurant_address") || "N/A"; // if you save it
-    const invoiceNo = documentNumber || "Draft";
-    const invoiceDate = new Date().toLocaleDateString();
-    const invoiceTime = new Date().toLocaleTimeString([], { hour: "2-digit", minute: "2-digit" });
+    // Ensure draft invoice is saved (has an ID)
+    if (!currentInvoiceDraftId) {
+      try {
+        const draftId = await saveInvoiceDraft(); // your existing saving function returns draft ID
+        currentInvoiceDraftId = draftId;
+      } catch {
+        toast.error("Please save invoice draft before printing.");
+        return;
+      }
+    }
   
-    // HEADER
-    pdf.setFont("helvetica", "bold");
-    pdf.setFontSize(18);
-    pdf.text(restaurantName, 40, y);
-    pdf.setFontSize(10);
-    pdf.setFont("helvetica", "normal");
-    pdf.text(restaurantAddress, 40, y + 15);
+    // Issue invoice to generate document_number if missing or "Draft"
+    if (!currentInvoiceNumber || currentInvoiceNumber.toLowerCase() === "draft") {
+      try {
+        const res = await invoiceServices.post(
+          `/${clientId}/invoice/issue?invoice_id=${currentInvoiceDraftId}`,
+          null, // no body here, use query param instead
+          { headers: { Authorization: `Bearer ${token}` } }
+        );
+        currentInvoiceNumber = res?.data?.data?.document_number;
+        if (!currentInvoiceNumber) throw new Error("Invoice number generation failed");
+        setDocumentNumber(currentInvoiceNumber);
+      } catch (err) {
+        console.error("Invoice issue error: ", err);
+        toast.error("Failed to generate invoice number before print.");
+        return;
+      }
+    }
   
-    pdf.setFont("helvetica", "bold");
-    pdf.text("INVOICE", 500, y);
+    // Now generate and save PDF with the confirmed invoice number
+    try {
+      const pdf = new jsPDF({ unit: "pt", format: "a4" });
+      let y = 40;
   
-    y += 35;
-    pdf.setFont("helvetica", "normal");
-    pdf.text(`Invoice No: ${invoiceNo}`, 400, y);
-    pdf.text(`Date: ${invoiceDate} ${invoiceTime}`, 400, y + 15);
+      // Restaurant / client info
+      const restaurantName = clientId?.toUpperCase() || "Restaurant";
+      const restaurantAddress = localStorage.getItem("restaurant_address") || "N/A";
+      const invoiceNo = currentInvoiceNumber;
+      const invoiceDate = new Date().toLocaleDateString();
+      const invoiceTime = new Date().toLocaleTimeString([], { hour: "2-digit", minute: "2-digit" });
   
-    // CUSTOMER + DELIVERY BLOCK
-    y += 50;
-    pdf.setFont("helvetica", "bold");
-    pdf.text("Customer", 40, y);
-    pdf.text("Deliver To", 300, y);
+      // Header
+      pdf.setFont("helvetica", "bold");
+      pdf.setFontSize(18);
+      pdf.text(restaurantName, 40, y);
+      pdf.setFontSize(10);
+      pdf.setFont("helvetica", "normal");
+      pdf.text(restaurantAddress, 40, y + 15);
+      pdf.setFont("helvetica", "bold");
+      pdf.text("INVOICE", 500, y);
+      y += 35;
+      pdf.setFont("helvetica", "normal");
+      pdf.text(`Invoice No: ${invoiceNo}`, 400, y);
+      pdf.text(`Date: ${invoiceDate} ${invoiceTime}`, 400, y + 15);
   
-    pdf.setFont("helvetica", "normal");
-    pdf.text(`ID: ${selectedOrder.customer_id || "-"}`, 40, y + 20);
-    pdf.text(`Phone: ${selectedOrder.contact_phone || "-"}`, 40, y + 35);
-    pdf.text(`Email: ${selectedOrder.contact_email || "-"}`, 40, y + 50);
+      // Customer + delivery info
+      y += 50;
+      pdf.setFont("helvetica", "bold");
+      pdf.text("Customer", 40, y);
+      pdf.text("Deliver To", 300, y);
+      pdf.setFont("helvetica", "normal");
+      pdf.text(`ID: ${selectedOrder.customer_id || "-"}`, 40, y + 20);
+      pdf.text(`Phone: ${selectedOrder.contact_phone || "-"}`, 40, y + 35);
+      pdf.text(`Email: ${selectedOrder.contact_email || "-"}`, 40, y + 50);
+      const tableName = tablesMap[selectedOrder.table_id]?.name || `Table ${selectedOrder.table_id || "-"}`;
+      pdf.text(`Table: ${tableName}`, 300, y + 20);
+      pdf.text(`Type: ${selectedOrder.mode || "Dine-In"}`, 300, y + 35);
   
-    const tableName = tablesMap[selectedOrder.table_id]?.name || `Table ${selectedOrder.table_id || "-"}`;
-    pdf.text(`Table: ${tableName}`, 300, y + 20);
-    pdf.text(`Type: ${selectedOrder.mode || "Dine-In"}`, 300, y + 35); // use order mode if available
+      // Section title
+      y += 100;
+      pdf.setFont("helvetica", "bold");
+      pdf.setTextColor(200, 50, 50);
+      pdf.text("Order Details", 40, y);
+      pdf.setTextColor(0, 0, 0);
   
-    // SECTION TITLE
-    y += 100;
-    pdf.setFont("helvetica", "bold");
-    pdf.setTextColor(200, 50, 50);
-    pdf.text("Order Details", 40, y);
-    pdf.setTextColor(0, 0, 0);
+      // Column headers
+      y += 25;
+      pdf.setFont("helvetica", "bold");
+      pdf.text("Item", 40, y);
+      pdf.text("Qty", 250, y);
+      pdf.text("Unit Price", 320, y);
+      pdf.text("Amount", 420, y);
+      pdf.setFont("helvetica", "normal");
   
-    // COLUMN HEADERS
-    y += 25;
-    pdf.setFont("helvetica", "bold");
-    pdf.text("Item", 40, y);
-    pdf.text("Qty", 250, y);
-    pdf.text("Unit Price", 320, y);
-    pdf.text("Amount", 420, y);
+      // Order items
+      selectedOrder.items.forEach((item) => {
+        y += 20;
+        pdf.text(item.name || "Unnamed", 40, y);
+        pdf.text(`${item.quantity || 0}`, 250, y);
+        pdf.text(`Rs.${(item.unit_price ?? 0).toFixed(2)}`, 320, y);
+        pdf.text(`Rs.${((item.unit_price ?? 0) * (item.quantity ?? 0)).toFixed(2)}`, 420, y);
+      });
   
-    pdf.setFont("helvetica", "normal");
-  
-    // ORDER ITEMS
-    selectedOrder.items.forEach((item) => {
+      // Summary
+      y += 40;
+      pdf.setFont("helvetica", "normal");
+      pdf.text(`Subtotal: Rs.${subtotal.toFixed(2)}`, 300, y);
       y += 20;
-      pdf.text(item.name || "Unnamed", 40, y);
-      pdf.text(`${item.quantity || 0}`, 250, y);
-      pdf.text(`Rs.${(item.unit_price ?? 0).toFixed(2)}`, 320, y);
-      pdf.text(`Rs.${((item.unit_price ?? 0) * (item.quantity ?? 0)).toFixed(2)}`, 420, y);
-    });
+      pdf.text(`Discount: -Rs.${discountAmount.toFixed(2)}`, 300, y);
+      y += 20;
+      pdf.text(`GST: Rs.${taxAmount.toFixed(2)}`, 300, y);
+      y += 25;
+      pdf.setFont("helvetica", "bold");
+      pdf.text(`TOTAL DUE: Rs.${total.toFixed(2)}`, 300, y);
   
-    // SUMMARY
-    y += 40;
-    pdf.setFont("helvetica", "normal");
-    pdf.text(`Subtotal: Rs.${subtotal.toFixed(2)}`, 300, y);
-    y += 20;
-    pdf.text(`Discount: -Rs.${discountAmount.toFixed(2)}`, 300, y);
-    y += 20;
-    pdf.text(`GST: Rs.${taxAmount.toFixed(2)}`, 300, y);
-    y += 25;
+      // Payment info
+      y += 40;
+      pdf.setFont("helvetica", "normal");
+      if (splitPaymentEnabled) {
+        paymentSplits.forEach((split, idx) => {
+          pdf.text(`Payment Method ${idx + 1}: ${split.method} - Rs.${Number(split.amount).toFixed(2)}`, 40, y);
+          y += 20;
+        });
+      } else {
+        pdf.text(`Payment Method: ${method}`, 40, y);
+        y += 20;
+        pdf.text(`Amount Given: Rs.${singlePaymentAmount.toFixed(2)}`, 40, y);
+        y += 20;
+      }
+      pdf.text(`Payment Status: ${paymentStatus}`, 40, y);
   
-    pdf.setFont("helvetica", "bold");
-    pdf.text(`TOTAL DUE: Rs.${total.toFixed(2)}`, 300, y);
+      // Footer
+      y += 50;
+      pdf.setFont("helvetica", "italic");
+      pdf.setFontSize(10);
+      pdf.text(`${restaurantName} - Thank you for dining with us!`, 220, y, { align: "center" });
   
-    // PAYMENT INFO
-    y += 40;
-    pdf.setFont("helvetica", "normal");
-    pdf.text(`Payment Method: ${method}`, 40, y);
-    y += 20;
-    pdf.text(`Payment Status: ${paymentStatus}`, 40, y);
-  
-    // FOOTER
-    y += 50;
-    pdf.setFont("helvetica", "italic");
-    pdf.setFontSize(10);
-    pdf.text(`${restaurantName} - Thank you for dining with us!`, 220, y, { align: "center" });
-  
-    pdf.save(`Invoice_${invoiceDraftId || "draft"}.pdf`);
+      pdf.save(`Invoice_${currentInvoiceDraftId || "draft"}.pdf`);
+      toast.success("Invoice issued and PDF downloaded!");
+    } catch (err) {
+      console.error("Error generating PDF:", err);
+      toast.error("Failed to generate invoice PDF.");
+    } finally {
+      setSaving(false);
+    }
   };
+  
   
   
 
@@ -3592,7 +3637,7 @@ export default function BillingPage() {
   <div className="Invoice-container-page">
       <div className="inv--container">
       <div className="inv--header-row">
-        <div className="inv--header-l">Billing Invoices</div>
+        {/* <div className="inv--header-l">Billing Invoices</div> */}
         {/* <div className="inv--header-r">
           <button className="inv--btn-light" disabled>{loading ? "Loading..." : "Export"}</button>
           <button className="inv--btn-light" disabled>{loading ? "Loading..." : "Import"}</button>
@@ -3758,19 +3803,20 @@ export default function BillingPage() {
                   <option value="fixed">Fixed</option>
                 </select>
               </label>
-              <label>
-                Payment Status<br />
-                <select
-                  value={paymentStatus}
-                  onChange={(e) => setPaymentStatus(e.target.value)}
-                  className="inv--select"
-                >
-                  <option>Pending</option>
-                  <option>Paid</option>
-                  <option>Partial</option>
-                  <option>Due</option>
-                </select>
-              </label>
+              <div className="inv--payment-status-buttons">
+  <span>Payment Status:</span>
+  {["Pending", "Paid", "Partial", "Due"].map((statusOption) => (
+    <button
+      key={statusOption}
+      type="button"
+      className={`inv--status-btn ${paymentStatus === statusOption ? "active" : ""}`}
+      onClick={() => setPaymentStatus(statusOption)}
+    >
+      {statusOption}
+    </button>
+  ))}
+</div>
+
               <label className="inv--checkbox-label">
                 <input
                   type="checkbox"
