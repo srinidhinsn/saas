@@ -1,7 +1,7 @@
 
 from fastapi import FastAPI
 from fastapi.middleware.cors import CORSMiddleware
-from app.api import routes as report_routes
+from api import routes as report_routes
 
 app = FastAPI(
     title="Report Service",
