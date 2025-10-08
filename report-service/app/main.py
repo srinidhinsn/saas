@@ -21,9 +21,31 @@ app.add_middleware(
 # Route structure: /saas/{client_id}/report/*
 app.include_router(report_routes.router, prefix="/saas/{client_id}/reports", tags=["Report Service"])
 
+
+@app.get('/')
+def root():
+    return {"Report Service":  "Running on 8004"}
+
+
+@app.middleware("http")
+async def log_requests(request: Request, call_next):
+    start_time = time.time()
+    logger.info(
+        f"Request start time: {request.method} {request.url} - Request: {request} - Time: {start_time: .4f}s")
+    response = await call_next(request)
+    process_time = time.time() - start_time
+    logger.info(
+        f"Request processed time: {request.method} {request.url} - Response: {response.status_code} - Time: {process_time: .4f}s")
+    return response
+
+
+
 # Optional: root for sanity check
 @app.get("/")
-def read_root():
+async def read_root():
     return {"message": "Report service is up and running"}
 
+if __name__ == "__main__":
+    import uvicorn
+    uvicorn.run(app, host="0.0.0.0", port=8004)
 
