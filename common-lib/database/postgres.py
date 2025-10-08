@@ -2,7 +2,14 @@ import os
 import sqlalchemy
 from sqlalchemy.ext.declarative import declarative_base
 from google.cloud.sql.connector import Connector, IPTypes
-import pg8000
+import pg8000.dbapi
+
+PROJECT_ID = "saas-user-service"
+REGION = "asia-south2"
+INSTANCE_NAME = "saas-user-service:asia-south2:saas-473815"
+DB_USER = "postgres"
+DB_PASS = "Saasqa@123"
+DB_NAME = "postgres"
 
 Base = declarative_base()
 
@@ -17,13 +24,6 @@ def get_db() -> sqlalchemy.engine.base.Engine:
     # Cloud Secret Manager (https://cloud.google.com/secret-manager) to help
     # keep secrets safe.
 
-    instance_connection_name = os.environ[
-        "saas-473815:asia-south2:saas"
-    ]  # e.g. 'project:region:instance'
-    db_user = os.environ["postgres"]  # e.g. 'my-db-user'
-    db_pass = os.environ["Saasqa@123"]  # e.g. 'my-db-password'
-    db_name = os.environ["postgres"]  # e.g. 'my-database'
-
     ip_type = IPTypes.PRIVATE if os.environ.get("PRIVATE_IP") else IPTypes.PUBLIC
 
     # initialize Cloud SQL Python Connector object
@@ -31,12 +31,12 @@ def get_db() -> sqlalchemy.engine.base.Engine:
 
     def getconn() -> pg8000.dbapi.Connection:
         conn: pg8000.dbapi.Connection = connector.connect(
-            instance_connection_name,
-            "pg8000",
-            user=db_user,
-            password=db_pass,
-            db=db_name,
-            ip_type=ip_type,
+            f"{PROJECT_ID}:{REGION}:{INSTANCE_NAME}",
+            "pg8000", # Or "psycopg2" if you installed psycopg2-binary
+            user=DB_USER,
+            password=DB_PASS,
+            db=DB_NAME,
+            ip_type=IPTypes.PUBLIC,
         )
         return conn
 
