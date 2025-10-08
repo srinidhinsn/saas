@@ -1,12 +1,13 @@
 import os
 import sqlalchemy
+from sqlalchemy.orm import sessionmaker, Session
 from sqlalchemy.ext.declarative import declarative_base
 from google.cloud.sql.connector import Connector, IPTypes
 import pg8000.dbapi
 
 PROJECT_ID = "saas-user-service"
 REGION = "asia-south2"
-INSTANCE_NAME = "saas-user-service:asia-south2:saas-473815"
+INSTANCE_NAME = "saas-473815"
 DB_USER = "postgres"
 DB_PASS = "Saasqa@123"
 DB_NAME = "postgres"
@@ -47,4 +48,11 @@ def get_db() -> sqlalchemy.engine.base.Engine:
         creator=getconn,
         # ...
     )
-    return pool
+    SessionLocal = sessionmaker(autocommit=False, autoflush=False, bind=pool)
+    db = SessionLocal()
+    try:
+        yield db
+    finally:
+        db.close()
+
+    return db
