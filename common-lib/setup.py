@@ -1,19 +1,21 @@
 from setuptools import setup, find_packages
 
 setup(
-    name = "common_lib",
+    name = "saas_common_lib_473815",
     version = "0.1",
     author = "Srinidhi Nagarajan",
-    author_email = "srinidhinsn@gmail.com",
+    author_email = "Srinidhinsn@gmail.com",
     description = ("Packaging all common functionalities"),
     license = "BSD",
     keywords = "Saas application",
     url = "",
-    #packages=['database', 'models', 'utils', 'config', 'entity'],
-    packages = find_packages(),
+    packages=['database', 'models', 'utils', 'config', 'entity'],
+    #packages = find_packages(),
     classifiers=[
-        "Development Status :: Initial version",
-        "Topic :: Common library",
+        "Development Status :: 3 - Alpha",
+        "Intended Audience :: Developers",
         "License :: OSI Approved :: BSD License",
+        "Operating System :: OS Independent",
+        "Programming Language :: Python :: 2",
     ],
 )
