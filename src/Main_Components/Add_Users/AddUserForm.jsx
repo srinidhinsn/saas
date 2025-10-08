@@ -60,8 +60,6 @@ const AddUserForm = ({ onCancel, onSave }) => {
       dob: formData.dob || null,
       phone: formData.phone || null,
       password: formData.password,
-      // roles: [formData.role], // uncomment if backend expects array
-      // grants: [],
     };
 
     try {

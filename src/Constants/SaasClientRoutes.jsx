@@ -58,25 +58,7 @@ const SaasClientRoutes = ({
         }
     }, [clientId]);
 
-    // ✅ Load tables only for this client
-    // const fetchTables = async () => {
-    //     try {
-    //         const token = localStorage.getItem("access_token");
-    //         const res = await axios.get(`http://localhost:8000/saas/${clientId}/tables/read`, {
-    //             headers: {
-    //                 Authorization: `Bearer ${token}`
-    //             }
-    //         });
-    //         setTables(res.data);
-    //     } catch (error) {
-    //         console.error("❌ Failed to fetch tables:", error);
-    //     }
-    // };
-
     useEffect(() => {
-        // if (clientId) {
-        //     fetchTables();
-        // }
         if (!clientId) {
             console.error("❌ Missing client ID. Cannot fetch tables.");
             return;
@@ -93,11 +75,6 @@ const SaasClientRoutes = ({
                 <div className="main-layout" style={{ flex: 1, overflowY: "auto" }}>
                     <Routes>
                         <Route path="/" element={<DashBoardPage />} />
-                        {/* <Route path="update-profile" element={<UpdateProfile />} />
-                    <Route path="settings" element={<Settings />} /> */}
-                        {/* <Route path="dinein-page" element={<MenuManager clientId={clientId} />} /> */}
-                        {/* <Route path="swiggy-page" element={<SwiggyMenuManager clientId={clientId} />} />
-                    <Route path="zomato-page" element={<ZomatoMenuManager clientId={clientId} />} /> */}
                         <Route path="menu-page/*" element={<MenuManager clientId={clientId} />} />
                         <Route
                             path="table-selection"
@@ -125,23 +102,12 @@ const SaasClientRoutes = ({
                         <Route path="kds-page" element={<KitchenDisplay />} />
                         <Route path="notifications" element={<Notifications />} />
                         <Route path="add-users" element={<Add_user />} />
-                        {/* <Route path="documents" element={<OrderSummary />} /> */}
                         <Route path="user-details" element={<PersonForm />} />
 
                         <Route path="all-notifications" element={<NotificationTable />} />
                         <Route path="popup-notifications" element={<PopupNotification />} />
 
                         <Route path="/billing" element={<BillingPage />} />
-
-                        {/* <Route path="documents" element={<Documents />} />
-                    <Route path="billing" element={<BillingPage />} />
-                    <Route path="invoice" element={<InvoicePage />} />
-                    <Route path="report-page" element={<ReportsPage />} />
-                    <Route path="add-users" element={<ReportsPage />} /> */}
-                        {/* <Route
-                        path="table-overview"
-                        element={<TableOverview clientId={clientId} tables={tables} />}
-                    /> */}
                         <Route path="*" element={<Navigate to="/" />} />
                     </Routes>
                 </div>
