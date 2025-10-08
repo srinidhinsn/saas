@@ -21,7 +21,7 @@ app.add_middleware(
 
 @app.get('/')
 def root():
-    return {"Document Service": "Running on 8004"}
+    return {"Document Service": "Running on 8006"}
 
 
 logging.config.dictConfig(LOGGING_CONFIG)
@@ -51,4 +51,4 @@ print("Absolute upload path:", os.path.abspath("uploads"))
 
 if __name__ == "__main__":
     import uvicorn
-    uvicorn.run(app, host="127.0.0.1", port=8001)
+    uvicorn.run(app, host="127.0.0.1", port=8006)
