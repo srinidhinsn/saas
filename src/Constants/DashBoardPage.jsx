@@ -118,7 +118,7 @@ const DashBoardPage = () => {
       if (!token || !clientId) return;
 
       try {
-        const res = await axios.get(`http://localhost:8003/saas/${clientId}/dinein/table`, {
+        const res = await orderServicesPort.get(`/${clientId}/dinein/table`, {
           headers: { Authorization: `Bearer ${token}` }
         });
 
