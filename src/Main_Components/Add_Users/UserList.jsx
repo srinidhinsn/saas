@@ -35,13 +35,10 @@ const UsersList = ({ onAddNew }) => {
             document.body.classList.remove("sidebar-minimized");
         }
     }, [tableId]);
-
-    // Load users on mount - assign each user a unique id if missing
     useEffect(() => {
 
     }, []);
 
-    // Filter and keep ids intact
     const filteredUsers = useMemo(() => {
         let filtered =
             filterRole === "all"
@@ -51,8 +48,6 @@ const UsersList = ({ onAddNew }) => {
                     : users;
         return filtered;
     }, [users, filterRole]);
-
-    // Columns definition same as before
     const columns = [
         {
             field: "username",

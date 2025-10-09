@@ -1,7 +1,7 @@
 import React, { useState, useEffect } from "react";
 import { useParams } from "react-router-dom";
-import axios from "axios";
 import userServicesPort from "../../Backend_Port_Files/UserServices";
+import inventoryServicesPort from "../../Backend_Port_Files/InventoryServices";
 
 const AddUserForm = ({ onCancel, onSave }) => {
   const { clientId } = useParams();
@@ -23,9 +23,8 @@ const AddUserForm = ({ onCancel, onSave }) => {
   useEffect(() => {
     const fetchRoles = async () => {
       try {
-        const res = await axios.get(
-          "http://localhost:8002/saas/easyfood/inventory/read_category?category_id=roles",
-          {
+        const res = await  inventoryServicesPort
+        .get(`/${clientId}/inventory/read_category?category_id=roles`, {
             headers: { Authorization: `Bearer ${token}` },
           }
         );
@@ -60,8 +59,6 @@ const AddUserForm = ({ onCancel, onSave }) => {
       dob: formData.dob || null,
       phone: formData.phone || null,
       password: formData.password,
-      // roles: [formData.role], // uncomment if backend expects array
-      // grants: [],
     };
 
     try {
