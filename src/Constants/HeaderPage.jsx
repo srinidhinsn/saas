@@ -22,22 +22,11 @@ const HeaderBar = () => {
     const [tokenAvailable, setTokenAvailable] = useState(!!token);
 
     const addNotification = (message) => {
-        setNotifications((prev) => [message, ...prev]); // newest on top
-        setShowBellShaking(true); // trigger bell shake
-        setShowPopup(true); // Show popup automatically on new notification
+        setNotifications((prev) => [message, ...prev]); 
+        setShowBellShaking(true); 
+        setShowPopup(true); 
     };
-
-    // useEffect(() => {
-    //     // Initial sample notifications if any
-    //     setNotifications([
-    //         "Order #1001 created",
-    //         "Order #1001 served",
-    //         "User logged in",
-    //         "User logged out",
-    //     ]);
-    // }, []);
-
-    useEffect(() => {
+ useEffect(() => {
         const checkToken = () => {
             const newToken = localStorage.getItem("access_token");
             setTokenAvailable(!!newToken);
