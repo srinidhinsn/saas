@@ -1,23 +1,7 @@
 import axios from 'axios';
 
 const userServicesPort = axios.create({
-    baseURL: 'http://localhost:8000/saas',
+    baseURL: 'https://user-service-qa-582942992169.asia-south2.run.app/saas',
 });
 
 export default userServicesPort;
-
-
-//
-
-
-// import axios from 'axios';
-
-// const userServicesPort = axios.create({
-//     baseURL: 'http://localhost:8000/saas',
-//     withCredentials: true,
-//     headers: {
-//         'Content-Type': 'application/json'
-//     }
-// });
-
-// export default userServicesPort;
