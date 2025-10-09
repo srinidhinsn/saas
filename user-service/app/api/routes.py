@@ -3,15 +3,17 @@ from sqlalchemy.orm import Session
 from database.postgres import get_db
 from entity.user_entity import User, Person
 from entity.client_entity import Client
-from utils.auth import hash_password, verify_password, create_access_token, verify_token
+from utils.auth import hash_password, verify_password, create_access_token, verify_token, SECRET_KEY, ALGORITHM
 from models.saas_context import SaasContext
 from models.user_model import UserModel, ResetpasswordRequest, LoginRequest,PersonModel
 from models.response_model import ResponseModel
+from models.user_model import DelegatedAccessRequest
 from sqlalchemy import and_
 from utils.send_email_otp import otpEmailService, otp_store
 from utils.create_notification import  get_template_body, render_template
 import random
 from datetime import datetime, timedelta
+from jose import jwt
 
 router = APIRouter()
 
@@ -234,3 +236,47 @@ def get_notifications(
         screen_id=context.screen_id,
         data={"notifications": []}  
     )
+
+
+
+@router.post("/delegate-access")
+async def delegate_access(
+    client_id: str,
+    req: DelegatedAccessRequest,
+    db: Session = Depends(get_db)
+):
+    # 1️⃣ Validate admin credentials
+    admin = db.query(User).filter(User.username == req.admin_username).first()
+    if not admin:
+        raise HTTPException(status_code=401, detail="Invalid admin credentials")
+    if not verify_password(req.admin_password, admin.hashed_password):
+        raise HTTPException(status_code=401, detail="Invalid admin credentials")
+
+    # 2️⃣ Validate requester exists
+    requester = db.query(User).filter(User.id == req.requester_id).first()
+    if not requester:
+        raise HTTPException(status_code=404, detail="Requester not found")
+
+    # 3️⃣ Combine original grants with delegated page
+    original_grants = requester.grants or []
+    delegated_grants = list(set(original_grants + [req.page]))
+    print("the deegated grants",delegated_grants)
+
+    client = db.query(Client).filter(Client.id==client_id).first()
+    client_model = Client.copyToModel(client)
+
+    # 4️⃣ Create delegated token
+    expire = datetime.utcnow() + timedelta(minutes=1)
+    payload = {
+        "sub": str(requester.id),
+        "roles": admin.roles,           
+        "client_id": requester.client_id,
+        "delegated": True,
+        "granted_by": str(admin.id),
+        "grants": delegated_grants,
+        "exp": expire,
+        "realm": client_model.realm
+    }
+    token = jwt.encode(payload, SECRET_KEY, algorithm=ALGORITHM)
+
+    return {"delegated_token": token, "expires_at": expire}

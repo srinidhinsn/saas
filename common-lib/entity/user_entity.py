@@ -1,6 +1,6 @@
 import uuid
 from database.postgres import Base
-from sqlalchemy import Column , Integer, String, ARRAY, UUID, event, Date,TIMESTAMP,func
+from sqlalchemy import Column , Integer, String, ARRAY, UUID, event, Date,TIMESTAMP,func,DateTime
 from models.user_model import UserModel, PageDefinitionModel,PersonModel
 
 
@@ -130,3 +130,13 @@ class Notification(Base):
     updated_at = Column(
         TIMESTAMP, server_default=func.now(), onupdate=func.now())    
 
+
+class DelegatedAccess(Base):
+    __tablename__ = "delegated_access"
+
+    id = Column(UUID(as_uuid=True), primary_key=True, default=uuid.uuid4)
+    requester_id = Column(UUID(as_uuid=True), nullable=False)   # waiter
+    granted_by = Column(UUID(as_uuid=True), nullable=False)     # admin
+    client_id = Column(String, nullable=False)
+    resource = Column(String, nullable=False)                   # e.g., "orders"
+    expires_at = Column(DateTime, nullable=False)
