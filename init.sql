@@ -309,6 +309,9 @@ CREATE TABLE tables (
 );
 
 
+ALTER TABLE tables
+ALTER COLUMN id ADD GENERATED ALWAYS AS IDENTITY;
+
 --
 -- TOC entry 220 (class 1259 OID 49726)
 -- Name: user; Type: TABLE; Schema: public; Owner: postgres
