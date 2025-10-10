@@ -1,4 +1,5 @@
 from sqlalchemy import Column, BigInteger, Text, Float, DateTime, Boolean, Identity, ForeignKey, func, Integer
+from sqlalchemy.dialects.postgresql import JSONB
 from database.base import Base
 from models.billing_model import BillingDocument, BillingDocumentItem
 from enum import Enum
@@ -45,7 +46,7 @@ class BillingDocumentEntity(Base):
     updated_at               = Column(DateTime, default=func.now(), onupdate=func.now())
     payment_status           = Column(Text, nullable=True, default=PaymentStatusEnum.pending)
     payment_due_date         = Column(DateTime, nullable=True)
-    payment_method           = Column(Text, nullable=True)
+    payment_method           = Column(JSONB, nullable=True)
     payment_reference        = Column(Text, nullable=True)
     approval_status          = Column(Text, nullable=True, default=ApprovalStatusEnum.pending) # rejected
     approved_by              = Column(Text, nullable=True)

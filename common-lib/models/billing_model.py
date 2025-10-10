@@ -1,4 +1,4 @@
-from typing import Optional
+from typing import Optional,List,Dict,Any
 from pydantic import BaseModel
 from datetime import datetime
 from enum import Enum
@@ -43,7 +43,7 @@ class BillingDocument(BaseModel):
     updated_at:               Optional[datetime] = None
     payment_status:           Optional[PaymentStatusEnum] = PaymentStatusEnum.pending
     payment_due_date:         Optional[datetime] = None
-    payment_method:           Optional[str]      = None
+    payment_method:           Optional[List[Dict[str, Any]]] = None
     payment_reference:        Optional[str]      = None
     approval_status:          Optional[ApprovalStatusEnum] = ApprovalStatusEnum.pending
     approved_by:              Optional[str]      = None

@@ -2,6 +2,8 @@ from fastapi import Depends, HTTPException, APIRouter, Request
 from sqlalchemy.orm import Session
 from database.postgres import get_db
 from entity.user_entity import User, Person
+from entity.inventory_entity import Category
+from typing import List,Set
 from entity.client_entity import Client
 from utils.auth import hash_password, verify_password, create_access_token, verify_token
 from models.saas_context import SaasContext
@@ -12,20 +14,17 @@ from utils.send_email_otp import otpEmailService, otp_store
 from utils.create_notification import  get_template_body, render_template
 import random
 from datetime import datetime, timedelta
+from app.services.add_users import create_user_and_person
 
 router = APIRouter()
 
+@router.post("/add")
+async def add_user(client_id: str, userReq: UserModel, request: Request, db: Session = Depends(get_db)):
+    return await create_user_and_person(client_id, userReq, db)
 
 @router.post("/register")
-async def register_user(client_id: str, userReq: UserModel, db: Session = Depends(get_db)):
-    hashed_pw = hash_password(userReq.password)
-    print("user model 1 - ", userReq)
-    userReq.client_id = client_id
-    user = User(username=userReq.username, hashed_password=hashed_pw,
-                client_id=userReq.client_id, roles=userReq.roles, grants=userReq.grants)
-    db.add(user)
-    db.commit()
-    return {"message": "User registered successfully"}
+async def register_user(client_id: str, userReq: UserModel, request: Request, db: Session = Depends(get_db)):
+    return await create_user_and_person(client_id, userReq, db)
 
 @router.post("/login")
 async def login_user(client_id: str, userReq: LoginRequest, db: Session = Depends(get_db)):
@@ -79,7 +78,7 @@ async def test_msg(client_id: str, context: SaasContext = Depends(verify_token),
 
 # ================== FORGOT PASSWORD ==================
 @router.post("/forgot-password")
-async def forgot_password(client_id: str, req_data: ResetpasswordRequest, context: SaasContext = Depends(verify_token), db: Session = Depends(get_db)):
+async def forgot_password(client_id: str, req_data: ResetpasswordRequest, db: Session = Depends(get_db)):
     if not req_data.username:
         raise HTTPException(status_code=400, detail="Username is required")
 
@@ -105,10 +104,10 @@ async def forgot_password(client_id: str, req_data: ResetpasswordRequest, contex
     if not otpEmailService(person.email, notification_text):
         raise HTTPException(status_code=500, detail="Failed to send OTP")
 
-    return ResponseModel(screen_id=context.screen_id, data={"message": "OTP sent successfully"})
+    return ResponseModel(data={"message": "OTP sent successfully"})
 # ================== RESET PASSWORD ==================
 @router.post("/reset-password")
-async def reset_password(client_id: str, req_data: ResetpasswordRequest, context: SaasContext = Depends(verify_token), db: Session = Depends(get_db)):
+async def reset_password(client_id: str, req_data: ResetpasswordRequest, db: Session = Depends(get_db)):
     user = db.query(User).filter(
         and_(User.username == req_data.username, User.client_id == client_id)
     ).first()
@@ -132,7 +131,7 @@ async def reset_password(client_id: str, req_data: ResetpasswordRequest, context
 
         otpEmailService(person.email, render_template(template_body, metadata))
 
-        return ResponseModel(screen_id=context.screen_id, data={"message": "OTP sent successfully"})
+        return ResponseModel(data={"message": "OTP sent successfully"})
 
     # OTP verification
     if req_data.otp:
@@ -165,32 +164,38 @@ async def reset_password(client_id: str, req_data: ResetpasswordRequest, context
                             or "Dear {username}, your password for {clientId} has been reset successfully."
             otpEmailService(person.email, render_template(template_body, metadata))
 
-    return ResponseModel(screen_id=context.screen_id, data={"message": "Password reset successfully"})
+    return ResponseModel(data={"message": "Password reset successfully"})
 # ================== PERSON DETAILS ==================
 @router.post("/person-details")
-async def add_edit_person_details(
+async def update_person_details(
     client_id: str,
     person_req: PersonModel,
     context: SaasContext = Depends(verify_token),
     db: Session = Depends(get_db)
 ):
-    user = db.query(User).filter(User.id == context.user_id, User.client_id == client_id).first()
+    user = db.query(User).filter(
+        User.id == context.user_id, 
+        User.client_id == client_id
+    ).first()
     if not user:
         raise HTTPException(status_code=404, detail="User not found")
 
-    existing_person = db.query(Person).filter(Person.id == user.id).first()
+    # Fetch existing person
+    person = db.query(Person).filter(Person.id == user.id).first()
     action = "added"
 
-    if existing_person:
-        existing_person.first_name = person_req.first_name
-        existing_person.last_name = person_req.last_name
-        existing_person.dob = person_req.dob
-        existing_person.email = person_req.email
-        existing_person.phone = person_req.phone
+    if person:
+        # Update existing
+        person.first_name = person_req.first_name
+        person.last_name = person_req.last_name
+        person.dob = person_req.dob
+        person.email = person_req.email
+        person.phone = person_req.phone
         db.commit()
-        db.refresh(existing_person)
+        db.refresh(person)
         action = "updated"
     else:
+        # Create new
         person = Person(
             id=user.id,
             first_name=person_req.first_name,
@@ -202,27 +207,44 @@ async def add_edit_person_details(
         db.add(person)
         db.commit()
         db.refresh(person)
-        existing_person = person
 
+    # Send email notification if email exists
     if person_req.email:
-        body = f"Dear {person_req.first_name}, your details have been {action}."
-        otpEmailService(person_req.email, body)
+        body = f"Dear {person_req.first_name}, your details have been {action} successfully."
+        try:
+            otpEmailService(person_req.email, body)
+        except Exception as e:
+            # Log email failure but don't fail the request
+            print(f"Email failed: {e}")
 
     return ResponseModel(
         screen_id=context.screen_id,
-        data={"message": f"Person details {action} successfully"}
+        data={
+            "message": f"Person details {action} successfully",
+            "person": PersonModel.from_orm(person)
+        }
     )
 
 @router.get("/person-details")
-async def get_person_details(client_id: str, context: SaasContext = Depends(verify_token), db: Session = Depends(get_db)):
+async def get_person_details(
+    client_id: str,
+    context: SaasContext = Depends(verify_token),
+    db: Session = Depends(get_db),
+):
     person = db.query(Person).filter(Person.id == context.user_id).first()
-    if not person:
-        raise HTTPException(status_code=404, detail="Person not found")
 
+    if not person:
+        # Create empty Person record so user can later update it
+        person = Person(id=context.user_id, email=None, phone=None, first_name=None, last_name=None, dob=None)
+        db.add(person)
+        db.commit()
+        db.refresh(person)
+    
     return ResponseModel(
         screen_id=context.screen_id,
         data={"person": PersonModel.from_orm(person)}
     )
+
 
 @router.get("/notifications")
 def get_notifications(
@@ -233,4 +255,27 @@ def get_notifications(
     return ResponseModel(
         screen_id=context.screen_id,
         data={"notifications": []}  
+    )
+
+@router.get("/persons")
+async def get_all_persons(client_id: str, db: Session = Depends(get_db)):
+    results = (
+        db.query(Person, User.username, User.roles)
+        .join(User, Person.id == User.id)
+        .filter(User.client_id == client_id)
+        .all()
+    )
+
+    persons = [
+        {
+            **Person.copyToModel(person).dict(),
+            "username": username,
+            "role": (roles[0] if roles else "")
+        }
+        for person, username, roles in results
+    ]
+
+    return ResponseModel(
+        screen_id="persons_list",
+        data={"persons": persons}
     )
