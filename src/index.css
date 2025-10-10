@@ -2264,3 +2264,491 @@ input:focus {
 
 
 /* ========================== =============== */
+/* ========================== =============== */
+/* ========================== =============== */
+/* ========================== =============== */
+/* ========================== =============== */
+
+/* Container and wrapper */
+.ul-container {
+    padding-right: 5px;
+    overflow-x: auto;
+    
+  }
+  
+  .ul-wrapper {
+    padding: 16px;border-top-right-radius: 8px;
+    border-bottom-right-radius: 8px;
+    box-sizing: border-box;height: 89vh;
+    background-color: var(--bg-container);    overflow-x: auto;
+  }
+  
+  /* Header */
+  .ul-header {
+    display: flex;
+    justify-content: space-between;
+    align-items: center;
+    margin-bottom: 8px;
+  }
+  
+  .ul-title {
+    user-select: none;
+    color: var(--bg-text-color);
+    font-weight: 400;
+  }
+  
+  .ul-btn-add-new {
+    text-transform: none !important;
+    font-weight: bold !important;
+    font-size: 13px !important;
+    border-color: #0073aa !important;
+    color: #0073aa !important;
+  }
+  
+  .ul-btn-add-new:hover {
+    background-color: #0073aa !important;
+    color: #fff !important;
+  }
+  
+  /* Role filter */
+  .ul-role-filter {
+    margin-bottom: 8px;
+    font-size: 14px;
+    user-select: none;
+    display: inline-flex;
+    align-items: center;
+    gap: 8px;
+    color: red;
+  }
+  
+  .ul-role-link {
+    cursor: pointer;
+    color: #555;
+    font-weight: 600;
+    text-decoration: none;
+  }
+  
+  .ul-role-link:hover {
+    color: #0073aa;
+  }
+  
+  .ul-selected {
+    font-weight: 700 !important;
+    color: var(--bg-text-color) !important;
+  }
+  
+  .ul-filter-separator {
+    user-select: none;
+  }
+  
+  /* DataGrid wrapper for horizontal scroll */
+  .ul-data-grid-wrapper {
+    border: 1px solid #ddd;
+    background-color: var(--bg-chart-container);
+    margin-bottom: 8px;
+    overflow-x: auto;
+  }
+  
+  /* Override MUI DataGrid classes (no inline styles) */
+  .ul-data-grid .MuiDataGrid-columnHeaders {
+    background-color: var(--bg-container);
+    border-bottom: 1px solid green;
+    font-weight: 600;
+    font-size: 14px;
+    color: var(--bg-text-color);
+  }
+  
+  .ul-data-grid .MuiDataGrid-row {
+    font-size: 13px;
+    background: var(--bg-container);
+  }
+  
+  .ul-data-grid .MuiDataGrid-row:hover {
+    background-color: #ededed;
+    cursor: pointer;
+  }
+  
+  .ul-data-grid .MuiCheckbox-root,
+  .ul-data-grid .MuiCheckbox-root.Mui-checked {
+    padding: 0 9px 0 11px;
+  }
+  
+  /* Cell customizations */
+  .ul-cell {
+    color: var(--bg-text-color);
+    font-size: 14px;
+    display: flex;
+    align-items: center;
+  }
+  
+  .username-cell {
+    font-weight: 600;
+  }
+  
+  .ul-cell-user {
+    display: flex;
+    align-items: center;
+    gap: 0.5rem;
+  }
+  
+  .ul-avatar {
+    width: 32px;
+    height: 32px;
+  }
+  
+  /* Links */
+  .ul-link {
+    font-weight: 600;
+    font-size: 14px;
+    color: var(--bg-text-color);
+  }
+  
+  /* Align center for phone and role columns */
+  .ul-align-center {
+    text-align: center;
+    justify-content: center;
+  }
+  
+  /* Typography inside cells */
+  .ul-typography {
+    font-size: 14px;
+    color: var(--bg-text-color);
+  }
+  
+  /* Role change controls */
+  .ul-role-change-section {
+    display: flex;
+    align-items: center;
+    gap: 8px;
+    font-size: 14px;
+    user-select: none;
+    color: var(--bg-text-color);
+    background-color: var(--bg-container);
+    padding: 8px 0;
+  }
+  
+  .ul-role-select-control {
+    min-width: 160px;
+    color: var(--bg-text-color);
+    background-color: var(--bg-container);
+  }
+  
+  .ul-input-label {
+    color: var(--bg-text-color) !important;
+  }
+  
+  .ul-select {
+    color: var(--bg-text-color) !important;
+    background-color: var(--bg-container) !important;
+  }
+  
+  .ul-change-role-btn {
+    text-transform: none !important;
+    color: var(--bg-text-color) !important;
+    background-color: var(--bg-container) !important;
+    border-color: var(--bg-text-color) !important;
+  }
+  
+  /* Dialog */
+  .ul-dialog .MuiDialogContent-root {
+    min-width: 320px;
+  }
+  
+  /* Responsive: horizontal scroll */
+  @media (max-width: 1030px) {
+    .ul-wrapper {
+     width: 720px;
+      overflow-x: auto;
+    }
+  }
+  
+  @media (max-width: 510px) {
+    .ul-wrapper {
+     width: 330px;
+      overflow-x: auto;
+    }
+  }
+  
+
+
+  /* ============================ */
+  /* ============================ */
+  /* ============================ */
+  /* ============================ */
+
+
+  .tm-bulk-actions {
+    display: flex;
+    gap: 12px;
+    align-items: center;
+    margin-top: 0;
+    margin-bottom: 0;
+    flex-wrap: wrap;
+  }
+  
+  .tm-bulk-actions input[type="text"],
+  .tm-bulk-actions input[type="number"] {
+    padding: 6px 12px;
+    border: 1px solid #d6e0ea;
+    border-radius: 5px;
+    width: 175px;
+    font-size: 15px;
+    background: #f7fafc;
+    transition: border-color 0.2s;
+  }
+  
+  .tm-bulk-actions input[type="text"]:focus,
+  .tm-bulk-actions input[type="number"]:focus {
+    border-color: #0275d8;
+    outline: none;
+  }
+  
+  .tm-bulk-delete-btn,
+  .tm-bulk-update-btn {
+    padding: 8px 15px;
+    border-radius: 5px;
+    font-size: 15px;
+    font-weight: 600;
+    transition: background 0.2s, box-shadow 0.2s;
+    box-shadow: 0 2px 6px rgba(0,0,0,0.05);
+    border: none;
+    outline: none;
+  }
+  
+  .tm-bulk-delete-btn {
+    background: #e74c3c;
+    color: #fff;
+    margin-right: 8px;
+  }
+  
+  .tm-bulk-delete-btn:hover {
+    background: #c0392b;
+  }
+  
+  .tm-bulk-update-btn {
+    background: #007bff;
+    color: #fff;
+  }
+  
+  .tm-bulk-update-btn:hover {
+    background: #0056b3;
+  }
+  
+  @media only screen and (max-width: 700px) {
+    .tm-bulk-actions {
+      flex-direction: column;
+      align-items: stretch;
+      gap: 8px;
+    }
+  
+    .tm-bulk-actions input[type="text"],
+    .tm-bulk-actions input[type="number"] {
+      width: 100%;
+      font-size: 14px;
+    }
+  
+    .tm-bulk-delete-btn,
+    .tm-bulk-update-btn {
+      width: 100%;
+      font-size: 14px;
+      margin-right: 0;
+    }
+  }
+  
+  /* Confirm Modals */
+  .tm-confirm-overlay {
+    position: fixed;
+    inset: 0;
+    background: rgba(0,0,0,0.12);
+    z-index: 800;
+    display: flex;
+    justify-content: center;
+    align-items: center;
+  }
+  
+  .tm-confirm-modal-card {
+    background: #fff;
+    border-radius: 9px;
+    box-shadow: 0 8px 30px rgba(44,62,80,0.12);
+    padding: 28px 34px;
+    max-width: 360px;
+    width: 100%;
+    text-align: center;
+    font-size: 16px;
+  }
+  
+  .tm-confirm-modal-btns {
+    display: flex;
+    gap: 20px;
+    justify-content: center;
+    margin-top: 24px;
+  }
+  
+  .tm-confirm-modal-card button {
+    font-weight: 600;
+    font-size: 15px;
+    padding: 9px 22px;
+    border-radius: 5px;
+    border: none;
+    cursor: pointer;
+    margin: 0 3px;
+    transition: background 0.18s;
+    outline: none;
+  }
+  
+  .tm-confirm-danger {
+    background: #e74c3c;
+    color: #fff;
+  }
+  
+  .tm-confirm-danger:hover {
+    background: #c0392b;
+  }
+  
+  .tm-confirm-cancel {
+    background: #bfc9d5;
+    color: #222;
+  }
+  
+  .tm-confirm-cancel:hover {
+    background: #95a5a6;
+  }
+  .tm-bulk-update-select {
+    background: #f5fafd;
+    border: 1px solid #e3eaf2;
+    border-radius: 5px;
+    padding: 7px 12px;
+    font-size: 15px;
+    color: #222;
+    width: 140px;
+    margin-bottom: 0;
+  }
+    
+
+
+
+  .mpc-backdrop {
+    width: 100%;
+    min-height: 100vh;
+    background: linear-gradient(120deg,#e4ecfa 0%, #fff6e7 100%);
+    display: flex;
+    justify-content: center;
+    align-items: flex-start;
+    padding: 2.5vw 0 3vw 0;
+  }
+  .mpc-card {
+    background: #fff;
+    border-radius: 20px;
+    box-shadow: 0 8px 40px rgba(80,103,212,.16);
+    padding: 2.5rem 2rem 2.2rem 2rem;
+    min-width: 350px;
+    max-width: 640px;
+    width: 100%;
+    margin: auto;
+  }
+  .mpc-profile-header {
+    display: flex;
+    align-items: center;
+    gap: 1.5rem;
+    margin-bottom: 1.7rem;
+    justify-content: flex-start;
+  }
+  .mpc-avatar {
+    width: 70px;
+    height: 70px;
+    border-radius: 50%;
+    object-fit: cover;
+    box-shadow: 0 2px 8px rgba(0,0,0,0.07);
+    border: 3px solid #f3f4fa;
+  }
+  .mpc-name {
+    font-size: 1.15rem;
+    font-weight: 700;
+  }
+  .mpc-email {
+    color: #7d8597;
+    font-size: 1rem;
+    margin-top: 3px;
+  }
+  .mpc-edit-btn {
+    margin-left: auto;
+    background: #337af4;
+    color: #fff;
+    border: none;
+    font-weight: 600;
+    padding: 0.6rem 1.3rem;
+    border-radius: 7px;
+    font-size: 1rem;
+    cursor: not-allowed;
+    display: flex; align-items: center; gap: 7px;
+    opacity: 0.6;
+  }
+  .mpc-details-grid {
+    display: grid;
+    grid-template-columns: 1fr 1fr;
+    gap: 1.25rem 2rem;
+    margin-bottom: 1rem;
+  }
+  .mpc-field-group {
+    display: flex;
+    flex-direction: column;
+    min-width: 110px;
+  }
+  .mpc-label {
+    font-weight: 500;
+    color: #4c4c4c;
+    margin-bottom: 0.45rem;
+    font-size: 0.98rem;
+  }
+  .mpc-input {
+    padding: 0.55rem 0.75rem;
+    font-size: 1.03rem;
+    border: 1.7px solid #d6d6ed;
+    border-radius: 8px;
+    background: #f5f7ff;
+    transition: border-color .2s, box-shadow .2s;
+    outline: none;
+  }
+  .mpc-input:focus {
+    border-color: #2890fa;
+    background: #e4f1fe;
+    box-shadow: 0 0 0 1px #82b8e6;
+  }
+  .mpc-actions {
+    grid-column: 1 / -1;
+    text-align: center;
+    margin-top: 5px;
+  }
+  .mpc-btn {
+    border: none;
+    outline: none;
+    background: #337af4;
+    color: #fff;
+    padding: 0.95rem 2.5rem;
+    border-radius: 9px;
+    font-weight: 700;
+    font-size: 1.07rem;
+    box-shadow: 0 1.5px 8px 0 #0159b947;
+    cursor: pointer;
+    margin-top: 10px;
+    transition: background .18s;
+  }
+  .mpc-btn:disabled {
+    background: #aacdff;
+    cursor: not-allowed;
+  }
+  .mpc-btn:not(:disabled):hover {
+    background: #2465db;
+  }
+  /* Responsive */
+  @media (max-width: 730px) {
+    .mpc-card { padding: 1.6rem 0.95rem; }
+    .mpc-details-grid { grid-template-columns: 1fr; gap: 1.05rem 0;}
+    .mpc-avatar { width: 56px; height: 56px; }
+  }
+  @media (max-width: 450px) {
+    .mpc-card { border-radius: 10px; min-width: 0; padding: .9rem .49rem;}
+    .mpc-profile-header { gap: 1rem; }
+    .mpc-btn { width: 100%; }
+  }
+  

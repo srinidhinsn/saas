@@ -115,13 +115,13 @@ const Navbar = () => {
                             {!isActive('/main/invoice') && <span className="arrow-indicator"><MdKeyboardArrowRight /></span>}
                         </li>
                     </ClickSpark> */}
-                    <ClickSpark>
+                    {/* <ClickSpark>
 
                         <li title="Report" onClick={() => go('/reports')} className={isActive('/main/reports') ? 'page-active' : ''}>
                             <FaFileInvoiceDollar /><span>Report</span>
                             {!isActive('/main/reports') && <span className="arrow-indicator"><MdKeyboardArrowRight /></span>}
                         </li>
-                    </ClickSpark>
+                    </ClickSpark> */}
                     <ClickSpark>
 
 

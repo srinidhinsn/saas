@@ -601,6 +601,12 @@ const TableManagement = () => {
     const [addRowError, setAddRowError] = useState("");
     const [modalOpen, setModalOpen] = useState(false);
     const [modalTable, setModalTable] = useState(null);
+    const [bulkDeleteSeries, setBulkDeleteSeries] = useState("");
+    const [bulkUpdateSeries, setBulkUpdateSeries] = useState("");
+    const [bulkUpdateSeating, setBulkUpdateSeating] = useState("");
+    const [showFirstDeleteConfirm, setShowFirstDeleteConfirm] = useState(false);
+    const [showSecondDeleteConfirm, setShowSecondDeleteConfirm] = useState(false);
+    const [bulkUpdateZone, setBulkUpdateZone] = useState("");
 
     const token = localStorage.getItem("access_token");
     const [tableId, setTableId] = useState(null)
@@ -779,7 +785,53 @@ const TableManagement = () => {
         const matchesStatus = !statusFilter || table.status === statusFilter;
         return matchesSearch && matchesStatus;
     });
-
+    const handleBulkDelete = async () => {
+        try {
+          const tablesToDelete = tables.filter(t => t.name.startsWith(bulkDeleteSeries));
+          for (const table of tablesToDelete) {
+            await tableServicesPort.post(`/${clientId}/tables/delete`, {
+              id: table.id,
+              client_id: clientId,
+              name: "",
+              table_type: "",
+              location_zone: "",
+            }, { headers: { Authorization: `Bearer ${token}` } });
+          }
+          fetchTables();
+        } catch (err) {
+          console.error("Bulk delete error", err);
+        } finally {
+          setShowSecondDeleteConfirm(false);
+          setBulkDeleteSeries("");
+        }
+      };
+      const handleBulkUpdate = async () => {
+        if (!bulkUpdateSeries || (!bulkUpdateSeating && !bulkUpdateZone)) {
+          alert("Enter a series and at least one change (seating/zone)");
+          return;
+        }
+        try {
+          const tablesToUpdate = tables.filter(t => t.name.startsWith(bulkUpdateSeries));
+          for (const table of tablesToUpdate) {
+            const updatedTable = {
+              ...table,
+              ...(bulkUpdateSeating && { table_type: bulkUpdateSeating.toString() }),
+              ...(bulkUpdateZone && { location_zone: bulkUpdateZone })
+            };
+            await tableServicesPort.post(`/${clientId}/tables/update`, updatedTable, {
+              headers: { Authorization: `Bearer ${token}` }
+            });
+          }
+          fetchTables();
+          setBulkUpdateSeries("");
+          setBulkUpdateSeating("");
+          setBulkUpdateZone("");
+        } catch (err) {
+          console.error("Bulk update error", err);
+        }
+      };
+      
+            
     return (
         <div className="Table-Creation-Management">
             <div className={`tm-bg ${darkMode ? 'tm-dark-mode' : ''}`}>
@@ -857,6 +909,51 @@ const TableManagement = () => {
                                     <option value="Reserved">Reserved</option>
                                 </select>
                             </div>
+                            {/* Bulk Delete Section */}
+<div className="tm-bulk-actions">
+  <input
+    type="text"
+    placeholder="Enter series"
+    value={bulkDeleteSeries}
+    onChange={e => setBulkDeleteSeries(e.target.value.toUpperCase())}
+  />
+  <button
+    className="tm-bulk-delete-btn"
+    onClick={() => setShowFirstDeleteConfirm(true)}
+  >
+    Bulk Delete
+  </button>
+  <input
+  type="text"
+  placeholder="Enter series"
+  value={bulkUpdateSeries}
+  onChange={e => setBulkUpdateSeries(e.target.value.toUpperCase())}
+/>
+<input
+  type="number"
+  placeholder="New seating"
+  value={bulkUpdateSeating}
+  onChange={e => setBulkUpdateSeating(e.target.value)}
+  min={1}
+/>
+<select
+  value={bulkUpdateZone}
+  onChange={e => setBulkUpdateZone(e.target.value)}
+  className="tm-bulk-update-select"
+>
+  <option value="">Zone (optional)</option>
+  <option value="AC">AC</option>
+  <option value="Non-AC">Non-AC</option>
+</select>
+<button
+  className="tm-bulk-update-btn"
+  onClick={handleBulkUpdate}
+>
+  Bulk Update
+</button>
+
+</div>
+
                             <button className="tm-add-table-btn" onClick={() => {
                                 setShowAddTable(true);
                                 setTableRanges([...tableRanges, { range: "", table_type: "", type: "", remark: "Vacant", is_active: false }]);
@@ -866,6 +963,35 @@ const TableManagement = () => {
                             </button>
                         </div>
                     </div>
+                    {showFirstDeleteConfirm && (
+  <div className="tm-confirm-overlay">
+    <div className="tm-confirm-modal-card">
+      <p>Are you sure you want to delete tables in series <strong>{bulkDeleteSeries}</strong>?</p>
+      <div className="tm-confirm-modal-btns">
+        <button onClick={() => {
+          setShowFirstDeleteConfirm(false);
+          setShowSecondDeleteConfirm(true);
+        }}>
+          Yes, Continue
+        </button>
+        <button onClick={() => setShowFirstDeleteConfirm(false)}>Cancel</button>
+      </div>
+    </div>
+  </div>
+)}
+
+{showSecondDeleteConfirm && (
+  <div className="tm-confirm-overlay">
+    <div className="tm-confirm-modal-card">
+      <p>This action is irreversible. Confirm to delete all tables in series <strong>{bulkDeleteSeries}</strong>.</p>
+      <div className="tm-confirm-modal-btns">
+        <button onClick={handleBulkDelete}>Confirm Delete</button>
+        <button onClick={() => setShowSecondDeleteConfirm(false)}>Cancel</button>
+      </div>
+    </div>
+  </div>
+)}
+
                     {/* Table Grid */}
                     <div className="tm-table-grid-card">
                         <div className="tm-table-grid">
