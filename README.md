@@ -40,6 +40,7 @@ Dependencies installation : npm install react-router-dom
                             npm install jspdf jspdf-autotable
                             npm install express
                             npm install path
+                            npm install motion
 
 
 
