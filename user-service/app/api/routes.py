@@ -14,17 +14,33 @@ from utils.create_notification import  get_template_body, render_template
 import random
 from datetime import datetime, timedelta
 from app.services.add_users import create_user_and_person
-from jose import jwt
+from jose import jwt,JWTError
+from utils.auth import oauth2_scheme
 
 router = APIRouter()
-
 @router.post("/add")
-async def add_user(client_id: str, userReq: UserModel, request: Request, db: Session = Depends(get_db)):
-    return await create_user_and_person(client_id, userReq, db)
+async def add_user(client_id: str,userReq: UserModel,token: str = Depends(oauth2_scheme),db: Session = Depends(get_db)):
+    try:
+        payload = jwt.decode(token, SECRET_KEY, algorithms=[ALGORITHM])
+        realm = payload.get("realm")
+        if not realm:
+            raise HTTPException(status_code=400, detail="Realm not found in token")
+    except JWTError:
+        raise HTTPException(status_code=401, detail="Invalid token")
+    return await create_user_and_person(client_id, userReq, db, token_realm=realm)
+
 
 @router.post("/register")
-async def register_user(client_id: str, userReq: UserModel, request: Request, db: Session = Depends(get_db)):
-    return await create_user_and_person(client_id, userReq, db)
+async def register_user(client_id: str,userReq: UserModel,token: str = Depends(oauth2_scheme),db: Session = Depends(get_db)):
+    try:
+        payload = jwt.decode(token, SECRET_KEY, algorithms=[ALGORITHM])
+        realm = payload.get("realm")
+        if not realm:
+            raise HTTPException(status_code=400, detail="Realm not found in token")
+    except JWTError:
+        raise HTTPException(status_code=401, detail="Invalid token")
+
+    return await create_user_and_person(client_id, userReq, db, token_realm=realm)
 
 @router.post("/login")
 async def login_user(client_id: str, userReq: LoginRequest, db: Session = Depends(get_db)):
@@ -93,21 +109,49 @@ async def forgot_password(client_id: str, req_data: ResetpasswordRequest, db: Se
     if not person or not person.email:
         raise HTTPException(status_code=404, detail="Email not found")
 
-    otp = str(random.randint(100000, 999999))
-    otp_store[userModel.id] = {"otp": otp, "expires": datetime.utcnow() + timedelta(minutes=10)}
+    # If OTP not provided, generate and send OTP
+    if not req_data.otp and not req_data.new_password:
+        otp = str(random.randint(100000, 999999))
+        otp_store[userModel.id] = {"otp": otp, "expires": datetime.utcnow() + timedelta(minutes=10)}
 
-    metadata = {"username": userModel.username, "clientId": client_id, "otp": otp}
-    template_body = get_template_body(db, client_id, "forgot_password", "template") \
-                    or "Dear {username}, your OTP for resetting password in {clientId} is {otp}."
+        metadata = {"username": userModel.username, "clientId": client_id, "otp": otp}
+        template_body = get_template_body(db, client_id, "forgot_password", "template") \
+                        or "Dear {username}, your OTP for resetting password in {clientId} is {otp}."
 
-    notification_text = render_template(template_body, metadata)
-    if not otpEmailService(person.email, notification_text):
-        raise HTTPException(status_code=500, detail="Failed to send OTP")
+        notification_text = render_template(template_body, metadata)
+        if not otpEmailService(person.email, notification_text):
+            raise HTTPException(status_code=500, detail="Failed to send OTP")
 
-    return ResponseModel(data={"message": "OTP sent successfully"})
+        return ResponseModel(data={"message": "OTP sent successfully"})
+
+    # If OTP and new_password provided, verify OTP and reset password
+    if req_data.otp and req_data.new_password:
+        otp_data = otp_store.get(userModel.id)
+        if not otp_data:
+            raise HTTPException(status_code=400, detail="OTP not requested")
+        if otp_data["otp"] != req_data.otp:
+            raise HTTPException(status_code=400, detail="Invalid OTP")
+        if datetime.utcnow() > otp_data["expires"]:
+            raise HTTPException(status_code=400, detail="OTP expired")
+        if req_data.new_password != req_data.confirm_password:
+            raise HTTPException(status_code=400, detail="Passwords do not match")
+
+        user.hashed_password = hash_password(req_data.new_password)
+        db.commit()
+        otp_store.pop(userModel.id, None)
+
+        metadata = {"username": userModel.username, "clientId": client_id}
+        template_body = get_template_body(db, client_id, "reset_password_success", "template") \
+                        or "Dear {username}, your password for {clientId} has been reset successfully."
+        otpEmailService(person.email, render_template(template_body, metadata))
+
+        return ResponseModel(data={"message": "Password reset successfully"})
+
+    raise HTTPException(status_code=400, detail="Invalid request data")
+
 # ================== RESET PASSWORD ==================
 @router.post("/reset-password")
-async def reset_password(client_id: str, req_data: ResetpasswordRequest, db: Session = Depends(get_db)):
+async def reset_password(client_id: str, req_data: ResetpasswordRequest, context: SaasContext = Depends(verify_token), db: Session = Depends(get_db)):
     user = db.query(User).filter(
         and_(User.username == req_data.username, User.client_id == client_id)
     ).first()
@@ -131,7 +175,7 @@ async def reset_password(client_id: str, req_data: ResetpasswordRequest, db: Ses
 
         otpEmailService(person.email, render_template(template_body, metadata))
 
-        return ResponseModel(data={"message": "OTP sent successfully"})
+        return ResponseModel( screen_id=context.screen_id,data={"message": "OTP sent successfully"})
 
     # OTP verification
     if req_data.otp:
@@ -164,7 +208,8 @@ async def reset_password(client_id: str, req_data: ResetpasswordRequest, db: Ses
                             or "Dear {username}, your password for {clientId} has been reset successfully."
             otpEmailService(person.email, render_template(template_body, metadata))
 
-    return ResponseModel(data={"message": "Password reset successfully"})
+    return ResponseModel( screen_id=context.screen_id,data={"message": "Password reset successfully"})
+
 # ================== PERSON DETAILS ==================
 @router.post("/person-details")
 async def update_person_details(
@@ -258,7 +303,7 @@ def get_notifications(
     )
 
 @router.get("/persons")
-async def get_all_persons(client_id: str, db: Session = Depends(get_db)):
+async def get_all_persons(client_id: str, context: SaasContext = Depends(verify_token), db: Session = Depends(get_db)):
     results = (
         db.query(Person, User.username, User.roles)
         .join(User, Person.id == User.id)
@@ -276,7 +321,7 @@ async def get_all_persons(client_id: str, db: Session = Depends(get_db)):
     ]
 
     return ResponseModel(
-        screen_id="persons_list",
+        screen_id=context.screen_id,
         data={"persons": persons}
     )
 
