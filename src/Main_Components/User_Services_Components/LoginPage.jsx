@@ -1,10 +1,10 @@
 import React, { useState } from "react";
 import { useNavigate, useParams } from "react-router-dom";
-import { jwtDecode } from "jwt-decode";
 import { FaUser, FaLock } from "react-icons/fa";
 import { toast } from "react-toastify";
 import "react-toastify/dist/ReactToastify.css";
 import userServicesPort from '../../Backend_Port_Files/UserServices'
+import CircularText from '../../Util_Components/CircularText'; 
 
 export default function Login() {
     const navigate = useNavigate();
@@ -33,63 +33,14 @@ export default function Login() {
             );
 
             const token = res.data.data.access_token;
-            const decoded = jwtDecode(token);
-
             localStorage.setItem("access_token", token);
-            // localStorage.setItem("clientId", decoded.client_id);
-            // localStorage.setItem("username", decoded.username);
-            // localStorage.setItem("grants", JSON.stringify(decoded.grants || []));
-
             toast.success("Login successful");
-
             navigate(`/saas/${clientId}/main`);
         } catch (err) {
             console.error("Login failed:", err);
-
-            let msg = "An unexpected error occurred";
-            const status = err?.response?.status;
-            const detail = err?.response?.data?.detail;
-
-            if (status === 401) {
-                msg = detail || "Unauthorized: Invalid credentials";
-            } else if (status === 404) {
-                msg = detail || "Not Found: API endpoint or client not found";
-            } else if (status === 500) {
-                msg = "Internal Server Error. Please try again later.";
-            } else if (detail && typeof detail === "string") {
-                msg = detail;
-            }
-
+            let msg = err?.response?.data?.detail || "Login failed";
             setError(msg);
             toast.error(msg);
-        }
-        finally {
-            setLoading(false);
-        }
-    };
-    const handleLogins = async (e) => {
-        e.preventDefault();
-        setError("");
-        setLoading(true);
-
-        try {
-            // POST credentials; backend sets cookie automatically
-            await userServicesPort.post(`/${clientId}/users/login`, {
-                username: form.username,
-                password: form.password,
-            });
-
-            // Call backend to get user info
-
-            // Assume profileRes.data has user info (username, roles, etc.)
-
-            // Set user context/state here instead of reading token
-            // For example: setUser(profileRes.data);
-
-            toast.success("Login successful");
-            navigate(`/saas/${clientId}/main`);
-        } catch (err) {
-            // Handle errors as before
         } finally {
             setLoading(false);
         }
@@ -100,6 +51,13 @@ export default function Login() {
             <div className="login-card">
                 <div className="avatar-circle">
                     <FaUser className="avatar-icon" />
+                    {/* Circular spinning text around avatar */}
+                    <CircularText
+  text={`${clientId.split('').join('★')} ♡ `}
+  spinDuration={20}
+  className="circular-clientId"
+/>
+
                 </div>
 
                 <form onSubmit={handleLogin}>
@@ -126,7 +84,8 @@ export default function Login() {
                             required
                         />
                     </div>
-                    <div style={{ display: 'flex', justifyContent: 'space-between', }}>
+
+                    <div style={{ display: 'flex', justifyContent: 'space-between' }}>
                         <div className="options-row login-link">
                             <span onClick={() => navigate(`/saas/${clientId}/reset`)}>Reset Password?</span>
                         </div>
@@ -135,16 +94,9 @@ export default function Login() {
                         </div>
                     </div>
 
-                    {/* {error && <p className="error">{error}</p>} */}
-
                     <button type="submit" className="login-button" disabled={loading}>
                         {loading ? "Logging in..." : "LOGIN"}
                     </button>
-
-                    <p className="login-link">
-                        Don’t have an account?{" "}
-                        <span onClick={() => navigate(`/saas/${clientId}/register`)}>Register here</span>
-                    </p>
                 </form>
             </div>
         </div>

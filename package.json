@@ -1,5 +1,5 @@
 {
-  "name": "saas-app",
+  "name": "saas-app-qa",
   "private": true,
   "version": "0.0.0",
   "type": "module",
@@ -36,6 +36,8 @@
     "react-router-dom": "^7.9.3",
     "react-toastify": "^11.0.5",
     "recharts": "^3.2.1",
+    "express": "^5.1.0",
+    "path": "^0.12.7",
     "xlsx": "^0.18.5"
   },
   "devDependencies": {
