@@ -7,7 +7,6 @@ import { useParams } from "react-router-dom";
 import { toast } from "react-toastify";
 import jsPDF from "jspdf";
 
-
 export default function BillingPage() {
   const { clientId } = useParams();
   const token = localStorage.getItem("access_token");

@@ -94,20 +94,20 @@ function InventoryItemList({ selectedCategory }) {
             });
     }, [clientId]);
 
-    useEffect(() => {
-        if (!clientId || !token) return;
+    const fetchInventoryItems = async () => {
+        try {
+            const res = await inventoryServicesPort.get(`/${clientId}/inventory/read`, { headers });
+            setItems(res.data.data || []);
+            setOriginalItems(res.data.data || []);
+        } catch (err) {
+            console.error("Failed to load inventory:", err);
+        }
+    };
 
-        inventoryServicesPort
-            .get(`/${clientId}/inventory/read`, { headers })
-            .then((res) => {
-                console.log("fetched items  :", res.data.data)
-                setItems(res.data.data || []);
-                setOriginalItems(res.data.data || []);
-            })
-            .catch((err) => {
-                console.error("Failed to load inventory:", err);
-            });
+    useEffect(() => {
+        fetchInventoryItems();
     }, [clientId, token]);
+
 
 
 
@@ -158,21 +158,14 @@ function InventoryItemList({ selectedCategory }) {
                     : [],
         };
 
-        // ✅ auto-generate slug from full ancestry
         updatedItem.slug = buildCategoryPath(updatedItem.category_id, updatedItem.name);
 
         try {
-            const res = await inventoryServicesPort.post(
-                `/${clientId}/inventory/update`,
-                updatedItem,
-                { headers }
-            );
+            await inventoryServicesPort.post(`/${clientId}/inventory/update`, updatedItem, { headers });
 
-            setItems(prev =>
-                prev.map(i =>
-                    i.inventory_id === updatedItem.inventory_id ? res.data.data : i
-                )
-            );
+            // ✅ Only refresh this list — not the full app
+            await fetchInventoryItems();
+
             setShowEditModal(false);
             setEditingItem(null);
         } catch (err) {
@@ -180,6 +173,7 @@ function InventoryItemList({ selectedCategory }) {
             alert("Edit failed.");
         }
     };
+
 
 
     const handleDelete = async (id) => {
@@ -470,7 +464,7 @@ function InventoryItemList({ selectedCategory }) {
 
             {/* Menu Grid */}
             <div className="menu-grid">
-            {items.length === 0 ? (
+                {items.length === 0 ? (
                     <p className="no-items">No inventory found.</p>
                 ) : (
                     items.map((item) => {
@@ -491,7 +485,7 @@ function InventoryItemList({ selectedCategory }) {
                     })
 
                 )}
-                
+
             </div>
 
 

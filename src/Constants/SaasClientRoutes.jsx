@@ -1,41 +1,62 @@
 import React, { useEffect } from "react";
 import { Routes, Route, useParams, Navigate, useNavigate } from "react-router-dom";
 import Navbar from "./Navbar";
+import HeaderBar from "./HeaderPage";
+import AuthModal from "./AuthModel";
+import Add_user from "../Main_Components/Add_Users/Add_user";
+import DashBoardPage from "./DashBoardPage";
 import MenuManager from "../Main_Components/Inventory_Services_Components/MenuManager";
 import ViewTables from "../Main_Components/Table_Service_Components/Table_Inventory_Order";
 import TableManagement from "../Main_Components/Table_Service_Components/TableManagement";
 import OrderForm from "../Main_Components/Order_Service_Components/OrderForm";
 import OrdersVisiblePage from "../Main_Components/Order_Service_Components/OrdersVisiblePage";
-import DashBoardPage from "./DashBoardPage";
 import Invoice_Page from "../Main_Components/Invoice_Services_Components/Invoice_Page";
 import KitchenDisplay from "../Main_Components/Order_Service_Components/KDS_Component/KitchenDisplay";
-import Add_user from "../Main_Components/Add_Users/Add_user";
-import HeaderBar from "./HeaderPage";
 import ReportService from "../Main_Components/Report_Service_Components/ReportService";
 import Notifications from "./Notifications";
 import PersonForm from "../Util_Components/PersonForm";
 import NotificationTable from "../Main_Components/Notification_Services_Components/All_NotificationsPage";
 import PopupNotification from "../Main_Components/Notification_Services_Components/Popup_Notifications";
-import BillingPage from "../Main_Components/Invoice_Services_Components/BillingUI";
+import RoleConfig from '../Main_Components/Role_Configuration/RoleConfig'
+import BillingPage from '../Main_Components/Invoice_Services_Components/BillingUI'
 
+const AccessDenied = ({ onAuthClick }) => (
+  <div style={{ textAlign: "center", padding: "2rem" }}>
+    <h2>🚫 Access Denied</h2>
+    <p>You do not have permission to view this page.</p>
+    <button onClick={onAuthClick} style={{ marginTop: "1rem", padding: "0.5rem 1rem" }}>
+      Request Admin Access
+    </button>
+  </div>
+);
 
 const SaasClientRoutes = ({
-    selectedTableId,
-    setSelectedTableId,
-    latestOrder,
-    setLatestOrder,
-    tables,
-    setTables,
-    hideNavbar
+  selectedTableId,
+  setSelectedTableId,
+  latestOrder,
+  setLatestOrder,
+  hideNavbar,
 }) => {
-    const { clientId } = useParams();
-    const navigate = useNavigate();
+  const { clientId } = useParams();
+  const location = useLocation();
+  const token = getValidToken();
 
-    const token = localStorage.getItem("access_token");
+  const [accessDenied, setAccessDenied] = useState(false);
+  const [authModalOpen, setAuthModalOpen] = useState(false);
+  const [grants, setGrants] = useState([]);
+  const [userId, setUserId] = useState(null);
 
-    // 🔒 Redirect to login if not authenticated
-    if (!token) {
-        return <Navigate to={`/saas/${clientId}/login`} />;
+  // Redirect to login if no token
+  if (!token) return <Navigate to={`/saas/${clientId}/login`} />;
+
+  // Decode JWT to get grants and userId
+  useEffect(() => {
+    try {
+      const decoded = jwtDecode(token);
+      if (decoded.grants) setGrants(decoded.grants);
+      if (decoded.user_id) setUserId(decoded.user_id);
+    } catch (err) {
+      console.error("❌ Token decode failed", err);
     }
 
     // ✅ Sync clientId and token to localStorage
