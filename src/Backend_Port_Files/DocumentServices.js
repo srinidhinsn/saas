@@ -1,7 +1,7 @@
 import axios from 'axios';
 
 const documentServicesPort = axios.create({
-    baseURL: 'http://localhost:8004/saas',
+    baseURL: 'https://document-service-qa-582942992169.asia-south2.run.app/saas',
 });
 
 export default documentServicesPort;
