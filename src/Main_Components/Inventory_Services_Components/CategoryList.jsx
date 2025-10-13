@@ -3,6 +3,7 @@ import { FaEdit, FaTrash } from "react-icons/fa";
 import { jwtDecode } from "jwt-decode";
 import { useParams } from "react-router-dom";
 import inventoryServicesPort from '../../Backend_Port_Files/InventoryServices'
+import { v4 as uuidv4 } from "uuid";
 
 
 function CategoryList({ onCategorySelect }) {
@@ -35,7 +36,7 @@ function CategoryList({ onCategorySelect }) {
         if (!token || !clientId) return;
 
         inventoryServicesPort
-            .get(`/${clientId}/inventory/read_category?category_id=dietery`, {
+            .get(`/${clientId}/menu/read_category?category_id=dietery`, {
                 headers: {
                     Authorization: `Bearer ${token}`,
                 },
@@ -210,24 +211,39 @@ function CategoryList({ onCategorySelect }) {
     const refreshCategoriesAndParentMap = async () => {
         try {
             const response = await inventoryServicesPort.get(
-                `/${clientId}/inventory/read_category`,
+                `/${clientId}/menu/read_category?category_id=dietery`,
                 { headers: { Authorization: `Bearer ${token}` } }
             );
 
             const rawCategories = response.data.data;
+            const tempParentMap = {};
+            const traverseAndBuildMap = (cats, parentId = null) => {
+                for (const cat of cats) {
+                    if (parentId) {
+                        tempParentMap[cat.id] = parentId;
+                    }
+                    if (cat.subCategories && cat.subCategories.length > 0) {
+                        traverseAndBuildMap(cat.subCategories, cat.id);
+                    }
+                }
+            };
 
-            const subCategoryIds = new Set();
-            rawCategories.forEach(cat => {
-                cat.subCategories?.forEach(sub => subCategoryIds.add(sub.id));
-            });
-            const topLevelCategories = rawCategories.filter(cat => !subCategoryIds.has(cat.id));
+            traverseAndBuildMap(rawCategories);
+            setParentMap(tempParentMap);
 
-            setCategories([{ id: "all", name: "All" }, ...topLevelCategories]);
-            setParentMap(buildParentMap(rawCategories));
+            const subCategoryIds = new Set(Object.keys(tempParentMap));
+            const topLevelCategories = rawCategories.filter(
+                (cat) => !subCategoryIds.has(cat.id)
+            );
+
+            const allCategory = { id: "all", name: "All" };
+            setCategories([allCategory, ...topLevelCategories]);
+            setActiveCategory("all");
         } catch (error) {
             console.error("Error refreshing categories:", error);
         }
     };
+
 
 
 
@@ -251,7 +267,7 @@ function CategoryList({ onCategorySelect }) {
 
 
         if (newSubcategoryName.trim()) {
-            const subId = `sub_${Date.now()}`;
+            const subId = uuidv4();
             const tempParentMap = { [subId]: newId.trim() };
 
             const newSubPayload = {
@@ -267,7 +283,7 @@ function CategoryList({ onCategorySelect }) {
 
             try {
                 const subRes = await inventoryServicesPort.post(
-                    `/${clientId}/inventory/create_category`,
+                    `/${clientId}/menu/create_category`,
                     newSubPayload,
                     { headers: { Authorization: `Bearer ${token}` } }
                 );
@@ -297,7 +313,7 @@ function CategoryList({ onCategorySelect }) {
 
         try {
             await inventoryServicesPort.post(
-                `/${clientId}/inventory/create_category`,
+                `/${clientId}/menu/create_category`,
                 mainPayload,
                 { headers: { Authorization: `Bearer ${token}` } }
             );
@@ -348,7 +364,7 @@ function CategoryList({ onCategorySelect }) {
         }
 
         if (editNewSubcategoryName.trim()) {
-            const newSubId = `subcat_${Date.now()}`;
+            const newSubId = uuidv4();
             const tempParentMap = { [newSubId]: editingId };
 
             const newSubPayload = {
@@ -364,7 +380,7 @@ function CategoryList({ onCategorySelect }) {
 
             try {
                 const subRes = await inventoryServicesPort.post(
-                    `/${clientId}/inventory/create_category`,
+                    `/${clientId}/menu/create_category`,
                     newSubPayload,
                     { headers: { Authorization: `Bearer ${token}` } }
                 );
@@ -393,7 +409,7 @@ function CategoryList({ onCategorySelect }) {
 
         try {
             await inventoryServicesPort.post(
-                `/${clientId}/inventory/update_category`,
+                `/${clientId}/menu/update_category`,
                 payload,
                 {
                     headers: {
@@ -424,7 +440,7 @@ function CategoryList({ onCategorySelect }) {
 
         try {
             const res = await inventoryServicesPort.post(
-                `/${clientId}/inventory/delete_category`,
+                `/${clientId}/menu/delete_category`,
                 { id: category.id },
                 {
                     headers: {
@@ -435,7 +451,7 @@ function CategoryList({ onCategorySelect }) {
             );
 
             const response = await inventoryServicesPort.get(
-                `/${clientId}/inventory/read_category`,
+                `/${clientId}/menu/read_category?category_id=dietery`,
                 {
                     headers: {
                         Authorization: `Bearer ${token}`,
