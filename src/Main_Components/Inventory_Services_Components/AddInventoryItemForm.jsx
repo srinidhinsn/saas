@@ -84,7 +84,7 @@ function AddInventoryItemForm({ onItemCreated, selectedCategory }) {
   useEffect(() => {
     if (!token || !clientId) return;
 
-    inventoryServicesPort.get(`/${clientId}/inventory/read_category?category_id=dietery`, {
+    inventoryServicesPort.get(`/${clientId}/menu/read_category?category_id=dietery`, {
       headers: { Authorization: `Bearer ${token}` },
     })
       .then((res) => {
@@ -94,7 +94,7 @@ function AddInventoryItemForm({ onItemCreated, selectedCategory }) {
       })
       .catch((err) => console.error("Error fetching categories:", err));
 
-    inventoryServicesPort.get(`/${clientId}/inventory/read`, {
+    inventoryServicesPort.get(`/${clientId}/menu/read`, {
       headers: { Authorization: `Bearer ${token}` },
     })
       .then((res) => setLineItems(res.data.data || []))
@@ -162,7 +162,7 @@ function AddInventoryItemForm({ onItemCreated, selectedCategory }) {
           };
 
           const response = await inventoryServicesPort.post(
-            `/${clientId}/inventory/create`,
+            `/${clientId}/menu/create`,
             payload,
             { headers: { Authorization: `Bearer ${token}` } }
           );
@@ -241,7 +241,7 @@ function AddInventoryItemForm({ onItemCreated, selectedCategory }) {
               type="text"
               value={item.inventory_id || ""}
               onChange={(e) => handleChange(index, "inventory_id", e.target.value)}
-              placeholder="Inventory ID"
+              placeholder="Menu ID"
               className="form-input short"
             />
 

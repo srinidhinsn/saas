@@ -6,7 +6,6 @@ import inventoryServicesPort from "../../Backend_Port_Files/InventoryServices";
 const AddUserForm = ({ onCancel, onSave }) => {
   const { clientId } = useParams();
   const token = localStorage.getItem("access_token");
-
   const [formData, setFormData] = useState({
     username: "",
     email: "",
@@ -23,8 +22,9 @@ const AddUserForm = ({ onCancel, onSave }) => {
   useEffect(() => {
     const fetchRoles = async () => {
       try {
-        const res = await  inventoryServicesPort
-        .get(`/${clientId}/inventory/read_category?category_id=roles`, {
+        const res = await inventoryServicesPort.get(
+          `/${clientId}/inventory/read_category?category_id=roles`,
+          {
             headers: { Authorization: `Bearer ${token}` },
           }
         );
@@ -59,7 +59,9 @@ const AddUserForm = ({ onCancel, onSave }) => {
       dob: formData.dob || null,
       phone: formData.phone || null,
       password: formData.password,
+      roles: [formData.role],           
     };
+    
 
     try {
       const res = await userServicesPort.post(
@@ -197,7 +199,6 @@ const AddUserForm = ({ onCancel, onSave }) => {
               )}
             </select>
           </div>
-
           {/* Buttons */}
           <div className="form-buttons">
             <button type="submit" className="button button-primary">

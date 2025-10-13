@@ -67,7 +67,7 @@ function InventoryItemList({ selectedCategory }) {
         if (!token || !clientId) return;
 
         // Fetch nested category tree from backend
-        inventoryServicesPort.get(`/${clientId}/inventory/read_category?category_id=dietery`, {
+        inventoryServicesPort.get(`/${clientId}/menu/read_category?category_id=dietery`, {
             headers: { Authorization: `Bearer ${token}` },
         })
             .then((res) => {
@@ -83,7 +83,7 @@ function InventoryItemList({ selectedCategory }) {
     useEffect(() => {
         if (!token || !clientId) return;
 
-        inventoryServicesPort.get(`/${clientId}/inventory/read_category`, {
+        inventoryServicesPort.get(`/${clientId}/menu/read_category`, {
             headers: { Authorization: `Bearer ${token}` },
         })
             .then((res) => {
@@ -96,7 +96,7 @@ function InventoryItemList({ selectedCategory }) {
 
     const fetchInventoryItems = async () => {
         try {
-            const res = await inventoryServicesPort.get(`/${clientId}/inventory/read`, { headers });
+            const res = await inventoryServicesPort.get(`/${clientId}/menu/read`, { headers });
             setItems(res.data.data || []);
             setOriginalItems(res.data.data || []);
         } catch (err) {
@@ -151,6 +151,7 @@ function InventoryItemList({ selectedCategory }) {
         const updatedItem = {
             ...editingItem,
             client_id: clientId,
+            id: editingItem.id,
             line_item_id: Array.isArray(editingItem.line_item_id)
                 ? editingItem.line_item_id
                 : typeof editingItem.line_item_id === "string"
@@ -161,7 +162,7 @@ function InventoryItemList({ selectedCategory }) {
         updatedItem.slug = buildCategoryPath(updatedItem.category_id, updatedItem.name);
 
         try {
-            await inventoryServicesPort.post(`/${clientId}/inventory/update`, updatedItem, { headers });
+            await inventoryServicesPort.post(`/${clientId}/menu/update`, updatedItem, { headers });
 
             // ✅ Only refresh this list — not the full app
             await fetchInventoryItems();
@@ -180,7 +181,7 @@ function InventoryItemList({ selectedCategory }) {
         try {
             // 1. Delete the item itself in backend
             await inventoryServicesPort.post(
-                `/${clientId}/inventory/delete`,
+                `/${clientId}/menu/delete`,
                 { id },
                 { headers }
             );
@@ -193,7 +194,7 @@ function InventoryItemList({ selectedCategory }) {
 
                     // Update in backend
                     inventoryServicesPort.post(
-                        `/${clientId}/inventory/update`,
+                        `/${clientId}/menu/update`,
                         updatedItem,
                         { headers }
                     ).catch(err => {
@@ -376,7 +377,7 @@ function InventoryItemList({ selectedCategory }) {
 
                 //  Delete all existing items
                 await inventoryServicesPort.delete(
-                    `/${clientId}/inventory/delete_all`,
+                    `/${clientId}/menu/delete_all`,
                     { headers: { Authorization: `Bearer ${token}` } }
                 );
 
@@ -408,7 +409,7 @@ function InventoryItemList({ selectedCategory }) {
                     };
 
                     await inventoryServicesPort.post(
-                        `/${clientId}/inventory/create`,
+                        `/${clientId}/menu/create`,
                         newItem,
                         { headers: { Authorization: `Bearer ${token}` } }
                     );
@@ -472,7 +473,7 @@ function InventoryItemList({ selectedCategory }) {
                         const finalPrice = (item.unit_price || 0) + totalPrice;
 
                         return (
-                            <div className="menu-card" key={item.inventory_id}>
+                            <div className="menu-card" key={item.id}>
                                 <h4>{item.name}</h4>
                                 <h6 className="line-items">Line Items: {names}</h6>
                                 <p className="price">₹{finalPrice}</p>
@@ -496,7 +497,7 @@ function InventoryItemList({ selectedCategory }) {
                     }
                 }}>
                     <div className="menu-modal-content">
-                        <h3>Add New Inventory Item</h3>
+                        <h3>Add New Menu Item</h3>
                         <AddMenuForm
                             clientId={clientId}
                             onItemCreated={handleItemCreated}
@@ -511,7 +512,7 @@ function InventoryItemList({ selectedCategory }) {
                     if (e.target.classList.contains("modal-overlay")) setShowEditModal(false);
                 }}>
                     <div className="menu-modal-content">
-                        <h3>Edit Inventory Item</h3>
+                        <h3>Edit Menu Item</h3>
                         <form onSubmit={(e) => {
                             e.preventDefault();
                             handleEditSave();
@@ -523,7 +524,7 @@ function InventoryItemList({ selectedCategory }) {
                                         type="text"
                                         value={editingItem.inventory_id}
                                         onChange={(e) => setEditingItem({ ...editingItem, inventory_id: e.target.value })}
-                                        placeholder="Inventory ID"
+                                        placeholder="menu ID"
                                         className="form-input short"
                                         readOnly
                                     />
