@@ -1,6 +1,5 @@
 import React, { useEffect } from "react";
 import { Routes, Route, useParams, Navigate, useNavigate } from "react-router-dom";
-
 import Navbar from "./Navbar";
 import MenuManager from "../Main_Components/Inventory_Services_Components/MenuManager";
 import ViewTables from "../Main_Components/Table_Service_Components/Table_Inventory_Order";
@@ -13,9 +12,7 @@ import KitchenDisplay from "../Main_Components/Order_Service_Components/KDS_Comp
 import Add_user from "../Main_Components/Add_Users/Add_user";
 import HeaderBar from "./HeaderPage";
 import ReportService from "../Main_Components/Report_Service_Components/ReportService";
-// import OrderSummary from "../Main_Components/Order_Service_Components/OrderSummary";
 import Notifications from "./Notifications";
-import ResetPassword from "../Main_Components/User_Services_Components/ResetPassword";
 import PersonForm from "../Util_Components/PersonForm";
 import NotificationTable from "../Main_Components/Notification_Services_Components/All_NotificationsPage";
 import PopupNotification from "../Main_Components/Notification_Services_Components/Popup_Notifications";
@@ -56,31 +53,11 @@ const SaasClientRoutes = ({
             window.location.href = `/saas/${clientId}/login`;
         }
     }, [clientId]);
-
-    // ✅ Load tables only for this client
-    // const fetchTables = async () => {
-    //     try {
-    //         const token = localStorage.getItem("access_token");
-    //         const res = await axios.get(`http://localhost:8000/saas/${clientId}/tables/read`, {
-    //             headers: {
-    //                 Authorization: `Bearer ${token}`
-    //             }
-    //         });
-    //         setTables(res.data);
-    //     } catch (error) {
-    //         console.error("❌ Failed to fetch tables:", error);
-    //     }
-    // };
-
     useEffect(() => {
-        // if (clientId) {
-        //     fetchTables();
-        // }
         if (!clientId) {
             console.error("❌ Missing client ID. Cannot fetch tables.");
             return;
         }
-
     }, [clientId]);
 
     return (

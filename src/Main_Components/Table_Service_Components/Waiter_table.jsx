@@ -1,8 +1,6 @@
-
 import React, { useEffect, useState } from "react";
-import { FiSun, FiMoon } from "react-icons/fi";
 import { useTheme } from "../../ThemeChangerComponent/ThemeProvider";
-import { FaEdit, FaTrash, FaCheck, FaTimes, FaSearch, FaUsers, FaClock, FaChartLine, FaPlus, FaUser, FaUtensils } from "react-icons/fa";
+import { FaUsers, FaClock, FaChartLine} from "react-icons/fa";
 import tableServicesPort from "../../Backend_Port_Files/TableServices";
 import { useParams } from 'react-router-dom';
 
