@@ -9,13 +9,14 @@ async def create_user_and_person(client_id: str, userReq: UserModel, db: Session
     if not userReq.username or not userReq.password:
         raise HTTPException(status_code=400, detail="Username and password are required.")
 
-    realm_grant = token_realm
+    existing_user = db.query(User).filter(User.username == userReq.username, User.client_id == client_id).first()
+    if existing_user:
+        raise HTTPException(status_code=400, detail="Username already exists for this client.")
 
-    # Preparing roles and grants
     roles = userReq.roles or []
     grants = userReq.grants or []
-    if realm_grant and realm_grant not in grants:
-        grants.append(realm_grant)
+    if token_realm and token_realm not in grants:
+        grants.append(token_realm)
 
     hashed_pw = hash_password(userReq.password)
 
@@ -42,7 +43,7 @@ async def create_user_and_person(client_id: str, userReq: UserModel, db: Session
         )
         db.add(user)
 
-        db.commit() 
+        db.commit()
         db.refresh(user)
 
         return ResponseModel(

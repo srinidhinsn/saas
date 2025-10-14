@@ -14,33 +14,20 @@ from utils.create_notification import  get_template_body, render_template
 import random
 from datetime import datetime, timedelta
 from app.services.add_users import create_user_and_person
-from jose import jwt,JWTError
-from utils.auth import oauth2_scheme
+from jose import jwt
 
 router = APIRouter()
+# ================== ADD USER ==================
 @router.post("/add")
-async def add_user(client_id: str,userReq: UserModel,token: str = Depends(oauth2_scheme),db: Session = Depends(get_db)):
-    try:
-        payload = jwt.decode(token, SECRET_KEY, algorithms=[ALGORITHM])
-        realm = payload.get("realm")
-        if not realm:
-            raise HTTPException(status_code=400, detail="Realm not found in token")
-    except JWTError:
-        raise HTTPException(status_code=401, detail="Invalid token")
-    return await create_user_and_person(client_id, userReq, db, token_realm=realm)
+async def add_user(client_id: str, userReq: UserModel,context: SaasContext = Depends(verify_token),db: Session = Depends(get_db)):
+    token_realm = context.grants[0] if context.grants else None
+    return await create_user_and_person(client_id=client_id,userReq=userReq, db=db,token_realm=token_realm)
 
-
+# ================== REGISTER USER ==================
 @router.post("/register")
-async def register_user(client_id: str,userReq: UserModel,token: str = Depends(oauth2_scheme),db: Session = Depends(get_db)):
-    try:
-        payload = jwt.decode(token, SECRET_KEY, algorithms=[ALGORITHM])
-        realm = payload.get("realm")
-        if not realm:
-            raise HTTPException(status_code=400, detail="Realm not found in token")
-    except JWTError:
-        raise HTTPException(status_code=401, detail="Invalid token")
-
-    return await create_user_and_person(client_id, userReq, db, token_realm=realm)
+async def register_user(client_id: str, userReq: UserModel,context: SaasContext = Depends(verify_token),db: Session = Depends(get_db)):
+    token_realm = context.grants[0] if context.grants else None
+    return await create_user_and_person(client_id=client_id,userReq=userReq,db=db,token_realm=token_realm)
 
 @router.post("/login")
 async def login_user(client_id: str, userReq: LoginRequest, db: Session = Depends(get_db)):
@@ -145,7 +132,7 @@ async def forgot_password(client_id: str, req_data: ResetpasswordRequest, db: Se
                         or "Dear {username}, your password for {clientId} has been reset successfully."
         otpEmailService(person.email, render_template(template_body, metadata))
 
-        return ResponseModel(data={"message": "Password reset successfully"})
+        return ResponseModel(screen_id="default_user",data={"message": "Password reset successfully"})
 
     raise HTTPException(status_code=400, detail="Invalid request data")
 
