@@ -1,4 +1,4 @@
-from sqlalchemy import Column, Integer, String, Float, DateTime, ForeignKey, ARRAY
+from sqlalchemy import Column, Integer, String, Float, DateTime, ForeignKey, ARRAY,BigInteger
 from sqlalchemy.orm import declarative_base, relationship
 import datetime
 from models.order_model import OrderItemModel, DineinOrderModel
