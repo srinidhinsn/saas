@@ -1,7 +1,7 @@
 import axios from 'axios';
 
 const reportServicesPort = axios.create({
-    baseURL: 'http://localhost:8006/saas',
+    baseURL: 'https://report-service-qa-582942992169.asia-south2.run.app/saas',
 });
 
 export default reportServicesPort;

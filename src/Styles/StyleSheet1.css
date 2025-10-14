@@ -2447,67 +2447,190 @@ body.sidebar-minimized .sidebar li .arrow-indicator {
 }
 
 
-/* === Modal === */
-.tm-modal-overlay,
-.tm-edit-modal-overlay,
-.tm-confirm-overlay {
+/* Modal overlay (background) */
+.tm-modal-overlay {
     position: fixed;
-    inset: 0;
-    background: rgba(0, 0, 0, .38);
-    z-index: 99;
+    top: 0;
+    left: 0;
+    width: 100%;
+    height: 100%;
+    background: rgba(15, 15, 15, 0.6);
     display: flex;
-    justify-content: center;
     align-items: center;
-}
-
-.tm-modal-card,
-.tm-edit-modal-card,
-.tm-confirm-modal-card {
-    background: var(--bg-color);
-    border-radius: 14px;
-    padding: 24px 18px;
-    box-shadow: 0 8px 24px rgba(0, 0, 0, .11);
-    width: 97vw;
-    max-width: 500px;
-}
-
-.tm-modal-header,
-.tm-edit-modal-header {
+    justify-content: center;
+    padding: 16px;
+    z-index: 1000;
+  }
+  
+  /* Modal card (container) */
+  .tm-modal-card {
+    background: var(--modal-bg, #fff);
+    color: var(--modal-text, #222);
+    border-radius: 12px;
+    width: 100%;
+    max-width: 850px;
+    box-shadow: 0 4px 16px rgba(0, 0, 0, 0.25);
+    display: flex;
+    flex-direction: column;
+    overflow: hidden;
+    animation: fadeInScale 0.25s ease-in-out;
+  }
+  
+  /* Header */
+  .tm-modal-header {
     display: flex;
     justify-content: space-between;
     align-items: center;
-    color: var(--bg-text-color);
-}
-
-.tm-modal-close,
-.tm-edit-modal-close {
+    padding: 16px;
+    border-bottom: 1px solid #e0e0e0;
+    background: var(--header-bg, #f8f8f8);
+  }
+  
+  .tm-modal-header h3 {
+    margin: 0;
+    font-size: 18px;
+    font-weight: 600;
+  }
+  
+  .tm-modal-close {
     background: none;
     border: none;
-    color: var(--bg-number-color);
-    font-size: 17px;
+    color: #666;
     cursor: pointer;
-}
-
-.tm-modal-body {
-    margin-top: 8px;
-}
-
-.tm-modal-row,
-.tm-edit-modal-body {
+    font-size: 20px;
+    transition: color 0.2s;
+  }
+  .tm-modal-close:hover {
+    color: #d11a2a;
+  }
+  
+  /* Body */
+  .tm-modal-body {
+    padding: 16px;
+    display: flex;
+    flex-direction: column;
+    gap: 16px;
+    overflow-y: auto;
+    max-height: 80vh;
+  }
+  
+  /* Row */
+  .tm-modal-row {
     display: grid;
-    grid-template-columns: 1fr 1fr;
-    gap: 12px;
-    margin-bottom: 8px;
-    background: var(--bg-chart-container);
-}
-
-@media (max-width: 540px) {
-
-    .tm-modal-row,
-    .tm-edit-modal-body {
-        grid-template-columns: 1fr;
+    grid-template-columns: repeat(auto-fit, minmax(180px, 1fr));
+    gap: 16px;
+    background: var(--row-bg, #fafafa);
+    padding: 16px;
+    border-radius: 8px;
+    border: 1px solid #e6e6e6;
+  }
+  
+  /* Field */
+  .tm-modal-field {
+    display: flex;
+    flex-direction: column;
+    gap: 4px;
+  }
+  
+  .tm-modal-field label {
+    font-size: 13px;
+    font-weight: 500;
+    color: #444;
+  }
+  
+  .tm-modal-field input,
+  .tm-modal-field select {
+    padding: 8px;
+    border: 1px solid #ccc;
+    border-radius: 6px;
+    font-size: 14px;
+    outline: none;
+    transition: border 0.2s, box-shadow 0.2s;
+  }
+  
+  .tm-modal-field input:focus,
+  .tm-modal-field select:focus {
+    border-color: #007bff;
+    box-shadow: 0 0 0 2px rgba(0, 123, 255, 0.2);
+  }
+  
+  /* Checkbox field */
+  .tm-checkbox-field {
+    display: flex;
+    align-items: center;
+    gap: 8px;
+  }
+  
+  /* Error */
+  .tm-error-input {
+    border-color: #d93025 !important;
+    background: #ffecec;
+  }
+  
+  .tm-error-message {
+    color: #d93025;
+    font-size: 12px;
+  }
+  
+  /* Example */
+  .tm-modal-example {
+    background: #f1f1f1;
+    border-radius: 8px;
+    padding: 12px;
+    font-size: 13px;
+    color: #555;
+    line-height: 1.5;
+  }
+  
+  /* Buttons */
+  .tm-modal-add-row,
+  .tm-modal-generate-table {
+    margin-top: 8px;
+    background: #007bff;
+    color: #fff;
+    border: none;
+    border-radius: 8px;
+    padding: 10px 16px;
+    font-size: 15px;
+    font-weight: 500;
+    cursor: pointer;
+    transition: background 0.2s;
+  }
+  
+  .tm-modal-add-row:hover,
+  .tm-modal-generate-table:hover {
+    background: #0056b3;
+  }
+  
+  .tm-modal-error {
+    color: #d93025;
+    font-weight: 500;
+    font-size: 13px;
+  }
+  
+  /* Animations */
+  @keyframes fadeInScale {
+    from {
+      opacity: 0;
+      transform: scale(0.95);
     }
-}
+    to {
+      opacity: 1;
+      transform: scale(1);
+    }
+  }
+  
+  /* Responsive tweaks */
+  @media (max-width: 600px) {
+    .tm-modal-card {
+      max-width: 95%;
+    }
+    .tm-modal-row {
+      grid-template-columns: 1fr;
+      gap: 12px;
+    }
+  }
+  
 
 .tm-modal-field,
 .tm-edit-modal-field {
