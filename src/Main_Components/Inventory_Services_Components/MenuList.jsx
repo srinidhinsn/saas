@@ -1,11 +1,9 @@
 import React, { useEffect, useState, useRef } from "react";
 import AddMenuForm from './AddInventoryItemForm'; import { useParams } from "react-router-dom";
 import { FaEdit, FaTrash } from "react-icons/fa";
-import inventoryServicesPort from "../../Backend_Port_Files/InventoryServices";
+import axios from 'axios';
 import * as XLSX from "xlsx";
 import { saveAs } from "file-saver";
-
-import { AgGridReact } from "ag-grid-react";
 import "ag-grid-community/styles/ag-grid.css";
 import "ag-grid-community/styles/ag-theme-alpine.css";
 
@@ -67,7 +65,7 @@ function InventoryItemList({ selectedCategory }) {
         if (!token || !clientId) return;
 
         // Fetch nested category tree from backend
-        inventoryServicesPort.get(`/${clientId}/menu/read_category?category_id=dietery`, {
+        axios.get(`${import.meta.env.VITE_API_INVENTORY_SERVICE_URL}/${clientId}/menu/read_category?category_id=dietery`, {
             headers: { Authorization: `Bearer ${token}` },
         })
             .then((res) => {
@@ -83,7 +81,7 @@ function InventoryItemList({ selectedCategory }) {
     useEffect(() => {
         if (!token || !clientId) return;
 
-        inventoryServicesPort.get(`/${clientId}/menu/read_category`, {
+        axios.get(`${import.meta.env.VITE_API_INVENTORY_SERVICE_URL}/${clientId}/menu/read_category`, {
             headers: { Authorization: `Bearer ${token}` },
         })
             .then((res) => {
@@ -96,7 +94,7 @@ function InventoryItemList({ selectedCategory }) {
 
     const fetchInventoryItems = async () => {
         try {
-            const res = await inventoryServicesPort.get(`/${clientId}/menu/read`, { headers });
+            const res = await axios.get(`${import.meta.env.VITE_API_INVENTORY_SERVICE_URL}/${clientId}/menu/read`, { headers });
             setItems(res.data.data || []);
             setOriginalItems(res.data.data || []);
         } catch (err) {
@@ -162,7 +160,7 @@ function InventoryItemList({ selectedCategory }) {
         updatedItem.slug = buildCategoryPath(updatedItem.category_id, updatedItem.name);
 
         try {
-            await inventoryServicesPort.post(`/${clientId}/menu/update`, updatedItem, { headers });
+            await axios.post(`${import.meta.env.VITE_API_INVENTORY_SERVICE_URL}/${clientId}/menu/update`, updatedItem, { headers });
 
             // ✅ Only refresh this list — not the full app
             await fetchInventoryItems();
@@ -180,8 +178,8 @@ function InventoryItemList({ selectedCategory }) {
     const handleDelete = async (id) => {
         try {
             // 1. Delete the item itself in backend
-            await inventoryServicesPort.post(
-                `/${clientId}/menu/delete`,
+            await axios.post(
+                `${import.meta.env.VITE_API_INVENTORY_SERVICE_URL}/${clientId}/menu/delete`,
                 { id },
                 { headers }
             );
@@ -193,8 +191,8 @@ function InventoryItemList({ selectedCategory }) {
                     const updatedItem = { ...item, line_item_id: newLineItems };
 
                     // Update in backend
-                    inventoryServicesPort.post(
-                        `/${clientId}/menu/update`,
+                    axios.post(
+                        `${import.meta.env.VITE_API_INVENTORY_SERVICE_URL}/${clientId}/menu/update`,
                         updatedItem,
                         { headers }
                     ).catch(err => {
@@ -376,8 +374,8 @@ function InventoryItemList({ selectedCategory }) {
                 const parsedData = XLSX.utils.sheet_to_json(worksheet);
 
                 //  Delete all existing items
-                await inventoryServicesPort.delete(
-                    `/${clientId}/menu/delete_all`,
+                await axios.delete(
+                    `${import.meta.env.VITE_API_INVENTORY_SERVICE_URL}/${clientId}/menu/delete_all`,
                     { headers: { Authorization: `Bearer ${token}` } }
                 );
 
@@ -408,8 +406,8 @@ function InventoryItemList({ selectedCategory }) {
                         updated_by
                     };
 
-                    await inventoryServicesPort.post(
-                        `/${clientId}/menu/create`,
+                    await axios.post(
+                        `${import.meta.env.VITE_API_INVENTORY_SERVICE_URL}/${clientId}/menu/create`,
                         newItem,
                         { headers: { Authorization: `Bearer ${token}` } }
                     );

@@ -5605,7 +5605,7 @@ body {
 .categories-list {
     flex: 1;
     padding: 1rem;
-    overflow-y: auto;
+    overflow-y: auto;height: 78vh;
 }
 
 .category-item {
