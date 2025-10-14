@@ -3,8 +3,8 @@ import { useNavigate, useParams } from "react-router-dom";
 import { FaUser, FaLock, FaKey } from "react-icons/fa";
 import { toast } from "react-toastify";
 import "react-toastify/dist/ReactToastify.css";
-import userServicesPort from "../../Backend_Port_Files/UserServices";
 import CircularText from '../../Util_Components/CircularText'; 
+import axios from 'axios';
 
 export default function ForgotPassword() {
   const navigate = useNavigate();
@@ -33,7 +33,7 @@ export default function ForgotPassword() {
     setLoading(true);
 
     try {
-      await userServicesPort.post(`/${clientId}/users/forgot-password`, {
+      await axios.post(`${import.meta.env.VITE_API_USER_SERVICE_URL}/${clientId}/users/forgot-password`, {
         username: form.username
       });
 
@@ -63,7 +63,7 @@ export default function ForgotPassword() {
     setLoading(true);
 
     try {
-      await userServicesPort.post(`/${clientId}/users/forgot-password`, {
+      await axios.post(`${import.meta.env.VITE_API_USER_SERVICE_URL}/${clientId}/users/forgot-password`, {
         username: form.username,
         otp: form.otp,
         new_password: form.new_password,

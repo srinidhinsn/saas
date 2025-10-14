@@ -3,7 +3,7 @@ import React, { useEffect, useState } from "react";
 import { FiSun, FiMoon } from "react-icons/fi";
 import { useTheme } from "../../ThemeChangerComponent/ThemeProvider";
 import { FaEdit, FaTrash, FaCheck, FaTimes, FaSearch, FaUsers, FaClock, FaChartLine, FaPlus, FaUser, FaUtensils } from "react-icons/fa";
-import tableServicesPort from "../../Backend_Port_Files/TableServices";
+import axios from 'axios';
 import { useParams } from 'react-router-dom';
 
 const statusConfig = {
@@ -48,7 +48,7 @@ const TableManagement = () => {
     const fetchTables = async () => {
         if (!clientId) return;
         try {
-            const res = await tableServicesPort.get(`/${clientId}/tables/read`, {
+            const res = await axios.get(`${import.meta.env.VITE_API_TABLE_SERVICE_URL}/${clientId}/tables/read`, {
                 headers: { Authorization: `Bearer ${token}`}
             });
             const result = res.data;
