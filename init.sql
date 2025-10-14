@@ -383,6 +383,7 @@ INSERT INTO category (id, client_id, name, description, sub_categories, slug, cr
 INSERT INTO category (id, client_id, name, description, sub_categories, slug, created_by, updated_by, created_at, updated_at) VALUES ('document', 'saas', 'Document', 'Document storage', '{read,upload,replace,download}', '_Realm_Restaurant_Document', NULL, NULL, '2025-09-19 02:27:03.632856', '2025-09-19 02:27:03.632856');
 INSERT INTO category (id, client_id, name, description, sub_categories, slug, created_by, updated_by, created_at, updated_at) VALUES ('kds', 'saas', 'KDS', 'Kitchen Display', '{read,update,delete}', '_Realm_Restaurant_KDS', NULL, NULL, '2025-09-19 02:27:03.632856', '2025-09-19 02:27:03.632856');
 
-
-
-
+-- add-user update
+UPDATE category
+SET sub_categories = array_cat(sub_categories, ARRAY['person-details', 'persons'])
+WHERE id = 'users' AND client_id = 'saas';
