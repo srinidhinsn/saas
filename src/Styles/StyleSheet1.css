@@ -4947,10 +4947,14 @@ body {
 
 .sidebar-header {
     display: flex;
+    justify-content: center;
+    align-items: center;
     padding: 0.5rem;
     border-bottom: 1px solid #e5e7eb;
     background: linear-gradient(to right, #2563eb, #1d4ed8);
     color: white;
+    margin-bottom: 10px;
+    border-radius: 5px;
 }
 
 .sidebar-header h2 {

@@ -24,11 +24,6 @@ function CategoryList({ onCategorySelect }) {
     const [editNewSubcategoryName, setEditNewSubcategoryName] = useState("");
     const [parentMap, setParentMap] = useState({});
 
-    const [newParentCategory, setNewParentCategory] = useState("");
-
-    /////////////////////////////////////// /////////////
-
-
     const { clientId } = useParams();
     const token = localStorage.getItem("access_token");
 
@@ -43,30 +38,30 @@ function CategoryList({ onCategorySelect }) {
             })
             .then((res) => {
                 const rawCategories = res.data.data;
+            
+                // ✅ The API returns [{ id: "dietery", name: "Dietary", subCategories: [veg, non-veg, egg] }]
+                // We only want the subcategories of "dietery"
+                const dietaryRoot = rawCategories.find(cat => cat.id === "dietery");
+                const displayCategories = dietaryRoot?.subCategories || [];
+            
+                // Build parent map for subcategories
                 const tempParentMap = {};
                 const traverseAndBuildMap = (cats, parentId = null) => {
                     for (const cat of cats) {
-                        if (parentId) {
-                            tempParentMap[cat.id] = parentId;
-                        }
-                        if (cat.subCategories && cat.subCategories.length > 0) {
+                        if (parentId) tempParentMap[cat.id] = parentId;
+                        if (cat.subCategories?.length > 0) {
                             traverseAndBuildMap(cat.subCategories, cat.id);
                         }
                     }
                 };
-
-                traverseAndBuildMap(rawCategories);
+                traverseAndBuildMap(displayCategories);
                 setParentMap(tempParentMap);
-
-                const subCategoryIds = new Set(Object.keys(tempParentMap));
-                const topLevelCategories = rawCategories.filter(
-                    (cat) => !subCategoryIds.has(cat.id)
-                );
-
-                const allCategory = { id: "all", name: "All" };
-                setCategories([allCategory, ...topLevelCategories]);
-                setActiveCategory("all");
+            
+                // ✅ Skip "All" if not needed
+                setCategories(displayCategories);
+                setActiveCategory(displayCategories.length > 0 ? displayCategories[0].id : null);
             })
+            
 
             .catch((err) => console.error("❌ Error fetching categories:", err));
     }, [clientId, token]);
@@ -83,15 +78,15 @@ function CategoryList({ onCategorySelect }) {
         const isParent = level === 0;
 
         return (
-            <div key={category.id} style={{ marginLeft: level * 5 }}>
-                <div className="category-item" style={{ display: "flex", alignItems: "center" }}>
+            <div key={category.id} style={{ marginLeft: level * 8 }}>
+                <div className="category-item" style={{ display: "flex", alignItems: "center"}}>
                     <span
                         onClick={() => onCategorySelect(category)}
                         style={{
                             cursor: "pointer",
                             fontWeight: "bold",
                             flexGrow: 1,
-                            color: isParent ? "var(--bg-number-color)" : "var(--bg-text-color)"
+                            color: isParent ? "var(--bg-number-color)" : "gray"
                         }}
                     >
                         {category.name}
@@ -362,8 +357,7 @@ function CategoryList({ onCategorySelect }) {
         } catch (err) {
             console.error("Token decode failed:", err);
         }
-    
-        // 1️⃣ Create a new subcategory if entered
+
         if (editNewSubcategoryName.trim()) {
             const newSubId = uuidv4();
             const tempParentMap = { [newSubId]: editingId.trim() };
@@ -395,10 +389,10 @@ function CategoryList({ onCategorySelect }) {
     
         // 2️⃣ Generate updated slug for main category
         const slug = generateSlugFromParents(editingId, editName.trim());
-    
-        // 3️⃣ Prepare payload for update
+
         const payload = {
             id: editingId,
+            client_id: clientId,
             name: editName.trim(),
             description: editDescription.trim(),
             sub_categories: finalEditSubcategories,
@@ -408,7 +402,7 @@ function CategoryList({ onCategorySelect }) {
     
         try {
             await inventoryServicesPort.post(
-                `/${clientId}/menu/update_category`,
+                `/${clientId}/menu/update_category?client_id=${clientId}`,
                 payload,
                 {
                     headers: {
@@ -485,7 +479,7 @@ function CategoryList({ onCategorySelect }) {
         <div className="sidebar1">
             {/* Header */}
             <div className="sidebar-header">
-                <h2>Categories</h2>
+                <h2>Dietery</h2>
                 {/* <button className="add-btn" onClick={() => setShowAddModal(true)}>
                     ➕
                 </button> */}

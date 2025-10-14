@@ -130,7 +130,6 @@ function InventoryItemList({ selectedCategory }) {
         if (!selectedCategory || selectedCategory.name === "All") {
             setItems(originalItems);
         } else {
-            // collect self + descendants
             const descendantIds = getDescendantCategoryIds(selectedCategory.id, categories);
             const filtered = originalItems.filter(item =>
                 descendantIds.includes(item.category_id)
@@ -138,9 +137,6 @@ function InventoryItemList({ selectedCategory }) {
             setItems(filtered);
         }
     }, [selectedCategory, originalItems, categories]);
-
-
-
 
     const handleEdit = (item) => {
         setEditingItem({ ...item });
@@ -164,8 +160,8 @@ function InventoryItemList({ selectedCategory }) {
         try {
             await inventoryServicesPort.post(`/${clientId}/menu/update`, updatedItem, { headers });
 
-            // ✅ Only refresh this list — not the full app
             await fetchInventoryItems();
+            console.log("Updating item:", updatedItem.id, "line_item_id:", updatedItem.line_item_id);
 
             setShowEditModal(false);
             setEditingItem(null);
@@ -223,14 +219,11 @@ function InventoryItemList({ selectedCategory }) {
         setShowAddModal(false);
     };
 
-
-    // Change this function signature
     const getLineItemDetails = (lineItemIds) => {
         if (!Array.isArray(lineItemIds)) return { names: "No linked items", totalPrice: 0 };
 
         let totalPrice = 0;
 
-        // Use originalItems here instead of items
         const names = lineItemIds.map((id) => {
             const match = originalItems.find(
                 (i) => i.id === id || (Array.isArray(i.line_item_id) && i.line_item_id.includes(id))
