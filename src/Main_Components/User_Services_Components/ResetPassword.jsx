@@ -152,7 +152,7 @@ import CircularText from '../../Util_Components/CircularText';
 export default function ResetPassword() {
   const navigate = useNavigate();
   const { clientId } = useParams();
-
+const token=localStorage.getItem("access_token")
   const [form, setForm] = useState({
     username: "",
     otp: "",
@@ -192,6 +192,10 @@ export default function ResetPassword() {
         old_password: "",
         new_password: "",
         confirm_password: "",
+      },{
+        headers:{
+          Authorization:`Bearer ${token}`
+        }
       });
       toast.success(res.data.message || "OTP sent successfully");
       setOtpSent(true);
@@ -237,7 +241,12 @@ export default function ResetPassword() {
         old_password: resetMethod === "old_password" ? form.old_password : "",
       };
 
-      const res = await userServicesPort.post(`/${clientId}/users/reset-password`, payload);
+      const res = await userServicesPort.post(`/${clientId}/users/reset-password`, payload, {
+        headers: {
+          Authorization: `Bearer ${token}`
+        }
+      });
+      
       toast.success(res.data.message || "Password reset successfully");
       navigate(`/saas/${clientId}/login`);
     } catch (err) {

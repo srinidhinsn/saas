@@ -568,11 +568,9 @@
 // ================================================================================================================================ //
 // ================================================================================================================================ //
 
-
 import React, { useEffect, useState } from "react";
-import { FiSun, FiMoon } from "react-icons/fi";
 import { useTheme } from "../../ThemeChangerComponent/ThemeProvider";
-import { FaEdit, FaTrash, FaCheck, FaTimes, FaSearch, FaUsers, FaClock, FaChartLine, FaPlus, FaUser, FaUtensils } from "react-icons/fa";
+import { FaEdit, FaTrash, FaCheck, FaTimes, FaSearch, FaUsers, FaClock,  FaPlus } from "react-icons/fa";
 import tableServicesPort from "../../Backend_Port_Files/TableServices";
 import { useParams } from 'react-router-dom';
 
@@ -601,15 +599,28 @@ const TableManagement = () => {
     const [addRowError, setAddRowError] = useState("");
     const [modalOpen, setModalOpen] = useState(false);
     const [modalTable, setModalTable] = useState(null);
-    const [bulkDeleteSeries, setBulkDeleteSeries] = useState("");
-    const [bulkUpdateSeries, setBulkUpdateSeries] = useState("");
-    const [bulkUpdateSeating, setBulkUpdateSeating] = useState("");
+    
+    // Bulk Update States
+    const [showBulkUpdate, setShowBulkUpdate] = useState(false);
+    const [bulkUpdateSearch, setBulkUpdateSearch] = useState("");
+    const [selectedUpdateTables, setSelectedUpdateTables] = useState([]);
+    const [bulkUpdateData, setBulkUpdateData] = useState({});
+    
+    // Bulk Delete States
+    const [showBulkDelete, setShowBulkDelete] = useState(false);
+    const [bulkDeleteSearch, setBulkDeleteSearch] = useState("");
+    const [selectedDeleteTables, setSelectedDeleteTables] = useState([]);
     const [showFirstDeleteConfirm, setShowFirstDeleteConfirm] = useState(false);
     const [showSecondDeleteConfirm, setShowSecondDeleteConfirm] = useState(false);
-    const [bulkUpdateZone, setBulkUpdateZone] = useState("");
-
+    const [bulkUpdateGlobal, setBulkUpdateGlobal] = useState({
+        table_type: "",
+        status: "",
+        location_zone: ""
+    });
+    
     const token = localStorage.getItem("access_token");
-    const [tableId, setTableId] = useState(null)
+    const [tableId, setTableId] = useState(null);
+
     useEffect(() => {
         if (tableId) {
             document.body.classList.add("sidebar-minimized");
@@ -617,6 +628,7 @@ const TableManagement = () => {
             document.body.classList.remove("sidebar-minimized");
         }
     }, [tableId]);
+
     useEffect(() => {
         if (clientId) fetchTables();
     }, [clientId]);
@@ -693,7 +705,8 @@ const TableManagement = () => {
                     description: row.description,
                     section: row.section,
                     sort_order: row.sort_order ? parseInt(row.sort_order) : null,
-                    is_active: row.is_active, qr_code_url: row.qr_code_url || "",
+                    is_active: row.is_active,
+                    qr_code_url: row.qr_code_url || "",
                     slug: `${clientId}-${(row.slug || num).toLowerCase().replace(/[^a-z0-9-]/g, '')}`
                 });
             });
@@ -772,6 +785,130 @@ const TableManagement = () => {
         }
     };
 
+    // Bulk Update Functions
+    const openBulkUpdate = () => {
+        setShowBulkUpdate(true);
+        setSelectedUpdateTables([]);
+        setBulkUpdateSearch("");
+        // Initialize bulk update data for all tables
+        const initialData = {};
+        tables.forEach(table => {
+            initialData[table.id] = {
+                table_type: table.table_type,
+                location_zone: table.location_zone,
+                status: table.status
+            };
+        });
+        setBulkUpdateData(initialData);
+    };
+
+    const toggleUpdateTableSelection = (tableId) => {
+        setSelectedUpdateTables(prev =>
+            prev.includes(tableId)
+                ? prev.filter(id => id !== tableId)
+                : [...prev, tableId]
+        );
+    };
+
+    const selectAllUpdateTables = () => {
+        const filtered = getFilteredUpdateTables();
+        if (selectedUpdateTables.length === filtered.length) {
+            setSelectedUpdateTables([]);
+        } else {
+            setSelectedUpdateTables(filtered.map(t => t.id));
+        }
+    };
+
+    const handleBulkUpdateChange = (tableId, field, value) => {
+        setBulkUpdateData(prev => ({
+            ...prev,
+            [tableId]: {
+                ...prev[tableId],
+                [field]: value
+            }
+        }));
+    };
+
+    const saveBulkUpdate = async () => {
+        try {
+            const tablesToUpdate = tables.filter(t => selectedUpdateTables.includes(t.id));
+            for (const table of tablesToUpdate) {
+                const updatedTable = {
+                    ...table,
+                    ...bulkUpdateGlobal  // Apply global settings
+                };
+                await tableServicesPort.post(`/${clientId}/tables/update`, updatedTable, {
+                    headers: { Authorization: `Bearer ${token}` }
+                });
+            }
+            fetchTables();
+            setShowBulkUpdate(false);
+            setSelectedUpdateTables([]);
+            setBulkUpdateGlobal({ table_type: "", status: "", location_zone: "" });
+        } catch (err) {
+            console.error("Bulk update error", err);
+        }
+    };
+    
+
+    const getFilteredUpdateTables = () => {
+        return tables.filter(table =>
+            table.name.toLowerCase().includes(bulkUpdateSearch.toLowerCase())
+        );
+    };
+
+    // Bulk Delete Functions
+    const openBulkDelete = () => {
+        setShowBulkDelete(true);
+        setSelectedDeleteTables([]);
+        setBulkDeleteSearch("");
+    };
+
+    const toggleDeleteTableSelection = (tableId) => {
+        setSelectedDeleteTables(prev =>
+            prev.includes(tableId)
+                ? prev.filter(id => id !== tableId)
+                : [...prev, tableId]
+        );
+    };
+
+    const selectAllDeleteTables = () => {
+        const filtered = getFilteredDeleteTables();
+        if (selectedDeleteTables.length === filtered.length) {
+            setSelectedDeleteTables([]);
+        } else {
+            setSelectedDeleteTables(filtered.map(t => t.id));
+        }
+    };
+
+    const confirmBulkDelete = async () => {
+        try {
+            const tablesToDelete = tables.filter(t => selectedDeleteTables.includes(t.id));
+            for (const table of tablesToDelete) {
+                await tableServicesPort.post(`/${clientId}/tables/delete`, {
+                    id: table.id,
+                    client_id: clientId,
+                    name: "",
+                    table_type: "",
+                    location_zone: "",
+                }, { headers: { Authorization: `Bearer ${token}` } });
+            }
+            fetchTables();
+        } catch (err) {
+            console.error("Bulk delete error", err);
+        } finally {
+            setShowBulkDelete(false);
+            setShowSecondDeleteConfirm(false);
+            setSelectedDeleteTables([]);
+        }
+    };
+
+    const getFilteredDeleteTables = () => {
+        return tables.filter(table =>
+            table.name.toLowerCase().includes(bulkDeleteSearch.toLowerCase())
+        );
+    };
+
     // Stats
     const available = tables.filter(t => t.status === 'Vacant').length;
     const occupied = tables.filter(t => t.status === 'Occupied').length;
@@ -785,105 +922,11 @@ const TableManagement = () => {
         const matchesStatus = !statusFilter || table.status === statusFilter;
         return matchesSearch && matchesStatus;
     });
-    const handleBulkDelete = async () => {
-        try {
-          const tablesToDelete = tables.filter(t => t.name.startsWith(bulkDeleteSeries));
-          for (const table of tablesToDelete) {
-            await tableServicesPort.post(`/${clientId}/tables/delete`, {
-              id: table.id,
-              client_id: clientId,
-              name: "",
-              table_type: "",
-              location_zone: "",
-            }, { headers: { Authorization: `Bearer ${token}` } });
-          }
-          fetchTables();
-        } catch (err) {
-          console.error("Bulk delete error", err);
-        } finally {
-          setShowSecondDeleteConfirm(false);
-          setBulkDeleteSeries("");
-        }
-      };
-      const handleBulkUpdate = async () => {
-        if (!bulkUpdateSeries || (!bulkUpdateSeating && !bulkUpdateZone)) {
-          alert("Enter a series and at least one change (seating/zone)");
-          return;
-        }
-        try {
-          const tablesToUpdate = tables.filter(t => t.name.startsWith(bulkUpdateSeries));
-          for (const table of tablesToUpdate) {
-            const updatedTable = {
-              ...table,
-              ...(bulkUpdateSeating && { table_type: bulkUpdateSeating.toString() }),
-              ...(bulkUpdateZone && { location_zone: bulkUpdateZone })
-            };
-            await tableServicesPort.post(`/${clientId}/tables/update`, updatedTable, {
-              headers: { Authorization: `Bearer ${token}` }
-            });
-          }
-          fetchTables();
-          setBulkUpdateSeries("");
-          setBulkUpdateSeating("");
-          setBulkUpdateZone("");
-        } catch (err) {
-          console.error("Bulk update error", err);
-        }
-      };
-      
-            
+
     return (
         <div className="Table-Creation-Management">
             <div className={`tm-bg ${darkMode ? 'tm-dark-mode' : ''}`}>
-                {/* Header */}
                 <main className="tm-main-container">
-                    {/* Stats Cards */}
-                    {/* <div className="tm-stats-grid">
-                        <div className="tm-stats-card">
-                            <div className="tm-stats-flex">
-                                <div className="tm-stats-icon-bg tm-stats-icon-green">
-                                    <FaCheck className="tm-icon-available" />
-                                </div>
-                                <div className="tm-stats-text-group">
-                                    <p className="tm-stats-label">Available</p>
-                                    <p className="tm-stats-value">{available}</p>
-                                </div>
-                            </div>
-                        </div>
-                        <div className="tm-stats-card">
-                            <div className="tm-stats-flex">
-                                <div className="tm-stats-icon-bg tm-stats-icon-blue">
-                                    <FaUsers className="tm-icon-occupied" />
-                                </div>
-                                <div className="tm-stats-text-group">
-                                    <p className="tm-stats-label">Occupied</p>
-                                    <p className="tm-stats-value">{occupied}</p>
-                                </div>
-                            </div>
-                        </div>
-                        <div className="tm-stats-card">
-                            <div className="tm-stats-flex">
-                                <div className="tm-stats-icon-bg tm-stats-icon-yellow">
-                                    <FaClock className="tm-icon-reserved" />
-                                </div>
-                                <div className="tm-stats-text-group">
-                                    <p className="tm-stats-label">Reserved</p>
-                                    <p className="tm-stats-value">{reserved}</p>
-                                </div>
-                            </div>
-                        </div>
-                        <div className="tm-stats-card">
-                            <div className="tm-stats-flex">
-                                <div className="tm-stats-icon-bg tm-stats-icon-purple">
-                                    <FaChartLine className="tm-icon-total" />
-                                </div>
-                                <div className="tm-stats-text-group">
-                                    <p className="tm-stats-label">Total Tables</p>
-                                    <p className="tm-stats-value">{total}</p>
-                                </div>
-                            </div>
-                        </div>
-                    </div> */}
                     {/* Controls */}
                     <div className="tm-controls-card">
                         <div className="tm-controls-flex">
@@ -909,88 +952,24 @@ const TableManagement = () => {
                                     <option value="Reserved">Reserved</option>
                                 </select>
                             </div>
-                            {/* Bulk Delete Section */}
-<div className="tm-bulk-actions">
-  <input
-    type="text"
-    placeholder="Enter series"
-    value={bulkDeleteSeries}
-    onChange={e => setBulkDeleteSeries(e.target.value.toUpperCase())}
-  />
-  <button
-    className="tm-bulk-delete-btn"
-    onClick={() => setShowFirstDeleteConfirm(true)}
-  >
-    Bulk Delete
-  </button>
-  <input
-  type="text"
-  placeholder="Enter series"
-  value={bulkUpdateSeries}
-  onChange={e => setBulkUpdateSeries(e.target.value.toUpperCase())}
-/>
-<input
-  type="number"
-  placeholder="New seating"
-  value={bulkUpdateSeating}
-  onChange={e => setBulkUpdateSeating(e.target.value)}
-  min={1}
-/>
-<select
-  value={bulkUpdateZone}
-  onChange={e => setBulkUpdateZone(e.target.value)}
-  className="tm-bulk-update-select"
->
-  <option value="">Zone (optional)</option>
-  <option value="AC">AC</option>
-  <option value="Non-AC">Non-AC</option>
-</select>
-<button
-  className="tm-bulk-update-btn"
-  onClick={handleBulkUpdate}
->
-  Bulk Update
-</button>
 
-</div>
-
-                            <button className="tm-add-table-btn" onClick={() => {
-                                setShowAddTable(true);
-                                setTableRanges([...tableRanges, { range: "", table_type: "", type: "", remark: "Vacant", is_active: false }]);
-                                setFieldErrors([{}]);
-                            }}>
-                                <FaPlus className="tm-add-icon" /> <span>Add Table</span>
-                            </button>
+                            <div className="tm-action-buttons">
+                                <button className="tm-bulk-update-btn" onClick={openBulkUpdate}>
+                                    <FaEdit /> <span>Bulk Update</span>
+                                </button>
+                                <button className="tm-bulk-delete-btn" onClick={openBulkDelete}>
+                                    <FaTrash /> <span>Bulk Delete</span>
+                                </button>
+                                <button className="tm-add-table-btn" onClick={() => {
+                                    setShowAddTable(true);
+                                    setTableRanges([...tableRanges, { range: "", table_type: "", type: "", remark: "Vacant", is_active: false }]);
+                                    setFieldErrors([{}]);
+                                }}>
+                                    <FaPlus className="tm-add-icon" /> <span>Add Table</span>
+                                </button>
+                            </div>
                         </div>
                     </div>
-                    {showFirstDeleteConfirm && (
-  <div className="tm-confirm-overlay">
-    <div className="tm-confirm-modal-card">
-      <p>Are you sure you want to delete tables in series <strong>{bulkDeleteSeries}</strong>?</p>
-      <div className="tm-confirm-modal-btns">
-        <button onClick={() => {
-          setShowFirstDeleteConfirm(false);
-          setShowSecondDeleteConfirm(true);
-        }}>
-          Yes, Continue
-        </button>
-        <button onClick={() => setShowFirstDeleteConfirm(false)}>Cancel</button>
-      </div>
-    </div>
-  </div>
-)}
-
-{showSecondDeleteConfirm && (
-  <div className="tm-confirm-overlay">
-    <div className="tm-confirm-modal-card">
-      <p>This action is irreversible. Confirm to delete all tables in series <strong>{bulkDeleteSeries}</strong>.</p>
-      <div className="tm-confirm-modal-btns">
-        <button onClick={handleBulkDelete}>Confirm Delete</button>
-        <button onClick={() => setShowSecondDeleteConfirm(false)}>Cancel</button>
-      </div>
-    </div>
-  </div>
-)}
 
                     {/* Table Grid */}
                     <div className="tm-table-grid-card">
@@ -998,7 +977,7 @@ const TableManagement = () => {
                             {filteredTables.map(table => {
                                 const config = statusConfig[table.status] || statusConfig['Vacant'];
                                 return (
-                                    <div key={table.id} className={`tm-table-card ${config.card}`} onClick={() => { }}>
+                                    <div key={table.id} className={`tm-table-card ${config.card}`}>
                                         <div className="tm-table-card-header">
                                             <div>
                                                 <div className="tm-table-card-title">{table.name}</div>
@@ -1009,6 +988,7 @@ const TableManagement = () => {
                                         <div className="tm-table-card-status-row">
                                             <span className={`tm-status-badge ${config.card}`}>{config.label}</span>
                                         </div>
+                                      
                                         <div className="tm-table-card-actions">
                                             <button className="tm-edit-btn" onClick={() => setEditRowId(table.id)}><FaEdit /></button>
                                             <button className="tm-delete-btn" onClick={() => { setDeleteTableId(table.id); setShowConfirmDelete(true); }}><FaTrash /></button>
@@ -1018,6 +998,7 @@ const TableManagement = () => {
                             })}
                         </div>
                     </div>
+
                     {/* Add Table Modal */}
                     {showAddTable && (
                         <div className="tm-modal-overlay">
@@ -1168,26 +1149,12 @@ const TableManagement = () => {
                                         a) Table Range: T01:T10<br />
                                         b) Multi-Table Range: A01:A10,B01:B05
                                     </div>
-                                    {addRowError && <div className="tm-modal-error">{addRowError}</div>}
-                                    {/* <button className="tm-modal-add-row" onClick={() => {
-                                        const emptyRows = tableRanges.filter(
-                                            row => !row.range || !row.table_type || !row.type
-                                        );
-                                        if (emptyRows.length >= 3) {
-                                            setAddRowError("Please fill the existing rows first.");
-                                            return;
-                                        }
-                                        setAddRowError("");
-                                        setTableRanges([...tableRanges, { range: "", table_type: "", type: "", remark: "Vacant", is_active: false }]);
-                                        setFieldErrors([...fieldErrors, {}]);
-                                    }}>
-                                        + Add Row
-                                    </button> */}
                                     <button className="tm-modal-generate-table" onClick={generateTables}>Generate Table</button>
                                 </div>
                             </div>
                         </div>
                     )}
+
                     {/* Edit Table Modal */}
                     <div className="tm-edit-tables-section">
                         {editRowId && (
@@ -1197,55 +1164,319 @@ const TableManagement = () => {
                                         <h3>Edit Table</h3>
                                         <button className="tm-edit-modal-close" onClick={cancelEdit}><FaTimes /></button>
                                     </div>
-                                    {tables.filter(table => table.id === editRowId).map(table => (
-                                        <div className="tm-edit-modal-body" key={table.id}>
-                                            <div className="tm-edit-modal-field">
-                                                <label>No of Seating</label>
-                                                <input
-                                                    type="number"
-                                                    value={table.table_type}
-                                                    onChange={e => handleEditChange(table.id, "table_type", e.target.value)}
-                                                />
+                                    {tables
+                                        .filter((table) => table.id === editRowId)
+                                        .map((table) => (
+                                            <div className="tm-edit-modal-body" key={table.id}>
+                                                <div className="tm-edit-modal-table-name">
+                                                    <span className="tm-edit-modal-label">Table Name:</span>
+                                                    <span className="tm-edit-modal-value">{table.name}</span>
+                                                </div>
+                                                <div className="tm-edit-modal-field">
+                                                    <label>No of Seating</label>
+                                                    <input
+                                                        type="number"
+                                                        value={table.table_type}
+                                                        onChange={(e) => handleEditChange(table.id, "table_type", e.target.value)}
+                                                    />
+                                                </div>
+                                                <div className="tm-edit-modal-field">
+                                                    <label>Type</label>
+                                                    <select
+                                                        value={table.location_zone}
+                                                        onChange={(e) => handleEditChange(table.id, "location_zone", e.target.value)}
+                                                    >
+                                                        <option value="AC">AC</option>
+                                                        <option value="Non-AC">Non-AC</option>
+                                                    </select>
+                                                </div>
+                                                <div className="tm-edit-modal-field">
+                                                    <label>Remark</label>
+                                                    <select
+                                                        value={table.status || ""}
+                                                        onChange={(e) => handleEditChange(table.id, "status", e.target.value)}
+                                                    >
+                                                        <option value="Vacant">Vacant</option>
+                                                        <option value="Occupied">Occupied</option>
+                                                        <option value="Reserved">Reserved</option>
+                                                    </select>
+                                                </div>
+                                                <div className="tm-edit-modal-btns">
+                                                    <button className="tm-edit-modal-save" onClick={() => saveEdit(table)}>
+                                                        <FaCheck />
+                                                    </button>
+                                                    <button className="tm-edit-modal-cancel" onClick={cancelEdit}>
+                                                        <FaTimes />
+                                                    </button>
+                                                </div>
                                             </div>
-                                            <div className="tm-edit-modal-field">
-                                                <label>Type</label>
-                                                <select
-                                                    value={table.location_zone}
-                                                    onChange={e => handleEditChange(table.id, "location_zone", e.target.value)}
-                                                >
-                                                    <option value="AC">AC</option>
-                                                    <option value="Non-AC">Non-AC</option>
-                                                </select>
-                                            </div>
-                                            <div className="tm-edit-modal-field">
-                                                <label>Remark</label>
-                                                <select
-                                                    value={table.status || ""}
-                                                    onChange={e => handleEditChange(table.id, "status", e.target.value)}
-                                                >
-                                                    <option value="Vacant">Vacant</option>
-                                                    <option value="Occupied">Occupied</option>
-                                                    <option value="Reserved">Reserved</option>
-                                                </select>
-                                            </div>
-
-                                            <div className="tm-edit-modal-btns">
-                                                <button className="tm-edit-modal-save" onClick={() => saveEdit(table)}><FaCheck /></button>
-                                                <button className="tm-edit-modal-cancel" onClick={cancelEdit}><FaTimes /></button>
-                                            </div>
-                                        </div>
-                                    ))}
+                                        ))}
                                 </div>
                             </div>
                         )}
                     </div>
-                    {/* Delete Modal */}
+
+                    {/* Bulk Update Modal */}
+                    {showBulkUpdate && (
+                        <div className="tm-bulk-modal-overlay">
+                            <div className="tm-bulk-modal">
+                            <div className="tm-bulk-global-update-row">
+    <div className="tm-bulk-field">
+        <label>Seating</label>
+        <input
+            type="number"
+            value={bulkUpdateGlobal.table_type}
+            onChange={e => setBulkUpdateGlobal(prev => ({ ...prev, table_type: e.target.value }))}
+        />
+    </div>
+    <div className="tm-bulk-field">
+        <label>Status</label>
+        <select
+            value={bulkUpdateGlobal.status}
+            onChange={e => setBulkUpdateGlobal(prev => ({ ...prev, status: e.target.value }))}
+        >
+            <option value="">-- Select --</option>
+            <option value="Vacant">Vacant</option>
+            <option value="Occupied">Occupied</option>
+            <option value="Reserved">Reserved</option>
+        </select>
+    </div>
+    <div className="tm-bulk-field">
+        <label>Zone</label>
+        <select
+            value={bulkUpdateGlobal.location_zone}
+            onChange={e => setBulkUpdateGlobal(prev => ({ ...prev, location_zone: e.target.value }))}
+        >
+            <option value="">-- Select --</option>
+            <option value="AC">AC</option>
+            <option value="Non-AC">Non-AC</option>
+        </select>
+    </div>
+</div>
+
+                                <div className="tm-bulk-modal-header">
+                                    <h3>Bulk Update Tables</h3>
+                                    <button className="tm-modal-close" onClick={() => setShowBulkUpdate(false)}>
+                                        <FaTimes />
+                                    </button>
+                                </div>
+
+                                <div className="tm-bulk-modal-search">
+                                    {/* <FaSearch className="tm-search-icon" /> */}
+                                    <input
+                                        type="text"
+                                        placeholder="Search tables to update..."
+                                        value={bulkUpdateSearch}
+                                        onChange={(e) => setBulkUpdateSearch(e.target.value)}
+                                    />
+                                </div>
+
+                                <div className="tm-bulk-select-all">
+                                    <label>
+                                        <input
+                                            type="checkbox"
+                                            checked={selectedUpdateTables.length === getFilteredUpdateTables().length && getFilteredUpdateTables().length > 0}
+                                            onChange={selectAllUpdateTables}
+                                        />
+                                        <span>Select All ({selectedUpdateTables.length} selected)</span>
+                                    </label>
+                                </div>
+
+                                <div className="tm-bulk-table-list">
+                                    {getFilteredUpdateTables().map(table => (
+                                        <div key={table.id} className="tm-bulk-table-item">
+                                            <div className="tm-bulk-table-checkbox">
+                                                <input
+                                                    type="checkbox"
+                                                    checked={selectedUpdateTables.includes(table.id)}
+                                                    onChange={() => toggleUpdateTableSelection(table.id)}
+                                                />
+                                                <span className="tm-bulk-table-name">{table.name}</span>
+                                            </div>
+
+                                            {selectedUpdateTables.includes(table.id) && (
+                                                <div className="tm-bulk-table-fields">
+                                                    <div className="tm-bulk-field">
+                                                        <label>Seating</label>
+                                                        <input
+                                                            type="number"
+                                                            value={bulkUpdateData[table.id]?.table_type || table.table_type}
+                                                            onChange={(e) => handleBulkUpdateChange(table.id, 'table_type', e.target.value)}
+                                                        />
+                                                    </div>
+                                                    <div className="tm-bulk-field">
+    <label>Status</label>
+    <select
+        value={bulkUpdateData[table.id]?.status || table.status}
+        onChange={(e) => handleBulkUpdateChange(table.id, 'status', e.target.value)}
+    >
+        <option value="Vacant">Vacant</option>
+        <option value="Occupied">Occupied</option>
+        <option value="Reserved">Reserved</option>
+    </select>
+</div>
+
+<div className="tm-bulk-field">
+    <label>Zone</label>
+    <select
+        value={bulkUpdateData[table.id]?.location_zone || table.location_zone}
+        onChange={(e) => handleBulkUpdateChange(table.id, 'location_zone', e.target.value)}
+    >
+        <option value="AC">AC</option>
+        <option value="Non-AC">Non-AC</option>
+        {/* Add more zones if needed */}
+    </select>
+</div>
+
+                                                </div>
+                                            )}
+                                        </div>
+                                    ))}
+                                </div>
+
+                                <div className="tm-bulk-modal-footer">
+                                    <button
+                                        className="tm-bulk-save-btn"
+                                        onClick={saveBulkUpdate}
+                                        disabled={selectedUpdateTables.length === 0}
+                                    >
+                                        <FaCheck /> Update {selectedUpdateTables.length} Table(s)
+                                    </button>
+                                    <button className="tm-bulk-cancel-btn" onClick={() => setShowBulkUpdate(false)}>
+                                        <FaTimes /> Cancel
+                                    </button>
+                                </div>
+                            </div>
+                        </div>
+                    )}
+
+                    {/* Bulk Delete Modal */}
+                    {showBulkDelete && (
+                        <div className="tm-bulk-modal-overlay">
+                            <div className="tm-bulk-modal">
+                                <div className="tm-bulk-modal-header">
+                                    <h3>Bulk Delete Tables</h3>
+                                    <button className="tm-modal-close" onClick={() => setShowBulkDelete(false)}>
+                                        <FaTimes />
+                                    </button>
+                                </div>
+
+                                <div className="tm-bulk-modal-search">
+                                    <FaSearch className="tm-search-icon" />
+                                    <input
+                                        type="text"
+                                        placeholder="Search tables to delete..."
+                                        value={bulkDeleteSearch}
+                                        onChange={(e) => setBulkDeleteSearch(e.target.value)}
+                                    />
+                                </div>
+
+                                <div className="tm-bulk-select-all">
+                                    <label>
+                                        <input
+                                            type="checkbox"
+                                            checked={selectedDeleteTables.length === getFilteredDeleteTables().length && getFilteredDeleteTables().length > 0}
+                                            onChange={selectAllDeleteTables}
+                                        />
+                                        <span>Select All ({selectedDeleteTables.length} selected)</span>
+                                    </label>
+                                </div>
+
+                                <div className="tm-bulk-table-list tm-bulk-delete-list">
+                                    {getFilteredDeleteTables().map(table => (
+                                        <div key={table.id} className="tm-bulk-table-item tm-bulk-delete-item">
+                                            <label className="tm-bulk-delete-checkbox">
+                                                <input
+                                                    type="checkbox"
+                                                    checked={selectedDeleteTables.includes(table.id)}
+                                                    onChange={() => toggleDeleteTableSelection(table.id)}
+                                                />
+                                                <div className="tm-bulk-delete-info">
+                                                    <span className="tm-bulk-table-name">{table.name}</span>
+                                                    <span className="tm-bulk-table-details">
+                                                        Seating: {table.table_type}  | Status: {table.status}
+                                                    </span>
+                                                </div>
+                                            </label>
+                                        </div>
+                                    ))}
+                                </div>
+
+                                <div className="tm-bulk-modal-footer">
+                                    <button
+                                        className="tm-bulk-delete-confirm-btn"
+                                        onClick={() => {
+                                            setShowBulkDelete(false);
+                                            setShowFirstDeleteConfirm(true);
+                                        }}
+                                        disabled={selectedDeleteTables.length === 0}
+                                    >
+                                        <FaTrash /> Delete {selectedDeleteTables.length} Table(s)
+                                    </button>
+                                    <button className="tm-bulk-cancel-btn" onClick={() => setShowBulkDelete(false)}>
+                                        <FaTimes /> Cancel
+                                    </button>
+                                </div>
+                            </div>
+                        </div>
+                    )}
+
+                    {/* First Delete Confirmation */}
+                    {showFirstDeleteConfirm && (
+                        <div className="tm-confirm-overlay">
+                            <div className="tm-confirm-modal-card">
+                                <div className="tm-confirm-icon-warning">⚠️</div>
+                                <h3>Confirm Deletion</h3>
+                                <p>Are you sure you want to delete <strong>{selectedDeleteTables.length}</strong> table(s)?</p>
+                                <div className="tm-confirm-table-list">
+                                    {tables.filter(t => selectedDeleteTables.includes(t.id)).map(t => (
+                                        <span key={t.id} className="tm-confirm-table-tag">{t.name}</span>
+                                    ))}
+                                </div>
+                                <div className="tm-confirm-modal-btns">
+                                    <button className="tm-confirm-warning" onClick={() => {
+                                        setShowFirstDeleteConfirm(false);
+                                        setShowSecondDeleteConfirm(true);
+                                    }}>
+                                        Yes, Continue
+                                    </button>
+                                    <button className="tm-confirm-cancel" onClick={() => setShowFirstDeleteConfirm(false)}>
+                                        Cancel
+                                    </button>
+                                </div>
+                            </div>
+                        </div>
+                    )}
+
+                    {/* Second Delete Confirmation */}
+                    {showSecondDeleteConfirm && (
+                        <div className="tm-confirm-overlay">
+                            <div className="tm-confirm-modal-card tm-confirm-danger-modal">
+                                <div className="tm-confirm-icon-danger">🗑️</div>
+                                <h3>Final Confirmation</h3>
+                                <p className="tm-confirm-danger-text">
+                                    This action is <strong>irreversible</strong>. All selected tables will be permanently deleted.
+                                </p>
+                                <div className="tm-confirm-modal-btns">
+                                    <button className="tm-confirm-danger" onClick={confirmBulkDelete}>
+                                        <FaTrash /> Confirm Delete
+                                    </button>
+                                    <button className="tm-confirm-cancel" onClick={() => {
+                                        setShowSecondDeleteConfirm(false);
+                                        setShowFirstDeleteConfirm(false);
+                                    }}>
+                                        Cancel
+                                    </button>
+                                </div>
+                            </div>
+                        </div>
+                    )}
+
+                    {/* Single Delete Modal */}
                     {showConfirmDelete && (
                         <div className="tm-confirm-overlay">
                             <div className="tm-confirm-modal-card">
-                                <p>
-                                    Delete table <strong>{tables.find(t => t.id === deleteTableId)?.name || "this table"}</strong>?
-                                </p>
+                                <p>Delete table <strong>{tables.find(t => t.id === deleteTableId)?.name || "this table"}</strong>?</p>
                                 <div className="tm-confirm-modal-btns">
                                     <button className="tm-confirm-danger" onClick={confirmDelete}>Yes</button>
                                     <button className="tm-confirm-cancel" onClick={() => setShowConfirmDelete(false)}>No</button>
@@ -1253,10 +1484,12 @@ const TableManagement = () => {
                             </div>
                         </div>
                     )}
-
                 </main>
             </div>
         </div>
     );
 };
+
 export default TableManagement;
+
+// =============================================================
