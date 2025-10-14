@@ -352,7 +352,53 @@ const TableManagement = () => {
         const matchesStatus = !statusFilter || table.status === statusFilter;
         return matchesSearch && matchesStatus;
     });
-
+    const handleBulkDelete = async () => {
+        try {
+          const tablesToDelete = tables.filter(t => t.name.startsWith(bulkDeleteSeries));
+          for (const table of tablesToDelete) {
+            await tableServicesPort.post(`/${clientId}/tables/delete`, {
+              id: table.id,
+              client_id: clientId,
+              name: "",
+              table_type: "",
+              location_zone: "",
+            }, { headers: { Authorization: `Bearer ${token}` } });
+          }
+          fetchTables();
+        } catch (err) {
+          console.error("Bulk delete error", err);
+        } finally {
+          setShowSecondDeleteConfirm(false);
+          setBulkDeleteSeries("");
+        }
+      };
+      const handleBulkUpdate = async () => {
+        if (!bulkUpdateSeries || (!bulkUpdateSeating && !bulkUpdateZone)) {
+          alert("Enter a series and at least one change (seating/zone)");
+          return;
+        }
+        try {
+          const tablesToUpdate = tables.filter(t => t.name.startsWith(bulkUpdateSeries));
+          for (const table of tablesToUpdate) {
+            const updatedTable = {
+              ...table,
+              ...(bulkUpdateSeating && { table_type: bulkUpdateSeating.toString() }),
+              ...(bulkUpdateZone && { location_zone: bulkUpdateZone })
+            };
+            await tableServicesPort.post(`/${clientId}/tables/update`, updatedTable, {
+              headers: { Authorization: `Bearer ${token}` }
+            });
+          }
+          fetchTables();
+          setBulkUpdateSeries("");
+          setBulkUpdateSeating("");
+          setBulkUpdateZone("");
+        } catch (err) {
+          console.error("Bulk update error", err);
+        }
+      };
+      
+            
     return (
         <div className="Table-Creation-Management">
             <div className={`tm-bg ${darkMode ? 'tm-dark-mode' : ''}`}>
@@ -722,6 +768,9 @@ const TableManagement = () => {
                                                     onChange={() => toggleUpdateTableSelection(table.id)}
                                                 />
                                                 <span className="tm-bulk-table-name">{table.name}</span>
+                                                <span className="tm-bulk-table-details">
+                                                        Seating: {table.table_type}  | Status: {table.status}
+                                                    </span>
                                             </div>
 
                                             {selectedUpdateTables.includes(table.id) && (

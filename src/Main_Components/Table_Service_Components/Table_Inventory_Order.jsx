@@ -357,35 +357,7 @@ const Table_Inventory_Order = ({ onOrderUpdate }) => {
         <div className="Table-Selection-container">
 
             <div className={`view-tables-wrapper ${darkMode ? "dark" : "light"}`}>
-
-                {/* {!selectedTable && (
-                    <div className="viewmode-tabs">
-                        <button
-                            className={modeFromParams === "table" ? "active" : ""}
-                            onClick={() => setSearchParams({})}
-                        >
-                            Table
-                        </button>
-                        <button
-                        className={modeFromParams === "pickup" ? "active" : ""}
-                        onClick={() => handleModeClick("pickup")}
-                    >
-                        Pickup
-                    </button>
-                    <button
-                        className={modeFromParams === "delivery" ? "active" : ""}
-                        onClick={() => handleModeClick("delivery")}
-                    >
-                        Delivery
-                    </button>
-                    </div>
-                )} */}
-
-                {!selectedTable && (
-
-                    <>
-
-
+  {!selectedTable && (  <>
                         <div className="tm-stats-grid">
                             <div className="tm-stats-card">
                                 <div className="tm-stats-flex">
@@ -566,75 +538,7 @@ const Table_Inventory_Order = ({ onOrderUpdate }) => {
 
 
                         </div>
-
-
-                        {/* <div className="item-pane">
-  <div className="grid-layout">
-    {activeCategory?.toLowerCase() === "all" ? (
-      <>
-
-        {categories
-          .filter(c => c.id !== "all")
-          .map(cat => {
-            const catItems = items.filter(item => item.category_id === cat.id)
-                                   .filter(item => item.name.toLowerCase().includes(searchTerm.toLowerCase()));
-            if (catItems.length === 0) return null;
-
-            return (
-              <React.Fragment key={cat.id}>
-               <div className="layout">
-                 <div className="grids" style={{ width: "100%", pointerEvents: "none", background: "transparent", boxShadow: "none" }}>
-                  <strong>{cat.name}</strong>
-                </div>
-                {catItems.map(item => (
-                  <div key={item.id} className="grids" onClick={() => handleItemClick(item)}>
-                    <h4>{item.name}</h4>
-                    <div className="item-price">₹{item.unit_price}</div>
-                  </div>
-                ))}
-               </div>
-              </React.Fragment>
-            );
-          })}
-
-        {(() => {
-          const uncategorizedItems = items.filter(item => !categories.some(c => c.id === item.category_id) || !item.category_id)
-                                          .filter(item => item.name.toLowerCase().includes(searchTerm.toLowerCase()));
-
-          if (uncategorizedItems.length === 0) return null;
-
-          return (
-            <React.Fragment key="uncategorized">
-              <div className="grids" style={{ width: "100%", pointerEvents: "none", background: "transparent", boxShadow: "none" }}>
-                <strong>Uncategorized</strong>
-              </div>
-              {uncategorizedItems.map(item => (
-                <div key={item.id} className="grids" onClick={() => handleItemClick(item)}>
-                  <h4>{item.name}</h4>
-                  <div className="item-price">₹{item.unit_price}</div>
-                </div>
-              ))}
-            </React.Fragment>
-          );
-        })()}
-      </>
-    ) : (
-      getFilteredItems().map(item => (
-        <div key={item.id} className="grids" onClick={() => handleItemClick(item)}>
-          <h4>{item.name}</h4>
-          <div className="item-price">₹{item.unit_price}</div>
-        </div>
-      ))
-    )}
-  </div>
-</div> */}
-
-
-
-
-
-
-                    </div>
+ </div>
                 )}
             </div>
         </div>

@@ -31,13 +31,15 @@ Installation : git clone <https://github.com/srinidhinsn/saas.git>
 
                
 Dependencies installation : npm install react-router-dom
-                            npm install react-charts
+                            npm install recharts
                             npm install react-icons
                             npm install axios
                             npm install jwt-decode
                             npm install xlsx file-saver
                             npm install react-toastify
                             npm install jspdf jspdf-autotable
+                            npm install express
+                            npm install path
                             npm install motion
 
 
