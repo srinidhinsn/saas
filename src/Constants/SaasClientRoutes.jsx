@@ -1,7 +1,5 @@
-import React, { useEffect, useState } from "react";
-import { Routes, Route, useParams, Navigate, useLocation } from "react-router-dom";
-import { jwtDecode } from "jwt-decode";
-import api, { getValidToken } from "./Api";
+import React, { useEffect } from "react";
+import { Routes, Route, useParams, Navigate, useNavigate } from "react-router-dom";
 import Navbar from "./Navbar";
 import HeaderBar from "./HeaderPage";
 import AuthModal from "./AuthModel";
@@ -59,84 +57,96 @@ const SaasClientRoutes = ({
       if (decoded.user_id) setUserId(decoded.user_id);
     } catch (err) {
       console.error("❌ Token decode failed", err);
-    }
-  }, [token]);
+    }},[token]);
 
-  // Ensure localStorage clientId consistency
-  useEffect(() => {
-    const storedClient = localStorage.getItem("clientId");
-    if (storedClient && storedClient !== clientId) {
-      localStorage.clear();
-      window.location.href = `/saas/${clientId}/login`;
-    } else if (clientId) {
-      localStorage.setItem("clientId", clientId);
-    }
-  }, [clientId]);
+    // ✅ Sync clientId and token to localStorage
+    useEffect(() => {
+        if (clientId) localStorage.setItem("clientId", clientId);
+        // if (accessToken) localStorage.setItem("access_token", accessToken);
+    }, [clientId]);
 
-  // Listen for global 403 event
-  useEffect(() => {
-    const handleDenied = () => setAccessDenied(true);
-    window.addEventListener("accessDenied", handleDenied);
-    return () => window.removeEventListener("accessDenied", handleDenied);
-  }, []);
+    // ❗ Optional: Force logout if different client is loaded
+    useEffect(() => {
+        const storedClient = localStorage.getItem("clientId");
+        if (storedClient && storedClient !== clientId) {
+            console.warn("Client mismatch. Resetting session.");
+            localStorage.clear();
+            window.location.href = `/saas/${clientId}/login`;
+        }
+    }, [clientId]);
+    useEffect(() => {
+        if (!clientId) {
+            console.error("❌ Missing client ID. Cannot fetch tables.");
+            return;
+        }
+    }, [clientId]);
 
-  // Reset access denied when route changes
-  useEffect(() => {
-    setAccessDenied(false);
-  }, [location.pathname]);
+    return (
+        <>
 
-  // Delegated token success handler
-  const handleAuthSuccess = (delegatedToken, expiresAt) => {
-    console.log("Delegated token received:", delegatedToken);
-    localStorage.setItem("delegated_token", delegatedToken);
-    setAccessDenied(false);
-  };
+            <HeaderBar />
+            <div className="app-wrapper" style={{ display: "flex" }}>
+                {!hideNavbar && <Navbar />}
+                <div className="main-layout" style={{ flex: 1, overflowY: "auto" }}>
+                    <Routes>
+                        <Route path="/" element={<DashBoardPage />} />
+                        {/* <Route path="update-profile" element={<UpdateProfile />} />
+                    <Route path="settings" element={<Settings />} /> */}
+                        {/* <Route path="dinein-page" element={<MenuManager clientId={clientId} />} /> */}
+                        {/* <Route path="swiggy-page" element={<SwiggyMenuManager clientId={clientId} />} />
+                    <Route path="zomato-page" element={<ZomatoMenuManager clientId={clientId} />} /> */}
+                        <Route path="menu-page/*" element={<MenuManager clientId={clientId} />} />
+                        <Route
+                            path="table-selection"
+                            element={
+                                <TableManagement
+                                    clientId={clientId}
+                                    onTableAdded={(newTable) => {
+                                        setSelectedTableId(newTable.table_number);
+                                        fetchTables();
+                                    }}
+                                />
+                            }
+                        />
+                        <Route
+                            path="view-tables/:tableId?"
+                            element={<ViewTables clientId={clientId} onOrderUpdate={setLatestOrder} />}
+                        />
+                        <Route
+                            path="order-form"
+                            element={<OrderForm tableId={selectedTableId} clientId={clientId} onOrderCreated={() => { }} />}
+                        />
+                        <Route path="orders-view" element={<OrdersVisiblePage latestOrder={latestOrder} />} />
+                        <Route path="invoice" element={<Invoice_Page />} />
+                        <Route path="reports" element={<ReportService />} />
+                        <Route path="kds-page" element={<KitchenDisplay />} />
+                        <Route path="notifications" element={<Notifications />} />
+                        <Route path="add-users" element={<Add_user />} />
+                        {/* <Route path="documents" element={<OrderSummary />} /> */}
+                        <Route path="user-details" element={<PersonForm />} />
 
-  return (
-    <>
-      <HeaderBar />
-      <div className="app-wrapper" style={{ display: "flex" }}>
-        {!hideNavbar && <Navbar />}
-        <div className="main-layout" style={{ flex: 1, overflowY: "auto" }}>
-          {accessDenied ? (
-            <AccessDenied onAuthClick={() => setAuthModalOpen(true)} />
-          ) : (
-            <Routes>
-              <Route path="/" element={<DashBoardPage />} />
-              <Route path="menu-page/*" element={<MenuManager clientId={clientId} />} />
-              <Route path="table-selection" element={<TableManagement clientId={clientId} />} />
-              <Route
-                path="view-tables/:tableId?"
-                element={<ViewTables clientId={clientId} onOrderUpdate={setLatestOrder} />}
-              />
-              <Route path="order-form" element={<OrderForm tableId={selectedTableId} clientId={clientId} />} />
-              <Route path="orders-view" element={<OrdersVisiblePage latestOrder={latestOrder} />} />
-              <Route path="invoice" element={<Invoice_Page />} />
-              <Route path="reports" element={<ReportService />} />
-              <Route path="kds-page" element={<KitchenDisplay />} />
-              <Route path="notifications" element={<Notifications />} />
-              <Route path="user-details" element={<PersonForm />} />
-              <Route path="all-notifications" element={<NotificationTable />} />
-              <Route path="popup-notifications" element={<PopupNotification />} />
-              <Route path="role-config" element={<RoleConfig />} />
-              <Route path="/billing" element={<BillingPage />} />
-              <Route path="add-users" element={<Add_user />} />
-              <Route path="*" element={<Navigate to="/" />} />
-            </Routes>
-          )}
-        </div>
-      </div>
+                        <Route path="all-notifications" element={<NotificationTable />} />
+                        <Route path="popup-notifications" element={<PopupNotification />} />
 
-      <AuthModal
-        isOpen={authModalOpen}
-        onClose={() => setAuthModalOpen(false)}
-        onSuccess={handleAuthSuccess}
-        clientId={clientId}
-        requesterId={userId} // current user id
-        page={location.pathname} // page user is trying to access
-      />
-    </>
-  );
+                        <Route path="/billing" element={<BillingPage />} />
+
+                        {/* <Route path="documents" element={<Documents />} />
+                    <Route path="billing" element={<BillingPage />} />
+                    <Route path="invoice" element={<InvoicePage />} />
+                    <Route path="report-page" element={<ReportsPage />} />
+                    <Route path="add-users" element={<ReportsPage />} /> */}
+                        {/* <Route
+                        path="table-overview"
+                        element={<TableOverview clientId={clientId} tables={tables} />}
+                    /> */}
+                        <Route path="*" element={<Navigate to="/" />} />
+                    </Routes>
+                </div>
+            </div>
+
+        </>
+
+    );
 };
 
 export default SaasClientRoutes;

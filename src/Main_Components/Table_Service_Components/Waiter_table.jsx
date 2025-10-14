@@ -1,6 +1,4 @@
-
 import React, { useEffect, useState } from "react";
-import { FiSun, FiMoon } from "react-icons/fi";
 import { useTheme } from "../../ThemeChangerComponent/ThemeProvider";
 import { FaEdit, FaTrash, FaCheck, FaTimes, FaSearch, FaUsers, FaClock, FaChartLine, FaPlus, FaUser, FaUtensils } from "react-icons/fa";
 import axios from 'axios';
