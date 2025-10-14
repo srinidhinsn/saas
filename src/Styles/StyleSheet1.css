@@ -4854,8 +4854,10 @@ body {
 
 .categories-list {
     flex: 1;
-    padding: 1rem;
+    max-height:80vh; /* adjust as needed for your layout */
     overflow-y: auto;
+    padding-right: 5px; /* optional: avoid scrollbar overlapping content */
+    scrollbar-width: thin;
 }
 
 .category-item {

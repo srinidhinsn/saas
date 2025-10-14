@@ -349,12 +349,12 @@ function CategoryList({ onCategorySelect }) {
 
 
     const handleEditSave = async () => {
-        let finalEditSubcategories = [...editSubcategories];
-
         if (!editingId) return;
-
+    
+        let finalEditSubcategories = [...editSubcategories];
         let createdBy = "null";
         let updatedBy = "null";
+    
         try {
             const decoded = jwtDecode(token);
             createdBy = String(decoded.user_id);
@@ -362,11 +362,12 @@ function CategoryList({ onCategorySelect }) {
         } catch (err) {
             console.error("Token decode failed:", err);
         }
-
+    
+        // 1️⃣ Create a new subcategory if entered
         if (editNewSubcategoryName.trim()) {
             const newSubId = uuidv4();
-            const tempParentMap = { [newSubId]: editingId };
-
+            const tempParentMap = { [newSubId]: editingId.trim() };
+    
             const newSubPayload = {
                 id: newSubId,
                 client_id: clientId,
@@ -377,36 +378,34 @@ function CategoryList({ onCategorySelect }) {
                 updated_by: updatedBy,
                 slug: generateSlugFromParents(newSubId, editNewSubcategoryName.trim(), tempParentMap),
             };
-
+    
             try {
                 const subRes = await inventoryServicesPort.post(
                     `/${clientId}/menu/create_category`,
                     newSubPayload,
                     { headers: { Authorization: `Bearer ${token}` } }
                 );
-                const createdSubId = subRes.data.data.id;
-                finalEditSubcategories.push(createdSubId);
+                finalEditSubcategories.push(subRes.data.data.id);
             } catch (err) {
                 console.error("Error creating subcategory:", err.response?.data || err);
                 alert("Failed to create subcategory");
                 return;
             }
         }
-
-
-        await refreshCategoriesAndParentMap();
-
+    
+        // 2️⃣ Generate updated slug for main category
         const slug = generateSlugFromParents(editingId, editName.trim());
-
+    
+        // 3️⃣ Prepare payload for update
         const payload = {
             id: editingId,
             name: editName.trim(),
             description: editDescription.trim(),
             sub_categories: finalEditSubcategories,
             slug,
-            overwrite_subcategories: true
+            overwrite_subcategories: true,
         };
-
+    
         try {
             await inventoryServicesPort.post(
                 `/${clientId}/menu/update_category`,
@@ -418,9 +417,11 @@ function CategoryList({ onCategorySelect }) {
                     },
                 }
             );
-
+    
+            // ✅ Single refresh after everything is done
             await refreshCategoriesAndParentMap();
-
+    
+            // Reset state
             setEditingId(null);
             setEditNewSubcategoryName("");
             setShowEditModal(false);
@@ -429,7 +430,7 @@ function CategoryList({ onCategorySelect }) {
             alert("Failed to update category.");
         }
     };
-
+    
 
 
 
@@ -485,9 +486,9 @@ function CategoryList({ onCategorySelect }) {
             {/* Header */}
             <div className="sidebar-header">
                 <h2>Categories</h2>
-                <button className="add-btn" onClick={() => setShowAddModal(true)}>
+                {/* <button className="add-btn" onClick={() => setShowAddModal(true)}>
                     ➕
-                </button>
+                </button> */}
             </div>
 
             {/* Categories List */}
