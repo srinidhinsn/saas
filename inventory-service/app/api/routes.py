@@ -9,7 +9,7 @@ from entity.inventory_entity import CategoryEntity
 from models.response_model import ResponseModel
 from models.saas_context import SaasContext
 from utils.auth import verify_token
-from app.services import service
+from services import service
 
 router = APIRouter()
 

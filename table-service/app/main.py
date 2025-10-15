@@ -1,6 +1,6 @@
 from fastapi import FastAPI, Request
 from fastapi.middleware.cors import CORSMiddleware
-from app.api.routes import router as table_router
+from api.routes import router as table_router
 import logging
 import logging.config
 import time
@@ -21,7 +21,7 @@ app.add_middleware(
 
 @app.get('/')
 def root():
-    return {"Table Service": "Running on 8001"}
+    return {"Table Service": "Running on 8003"}
 
 
 app.include_router(table_router, prefix="/saas/{client_id}/tables")
@@ -45,4 +45,4 @@ async def read_root():
 
 if __name__ == "__main__":
     import uvicorn
-    uvicorn.run(app, host="127.0.0.1", port=8001)
+    uvicorn.run(app, host="127.0.0.1", port=8003)
