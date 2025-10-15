@@ -356,17 +356,6 @@ INSERT INTO category (id, client_id, name, description, sub_categories, slug, cr
 INSERT INTO category (id, client_id, name, description, sub_categories, slug, created_by, updated_by, created_at, updated_at) VALUES ('red_wire_01', 'ram_manufacturing', 'RED_WIRE', 'All red wires', NULL, NULL, '1000', '1000', '2025-09-25 01:36:00.080849', '2025-09-25 01:36:00.080849');
 INSERT INTO category (id, client_id, name, description, sub_categories, slug, created_by, updated_by, created_at, updated_at) VALUES ('switch_01', 'ram_manufacturing', 'SWITCH', 'All switches', NULL, NULL, '1000', '1000', '2025-09-25 01:36:00.080849', '2025-09-25 01:36:00.080849');
 INSERT INTO category (id, client_id, name, description, sub_categories, slug, created_by, updated_by, created_at, updated_at) VALUES ('switch_02', 'ram_manufacturing', 'DP SWITCH', 'All switches', '{red_wire_01}', NULL, '1000', '1000', '2025-09-25 01:36:00.080849', '2025-09-25 01:36:00.080849');
-INSERT INTO category (id, client_id, name, description, sub_categories, slug, created_by, updated_by, created_at, updated_at) VALUES ('realm', 'saas', 'Realm', 'Realm of overall application framework', '{restaurant}', '_Realm', NULL, NULL, '2025-09-19 02:27:03.632856', '2025-09-19 02:27:03.632856');
-INSERT INTO category (id, client_id, name, description, sub_categories, slug, created_by, updated_by, created_at, updated_at) VALUES ('restaurant', 'saas', 'Restaurant', 'Restaurant realm in saas application', '{dinein,order,menu,users,tables,invoice,menu,document,order_item,order_items}', '_Realm_Restaurant', NULL, NULL, '2025-09-19 02:27:03.632856', '2025-09-19 02:27:03.632856');
-INSERT INTO category (id, client_id, name, description, sub_categories, slug, created_by, updated_by, created_at, updated_at) VALUES ('dinein', 'saas', 'Dinein', 'All access to dine in module', '{create,update,order,table,delete}', '_Realm_Restaurant_Dinein', NULL, NULL, '2025-09-19 02:27:03.632856', '2025-09-19 02:27:03.632856');
-INSERT INTO category (id, client_id, name, description, sub_categories, slug, created_by, updated_by, created_at, updated_at) VALUES ('order_items', 'saas', 'Order Items', 'All access to order items module', '{update}', '_Realm_Restaurant_Order Items', NULL, NULL, '2025-09-19 02:27:03.632856', '2025-09-19 02:27:03.632856');
-INSERT INTO category (id, client_id, name, description, sub_categories, slug, created_by, updated_by, created_at, updated_at) VALUES ('order', 'saas', 'Order', 'All access to order module', '{update}', '_Realm_Restaurant_Order', NULL, NULL, '2025-09-19 02:27:03.632856', '2025-09-19 02:27:03.632856');
-INSERT INTO category (id, client_id, name, description, sub_categories, slug, created_by, updated_by, created_at, updated_at) VALUES ('order_item', 'saas', 'Order item', 'Single order item accessibility', '{update,delete}', '_Realm_Restaurant_Order item', NULL, NULL, '2025-09-19 02:27:03.632856', '2025-09-19 02:27:03.632856');
-INSERT INTO category (id, client_id, name, description, sub_categories, slug, created_by, updated_by, created_at, updated_at) VALUES ('menu', 'saas', 'Menu', 'All access related to menu configuration', '{create,update,read,delete,read_category,update_category,delete_category,create_category}', '_Realm_Restaurant_Menu', NULL, NULL, '2025-09-19 02:27:03.632856', '2025-09-19 02:27:03.632856');
-INSERT INTO category (id, client_id, name, description, sub_categories, slug, created_by, updated_by, created_at, updated_at) VALUES ('tables', 'saas', 'Tables', 'Table management accesses', '{create,update,read,delete}', '_Realm_Restaurant_Tables', NULL, NULL, '2025-09-19 02:27:03.632856', '2025-09-19 02:27:03.632856');
-INSERT INTO category (id, client_id, name, description, sub_categories, slug, created_by, updated_by, created_at, updated_at) VALUES ('users', 'saas', 'Users', 'User management accesses', '{register,login,add,reset-password,test,test2,test3}', '_Realm_Restaurant_Users', NULL, NULL, '2025-09-19 02:27:03.632856', '2025-09-19 02:27:03.632856');
-INSERT INTO category (id, client_id, name, description, sub_categories, slug, created_by, updated_by, created_at, updated_at) VALUES ('invoice', 'saas', 'Billing', 'Billing generation and update service accessibility', '{create,update,read,delete,read_document,update_document,delete_document,create_document,from-order-service,generate,issue}', '_Realm_Restaurant_Billing', NULL, NULL, '2025-09-19 02:27:03.632856', '2025-09-19 02:27:03.632856');
-INSERT INTO category (id, client_id, name, description, sub_categories, slug, created_by, updated_by, created_at, updated_at) VALUES ('document', 'saas', 'Document', 'Document storage', '{read,upload,replace,download}', '_Realm_Restaurant_Document', NULL, NULL, '2025-09-19 02:27:03.632856', '2025-09-19 02:27:03.632856');
 INSERT INTO category (id, client_id, name, description, sub_categories, slug, created_by, updated_by, created_at, updated_at) VALUES ('roles', 'easyfood', 'Roles', 'Roles definition', '{admin,waiter,receptionist}', '_Roles', '1000', '1000', '2025-08-19 12:47:01.377214', '2025-08-19 12:47:01.377214');
 INSERT INTO category (id, client_id, name, description, sub_categories, slug, created_by, updated_by, created_at, updated_at) VALUES ('admin', 'easyfood', 'Admin', 'admin', NULL, '_Roles_Admin', '1000', '1000', '2025-08-19 12:47:01.377214', '2025-08-19 12:47:01.377214');
 INSERT INTO category (id, client_id, name, description, sub_categories, slug, created_by, updated_by, created_at, updated_at) VALUES ('waiter', 'easyfood', 'Waiter', 'admin', NULL, '_Roles_Waiter', '1000', '1000', '2025-08-19 12:47:01.377214', '2025-08-19 12:47:01.377214');
@@ -380,8 +369,6 @@ INSERT INTO category (id, client_id, name, description, sub_categories, slug, cr
 --
 
 INSERT INTO client (id, name, realm, email, phone, logo, saved_address_ids, created_date_time, updated_date_time) VALUES ('easyfood', 'Easy Food Restaurant', 'restaurant', 'easyfood@gmail.com', NULL, NULL, NULL, '2025-09-25 01:36:00.080849', '2025-09-25 01:36:00.080849');
-INSERT INTO client (id, name, realm, email, phone, logo, saved_address_ids, created_date_time, updated_date_time) VALUES ('easyfood', 'Easy Food Restaurant', 'restaurant', 'easyfood@gmail.com', NULL, NULL, NULL, '2025-09-24 00:58:32.821403', '2025-09-24 00:58:32.821403');
-
 
 --
 -- TOC entry 3390 (class 0 OID 49704)
@@ -493,54 +480,21 @@ INSERT INTO page_definition (id, client_id, module, role, screen_id, load_type, 
 INSERT INTO "user" (username, hashed_password, id, client_id, roles, grants) VALUES ('admin', '$2b$12$NcusUR2dTlmL/bwUYamZt.QOrGW9.ksrmFSQyx32Lc15VtWfyDPFC', '461e8cc6-a897-59b3-9f0e-1f2e19cd179c', 'easyfood', '{Admin}', '{restaurant}');
 
 
---
--- TOC entry 3413 (class 0 OID 0)
--- Dependencies: 226
--- Name: address_id_seq; Type: SEQUENCE SET; Schema: public; Owner: postgres
---
+INSERT INTO category (id, client_id, name, description, sub_categories, slug, created_by, updated_by, created_at, updated_at) VALUES ('realm', 'saas', 'Realm', 'Realm of overall application framework', '{restaurant}', '_Realm', NULL, NULL, '2025-09-19 02:27:03.632856', '2025-09-19 02:27:03.632856');
+INSERT INTO category (id, client_id, name, description, sub_categories, slug, created_by, updated_by, created_at, updated_at) VALUES ('restaurant', 'saas', 'Restaurant', 'Restaurant realm in saas application', '{dinein,order,menu,inventory,users,tables,invoice,menu,document,order_item,order_items,kds}', '_Realm_Restaurant', NULL, NULL, '2025-09-19 02:27:03.632856', '2025-09-19 02:27:03.632856');
+INSERT INTO category (id, client_id, name, description, sub_categories, slug, created_by, updated_by, created_at, updated_at) VALUES ('dinein', 'saas', 'Dinein', 'All access to dine in module', '{create,update,order,table,delete}', '_Realm_Restaurant_Dinein', NULL, NULL, '2025-09-19 02:27:03.632856', '2025-09-19 02:27:03.632856');
+INSERT INTO category (id, client_id, name, description, sub_categories, slug, created_by, updated_by, created_at, updated_at) VALUES ('order_items', 'saas', 'Order Items', 'All access to order items module', '{update}', '_Realm_Restaurant_Order Items', NULL, NULL, '2025-09-19 02:27:03.632856', '2025-09-19 02:27:03.632856');
+INSERT INTO category (id, client_id, name, description, sub_categories, slug, created_by, updated_by, created_at, updated_at) VALUES ('order', 'saas', 'Order', 'All access to order module', '{update}', '_Realm_Restaurant_Order', NULL, NULL, '2025-09-19 02:27:03.632856', '2025-09-19 02:27:03.632856');
+INSERT INTO category (id, client_id, name, description, sub_categories, slug, created_by, updated_by, created_at, updated_at) VALUES ('order_item', 'saas', 'Order item', 'Single order item accessibility', '{update,delete}', '_Realm_Restaurant_Order item', NULL, NULL, '2025-09-19 02:27:03.632856', '2025-09-19 02:27:03.632856');
+INSERT INTO category (id, client_id, name, description, sub_categories, slug, created_by, updated_by, created_at, updated_at) VALUES ('menu', 'saas', 'Menu', 'All access related to menu configuration', '{create,update,read,delete,delete_all,read_category,update_category,delete_category,create_category}', '_Realm_Restaurant_Menu', NULL, NULL, '2025-09-19 02:27:03.632856', '2025-09-19 02:27:03.632856');
+INSERT INTO category (id, client_id, name, description, sub_categories, slug, created_by, updated_by, created_at, updated_at) VALUES ('inventory', 'saas', 'Inventory', 'All access related to menu configuration', '{create,update,read,delete,read_category,update_category,delete_category,create_category}', '_Realm_Restaurant_Inventory', NULL, NULL, '2025-09-19 02:27:03.632856', '2025-09-19 02:27:03.632856');
+INSERT INTO category (id, client_id, name, description, sub_categories, slug, created_by, updated_by, created_at, updated_at) VALUES ('tables', 'saas', 'Tables', 'Table management accesses', '{create,update,read,delete}', '_Realm_Restaurant_Tables', NULL, NULL, '2025-09-19 02:27:03.632856', '2025-09-19 02:27:03.632856');
+INSERT INTO category (id, client_id, name, description, sub_categories, slug, created_by, updated_by, created_at, updated_at) VALUES ('users', 'saas', 'Users', 'User management accesses', '{register,login,add,reset-password,test,test2,test3}', '_Realm_Restaurant_Users', NULL, NULL, '2025-09-19 02:27:03.632856', '2025-09-19 02:27:03.632856');
+INSERT INTO category (id, client_id, name, description, sub_categories, slug, created_by, updated_by, created_at, updated_at) VALUES ('invoice', 'saas', 'Billing', 'Billing generation and update service accessibility', '{create,update,read,delete,read_document,update_document,delete_document,create_document,from-order-service,generate,issue}', '_Realm_Restaurant_Billing', NULL, NULL, '2025-09-19 02:27:03.632856', '2025-09-19 02:27:03.632856');
+INSERT INTO category (id, client_id, name, description, sub_categories, slug, created_by, updated_by, created_at, updated_at) VALUES ('document', 'saas', 'Document', 'Document storage', '{read,upload,replace,download}', '_Realm_Restaurant_Document', NULL, NULL, '2025-09-19 02:27:03.632856', '2025-09-19 02:27:03.632856');
+INSERT INTO category (id, client_id, name, description, sub_categories, slug, created_by, updated_by, created_at, updated_at) VALUES ('kds', 'saas', 'KDS', 'Kitchen Display', '{read,update,delete}', '_Realm_Restaurant_KDS', NULL, NULL, '2025-09-19 02:27:03.632856', '2025-09-19 02:27:03.632856');
 
-SELECT pg_catalog.setval('address_id_seq', 1000, false);
-
-
---
--- TOC entry 3414 (class 0 OID 0)
--- Dependencies: 215
--- Name: dineinorder_id_seq; Type: SEQUENCE SET; Schema: public; Owner: postgres
---
-
-SELECT pg_catalog.setval('dineinorder_id_seq', 1000, false);
-
-
---
--- TOC entry 3415 (class 0 OID 0)
--- Dependencies: 219
--- Name: inventory_id_seq; Type: SEQUENCE SET; Schema: public; Owner: postgres
---
-
-SELECT pg_catalog.setval('inventory_id_seq', 1000, false);
-
-
---
--- TOC entry 3416 (class 0 OID 0)
--- Dependencies: 217
--- Name: orderitem_id_seq; Type: SEQUENCE SET; Schema: public; Owner: postgres
---
-
-SELECT pg_catalog.setval('orderitem_id_seq', 1000, false);
-
-
---
--- TOC entry 3417 (class 0 OID 0)
--- Dependencies: 222
--- Name: pagedefinition_id_seq; Type: SEQUENCE SET; Schema: public; Owner: postgres
---
-
-SELECT pg_catalog.setval('pagedefinition_id_seq', 1000, false);
-
-
--- Completed on 2025-10-04 00:16:18
-
---
--- PostgreSQL database dump complete
---
-
+-- add-user update
+UPDATE category
+SET sub_categories = array_cat(sub_categories, ARRAY['person-details', 'persons'])
+WHERE id = 'users' AND client_id = 'saas';

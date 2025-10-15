@@ -4,10 +4,10 @@ psycopg2-binary
 sqlalchemy
 alembic
 passlib
-bcrypt
+bcrypt==4.3.0
 python-jose
 setuptools
 pytest
 httpx
 cloud-sql-python-connector[pg8000]
--e common-lib
+saas_common_lib_473815
