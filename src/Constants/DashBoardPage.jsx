@@ -8,7 +8,7 @@ import { BsPersonCheck } from "react-icons/bs";
 import { MdOutlineTableBar } from "react-icons/md";
 import { GoPackageDependents } from "react-icons/go";
 import { MdOutlineSoupKitchen } from "react-icons/md";
-import { TbToolsKitchen3 } from "react-icons/tb"; import orderServicesPort from "../Backend_Port_Files/OrderServices";
+import { TbToolsKitchen3 } from "react-icons/tb"; 
 import {
   LineChart, Line, XAxis, YAxis, CartesianGrid, Tooltip, ResponsiveContainer, BarChart, Bar, RadarChart, Radar, PolarGrid, PolarAngleAxis, PolarRadiusAxis
 } from 'recharts';
@@ -73,7 +73,7 @@ const DashBoardPage = () => {
     const fetchTopItems = async () => {
       if (!clientId) return;
       try {
-        const response = await orderServicesPort.get(`/${clientId}/dinein/table`, {
+        const response = await axios.get(`${import.meta.env.VITE_API_ORDER_SERVICE_URL}/${clientId}/dinein/table`, {
           headers: { Authorization: `Bearer ${token}` }
         });
         const allOrders = response.data?.data || [];
@@ -118,7 +118,7 @@ const DashBoardPage = () => {
       if (!token || !clientId) return;
 
       try {
-        const res = await orderServicesPort.get(`/${clientId}/dinein/table`, {
+        const res = await axios.get(`${import.meta.env.VITE_API_ORDER_SERVICE_URL}/${clientId}/dinein/table`, {
           headers: { Authorization: `Bearer ${token}` }
         });
 
@@ -342,7 +342,7 @@ const DashBoardPage = () => {
               <div className="chart">
                 <div className="chart-header">
                   <h3>Sales value</h3>
-                  <input type="date" />
+                  <input className='date-field' type="date" />
                 </div>
                 <div className="amount">₹{totalEarnings}</div>
                 <div className="growth">{getSalesLabel()}</div>
@@ -373,7 +373,7 @@ const DashBoardPage = () => {
               <div className="chart">
                 <div className="chart-header">
                   <h3>Order sales</h3>
-                  <input type="date" />
+                  <input className='date-field' type="date" />
                 </div>
                 <div className="amount">#{totalOrders} order(s)</div>
                 <div className="growth">{getOrdersLabel()}</div>
@@ -411,7 +411,7 @@ const DashBoardPage = () => {
             <div className="charts">
 
               {/* High sales items */}
-              <div className="chart">
+              {/* <div className="chart">
                 <div className="chart-header">
                   <h3>Top Ordered Items</h3>
                 </div>
@@ -436,7 +436,7 @@ const DashBoardPage = () => {
                     </div>
                   )}
                 </ResponsiveContainer>
-              </div>
+              </div> */}
 
 
 
@@ -444,7 +444,7 @@ const DashBoardPage = () => {
               <div className="chart">
                 <div className="chart-header">
                   <h3>Order sales</h3>
-                  <input type="date" />
+                  <input className='date-field' type="date" />
                 </div>
                 <div className="amount">#{totalOrders} order(s)</div>
                 <div className="growth">{getOrdersLabel()}</div>

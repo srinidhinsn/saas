@@ -1,13 +1,11 @@
 import React, { useEffect, useState } from "react";
-import axios from "axios";
 import Modal from "react-modal";
 import { FaUser, FaTable, FaTrash } from "react-icons/fa";
 import { BsCash, BsCreditCard, BsQrCode } from "react-icons/bs";
-import orderServicesPort from "../../Backend_Port_Files/OrderServices";
-import tableServicesPort from "../../Backend_Port_Files/TableServices";
+import axios from 'axios';
 import { useParams } from 'react-router-dom';
 import { useNavigate } from "react-router-dom";
-import { toast, ToastContainer } from 'react-toastify';
+import { toast} from 'react-toastify';
 import 'react-toastify/dist/ReactToastify.css';
 
 
@@ -233,8 +231,8 @@ const OrderForm = ({ table, onOrderCreated }) => {
             
                 console.log("📦 Sending payload:", JSON.stringify(payload, null, 2));
             
-                orderServicesPort
-                    .post(`/${clientId}/dinein/create`, payload, {
+                axios
+                    .post(`${import.meta.env.VITE_API_ORDER_SERVICE_URL}/${clientId}/dinein/create`, payload, {
                         headers: { Authorization: `Bearer ${token}` },
                     })
                     .then((res) => {
@@ -272,7 +270,7 @@ const OrderForm = ({ table, onOrderCreated }) => {
                         onClick={async () => {
                             if (mode === "Pick Up") {
                                 try {
-                                    const res = await tableServicesPort.get(`/${clientId}/tables/read`,
+                                    const res = await axios.get(`${import.meta.env.VITE_API_TABLE_SERVICE_URL}/${clientId}/tables/read`,
                                         {
                                             headers: {
                                                 Authorization: `Bearer ${token}`
@@ -326,7 +324,7 @@ const OrderForm = ({ table, onOrderCreated }) => {
                             onMouseOver={async () => {
                                 if (mode === "Dine In") {
                                     try {
-                                        const res = await tableServicesPort.get(`/${clientId}/tables/read`, {
+                                        const res = await axios.get(`${import.meta.env.VITE_API_TABLE_SERVICE_URL}/${clientId}/tables/read`, {
                                             headers: {
                                                 Authorization: `Bearer ${token}`,
                                             },

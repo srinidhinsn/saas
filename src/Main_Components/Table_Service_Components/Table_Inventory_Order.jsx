@@ -3,16 +3,9 @@ import { useTheme } from "../../ThemeChangerComponent/ThemeProvider";
 import OrderForm from "../Order_Service_Components/OrderForm";
 import { useNavigate, useParams, useSearchParams } from "react-router-dom";
 import { FiSearch } from "react-icons/fi";
-import tableServicesPort from "../../Backend_Port_Files/TableServices";
-import inventoryServicesPort from "../../Backend_Port_Files/InventoryServices"; import axios from "axios";
+import axios from 'axios';
 import { FaCheck, FaUsers, FaClock, FaChartLine } from "react-icons/fa";
 import { toast } from 'react-toastify';
-
-const statusConfig = {
-    Vacant: { card: "tm-status-card-available", icon: <FaCheck className="tm-status-icon tm-available" />, label: "Available" },
-    Occupied: { card: "tm-status-card-occupied", icon: <FaUsers className="tm-status-icon tm-occupied" />, label: "Occupied" },
-    Reserved: { card: "tm-status-card-reserved", icon: <FaClock className="tm-status-icon tm-reserved" />, label: "Reserved" }
-};
 
 const Table_Inventory_Order = ({ onOrderUpdate }) => {
     const { darkMode } = useTheme();
@@ -50,7 +43,7 @@ const Table_Inventory_Order = ({ onOrderUpdate }) => {
     useEffect(() => {
         if (!clientId) return;
 
-        tableServicesPort.get(`/${clientId}/tables/read`, {
+        axios.get(`${import.meta.env.VITE_API_TABLE_SERVICE_URL}/${clientId}/tables/read`, {
             headers: {
                 Authorization: `Bearer ${token}`
             }
@@ -69,7 +62,7 @@ const Table_Inventory_Order = ({ onOrderUpdate }) => {
 
 
 
-        inventoryServicesPort.get(`/${clientId}/inventory/read`, {
+        axios.get(`${import.meta.env.VITE_API_INVENTORY_SERVICE_URL}/${clientId}/inventory/read`, {
             headers: {
                 Authorization: `Bearer ${token}`,
             },
@@ -79,10 +72,10 @@ const Table_Inventory_Order = ({ onOrderUpdate }) => {
                 console.log("Fetched items full:", rawItems);
 
                 axios.all([
-                    inventoryServicesPort.get(`/${clientId}/inventory/read_category?category_id=dietery`, {
+                    axios.get(`${import.meta.env.VITE_API_INVENTORY_SERVICE_URL}/${clientId}/inventory/read_category?category_id=dietery`, {
                         headers: { Authorization: `Bearer ${token}` },
                     }),
-                    inventoryServicesPort.get(`/${clientId}/inventory/read`, {
+                    axios.get(`${import.meta.env.VITE_API_INVENTORY_SERVICE_URL}/${clientId}/inventory/read`, {
                         headers: { Authorization: `Bearer ${token}` },
                     }),
                 ])
@@ -186,8 +179,14 @@ const Table_Inventory_Order = ({ onOrderUpdate }) => {
     }));
 
 
-
-    const uniqueZones = Array.from(new Set(tables.map(t => t.location_zone))).filter(Boolean);
+    const uniqueZones = Array.from(
+        new Set(
+          tables
+            .filter(t => ["vacant", "available"].includes(t.status?.trim().toLowerCase()))
+            .map(t => t.location_zone)
+        )
+      ).filter(Boolean);
+      
 
 
     // const handleItemClick = (item) => {
@@ -237,8 +236,8 @@ const Table_Inventory_Order = ({ onOrderUpdate }) => {
 
     const fetchTables = async () => {
         try {
-            const res = await tableServicesPort.get(
-                `/${clientId}/tables/read`,
+            const res = await axios.get(
+                `${import.meta.env.VITE_API_TABLE_SERVICE_URL}/${clientId}/tables/read`,
                 { headers: { Authorization: `Bearer ${token}` } }
             );
             if (res.data?.data) {
@@ -406,26 +405,30 @@ const Table_Inventory_Order = ({ onOrderUpdate }) => {
                             </div>
                         </div>
                         <div className="tables-view">
-                            <h2>Table Reservation</h2>
+                            <h2>Table Creation</h2>
                             {uniqueZones.map(zone => (
                                 <div className="zone-group" key={zone}>
                                     <h3 className="zone-title">{zone}</h3>
                                     <div className="zone-section">
+                                    {tables
+  .filter(
+    (t) =>
+      t.location_zone === zone &&
+      ["vacant", "available"].includes(t.status?.trim().toLowerCase())
+  )
+  .map((table) => (
+    <div
+      key={table.id}
+      className="table-card"
+      onClick={() => navigate(`${table.id}`)}
+    >
+      <div className="table-number">{table.table_number}</div>
+      <div className={`table-status-label tm-status-card-${table.status?.toLowerCase()}`}>
+        {table.status}
+      </div>
+    </div>
+  ))}
 
-                                        {tables
-                                            .filter((t) => t.location_zone === zone && (t.status === "Vacant" || t.status === "Available"))
-                                            .map((table) => (
-                                                <div
-                                                    key={table.id}
-                                                    className="table-card"
-                                                    onClick={() => navigate(`${table.id}`)}
-                                                >
-                                                    <div className="table-number">{table.table_number}</div>
-                                                    <div className={`table-status-label tm-status-card-${table.status?.toLowerCase()}`}>
-                                                        {table.status}
-                                                    </div>
-                                                </div>
-                                            ))}
 
                                     </div>
                                 </div>
@@ -497,8 +500,8 @@ const Table_Inventory_Order = ({ onOrderUpdate }) => {
 
                                             const tableObj = tables?.find(t => t.id === selectedTable.id);
 
-                                            await tableServicesPort.post(
-                                                `/${clientId}/tables/update`,
+                                            await axios.post(
+                                                `${import.meta.env.VITE_API_TABLE_SERVICE_URL}/${clientId}/tables/update`,
                                                 {
                                                     id: selectedTable.id,
                                                     client_id: clientId,

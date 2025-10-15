@@ -3,9 +3,8 @@ import { useNavigate, useParams } from "react-router-dom";
 import { FaUser, FaLock } from "react-icons/fa";
 import { toast } from "react-toastify";
 import "react-toastify/dist/ReactToastify.css";
-import userServicesPort from '../../Backend_Port_Files/UserServices'
 import CircularText from '../../Util_Components/CircularText'; 
-
+import axios from "axios";
 export default function Login() {
     const navigate = useNavigate();
     const { clientId } = useParams();
@@ -17,6 +16,8 @@ export default function Login() {
         const { name, value } = e.target;
         setForm((prev) => ({ ...prev, [name]: value }));
     };
+ 
+
 
     const handleLogin = async (e) => {
         e.preventDefault();
@@ -24,8 +25,8 @@ export default function Login() {
         setLoading(true);
 
         try {
-            const res = await userServicesPort.post(
-                `/${clientId}/users/login`,
+            const res = await axios.post(
+                `${import.meta.env.VITE_API_USER_SERVICE_URL}/${clientId}/users/login`,
                 {
                     username: form.username,
                     password: form.password,

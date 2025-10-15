@@ -1,8 +1,5 @@
 import React, { useEffect, useState } from "react";
-import orderServicesPort from "../../Backend_Port_Files/OrderServices";
-import tableServicesPort from "../../Backend_Port_Files/TableServices";
-import inventoryServicesPort from "../../Backend_Port_Files/InventoryServices";
-import invoiceServicesPort from "../../Backend_Port_Files/InvoiceServices";
+import axios from 'axios';
 import { useParams } from "react-router-dom";
 import { useTheme } from "../../ThemeChangerComponent/ThemeProvider";
 import { toast } from "react-toastify";
@@ -56,7 +53,7 @@ const OrdersVisiblePage = () => {
         try {
             const orderIds = ordersList.map(o => o.id);
             // Fetch all invoices for client
-            const res = await invoiceServicesPort.get(`/${clientId}/invoice/read_document`, {
+            const res = await axios.get(`${import.meta.env.VITE_API_BILLING_SERVICE_URL}/${clientId}/invoice/read_document`, {
                 headers: { Authorization: `Bearer ${token}` },
                 params: { client_id: clientId },
             });
@@ -93,7 +90,7 @@ const OrdersVisiblePage = () => {
 
     const fetchTables = async () => {
         try {
-            const res = await tableServicesPort.get(`/${clientId}/tables/read`, {
+            const res = await axios.get(`${import.meta.env.VITE_API_TABLE_SERVICE_URL}/${clientId}/tables/read`, {
                 headers: { Authorization: `Bearer ${token}` },
             });
             setTables(res.data?.data || []);
@@ -111,8 +108,8 @@ const OrdersVisiblePage = () => {
     }, [clientId]);
 
     useEffect(() => {
-        inventoryServicesPort
-            .get(`/${clientId}/inventory/read`, {
+        axios
+            .get(`${import.meta.env.VITE_API_INVENTORY_SERVICE_URL}/${clientId}/inventory/read`, {
                 headers: { Authorization: `Bearer ${token}` },
             })
             .then((res) => {
@@ -212,7 +209,7 @@ const OrdersVisiblePage = () => {
                 return;
             }
             try {
-                const response = await orderServicesPort.get(`/${clientId}/dinein/table`, {
+                const response = await axios.get(`${import.meta.env.VITE_API_ORDER_SERVICE_URL}/${clientId}/dinein/table`, {
                     headers: { Authorization: `Bearer ${token}` },
                 });
                 // Fetch invoices info to get payment_status per order
@@ -252,16 +249,16 @@ const OrdersVisiblePage = () => {
 
         try {
             // Update order status in order service
-            await orderServicesPort.post(
-                `/${clientId}/dinein/update`,
+            await axios.post(
+                `${import.meta.env.VITE_API_ORDER_SERVICE_URL}/${clientId}/dinein/update`,
                 { id: orderId, client_id: clientId, status: newStatus },
                 { headers: { Authorization: `Bearer ${token}` } }
             );
 
             // If served, free the table
             if (newStatus === "served" && tableObj) {
-                await tableServicesPort.post(
-                    `/${clientId}/tables/update`,
+                await axios.post(
+                    `${import.meta.env.VITE_API_TABLE_SERVICE_URL}/${clientId}/tables/update`,
                     {
                         id: order.table_id,
                         client_id: clientId,
@@ -298,13 +295,13 @@ const OrdersVisiblePage = () => {
                 (sum, item) => sum + (inventoryMap[item.item_id]?.unit_price || 0) * (item.quantity || 1),
                 0
             );
-            await orderServicesPort.post(
-                `/${clientId}/order_items/update?order_id=${orderId}`,
+            await axios.post(
+                `${import.meta.env.VITE_API_ORDER_SERVICE_URL}/${clientId}/order_items/update?order_id=${orderId}`,
                 itemsForUpdate,
                 { headers: { Authorization: `Bearer ${token}` } }
             );
-            await orderServicesPort.post(
-                `/${clientId}/dinein/update`,
+            await axios.post(
+                `${import.meta.env.VITE_API_ORDER_SERVICE_URL}/${clientId}/dinein/update`,
                 { id: orderId, total_price: totalPrice },
                 { headers: { Authorization: `Bearer ${token}` } }
             );
@@ -322,7 +319,7 @@ const OrdersVisiblePage = () => {
         const item = order?.items.find((i) => i.item_id === itemId);
         if (!item?.id) return;
         try {
-            await orderServicesPort.delete(`/${clientId}/order_item/delete`, {
+            await axios.delete(`${import.meta.env.VITE_API_ORDER_SERVICE_URL}/${clientId}/order_item/delete`, {
                 params: { order_item_id: item.id, client_id: clientId },
                 headers: { Authorization: `Bearer ${token}` },
             });
@@ -338,8 +335,8 @@ const OrdersVisiblePage = () => {
             setOrders(updatedOrders);
             const newOrder = updatedOrders.find((o) => o.id === orderId);
             if (newOrder) {
-                await orderServicesPort.post(
-                    `/${clientId}/dinein/update`,
+                await axios.post(
+                    `${import.meta.env.VITE_API_ORDER_SERVICE_URL}/${clientId}/dinein/update`,
                     { id: orderId, total_price: newOrder.unit_price },
                     { headers: { Authorization: `Bearer ${token}` } }
                 );
@@ -368,13 +365,13 @@ const OrdersVisiblePage = () => {
         }));
         const totalPrice = cleanedItems.reduce((sum, item) => sum + item.unit_price * item.quantity, 0);
         try {
-            await orderServicesPort.post(
-                `/${clientId}/order_items/update?order_id=${orderId}`,
+            await axios.post(
+                `${import.meta.env.VITE_API_ORDER_SERVICE_URL}${clientId}/order_items/update?order_id=${orderId}`,
                 cleanedItems,
                 { headers: { Authorization: `Bearer ${token}` } }
             );
-            await orderServicesPort.post(
-                `/${clientId}/dinein/update`,
+            await axios.post(
+                `${import.meta.env.VITE_API_ORDER_SERVICE_URL}/${clientId}/dinein/update`,
                 { id: orderId, total_price: totalPrice },
                 { headers: { Authorization: `Bearer ${token}` } }
             );
@@ -387,7 +384,7 @@ const OrdersVisiblePage = () => {
     const confirmDeleteOrder = async () => {
         if (!orderToDelete) return;
         try {
-            await orderServicesPort.delete(`/${clientId}/dinein/delete`, {
+            await axios.delete(`${import.meta.env.VITE_API_ORDER_SERVICE_URL}/${clientId}/dinein/delete`, {
                 params: { dinein_order_id: orderToDelete, client_id: clientId },
                 headers: { Authorization: `Bearer ${token}` },
             });
@@ -398,8 +395,8 @@ const OrdersVisiblePage = () => {
             if (tableIdOfDeletedOrder) {
                 const tableObj = tables.find(t => t.id === tableIdOfDeletedOrder);
 
-                await tableServicesPort.post(
-                    `/${clientId}/tables/update`,
+                await axios.post(
+                    `${import.meta.env.VITE_API_TABLE_SERVICE_URL}/${clientId}/tables/update`,
                     {
                         id: tableIdOfDeletedOrder,
                         client_id: clientId,
@@ -427,7 +424,7 @@ const OrdersVisiblePage = () => {
     useEffect(() => {
         const fetchTables = async () => {
             try {
-                const res = await tableServicesPort.get(`/${clientId}/tables/read`, {
+                const res = await axios.get(`${import.meta.env.VITE_API_TABLE_SERVICE_URL}/${clientId}/tables/read`, {
                     headers: { Authorization: `Bearer ${token}` },
                 });
                 const tableList = res.data?.data || [];
@@ -445,7 +442,7 @@ const OrdersVisiblePage = () => {
         const fetchInventory = async () => {
             if (!token || !clientId) return;
             try {
-                const res = await inventoryServicesPort.get(`/${clientId}/inventory/read`, {
+                const res = await axios.get(`${import.meta.env.VITE_API_INVENTORY_SERVICE_URL}/${clientId}/inventory/read`, {
                     headers: { Authorization: `Bearer ${token}` },
                 });
                 const inventoryList = res.data?.data || [];
