@@ -1,7 +1,7 @@
 import React, { useState, useEffect, useRef } from "react";
 import { jwtDecode } from "jwt-decode";
 import { useParams } from "react-router-dom";
-import inventoryServicesPort from '../../Backend_Port_Files/InventoryServices';
+import axios from 'axios';
 
 function AddInventoryItemForm({ onItemCreated, selectedCategory }) {
   const { clientId } = useParams();
@@ -84,7 +84,7 @@ function AddInventoryItemForm({ onItemCreated, selectedCategory }) {
   useEffect(() => {
     if (!token || !clientId) return;
 
-    inventoryServicesPort.get(`/${clientId}/menu/read_category?category_id=dietery`, {
+    axios.get(`${import.meta.env.VITE_API_INVENTORY_SERVICE_URL}/${clientId}/menu/read_category?category_id=dietery`, {
       headers: { Authorization: `Bearer ${token}` },
     })
       .then((res) => {
@@ -94,7 +94,7 @@ function AddInventoryItemForm({ onItemCreated, selectedCategory }) {
       })
       .catch((err) => console.error("Error fetching categories:", err));
 
-    inventoryServicesPort.get(`/${clientId}/menu/read`, {
+    axios.get(`${import.meta.env.VITE_API_INVENTORY_SERVICE_URL}/${clientId}/menu/read`, {
       headers: { Authorization: `Bearer ${token}` },
     })
       .then((res) => setLineItems(res.data.data || []))
@@ -161,8 +161,8 @@ function AddInventoryItemForm({ onItemCreated, selectedCategory }) {
             updated_by,
           };
 
-          const response = await inventoryServicesPort.post(
-            `/${clientId}/menu/create`,
+          const response = await axios.post(
+            `${import.meta.env.VITE_API_INVENTORY_SERVICE_URL}/${clientId}/menu/create`,
             payload,
             { headers: { Authorization: `Bearer ${token}` } }
           );

@@ -1,8 +1,7 @@
 import React, { useState, useEffect, useMemo } from "react";
 import { DataGrid } from "@mui/x-data-grid";
 import { Avatar,Box, Link, Typography, Button, Dialog, DialogTitle, DialogContent, DialogActions, Select, MenuItem, FormControl, InputLabel } from "@mui/material";
-import userServicesPort from "../../Backend_Port_Files/UserServices";
-import inventoryServicesPort from "../../Backend_Port_Files/InventoryServices";
+import axios from 'axios';
 import { useParams } from "react-router-dom";
 
 const UsersList = ({ onAddNew }) => {
@@ -19,8 +18,8 @@ const UsersList = ({ onAddNew }) => {
   useEffect(() => {
     const fetchRoles = async () => {
       try {
-        const res = await inventoryServicesPort.get(
-          `/${clientId}/inventory/read_category?category_id=roles`,
+        const res = await axios.get(
+          `${import.meta.env.VITE_API_INVENTORY_SERVICE_URL}/${clientId}/inventory/read_category?category_id=roles`,
           { headers: { Authorization: `Bearer ${token}` } }
         );
         if (res.data?.data?.length) {
@@ -37,7 +36,7 @@ const UsersList = ({ onAddNew }) => {
   useEffect(() => {
     const fetchUsers = async () => {
       try {
-        const res = await userServicesPort.get(`/${clientId}/users/persons`, {
+        const res = await axios.get(`${import.meta.env.VITE_API_USER_SERVICE_URL}/${clientId}/users/persons`, {
           headers: { Authorization: `Bearer ${token}` },
         });
         if (res.data?.data?.persons) {
@@ -71,8 +70,8 @@ const UsersList = ({ onAddNew }) => {
         selectionModel.map(async (userId) => {
           const user = users.find((u) => u.id === userId);
           if (user) {
-            await userServicesPort.post(
-              `/${clientId}/users/update-role`,
+            await axios.post(
+              `${import.meta.env.VITE_API_USER_SERVICE_URL}/${clientId}/users/update-role`,
               null,
               {
                 params: { username: user.username, new_role: changeRoleValue },

@@ -15,7 +15,6 @@ const App = () => {
   const [tables, setTables] = useState([]);
   const [selectedTableId, setSelectedTableId] = useState("");
   const [latestOrder, setLatestOrder] = useState(null);
-
   const location = useLocation();
   const hideNavbar = /\/saas\/[^/]+\/(login|register|forgot)/.test(location.pathname);
   const [tick, setTick] = useState(0);
@@ -61,7 +60,7 @@ const App = () => {
 
         </Routes>
         <ToastContainer position="top-right"
-          autoClose={3000}
+          autoClose={2500}
           hideProgressBar={false}
           newestOnTop={false}
           closeOnClick
