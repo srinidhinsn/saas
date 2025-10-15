@@ -2,10 +2,9 @@ import React, { useEffect } from 'react';
 import { useNavigate, useLocation, useParams } from 'react-router-dom';
 import { useTheme } from "../ThemeChangerComponent/ThemeProvider";
 import { GiHamburgerMenu } from "react-icons/gi";
-import { FaHamburger, FaCashRegister, FaRegMoneyBillAlt } from "react-icons/fa";
-import { MdOutlineMenuBook, MdOutlineRateReview, MdOutlineTableBar } from "react-icons/md";
-import { FcComboChart } from "react-icons/fc";
-import { FaKitchenSet, FaFileInvoiceDollar, FaUserPlus, FaTableCells } from "react-icons/fa6";
+import { FaHamburger } from "react-icons/fa";
+import { MdOutlineMenuBook, MdOutlineTableBar } from "react-icons/md";
+import { FaKitchenSet, FaUserPlus, FaTableCells } from "react-icons/fa6";
 import { MdKeyboardArrowRight } from "react-icons/md";
 import { IoDocumentTextOutline } from "react-icons/io5";
 import ClickSpark from '../Sub_Components/SparkArrow';
@@ -115,13 +114,13 @@ const Navbar = () => {
                             {!isActive('/main/invoice') && <span className="arrow-indicator"><MdKeyboardArrowRight /></span>}
                         </li>
                     </ClickSpark> */}
-                    <ClickSpark>
+                    {/* <ClickSpark>
 
                         <li title="Report" onClick={() => go('/reports')} className={isActive('/main/reports') ? 'page-active' : ''}>
                             <FaFileInvoiceDollar /><span>Report</span>
                             {!isActive('/main/reports') && <span className="arrow-indicator"><MdKeyboardArrowRight /></span>}
                         </li>
-                    </ClickSpark>
+                    </ClickSpark> */}
                     <ClickSpark>
 
 

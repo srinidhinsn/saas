@@ -1,15 +1,14 @@
-
 import React, { useState } from "react";
 import { useNavigate, useParams } from "react-router-dom";
 import { FaLock, FaUser } from "react-icons/fa";
 import { toast } from "react-toastify";
 import "react-toastify/dist/ReactToastify.css";
-import userServicesPort from "../../Backend_Port_Files/UserServices";
 import CircularText from '../../Util_Components/CircularText'; 
+import axios from 'axios';
 export default function ResetPassword() {
   const navigate = useNavigate();
   const { clientId } = useParams();
-
+const token=localStorage.getItem("access_token")
   const [form, setForm] = useState({
     username: "",
     otp: "",
@@ -43,12 +42,16 @@ export default function ResetPassword() {
     }
     setLoading(true);
     try {
-      const res = await userServicesPort.post(`/${clientId}/users/reset-password`, {
+      const res = await axios.post(`${import.meta.env.VITE_API_USER_SERVICE_URL}/${clientId}/users/reset-password`, {
         username: form.username,
         otp: "",
         old_password: "",
         new_password: "",
         confirm_password: "",
+      },{
+        headers:{
+          Authorization:`Bearer ${token}`
+        }
       });
       toast.success(res.data.message || "OTP sent successfully");
       setOtpSent(true);
@@ -94,7 +97,12 @@ export default function ResetPassword() {
         old_password: resetMethod === "old_password" ? form.old_password : "",
       };
 
-      const res = await userServicesPort.post(`/${clientId}/users/reset-password`, payload);
+      const res = await axios.post(`${import.meta.env.VITE_API_USER_SERVICE_URL}/${clientId}/users/reset-password`, payload, {
+        headers: {
+          Authorization: `Bearer ${token}`
+        }
+      });
+      
       toast.success(res.data.message || "Password reset successfully");
       navigate(`/saas/${clientId}/login`);
     } catch (err) {

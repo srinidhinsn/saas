@@ -2,7 +2,7 @@ import React, { useEffect, useState } from "react";
 import { FaEdit, FaTrash } from "react-icons/fa";
 import { jwtDecode } from "jwt-decode";
 import { useParams } from "react-router-dom";
-import inventoryServicesPort from '../../Backend_Port_Files/InventoryServices'
+import axios from 'axios';
 import { v4 as uuidv4 } from "uuid";
 
 
@@ -30,8 +30,8 @@ function CategoryList({ onCategorySelect }) {
     useEffect(() => {
         if (!token || !clientId) return;
 
-        inventoryServicesPort
-            .get(`/${clientId}/menu/read_category?category_id=dietery`, {
+        axios
+            .get(`${import.meta.env.VITE_API_INVENTORY_SERVICE_URL}/${clientId}/menu/read_category?category_id=dietery`, {
                 headers: {
                     Authorization: `Bearer ${token}`,
                 },
@@ -201,8 +201,8 @@ function CategoryList({ onCategorySelect }) {
 
     const refreshCategoriesAndParentMap = async () => {
         try {
-            const response = await inventoryServicesPort.get(
-                `/${clientId}/menu/read_category?category_id=dietery`,
+            const response = await axios.get(
+                `${import.meta.env.VITE_API_INVENTORY_SERVICE_URL}/${clientId}/menu/read_category?category_id=dietery`,
                 { headers: { Authorization: `Bearer ${token}` } }
             );
     
@@ -368,8 +368,8 @@ function CategoryList({ onCategorySelect }) {
             };
 
             try {
-                const subRes = await inventoryServicesPort.post(
-                    `/${clientId}/menu/create_category`,
+                const subRes = await axios.post(
+                    `${import.meta.env.VITE_API_INVENTORY_SERVICE_URL}/${clientId}/menu/create_category`,
                     newSubPayload,
                     { headers: { Authorization: `Bearer ${token}` } }
                 );
@@ -428,8 +428,8 @@ function CategoryList({ onCategorySelect }) {
         console.log("Deleting category ID:", category.id);
 
         try {
-            const res = await inventoryServicesPort.post(
-                `/${clientId}/menu/delete_category`,
+            const res = await axios.post(
+                `${import.meta.env.VITE_API_INVENTORY_SERVICE_URL}/${clientId}/menu/delete_category`,
                 { id: category.id },
                 {
                     headers: {
@@ -439,8 +439,8 @@ function CategoryList({ onCategorySelect }) {
                 }
             );
 
-            const response = await inventoryServicesPort.get(
-                `/${clientId}/menu/read_category?category_id=dietery`,
+            const response = await axios.get(
+                `${import.meta.env.VITE_API_INVENTORY_SERVICE_URL}/${clientId}/menu/read_category?category_id=dietery`,
                 {
                     headers: {
                         Authorization: `Bearer ${token}`,

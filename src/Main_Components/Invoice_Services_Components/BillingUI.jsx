@@ -1,12 +1,8 @@
 import React, { useEffect, useState, useRef } from "react";
-import orderServices from "../../Backend_Port_Files/OrderServices";
-import tableServices from "../../Backend_Port_Files/TableServices";
-import inventoryServices from "../../Backend_Port_Files/InventoryServices";
-import invoiceServices from "../../Backend_Port_Files/InvoiceServices";
+import axios from 'axios';
 import { useParams } from "react-router-dom";
 import { toast } from "react-toastify";
 import jsPDF from "jspdf";
-import autoTable from "jspdf-autotable";
 
 export default function BillingPage() {
   const { clientId } = useParams();
@@ -53,13 +49,13 @@ export default function BillingPage() {
       setLoading(true);
       try {
         const [ordersRes, tablesRes, invRes] = await Promise.all([
-          orderServices.get(`/${clientId}/dinein/table`, {
+          axios.get(`${import.meta.env.VITE_API_ORDER_SERVICE_URL}/${clientId}/dinein/table`, {
             headers: { Authorization: `Bearer ${token}` },
           }),
-          tableServices.get(`/${clientId}/tables/read`, {
+          axios.get(`${import.meta.env.VITE_API_TABLE_SERVICE_URL}/${clientId}/tables/read`, {
             headers: { Authorization: `Bearer ${token}` },
           }),
-          inventoryServices.get(`/${clientId}/inventory/read`, {
+          axios.get(`${import.meta.env.VITE_API_INVENTORY_SERVICE_URL}/${clientId}/inventory/read`, {
             headers: { Authorization: `Bearer ${token}` },
           }),
         ]);
@@ -89,7 +85,7 @@ export default function BillingPage() {
 
   const fetchInvoiceDraft = async (orderId) => {
     try {
-      const res = await invoiceServices.get(`/${clientId}/invoice/read_document`, {
+      const res = await axios.get(`${import.meta.env.VITE_API_BILLING_SERVICE_URL}/${clientId}/invoice/read_document`, {
         headers: { Authorization: `Bearer ${token}` },
         params: { client_id: clientId },
       });
@@ -364,8 +360,8 @@ export default function BillingPage() {
 
       let draftId = invoiceDraftId;
       if (!draftId) {
-        const res = await invoiceServices.post(
-          `/${clientId}/invoice/create_document`,
+        const res = await axios.post(
+          `${import.meta.env.VITE_API_BILLING_SERVICE_URL}/${clientId}/invoice/create_document`,
           payload,
           { headers: { Authorization: `Bearer ${token}` } }
         );
@@ -373,8 +369,8 @@ export default function BillingPage() {
         if (!draftId) throw new Error("Draft creation failed");
         setInvoiceDraftId(draftId);
       } else {
-        await invoiceServices.post(
-          `/${clientId}/invoice/update_document`,
+        await axios.post(
+          `${import.meta.env.VITE_API_BILLING_SERVICE_URL}/${clientId}/invoice/update_document`,
           { id: draftId, ...payload },
           { headers: { Authorization: `Bearer ${token}` } }
         );
@@ -388,8 +384,8 @@ export default function BillingPage() {
         total: (item.unit_price || 0) * (item.quantity || 0),
       }));
 
-      await invoiceServices.post(
-        `/${clientId}/invoice/create?document_id=${draftId}&client_id=${clientId}`,
+      await axios.post(
+        `${import.meta.env.VITE_API_BILLING_SERVICE_URL}/${clientId}/invoice/create?document_id=${draftId}&client_id=${clientId}`,
         itemsPayload,
         { headers: { Authorization: `Bearer ${token}` } }
       );
@@ -429,8 +425,8 @@ export default function BillingPage() {
     // Issue invoice to generate document_number if missing or "Draft"
     if (!currentInvoiceNumber || currentInvoiceNumber.toLowerCase() === "draft") {
       try {
-        const res = await invoiceServices.post(
-          `/${clientId}/invoice/issue?invoice_id=${currentInvoiceDraftId}`,
+        const res = await axios.post(
+          `${import.meta.env.VITE_API_BILLING_SERVICE_URL}/${clientId}/invoice/issue?invoice_id=${currentInvoiceDraftId}`,
           null, // no body here, use query param instead
           { headers: { Authorization: `Bearer ${token}` } }
         );
@@ -559,7 +555,7 @@ export default function BillingPage() {
   <div className="Invoice-container-page">
       <div className="inv--container">
       <div className="inv--header-row">
-        <div className="inv--header-l">Billing Invoices</div>
+        {/* <div className="inv--header-l">Billing Invoices</div> */}
         {/* <div className="inv--header-r">
           <button className="inv--btn-light" disabled>{loading ? "Loading..." : "Export"}</button>
           <button className="inv--btn-light" disabled>{loading ? "Loading..." : "Import"}</button>
@@ -725,19 +721,20 @@ export default function BillingPage() {
                   <option value="fixed">Fixed</option>
                 </select>
               </label>
-              <label>
-                Payment Status<br />
-                <select
-                  value={paymentStatus}
-                  onChange={(e) => setPaymentStatus(e.target.value)}
-                  className="inv--select"
-                >
-                  <option>Pending</option>
-                  <option>Paid</option>
-                  <option>Partial</option>
-                  <option>Due</option>
-                </select>
-              </label>
+              <div className="inv--payment-status-buttons">
+  <span>Payment Status:</span>
+  {["Pending", "Paid", "Partial", "Due"].map((statusOption) => (
+    <button
+      key={statusOption}
+      type="button"
+      className={`inv--status-btn ${paymentStatus === statusOption ? "active" : ""}`}
+      onClick={() => setPaymentStatus(statusOption)}
+    >
+      {statusOption}
+    </button>
+  ))}
+</div>
+
               <label className="inv--checkbox-label">
                 <input
                   type="checkbox"
