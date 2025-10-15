@@ -5574,10 +5574,14 @@ body {
 
 .sidebar-header {
     display: flex;
+    justify-content: center;
+    align-items: center;
     padding: 0.5rem;
     border-bottom: 1px solid #e5e7eb;
     background: linear-gradient(to right, #2563eb, #1d4ed8);
     color: white;
+    margin-bottom: 10px;
+    border-radius: 5px;
 }
 
 .sidebar-header h2 {
@@ -5604,8 +5608,10 @@ body {
 
 .categories-list {
     flex: 1;
-    padding: 1rem;
-    overflow-y: auto;height: 78vh;
+    max-height:80vh; /* adjust as needed for your layout */
+    overflow-y: auto;
+    padding-right: 5px; /* optional: avoid scrollbar overlapping content */
+    scrollbar-width: thin;
 }
 
 .category-item {
