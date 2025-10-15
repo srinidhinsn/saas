@@ -342,7 +342,7 @@ const DashBoardPage = () => {
               <div className="chart">
                 <div className="chart-header">
                   <h3>Sales value</h3>
-                  <input type="date" />
+                  <input className='date-field' type="date" />
                 </div>
                 <div className="amount">₹{totalEarnings}</div>
                 <div className="growth">{getSalesLabel()}</div>
@@ -373,7 +373,7 @@ const DashBoardPage = () => {
               <div className="chart">
                 <div className="chart-header">
                   <h3>Order sales</h3>
-                  <input type="date" />
+                  <input className='date-field' type="date" />
                 </div>
                 <div className="amount">#{totalOrders} order(s)</div>
                 <div className="growth">{getOrdersLabel()}</div>
@@ -411,7 +411,7 @@ const DashBoardPage = () => {
             <div className="charts">
 
               {/* High sales items */}
-              <div className="chart">
+              {/* <div className="chart">
                 <div className="chart-header">
                   <h3>Top Ordered Items</h3>
                 </div>
@@ -436,7 +436,7 @@ const DashBoardPage = () => {
                     </div>
                   )}
                 </ResponsiveContainer>
-              </div>
+              </div> */}
 
 
 
@@ -444,7 +444,7 @@ const DashBoardPage = () => {
               <div className="chart">
                 <div className="chart-header">
                   <h3>Order sales</h3>
-                  <input type="date" />
+                  <input className='date-field' type="date" />
                 </div>
                 <div className="amount">#{totalOrders} order(s)</div>
                 <div className="growth">{getOrdersLabel()}</div>

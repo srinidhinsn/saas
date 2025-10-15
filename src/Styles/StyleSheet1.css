@@ -5850,7 +5850,9 @@ body {
     padding: 20px;
     background: #f9f9f9;
 }
-
+.date-field{
+    display: none;
+}
 .dashboard-header {
     display: flex;
     justify-content: space-between;
