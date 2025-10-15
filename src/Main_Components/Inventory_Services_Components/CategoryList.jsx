@@ -38,13 +38,9 @@ function CategoryList({ onCategorySelect }) {
             })
             .then((res) => {
                 const rawCategories = res.data.data;
-            
-                // ✅ The API returns [{ id: "dietery", name: "Dietary", subCategories: [veg, non-veg, egg] }]
-                // We only want the subcategories of "dietery"
-                const dietaryRoot = rawCategories.find(cat => cat.id === "dietery");
+                const dietaryRoot = rawCategories[0];
                 const displayCategories = dietaryRoot?.subCategories || [];
-            
-                // Build parent map for subcategories
+
                 const tempParentMap = {};
                 const traverseAndBuildMap = (cats, parentId = null) => {
                     for (const cat of cats) {
@@ -56,12 +52,12 @@ function CategoryList({ onCategorySelect }) {
                 };
                 traverseAndBuildMap(displayCategories);
                 setParentMap(tempParentMap);
-            
+
                 // ✅ Skip "All" if not needed
                 setCategories(displayCategories);
                 setActiveCategory(displayCategories.length > 0 ? displayCategories[0].id : null);
             })
-            
+
 
             .catch((err) => console.error("❌ Error fetching categories:", err));
     }, [clientId, token]);
@@ -79,7 +75,7 @@ function CategoryList({ onCategorySelect }) {
 
         return (
             <div key={category.id} style={{ marginLeft: level * 8 }}>
-                <div className="category-item" style={{ display: "flex", alignItems: "center"}}>
+                <div className="category-item" style={{ display: "flex", alignItems: "center" }}>
                     <span
                         onClick={() => onCategorySelect(category)}
                         style={{
@@ -209,47 +205,48 @@ function CategoryList({ onCategorySelect }) {
                 `/${clientId}/menu/read_category?category_id=dietery`,
                 { headers: { Authorization: `Bearer ${token}` } }
             );
-
+    
             const rawCategories = response.data.data;
+    
+            // Only take subcategories under dietery
+            const dietaryRoot = rawCategories[0];
+            const displayCategories = dietaryRoot?.subCategories || [];
+    
+            // Build parent map
             const tempParentMap = {};
             const traverseAndBuildMap = (cats, parentId = null) => {
                 for (const cat of cats) {
-                    if (parentId) {
-                        tempParentMap[cat.id] = parentId;
-                    }
-                    if (cat.subCategories && cat.subCategories.length > 0) {
+                    if (parentId) tempParentMap[cat.id] = parentId;
+                    if (cat.subCategories?.length > 0) {
                         traverseAndBuildMap(cat.subCategories, cat.id);
                     }
                 }
             };
-
-            traverseAndBuildMap(rawCategories);
+            traverseAndBuildMap(displayCategories);
             setParentMap(tempParentMap);
-
-            const subCategoryIds = new Set(Object.keys(tempParentMap));
-            const topLevelCategories = rawCategories.filter(
-                (cat) => !subCategoryIds.has(cat.id)
-            );
-
-            const allCategory = { id: "all", name: "All" };
-            setCategories([allCategory, ...topLevelCategories]);
-            setActiveCategory("all");
+    
+            setCategories(displayCategories);
+            setActiveCategory(displayCategories.length > 0 ? displayCategories[0].id : null);
+    
         } catch (error) {
             console.error("Error refreshing categories:", error);
         }
     };
+    
 
 
 
 
     const handleAddCategory = async () => {
-        if (!newId.trim() || !newName.trim()) {
-            alert("ID and Name are required");
+        if (!newName.trim()) {
+            alert("Category name is required");
             return;
         }
-
+    
+        const newId = uuidv4(); // auto-generate ID
         let createdBy = "null";
         let updatedBy = "null";
+    
         try {
             const decoded = jwtDecode(token);
             createdBy = String(decoded.user_id);
@@ -257,75 +254,72 @@ function CategoryList({ onCategorySelect }) {
         } catch (err) {
             console.error("Token decode failed:", err);
         }
-
-        let finalSubcategories = [...newSubcategories];
-
-
-        if (newSubcategoryName.trim()) {
-            const subId = uuidv4();
-            const tempParentMap = { [subId]: newId.trim() };
-
-            const newSubPayload = {
-                id: subId,
-                client_id: clientId,
-                name: newSubcategoryName.trim(),
-                description: "",
-                sub_categories: [],
-                created_by: createdBy,
-                updated_by: updatedBy,
-                slug: generateSlugFromParents(subId, newSubcategoryName.trim(), tempParentMap),
-            };
-
-            try {
-                const subRes = await inventoryServicesPort.post(
-                    `/${clientId}/menu/create_category`,
-                    newSubPayload,
-                    { headers: { Authorization: `Bearer ${token}` } }
-                );
-                const newSubId = subRes.data.data.id;
-                finalSubcategories.push(newSubId);
-            } catch (err) {
-                console.error("Error creating new subcategory:", err.response?.data || err);
-                alert("Failed to create subcategory");
-                return;
-            }
-        }
-
-        await refreshCategoriesAndParentMap();
-
-        const slug = generateSlugFromParents(newId.trim(), newName.trim());
-
-        const mainPayload = {
-            id: newId.trim(),
+    
+        // Step 1️⃣ - Create the new subcategory itself
+        const tempParentMap = { [newId]: "dietery" };
+        const slug = generateSlugFromParents(newId, newName.trim(), tempParentMap);
+    
+        const newCategoryPayload = {
+            id: newId,
             client_id: clientId,
             name: newName.trim(),
             description: newDescription.trim(),
-            sub_categories: finalSubcategories,
+            sub_categories: [],
             created_by: createdBy,
             updated_by: updatedBy,
             slug,
         };
-
+    
         try {
             await inventoryServicesPort.post(
                 `/${clientId}/menu/create_category`,
-                mainPayload,
+                newCategoryPayload,
                 { headers: { Authorization: `Bearer ${token}` } }
             );
-
+    
+            // Step 2️⃣ - Fetch the current 'dietery' category to get existing subcategories
+            const parentRes = await inventoryServicesPort.get(
+                `/${clientId}/menu/read_category?category_id=dietery`,
+                { headers: { Authorization: `Bearer ${token}` } }
+            );
+    
+            const dietaryCategory = parentRes.data.data.find(cat => cat.id === "dietery");
+            const existingSubs = dietaryCategory?.sub_categories || dietaryCategory?.subCategories?.map(sub => sub.id) || [];
+    
+            // Step 3️⃣ - Update 'dietery' to include new subcategory
+            const updatePayload = {
+                id: "dietery",
+                client_id: clientId,
+                name: dietaryCategory.name,
+                description: dietaryCategory.description || "",
+                sub_categories: [...existingSubs, newId],
+                slug: "_Dietery",
+                overwrite_subcategories: true,
+            };
+    
+            await inventoryServicesPort.post(
+                `/${clientId}/menu/update_category?client_id=${clientId}`,
+                updatePayload,
+                {
+                    headers: {
+                        Authorization: `Bearer ${token}`,
+                        "Content-Type": "application/json",
+                    },
+                }
+            );
+    
             await refreshCategoriesAndParentMap();
-
-            setNewId("");
+    
             setNewName("");
             setNewDescription("");
-            setNewSubcategories([]);
-            setNewSubcategoryName("");
             setShowAddModal(false);
+            alert("✅ New category added under Dietery!");
         } catch (err) {
-            console.error("Error adding main category:", err.response?.data || err);
-            alert("Failed to add main category");
+            console.error("❌ Error adding category:", err.response?.data || err);
+            alert("Failed to add category under Dietery");
         }
     };
+    
 
 
     const startEdit = (cat) => {
@@ -345,11 +339,11 @@ function CategoryList({ onCategorySelect }) {
 
     const handleEditSave = async () => {
         if (!editingId) return;
-    
+
         let finalEditSubcategories = [...editSubcategories];
         let createdBy = "null";
         let updatedBy = "null";
-    
+
         try {
             const decoded = jwtDecode(token);
             createdBy = String(decoded.user_id);
@@ -361,7 +355,7 @@ function CategoryList({ onCategorySelect }) {
         if (editNewSubcategoryName.trim()) {
             const newSubId = uuidv4();
             const tempParentMap = { [newSubId]: editingId.trim() };
-    
+
             const newSubPayload = {
                 id: newSubId,
                 client_id: clientId,
@@ -372,7 +366,7 @@ function CategoryList({ onCategorySelect }) {
                 updated_by: updatedBy,
                 slug: generateSlugFromParents(newSubId, editNewSubcategoryName.trim(), tempParentMap),
             };
-    
+
             try {
                 const subRes = await inventoryServicesPort.post(
                     `/${clientId}/menu/create_category`,
@@ -386,7 +380,7 @@ function CategoryList({ onCategorySelect }) {
                 return;
             }
         }
-    
+
         // 2️⃣ Generate updated slug for main category
         const slug = generateSlugFromParents(editingId, editName.trim());
 
@@ -399,7 +393,7 @@ function CategoryList({ onCategorySelect }) {
             slug,
             overwrite_subcategories: true,
         };
-    
+
         try {
             await inventoryServicesPort.post(
                 `/${clientId}/menu/update_category?client_id=${clientId}`,
@@ -411,10 +405,10 @@ function CategoryList({ onCategorySelect }) {
                     },
                 }
             );
-    
+
             // ✅ Single refresh after everything is done
             await refreshCategoriesAndParentMap();
-    
+
             // Reset state
             setEditingId(null);
             setEditNewSubcategoryName("");
@@ -424,7 +418,7 @@ function CategoryList({ onCategorySelect }) {
             alert("Failed to update category.");
         }
     };
-    
+
 
 
 
@@ -465,6 +459,8 @@ function CategoryList({ onCategorySelect }) {
             const allCategory = { id: "all", name: "All" };
             setCategories([allCategory, ...topLevelCategories]);
             setActiveCategory("all");
+
+            await refreshCategoriesAndParentMap();
             setDeleteTarget(null);
 
             alert(res.data.message || "Category deleted successfully");
@@ -480,9 +476,9 @@ function CategoryList({ onCategorySelect }) {
             {/* Header */}
             <div className="sidebar-header">
                 <h2>Dietery</h2>
-                {/* <button className="add-btn" onClick={() => setShowAddModal(true)}>
+                <button className="add-btn" onClick={() => setShowAddModal(true)}>
                     ➕
-                </button> */}
+                </button>
             </div>
 
             {/* Categories List */}
@@ -498,52 +494,23 @@ function CategoryList({ onCategorySelect }) {
             {showAddModal && (
                 <div className="modal-overlay">
                     <div className="modal-content">
-                        <h4>Add New Category</h4>
+                        <h4>Add New Dietary Category</h4>
+
                         <input
                             type="text"
-                            value={newId}
-                            onChange={(e) => setNewId(e.target.value)}
-                            placeholder="Category ID (required)"
+                            value={newName}
+                            onChange={(e) => setNewName(e.target.value)}
+                            placeholder="Category Name (required)"
                             className="modal-input"
                             required
                         />
                         <input
                             type="text"
-                            value={newName}
-                            onChange={(e) => setNewName(e.target.value)}
-                            placeholder="Category Name"
-                            className="modal-input"
-                        />
-                        <input
-                            type="text"
                             value={newDescription}
                             onChange={(e) => setNewDescription(e.target.value)}
-                            placeholder="Description"
+                            placeholder="Description (optional)"
                             className="modal-input"
                         />
-                        <input
-                            type="text"
-                            value={newSubcategoryName}
-                            onChange={(e) => setNewSubcategoryName(e.target.value)}
-                            placeholder="New Subcategory Name (optional)"
-                            className="modal-input"
-                        />
-
-                        {/* <label>Assign as Subcategory under:</label>
-                        <div className="subcategory-checkboxes">
-                            {getAllCategoriesRecursive(categories).map((cat) => (
-                                <label key={cat.id}>
-                                    <input
-                                        type="checkbox"
-                                        checked={newSubcategories.includes(cat.id)}
-                                        onChange={() => toggleSubcategory(cat.id)}
-                                    />
-                                    {cat.name}
-                                </label>
-                            ))}
-                        </div> */}
-
-
 
                         <div className="modal-buttons">
                             <button onClick={handleAddCategory} className="modal-save-btn">
@@ -552,10 +519,8 @@ function CategoryList({ onCategorySelect }) {
                             <button
                                 onClick={() => {
                                     setShowAddModal(false);
-                                    setNewId("");
                                     setNewName("");
                                     setNewDescription("");
-                                    setNewSubcategories([]);
                                 }}
                                 className="modal-cancel-btn"
                             >
@@ -565,6 +530,7 @@ function CategoryList({ onCategorySelect }) {
                     </div>
                 </div>
             )}
+
 
             {/* Edit Modal */}
             {showEditModal && (

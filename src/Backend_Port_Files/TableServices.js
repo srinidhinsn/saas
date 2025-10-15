@@ -1,7 +1,7 @@
 import axios from 'axios';
 
 const tableServicesPort = axios.create({
-    baseURL: 'https://table-service-qa-582942992169.asia-south2.run.app/saas',
+    baseURL: 'http://localhost:8001/saas',
 });
 
 export default tableServicesPort;
