@@ -868,7 +868,6 @@ import axios from "axios";
 import { useParams } from "react-router-dom";
 import { toast } from "react-toastify";
 import jsPDF from "jspdf";
-import autoTable from "jspdf-autotable";
 
 export default function BillingPage() {
   const { clientId } = useParams();
@@ -896,7 +895,7 @@ export default function BillingPage() {
   const [invoiceModalOpen, setInvoiceModalOpen] = useState(false);
   const [status, setStatus] = useState("Draft");
   const isMobile = window.innerWidth <= 700;
-
+  const [paidInvoices, setPaidInvoices] = useState([]);
   // Utility safe number
   const safeNum = (num) => (typeof num === "number" && !isNaN(num) ? num : 0);
   const updateBalance = (sumOfPayments) => {
@@ -1379,7 +1378,31 @@ export default function BillingPage() {
   
     setSaving(false);
   };
-  
+
+
+useEffect(() => {
+  async function fetchPaidInvoices() {
+    try {
+      const res = await axios.get(
+        `${import.meta.env.VITE_API_BILLING_SERVICE_URL}/${clientId}/invoice/read_document`,
+        {
+          headers: { Authorization: `Bearer ${token}` },
+          params: { client_id: clientId }
+        }
+      );
+      // Filter PAID and today's date
+      const today = (new Date()).toISOString().slice(0,10);
+      const paid = (res.data?.data || []).filter(
+        inv => inv.payment_status?.toLowerCase() === "paid" && (inv.document_date || "").slice(0,10) === today
+      );
+      setPaidInvoices(paid);
+    } catch (err) {
+      setPaidInvoices([]);
+    }
+  }
+  fetchPaidInvoices();
+}, [clientId, token, selectedOrder]);
+
   
 
   return (
@@ -1509,8 +1532,66 @@ export default function BillingPage() {
                         </tr>
                       </tbody>
                     </table>
+                    <div className="inv--controls">
+            <label>
+              GST (%)<br/>
+              <input type="number" value={taxPercent} onChange={e => setTaxPercent(Number(e.target.value))} className="inv--input"/>
+            </label>
+            <label>
+              Discount<br/>
+              <input type="number" value={discount} onChange={e => setDiscount(Number(e.target.value))} className="inv--input"/>
+            </label>
+            <label>
+              <select value={discountIsPercent ? "percent" : "fixed"} onChange={e => setDiscountIsPercent(e.target.value === "percent")} className="inv--select">
+                <option value="percent">%</option>
+                <option value="fixed">Fixed</option>
+              </select>
+            </label>
 
+            {/* Payment Status */}
+            <div className="inv--payment-status-buttons">
+              <span>Payment Status:</span>
+              {["Pending","Paid","Partial","Due"].map(s => (
+                <button key={s} type="button" className={`inv--status-btn ${paymentStatus===s?"active":""}`} onClick={()=>setPaymentStatus(s)}>{s}</button>
+              ))}
+            </div>
+
+            {/* Split Payment */}
+            <label>
+              <input type="checkbox" checked={splitPaymentEnabled} onChange={()=>setSplitPaymentEnabled(!splitPaymentEnabled)}/>
+              Enable Split Payment
+            </label>
+
+            {splitPaymentEnabled ? (
+              <div className="inv--split-payments">
+                {paymentSplits.map((split, idx)=>(
+                  <div key={idx} className="inv--split-row">
+                    <select value={split.method} onChange={e=>{
+                      const newSplits = [...paymentSplits]; newSplits[idx].method=e.target.value; setPaymentSplits(newSplits);
+                    }}>
+                      <option>Cash</option><option>UPI</option><option>Card</option><option>Due</option>
+                    </select>
+                    <input type="number" value={split.amount} onChange={e=>updateSplitAmount(idx,e.target.value)}/>
+                    <button type="button" onClick={()=>removeSplitRow(idx)}>&times;</button>
+                  </div>
+                ))}
+                <button type="button" onClick={addSplitRow}>Add Payment Method</button>
+              </div>
+            ) : (
+              <div>
+                <label>Payment Method
+                  <select value={method} onChange={e=>{ setMethod(e.target.value); setPaymentSplits([{method:e.target.value, amount:singlePaymentAmount}])}}>
+                    <option>Cash</option><option>UPI</option><option>Card</option><option>Due</option>
+                  </select>
+                </label>
+                <label>Amount Given
+                  <input type="number" value={singlePaymentAmount} onChange={e=>onSinglePaymentAmountChange(e.target.value)}/>
+                </label>
+              </div>
+            )}
+          </div>
                     <div className="inv--actions">
+                    <button onClick={saveInvoiceDraft}>Save Bill</button>
                       <button onClick={printInvoice} className="inv--btn-success" type="button">
                         Download PDF / Print
                       </button>
@@ -1773,6 +1854,21 @@ export default function BillingPage() {
               <p>Select an order to view invoice details</p>
             </section>
           )}
+        {/* <aside className="inv--paid-bills-list">
+  <h3>Paid Bills</h3>
+  {paidInvoices.length === 0
+    ? <div className="inv--empty-text">None today</div>
+    : paidInvoices.map(bill =>
+      <div key={bill.id} className="inv--paid-bill-card">
+        <div><b>#{bill.document_number || bill.id}</b></div>
+        <div>Table: {bill.reference_number || '-'}</div>
+        <div>Total: ₹{bill.total_amount || "N/A"}</div>
+        <div style={{fontSize: "11px", color: "#888"}}>Issued at {new Date(bill.document_date).toLocaleTimeString([], { hour: "2-digit", minute: "2-digit" })}</div>
+      </div>
+    )
+  }
+</aside> */}
+
         </div>
       </div>
     </div>
