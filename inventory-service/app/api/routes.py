@@ -56,10 +56,21 @@ def delete_inventory(client_id: str, item: Inventory, context: SaasContext = Dep
     return ResponseModel[Inventory](screen_id=context.screen_id, status="success", message="Inventory item deleted", data=model)
 
 @router.delete("/delete_all", response_model=ResponseModel[str])
-def delete_all_inventory(client_id: str, context: SaasContext = Depends(verify_token), db: Session = Depends(get_db)):
+def delete_all_inventory(
+    client_id: str,
+    context: SaasContext = Depends(verify_token),
+    db: Session = Depends(get_db)
+):
     records = db.query(InventoryEntity).filter(InventoryEntity.client_id == client_id).all()
+
     if not records:
-        raise HTTPException(status_code=404, detail="No inventory items found for this client")
+        # ✅ No items? Just return success instead of 404
+        return ResponseModel[str](
+            screen_id=context.screen_id,
+            status="success",
+            message="No inventory items found — nothing to delete",
+            data="No records to delete"
+        )
 
     for record in records:
         db.delete(record)
@@ -71,6 +82,7 @@ def delete_all_inventory(client_id: str, context: SaasContext = Depends(verify_t
         message="All inventory items deleted",
         data="All inventory items deleted successfully"
     )
+
 # -------------------- CATEGORY ROUTES --------------------
 
 @router.get("/read_category", response_model=ResponseModel)
