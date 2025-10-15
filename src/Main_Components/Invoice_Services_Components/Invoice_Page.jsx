@@ -140,7 +140,7 @@ const InvoiceModal = ({ order, onClose }) => {
                 <div className="text-right">
                   <h2 className="invoice-title">INVOICE</h2>
                   <p className="restaurant-info">
-                    Invoice #: <span>{documentNumber || "N/A"}</span>
+                    Invoice #: <span>{documentNumber || "Draft"}</span>
                   </p>
                   <p className="restaurant-info">
                     Date: <span>{orderDate}</span>
