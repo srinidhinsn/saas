@@ -1,7 +1,6 @@
 import React, { useState, useEffect } from "react";
 import { useParams } from "react-router-dom";
-import userServicesPort from "../../Backend_Port_Files/UserServices";
-import inventoryServicesPort from "../../Backend_Port_Files/InventoryServices";
+import axios from 'axios';
 
 const AddUserForm = ({ onCancel, onSave }) => {
   const { clientId } = useParams();
@@ -22,8 +21,8 @@ const AddUserForm = ({ onCancel, onSave }) => {
   useEffect(() => {
     const fetchRoles = async () => {
       try {
-        const res = await inventoryServicesPort.get(
-          `/${clientId}/inventory/read_category?category_id=roles`,
+        const res = await axios.get(
+          `${import.meta.env.VITE_API_INVENTORY_SERVICE_URL}/${clientId}/inventory/read_category?category_id=roles`,
           {
             headers: { Authorization: `Bearer ${token}` },
           }
@@ -64,8 +63,8 @@ const AddUserForm = ({ onCancel, onSave }) => {
     
 
     try {
-      const res = await userServicesPort.post(
-        `/${clientId}/users/add`,
+      const res = await axios.post(
+        `${import.meta.env.VITE_API_USER_SERVICE_URL}/${clientId}/users/add`,
         payload,
         {
           headers: { Authorization: `Bearer ${token}` },

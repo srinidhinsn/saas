@@ -1,5 +1,5 @@
 import React, { useState } from "react";
-import userServicesPort from '../../Backend_Port_Files/UserServices'
+import axios from 'axios';
 import { useNavigate, useParams } from "react-router-dom";
 import { FaUser, FaLock } from "react-icons/fa";
 
@@ -66,8 +66,8 @@ export default function Register() {
                 first_name: form.username
             };
 
-            const response = await userServicesPort.post(
-                `/${clientId}/users/register`,
+            const response = await axios.post(
+                `${import.meta.env.VITE_API_USER_SERVICE_URL}/${clientId}/users/register`,
                 payload
             );
 

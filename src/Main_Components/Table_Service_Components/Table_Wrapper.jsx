@@ -1,6 +1,6 @@
 import React, { useEffect, useState } from "react";
 import { useParams } from "react-router-dom";
-import tableServicesPort from "../../Backend_Port_Files/TableServices";
+import axios from 'axios';
 import TableManagement from "./TableManagement";
 import TableManagementWaiter from "./Waiter_table";
 
@@ -13,7 +13,7 @@ const TableManagementWrapper = () => {
   useEffect(() => {
     const fetchScreen = async () => {
       try {
-        const res = await tableServicesPort.get(`/${clientId}/tables/read`, {
+        const res = await axios.get(`${import.meta.env.VITE_API_TABLE_SERVICE_URL}/${clientId}/tables/read`, {
           headers: { Authorization: `Bearer ${token}` },
         });
         const result = res.data;

@@ -3,10 +3,10 @@ import { FaBell, FaUserCircle } from "react-icons/fa";
 import { HiOutlineSun } from "react-icons/hi";
 import { PiMoonThin } from "react-icons/pi";
 import { useTheme } from "../ThemeChangerComponent/ThemeProvider";
-import { useNavigate, useParams } from "react-router-dom";
+import { useNavigate } from "react-router-dom";
 import ClickSpark from "../Sub_Components/SparkArrow";
 import { MdKeyboardDoubleArrowRight } from "react-icons/md";
-
+import { useLocation } from "react-router-dom";
 const HeaderBar = () => {
     const [notifications, setNotifications] = useState([]);
     const [showPopup, setShowPopup] = useState(false);
@@ -17,7 +17,8 @@ const HeaderBar = () => {
     const navigate = useNavigate();
     const [showBellShaking, setShowBellShaking] = useState(false);
     const { darkMode, toggleTheme } = useTheme();
-    const { clientId } = useParams()
+    const location = useLocation();
+const clientId = location.pathname.split("/")[2]; 
     const token = localStorage.getItem("access_token");
     const [tokenAvailable, setTokenAvailable] = useState(!!token);
 
@@ -81,8 +82,12 @@ const HeaderBar = () => {
         localStorage.removeItem("access_token");
         setTokenAvailable(false);
         setProfileImage(null);
-        navigate("/login");
+    
+        // clientId dynamically fetched from URL
+        const dynamicClientId = location.pathname.split("/")[2];
+        navigate(`/saas/${dynamicClientId}/login`);
     };
+    
 
     function notificationsPage() {
         navigate(`/saas/${clientId}/main/all-notifications`);

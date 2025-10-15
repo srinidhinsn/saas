@@ -1,7 +1,7 @@
 import axios from 'axios';
 
 const inventoryServicesPort = axios.create({
-    baseURL: 'https://inventory-service-qa-582942992169.asia-south2.run.app/saas',
+    baseURL: 'http://localhost:8002/saas',
 });
 
 export default inventoryServicesPort;
