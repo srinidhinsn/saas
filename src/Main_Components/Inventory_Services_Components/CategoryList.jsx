@@ -2,8 +2,10 @@ import React, { useEffect, useState } from "react";
 import { FaEdit, FaTrash } from "react-icons/fa";
 import { jwtDecode } from "jwt-decode";
 import { useParams } from "react-router-dom";
-import axios from 'axios';
+import inventoryServicesPort from '../../Backend_Port_Files/InventoryServices'
 import { v4 as uuidv4 } from "uuid";
+import axios from 'axios';
+
 
 
 function CategoryList({ onCategorySelect }) {
@@ -205,13 +207,13 @@ function CategoryList({ onCategorySelect }) {
                 `${import.meta.env.VITE_API_INVENTORY_SERVICE_URL}/${clientId}/menu/read_category?category_id=dietery`,
                 { headers: { Authorization: `Bearer ${token}` } }
             );
-    
+
             const rawCategories = response.data.data;
-    
+
             // Only take subcategories under dietery
             const dietaryRoot = rawCategories[0];
             const displayCategories = dietaryRoot?.subCategories || [];
-    
+
             // Build parent map
             const tempParentMap = {};
             const traverseAndBuildMap = (cats, parentId = null) => {
@@ -224,15 +226,15 @@ function CategoryList({ onCategorySelect }) {
             };
             traverseAndBuildMap(displayCategories);
             setParentMap(tempParentMap);
-    
+
             setCategories(displayCategories);
             setActiveCategory(displayCategories.length > 0 ? displayCategories[0].id : null);
-    
+
         } catch (error) {
             console.error("Error refreshing categories:", error);
         }
     };
-    
+
 
 
 
@@ -242,11 +244,11 @@ function CategoryList({ onCategorySelect }) {
             alert("Category name is required");
             return;
         }
-    
+
         const newId = uuidv4(); // auto-generate ID
         let createdBy = "null";
         let updatedBy = "null";
-    
+
         try {
             const decoded = jwtDecode(token);
             createdBy = String(decoded.user_id);
@@ -254,11 +256,11 @@ function CategoryList({ onCategorySelect }) {
         } catch (err) {
             console.error("Token decode failed:", err);
         }
-    
+
         // Step 1️⃣ - Create the new subcategory itself
         const tempParentMap = { [newId]: "dietery" };
         const slug = generateSlugFromParents(newId, newName.trim(), tempParentMap);
-    
+
         const newCategoryPayload = {
             id: newId,
             client_id: clientId,
@@ -269,23 +271,23 @@ function CategoryList({ onCategorySelect }) {
             updated_by: updatedBy,
             slug,
         };
-    
+
         try {
-            await inventoryServicesPort.post(
-                `/${clientId}/menu/create_category`,
+            await axios.post(
+                `${import.meta.env.VITE_API_INVENTORY_SERVICE_URL}/${clientId}/menu/create_category`,
                 newCategoryPayload,
                 { headers: { Authorization: `Bearer ${token}` } }
             );
-    
+
             // Step 2️⃣ - Fetch the current 'dietery' category to get existing subcategories
-            const parentRes = await inventoryServicesPort.get(
-                `/${clientId}/menu/read_category?category_id=dietery`,
+            const parentRes = await axios.get(
+                `${import.meta.env.VITE_API_INVENTORY_SERVICE_URL}/${clientId}/menu/read_category?category_id=dietery`,
                 { headers: { Authorization: `Bearer ${token}` } }
             );
-    
-            const dietaryCategory = parentRes.data.data.find(cat => cat.id === "dietery");
+
+            const dietaryCategory = parentRes.data.data[0];
             const existingSubs = dietaryCategory?.sub_categories || dietaryCategory?.subCategories?.map(sub => sub.id) || [];
-    
+
             // Step 3️⃣ - Update 'dietery' to include new subcategory
             const updatePayload = {
                 id: "dietery",
@@ -296,9 +298,9 @@ function CategoryList({ onCategorySelect }) {
                 slug: "_Dietery",
                 overwrite_subcategories: true,
             };
-    
-            await inventoryServicesPort.post(
-                `/${clientId}/menu/update_category?client_id=${clientId}`,
+
+            await axios.post(
+                `${import.meta.env.VITE_API_INVENTORY_SERVICE_URL}/${clientId}/menu/update_category?client_id=${clientId}`,
                 updatePayload,
                 {
                     headers: {
@@ -307,9 +309,9 @@ function CategoryList({ onCategorySelect }) {
                     },
                 }
             );
-    
+
             await refreshCategoriesAndParentMap();
-    
+
             setNewName("");
             setNewDescription("");
             setShowAddModal(false);
@@ -319,7 +321,7 @@ function CategoryList({ onCategorySelect }) {
             alert("Failed to add category under Dietery");
         }
     };
-    
+
 
 
     const startEdit = (cat) => {
@@ -395,8 +397,8 @@ function CategoryList({ onCategorySelect }) {
         };
 
         try {
-            await inventoryServicesPort.post(
-                `/${clientId}/menu/update_category?client_id=${clientId}`,
+            await axios.post(
+                `${import.meta.env.VITE_API_INVENTORY_SERVICE_URL}/${clientId}/menu/update_category?client_id=${clientId}`,
                 payload,
                 {
                     headers: {
@@ -425,10 +427,9 @@ function CategoryList({ onCategorySelect }) {
     const handleDelete = async () => {
         if (!deleteTarget) return;
         const category = deleteTarget;
-        console.log("Deleting category ID:", category.id);
 
         try {
-            const res = await axios.post(
+            await axios.post(
                 `${import.meta.env.VITE_API_INVENTORY_SERVICE_URL}/${clientId}/menu/delete_category`,
                 { id: category.id },
                 {
@@ -439,36 +440,40 @@ function CategoryList({ onCategorySelect }) {
                 }
             );
 
+            // Refresh just like the useEffect
             const response = await axios.get(
                 `${import.meta.env.VITE_API_INVENTORY_SERVICE_URL}/${clientId}/menu/read_category?category_id=dietery`,
-                {
-                    headers: {
-                        Authorization: `Bearer ${token}`,
-                    },
-                }
+                { headers: { Authorization: `Bearer ${token}` } }
             );
 
-            const rawCategories = response.data.data;
+            const dietaryRoot = response.data.data.find(cat => cat.id === "dietery");
+            const displayCategories = dietaryRoot?.subCategories || [];
 
-            const subCategoryIds = new Set();
-            rawCategories.forEach(cat => {
-                cat.subCategories?.forEach(sub => subCategoryIds.add(sub.id));
-            });
+            // Build parent map
+            const tempParentMap = {};
+            const traverseAndBuildMap = (cats, parentId = null) => {
+                for (const cat of cats) {
+                    if (parentId) tempParentMap[cat.id] = parentId;
+                    if (cat.subCategories?.length > 0) {
+                        traverseAndBuildMap(cat.subCategories, cat.id);
+                    }
+                }
+            };
+            traverseAndBuildMap(displayCategories);
+            setParentMap(tempParentMap);
 
-            const topLevelCategories = rawCategories.filter(cat => !subCategoryIds.has(cat.id));
-            const allCategory = { id: "all", name: "All" };
-            setCategories([allCategory, ...topLevelCategories]);
-            setActiveCategory("all");
-
-            await refreshCategoriesAndParentMap();
+            setCategories(displayCategories);
+            setActiveCategory(displayCategories.length > 0 ? displayCategories[0].id : null);
             setDeleteTarget(null);
 
-            alert(res.data.message || "Category deleted successfully");
+            alert("Category deleted successfully");
+
         } catch (err) {
             console.error("Delete error:", err.response?.data || err);
             alert(err.response?.data?.detail || "Failed to delete category");
         }
     };
+
 
 
     return (
