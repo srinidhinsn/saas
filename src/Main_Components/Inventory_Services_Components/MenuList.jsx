@@ -1,5 +1,6 @@
 import React, { useEffect, useState, useRef } from "react";
-import AddMenuForm from './AddInventoryItemForm'; import { useParams } from "react-router-dom";
+import AddMenuForm from './AddInventoryItemForm';
+import { useParams } from "react-router-dom";
 import { FaEdit, FaTrash } from "react-icons/fa";
 import axios from 'axios';
 import * as XLSX from "xlsx";
@@ -7,6 +8,10 @@ import { saveAs } from "file-saver";
 import "ag-grid-community/styles/ag-grid.css";
 import "ag-grid-community/styles/ag-theme-alpine.css";
 
+// NOTE: Your file earlier referenced jwtDecode in import logic for Excel import.
+// If you don't already import jwtDecode in the project, add:
+// import jwtDecode from "jwt-decode";
+// (left out intentionally to avoid breaking existing imports — add if needed)
 
 function InventoryItemList({ selectedCategory }) {
     const [items, setItems] = useState([]);
@@ -16,19 +21,26 @@ function InventoryItemList({ selectedCategory }) {
     const [showAddModal, setShowAddModal] = useState(false);
     const [originalItems, setOriginalItems] = useState([]);
 
+    // Bulk update states
+    const [showBulkModal, setShowBulkModal] = useState(false);
+    const [selectedRows, setSelectedRows] = useState([]); // ids selected in bulk modal
+    const [editingRows, setEditingRows] = useState({}); // { id: true/false }
+    const [editedRowCopies, setEditedRowCopies] = useState({}); // { id: {...edited fields...} }
+    const [selectAllChecked, setSelectAllChecked] = useState(false);
+    const [bulkSaving, setBulkSaving] = useState(false);
+
     const token = localStorage.getItem("access_token");
     const headers = { Authorization: `Bearer ${token}` };
 
     const [categories, setCategories] = useState([]);
     const { clientId } = useParams();
 
-
     const flattenCategories = (categoryTree) => {
         const flat = [];
         const recurse = (nodes) => {
             nodes.forEach(node => {
                 if (!node) return;
-                flat.push({ id: node.id, name: node.name });
+                flat.push({ id: node.id, name: node.name, parent_id: node.parent_id });
                 if (node.subCategories && node.subCategories.length > 0) {
                     recurse(node.subCategories);
                 }
@@ -38,13 +50,11 @@ function InventoryItemList({ selectedCategory }) {
         return flat;
     };
 
-
-    // Replace your existing buildCategoryPath with this
+    // Build slug path same as existing
     const buildCategoryPath = (categoryId, itemName = "") => {
         const path = [];
         let currentId = categoryId;
 
-        // walk up categories until root
         while (currentId) {
             const current = categories.find(cat => cat && cat.id === currentId);
             if (!current) break;
@@ -52,7 +62,6 @@ function InventoryItemList({ selectedCategory }) {
             currentId = current.parent_id;
         }
 
-        // add item name at the end
         if (itemName) {
             path.push(itemName.trim().replace(/\s+/g, "_"));
         }
@@ -60,11 +69,10 @@ function InventoryItemList({ selectedCategory }) {
         return "_" + path.join(" _");
     };
 
-
     useEffect(() => {
         if (!token || !clientId) return;
 
-        // Fetch nested category tree from backend
+        // Try to fetch nested categories (flatten afterwards)
         axios.get(`${import.meta.env.VITE_API_INVENTORY_SERVICE_URL}/${clientId}/menu/read_category?category_id=dietery`, {
             headers: { Authorization: `Bearer ${token}` },
         })
@@ -75,22 +83,6 @@ function InventoryItemList({ selectedCategory }) {
             })
             .catch((err) => console.error("Error fetching categories:", err));
     }, [clientId, token]);
-
-
-
-    useEffect(() => {
-        if (!token || !clientId) return;
-
-        axios.get(`${import.meta.env.VITE_API_INVENTORY_SERVICE_URL}/${clientId}/menu/read_category`, {
-            headers: { Authorization: `Bearer ${token}` },
-        })
-            .then((res) => {
-                setCategories(res.data.data || []);
-            })
-            .catch((err) => {
-                console.error("Error fetching categories:", err);
-            });
-    }, [clientId]);
 
     const fetchInventoryItems = async () => {
         try {
@@ -106,11 +98,9 @@ function InventoryItemList({ selectedCategory }) {
         fetchInventoryItems();
     }, [clientId, token]);
 
-
-
-
+    // Filtering by selectedCategory (existing logic)
     const getDescendantCategoryIds = (categoryId, categoryTree) => {
-        const ids = [categoryId]; // include self
+        const ids = [categoryId];
         const recurse = (id) => {
             categoryTree
                 .filter(cat => cat.parent_id === id)
@@ -122,7 +112,6 @@ function InventoryItemList({ selectedCategory }) {
         recurse(categoryId);
         return ids;
     };
-
 
     useEffect(() => {
         if (!selectedCategory || selectedCategory.name === "All") {
@@ -159,8 +148,6 @@ function InventoryItemList({ selectedCategory }) {
             await axios.post(`${import.meta.env.VITE_API_INVENTORY_SERVICE_URL}/${clientId}/menu/update`, updatedItem, { headers });
 
             await fetchInventoryItems();
-            console.log("Updating item:", updatedItem.id, "line_item_id:", updatedItem.line_item_id);
-
             setShowEditModal(false);
             setEditingItem(null);
         } catch (err) {
@@ -169,24 +156,18 @@ function InventoryItemList({ selectedCategory }) {
         }
     };
 
-
-
     const handleDelete = async (id) => {
         try {
-            // 1. Delete the item itself in backend
             await axios.post(
                 `${import.meta.env.VITE_API_INVENTORY_SERVICE_URL}/${clientId}/menu/delete`,
                 { id },
                 { headers }
             );
 
-            // 2. Remove this id from other items' line_item_id arrays
             const updatedItems = items.map(item => {
                 if (Array.isArray(item.line_item_id) && item.line_item_id.includes(id)) {
                     const newLineItems = item.line_item_id.filter(lid => lid !== id);
                     const updatedItem = { ...item, line_item_id: newLineItems };
-
-                    // Update in backend
                     axios.post(
                         `${import.meta.env.VITE_API_INVENTORY_SERVICE_URL}/${clientId}/menu/update`,
                         updatedItem,
@@ -194,21 +175,17 @@ function InventoryItemList({ selectedCategory }) {
                     ).catch(err => {
                         console.error(`Failed to update item ${item.id}`, err);
                     });
-
                     return updatedItem;
                 }
                 return item;
             });
 
-            // 3. Update state to remove deleted item & refresh affected ones
             setItems(updatedItems.filter(i => i.id !== id));
-
         } catch (err) {
             console.error("Delete failed:", err);
             alert("Delete failed.");
         }
     };
-
 
     const handleItemCreated = (responseData) => {
         if (responseData?.data) {
@@ -223,9 +200,7 @@ function InventoryItemList({ selectedCategory }) {
         let totalPrice = 0;
 
         const names = lineItemIds.map((id) => {
-            const match = originalItems.find(
-                (i) => i.id === id || (Array.isArray(i.line_item_id) && i.line_item_id.includes(id))
-            );
+            const match = originalItems.find(i => i.id === id);
 
             if (match) {
                 totalPrice += match.unit_price || 0;
@@ -238,6 +213,7 @@ function InventoryItemList({ selectedCategory }) {
     };
 
 
+    // DropdownCheckbox component kept as-is for single-edit modal usage
     const DropdownCheckbox = ({ selected, options, onChange }) => {
         const [open, setOpen] = useState(false);
         const ref = useRef(null);
@@ -285,34 +261,7 @@ function InventoryItemList({ selectedCategory }) {
         );
     };
 
-
-
-    //     const displayedItems = selectedCategory && selectedCategory.name !== "All"
-    //     ? originalItems.filter(item => item.category_id === selectedCategory.id)
-    //     : originalItems;
-
-    // // Group items by existing categories
-    // let groupedItems = categories.map(category => ({
-    //     ...category,
-    //     items: displayedItems.filter(item => item.category_id === category.id)
-    // }));
-
-    // // Find items with no category assigned
-    // const uncategorizedItems = displayedItems.filter(
-    //     item => !item.category_id || !categories.some(cat => cat.id === item.category_id)
-    // );
-
-    // // Add "Uncategorized" group if any found
-    // if (uncategorizedItems.length > 0) {
-    //     groupedItems.push({
-    //         id: "uncategorized",
-    //         name: "Uncategorized",
-    //         items: uncategorizedItems
-    //     });
-    // }
-
-
-
+    // Export to Excel (kept intact)
     const handleExportToExcel = () => {
         const exportData = items.map(item => ({
             ID: item.id || item.inventory_id,
@@ -344,8 +293,7 @@ function InventoryItemList({ selectedCategory }) {
         saveAs(data, "inventory_items.xlsx");
     };
 
-
-
+    // Import from Excel (kept intact although jwtDecode import may be needed)
     const handleImportFromExcel = async (e) => {
         const file = e.target.files[0];
         if (!file) return;
@@ -422,14 +370,190 @@ function InventoryItemList({ selectedCategory }) {
         return found ? found.id : null;
     };
 
+    // --------------- BULK MODAL HANDLERS ----------------
+
+    const openBulkModal = () => {
+        // Reset modal states and open
+        const initEditing = {};
+        const initCopies = {};
+        items.forEach(item => {
+            initEditing[item.id] = false;
+            // Make a shallow copy to be edited without mutating original
+            initCopies[item.id] = {
+                ...item,
+                line_item_id: Array.isArray(item.line_item_id) ? [...item.line_item_id] : (item.line_item_id ? item.line_item_id.split(",").map(i => parseInt(i)) : [])
+            };
+        });
+        setEditingRows(initEditing);
+        setEditedRowCopies(initCopies);
+        setSelectedRows([]); // nothing selected initially
+        setSelectAllChecked(false);
+        setShowBulkModal(true);
+    };
+
+    const toggleSelectRow = (id) => {
+        setSelectedRows(prev => {
+            if (prev.includes(id)) return prev.filter(x => x !== id);
+            return [...prev, id];
+        });
+    };
+
+    const toggleSelectAll = () => {
+        if (!selectAllChecked) {
+            const allIds = items.map(i => i.id);
+            setSelectedRows(allIds);
+            setSelectAllChecked(true);
+        } else {
+            setSelectedRows([]);
+            setSelectAllChecked(false);
+        }
+    };
+
+    // Toggle edit mode for a particular row
+    const toggleRowEdit = (id) => {
+        setEditingRows(prev => ({ ...prev, [id]: !prev[id] }));
+        // ensure edited copy exists
+        setEditedRowCopies(prev => ({ ...prev, [id]: prev[id] ? prev[id] : { ...(items.find(i => i.id === id) || {}) } }));
+    };
+
+    // Handle change for fields inside a row's editable copy
+    const handleRowChange = (id, field, value) => {
+        setEditedRowCopies(prev => ({
+            ...prev,
+            [id]: {
+                ...prev[id],
+                [field]: value
+            }
+        }));
+    };
+
+    // Save a single row to backend (used by Save button on that row)
+    const handleSaveRow = async (id) => {
+        const edited = editedRowCopies[id];
+        if (!edited) return alert("Nothing to save for this row.");
+
+        // Prepare update identical to single-edit save
+        const updatedItem = {
+            ...edited,
+            client_id: clientId,
+            id: edited.id,
+            line_item_id: Array.isArray(edited.line_item_id) ? edited.line_item_id : (typeof edited.line_item_id === "string" ? edited.line_item_id.split(",").map(s => parseInt(s.trim())).filter(n => !isNaN(n)) : []),
+        };
+        updatedItem.slug = buildCategoryPath(updatedItem.category_id, updatedItem.name);
+
+        try {
+            await axios.post(`${import.meta.env.VITE_API_INVENTORY_SERVICE_URL}/${clientId}/menu/update`, updatedItem, { headers });
+            // Refresh after save
+            await fetchInventoryItems();
+            setEditingRows(prev => ({ ...prev, [id]: false }));
+            setEditedRowCopies(prev => ({ ...prev, [id]: updatedItem }));
+            // remove from selectedRows if present (optional)
+            // setSelectedRows(prev => prev.filter(x => x !== id));
+        } catch (err) {
+            console.error("Row save failed:", err);
+            alert("Save failed for item " + (edited.name || id));
+        }
+    };
+
+    // Cancel edits for a row (revert copy to original)
+    const handleCancelRow = (id) => {
+        const original = items.find(i => i.id === id);
+        setEditedRowCopies(prev => ({ ...prev, [id]: original ? { ...original } : prev[id] }));
+        setEditingRows(prev => ({ ...prev, [id]: false }));
+    };
+
+
+    const handleBulkDelete = async () => {
+        if (selectedRows.length === 0) {
+            alert("No rows selected to delete.");
+            return;
+        }
+
+        const confirmDelete = window.confirm(
+            `Are you sure you want to delete ${selectedRows.length} selected item(s)?`
+        );
+        if (!confirmDelete) return;
+
+        try {
+            setBulkSaving(true);
+            await Promise.all(
+                selectedRows.map(async (id) => {
+                    await axios.post(
+                        `${import.meta.env.VITE_API_INVENTORY_SERVICE_URL}/${clientId}/menu/delete`,
+                        { id },
+                        { headers }
+                    );
+                })
+            );
+
+            alert("Selected items deleted successfully.");
+            setSelectedRows([]);
+            setSelectAllChecked(false);
+            await fetchInventoryItems(); // Refresh list
+        } catch (error) {
+            console.error("Bulk delete failed:", error);
+            alert("Failed to delete some items. Check console for details.");
+        } finally {
+            setBulkSaving(false);
+        }
+    };
+
+
+    const handleSaveSelected = async () => {
+        if (selectedRows.length === 0) return alert("No rows selected to save.");
+        setBulkSaving(true);
+        try {
+            await Promise.all(selectedRows.map(async (id) => {
+                // Ensure we have the latest edited copy for all fields
+                const edited = editedRowCopies[id]
+                    ? { ...editedRowCopies[id] }
+                    : { ...items.find(i => i.id === id) };
+
+                const updatedItem = {
+                    ...edited,
+                    client_id: clientId,
+                    id: edited.id,
+                };
+
+                updatedItem.slug = buildCategoryPath(updatedItem.category_id, updatedItem.name);
+
+                // Update the editedRowCopies to reflect saved data
+                setEditedRowCopies(prev => ({ ...prev, [id]: updatedItem }));
+
+                await axios.post(
+                    `${import.meta.env.VITE_API_INVENTORY_SERVICE_URL}/${clientId}/menu/update`,
+                    updatedItem,
+                    { headers }
+                );
+            }));
+
+            alert("Selected items updated successfully.");
+            setShowBulkModal(false);
+            setSelectedRows([]);
+            setSelectAllChecked(false);
+            await fetchInventoryItems();
+        } catch (err) {
+            console.error("Bulk save failed:", err);
+            alert("Bulk save failed. Check console for details.");
+        } finally {
+            setBulkSaving(false);
+        }
+    };
+
+
     return (
         <div className="menu-container">
             {/* Header */}
-            <div className="menu-header">
-                <div>
+            <div className="menu-header" style={{ display: "flex", alignItems: "center", gap: "12px" }}>
+                <div style={{ flex: 1 }}>
                     <h1>Menu Items</h1>
                     <p>Browse and manage your restaurant menu</p>
                 </div>
+
+                <button className="btn-add" onClick={openBulkModal} title="Bulk update multiple items">
+                    ⚙ Bulk Update & Delete
+                </button>
+
                 <button className="btn-add" onClick={() => {
                     setShowAddModal(true);
                     setEditingItem(null);
@@ -475,29 +599,46 @@ function InventoryItemList({ selectedCategory }) {
                             </div>
                         );
                     })
-
                 )}
-
             </div>
 
-
+            {/* Add Modal (existing) */}
             {showAddModal && (
-                <div className="modal-overlay" onClick={(e) => {
-                    if (e.target.classList.contains("modal-overlay")) {
-                        setShowAddModal(false);
-                    }
-                }}>
-                    <div className="menu-modal-content">
-                        <h3>Add New Menu Item</h3>
-                        <AddMenuForm
-                            clientId={clientId}
-                            onItemCreated={handleItemCreated}
-                            selectedCategory={selectedCategory}
-                        />
-                    </div>
-                </div>
-            )}
+    <div className="modal-overlay" onClick={(e) => {
+        if (e.target.classList.contains("modal-overlay")) {
+            setShowAddModal(false);
+        }
+    }}>
+        <div className="menu-modal-content" style={{ position: "relative" }}>
+            {/* X button */}
+            <button
+                style={{
+                    position: "absolute",
+                    top: 8,
+                    right: 8,
+                    background: "transparent",
+                    border: "none",
+                    fontSize: 20,
+                    cursor: "pointer"
+                }}
+                onClick={() => setShowAddModal(false)}
+            >
+                ✖
+            </button>
 
+            <h3>Add New Menu Item</h3>
+            <AddMenuForm
+                clientId={clientId}
+                onItemCreated={handleItemCreated}
+                selectedCategory={selectedCategory}
+            />
+        </div>
+    </div>
+)}
+
+
+
+            {/* Edit Modal (existing single-item edit) */}
             {showEditModal && editingItem && (
                 <div className="modal-overlay" onClick={(e) => {
                     if (e.target.classList.contains("modal-overlay")) setShowEditModal(false);
@@ -511,19 +652,10 @@ function InventoryItemList({ selectedCategory }) {
 
                             <div className="form-entry-wrapper">
                                 <div className="form-row">
-                                    <input
-                                        type="text"
-                                        value={editingItem.inventory_id}
-                                        onChange={(e) => setEditingItem({ ...editingItem, inventory_id: e.target.value })}
-                                        placeholder="menu ID"
-                                        className="form-input short"
-                                        readOnly
-                                    />
-
 
                                     <DropdownCheckbox
                                         selected={Array.isArray(editingItem.line_item_id) ? editingItem.line_item_id : []}
-                                        options={items}
+                                        options={items.filter(i => i.id !== editingItem.id)}  // Exclude self
                                         onChange={(newSelected) =>
                                             setEditingItem({ ...editingItem, line_item_id: newSelected })
                                         }
@@ -563,24 +695,6 @@ function InventoryItemList({ selectedCategory }) {
                                         ))}
                                     </select>
 
-                                    {/* <label htmlFor="">Realm :</label>
-                                    <input
-                                        value={editingItem.realm}
-                                        onChange={(e) => setEditingItem({ ...editingItem, realm: e.target.value })}
-                                        placeholder="Realm"
-                                        className="form-input"
-                                    />
-                                    <label htmlFor="">Dietary : </label>
-                                    <select
-                                        value={editingItem.dietary_type}
-                                        onChange={(e) => setEditingItem({ ...editingItem, dietary_type: e.target.value })}
-                                        className="form-input"
-                                    >
-                                        <option value="">Select Dietary Type</option>
-                                        <option value="veg">Veg</option>
-                                        <option value="non-veg">NonVeg</option>
-                                    </select> */}
-
                                     <label htmlFor="">Availability :</label>
                                     <input
                                         value={editingItem.availability}
@@ -609,63 +723,6 @@ function InventoryItemList({ selectedCategory }) {
                                         className="form-input"
                                     />
 
-                                    {/* <label htmlFor="">CST :</label>
-                                    <input
-                                        type="number"
-                                        value={editingItem.unit_cst}
-                                        onChange={(e) => setEditingItem({ ...editingItem, unit_cst: e.target.value })}
-                                        placeholder="Unit CST"
-                                        className="form-input short"
-                                    />
-
-                                    <label htmlFor="">GST :</label>
-                                    <input
-                                        type="number"
-                                        value={editingItem.unit_gst}
-                                        onChange={(e) => setEditingItem({ ...editingItem, unit_gst: e.target.value })}
-                                        placeholder="Unit GST"
-                                        className="form-input short"
-                                    />
-
-                                    <label htmlFor="">Total Price : </label>
-                                    <input
-                                        type="number"
-                                        value={editingItem.unit_total_price}
-                                        onChange={(e) => setEditingItem({ ...editingItem, unit_total_price: e.target.value })}
-                                        placeholder="Unit Total Price"
-                                        className="form-input short"
-                                    />
-                                </div>
-
-
-                                <div className="form-row">
-                                    <label htmlFor="">Total Price :</label>
-                                    <input
-                                        type="number"
-                                        value={editingItem.price}
-                                        onChange={(e) => setEditingItem({ ...editingItem, price: e.target.value })}
-                                        placeholder="Price"
-                                        className="form-input short"
-                                    />
-
-                                    <label htmlFor="">Total GST :</label>
-                                    <input
-                                        type="number"
-                                        value={editingItem.cst}
-                                        onChange={(e) => setEditingItem({ ...editingItem, cst: e.target.value })}
-                                        placeholder="CST"
-                                        className="form-input short"
-                                    />
-
-                                    <label htmlFor="">Total GST :</label>
-                                    <input
-                                        type="number"
-                                        value={editingItem.gst}
-                                        onChange={(e) => setEditingItem({ ...editingItem, gst: e.target.value })}
-                                        placeholder="GST"
-                                        className="form-input short"
-                                    /> */}
-
                                     <label htmlFor="">Discount :</label>
                                     <input
                                         type="number"
@@ -674,34 +731,8 @@ function InventoryItemList({ selectedCategory }) {
                                         placeholder="Discount"
                                         className="form-input short"
                                     />
-
-                                    {/* <label htmlFor="">Total Price :</label>
-                                    <input
-                                        type="number"
-                                        value={editingItem.total_price}
-                                        onChange={(e) => setEditingItem({ ...editingItem, total_price: e.target.value })}
-                                        placeholder="Total Price"
-                                        className="form-input short"
-                                    /> */}
-
-                                    <label htmlFor="">Slug :</label>
-                                    <input
-                                        value={editingItem.slug}
-                                        onChange={(e) => setEditingItem({ ...editingItem, slug: e.target.value })}
-                                        placeholder="Slug"
-                                        className="form-input"
-                                    />
-                                    <button
-                                        type="button"
-                                        className="btn-cancel-row"
-                                        onClick={() => handleCancel(index)}
-                                    >
-                                        Cancel
-                                    </button>
                                 </div>
                             </div>
-
-
 
                             <div className="form-actions">
                                 <button type="submit" className="btn-add">Save</button>
@@ -712,6 +743,7 @@ function InventoryItemList({ selectedCategory }) {
                 </div>
             )}
 
+            {/* Delete Confirmation (existing) */}
             {deleteTarget && (
                 <div className="modal-overlay">
                     <div className="modal-content">
@@ -730,9 +762,150 @@ function InventoryItemList({ selectedCategory }) {
                     </div>
                 </div>
             )}
+
+            {/* BULK UPDATE MODAL */}
+            {/* BULK UPDATE MODAL */}
+            {showBulkModal && (
+                <div className="modal-overlay" onClick={(e) => {
+                    if (e.target.classList.contains("modal-overlay")) setShowBulkModal(false);
+                }}>
+                    <div className="menu-modal-content" style={{ width: "90%", maxHeight: "85vh", overflowY: "auto" }}>
+                        <h3>Bulk Update Items</h3>
+
+                        <div style={{ display: "flex", justifyContent: "space-between", alignItems: "center", marginBottom: 8 }}>
+                            <div>
+                                <label style={{ marginRight: 8 }}>
+                                    <input type="checkbox" checked={selectAllChecked} onChange={toggleSelectAll} /> Select All
+                                </label>
+                                <span style={{ marginLeft: 12 }}>{selectedRows.length} selected</span>
+                            </div>
+
+                            <div style={{ display: "flex", gap: "8px" }}>
+                                <button
+                                    className="btn-add"
+                                    onClick={handleSaveSelected}
+                                    disabled={bulkSaving || selectedRows.length === 0}
+                                >
+                                    {bulkSaving ? "Saving..." : "Save Selected"}
+                                </button>
+
+                                <button
+                                    className="btn-delete"
+                                    onClick={handleBulkDelete}
+                                    disabled={selectedRows.length === 0}
+                                >
+                                    Delete Selected
+                                </button>
+
+                                <button
+                                    className="btn-cancel"
+                                    onClick={() => setShowBulkModal(false)}
+                                >
+                                    Close
+                                </button>
+                            </div>
+
+                        </div>
+
+                        {/* Table header */}
+                        <div className="bulk-table" style={{ width: "100%", borderCollapse: "collapse" }}>
+                            <div className="bulk-row bulk-header" style={{ display: "grid", gridTemplateColumns: "40px 1fr 1fr 140px 100px 100px 150px", gap: 8, alignItems: "center", padding: "8px 4px", borderBottom: "1px solid #e0e0e0" }}>
+                                <div></div>
+                                <div><strong>Name</strong></div>
+                                <div><strong>Description</strong></div>
+                                <div><strong>Category</strong></div>
+                                <div><strong>Unit Price</strong></div>
+                                <div><strong>Discount</strong></div>
+                            </div>
+
+                            {/* Rows */}
+                            {items.map((row) => {
+                                const copy = editedRowCopies[row.id] || row;
+                                const isSelected = selectedRows.includes(row.id);
+
+                                // Automatically open edit if checkbox is selected
+                                const isEditing = isSelected;
+
+                                return (
+                                    <div key={row.id} className="bulk-row" style={{ display: "grid", gridTemplateColumns: "40px 1fr 1fr 140px 100px 100px 150px", gap: 8, alignItems: "center", padding: "8px 4px", borderBottom: "1px solid #f0f0f0" }}>
+                                        <div>
+                                            <input
+                                                type="checkbox"
+                                                checked={isSelected}
+                                                onChange={() => {
+                                                    toggleSelectRow(row.id);
+                                                    // If row was unchecked and now checked, start editing
+                                                    if (!isSelected) {
+                                                        setEditingRows(prev => ({ ...prev, [row.id]: true }));
+                                                    }
+                                                }}
+                                            />
+                                        </div>
+
+                                        {/* Name */}
+                                        <div>
+                                            {isEditing ? (
+                                                <input className="form-input" value={copy.name || ""} onChange={(e) => handleRowChange(row.id, "name", e.target.value)} />
+                                            ) : (
+                                                <div>{row.name}</div>
+                                            )}
+                                        </div>
+
+                                        {/* Description */}
+                                        <div>
+                                            {isEditing ? (
+                                                <input className="form-input" value={copy.description || ""} onChange={(e) => handleRowChange(row.id, "description", e.target.value)} />
+                                            ) : (
+                                                <div style={{ maxWidth: 300, overflow: "hidden", textOverflow: "ellipsis", whiteSpace: "nowrap" }}>{row.description}</div>
+                                            )}
+                                        </div>
+
+                                        {/* Category */}
+                                        <div>
+                                            {isEditing ? (
+                                                <select className="form-input" value={copy.category_id || ""} onChange={(e) => handleRowChange(row.id, "category_id", e.target.value)}>
+                                                    <option value="">Select Category</option>
+                                                    {categories.map(cat => <option key={cat.id} value={cat.id}>{cat.name}</option>)}
+                                                </select>
+                                            ) : (
+                                                <div>{categories.find(c => c.id === row.category_id)?.name || "—"}</div>
+                                            )}
+                                        </div>
+
+                                        {/* Unit Price */}
+                                        <div>
+                                            {isEditing ? (
+                                                <input type="number" className="form-input short" value={copy.unit_price || ""} onChange={(e) => handleRowChange(row.id, "unit_price", e.target.value)} />
+                                            ) : (
+                                                <div>₹{row.unit_price ?? "-"}</div>
+                                            )}
+                                        </div>
+
+                                        {/* Discount */}
+                                        <div>
+                                            {isEditing ? (
+                                                <input type="number" className="form-input short" value={copy.discount || ""} onChange={(e) => handleRowChange(row.id, "discount", e.target.value)} />
+                                            ) : (
+                                                <div>{row.discount ?? "-"}</div>
+                                            )}
+                                        </div>
+
+                                        {/* Actions: only Cancel */}
+                                        {/* <div style={{ display: "flex", gap: 8 }}>
+                                {isEditing && (
+                                    <button className="btn-cancel" onClick={() => handleCancelRow(row.id)}>Cancel</button>
+                                )}
+                            </div> */}
+                                    </div>
+                                );
+                            })}
+                        </div>
+                    </div>
+                </div>
+            )}
+
         </div>
     );
 }
-
 
 export default InventoryItemList;

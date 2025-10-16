@@ -73,18 +73,28 @@ function CategoryList({ onCategorySelect }) {
     };
 
     const renderCategory = (category, level = 0) => {
+        const isActive = category.id === activeCategory; // check if this is selected
         const isParent = level === 0;
 
         return (
             <div key={category.id} style={{ marginLeft: level * 8 }}>
-                <div className="category-item" style={{ display: "flex", alignItems: "center" }}>
+                <div
+                    className={`category-item ${isActive ? "active-category" : ""}`}
+                    style={{ display: "flex", alignItems: "center" }}
+                >
                     <span
-                        onClick={() => onCategorySelect(category)}
+                        onClick={() => {
+                            onCategorySelect(category);
+                            setActiveCategory(category.id); // set selected category
+                        }}
                         style={{
                             cursor: "pointer",
-                            fontWeight: "bold",
+                            fontWeight: isActive ? "bold" : "normal",
                             flexGrow: 1,
-                            color: isParent ? "var(--bg-number-color)" : "gray"
+                            color: isParent ? (isActive ? "#fff" : "var(--bg-number-color)") : (isActive ? "#fff" : "gray"),
+                            backgroundColor: isActive ? "var(--primary-color)" : "transparent",
+                            padding: "4px 8px",
+                            borderRadius: "4px"
                         }}
                     >
                         {category.name}
@@ -131,6 +141,7 @@ function CategoryList({ onCategorySelect }) {
             </div>
         );
     };
+
 
 
     const toggleSubcategory = (id, isEdit = false) => {
