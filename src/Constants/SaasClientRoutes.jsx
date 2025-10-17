@@ -3,6 +3,10 @@ import { Routes, Route, useParams, Navigate, useLocation } from "react-router-do
 import { jwtDecode } from "jwt-decode";
 import api, { getValidToken } from "./Api";
 import Navbar from "./Navbar";
+import NavbarA from "./Navbar1";
+import NavbarB from "./Navbar2";
+import NavbarC from "./Navbar3";
+// import NavbarC from "./NavbarC";
 import HeaderBar from "./HeaderPage";
 import AuthModal from "./AuthModel";
 import Add_user from "../Main_Components/Add_Users/Add_user";
@@ -47,11 +51,10 @@ const SaasClientRoutes = ({
   const [authModalOpen, setAuthModalOpen] = useState(false);
   const [grants, setGrants] = useState([]);
   const [userId, setUserId] = useState(null);
+  const [screenId, setScreenId] = useState(localStorage.getItem("screen_id") || "default_user"); // ✅ read from storage
 
-  // Redirect to login if no token
   if (!token) return <Navigate to={`/saas/${clientId}/login`} />;
 
-  // Decode JWT to get grants and userId
   useEffect(() => {
     try {
       const decoded = jwtDecode(token);
@@ -62,7 +65,6 @@ const SaasClientRoutes = ({
     }
   }, [token]);
 
-  // Ensure localStorage clientId consistency
   useEffect(() => {
     const storedClient = localStorage.getItem("clientId");
     if (storedClient && storedClient !== clientId) {
@@ -73,30 +75,46 @@ const SaasClientRoutes = ({
     }
   }, [clientId]);
 
-  // Listen for global 403 event
   useEffect(() => {
     const handleDenied = () => setAccessDenied(true);
     window.addEventListener("accessDenied", handleDenied);
     return () => window.removeEventListener("accessDenied", handleDenied);
   }, []);
 
-  // Reset access denied when route changes
   useEffect(() => {
     setAccessDenied(false);
   }, [location.pathname]);
 
-  // Delegated token success handler
   const handleAuthSuccess = (delegatedToken, expiresAt) => {
     console.log("Delegated token received:", delegatedToken);
     localStorage.setItem("delegated_token", delegatedToken);
     setAccessDenied(false);
   };
 
+  console.log(screenId)
+  // ✅ Decide which Navbar to show
+  const renderNavbar = () => {
+    if (hideNavbar) return null;
+
+    switch (screenId) {
+      case "default_user":
+        return <Navbar/>;
+      case "user_v1":
+        return <NavbarA />;
+      case "user_v2":
+        return <NavbarB />;
+      case "user_v3":
+        return <NavbarC />;
+      default:
+        return <Navbar />; // fallback
+    }
+  };
+
   return (
     <>
       <HeaderBar />
       <div className="app-wrapper" style={{ display: "flex" }}>
-        {!hideNavbar && <Navbar />}
+        {renderNavbar()}
         <div className="main-layout" style={{ flex: 1, overflowY: "auto" }}>
           {accessDenied ? (
             <AccessDenied onAuthClick={() => setAuthModalOpen(true)} />
@@ -132,8 +150,8 @@ const SaasClientRoutes = ({
         onClose={() => setAuthModalOpen(false)}
         onSuccess={handleAuthSuccess}
         clientId={clientId}
-        requesterId={userId} // current user id
-        page={location.pathname} // page user is trying to access
+        requesterId={userId}
+        page={location.pathname}
       />
     </>
   );
