@@ -5,6 +5,7 @@ import api, { getValidToken } from "./Api";
 import Navbar from "./Navbar";
 import NavbarA from "./Navbar1";
 import NavbarB from "./Navbar2";
+import NavbarC from "./Navbar3";
 // import NavbarC from "./NavbarC";
 import HeaderBar from "./HeaderPage";
 import AuthModal from "./AuthModel";
@@ -102,6 +103,8 @@ const SaasClientRoutes = ({
         return <NavbarA />;
       case "user_v2":
         return <NavbarB />;
+      case "user_v3":
+        return <NavbarC />;
       default:
         return <Navbar />; // fallback
     }
