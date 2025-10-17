@@ -1,6 +1,6 @@
 import React, { useEffect, useState } from "react";
 import { useTheme } from "../../ThemeChangerComponent/ThemeProvider";
-import { FaEdit, FaTrash, FaCheck, FaTimes, FaSearch, FaUsers, FaClock,  FaPlus } from "react-icons/fa";
+import { FaEdit, FaTrash, FaCheck, FaTimes, FaSearch, FaUsers, FaClock, FaPlus } from "react-icons/fa";
 import axios from 'axios';
 import { useParams } from 'react-router-dom';
 
@@ -29,13 +29,13 @@ const TableManagement = () => {
     const [addRowError, setAddRowError] = useState("");
     const [modalOpen, setModalOpen] = useState(false);
     const [modalTable, setModalTable] = useState(null);
-    
+
     // Bulk Update States
     const [showBulkUpdate, setShowBulkUpdate] = useState(false);
     const [bulkUpdateSearch, setBulkUpdateSearch] = useState("");
     const [selectedUpdateTables, setSelectedUpdateTables] = useState([]);
     const [bulkUpdateData, setBulkUpdateData] = useState({});
-    
+
     // Bulk Delete States
     const [showBulkDelete, setShowBulkDelete] = useState(false);
     const [bulkDeleteSearch, setBulkDeleteSearch] = useState("");
@@ -47,7 +47,7 @@ const TableManagement = () => {
         status: "",
         location_zone: ""
     });
-    
+
     const token = localStorage.getItem("access_token");
     const [tableId, setTableId] = useState(null);
 
@@ -279,7 +279,7 @@ const TableManagement = () => {
             console.error("Bulk update error", err);
         }
     };
-    
+
 
     const getFilteredUpdateTables = () => {
         return tables.filter(table =>
@@ -354,51 +354,51 @@ const TableManagement = () => {
     });
     const handleBulkDelete = async () => {
         try {
-          const tablesToDelete = tables.filter(t => t.name.startsWith(bulkDeleteSeries));
-          for (const table of tablesToDelete) {
-            await tableServicesPort.post(`/${clientId}/tables/delete`, {
-              id: table.id,
-              client_id: clientId,
-              name: "",
-              table_type: "",
-              location_zone: "",
-            }, { headers: { Authorization: `Bearer ${token}` } });
-          }
-          fetchTables();
+            const tablesToDelete = tables.filter(t => t.name.startsWith(bulkDeleteSeries));
+            for (const table of tablesToDelete) {
+                await tableServicesPort.post(`/${clientId}/tables/delete`, {
+                    id: table.id,
+                    client_id: clientId,
+                    name: "",
+                    table_type: "",
+                    location_zone: "",
+                }, { headers: { Authorization: `Bearer ${token}` } });
+            }
+            fetchTables();
         } catch (err) {
-          console.error("Bulk delete error", err);
+            console.error("Bulk delete error", err);
         } finally {
-          setShowSecondDeleteConfirm(false);
-          setBulkDeleteSeries("");
+            setShowSecondDeleteConfirm(false);
+            setBulkDeleteSeries("");
         }
-      };
-      const handleBulkUpdate = async () => {
+    };
+    const handleBulkUpdate = async () => {
         if (!bulkUpdateSeries || (!bulkUpdateSeating && !bulkUpdateZone)) {
-          alert("Enter a series and at least one change (seating/zone)");
-          return;
+            alert("Enter a series and at least one change (seating/zone)");
+            return;
         }
         try {
-          const tablesToUpdate = tables.filter(t => t.name.startsWith(bulkUpdateSeries));
-          for (const table of tablesToUpdate) {
-            const updatedTable = {
-              ...table,
-              ...(bulkUpdateSeating && { table_type: bulkUpdateSeating.toString() }),
-              ...(bulkUpdateZone && { location_zone: bulkUpdateZone })
-            };
-            await tableServicesPort.post(`/${clientId}/tables/update`, updatedTable, {
-              headers: { Authorization: `Bearer ${token}` }
-            });
-          }
-          fetchTables();
-          setBulkUpdateSeries("");
-          setBulkUpdateSeating("");
-          setBulkUpdateZone("");
+            const tablesToUpdate = tables.filter(t => t.name.startsWith(bulkUpdateSeries));
+            for (const table of tablesToUpdate) {
+                const updatedTable = {
+                    ...table,
+                    ...(bulkUpdateSeating && { table_type: bulkUpdateSeating.toString() }),
+                    ...(bulkUpdateZone && { location_zone: bulkUpdateZone })
+                };
+                await tableServicesPort.post(`/${clientId}/tables/update`, updatedTable, {
+                    headers: { Authorization: `Bearer ${token}` }
+                });
+            }
+            fetchTables();
+            setBulkUpdateSeries("");
+            setBulkUpdateSeating("");
+            setBulkUpdateZone("");
         } catch (err) {
-          console.error("Bulk update error", err);
+            console.error("Bulk update error", err);
         }
-      };
-      
-            
+    };
+
+
     return (
         <div className="Table-Creation-Management">
             <div className={`tm-bg ${darkMode ? 'tm-dark-mode' : ''}`}>
@@ -464,7 +464,7 @@ const TableManagement = () => {
                                         <div className="tm-table-card-status-row">
                                             <span className={`tm-status-badge ${config.card}`}>{config.label}</span>
                                         </div>
-                                      
+
                                         <div className="tm-table-card-actions">
                                             <button className="tm-edit-btn" onClick={() => setEditRowId(table.id)}><FaEdit /></button>
                                             <button className="tm-delete-btn" onClick={() => { setDeleteTableId(table.id); setShowConfirmDelete(true); }}><FaTrash /></button>
@@ -696,39 +696,39 @@ const TableManagement = () => {
                     {showBulkUpdate && (
                         <div className="tm-bulk-modal-overlay">
                             <div className="tm-bulk-modal">
-                            <div className="tm-bulk-global-update-row">
-    <div className="tm-bulk-field">
-        <label>Seating</label>
-        <input
-            type="number"
-            value={bulkUpdateGlobal.table_type}
-            onChange={e => setBulkUpdateGlobal(prev => ({ ...prev, table_type: e.target.value }))}
-        />
-    </div>
-    <div className="tm-bulk-field">
-        <label>Status</label>
-        <select
-            value={bulkUpdateGlobal.status}
-            onChange={e => setBulkUpdateGlobal(prev => ({ ...prev, status: e.target.value }))}
-        >
-            <option value="">-- Select --</option>
-            <option value="Vacant">Vacant</option>
-            <option value="Occupied">Occupied</option>
-            <option value="Reserved">Reserved</option>
-        </select>
-    </div>
-    <div className="tm-bulk-field">
-        <label>Zone</label>
-        <select
-            value={bulkUpdateGlobal.location_zone}
-            onChange={e => setBulkUpdateGlobal(prev => ({ ...prev, location_zone: e.target.value }))}
-        >
-            <option value="">-- Select --</option>
-            <option value="AC">AC</option>
-            <option value="Non-AC">Non-AC</option>
-        </select>
-    </div>
-</div>
+                                <div className="tm-bulk-global-update-row">
+                                    <div className="tm-bulk-field">
+                                        <label>Seating</label>
+                                        <input
+                                            type="number"
+                                            value={bulkUpdateGlobal.table_type}
+                                            onChange={e => setBulkUpdateGlobal(prev => ({ ...prev, table_type: e.target.value }))}
+                                        />
+                                    </div>
+                                    <div className="tm-bulk-field">
+                                        <label>Status</label>
+                                        <select
+                                            value={bulkUpdateGlobal.status}
+                                            onChange={e => setBulkUpdateGlobal(prev => ({ ...prev, status: e.target.value }))}
+                                        >
+                                            <option value="">-- Select --</option>
+                                            <option value="Vacant">Vacant</option>
+                                            <option value="Occupied">Occupied</option>
+                                            <option value="Reserved">Reserved</option>
+                                        </select>
+                                    </div>
+                                    <div className="tm-bulk-field">
+                                        <label>Zone</label>
+                                        <select
+                                            value={bulkUpdateGlobal.location_zone}
+                                            onChange={e => setBulkUpdateGlobal(prev => ({ ...prev, location_zone: e.target.value }))}
+                                        >
+                                            <option value="">-- Select --</option>
+                                            <option value="AC">AC</option>
+                                            <option value="Non-AC">Non-AC</option>
+                                        </select>
+                                    </div>
+                                </div>
 
                                 <div className="tm-bulk-modal-header">
                                     <h3>Bulk Update Tables</h3>
@@ -769,8 +769,8 @@ const TableManagement = () => {
                                                 />
                                                 <span className="tm-bulk-table-name">{table.name}</span>
                                                 <span className="tm-bulk-table-details">
-                                                        Seating: {table.table_type}  | Status: {table.status}
-                                                    </span>
+                                                    Seating: {table.table_type}  | Status: {table.status}
+                                                </span>
                                             </div>
 
                                             {selectedUpdateTables.includes(table.id) && (
@@ -784,28 +784,28 @@ const TableManagement = () => {
                                                         />
                                                     </div>
                                                     <div className="tm-bulk-field">
-    <label>Status</label>
-    <select
-        value={bulkUpdateData[table.id]?.status || table.status}
-        onChange={(e) => handleBulkUpdateChange(table.id, 'status', e.target.value)}
-    >
-        <option value="Vacant">Vacant</option>
-        <option value="Occupied">Occupied</option>
-        <option value="Reserved">Reserved</option>
-    </select>
-</div>
+                                                        <label>Status</label>
+                                                        <select
+                                                            value={bulkUpdateData[table.id]?.status || table.status}
+                                                            onChange={(e) => handleBulkUpdateChange(table.id, 'status', e.target.value)}
+                                                        >
+                                                            <option value="Vacant">Vacant</option>
+                                                            <option value="Occupied">Occupied</option>
+                                                            <option value="Reserved">Reserved</option>
+                                                        </select>
+                                                    </div>
 
-<div className="tm-bulk-field">
-    <label>Zone</label>
-    <select
-        value={bulkUpdateData[table.id]?.location_zone || table.location_zone}
-        onChange={(e) => handleBulkUpdateChange(table.id, 'location_zone', e.target.value)}
-    >
-        <option value="AC">AC</option>
-        <option value="Non-AC">Non-AC</option>
-        {/* Add more zones if needed */}
-    </select>
-</div>
+                                                    <div className="tm-bulk-field">
+                                                        <label>Zone</label>
+                                                        <select
+                                                            value={bulkUpdateData[table.id]?.location_zone || table.location_zone}
+                                                            onChange={(e) => handleBulkUpdateChange(table.id, 'location_zone', e.target.value)}
+                                                        >
+                                                            <option value="AC">AC</option>
+                                                            <option value="Non-AC">Non-AC</option>
+                                                            {/* Add more zones if needed */}
+                                                        </select>
+                                                    </div>
 
                                                 </div>
                                             )}

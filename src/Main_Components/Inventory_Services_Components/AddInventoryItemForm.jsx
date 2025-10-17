@@ -8,11 +8,11 @@ function AddInventoryItemForm({ onItemCreated, selectedCategory }) {
   const token = localStorage.getItem("access_token");
 
   const emptyItem = {
-    inventory_id: "",
+    inventory_id: "1",
     line_item_id: [],
     name: "",
     description: "",
-    category_id: selectedCategory || "",  // auto-picked from CategoryList
+    category_id: selectedCategory || "",  
     realm: "food",
     dietary_type: "",
     availability: "",
@@ -237,13 +237,13 @@ function AddInventoryItemForm({ onItemCreated, selectedCategory }) {
       {items.map((item, index) => (
         <div key={index} className="form-entry-wrapper">
           <div className="form-row">
-            <input
+            {/* <input
               type="text"
               value={item.inventory_id || ""}
               onChange={(e) => handleChange(index, "inventory_id", e.target.value)}
               placeholder="Menu ID"
               className="form-input short"
-            />
+            /> */}
 
             <DropdownCheckbox
               index={index}
@@ -378,12 +378,12 @@ function AddInventoryItemForm({ onItemCreated, selectedCategory }) {
               placeholder="Total Price"
               className="form-input short"
             /> */}
-            <input
+            {/* <input
               value={item.slug || ""}
               onChange={(e) => handleChange(index, "slug", e.target.value)}
               placeholder="Slug"
               className="form-input"
-            />
+            /> */}
             <button
               type="button"
               className="btn-cancel-row"
@@ -402,6 +402,7 @@ function AddInventoryItemForm({ onItemCreated, selectedCategory }) {
         <button type="submit" className="btn-add-item">
           Submit
         </button>
+        
       </div>
     </form>
   );
