@@ -34,7 +34,11 @@ export default function Login() {
             );
 
             const token = res.data.data.access_token;
+            const { screen_id } = res.data; // ✅ Get screen_id from top-level response
+
             localStorage.setItem("access_token", token);
+            localStorage.setItem("screen_id", screen_id); // ✅ Save for later use
+
             toast.success("Login successful");
             navigate(`/saas/${clientId}/main`);
         } catch (err) {

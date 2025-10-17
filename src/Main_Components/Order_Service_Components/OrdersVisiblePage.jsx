@@ -13,7 +13,7 @@ const OrdersVisiblePage = () => {
     const [expandedOrderIndex, setExpandedOrderIndex] = useState(null);
     const [servedClickCountMap, setServedClickCountMap] = useState({});
     const { darkMode } = useTheme();
-    const token = localStorage.getItem("access_token");
+    const token = localStorage.getItem("access_token") || localStorage.getItem("access_token");
     const [inventoryMap, setInventoryMap] = useState({});
     const [showDeleteModal, setShowDeleteModal] = useState(false);
     const [orderToDelete, setOrderToDelete] = useState(null);
