@@ -98,8 +98,10 @@ const SaasClientRoutes = ({
     switch (screenId) {
       case "default_user":
         return <Navbar/>;
-      case "waiter_user":
+      case "user_v1":
         return <NavbarA />;
+      case "user_v2":
+        return <NavbarB />;
       default:
         return <Navbar />; // fallback
     }
