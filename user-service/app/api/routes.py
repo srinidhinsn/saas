@@ -50,9 +50,9 @@ async def login_user(client_id: str, userReq: LoginRequest, db: Session = Depend
         "grants": userModel.grants,
         "realm": client_model.realm
     })
-    context = verify_token(token)
+    #context = verify_token(token)
     return ResponseModel(
-        screen_id=context.screen_id,
+        screen_id="default_user",
         data={"access_token": token, "token_type": "bearer"}
     )
 
