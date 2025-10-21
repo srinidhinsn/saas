@@ -5393,22 +5393,38 @@ input[type="checkbox"] {
 
 .orders-visible-edit-item-row {
     display: flex;
-    justify-content: space-between;
+    width: 100%;
     align-items: center;
-    gap: 8px;
     margin-bottom: 7px;
 }
 
-.orders-visible-edit-item-row span {
-    font-size: 10px;
-}
 
+.orders-visible-edit-item-row span:first-child {
+    font-size: 11px;
+    flex: 1 1 0; /* Let name take extra space but keep controls right */
+    white-space: nowrap;
+    overflow: auto;
+    text-overflow: ellipsis;
+    padding: 4px;width: 120px;
+}
+.orders-visible-btn.orders-visible-edit-delete-btn {
+    margin-left: 10px;
+    /* This keeps the delete button to the far right */
+}
+.orders-visible-edit-item-row > * {
+    /* Margin between items */
+    margin-right: 4px;
+}
+.orders-visible-edit-item-row > :last-child {
+    margin-right: 0;
+}
 .orders-visible-edit-qty-controls {
     display: flex;
     align-items: center;
     gap: 2px;
+    min-width: 60px;
+    justify-content: center;
 }
-
 .orders-visible-edit-qty-controls button {
     font-size: .7rem;
     border-radius: 3px;
@@ -5579,9 +5595,23 @@ input[type="checkbox"] {
         padding: 0;
     }
 }
+.orders-visible-item-row{
+    font-size: 11px;
+    display: flex;
+    justify-content: space-between;align-items: center;
+}
+.orders-visible-items-preview{
+    height: 200px;border: 1px solid darkorange;
+    overflow: auto;margin: 10px 0;
+}
 
-
-
+.orders-visible-item-row span:first-child{
+    padding: 4px;
+}
+.orders-visible-item-row span:last-child{
+    padding: 2px;
+    font-weight: 600;
+}
 
 
 
