@@ -1,7 +1,7 @@
 import config.settings
 from fastapi import FastAPI, Depends, Request, Header, HTTPException
 from sqlalchemy.orm import Session
-from api import routes
+from .api import routes
 import logging
 import logging.config
 import time
