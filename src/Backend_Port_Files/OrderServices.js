@@ -1,7 +1,7 @@
 import axios from 'axios';
 
 const orderServicesPort = axios.create({
-    baseURL: 'https://order-service-qa-582942992169.asia-south2.run.app/saas',
+    baseURL: 'http://localhost:8003/saas',
 });
 
 export default orderServicesPort;
