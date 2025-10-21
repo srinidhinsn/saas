@@ -366,7 +366,7 @@ const OrdersVisiblePage = () => {
         const totalPrice = cleanedItems.reduce((sum, item) => sum + item.unit_price * item.quantity, 0);
         try {
             await axios.post(
-                `${import.meta.env.VITE_API_ORDER_SERVICE_URL}${clientId}/order_items/update?order_id=${orderId}`,
+                `${import.meta.env.VITE_API_ORDER_SERVICE_URL}/${clientId}/order_items/update?order_id=${orderId}`,
                 cleanedItems,
                 { headers: { Authorization: `Bearer ${token}` } }
             );

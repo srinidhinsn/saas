@@ -1023,8 +1023,9 @@ body.sidebar-minimized .sidebar li .arrow-indicator {
   background-color: var(--category-bg);
 } */
 .search-bar {
+    display: none;
     width: 150px;
-    display: flex;
+    /* display: flex; */
     align-items: center;
     border: 1px solid #ccc;
     padding: 0.3rem 0.5rem;
@@ -1286,7 +1287,7 @@ body.sidebar-minimized .sidebar li .arrow-indicator {
 
     .view-tables-wrapper .order-overlay .item-pane {
         flex: 1;
-        padding: 1rem 3rem 0 1.5rem;
+        padding: .5rem ;
         min-height: 70vh;
         height: 88vh;
         overflow-y: auto;
@@ -1528,10 +1529,10 @@ body.sidebar-minimized .sidebar li .arrow-indicator {
     flex-direction: column;
     height: 89vh;
     background: var(--bg-container);
-    padding: 1rem;
+    padding: .7rem;
     box-sizing: border-box;
     overflow: hidden;
-    color: var(--bg-text-color);
+    color: var(--bg-text-color);width: 400px;
 }
 
 .order-header {
@@ -1542,13 +1543,13 @@ body.sidebar-minimized .sidebar li .arrow-indicator {
 
 .order-header .order-tabs {
     display: flex;
-    gap: 0.5rem;
+    gap: 0.2rem;
     margin-bottom: 1rem;
 }
 
 .order-header .order-tabs button {
     flex: 1;
-    padding: 0.5rem 1rem;
+    padding: 0.5rem;
     border: none;
     border-radius: 5px;
     background: var(--tab-bg);
@@ -1597,7 +1598,7 @@ body.sidebar-minimized .sidebar li .arrow-indicator {
 .order-header .table-meta .user-icon {
     font-size: 1.2rem;
     cursor: pointer;
-    margin-left: 1rem;
+    margin-left: .5rem;
     color: var(--icon-color);
 }
 
@@ -3896,6 +3897,7 @@ input[type="checkbox"] {
     .category-item {
         display: flex;
         flex-direction: column;
+        padding: 5px;font-size: 12px;width: 100px;
     }
 }
 
@@ -4591,6 +4593,21 @@ input[type="checkbox"] {
     .card-description {
         font-size: 12px;
     }
+   .item-pane .grid-layout{
+        display: flex;flex-wrap: wrap;
+    }
+    .menu-card{
+      background: var(--bg-container);
+        height:auto;width: 220px;
+    }
+    .menu-card h4{
+        text-align: center;
+        font-size: 14px;
+        color: var(--bg-text-color);
+    }
+    .menu-card div{
+        display: none;
+    }
 
     .price {
         font-size: 16px;
@@ -4598,7 +4615,7 @@ input[type="checkbox"] {
 }
 
 /* 360px and below */
-@media (max-width: 360px) {
+@media (max-width: 380px) {
     .menu-header h1 {
         font-size: 16px;
     }
@@ -4625,7 +4642,19 @@ input[type="checkbox"] {
     .price {
         font-size: 15px;
     }
-
+    .menu-card{
+        background: var(--bg-container);
+          height:auto;width: 150px;
+      }
+      .menu-card h4{
+          text-align: center;
+          font-size: 12px;
+          color: var(--bg-text-color);
+      }
+      .menu-card div{
+          display: none;
+      }
+  
     .category-name,
     .tag {
         font-size: 10px;
@@ -5612,9 +5641,9 @@ body {
     display: flex;
     align-items: center;
     justify-content: space-between;
-    padding: 1rem;
+    padding: .5rem;
     margin-bottom: 0.75rem;
-    background: #f9fafb;
+    background:var(--bg-container);
     border: 2px solid transparent;
     border-radius: 0.75rem;
     cursor: pointer;
