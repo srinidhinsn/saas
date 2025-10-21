@@ -487,13 +487,13 @@ export default function BillingPage() {
       doc.setFontSize(10);
       if (splitPaymentEnabled) {
         paymentSplits.forEach((split, idx) => {
-          doc.text(`Payment Method ${idx + 1}: ${split.method} - ₹${Number(split.amount).toFixed(2)}`, 40, y);
+          doc.text(`Payment Method ${idx + 1}: ${split.method} - Rs.${Number(split.amount).toFixed(2)}`, 40, y);
           y += 20;
         });
       } else {
         doc.text(`Payment Method: ${method}`, 40, y);
         y += 20;
-        doc.text(`Amount Given: ₹${singlePaymentAmount.toFixed(2)}`, 40, y);
+        doc.text(`Amount Given:  Rs.${singlePaymentAmount.toFixed(2)}`, 40, y);
         y += 20;
       }
       doc.text(`Payment Status: ${paymentStatus}`, 40, y);
@@ -551,10 +551,16 @@ useEffect(() => {
             {!loading && orders.length === 0 && <p className="inv--empty-text">No served orders today</p>}
             {orders.map((order) => {
               const tableName = tablesMap[order.table_id]?.name || `Table ${order.table_id}`;
-              const orderTotal = order.items.reduce(
-                (sum, i) => sum + safeNum(i.unit_price) * safeNum(i.quantity),
+              const itemsWithPrice = (order.items || []).map((item) => ({
+                ...item,
+                unit_price: item.unit_price ?? item.price ?? inventoryMap[item.item_id]?.unit_price ?? 0,
+              }));
+              
+              const orderTotal = itemsWithPrice.reduce(
+                (sum, item) => sum + (item.unit_price * (item.quantity || 1)),
                 0
               );
+              
               const isSelected = selectedOrder?.id === order.id;
               return (
                 <div

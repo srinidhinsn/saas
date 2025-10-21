@@ -6,6 +6,18 @@ import axios from 'axios';
 function AddInventoryItemForm({ onItemCreated, selectedCategory }) {
   const { clientId } = useParams();
   const token = localStorage.getItem("access_token");
+  const [realm, setRealm] = useState("");
+
+  useEffect(() => {
+    if (token) {
+      try {
+        const decoded = jwtDecode(token);
+        setRealm(decoded.realm || "");
+      } catch (err) {
+        console.error("Failed to decode token:", err);
+      }
+    }
+  }, []);
 
   const emptyItem = {
     inventory_id: "1",
@@ -13,7 +25,6 @@ function AddInventoryItemForm({ onItemCreated, selectedCategory }) {
     name: "",
     description: "",
     category_id: selectedCategory || "",  
-    realm: "food",
     dietary_type: "",
     availability: "",
     unit: "",
@@ -29,20 +40,31 @@ function AddInventoryItemForm({ onItemCreated, selectedCategory }) {
     slug: ""
   };
 
-  const [items, setItems] = useState([{ ...emptyItem }]);
+  const [items, setItems] = useState([]);
   const [categories, setCategories] = useState([]);
   const [lineItems, setLineItems] = useState([]);
-
+  useEffect(() => {
+    if (realm) {
+      setItems([{ ...emptyItem, category_id: selectedCategory, realm }]);
+    }
+  }, [realm, selectedCategory]);
+  
   // Whenever selectedCategory changes, update all items
   useEffect(() => {
-    setItems((prev) =>
-      prev.map((item) => ({
-        ...item,
-        category_id: selectedCategory,
-        slug: generateSlug(selectedCategory, item.name), // auto-generate slug too
-      }))
+    if (!selectedCategory) return;
+  
+    setItems((prevItems) =>
+      prevItems.map((item) => {
+        const updatedName = item.name?.trim() || "";
+        return {
+          ...item,
+          category_id: selectedCategory,
+          slug: generateSlug(selectedCategory, updatedName),
+        };
+      })
     );
   }, [selectedCategory]);
+  
 
   // Recursive flattening of nested category tree
   const flattenCategories = (categoryTree) => {
@@ -115,18 +137,20 @@ function AddInventoryItemForm({ onItemCreated, selectedCategory }) {
   };
 
   const handleAddItem = () => {
-    setItems([...items, { ...emptyItem, category_id: selectedCategory }]);
+    setItems([...items, { ...emptyItem, category_id: selectedCategory, realm }]);
   };
+  
 
   const handleCancel = (index) => {
     if (items.length === 1) {
-      setItems([{ ...emptyItem, category_id: selectedCategory }]);
+      setItems([{ ...emptyItem, category_id: selectedCategory, realm }]);
     } else {
       const updated = [...items];
       updated.splice(index, 1);
       setItems(updated);
     }
   };
+  
 
   const handleSubmit = async (e) => {
     e.preventDefault();
