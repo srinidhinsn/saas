@@ -286,8 +286,8 @@ def update_order_status(
     if not body.id:
         raise HTTPException(status_code=400, detail="Order ID is required")
 
-    order = db.query(Db_Order_Entity).filter(Db_Order_Entity.id == str(
-        body.id), Db_Order_Entity.client_id == str(client_id)).first()
+    order = db.query(Db_Order_Entity).filter(Db_Order_Entity.id == 
+        body.id, Db_Order_Entity.client_id == str(client_id)).first()
     if not order:
         raise HTTPException(status_code=404, detail="Order not found")
 

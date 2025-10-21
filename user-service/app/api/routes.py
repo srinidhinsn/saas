@@ -51,8 +51,16 @@ async def login_user(client_id: str, userReq: LoginRequest, db: Session = Depend
         "grants": userModel.grants,
         "realm": client_model.realm
     })
+    payload = jwt.decode(token, SECRET_KEY, algorithms=[ALGORITHM])
+    context=UserModel(id=payload.get("user_id"),
+                      roles=payload.get("roles"),
+                      client_id=payload.get("client_id"),
+                      grants=payload.get("grants"))
+    screen_id=context.client_id
+    print("my screen_id : ", screen_id)
+
     return ResponseModel(
-        screen_id="default_user",
+        screen_id=screen_id,
         data={"access_token": token, "token_type": "bearer"}
     )
 
