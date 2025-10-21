@@ -29,7 +29,6 @@ async def register_user(client_id: str, userReq: UserModel,context: SaasContext 
     token_realm = context.grants[0] if context.grants else None
     return await create_user_and_person(client_id=client_id,userReq=userReq,db=db,token_realm=token_realm)
 
-
 @router.post("/login")
 async def login_user(client_id: str, userReq: LoginRequest, db: Session = Depends(get_db)):
     user = db.query(User).filter(
