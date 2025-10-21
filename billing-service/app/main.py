@@ -1,7 +1,7 @@
 from fastapi import FastAPI, Request
 from fastapi.middleware.cors import CORSMiddleware
-from app.api.routes import router as table_router
-from .api import routes
+from api.routes import router as table_router
+from api import routes
 
 import logging, time
 from config.settings import LOGGING_CONFIG
@@ -29,7 +29,7 @@ app.add_middleware(
 
 @app.get('/')
 def root():
-    return {"Billing Service": "Running on 8002"}
+    return {"Billing Service": "Running on 8005"}
 
 @app.middleware("http")
 async def log_requests(request: Request, call_next):
@@ -49,7 +49,7 @@ async def read_root():
 
 if __name__ == "__main__":
     import uvicorn
-    uvicorn.run(app, host="127.0.0.1", port=8002)
+    uvicorn.run(app, host="127.0.0.1", port=8005)
 
 # @app.middleware("http")
 # async def log_requests(request: Request, call_next):

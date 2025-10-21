@@ -26,7 +26,7 @@ class ResponseModel(BaseModel, Generic[T]):
         super().__init__(screen_id=screen_id, status=status, message=message, data=data)
 
 # Example usage
-response = ResponseModel(screen_id="home", status="success", message="Operation completed", data={"id": 1, "name": "Rajath"})
+response = ResponseModel(screen_id="home", status="success", message="Operation completed", data={"id": 1, "name": "Arjun"})
 print(response)
 
 # Updating response using setter method

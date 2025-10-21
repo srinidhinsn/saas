@@ -2,7 +2,7 @@ from typing import List, Dict, Any
 from sqlalchemy.orm import Session
 from entity.order_entity import DineinOrder as DBOrder, OrderItem as DBOrderItem
 # from .billing_client import push_order_to_billing
-from .billing_client import push_order_to_billing_public
+from billing_client import push_order_to_billing_public
 
 # def build_billing_payload_from_order(order: DBOrder, items: List[DBOrderItem]) -> Dict[str, Any]:
 #     """

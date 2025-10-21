@@ -9,7 +9,7 @@ from entity.inventory_entity import CategoryEntity
 from models.response_model import ResponseModel
 from models.saas_context import SaasContext
 from utils.auth import verify_token
-from app.services import service
+from services import service
 
 router = APIRouter()
 
@@ -55,6 +55,34 @@ def delete_inventory(client_id: str, item: Inventory, context: SaasContext = Dep
     model = InventoryEntity.copyToModel(record)
     return ResponseModel[Inventory](screen_id=context.screen_id, status="success", message="Inventory item deleted", data=model)
 
+@router.delete("/delete_all", response_model=ResponseModel[str])
+def delete_all_inventory(
+    client_id: str,
+    context: SaasContext = Depends(verify_token),
+    db: Session = Depends(get_db)
+):
+    records = db.query(InventoryEntity).filter(InventoryEntity.client_id == client_id).all()
+
+    if not records:
+        # ✅ No items? Just return success instead of 404
+        return ResponseModel[str](
+            screen_id=context.screen_id,
+            status="success",
+            message="No inventory items found — nothing to delete",
+            data="No records to delete"
+        )
+
+    for record in records:
+        db.delete(record)
+    db.commit()
+
+    return ResponseModel[str](
+        screen_id=context.screen_id,
+        status="success",
+        message="All inventory items deleted",
+        data="All inventory items deleted successfully"
+    )
+
 # -------------------- CATEGORY ROUTES --------------------
 
 @router.get("/read_category", response_model=ResponseModel)
@@ -80,10 +108,17 @@ def update_category(client_id: str, updates: Category, context: SaasContext = De
     if not updates.id:
         raise HTTPException(status_code=400, detail="Missing category ID")
     record = db.query(CategoryEntity).filter(CategoryEntity.id == updates.id, CategoryEntity.client_id == client_id).first()
+    print("Updating category:", record.id, "Client:", record.client_id)
     if not record:
         raise HTTPException(status_code=404, detail="Category not found")
-    for key, value in updates.dict(exclude_unset=True).items():
-        setattr(record, key, value)
+       # Perform the update explicitly with both filters
+    db.query(CategoryEntity).filter(
+        CategoryEntity.id == updates.id,
+        CategoryEntity.client_id == client_id
+    ).update(
+        updates.dict(exclude_unset=True),
+        synchronize_session=False
+    )
     db.commit()
     db.refresh(record)
     model = CategoryEntity.copyToModel(record)

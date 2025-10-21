@@ -6,8 +6,7 @@ alembic
 passlib
 bcrypt==4.3.0
 python-jose
-setuptools
 pytest
 httpx
-cloud-sql-python-connector[pg8000]
+python-multipart
 saas_common_lib_473815

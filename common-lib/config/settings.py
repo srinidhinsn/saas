@@ -11,15 +11,10 @@ LOGGING_CONFIG = {
         "console": {
             "class": "logging.StreamHandler",
             "formatter": "default"
-        },
-        "file": {
-            "class": "logging.FileHandler",
-            "formatter": "default",
-            "filename": "./../app.log"
         }
     },
     "root": {
-        "handlers": ["console", "file"],
+        "handlers": ["console"],
         "level": "INFO"
     }
 }
