@@ -528,7 +528,7 @@ const KitchenDisplay = () => {
 
             // Update overall order status and total price
             await axios.post(
-                `${import.meta.env.VITE_API_ORDER_SERVICE_URL}${clientId}/dinein/update`,
+                `${import.meta.env.VITE_API_ORDER_SERVICE_URL}/${clientId}/dinein/update`,
                 { id: orderId, status: newStatus, total_price: totalPrice },
                 { headers: { Authorization: `Bearer ${token}` } }
             );

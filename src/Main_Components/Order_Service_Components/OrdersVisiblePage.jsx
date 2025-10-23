@@ -366,7 +366,7 @@ const OrdersVisiblePage = () => {
         const totalPrice = cleanedItems.reduce((sum, item) => sum + item.unit_price * item.quantity, 0);
         try {
             await axios.post(
-                `${import.meta.env.VITE_API_ORDER_SERVICE_URL}${clientId}/order_items/update?order_id=${orderId}`,
+                `${import.meta.env.VITE_API_ORDER_SERVICE_URL}/${clientId}/order_items/update?order_id=${orderId}`,
                 cleanedItems,
                 { headers: { Authorization: `Bearer ${token}` } }
             );
@@ -589,39 +589,104 @@ const OrdersVisiblePage = () => {
                                                     ).toFixed(2)}
                                                 </span>
                                             </div>
-
-                                            <div className="orders-visible-expanded-actions">
-                                                {editOrderId === order.id ? (
-                                                    <button
-                                                        className="orders-visible-btn orders-visible-edit-btn active"
-                                                        onClick={() => setEditOrderId((prev) => (prev === order.id ? null : order.id))}
-                                                    >
-                                                        Done Editing
-                                                    </button>
-                                                ) : (
-                                                    <button className="orders-visible-btn orders-visible-edit-btn" onClick={() => setEditOrderId(order.id)}>
-                                                        Edit
-                                                    </button>
-                                                )}
-                                                <button
-                                                    className="orders-visible-btn orders-visible-served-btn"
-                                                    disabled={order.status === "served"}
-                                                    onClick={() => handleStatusChange(order.id, "served")}
-                                                >
-                                                    Served
-                                                </button>
-                                                <button
-                                                    className="orders-visible-btn orders-visible-delete-btn"
-                                                    onClick={() => {
-                                                        setOrderToDelete(order.id);
-                                                        setShowDeleteModal(true);
-                                                    }}
-                                                >
-                                                    Delete
-                                                </button>
+                                            <div className="orders-visible-items-preview">
+  {editOrderId === order.id ? (
+    <div className="orders-visible-edit-panel">
+      <div className="orders-visible-edit-items-list">
+        {order.items.map((item, idx) => (
+          <div key={idx} className="orders-visible-edit-item-row">
+            <span>{item.item_name || item.item_id}</span>
+            <div className="orders-visible-edit-qty-controls">
+              <button
+                onClick={() => updateItemQuantity(order.id, item.item_id, item.quantity - 1)}
+                disabled={item.quantity <= 1}
+              >
+                −
+              </button>
+              <span>{item.quantity}</span>
+              <button onClick={() => updateItemQuantity(order.id, item.item_id, item.quantity + 1)}>+</button>
+            </div>
+            <button
+              className="orders-visible-btn orders-visible-edit-delete-btn"
+              onClick={() => {
+                setDeleteTarget({ orderId: order.id, itemId: item.item_id });
+                setShowDeleteModals(true);
+              }}
+              disabled={item.status === "cancelled"}
+            >
+              Delete
+            </button>
+          </div>
+        ))}
+      </div>
+      <div className="orders-visible-add-item-row">
+        <input
+          type="text"
+          className="orders-visible-item-search"
+          placeholder="Search item to add..."
+          value={itemSearchQuery}
+          onChange={(e) => setItemSearchQuery(e.target.value)}
+        />
+        {itemSearchResults.length > 0 && (
+          <ul className="orders-visible-search-results">
+            {itemSearchResults.map((item) => (
+              <li key={item.id} onClick={() => addItemToOrder(order.id, item)}>
+                {item.name} - ₹{item.unit_price}
+              </li>
+            ))}
+          </ul>
+        )}
+      </div>
+      <div className="orders-visible-save-row">
+        <button className="orders-visible-btn orders-visible-save-btn" onClick={() => updateOrderItems(order.id, order.items)}>
+          Save Items
+        </button>
+      </div>
+    </div>
+  ) : (
+    order.items.map((item, idx) => (
+      <div key={idx} className="orders-visible-item-row">
+        <span>{item.item_name || item.item_id}</span>
+        <span>Qty: {item.quantity}</span>
+      </div>
+    ))
+  )}
                                             </div>
 
-                                            {editOrderId === order.id && (
+
+                                            <div className="orders-visible-expanded-actions">
+                                         
+
+    {editOrderId === order.id ? (
+        <button
+            className="orders-visible-btn orders-visible-edit-btn active"
+            onClick={() => setEditOrderId(prev => (prev === order.id ? null : order.id))}
+        >
+            Done Editing
+        </button>
+    ) : (
+        <button className="orders-visible-btn orders-visible-edit-btn" onClick={() => setEditOrderId(order.id)}>
+            Edit
+        </button>
+    )}
+    <button
+        className="orders-visible-btn orders-visible-served-btn"
+        disabled={order.status === "served"}
+        onClick={() => handleStatusChange(order.id, "served")}
+    >
+        Served
+    </button>
+    <button
+        className="orders-visible-btn orders-visible-delete-btn"
+        onClick={() => {
+            setOrderToDelete(order.id);
+            setShowDeleteModal(true);
+        }}
+    >
+        Delete
+    </button>
+</div>
+                                            {/* {editOrderId === order.id && (
                                                 <div className="orders-visible-edit-panel">
                                                     <div className="orders-visible-edit-items-list">
                                                         {order.items.map((item, idx) => (
@@ -674,7 +739,7 @@ const OrdersVisiblePage = () => {
                                                         </button>
                                                     </div>
                                                 </div>
-                                            )}
+                                            )} */}
                                         </div>
                                     </div>
                                 );
@@ -796,3 +861,8 @@ const OrdersVisiblePage = () => {
 };
 
 export default OrdersVisiblePage;
+// ================
+// ================
+// ================
+// ================
+// ================
