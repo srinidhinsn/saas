@@ -111,7 +111,7 @@ const HeaderBar = () => {
         <div className="header-bar-container" ref={wrapperRef}>
             <div className="header-bar">
                 <div className="Left-Side-bar">
-                    <h5>Saas Application</h5>
+                    <h5>{clientId}</h5>
                 </div>
 
                 <div className="Right-Side-Header">

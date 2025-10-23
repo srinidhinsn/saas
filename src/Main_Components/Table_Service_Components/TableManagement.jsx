@@ -1,4 +1,4 @@
-import React, { useEffect, useState } from "react";
+import React, { useEffect, useState } from "react";import { toast } from "react-toastify";
 import { useTheme } from "../../ThemeChangerComponent/ThemeProvider";
 import { FaEdit, FaTrash, FaCheck, FaTimes, FaSearch, FaUsers, FaClock, FaPlus } from "react-icons/fa";
 import axios from 'axios';
@@ -13,22 +13,19 @@ const statusConfig = {
 const TableManagement = () => {
     const { clientId } = useParams();
     const { darkMode } = useTheme();
-
+    const [noChangeRowId, setNoChangeRowId] = useState(null);
+    const [highlightRow, setHighlightRow] = useState(null);
     const [searchTerm, setSearchTerm] = useState("");
     const [statusFilter, setStatusFilter] = useState("");
     const [tableRanges, setTableRanges] = useState([]);
     const [tables, setTables] = useState([]);
     const [originalTables, setOriginalTables] = useState([]);
     const [fieldErrors, setFieldErrors] = useState([]);
+    const [editFieldErrors, setEditFieldErrors] = useState({});
     const [showAddTable, setShowAddTable] = useState(false);
     const [editRowId, setEditRowId] = useState(null);
-    const [highlightRow, setHighlightRow] = useState(null);
-    const [noChangeRowId, setNoChangeRowId] = useState(null);
     const [showConfirmDelete, setShowConfirmDelete] = useState(false);
     const [deleteTableId, setDeleteTableId] = useState(null);
-    const [addRowError, setAddRowError] = useState("");
-    const [modalOpen, setModalOpen] = useState(false);
-    const [modalTable, setModalTable] = useState(null);
 
     // Bulk Update States
     const [showBulkUpdate, setShowBulkUpdate] = useState(false);
@@ -161,36 +158,83 @@ const TableManagement = () => {
 
     const handleEditChange = (id, field, value) => {
         setTables(prev =>
-            prev.map(table => (table.id === id ? { ...table, [field]: value } : table))
+          prev.map(table =>
+            table.id === id
+              ? { 
+                  ...table, 
+                  [field]: field === "table_type"
+                    ? Math.max(1, Number(value) || 1)  // ✅ Ensure minimum 1
+                    : value 
+                }
+              : table
+          )
         );
-    };
+        setEditFieldErrors(prevErrors => ({ ...prevErrors, [field]: undefined }));
+      };
+      
 
-    const saveEdit = async (table) => {
+      const saveEdit = async (table) => {
+        let errors = {};
+        if (Number(table.table_type) < 1) {
+          errors.table_type = 'Seating must be at least 1';
+        }
+        
+        if (!table.table_type || table.table_type.toString().trim() === '') {
+          errors.table_type = 'Required';
+        }
+        if (!table.location_zone || table.location_zone.trim() === '') {
+          errors.location_zone = 'Required';
+        }
+        if (!table.status || table.status.trim() === '') {
+          errors.status = 'Required';
+        }
+        
+        if (Object.keys(errors).length > 0) {
+          setEditFieldErrors(errors);
+          return;
+        }
+        
+        setEditFieldErrors({});
+        
         const original = originalTables.find(t => t.id === table.id);
         const hasChanged = (
-            original?.table_type?.toString() !== table.table_type?.toString() ||
-            original?.location_zone !== table.location_zone ||
-            (original?.status || "") !== (table.status || "")
+          original?.table_type?.toString() !== table.table_type?.toString() ||
+          original?.location_zone !== table.location_zone ||
+          (original?.status || "") !== (table.status || "")
         );
+        
         if (!hasChanged) {
-            setNoChangeRowId(table.id);
-            setTimeout(() => {
-                setNoChangeRowId(null);
-                setEditRowId(null);
-            }, 2000);
-            return;
+          toast.info("No changes detected");
+          setEditRowId(null);
+          return;
         }
+        
         try {
-            await axios.post(`${import.meta.env.VITE_API_TABLE_SERVICE_URL}/${clientId}/tables/update`, table, { headers: { Authorization: `Bearer ${token}` } });
-            setEditRowId(null);
-            setHighlightRow(table.id);
-            setTimeout(() => setHighlightRow(null), 3000);
-            fetchTables();
+          const payload = {
+            ...table,
+            table_type: table.table_type.toString()
+          };
+          
+          await axios.post(
+            `${import.meta.env.VITE_API_TABLE_SERVICE_URL}/${clientId}/tables/update`,
+            payload,
+            { headers: { Authorization: `Bearer ${token}` } }
+          );
+          
+          toast.success("Table updated successfully!");
+          
+          // Close modal immediately
+          setEditRowId(null);
+          setEditFieldErrors({});
+          
+          // Then fetch updated data
+          await fetchTables();
+          
         } catch (err) {
-            console.error("Error updating table");
+          console.error("Error updating table", err);
+          toast.error("Failed to update table");
         }
-    };
-
+      };
     const cancelEdit = () => {
         setEditRowId(null);
         setNoChangeRowId(null);
@@ -199,38 +243,57 @@ const TableManagement = () => {
 
     const confirmDelete = async () => {
         try {
-            await axios.post(`${import.meta.env.VITE_API_TABLE_SERVICE_URL}/${clientId}/tables/delete`, {
-                id: deleteTableId,
-                client_id: clientId,
-                name: "",
-                table_type: "",
-                location_zone: "",
-            }, { headers: { Authorization: `Bearer ${token}` } });
-            fetchTables();
+          await axios.post(
+            `${import.meta.env.VITE_API_TABLE_SERVICE_URL}/${clientId}/tables/delete`,
+            {
+              id: deleteTableId,
+              client_id: clientId,
+              name: "",
+              table_type: "",
+              location_zone: "",
+            },
+            { headers: { Authorization: `Bearer ${token}` } }
+          );
+          
+          // ✅ Close modal and reset BEFORE fetching
+          setShowConfirmDelete(false);
+          setDeleteTableId(null);
+          
+          await fetchTables();
+          toast.success("Table deleted successfully!"); // ✅ Add success message
+          
         } catch (err) {
-            console.error("Error deleting table");
-        } finally {
-            setShowConfirmDelete(false);
-            setDeleteTableId(null);
+          console.error("Error deleting table", err);
+          toast.error("Failed to delete table");
+          // ✅ Still close modal even on error
+          setShowConfirmDelete(false);
+          setDeleteTableId(null);
         }
-    };
+      };
 
-    // Bulk Update Functions
-    const openBulkUpdate = () => {
+      const openBulkUpdate = () => {
         setShowBulkUpdate(true);
         setSelectedUpdateTables([]);
         setBulkUpdateSearch("");
-        // Initialize bulk update data for all tables
+        
+        // Reset global values
+        setBulkUpdateGlobal({
+          table_type: "",
+          status: "",
+          location_zone: ""
+        });
+        
+        // Initialize bulk update data for all tables with their current values
         const initialData = {};
         tables.forEach(table => {
-            initialData[table.id] = {
-                table_type: table.table_type,
-                location_zone: table.location_zone,
-                status: table.status
-            };
+          initialData[table.id] = {
+            table_type: table.table_type,
+            location_zone: table.location_zone,
+            status: table.status
+          };
         });
         setBulkUpdateData(initialData);
-    };
+      };
 
     const toggleUpdateTableSelection = (tableId) => {
         setSelectedUpdateTables(prev =>
@@ -251,34 +314,91 @@ const TableManagement = () => {
 
     const handleBulkUpdateChange = (tableId, field, value) => {
         setBulkUpdateData(prev => ({
-            ...prev,
-            [tableId]: {
-                ...prev[tableId],
-                [field]: value
-            }
+          ...prev,
+          [tableId]: {
+            ...prev[tableId],
+            [field]: field === "table_type" ? (value ? Math.max(1, Number(value)) : "") : value
+          }
         }));
-    };
+      };
 
-    const saveBulkUpdate = async () => {
+      const saveBulkUpdate = async () => {
         try {
-            const tablesToUpdate = tables.filter(t => selectedUpdateTables.includes(t.id));
-            for (const table of tablesToUpdate) {
-                const updatedTable = {
-                    ...table,
-                    ...bulkUpdateGlobal  // Apply global settings
-                };
-                await axios.post(`${import.meta.env.VITE_API_TABLE_SERVICE_URL}/${clientId}/tables/update`, updatedTable, {
-                    headers: { Authorization: `Bearer ${token}` }
-                });
+          const tablesToUpdate = tables.filter(t =>
+            selectedUpdateTables.includes(t.id)
+          );
+      
+          for (const table of tablesToUpdate) {
+            const tableUpdates = bulkUpdateData[table.id] || {};
+            
+            // Determine final values with proper priority logic
+            // Priority: Individual change > Global change > Original value
+            
+            // For table_type (seating)
+            let finalTableType = table.table_type;
+            if (tableUpdates.table_type && tableUpdates.table_type !== table.table_type) {
+              // User explicitly changed this individual table
+              finalTableType = tableUpdates.table_type;
+            } else if (bulkUpdateGlobal.table_type) {
+              // Global value should apply
+              finalTableType = bulkUpdateGlobal.table_type;
             }
-            fetchTables();
-            setShowBulkUpdate(false);
-            setSelectedUpdateTables([]);
-            setBulkUpdateGlobal({ table_type: "", status: "", location_zone: "" });
+            
+            // For status
+            let finalStatus = table.status;
+            if (tableUpdates.status && tableUpdates.status !== table.status) {
+              finalStatus = tableUpdates.status;
+            } else if (bulkUpdateGlobal.status) {
+              finalStatus = bulkUpdateGlobal.status;
+            }
+            
+            // For location_zone
+            let finalZone = table.location_zone;
+            if (tableUpdates.location_zone && tableUpdates.location_zone !== table.location_zone) {
+              finalZone = tableUpdates.location_zone;
+            } else if (bulkUpdateGlobal.location_zone) {
+              finalZone = bulkUpdateGlobal.location_zone;
+            }
+            
+            const updatedFields = {
+              ...table,
+              table_type: finalTableType.toString(),
+              status: finalStatus,
+              location_zone: finalZone,
+            };
+      
+            await axios.post(
+              `${import.meta.env.VITE_API_TABLE_SERVICE_URL}/${clientId}/tables/update`,
+              updatedFields,
+              {
+                headers: { Authorization: `Bearer ${token}` },
+              }
+            );
+          }
+      
+          toast.success(`${tablesToUpdate.length} table(s) updated successfully!`);
+          
+          // Close modal and reset states
+          setShowBulkUpdate(false);
+          setSelectedUpdateTables([]);
+          setBulkUpdateData({});
+          setBulkUpdateSearch("");
+          setBulkUpdateGlobal({
+            table_type: "",
+            status: "",
+            location_zone: "",
+          });
+          
+          // Fetch updated data
+          await fetchTables();
+          
         } catch (err) {
-            console.error("Bulk update error", err);
+          console.error("Bulk update error", err);
+          toast.error("Failed to update tables");
         }
-    };
+      };
+      
+    
 
 
     const getFilteredUpdateTables = () => {
@@ -397,7 +517,37 @@ const TableManagement = () => {
             console.error("Bulk update error", err);
         }
     };
-
+    const handleCloseAddTableModal = () => {
+        // Validate each row for required fields
+        let errors = {};
+        tableRanges.forEach((row, index) => {
+          if (!row.tabletype || row.tabletype.trim() === '') {
+            errors[index] = {...errors[index], tabletype: true};
+          }
+          if (!row.range || row.range.trim() === '') {
+            errors[index] = {...errors[index], range: true};
+          }
+          if (!row.type || row.type.trim() === '') {
+            errors[index] = {...errors[index], type: true};
+          }
+        });
+      
+        if (Object.keys(errors).length > 0) {
+          setFieldErrors(errors); // Update error state to highlight fields
+          return; // prevent modal close
+        }
+      
+        // No validation errors, close modal
+        setShowAddTable(false);
+        setTableRanges([]);
+        setFieldErrors([]);
+      };
+      
+      const closeEditModal = () => {
+        setEditRowId(null);
+        setEditFieldErrors({});
+      };
+      
 
     return (
         <div className="Table-Creation-Management">
@@ -436,13 +586,27 @@ const TableManagement = () => {
                                 <button className="tm-bulk-delete-btn" onClick={openBulkDelete}>
                                     <FaTrash /> <span>Bulk Delete</span>
                                 </button>
-                                <button className="tm-add-table-btn" onClick={() => {
-                                    setShowAddTable(true);
-                                    setTableRanges([...tableRanges, { range: "", table_type: "", type: "", remark: "Vacant", is_active: false }]);
-                                    setFieldErrors([{}]);
-                                }}>
-                                    <FaPlus className="tm-add-icon" /> <span>Add Table</span>
-                                </button>
+                                <button 
+  className="tm-add-table-btn" 
+  onClick={() => {
+    setShowAddTable(true);
+    setTableRanges([{ 
+      range: "", 
+      table_type: "", 
+      type: "", 
+      remark: "Vacant", 
+      is_active: false,
+      description: "",    // ✅ Add these
+      slug: "",           // ✅ Add these
+      section: "",        // ✅ Add these
+      sort_order: "",     // ✅ Add these
+      qr_code_url: ""     // ✅ Add these
+    }]);
+    setFieldErrors([{}]);
+  }}
+>
+  <FaPlus className="tm-add-icon" /> <span>Add Table</span>
+</button>
                             </div>
                         </div>
                     </div>
@@ -457,7 +621,8 @@ const TableManagement = () => {
                                         <div className="tm-table-card-header">
                                             <div>
                                                 <div className="tm-table-card-title">{table.name}</div>
-                                                <div className="tm-table-card-capacity">Capacity: <span>{table.table_type}</span></div>
+                                                <div className="tm-table-card-capacity">Seating: <span>{table.table_type}</span></div>
+                                           <div className="tm-table-card-capacity">Zone: <span>{table.location_zone}</span></div>
                                             </div>
                                             {config.icon}
                                         </div>
@@ -481,7 +646,16 @@ const TableManagement = () => {
                             <div className="tm-modal-card">
                                 <div className="tm-modal-header">
                                     <h3>Add New Tables</h3>
-                                    <button className="tm-modal-close" onClick={() => setShowAddTable(false)}><FaTimes /></button>
+                                    <button 
+  className="tm-modal-close" 
+  onClick={() => {
+    setShowAddTable(false);
+    setTableRanges([]);
+    setFieldErrors([]);  // ✅ Add this
+  }}
+>
+  <FaTimes />
+</button>
                                 </div>
                                 <div className="tm-modal-body">
                                     {tableRanges.map((row, index) => (
@@ -502,13 +676,14 @@ const TableManagement = () => {
                                             <div className="tm-modal-field">
                                                 <label>No of Seating</label>
                                                 <input
-                                                    type="number"
+                                                    type="number" min="1"
                                                     value={row.table_type}
                                                     onChange={e => {
+                                                        const value = Math.max(1, Number(e.target.value) || "");  // ✅ Add this
                                                         const updated = [...tableRanges];
-                                                        updated[index].table_type = e.target.value;
+                                                        updated[index].table_type = value;
                                                         setTableRanges(updated);
-                                                    }}
+                                                      }}
                                                     className={fieldErrors[index]?.table_type ? "tm-error-input" : ""}
                                                 />
                                                 {fieldErrors[index]?.table_type && <div className="tm-error-message">Enter seating</div>}
@@ -638,7 +813,8 @@ const TableManagement = () => {
                                 <div className="tm-edit-modal-card">
                                     <div className="tm-edit-modal-header">
                                         <h3>Edit Table</h3>
-                                        <button className="tm-edit-modal-close" onClick={cancelEdit}><FaTimes /></button>
+                                        <button className="tm-edit-modal-close" onClick={closeEditModal}
+                                        ><FaTimes /></button>
                                     </div>
                                     {tables
                                         .filter((table) => table.id === editRowId)
@@ -651,10 +827,15 @@ const TableManagement = () => {
                                                 <div className="tm-edit-modal-field">
                                                     <label>No of Seating</label>
                                                     <input
-                                                        type="number"
+                                                        type="number" min="1"
                                                         value={table.table_type}
-                                                        onChange={(e) => handleEditChange(table.id, "table_type", e.target.value)}
+                                                        onChange={(e) => {
+                                                            const value = Math.max(1, Number(e.target.value) || 1);  // ✅ Fix this
+                                                            handleEditChange(table.id, "table_type", value);
+                                                          }}
                                                     />
+                                             {editFieldErrors.table_type && <div className="tm-error-message">Enter seating</div>}
+
                                                 </div>
                                                 <div className="tm-edit-modal-field">
                                                     <label>Type</label>
@@ -681,7 +862,8 @@ const TableManagement = () => {
                                                     <button className="tm-edit-modal-save" onClick={() => saveEdit(table)}>
                                                         <FaCheck />
                                                     </button>
-                                                    <button className="tm-edit-modal-cancel" onClick={cancelEdit}>
+                                                    <button className="tm-edit-modal-cancel"onClick={closeEditModal}
+ >
                                                         <FaTimes />
                                                     </button>
                                                 </div>
@@ -694,141 +876,197 @@ const TableManagement = () => {
 
                     {/* Bulk Update Modal */}
                     {showBulkUpdate && (
-                        <div className="tm-bulk-modal-overlay">
-                            <div className="tm-bulk-modal">
-                                <div className="tm-bulk-global-update-row">
-                                    <div className="tm-bulk-field">
-                                        <label>Seating</label>
-                                        <input
-                                            type="number"
-                                            value={bulkUpdateGlobal.table_type}
-                                            onChange={e => setBulkUpdateGlobal(prev => ({ ...prev, table_type: e.target.value }))}
-                                        />
-                                    </div>
-                                    <div className="tm-bulk-field">
-                                        <label>Status</label>
-                                        <select
-                                            value={bulkUpdateGlobal.status}
-                                            onChange={e => setBulkUpdateGlobal(prev => ({ ...prev, status: e.target.value }))}
-                                        >
-                                            <option value="">-- Select --</option>
-                                            <option value="Vacant">Vacant</option>
-                                            <option value="Occupied">Occupied</option>
-                                            <option value="Reserved">Reserved</option>
-                                        </select>
-                                    </div>
-                                    <div className="tm-bulk-field">
-                                        <label>Zone</label>
-                                        <select
-                                            value={bulkUpdateGlobal.location_zone}
-                                            onChange={e => setBulkUpdateGlobal(prev => ({ ...prev, location_zone: e.target.value }))}
-                                        >
-                                            <option value="">-- Select --</option>
-                                            <option value="AC">AC</option>
-                                            <option value="Non-AC">Non-AC</option>
-                                        </select>
-                                    </div>
-                                </div>
+  <div className="tm-bulk-modal-overlay">
+    <div className="tm-bulk-modal">
+      {/* Global Update Section */}
+      <div className="tm-bulk-global-update-row">
+        <div className="tm-bulk-field">
+          <label>Global Seating</label>
+          <input
+            type="number"
+            min="1"
+            value={bulkUpdateGlobal.table_type}
+            onChange={e => {
+              const value = e.target.value ? Math.max(1, Number(e.target.value)) : "";
+              setBulkUpdateGlobal(prev => ({
+                ...prev,
+                table_type: value
+              }));
+            }}
+            placeholder="Apply to all selected"
+          />
+        </div>
+        <div className="tm-bulk-field">
+          <label>Global Status</label>
+          <select
+            value={bulkUpdateGlobal.status}
+            onChange={e => setBulkUpdateGlobal(prev => ({ ...prev, status: e.target.value }))}
+          >
+            <option value="">-- No Change --</option>
+            <option value="Vacant">Vacant</option>
+            <option value="Occupied">Occupied</option>
+            <option value="Reserved">Reserved</option>
+          </select>
+        </div>
+        <div className="tm-bulk-field">
+          <label>Global Zone</label>
+          <select
+            value={bulkUpdateGlobal.location_zone}
+            onChange={e => setBulkUpdateGlobal(prev => ({ ...prev, location_zone: e.target.value }))}
+          >
+            <option value="">-- No Change --</option>
+            <option value="AC">AC</option>
+            <option value="Non-AC">Non-AC</option>
+          </select>
+        </div>
+      </div>
 
-                                <div className="tm-bulk-modal-header">
-                                    <h3>Bulk Update Tables</h3>
-                                    <button className="tm-modal-close" onClick={() => setShowBulkUpdate(false)}>
-                                        <FaTimes />
-                                    </button>
-                                </div>
+      {/* Modal Header */}
+      <div className="tm-bulk-modal-header">
+        <h3>Bulk Update Tables</h3>
+        <button 
+          className="tm-modal-close" 
+          onClick={() => {
+            setShowBulkUpdate(false);
+            setSelectedUpdateTables([]);
+            setBulkUpdateData({});
+            setBulkUpdateSearch("");
+            setBulkUpdateGlobal({
+              table_type: "",
+              status: "",
+              location_zone: "",
+            });
+          }}
+        >
+          <FaTimes />
+        </button>
+      </div>
 
-                                <div className="tm-bulk-modal-search">
-                                    {/* <FaSearch className="tm-search-icon" /> */}
-                                    <input
-                                        type="text"
-                                        placeholder="Search tables to update..."
-                                        value={bulkUpdateSearch}
-                                        onChange={(e) => setBulkUpdateSearch(e.target.value)}
-                                    />
-                                </div>
+      {/* Search Bar */}
+      <div className="tm-bulk-modal-search">
+        <FaSearch className="tm-search-icon" />
+        <input
+          type="text"
+          placeholder="Search tables to update..."
+          value={bulkUpdateSearch}
+          onChange={(e) => setBulkUpdateSearch(e.target.value)}
+        />
+      </div>
 
-                                <div className="tm-bulk-select-all">
-                                    <label>
-                                        <input
-                                            type="checkbox"
-                                            checked={selectedUpdateTables.length === getFilteredUpdateTables().length && getFilteredUpdateTables().length > 0}
-                                            onChange={selectAllUpdateTables}
-                                        />
-                                        <span>Select All ({selectedUpdateTables.length} selected)</span>
-                                    </label>
-                                </div>
+      {/* Select All Checkbox */}
+      <div className="tm-bulk-select-all">
+        <label>
+          <input
+            type="checkbox"
+            checked={
+              selectedUpdateTables.length === getFilteredUpdateTables().length && 
+              getFilteredUpdateTables().length > 0
+            }
+            onChange={selectAllUpdateTables}
+          />
+          <span>Select All ({selectedUpdateTables.length} selected)</span>
+        </label>
+      </div>
 
-                                <div className="tm-bulk-table-list">
-                                    {getFilteredUpdateTables().map(table => (
-                                        <div key={table.id} className="tm-bulk-table-item">
-                                            <div className="tm-bulk-table-checkbox">
-                                                <input
-                                                    type="checkbox"
-                                                    checked={selectedUpdateTables.includes(table.id)}
-                                                    onChange={() => toggleUpdateTableSelection(table.id)}
-                                                />
-                                                <span className="tm-bulk-table-name">{table.name}</span>
-                                                <span className="tm-bulk-table-details">
-                                                    Seating: {table.table_type}  | Status: {table.status}
-                                                </span>
-                                            </div>
+      {/* Table List */}
+      <div className="tm-bulk-table-list">
+        {getFilteredUpdateTables().length === 0 ? (
+          <div className="tm-bulk-no-results">
+            <p>No tables found</p>
+          </div>
+        ) : (
+          getFilteredUpdateTables().map(table => (
+            <div key={table.id} className="tm-bulk-table-item">
+              {/* Checkbox and Table Name */}
+              <div className="tm-bulk-table-checkbox">
+                <input
+                  type="checkbox"
+                  checked={selectedUpdateTables.includes(table.id)}
+                  onChange={() => toggleUpdateTableSelection(table.id)}
+                />
+                <span className="tm-bulk-table-name">{table.name}</span>
+              </div>
+            
+              {selectedUpdateTables.includes(table.id) ? (
+                // Editable fields when selected
+                <div className="tm-bulk-table-fields">
+                  <div className="tm-bulk-field">
+                    <label>Seating</label>
+                    <input
+                      type="number" 
+                      min="1"
+                      value={bulkUpdateData[table.id]?.table_type ?? table.table_type ?? ""}
+                      onChange={(e) => {
+                        const value = e.target.value ? Math.max(1, Number(e.target.value)) : "";
+                        handleBulkUpdateChange(table.id, "table_type", value);
+                      }}
+                      placeholder={bulkUpdateGlobal.table_type ? `Global: ${bulkUpdateGlobal.table_type}` : ""}
+                    />
+                  </div>
+            
+                  <div className="tm-bulk-field">
+                    <label>Status</label>
+                    <select 
+                      value={bulkUpdateData[table.id]?.status ?? table.status}
+                      onChange={(e) => handleBulkUpdateChange(table.id, 'status', e.target.value)}
+                    >
+                      <option value="Vacant">Vacant</option>
+                      <option value="Occupied">Occupied</option>
+                      <option value="Reserved">Reserved</option>
+                    </select>
+                  </div>
+            
+                  <div className="tm-bulk-field">
+                    <label>Zone</label>
+                    <select
+                      value={bulkUpdateData[table.id]?.location_zone ?? table.location_zone}
+                      onChange={(e) => handleBulkUpdateChange(table.id, 'location_zone', e.target.value)}
+                    >
+                      <option value="AC">AC</option>
+                      <option value="Non-AC">Non-AC</option>
+                    </select>
+                  </div>
+                </div>
+              ) : (
+                // Read-only view when not selected
+                <div className="tm-bulk-table-details">
+                  Seating: {table.table_type} | Status: {table.status} | Zone: {table.location_zone}
+                </div>
+              )}
+            </div>
+          ))
+        )}
+      </div>
 
-                                            {selectedUpdateTables.includes(table.id) && (
-                                                <div className="tm-bulk-table-fields">
-                                                    <div className="tm-bulk-field">
-                                                        <label>Seating</label>
-                                                        <input
-                                                            type="number"
-                                                            value={bulkUpdateData[table.id]?.table_type || table.table_type}
-                                                            onChange={(e) => handleBulkUpdateChange(table.id, 'table_type', e.target.value)}
-                                                        />
-                                                    </div>
-                                                    <div className="tm-bulk-field">
-                                                        <label>Status</label>
-                                                        <select
-                                                            value={bulkUpdateData[table.id]?.status || table.status}
-                                                            onChange={(e) => handleBulkUpdateChange(table.id, 'status', e.target.value)}
-                                                        >
-                                                            <option value="Vacant">Vacant</option>
-                                                            <option value="Occupied">Occupied</option>
-                                                            <option value="Reserved">Reserved</option>
-                                                        </select>
-                                                    </div>
-
-                                                    <div className="tm-bulk-field">
-                                                        <label>Zone</label>
-                                                        <select
-                                                            value={bulkUpdateData[table.id]?.location_zone || table.location_zone}
-                                                            onChange={(e) => handleBulkUpdateChange(table.id, 'location_zone', e.target.value)}
-                                                        >
-                                                            <option value="AC">AC</option>
-                                                            <option value="Non-AC">Non-AC</option>
-                                                            {/* Add more zones if needed */}
-                                                        </select>
-                                                    </div>
-
-                                                </div>
-                                            )}
-                                        </div>
-                                    ))}
-                                </div>
-
-                                <div className="tm-bulk-modal-footer">
-                                    <button
-                                        className="tm-bulk-save-btn"
-                                        onClick={saveBulkUpdate}
-                                        disabled={selectedUpdateTables.length === 0}
-                                    >
-                                        <FaCheck /> Update {selectedUpdateTables.length} Table(s)
-                                    </button>
-                                    <button className="tm-bulk-cancel-btn" onClick={() => setShowBulkUpdate(false)}>
-                                        <FaTimes /> Cancel
-                                    </button>
-                                </div>
-                            </div>
-                        </div>
-                    )}
-
+      {/* Footer Buttons */}
+      <div className="tm-bulk-modal-footer">
+        <button
+          className="tm-bulk-save-btn"
+          onClick={saveBulkUpdate}
+          disabled={selectedUpdateTables.length === 0}
+        >
+          <FaCheck /> Update {selectedUpdateTables.length} Table(s)
+        </button>
+        <button 
+          className="tm-bulk-cancel-btn" 
+          onClick={() => {
+            setShowBulkUpdate(false);
+            setSelectedUpdateTables([]);
+            setBulkUpdateData({});
+            setBulkUpdateSearch("");
+            setBulkUpdateGlobal({
+              table_type: "",
+              status: "",
+              location_zone: "",
+            });
+          }}
+        >
+          <FaTimes /> Cancel
+        </button>
+      </div>
+    </div>
+  </div>
+)}
                     {/* Bulk Delete Modal */}
                     {showBulkDelete && (
                         <div className="tm-bulk-modal-overlay">
@@ -873,7 +1111,7 @@ const TableManagement = () => {
                                                 <div className="tm-bulk-delete-info">
                                                     <span className="tm-bulk-table-name">{table.name}</span>
                                                     <span className="tm-bulk-table-details">
-                                                        Seating: {table.table_type}  | Status: {table.status}
+                                                        Seating: {table.table_type}  | Status: {table.status} | Zone: {table.location_zone}
                                                     </span>
                                                 </div>
                                             </label>

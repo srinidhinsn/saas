@@ -147,7 +147,25 @@ export default function BillingPage() {
   // Save invoiceDraft logic, fetchInvoiceDraft etc omitted here for brevity
   // Assume your original saveInvoiceDraft, fetchInvoiceDraft, handleSelectOrder stay unchanged
 
-
+// Combine duplicate items by summing quantities
+const combineDuplicateItems = (items) => {
+  const itemsMap = new Map();
+  
+  items.forEach(item => {
+    const key = item.item_id.toString();
+    
+    if (itemsMap.has(key)) {
+      // Item exists, update quantity
+      const existing = itemsMap.get(key);
+      existing.quantity = (existing.quantity || 0) + (item.quantity || 0);
+    } else {
+      // New item, add to map
+      itemsMap.set(key, { ...item });
+    }
+  });
+  
+  return Array.from(itemsMap.values());
+};
   const handleSelectOrder = async (order) => {
     if (!order) return;
     const enrichedItems = (order.items || []).map((item) => {
@@ -156,10 +174,14 @@ export default function BillingPage() {
         ...item,
         unit_price: item.unit_price ?? item.price ?? inv.unit_price ?? 0,
         description: item.description ?? inv.description ?? "",
-        name: item.item_name ?? inv.name ?? "Unnamed Item", // <-- fetching item name here
+        name: item.item_name ?? inv.name ?? "Unnamed Item",
       };
     });
     
+    // ✅ Combine duplicate items
+    const combinedItems = combineDuplicateItems(enrichedItems);
+    
+    console.log("Combined items:", combinedItems);
     console.log("Enriched item:", enrichedItems);
     
 
@@ -167,7 +189,7 @@ export default function BillingPage() {
 
     const updatedOrder = {
       ...order,
-      items: enrichedItems,
+      items: combinedItems,
       customer_id: invoiceDraft?.customer_id || order.customer_id || "",
       contact_email: invoiceDraft?.contact_email || order.contact_email || "",
       contact_phone: invoiceDraft?.contact_phone || order.contact_phone || "",
@@ -178,7 +200,7 @@ export default function BillingPage() {
     setDocumentNumber(invoiceDraft?.document_number ?? "");
     setPaymentStatus(invoiceDraft?.payment_status ?? "Pending");
 
-    const totalVal = enrichedItems.reduce(
+    const totalVal = combinedItems.reduce(
       (sum, i) => sum + (i.unit_price ?? 0) * (i.quantity ?? 1),
       0
     );

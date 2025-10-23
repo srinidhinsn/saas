@@ -25,6 +25,7 @@ import NotificationTable from "../Main_Components/Notification_Services_Componen
 import PopupNotification from "../Main_Components/Notification_Services_Components/Popup_Notifications";
 import RoleConfig from '../Main_Components/Role_Configuration/RoleConfig'
 import BillingPage from '../Main_Components/Invoice_Services_Components/BillingUI'
+import ClientDetails from "../Main_Components/Client-Services/ClientDetails";
 
 const AccessDenied = ({ onAuthClick }) => (
   <div style={{ textAlign: "center", padding: "2rem" }}>
@@ -91,7 +92,6 @@ const SaasClientRoutes = ({
     setAccessDenied(false);
   };
 
-  console.log(screenId)
   // ✅ Decide which Navbar to show
   const renderNavbar = () => {
     if (hideNavbar) return null;
@@ -109,7 +109,11 @@ const SaasClientRoutes = ({
         return <Navbar />; // fallback
     }
   };
-
+  // const renderNavbar = () => {
+  //   if (hideNavbar) return null;
+  //   return <NavbarC />; // ✅ Always use Navbar3
+  // };
+  
   return (
     <>
       <HeaderBar />
@@ -139,6 +143,7 @@ const SaasClientRoutes = ({
               <Route path="role-config" element={<RoleConfig />} />
               <Route path="/billing" element={<BillingPage />} />
               <Route path="add-users" element={<Add_user />} />
+              <Route path="client-details" element={<ClientDetails />} />
               <Route path="*" element={<Navigate to="/" />} />
             </Routes>
           )}

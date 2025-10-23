@@ -78,9 +78,9 @@ const Navbar = () => {
                         </li>
                     </ClickSpark>
                     <ClickSpark>
-                        <li title="Realm" onClick={() => go('/orders-view')} className={isActive('/main/orders-view') ? 'page-active' : ''}>
+                        <li title="Realm" onClick={() => go('/client-details')} className={isActive('/main/client-details') ? 'page-active' : ''}>
                             <FaHamburger /><span>Restaurants</span>
-                            {!isActive('/main/orders-view') && <span className="arrow-indicator"><MdKeyboardArrowRight /></span>}
+                            {!isActive('/main/client-details') && <span className="arrow-indicator"><MdKeyboardArrowRight /></span>}
                         </li>
                     </ClickSpark>
                     <ClickSpark>
@@ -109,14 +109,14 @@ const Navbar = () => {
                             {!isActive('/main/reports') && <span className="arrow-indicator"><MdKeyboardArrowRight /></span>}
                         </li>
                     </ClickSpark> */}
-                    <ClickSpark>
+                    {/* <ClickSpark>
 
 
                         <li title="Add Users" onClick={() => go('/add-users')} className={isActive('/main/add-users') ? 'page-active' : ''}>
                             <FaUserPlus /><span>Add Users</span>
                             {!isActive('/main/add-users') && <span className="arrow-indicator"><MdKeyboardArrowRight /></span>}
                         </li>
-                    </ClickSpark>
+                    </ClickSpark> */}
                     <ClickSpark></ClickSpark>
                     <ClickSpark></ClickSpark>
                     <ClickSpark></ClickSpark>

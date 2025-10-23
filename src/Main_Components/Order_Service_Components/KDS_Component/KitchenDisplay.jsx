@@ -4,7 +4,7 @@ import { useParams } from "react-router-dom";
 import { useTheme } from "../../../ThemeChangerComponent/ThemeProvider";
 import { toast } from "react-toastify";
 import "react-toastify/dist/ReactToastify.css";
-import {FaCheckCircle, FaClock, FaHourglassHalf } from "react-icons/fa";
+import { FaCheckCircle, FaClock, FaHourglassHalf } from "react-icons/fa";
 
 const KitchenDisplay = () => {
     const { clientId } = useParams();
@@ -620,117 +620,120 @@ const KitchenDisplay = () => {
                                         </div> */}
                                         </div>
                                         <div className="kds-card-body">
-                                            {order.items.map((item, index) => (
-                                                <div
-                                                    key={item.item_id || index}
-                                                    className="item-row"
-                                                    style={{ alignItems: "center", cursor: isEditing ? "pointer" : "default" }}
-                                                >
-                                                    <div className="item-name" style={{ flex: 1 }}>
-                                                        {isEditing ? (
-                                                            <input
-                                                                value={item.item_name}
-                                                                onChange={(e) => updateItemName(order.id, item.item_id, e.target.value)}
-                                                            />
-                                                        ) : (
-                                                            `${item.quantity}x ${item.item_name || "Unnamed Item"}`
-                                                        )}
-                                                    </div>
-                                                    {order.status !== "served" && (
-                                                        <div
-                                                            className="status-icons"
-                                                            style={{ display: "flex", gap: "8px", marginLeft: "12px" }}
-                                                        >
-                                                            {item.status === "served" ? (
-                                                                <FaCheckCircle
-                                                                    className="served-status spin"
-                                                                    title="Served"
-                                                                    color="green"
-                                                                    style={{ cursor: "default" }}
+                                            {order.items.map((item, index) => {
+                                                // ✅ Check if item is newly added (within last 30 minutes)
+                                                const checkIfNewlyAdded = () => {
+                                                    const key = `new_item_${order.id}_${item.item_id}`;
+                                                    const timestamp = localStorage.getItem(key);
+                                                    if (!timestamp) return false;
+
+                                                    const age = Date.now() - parseInt(timestamp);
+                                                    const maxAge = 30 * 60 * 1000; // 30 minutes
+
+                                                    if (age > maxAge) {
+                                                        localStorage.removeItem(key); // Clean up old entries
+                                                        return false;
+                                                    }
+                                                    return true;
+                                                };
+
+                                                const isNewlyAdded = checkIfNewlyAdded();
+
+                                                return (
+                                                    <div
+                                                        key={item.item_id || index}
+                                                        className="item-row"
+                                                        style={{
+                                                            alignItems: "center",
+                                                            cursor: isEditing ? "pointer" : "default",
+                                                            borderTop: isNewlyAdded ? "1px dashed gray" : "none",
+                                                        }}
+                                                    >
+                                                        <div className="item-name" style={{ flex: 1 }}>
+                                                            {isEditing ? (
+                                                                <input
+                                                                    value={item.item_name}
+                                                                    onChange={(e) => updateItemName(order.id, item.item_id, e.target.value)}
                                                                 />
                                                             ) : (
-                                                                <>
+                                                                `${item.quantity}x ${item.item_name || "Unnamed Item"}`
+                                                            )}
+                                                        </div>
+                                                        {order.status !== "served" && (
+                                                            <div
+                                                                className="status-icons"
+                                                                style={{ display: "flex", gap: "8px", marginLeft: "12px" }}
+                                                            >
+                                                                {item.status === "served" ? (
+                                                                    <FaCheckCircle
+                                                                        className="served-status spin"
+                                                                        title="Served"
+                                                                        color="green"
+                                                                        style={{ cursor: "default" }}
+                                                                    />
+                                                                ) : (
+                                                                    <>
+                                                                        <FaClock
+                                                                            className={`pending-status ${item.status === "pending" ? "spin" : ""}`}
+                                                                            title="Pending"
+                                                                            color={item.status === "pending" ? "blue" : "grey"}
+                                                                            style={{ cursor: "pointer" }}
+                                                                            onClick={() => handleItemStatusChange(order.id, item.item_id, "pending")}
+                                                                        />
+                                                                        <FaHourglassHalf
+                                                                            className={`preparing-status ${item.status === "preparing" ? "spin" : ""}`}
+                                                                            title="Preparing"
+                                                                            color={item.status === "preparing" ? "orange" : "grey"}
+                                                                            style={{ cursor: "pointer" }}
+                                                                            onClick={() => handleItemStatusChange(order.id, item.item_id, "preparing")}
+                                                                        />
+                                                                        <FaCheckCircle
+                                                                            className={`served-status ${item.status === "served" ? "spin" : ""}`}
+                                                                            title="Served"
+                                                                            color={item.status === "served" ? "green" : "grey"}
+                                                                            style={{ cursor: "pointer" }}
+                                                                            onClick={() => handleItemStatusChange(order.id, item.item_id, "served")}
+                                                                        />
+                                                                    </>
+                                                                )}
+                                                            </div>
+                                                        )}
+
+                                                        {(isEditing || isAdding) && (
+                                                            <>
+                                                                <div
+                                                                    className="status-icons"
+                                                                    style={{ display: "flex", gap: "8px", marginLeft: "12px" }}
+                                                                >
                                                                     <FaClock
-                                                                        className={`pending-status ${item.status === "pending" ? "spin" : ""}`}
                                                                         title="Pending"
                                                                         color={item.status === "pending" ? "blue" : "grey"}
                                                                         style={{ cursor: "pointer" }}
                                                                         onClick={() => handleItemStatusChange(order.id, item.item_id, "pending")}
                                                                     />
                                                                     <FaHourglassHalf
-                                                                        className={`preparing-status ${item.status === "preparing" ? "spin" : ""}`}
                                                                         title="Preparing"
                                                                         color={item.status === "preparing" ? "orange" : "grey"}
                                                                         style={{ cursor: "pointer" }}
                                                                         onClick={() => handleItemStatusChange(order.id, item.item_id, "preparing")}
                                                                     />
                                                                     <FaCheckCircle
-                                                                        className={`served-status ${item.status === "served" ? "spin" : ""}`}
                                                                         title="Served"
                                                                         color={item.status === "served" ? "green" : "grey"}
                                                                         style={{ cursor: "pointer" }}
                                                                         onClick={() => handleItemStatusChange(order.id, item.item_id, "served")}
                                                                     />
-                                                                </>
-                                                            )}
-                                                        </div>
-                                                    )}
-
-                                                    {(isEditing || isAdding) && (
-                                                        <>
-                                                            {/* <div className="quantity-controls">
-                                                                <button
-                                                                    onClick={() => updateItemQuantity(order.id, item.item_id, item.quantity - 1)}
-                                                                    disabled={item.quantity <= 1}
-                                                                >
-                                                                    −
-                                                                </button>
-                                                                <span style={{ margin: "0 6px" }}>{item.quantity}</span>
-                                                                <button onClick={() => updateItemQuantity(order.id, item.item_id, item.quantity + 1)}>+</button>
-                                                            </div> */}
-                                                            <div
-                                                                className="status-icons"
-                                                                style={{ display: "flex", gap: "8px", marginLeft: "12px" }}
-                                                            >
-                                                                <FaClock
-                                                                    title="Pending"
-                                                                    color={item.status === "pending" ? "blue" : "grey"}
-                                                                    style={{ cursor: "pointer" }}
-                                                                    onClick={() => handleItemStatusChange(order.id, item.item_id, "pending")}
-                                                                />
-                                                                <FaHourglassHalf
-                                                                    title="Preparing"
-                                                                    color={item.status === "preparing" ? "orange" : "grey"}
-                                                                    style={{ cursor: "pointer" }}
-                                                                    onClick={() => handleItemStatusChange(order.id, item.item_id, "preparing")}
-                                                                />
-                                                                <FaCheckCircle
-                                                                    title="Served"
-                                                                    color={item.status === "served" ? "green" : "grey"}
-                                                                    style={{ cursor: "pointer" }}
-                                                                    onClick={() => handleItemStatusChange(order.id, item.item_id, "served")}
-                                                                />
+                                                                </div>
+                                                            </>
+                                                        )}
+                                                        {!isEditing && !isAdding && (
+                                                            <div className="item-measure" style={{ marginLeft: "12px" }}>
+                                                                {item.measure || ""}
                                                             </div>
-                                                            {/* <button
-                                                                className="delete-item-btn"
-                                                                onClick={() => {
-                                                                    setDeleteItemTarget({ orderId: order.id, itemId: item.item_id });
-                                                                    setShowDeleteItemModal(true);
-                                                                }}
-                                                                title="Delete Item"
-                                                                style={{ marginLeft: "12px", color: "red", cursor: "pointer" }}
-                                                            >
-                                                                <FaTrash />
-                                                            </button> */}
-                                                        </>
-                                                    )}
-                                                    {!isEditing && !isAdding && (
-                                                        <div className="item-measure" style={{ marginLeft: "12px" }}>
-                                                            {item.measure || ""}
-                                                        </div>
-                                                    )}
-                                                </div>
-                                            ))}
+                                                        )}
+                                                    </div>
+                                                );
+                                            })}
                                             {isAdding && (
                                                 <div style={{ marginTop: "12px" }}>
                                                     <input
