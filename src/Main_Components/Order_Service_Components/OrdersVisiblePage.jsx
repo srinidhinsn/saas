@@ -1,4 +1,4 @@
-import React, { useEffect, useState } from "react";
+import React, { useEffect, useState,useRef } from "react";
 import axios from 'axios';
 import { useParams } from "react-router-dom";
 import { useTheme } from "../../ThemeChangerComponent/ThemeProvider";
@@ -20,7 +20,7 @@ const OrdersVisiblePage = () => {
     const [tablesMap, setTablesMap] = useState({});
     const [editOrderId, setEditOrderId] = useState(null);
     const [showDeleteModals, setShowDeleteModals] = useState(false);
-    const [deleteTarget, setDeleteTarget] = useState({ orderId: null, itemId: null });
+    const [deleteTarget, setDeleteTarget] = useState({ orderId: null, itemBackendId: null });
     const [editedItemsMap, setEditedItemsMap] = useState({});
     const [allInventoryItems, setAllInventoryItems] = useState([]);
     const [itemSearchQuery, setItemSearchQuery] = useState("");
@@ -31,8 +31,9 @@ const OrdersVisiblePage = () => {
     const [showInvoiceModal, setShowInvoiceModal] = useState(false);
     const [invoiceOrder, setInvoiceOrder] = useState(null);
     const [tableId, setTableId] = useState(null)
-    const [tables, setTables] = useState([]);
+    const [tables, setTables] = useState([]);const newlyAddedItemsRef = useRef({});
 
+    const [newlyAddedItems, setNewlyAddedItems] = useState({});
     useEffect(() => {
         if (tableId) {
             document.body.classList.add("sidebar-minimized");
@@ -131,42 +132,58 @@ const OrdersVisiblePage = () => {
             setItemSearchResults([]);
             return;
         }
-        const currentOrderItems = orders[expandedOrderIndex].items.map((i) =>
-            i.item_id.toString()
+        // ✅ Don't filter out existing items - allow duplicates
+        const filtered = allInventoryItems.filter((item) =>
+            (item.name || "").toLowerCase().includes(itemSearchQuery.toLowerCase())
         );
-        const filtered = allInventoryItems
-            .filter((item) =>
-                (item.name || "").toLowerCase().includes(itemSearchQuery.toLowerCase())
-            )
-            .filter((item) => !currentOrderItems.includes(item.id.toString()));
         setItemSearchResults(filtered);
     }, [itemSearchQuery, allInventoryItems, expandedOrderIndex, orders]);
-
     const addItemToOrder = (orderId, selectedItem) => {
+        console.log("🟢 Adding item to order:", selectedItem);
+    
         let targetItems = [];
-        setOrders((prevOrders) => {
-            return prevOrders.map((order) => {
+        const timestamp = Date.now();
+        const uniqueItemKey = `${selectedItem.id}_${timestamp}`;
+    
+        setOrders(prevOrders => {
+            return prevOrders.map(order => {
                 if (order.id !== orderId) return order;
+    
                 const newItem = {
                     item_id: selectedItem.id,
                     item_name: selectedItem.name,
                     quantity: 1,
-                    price: selectedItem.total_price,
+                    price: selectedItem.unit_price,
                     status: "new",
                     note: "",
-                    slug: selectedItem.slug || selectedItem.name.replace(/[\s]+/g, "-").toLowerCase(),
+                    slug: selectedItem.slug || generateSlug(selectedItem.name),
+                    unique_key: uniqueItemKey
                 };
+    
                 const newItems = [...order.items, newItem];
                 targetItems = newItems;
+    
                 return {
                     ...order,
-                    items: newItems,
+                    items: newItems
                 };
             });
         });
+    
+        // ✅ Store in ref
+        if (!newlyAddedItemsRef.current[orderId]) {
+            newlyAddedItemsRef.current[orderId] = {};
+        }
+        newlyAddedItemsRef.current[orderId][uniqueItemKey] = timestamp;
+    
+        // ✅ ALSO store in localStorage for cross-component sync
+        const storageKey = `new_item_${orderId}_${uniqueItemKey}`;
+        localStorage.setItem(storageKey, timestamp.toString());
+    
         setTimeout(() => {
             updateOrderItems(orderId, targetItems);
         }, 0);
+    
         setItemSearchQuery("");
         setItemSearchResults([]);
     };
@@ -201,29 +218,61 @@ const OrdersVisiblePage = () => {
     useEffect(() => {
         document.body.setAttribute("data-theme", darkMode ? "dark" : "light");
     }, [darkMode]);
-
+    const generateSlug = (name) => {
+        return name.toLowerCase().replace(/[\s]+/g, "-");
+    };
     useEffect(() => {
         const fetchOrders = async () => {
-            if (!token) {
+            if (!token || !clientId) {
                 setLoading(false);
                 return;
             }
             try {
-                const response = await axios.get(`${import.meta.env.VITE_API_ORDER_SERVICE_URL}/${clientId}/dinein/table`, {
+                const res = await axios.get(`${import.meta.env.VITE_API_ORDER_SERVICE_URL}/${clientId}/dinein/table`, {
                     headers: { Authorization: `Bearer ${token}` },
                 });
-                // Fetch invoices info to get payment_status per order
-                await fetchInvoicesForOrders(response.data?.data || []);
-                setLoading(false);
-            } catch (error) {
-                toast.error("❌ Failed to fetch dine-in orders.");
+    
+                const allOrders = res.data?.data || [];
+                // const today = new Date();
+                // const todayString = today.toLocaleDateString("en-CA");
+    
+                // const todayOrders = allOrders.filter(order => {
+                //     const orderDate = new Date(order.created_at || order.createdAt)
+                //         .toLocaleDateString("en-CA");
+                //     return orderDate === todayString ;
+                // });
+
+                // ✅ Preserve unique_key on refresh
+                setOrders(prevOrders => {
+                    return allOrders.map(newOrder => {
+                        const prevOrder = prevOrders.find(o => o.id === newOrder.id);
+                        if (!prevOrder) return newOrder;
+    
+                        const mergedItems = newOrder.items.map(newItem => {
+                            const prevItem = prevOrder.items.find(
+                                pi => (pi.id && pi.id === newItem.id) || 
+                                      (pi.item_id === newItem.item_id && pi.quantity === newItem.quantity)
+                            );
+                            return prevItem?.unique_key 
+                                ? { ...newItem, unique_key: prevItem.unique_key }
+                                : newItem;
+                        });
+    
+                        return { ...newOrder, items: mergedItems };
+                    });
+                });
+    
+            } catch {
+                toast.error("Failed to fetch orders");
+            } finally {
                 setLoading(false);
             }
         };
-        if (clientId) {
-            fetchOrders();
-        }
-    }, [clientId, token]);
+    
+        fetchOrders();
+        const interval = setInterval(fetchOrders, 10000);
+        return () => clearInterval(interval);
+    }, [clientId, token]); // ✅ No orders dependency
 
     // Only one expanded order at a time
     const toggleExpand = (index) => {
@@ -240,7 +289,40 @@ const OrdersVisiblePage = () => {
             setServedClickCountMap((prev) => ({ ...prev, [orderId]: 0 }));
         }
     };
-
+// Add this in both OrdersVisiblePage.jsx and KitchenDisplay.jsx
+useEffect(() => {
+    const cleanupInterval = setInterval(() => {
+        const keysToRemove = [];
+        const maxAge = 30 * 60 * 1000; // 30 minutes
+        
+        for (let i = 0; i < localStorage.length; i++) {
+            const key = localStorage.key(i);
+            if (key && key.startsWith('new_item_')) {
+                const timestamp = parseInt(localStorage.getItem(key), 10);
+                const age = Date.now() - timestamp;
+                
+                if (age > maxAge) {
+                    keysToRemove.push(key);
+                    
+                    // Also remove from ref
+                    const parts = key.replace('new_item_', '').split('_');
+                    if (parts.length >= 3) {
+                        const orderId = parseInt(parts[0], 10);
+                        const uniqueKey = parts.slice(1).join('_');
+                        
+                        if (newlyAddedItemsRef.current[orderId]) {
+                            delete newlyAddedItemsRef.current[orderId][uniqueKey];
+                        }
+                    }
+                }
+            }
+        }
+        
+        keysToRemove.forEach(key => localStorage.removeItem(key));
+    }, 60000); // Check every minute
+    
+    return () => clearInterval(cleanupInterval);
+}, []);
     const handleStatusChange = async (orderId, newStatus) => {
         const order = orders.find((o) => o.id === orderId);
         if (!order || order.status === "served") return;
@@ -314,37 +396,48 @@ const OrdersVisiblePage = () => {
         }
     };
 
-    const cancelItem = async (orderId, itemId) => {
+
+    // ✅ Updated cancelItem to accept backend id
+    const cancelItem = async (orderId, itemBackendId) => {
         const order = orders.find((o) => o.id === orderId);
-        const item = order?.items.find((i) => i.item_id === itemId);
-        if (!item?.id) return;
+        const item = order?.items.find((i) => i.id === itemBackendId);
+        if (!item) return;
+
         try {
             await axios.delete(`${import.meta.env.VITE_API_ORDER_SERVICE_URL}/${clientId}/order_item/delete`, {
-                params: { order_item_id: item.id, client_id: clientId },
+                params: { order_item_id: itemBackendId, client_id: clientId },
                 headers: { Authorization: `Bearer ${token}` },
             });
+
             const updatedOrders = orders.map((o) => {
                 if (o.id !== orderId) return o;
-                const updatedItems = o.items.filter((i) => i.item_id !== itemId);
+
+                const updatedItems = o.items.filter((i) => i.id !== itemBackendId);
+
                 const newTotal = updatedItems.reduce((sum, item) => {
                     const price = inventoryMap[item.item_id]?.unit_price || item.price || 0;
                     return sum + (item.quantity || 1) * price;
                 }, 0);
-                return { ...o, items: updatedItems, unit_price: newTotal };
+
+                return { ...o, items: updatedItems, total_price: newTotal };
             });
+
             setOrders(updatedOrders);
+
             const newOrder = updatedOrders.find((o) => o.id === orderId);
             if (newOrder) {
                 await axios.post(
                     `${import.meta.env.VITE_API_ORDER_SERVICE_URL}/${clientId}/dinein/update`,
-                    { id: orderId, total_price: newOrder.unit_price },
+                    { id: orderId, total_price: newOrder.total_price },
                     { headers: { Authorization: `Bearer ${token}` } }
                 );
             }
+
             setEditedItemsMap((prev) => {
-                const updated = (prev[orderId] || []).filter((i) => i.item_id !== itemId);
+                const updated = (prev[orderId] || []).filter((i) => i.id !== itemBackendId);
                 return { ...prev, [orderId]: updated };
             });
+
             toast.success("Item cancelled and total updated");
         } catch (err) {
             toast.error("❌ Failed to cancel item.");
@@ -366,7 +459,7 @@ const OrdersVisiblePage = () => {
         const totalPrice = cleanedItems.reduce((sum, item) => sum + item.unit_price * item.quantity, 0);
         try {
             await axios.post(
-                `${import.meta.env.VITE_API_ORDER_SERVICE_URL}${clientId}/order_items/update?order_id=${orderId}`,
+                `${import.meta.env.VITE_API_ORDER_SERVICE_URL}/${clientId}/order_items/update?order_id=${orderId}`,
                 cleanedItems,
                 { headers: { Authorization: `Bearer ${token}` } }
             );
@@ -589,12 +682,78 @@ const OrdersVisiblePage = () => {
                                                     ).toFixed(2)}
                                                 </span>
                                             </div>
+                                            <div className="orders-visible-items-preview">
+                                                {editOrderId === order.id ? (
+                                                    <div className="orders-visible-edit-panel">
+                                                        <div className="orders-visible-edit-items-list">
+                                                            {order.items.map((item, idx) => (
+                                                                <div key={idx} className="orders-visible-edit-item-row">
+                                                                    <span>{item.item_name || item.item_id}</span>
+                                                                    <div className="orders-visible-edit-qty-controls">
+                                                                        <button
+                                                                            onClick={() => updateItemQuantity(order.id, item.item_id, item.quantity - 1)}
+                                                                            disabled={item.quantity <= 1}
+                                                                        >
+                                                                            −
+                                                                        </button>
+                                                                        <span>{item.quantity}</span>
+                                                                        <button onClick={() => updateItemQuantity(order.id, item.item_id, item.quantity + 1)}>+</button>
+                                                                    </div>
+                                                                    <button
+                                                                        className="orders-visible-btn orders-visible-edit-delete-btn"
+                                                                        onClick={() => {
+                                                                            setDeleteTarget({ orderId: order.id, itemBackendId: item.id }); // ✅ CORRECT
+                                                                            setShowDeleteModals(true);
+                                                                        }}
+                                                                        disabled={item.status === "cancelled"}
+                                                                    >
+                                                                        Delete
+                                                                    </button>
+                                                                </div>
+                                                            ))}
+                                                        </div>
+                                                        <div className="orders-visible-add-item-row">
+                                                            <input
+                                                                type="text"
+                                                                className="orders-visible-item-search"
+                                                                placeholder="Search item to add..."
+                                                                value={itemSearchQuery}
+                                                                onChange={(e) => setItemSearchQuery(e.target.value)}
+                                                            />
+                                                            {itemSearchResults.length > 0 && (
+                                                                <ul className="orders-visible-search-results">
+                                                                    {itemSearchResults.map((item) => (
+                                                                        <li key={item.id} onClick={() => addItemToOrder(order.id, item)}>
+                                                                            {item.name} - ₹{item.unit_price}
+                                                                        </li>
+                                                                    ))}
+                                                                </ul>
+                                                            )}
+                                                        </div>
+                                                        <div className="orders-visible-save-row">
+                                                            <button className="orders-visible-btn orders-visible-save-btn" onClick={() => updateOrderItems(order.id, order.items)}>
+                                                                Save Items
+                                                            </button>
+                                                        </div>
+                                                    </div>
+                                                ) : (
+                                                    order.items.map((item, idx) => (
+                                                        <div key={idx} className="orders-visible-item-row">
+                                                            <span>{item.item_name || item.item_id}</span>
+                                                            <span>Qty: {item.quantity}</span>
+                                                        </div>
+                                                    ))
+                                                )}
+                                            </div>
+
 
                                             <div className="orders-visible-expanded-actions">
+
+
                                                 {editOrderId === order.id ? (
                                                     <button
                                                         className="orders-visible-btn orders-visible-edit-btn active"
-                                                        onClick={() => setEditOrderId((prev) => (prev === order.id ? null : order.id))}
+                                                        onClick={() => setEditOrderId(prev => (prev === order.id ? null : order.id))}
                                                     >
                                                         Done Editing
                                                     </button>
@@ -620,8 +779,7 @@ const OrdersVisiblePage = () => {
                                                     Delete
                                                 </button>
                                             </div>
-
-                                            {editOrderId === order.id && (
+                                            {/* {editOrderId === order.id && (
                                                 <div className="orders-visible-edit-panel">
                                                     <div className="orders-visible-edit-items-list">
                                                         {order.items.map((item, idx) => (
@@ -674,7 +832,7 @@ const OrdersVisiblePage = () => {
                                                         </button>
                                                     </div>
                                                 </div>
-                                            )}
+                                            )} */}
                                         </div>
                                     </div>
                                 );
@@ -691,9 +849,9 @@ const OrdersVisiblePage = () => {
                                 <button
                                     className="orders-visible-btn orders-visible-modal-yes"
                                     onClick={() => {
-                                        cancelItem(deleteTarget.orderId, deleteTarget.itemId);
+                                        cancelItem(deleteTarget.orderId, deleteTarget.itemBackendId);
                                         setShowDeleteModals(false);
-                                        setDeleteTarget({ orderId: null, itemId: null });
+                                        setDeleteTarget({ orderId: null, itemBackendId: null });
                                     }}
                                 >
                                     Yes
@@ -702,7 +860,7 @@ const OrdersVisiblePage = () => {
                                     className="orders-visible-btn orders-visible-modal-no"
                                     onClick={() => {
                                         setShowDeleteModals(false);
-                                        setDeleteTarget({ orderId: null, itemId: null });
+                                        setDeleteTarget({ orderId: null, itemBackendId: null });
                                     }}
                                 >
                                     No
@@ -796,3 +954,8 @@ const OrdersVisiblePage = () => {
 };
 
 export default OrdersVisiblePage;
+// ================
+// ================
+// ================
+// ================
+// ================

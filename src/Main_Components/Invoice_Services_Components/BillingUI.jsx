@@ -147,7 +147,25 @@ export default function BillingPage() {
   // Save invoiceDraft logic, fetchInvoiceDraft etc omitted here for brevity
   // Assume your original saveInvoiceDraft, fetchInvoiceDraft, handleSelectOrder stay unchanged
 
-
+// Combine duplicate items by summing quantities
+const combineDuplicateItems = (items) => {
+  const itemsMap = new Map();
+  
+  items.forEach(item => {
+    const key = item.item_id.toString();
+    
+    if (itemsMap.has(key)) {
+      // Item exists, update quantity
+      const existing = itemsMap.get(key);
+      existing.quantity = (existing.quantity || 0) + (item.quantity || 0);
+    } else {
+      // New item, add to map
+      itemsMap.set(key, { ...item });
+    }
+  });
+  
+  return Array.from(itemsMap.values());
+};
   const handleSelectOrder = async (order) => {
     if (!order) return;
     const enrichedItems = (order.items || []).map((item) => {
@@ -156,10 +174,14 @@ export default function BillingPage() {
         ...item,
         unit_price: item.unit_price ?? item.price ?? inv.unit_price ?? 0,
         description: item.description ?? inv.description ?? "",
-        name: item.item_name ?? inv.name ?? "Unnamed Item", // <-- fetching item name here
+        name: item.item_name ?? inv.name ?? "Unnamed Item",
       };
     });
     
+    // ✅ Combine duplicate items
+    const combinedItems = combineDuplicateItems(enrichedItems);
+    
+    console.log("Combined items:", combinedItems);
     console.log("Enriched item:", enrichedItems);
     
 
@@ -167,7 +189,7 @@ export default function BillingPage() {
 
     const updatedOrder = {
       ...order,
-      items: enrichedItems,
+      items: combinedItems,
       customer_id: invoiceDraft?.customer_id || order.customer_id || "",
       contact_email: invoiceDraft?.contact_email || order.contact_email || "",
       contact_phone: invoiceDraft?.contact_phone || order.contact_phone || "",
@@ -178,7 +200,7 @@ export default function BillingPage() {
     setDocumentNumber(invoiceDraft?.document_number ?? "");
     setPaymentStatus(invoiceDraft?.payment_status ?? "Pending");
 
-    const totalVal = enrichedItems.reduce(
+    const totalVal = combinedItems.reduce(
       (sum, i) => sum + (i.unit_price ?? 0) * (i.quantity ?? 1),
       0
     );
@@ -487,13 +509,13 @@ export default function BillingPage() {
       doc.setFontSize(10);
       if (splitPaymentEnabled) {
         paymentSplits.forEach((split, idx) => {
-          doc.text(`Payment Method ${idx + 1}: ${split.method} - ₹${Number(split.amount).toFixed(2)}`, 40, y);
+          doc.text(`Payment Method ${idx + 1}: ${split.method} - Rs.${Number(split.amount).toFixed(2)}`, 40, y);
           y += 20;
         });
       } else {
         doc.text(`Payment Method: ${method}`, 40, y);
         y += 20;
-        doc.text(`Amount Given: ₹${singlePaymentAmount.toFixed(2)}`, 40, y);
+        doc.text(`Amount Given:  Rs.${singlePaymentAmount.toFixed(2)}`, 40, y);
         y += 20;
       }
       doc.text(`Payment Status: ${paymentStatus}`, 40, y);
@@ -551,10 +573,16 @@ useEffect(() => {
             {!loading && orders.length === 0 && <p className="inv--empty-text">No served orders today</p>}
             {orders.map((order) => {
               const tableName = tablesMap[order.table_id]?.name || `Table ${order.table_id}`;
-              const orderTotal = order.items.reduce(
-                (sum, i) => sum + safeNum(i.unit_price) * safeNum(i.quantity),
+              const itemsWithPrice = (order.items || []).map((item) => ({
+                ...item,
+                unit_price: item.unit_price ?? item.price ?? inventoryMap[item.item_id]?.unit_price ?? 0,
+              }));
+              
+              const orderTotal = itemsWithPrice.reduce(
+                (sum, item) => sum + (item.unit_price * (item.quantity || 1)),
                 0
               );
+              
               const isSelected = selectedOrder?.id === order.id;
               return (
                 <div

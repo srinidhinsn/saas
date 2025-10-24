@@ -2802,3 +2802,52 @@ input:focus {
     .mpc-btn { width: 100%; }
   }
   
+  .item-row.newly-added {
+    border-left: 4px solid #4CAF50;
+    background-color: rgba(76, 175, 80, 0.1);
+    padding-left: 8px;
+    animation: slideIn 0.3s ease-out;
+}
+
+@keyframes slideIn {
+    from {
+        opacity: 0;
+        transform: translateX(-10px);
+    }
+    to {
+        opacity: 1;
+        transform: translateX(0);
+    }
+}
+
+.item-row.newly-added {
+  border-left: 4px solid #4CAF50 !important;
+  background-color: rgba(76, 175, 80, 0.15) !important;
+  padding-left: 12px;
+  animation: slideIn 0.5s ease-out;
+  position: relative;
+}
+
+.item-row.newly-added::before {
+  content: '';
+  position: absolute;
+  left: 0;
+  top: 0;
+  bottom: 0;
+  width: 4px;
+  background: linear-gradient(to bottom, #4CAF50, #66BB6A);
+}
+
+@keyframes slideIn {
+  from {
+      opacity: 0;
+      transform: translateX(-20px);
+      background-color: rgba(76, 175, 80, 0.3);
+  }
+  to {
+      opacity: 1;
+      transform: translateX(0);
+      background-color: rgba(76, 175, 80, 0.15);
+  }
+}
+
