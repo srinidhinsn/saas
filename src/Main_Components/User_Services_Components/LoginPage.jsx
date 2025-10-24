@@ -3,7 +3,7 @@ import { useNavigate, useParams } from "react-router-dom";
 import { FaUser, FaLock } from "react-icons/fa";
 import { toast } from "react-toastify";
 import "react-toastify/dist/ReactToastify.css";
-import CircularText from '../../Util_Components/CircularText'; 
+import CircularText from '../../Util_Components/CircularText';
 import axios from "axios";
 export default function Login() {
     const navigate = useNavigate();
@@ -16,7 +16,7 @@ export default function Login() {
         const { name, value } = e.target;
         setForm((prev) => ({ ...prev, [name]: value }));
     };
- 
+
 
 
     const handleLogin = async (e) => {
@@ -33,9 +33,9 @@ export default function Login() {
                 }
             );
 
+            console.log("Login response:", res.data);
             const token = res.data.data.access_token;
-            const { screen_id } = res.data; // ✅ Get screen_id from top-level response
-
+            const screen_id = res.data.screen_id || "default_user";
             localStorage.setItem("access_token", token);
             localStorage.setItem("screen_id", screen_id); // ✅ Save for later use
 
@@ -58,10 +58,10 @@ export default function Login() {
                     <FaUser className="avatar-icon" />
                     {/* Circular spinning text around avatar */}
                     <CircularText
-  text={`${clientId.split('').join('★')} ♡ `}
-  spinDuration={20}
-  className="circular-clientId"
-/>
+                        text={`${clientId.split('').join('★')} ♡ `}
+                        spinDuration={20}
+                        className="circular-clientId"
+                    />
 
                 </div>
 

@@ -79,16 +79,16 @@ const Navbar = () => {
                     </ClickSpark>
                     <ClickSpark>
                         <li title="Realm" onClick={() => go('/client-details')} className={isActive('/main/client-details') ? 'page-active' : ''}>
-                            <FaHamburger /><span>Restaurants</span>
+                            <FaHamburger /><span>Menu</span>
                             {!isActive('/main/client-details') && <span className="arrow-indicator"><MdKeyboardArrowRight /></span>}
                         </li>
                     </ClickSpark>
-                    <ClickSpark>
+                    {/* <ClickSpark>
                         <li title="Menu" onClick={() => go('/menu-page')} className={isActive('/main/menu-page') ? 'page-active' : ''}>
                             <MdOutlineMenuBook /><span>Menu</span>
                             {!isActive('/main/menu-page') && <span className="arrow-indicator"><MdKeyboardArrowRight /></span>}
                         </li>
-                    </ClickSpark>
+                    </ClickSpark> */}
                     <ClickSpark>
                         <li title="Billing" onClick={() => go('/billing')} className={isActive('/main/billing') ? 'page-active' : ''}>
                             <IoDocumentTextOutline /><span>Billing</span>

@@ -1,4 +1,4 @@
-import React, { useEffect, useState } from "react";
+import React, { useEffect, useState,useRef } from "react";
 import axios from 'axios';
 import { useParams } from "react-router-dom";
 import { useTheme } from "../../ThemeChangerComponent/ThemeProvider";
@@ -20,7 +20,7 @@ const OrdersVisiblePage = () => {
     const [tablesMap, setTablesMap] = useState({});
     const [editOrderId, setEditOrderId] = useState(null);
     const [showDeleteModals, setShowDeleteModals] = useState(false);
-    const [deleteTarget, setDeleteTarget] = useState({ orderId: null, itemId: null });
+    const [deleteTarget, setDeleteTarget] = useState({ orderId: null, itemBackendId: null });
     const [editedItemsMap, setEditedItemsMap] = useState({});
     const [allInventoryItems, setAllInventoryItems] = useState([]);
     const [itemSearchQuery, setItemSearchQuery] = useState("");
@@ -31,8 +31,9 @@ const OrdersVisiblePage = () => {
     const [showInvoiceModal, setShowInvoiceModal] = useState(false);
     const [invoiceOrder, setInvoiceOrder] = useState(null);
     const [tableId, setTableId] = useState(null)
-    const [tables, setTables] = useState([]);
+    const [tables, setTables] = useState([]);const newlyAddedItemsRef = useRef({});
 
+    const [newlyAddedItems, setNewlyAddedItems] = useState({});
     useEffect(() => {
         if (tableId) {
             document.body.classList.add("sidebar-minimized");
@@ -138,35 +139,51 @@ const OrdersVisiblePage = () => {
         setItemSearchResults(filtered);
     }, [itemSearchQuery, allInventoryItems, expandedOrderIndex, orders]);
     const addItemToOrder = (orderId, selectedItem) => {
+        console.log("🟢 Adding item to order:", selectedItem);
+    
         let targetItems = [];
-        setOrders((prevOrders) => {
-            return prevOrders.map((order) => {
+        const timestamp = Date.now();
+        const uniqueItemKey = `${selectedItem.id}_${timestamp}`;
+    
+        setOrders(prevOrders => {
+            return prevOrders.map(order => {
                 if (order.id !== orderId) return order;
+    
                 const newItem = {
                     item_id: selectedItem.id,
                     item_name: selectedItem.name,
                     quantity: 1,
-                    price: selectedItem.total_price,
+                    price: selectedItem.unit_price,
                     status: "new",
                     note: "",
-                    slug: selectedItem.slug || selectedItem.name.replace(/[\s]+/g, "-").toLowerCase(),
+                    slug: selectedItem.slug || generateSlug(selectedItem.name),
+                    unique_key: uniqueItemKey
                 };
+    
                 const newItems = [...order.items, newItem];
                 targetItems = newItems;
-
-                // ✅ Mark as newly added in localStorage
-                const key = `new_item_${orderId}_${selectedItem.id}`;
-                localStorage.setItem(key, Date.now().toString());
-
+    
                 return {
                     ...order,
-                    items: newItems,
+                    items: newItems
                 };
             });
         });
+    
+        // ✅ Store in ref
+        if (!newlyAddedItemsRef.current[orderId]) {
+            newlyAddedItemsRef.current[orderId] = {};
+        }
+        newlyAddedItemsRef.current[orderId][uniqueItemKey] = timestamp;
+    
+        // ✅ ALSO store in localStorage for cross-component sync
+        const storageKey = `new_item_${orderId}_${uniqueItemKey}`;
+        localStorage.setItem(storageKey, timestamp.toString());
+    
         setTimeout(() => {
             updateOrderItems(orderId, targetItems);
         }, 0);
+    
         setItemSearchQuery("");
         setItemSearchResults([]);
     };
@@ -201,29 +218,61 @@ const OrdersVisiblePage = () => {
     useEffect(() => {
         document.body.setAttribute("data-theme", darkMode ? "dark" : "light");
     }, [darkMode]);
-
+    const generateSlug = (name) => {
+        return name.toLowerCase().replace(/[\s]+/g, "-");
+    };
     useEffect(() => {
         const fetchOrders = async () => {
-            if (!token) {
+            if (!token || !clientId) {
                 setLoading(false);
                 return;
             }
             try {
-                const response = await axios.get(`${import.meta.env.VITE_API_ORDER_SERVICE_URL}/${clientId}/dinein/table`, {
+                const res = await axios.get(`${import.meta.env.VITE_API_ORDER_SERVICE_URL}/${clientId}/dinein/table`, {
                     headers: { Authorization: `Bearer ${token}` },
                 });
-                // Fetch invoices info to get payment_status per order
-                await fetchInvoicesForOrders(response.data?.data || []);
-                setLoading(false);
-            } catch (error) {
-                toast.error("❌ Failed to fetch dine-in orders.");
+    
+                const allOrders = res.data?.data || [];
+                // const today = new Date();
+                // const todayString = today.toLocaleDateString("en-CA");
+    
+                // const todayOrders = allOrders.filter(order => {
+                //     const orderDate = new Date(order.created_at || order.createdAt)
+                //         .toLocaleDateString("en-CA");
+                //     return orderDate === todayString ;
+                // });
+
+                // ✅ Preserve unique_key on refresh
+                setOrders(prevOrders => {
+                    return allOrders.map(newOrder => {
+                        const prevOrder = prevOrders.find(o => o.id === newOrder.id);
+                        if (!prevOrder) return newOrder;
+    
+                        const mergedItems = newOrder.items.map(newItem => {
+                            const prevItem = prevOrder.items.find(
+                                pi => (pi.id && pi.id === newItem.id) || 
+                                      (pi.item_id === newItem.item_id && pi.quantity === newItem.quantity)
+                            );
+                            return prevItem?.unique_key 
+                                ? { ...newItem, unique_key: prevItem.unique_key }
+                                : newItem;
+                        });
+    
+                        return { ...newOrder, items: mergedItems };
+                    });
+                });
+    
+            } catch {
+                toast.error("Failed to fetch orders");
+            } finally {
                 setLoading(false);
             }
         };
-        if (clientId) {
-            fetchOrders();
-        }
-    }, [clientId, token]);
+    
+        fetchOrders();
+        const interval = setInterval(fetchOrders, 10000);
+        return () => clearInterval(interval);
+    }, [clientId, token]); // ✅ No orders dependency
 
     // Only one expanded order at a time
     const toggleExpand = (index) => {
@@ -240,7 +289,40 @@ const OrdersVisiblePage = () => {
             setServedClickCountMap((prev) => ({ ...prev, [orderId]: 0 }));
         }
     };
-
+// Add this in both OrdersVisiblePage.jsx and KitchenDisplay.jsx
+useEffect(() => {
+    const cleanupInterval = setInterval(() => {
+        const keysToRemove = [];
+        const maxAge = 30 * 60 * 1000; // 30 minutes
+        
+        for (let i = 0; i < localStorage.length; i++) {
+            const key = localStorage.key(i);
+            if (key && key.startsWith('new_item_')) {
+                const timestamp = parseInt(localStorage.getItem(key), 10);
+                const age = Date.now() - timestamp;
+                
+                if (age > maxAge) {
+                    keysToRemove.push(key);
+                    
+                    // Also remove from ref
+                    const parts = key.replace('new_item_', '').split('_');
+                    if (parts.length >= 3) {
+                        const orderId = parseInt(parts[0], 10);
+                        const uniqueKey = parts.slice(1).join('_');
+                        
+                        if (newlyAddedItemsRef.current[orderId]) {
+                            delete newlyAddedItemsRef.current[orderId][uniqueKey];
+                        }
+                    }
+                }
+            }
+        }
+        
+        keysToRemove.forEach(key => localStorage.removeItem(key));
+    }, 60000); // Check every minute
+    
+    return () => clearInterval(cleanupInterval);
+}, []);
     const handleStatusChange = async (orderId, newStatus) => {
         const order = orders.find((o) => o.id === orderId);
         if (!order || order.status === "served") return;
@@ -314,37 +396,48 @@ const OrdersVisiblePage = () => {
         }
     };
 
-    const cancelItem = async (orderId, itemId) => {
+
+    // ✅ Updated cancelItem to accept backend id
+    const cancelItem = async (orderId, itemBackendId) => {
         const order = orders.find((o) => o.id === orderId);
-        const item = order?.items.find((i) => i.item_id === itemId);
-        if (!item?.id) return;
+        const item = order?.items.find((i) => i.id === itemBackendId);
+        if (!item) return;
+
         try {
             await axios.delete(`${import.meta.env.VITE_API_ORDER_SERVICE_URL}/${clientId}/order_item/delete`, {
-                params: { order_item_id: item.id, client_id: clientId },
+                params: { order_item_id: itemBackendId, client_id: clientId },
                 headers: { Authorization: `Bearer ${token}` },
             });
+
             const updatedOrders = orders.map((o) => {
                 if (o.id !== orderId) return o;
-                const updatedItems = o.items.filter((i) => i.item_id !== itemId);
+
+                const updatedItems = o.items.filter((i) => i.id !== itemBackendId);
+
                 const newTotal = updatedItems.reduce((sum, item) => {
                     const price = inventoryMap[item.item_id]?.unit_price || item.price || 0;
                     return sum + (item.quantity || 1) * price;
                 }, 0);
-                return { ...o, items: updatedItems, unit_price: newTotal };
+
+                return { ...o, items: updatedItems, total_price: newTotal };
             });
+
             setOrders(updatedOrders);
+
             const newOrder = updatedOrders.find((o) => o.id === orderId);
             if (newOrder) {
                 await axios.post(
                     `${import.meta.env.VITE_API_ORDER_SERVICE_URL}/${clientId}/dinein/update`,
-                    { id: orderId, total_price: newOrder.unit_price },
+                    { id: orderId, total_price: newOrder.total_price },
                     { headers: { Authorization: `Bearer ${token}` } }
                 );
             }
+
             setEditedItemsMap((prev) => {
-                const updated = (prev[orderId] || []).filter((i) => i.item_id !== itemId);
+                const updated = (prev[orderId] || []).filter((i) => i.id !== itemBackendId);
                 return { ...prev, [orderId]: updated };
             });
+
             toast.success("Item cancelled and total updated");
         } catch (err) {
             toast.error("❌ Failed to cancel item.");
@@ -609,7 +702,7 @@ const OrdersVisiblePage = () => {
                                                                     <button
                                                                         className="orders-visible-btn orders-visible-edit-delete-btn"
                                                                         onClick={() => {
-                                                                            setDeleteTarget({ orderId: order.id, itemId: item.item_id });
+                                                                            setDeleteTarget({ orderId: order.id, itemBackendId: item.id }); // ✅ CORRECT
                                                                             setShowDeleteModals(true);
                                                                         }}
                                                                         disabled={item.status === "cancelled"}
@@ -756,9 +849,9 @@ const OrdersVisiblePage = () => {
                                 <button
                                     className="orders-visible-btn orders-visible-modal-yes"
                                     onClick={() => {
-                                        cancelItem(deleteTarget.orderId, deleteTarget.itemId);
+                                        cancelItem(deleteTarget.orderId, deleteTarget.itemBackendId);
                                         setShowDeleteModals(false);
-                                        setDeleteTarget({ orderId: null, itemId: null });
+                                        setDeleteTarget({ orderId: null, itemBackendId: null });
                                     }}
                                 >
                                     Yes
@@ -767,7 +860,7 @@ const OrdersVisiblePage = () => {
                                     className="orders-visible-btn orders-visible-modal-no"
                                     onClick={() => {
                                         setShowDeleteModals(false);
-                                        setDeleteTarget({ orderId: null, itemId: null });
+                                        setDeleteTarget({ orderId: null, itemBackendId: null });
                                     }}
                                 >
                                     No
