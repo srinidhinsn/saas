@@ -181,12 +181,12 @@ const Table_Inventory_Order = ({ onOrderUpdate }) => {
 
     const uniqueZones = Array.from(
         new Set(
-          tables
-            .filter(t => ["vacant", "available"].includes(t.status?.trim().toLowerCase()))
-            .map(t => t.location_zone)
+            tables
+                .filter(t => ["vacant", "available"].includes(t.status?.trim().toLowerCase()))
+                .map(t => t.location_zone)
         )
-      ).filter(Boolean);
-      
+    ).filter(Boolean);
+
 
 
     // const handleItemClick = (item) => {
@@ -357,84 +357,84 @@ const Table_Inventory_Order = ({ onOrderUpdate }) => {
         <div className="Table-Selection-container">
 
             <div className={`view-tables-wrapper ${darkMode ? "dark" : "light"}`}>
-  {!selectedTable && (  <>
-                        <div className="tm-stats-grid">
-                            <div className="tm-stats-card">
-                                <div className="tm-stats-flex">
-                                    <div className="tm-stats-icon-bg tm-stats-icon-green">
-                                        <FaCheck className="tm-icon-available" />
-                                    </div>
-                                    <div className="tm-stats-text-group">
-                                        <p className="tm-stats-label">Available</p>
-                                        <p className="tm-stats-value">{available}</p>
-                                    </div>
+                {!selectedTable && (<>
+                    <div className="tm-stats-grid">
+                        <div className="tm-stats-card">
+                            <div className="tm-stats-flex">
+                                <div className="tm-stats-icon-bg tm-stats-icon-green">
+                                    <FaCheck className="tm-icon-available" />
                                 </div>
-                            </div>
-                            <div className="tm-stats-card">
-                                <div className="tm-stats-flex">
-                                    <div className="tm-stats-icon-bg tm-stats-icon-blue">
-                                        <FaUsers className="tm-icon-occupied" />
-                                    </div>
-                                    <div className="tm-stats-text-group">
-                                        <p className="tm-stats-label">Occupied</p>
-                                        <p className="tm-stats-value">{occupied}</p>
-                                    </div>
-                                </div>
-                            </div>
-                            <div className="tm-stats-card">
-                                <div className="tm-stats-flex">
-                                    <div className="tm-stats-icon-bg tm-stats-icon-yellow">
-                                        <FaClock className="tm-icon-reserved" />
-                                    </div>
-                                    <div className="tm-stats-text-group">
-                                        <p className="tm-stats-label">Reserved</p>
-                                        <p className="tm-stats-value">{reserved}</p>
-                                    </div>
-                                </div>
-                            </div>
-                            <div className="tm-stats-card">
-                                <div className="tm-stats-flex">
-                                    <div className="tm-stats-icon-bg tm-stats-icon-purple">
-                                        <FaChartLine className="tm-icon-total" />
-                                    </div>
-                                    <div className="tm-stats-text-group">
-                                        <p className="tm-stats-label">Total Tables</p>
-                                        <p className="tm-stats-value">{total}</p>
-                                    </div>
+                                <div className="tm-stats-text-group">
+                                    <p className="tm-stats-label">Available</p>
+                                    <p className="tm-stats-value">{available}</p>
                                 </div>
                             </div>
                         </div>
-                        <div className="tables-view">
-                            <h2>Table Creation</h2>
-                            {uniqueZones.map(zone => (
-                                <div className="zone-group" key={zone}>
-                                    <h3 className="zone-title">{zone}</h3>
-                                    <div className="zone-section">
+                        <div className="tm-stats-card">
+                            <div className="tm-stats-flex">
+                                <div className="tm-stats-icon-bg tm-stats-icon-blue">
+                                    <FaUsers className="tm-icon-occupied" />
+                                </div>
+                                <div className="tm-stats-text-group">
+                                    <p className="tm-stats-label">Occupied</p>
+                                    <p className="tm-stats-value">{occupied}</p>
+                                </div>
+                            </div>
+                        </div>
+                        <div className="tm-stats-card">
+                            <div className="tm-stats-flex">
+                                <div className="tm-stats-icon-bg tm-stats-icon-yellow">
+                                    <FaClock className="tm-icon-reserved" />
+                                </div>
+                                <div className="tm-stats-text-group">
+                                    <p className="tm-stats-label">Reserved</p>
+                                    <p className="tm-stats-value">{reserved}</p>
+                                </div>
+                            </div>
+                        </div>
+                        <div className="tm-stats-card">
+                            <div className="tm-stats-flex">
+                                <div className="tm-stats-icon-bg tm-stats-icon-purple">
+                                    <FaChartLine className="tm-icon-total" />
+                                </div>
+                                <div className="tm-stats-text-group">
+                                    <p className="tm-stats-label">Total Tables</p>
+                                    <p className="tm-stats-value">{total}</p>
+                                </div>
+                            </div>
+                        </div>
+                    </div>
+                    <div className="tables-view">
+                        <h2>Table Creation</h2>
+                        {uniqueZones.map(zone => (
+                            <div className="zone-group" key={zone}>
+                                <h3 className="zone-title">{zone}</h3>
+                                <div className="zone-section">
                                     {tables
-  .filter(
-    (t) =>
-      t.location_zone === zone &&
-      ["vacant", "available"].includes(t.status?.trim().toLowerCase())
-  )
-  .map((table) => (
-    <div
-      key={table.id}
-      className="table-card"
-      onClick={() => navigate(`${table.id}`)}
-    >
-      <div className="table-number">{table.table_number}</div>
-      <div className={`table-status-label tm-status-card-${table.status?.toLowerCase()}`}>
-        {table.status}
-      </div>
-    </div>
-  ))}
+                                        .filter(
+                                            (t) =>
+                                                t.location_zone === zone &&
+                                                ["vacant", "available"].includes(t.status?.trim().toLowerCase())
+                                        )
+                                        .map((table) => (
+                                            <div
+                                                key={table.id}
+                                                className="table-card"
+                                                onClick={() => navigate(`${table.id}`)}
+                                            >
+                                                <div className="table-number">{table.table_number}</div>
+                                                <div className={`table-status-label tm-status-card-${table.status?.toLowerCase()}`}>
+                                                    {table.status}
+                                                </div>
+                                            </div>
+                                        ))}
 
 
-                                    </div>
                                 </div>
-                            ))}
-                        </div>
-                    </>
+                            </div>
+                        ))}
+                    </div>
+                </>
 
                 )}
 
@@ -538,7 +538,7 @@ const Table_Inventory_Order = ({ onOrderUpdate }) => {
 
 
                         </div>
- </div>
+                    </div>
                 )}
             </div>
         </div>
