@@ -13,7 +13,7 @@ from utils.send_email_otp import otpEmailService, otp_store
 from utils.create_notification import  get_template_body, render_template
 import random
 from datetime import datetime, timedelta
-from services.add_users import create_user_and_person
+from services.add_users import create_user_and_person,getting_screen_id
 from jose import jwt
 
 router = APIRouter()
@@ -50,9 +50,12 @@ async def login_user(client_id: str, userReq: LoginRequest, db: Session = Depend
         "grants": userModel.grants,
         "realm": client_model.realm
     })
-    #context = verify_token(token)
+    screen_id = getting_screen_id(token, db)
+
+    print("my screen_id : ", screen_id)
+
     return ResponseModel(
-        screen_id="default_user",
+        screen_id=screen_id,
         data={"access_token": token, "token_type": "bearer"}
     )
 
@@ -355,3 +358,21 @@ async def delegate_access(
     token = jwt.encode(payload, SECRET_KEY, algorithm=ALGORITHM)
 
     return {"delegated_token": token, "expires_at": expire}
+
+# ================================= Client Table Service ==================================== #
+@router.get("/realm")
+async def get_clients_by_realm(
+    realm: str,
+    db: Session = Depends(get_db),
+    context: SaasContext = Depends(verify_token)
+):
+    clients = db.query(Client).filter(Client.realm == realm).all()
+    client_models = [Client.copyToModel(c) for c in clients]
+    return ResponseModel(screen_id=context.screen_id, data={"clients": client_models})
+
+
+@router.get("/realms")
+async def get_realms(db: Session = Depends(get_db)):
+    realms = db.query(Client.realm).distinct().all()
+    realm_list = [r[0] for r in realms if r[0]]
+    return {"data": realm_list}
