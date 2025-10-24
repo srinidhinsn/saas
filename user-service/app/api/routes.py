@@ -376,3 +376,4 @@ async def get_realms(db: Session = Depends(get_db)):
     realms = db.query(Client.realm).distinct().all()
     realm_list = [r[0] for r in realms if r[0]]
     return {"data": realm_list}
+
