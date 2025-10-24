@@ -59,26 +59,30 @@ const DashBoardPage = ({realm}) => {
 
   // ----------------------------------------------------- //
 
-  useEffect(() => {
-    // Fetch total and pending orders for the selected realm directly
-    async function fetchOrderSummaryForRealm() {
-      if (!realm || !token) return;
-      try {
-        const res = await axios.get(
-          `${import.meta.env.VITE_API_USER_SERVICE_URL}/${clientId}/users/realm/ordersummary?realm=${encodeURIComponent(realm)}`,
-          { headers: { Authorization: `Bearer ${token}` } }
-        );
-        setTotalOrders(res.data?.data?.total_orders || 0);
-        setPendingOrders(res.data?.data?.pending_orders || 0);
-      } catch (err) {
-        console.error("Failed to fetch realm order summary:", err);
-        setTotalOrders(0);
-        setPendingOrders(0);
-      }
+ useEffect(() => {
+  async function fetchOrderSummaryForRealm() {
+    if (!token || !clientId) return;
+
+    // Prepare URL with or without realm query param
+    let url = `${import.meta.env.VITE_API_USER_SERVICE_URL}/${clientId}/users/realm/ordersummary`;
+    if (realm && realm !== "") {
+      url += `?realm=${encodeURIComponent(realm)}`;
     }
-    fetchOrderSummaryForRealm();
-  }, [realm, token]);
-  
+
+    try {
+      const res = await axios.get(url, { headers: { Authorization: `Bearer ${token}` } });
+
+      setTotalOrders(res.data?.data?.total_orders || 0);
+      setPendingOrders(res.data?.data?.pending_orders || 0);
+    } catch (err) {
+      console.error("Failed to fetch realm order summary:", err);
+      setTotalOrders(0);
+      setPendingOrders(0);
+    }
+  }
+  fetchOrderSummaryForRealm();
+}, [realm, token, clientId]);
+
 
   // Fetch and process top ordered items
   useEffect(() => {
@@ -179,7 +183,7 @@ const DashBoardPage = ({realm}) => {
             return new Date(a.date + ", " + new Date().getFullYear()) - new Date(b.date + ", " + new Date().getFullYear());
           });
         }
-
+        console.log("Aggregated chartData for sales:", sortedData);
         setChartData(sortedData);
 
       } catch (err) {
