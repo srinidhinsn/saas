@@ -499,5 +499,5 @@ INSERT INTO category (id, client_id, name, description, sub_categories, slug, cr
 
 -- add-user update
 UPDATE category
-SET sub_categories = array_cat(sub_categories, ARRAY['person-details', 'persons'])
+SET sub_categories = array_cat(sub_categories, ARRAY['person-details', 'persons','realm'])
 WHERE id = 'users' AND client_id = 'saas';
