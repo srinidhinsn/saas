@@ -11,6 +11,8 @@ from models.user_model import DelegatedAccessRequest
 from sqlalchemy import and_
 from utils.send_email_otp import otpEmailService, otp_store
 from utils.create_notification import  get_template_body, render_template
+from entity.inventory_entity import CategoryEntity
+from entity.order_entity import DineinOrder
 import random
 from datetime import datetime, timedelta
 from app.services.add_users import create_user_and_person,getting_screen_id
@@ -362,17 +364,37 @@ async def delegate_access(
 # ================================= Client Table Service ==================================== #
 @router.get("/realm")
 async def get_clients_by_realm(
-    realm: str,
+    realm: str = "",  
     db: Session = Depends(get_db),
     context: SaasContext = Depends(verify_token)
 ):
-    clients = db.query(Client).filter(Client.realm == realm).all()
+    query = db.query(Client)
+    if realm:
+        query = query.filter(Client.realm == realm)
+    clients = query.all()
     client_models = [Client.copyToModel(c) for c in clients]
     return ResponseModel(screen_id=context.screen_id, data={"clients": client_models})
 
+@router.get("/realm/ordersummary")
+async def get_order_summary_by_realm(
+    realm: str = None,  
+    db: Session = Depends(get_db),
+    context: SaasContext = Depends(verify_token)
+):
+    query = db.query(DineinOrder).join(Client, DineinOrder.client_id == Client.id)
+    if realm:
+        query = query.filter(Client.realm == realm)
+    total_orders = query.count()
+    pending_orders = query.filter(DineinOrder.status == "pending").count()
+
+    return ResponseModel(
+        screen_id=context.screen_id,
+        data={"total_orders": total_orders, "pending_orders": pending_orders}
+    )
 
 @router.get("/realms")
-async def get_realms(db: Session = Depends(get_db)):
-    realms = db.query(Client.realm).distinct().all()
-    realm_list = [r[0] for r in realms if r[0]]
-    return {"data": realm_list}
+async def get_realms(realm: str, db: Session = Depends(get_db)):
+    category = db.query(CategoryEntity).filter(CategoryEntity.id == realm).first()
+    if not category:
+        raise HTTPException(status_code=404, detail=f"Category with id '{realm}' not found")
+    return {"data": category.sub_categories or []}
