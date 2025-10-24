@@ -11,6 +11,7 @@ import HeaderBar from "./HeaderPage";
 import AuthModal from "./AuthModel";
 import Add_user from "../Main_Components/Add_Users/Add_user";
 import DashBoardPage from "./DashBoardPage";
+import DashBoard_V3 from "./DashBoard_Versions/DashBoard_V3";
 import MenuManager from "../Main_Components/Inventory_Services_Components/MenuManager";
 import ViewTables from "../Main_Components/Table_Service_Components/Table_Inventory_Order";
 import TableManagement from "../Main_Components/Table_Service_Components/TableManagement";
@@ -25,6 +26,7 @@ import NotificationTable from "../Main_Components/Notification_Services_Componen
 import PopupNotification from "../Main_Components/Notification_Services_Components/Popup_Notifications";
 import RoleConfig from '../Main_Components/Role_Configuration/RoleConfig'
 import BillingPage from '../Main_Components/Invoice_Services_Components/BillingUI'
+import ClientDetails from "../Main_Components/Client-Services/ClientDetails";
 
 const AccessDenied = ({ onAuthClick }) => (
   <div style={{ textAlign: "center", padding: "2rem" }}>
@@ -51,8 +53,26 @@ const SaasClientRoutes = ({
   const [authModalOpen, setAuthModalOpen] = useState(false);
   const [grants, setGrants] = useState([]);
   const [userId, setUserId] = useState(null);
-  const [screenId, setScreenId] = useState(localStorage.getItem("screen_id") || "default_user"); // ✅ read from storage
+  const [screenId, setScreenId] = useState(() => {
+    return localStorage.getItem("screen_id") || "default_user";
+  });
+  const [selectedRealm, setSelectedRealm] = useState(() => localStorage.getItem("selected_realm") || "");
 
+  useEffect(() => {
+    const handleStorageChange = () => {
+      const newRealm = localStorage.getItem("selected_realm") || "";
+      setSelectedRealm(newRealm);
+    };
+  
+    window.addEventListener("storage", handleStorageChange);
+    return () => window.removeEventListener("storage", handleStorageChange);
+  }, []);
+  
+
+  useEffect(() => {
+    localStorage.setItem("screen_id", screenId); 
+  }, [screenId]); 
+  
   if (!token) return <Navigate to={`/saas/${clientId}/login`} />;
 
   useEffect(() => {
@@ -91,7 +111,6 @@ const SaasClientRoutes = ({
     setAccessDenied(false);
   };
 
-  console.log(screenId)
   // ✅ Decide which Navbar to show
   const renderNavbar = () => {
     if (hideNavbar) return null;
@@ -109,10 +128,39 @@ const SaasClientRoutes = ({
         return <Navbar />; // fallback
     }
   };
-
+  const renderDashboard = () => {
+    switch (screenId) {
+      case "user_v3":
+        return <DashBoard_V3 realm={selectedRealm} />;
+      case "user_v2":
+        return <DashBoardPage version="v2" realm={selectedRealm} />;
+      default:
+        return <DashBoardPage realm={selectedRealm} />;
+    }
+  };
+  
+  
+  // const renderNavbar = () => {
+  //   if (hideNavbar) return null;
+  //   const currentScreenId = "user_v3";
+  //   if (screenId !== currentScreenId) {
+  //     setScreenId(currentScreenId);
+  //   }
+  //   return <NavbarC />; 
+  // };
+  // const renderNavbar = () => {
+  //   if (hideNavbar) return null;
+  //   const currentScreenId = "default_user";
+  //   if (screenId !== currentScreenId) {
+  //     setScreenId(currentScreenId);
+  //   }
+    
+  //   return <Navbar />; 
+  // };
+  
   return (
     <>
-      <HeaderBar />
+      <HeaderBar   screenId={screenId} selectedRealm={selectedRealm} setSelectedRealm={setSelectedRealm} />
       <div className="app-wrapper" style={{ display: "flex" }}>
         {renderNavbar()}
         <div className="main-layout" style={{ flex: 1, overflowY: "auto" }}>
@@ -120,7 +168,7 @@ const SaasClientRoutes = ({
             <AccessDenied onAuthClick={() => setAuthModalOpen(true)} />
           ) : (
             <Routes>
-              <Route path="/" element={<DashBoardPage />} />
+              <Route path="/" element={renderDashboard(selectedRealm)}/>
               <Route path="menu-page/*" element={<MenuManager clientId={clientId} />} />
               <Route path="table-selection" element={<TableManagement clientId={clientId} />} />
               <Route
@@ -139,6 +187,7 @@ const SaasClientRoutes = ({
               <Route path="role-config" element={<RoleConfig />} />
               <Route path="/billing" element={<BillingPage />} />
               <Route path="add-users" element={<Add_user />} />
+              <Route path="client-details" element={<ClientDetails />} />
               <Route path="*" element={<Navigate to="/" />} />
             </Routes>
           )}
@@ -158,3 +207,4 @@ const SaasClientRoutes = ({
 };
 
 export default SaasClientRoutes;
+// ======= ===================== ======================= ==================== ===================== //

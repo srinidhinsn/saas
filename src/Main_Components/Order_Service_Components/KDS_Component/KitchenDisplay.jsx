@@ -1,10 +1,10 @@
-import React, { useEffect, useState } from "react";
+import React, { useEffect, useState, useRef } from "react";
 import axios from 'axios';
 import { useParams } from "react-router-dom";
 import { useTheme } from "../../../ThemeChangerComponent/ThemeProvider";
 import { toast } from "react-toastify";
 import "react-toastify/dist/ReactToastify.css";
-import {FaCheckCircle, FaClock, FaHourglassHalf } from "react-icons/fa";
+import { FaCheckCircle, FaClock, FaHourglassHalf } from "react-icons/fa";
 
 const KitchenDisplay = () => {
     const { clientId } = useParams();
@@ -28,7 +28,10 @@ const KitchenDisplay = () => {
 
     const [itemSearchQuery, setItemSearchQuery] = useState("");
     const [itemSearchResults, setItemSearchResults] = useState([]);
+    const [newlyAddedItems, setNewlyAddedItems] = useState({});
     const [tableIds, setTableId] = useState(null)
+    const newlyAddedItemsRef = useRef({});
+
     useEffect(() => {
         if (tableIds) {
             document.body.classList.add("sidebar-minimized");
@@ -71,43 +74,82 @@ const KitchenDisplay = () => {
             .catch(() => toast.error("Failed to fetch inventory items"));
     }, [clientId, token]);
 
-    // Fetch today's orders
-    useEffect(() => {
-        const fetchOrders = async () => {
-            if (!token || !clientId) {
-                setLoading(false);
-                return;
-            }
-            try {
-                const res = await axios.get(`${import.meta.env.VITE_API_ORDER_SERVICE_URL}/${clientId}/dinein/table`, {
-                    headers: { Authorization: `Bearer ${token}` },
+  // Fetch today's orders
+// Fetch today's orders
+useEffect(() => {
+    const fetchOrders = async () => {
+        if (!token || !clientId) {
+            setLoading(false);
+            return;
+        }
+        try {
+            const res = await axios.get(`${import.meta.env.VITE_API_ORDER_SERVICE_URL}/${clientId}/dinein/table`, {
+                headers: { Authorization: `Bearer ${token}` },
+            });
+
+            const allOrders = res.data?.data || [];
+            const today = new Date();
+            const todayString = today.toLocaleDateString("en-CA");
+
+            const todayOrders = allOrders.filter(order => {
+                const orderDate = new Date(order.created_at || order.createdAt)
+                    .toLocaleDateString("en-CA");
+                return orderDate === todayString && order.status !== "served";
+            });
+
+            // ✅ NEW: Attach unique_key from localStorage to backend items
+            const ordersWithUniqueKeys = todayOrders.map(order => {
+                const enhancedItems = order.items.map(item => {
+                    // Check all localStorage keys for this order
+                    for (let i = 0; i < localStorage.length; i++) {
+                        const key = localStorage.key(i);
+                        if (key && key.startsWith(`new_item_${order.id}_`)) {
+                            const timestamp = parseInt(localStorage.getItem(key), 10);
+                            const age = Date.now() - timestamp;
+                            const maxAge = 30 * 60 * 1000; // 30 minutes
+                            
+                            // Skip expired items
+                            if (age > maxAge) continue;
+                            
+                            // Extract unique_key from localStorage key
+                            const uniqueKey = key.replace(`new_item_${order.id}_`, '');
+                            const itemIdFromKey = parseInt(uniqueKey.split('_')[0], 10);
+                            
+                            // Match by item_id
+                            if (itemIdFromKey === item.item_id) {
+                                console.log(`✅ Matched backend item ${item.item_id} with localStorage key: ${uniqueKey}`);
+                                
+                                // Update ref as well
+                                if (!newlyAddedItemsRef.current[order.id]) {
+                                    newlyAddedItemsRef.current[order.id] = {};
+                                }
+                                newlyAddedItemsRef.current[order.id][uniqueKey] = timestamp;
+                                
+                                return { ...item, unique_key: uniqueKey };
+                            }
+                        }
+                    }
+                    
+                    return item;
                 });
 
-                const allOrders = res.data?.data || [];
-                const today = new Date();
-                const todayString = today.toLocaleDateString("en-CA");
+                return { ...order, items: enhancedItems };
+            });
 
-                // ✅ filter only today's orders and exclude served ones
-                const todayOrders = allOrders.filter(order => {
-                    const orderDate = new Date(order.created_at || order.createdAt)
-                        .toLocaleDateString("en-CA");
-                    return orderDate === todayString && order.status !== "served";
-                });
+            setOrders(ordersWithUniqueKeys);
+            console.log('📦 Orders with unique_keys:', ordersWithUniqueKeys);
 
-                setOrders(todayOrders);
+        } catch {
+            toast.error("Failed to fetch orders");
+        } finally {
+            setLoading(false);
+        }
+    };
 
-            } catch {
-                toast.error("Failed to fetch orders");
-            } finally {
-                setLoading(false);
-            }
-        };
-
-        fetchOrders();
-        const interval = setInterval(fetchOrders, 10000);
-        return () => clearInterval(interval);
-    }, [clientId, token]);
-
+    fetchOrders();
+    const interval = setInterval(fetchOrders, 10000);
+    return () => clearInterval(interval);
+}, [clientId, token]);
 
 
     // Inventory filtering for add item search excluding already added items
@@ -130,15 +172,22 @@ const KitchenDisplay = () => {
     }, [itemSearchQuery, addingOrderId, inventoryItems, orders]);
 
     // Add item to order locally & save backend
+    // ✅ ADD THIS FUNCTION
+    const generateSlug = (name) => {
+        return name.toLowerCase().replace(/[\s]+/g, "-");
+    };
+
     const addItemToOrder = (orderId, selectedItem) => {
         console.log("🟢 Adding item to order:", selectedItem);
-
+    
         let targetItems = [];
-
+        const timestamp = Date.now();
+        const uniqueItemKey = `${selectedItem.id}_${timestamp}`;
+    
         setOrders(prevOrders => {
             return prevOrders.map(order => {
                 if (order.id !== orderId) return order;
-
+    
                 const newItem = {
                     item_id: selectedItem.id,
                     item_name: selectedItem.name,
@@ -146,30 +195,36 @@ const KitchenDisplay = () => {
                     price: selectedItem.price,
                     status: "new",
                     note: "",
-                    slug: selectedItem.slug || generateSlug(selectedItem.name)
+                    slug: selectedItem.slug || generateSlug(selectedItem.name),
+                    unique_key: uniqueItemKey
                 };
-
+    
                 const newItems = [...order.items, newItem];
-                targetItems = newItems; // 🟢 store for use after state update
-
+                targetItems = newItems;
+    
                 return {
                     ...order,
                     items: newItems
                 };
             });
         });
-
-        // ✅ Do this OUTSIDE of setOrders to avoid duplication
+    
+        // ✅ Use ref instead of state
+        if (!newlyAddedItemsRef.current[orderId]) {
+            newlyAddedItemsRef.current[orderId] = {};
+        }
+        newlyAddedItemsRef.current[orderId][uniqueItemKey] = timestamp;
+    
         setTimeout(() => {
             updateOrderItems(orderId, targetItems);
         }, 0);
-
+    
         setItemSearchQuery("");
         setItemSearchResults([]);
     };
     const updateOrderItems = async (orderId, updatedItemsWithStatuses) => {
         const cleanedItems = updatedItemsWithStatuses.map(item => ({
-            item_id: item.item_id || item.inventory_id, // fallback
+            item_id: item.item_id || item.inventory_id,
             item_name: item.name || item.item_name,
             quantity: item.quantity || 1,
             status: item.status || "new",
@@ -188,8 +243,8 @@ const KitchenDisplay = () => {
         }, 0);
 
         try {
-            // ✅ Use query param for order_id
-            await axios.post(
+            // ✅ Save items and get response with backend IDs
+            const response = await axios.post(
                 `${import.meta.env.VITE_API_ORDER_SERVICE_URL}/${clientId}/order_items/update?order_id=${orderId}`,
                 cleanedItems,
                 { headers: { Authorization: `Bearer ${token}` } }
@@ -203,6 +258,31 @@ const KitchenDisplay = () => {
                 },
                 { headers: { Authorization: `Bearer ${token}` } }
             );
+
+            // ✅ Update localStorage with backend IDs for newly added items
+            updatedItemsWithStatuses.forEach((item) => {
+                if (item.temp_id) {
+                    const oldKey = `new_item_${orderId}_${item.temp_id}`;
+                    const timestamp = localStorage.getItem(oldKey);
+
+                    if (timestamp && response.data?.data) {
+                        // Find the backend item by matching item_id
+                        const backendItem = response.data.data.find(
+                            (bi) => bi.item_id === item.item_id
+                        );
+
+                        if (backendItem?.id) {
+                            // Create new key with backend id
+                            const newKey = `new_item_${orderId}_${backendItem.id}`;
+                            localStorage.setItem(newKey, timestamp);
+                            // Remove old temp key
+                            localStorage.removeItem(oldKey);
+
+                            console.log(`✅ Migrated ${oldKey} → ${newKey}`);
+                        }
+                    }
+                }
+            });
 
             toast.success("Item statuses & total updated!");
         } catch (err) {
@@ -574,6 +654,90 @@ const KitchenDisplay = () => {
         }
     };
 
+useEffect(() => {
+    // Load newly added items from localStorage on mount
+    const loadNewlyAddedItems = () => {
+        const newItems = {};
+        const keysToRemove = [];
+        
+        for (let i = 0; i < localStorage.length; i++) {
+            const key = localStorage.key(i);
+            if (key && key.startsWith('new_item_')) {
+                const timestampStr = localStorage.getItem(key);
+                const timestamp = parseInt(timestampStr, 10);
+                const age = Date.now() - timestamp;
+                const maxAge = 30 * 60 * 1000; // 30 minutes
+                
+                if (age > maxAge) {
+                    keysToRemove.push(key);
+                } else {
+                    // ✅ Parse key: "new_item_{orderId}_{itemId}_{timestamp}"
+                    // Example: "new_item_123_456_1704067200000"
+                    const withoutPrefix = key.replace('new_item_', '');
+                    const firstUnderscoreIndex = withoutPrefix.indexOf('_');
+                    
+                    if (firstUnderscoreIndex !== -1) {
+                        const orderId = parseInt(withoutPrefix.substring(0, firstUnderscoreIndex), 10);
+                        const uniqueKey = withoutPrefix.substring(firstUnderscoreIndex + 1);
+                        
+                        if (!isNaN(orderId)) {
+                            if (!newItems[orderId]) {
+                                newItems[orderId] = {};
+                            }
+                            newItems[orderId][uniqueKey] = timestamp;
+                            console.log(`✅ Loaded: orderId=${orderId}, uniqueKey=${uniqueKey}, timestamp=${timestamp}`);
+                        }
+                    }
+                }
+            }
+        }
+        
+        // Remove expired items
+        keysToRemove.forEach(key => localStorage.removeItem(key));
+        
+        // Update ref
+        newlyAddedItemsRef.current = newItems;
+        console.log('📦 Final loaded items:', newItems);
+    };
+    
+    loadNewlyAddedItems();
+}, []);
+
+useEffect(() => {
+    const cleanupInterval = setInterval(() => {
+        const keysToRemove = [];
+        const maxAge = 30 * 60 * 1000; // 30 minutes
+        
+        for (let i = 0; i < localStorage.length; i++) {
+            const key = localStorage.key(i);
+            if (key && key.startsWith('new_item_')) {
+                const timestamp = parseInt(localStorage.getItem(key), 10);
+                const age = Date.now() - timestamp;
+                
+                if (age > maxAge) {
+                    keysToRemove.push(key);
+                    
+                    // Also remove from ref
+                    const withoutPrefix = key.replace('new_item_', '');
+                    const firstUnderscoreIndex = withoutPrefix.indexOf('_');
+                    
+                    if (firstUnderscoreIndex !== -1) {
+                        const orderId = parseInt(withoutPrefix.substring(0, firstUnderscoreIndex), 10);
+                        const uniqueKey = withoutPrefix.substring(firstUnderscoreIndex + 1);
+                        
+                        if (newlyAddedItemsRef.current[orderId]) {
+                            delete newlyAddedItemsRef.current[orderId][uniqueKey];
+                        }
+                    }
+                }
+            }
+        }
+        
+        keysToRemove.forEach(key => localStorage.removeItem(key));
+    }, 60000); // Check every minute
+    
+    return () => clearInterval(cleanupInterval);
+}, []);
     return (
         <div className="KDS-Container">
             <>
@@ -620,117 +784,117 @@ const KitchenDisplay = () => {
                                         </div> */}
                                         </div>
                                         <div className="kds-card-body">
-                                            {order.items.map((item, index) => (
-                                                <div
-                                                    key={item.item_id || index}
-                                                    className="item-row"
-                                                    style={{ alignItems: "center", cursor: isEditing ? "pointer" : "default" }}
-                                                >
-                                                    <div className="item-name" style={{ flex: 1 }}>
-                                                        {isEditing ? (
-                                                            <input
-                                                                value={item.item_name}
-                                                                onChange={(e) => updateItemName(order.id, item.item_id, e.target.value)}
-                                                            />
-                                                        ) : (
-                                                            `${item.quantity}x ${item.item_name || "Unnamed Item"}`
-                                                        )}
-                                                    </div>
-                                                    {order.status !== "served" && (
-                                                        <div
-                                                            className="status-icons"
-                                                            style={{ display: "flex", gap: "8px", marginLeft: "12px" }}
-                                                        >
-                                                            {item.status === "served" ? (
-                                                                <FaCheckCircle
-                                                                    className="served-status spin"
-                                                                    title="Served"
-                                                                    color="green"
-                                                                    style={{ cursor: "default" }}
-                                                                />
-                                                            ) : (
-                                                                <>
-                                                                    <FaClock
-                                                                        className={`pending-status ${item.status === "pending" ? "spin" : ""}`}
-                                                                        title="Pending"
-                                                                        color={item.status === "pending" ? "blue" : "grey"}
-                                                                        style={{ cursor: "pointer" }}
-                                                                        onClick={() => handleItemStatusChange(order.id, item.item_id, "pending")}
-                                                                    />
-                                                                    <FaHourglassHalf
-                                                                        className={`preparing-status ${item.status === "preparing" ? "spin" : ""}`}
-                                                                        title="Preparing"
-                                                                        color={item.status === "preparing" ? "orange" : "grey"}
-                                                                        style={{ cursor: "pointer" }}
-                                                                        onClick={() => handleItemStatusChange(order.id, item.item_id, "preparing")}
-                                                                    />
-                                                                    <FaCheckCircle
-                                                                        className={`served-status ${item.status === "served" ? "spin" : ""}`}
-                                                                        title="Served"
-                                                                        color={item.status === "served" ? "green" : "grey"}
-                                                                        style={{ cursor: "pointer" }}
-                                                                        onClick={() => handleItemStatusChange(order.id, item.item_id, "served")}
-                                                                    />
-                                                                </>
-                                                            )}
-                                                        </div>
-                                                    )}
+                                        {order.items.map((item, index) => {
+    const checkIfNewlyAdded = () => {
+        if (!item.unique_key) {
+            console.log(`❌ Item ${item.item_name} has NO unique_key`);
+            return false;
+        }
 
-                                                    {(isEditing || isAdding) && (
-                                                        <>
-                                                            {/* <div className="quantity-controls">
-                                                                <button
-                                                                    onClick={() => updateItemQuantity(order.id, item.item_id, item.quantity - 1)}
-                                                                    disabled={item.quantity <= 1}
-                                                                >
-                                                                    −
-                                                                </button>
-                                                                <span style={{ margin: "0 6px" }}>{item.quantity}</span>
-                                                                <button onClick={() => updateItemQuantity(order.id, item.item_id, item.quantity + 1)}>+</button>
-                                                            </div> */}
-                                                            <div
-                                                                className="status-icons"
-                                                                style={{ display: "flex", gap: "8px", marginLeft: "12px" }}
-                                                            >
-                                                                <FaClock
-                                                                    title="Pending"
-                                                                    color={item.status === "pending" ? "blue" : "grey"}
-                                                                    style={{ cursor: "pointer" }}
-                                                                    onClick={() => handleItemStatusChange(order.id, item.item_id, "pending")}
-                                                                />
-                                                                <FaHourglassHalf
-                                                                    title="Preparing"
-                                                                    color={item.status === "preparing" ? "orange" : "grey"}
-                                                                    style={{ cursor: "pointer" }}
-                                                                    onClick={() => handleItemStatusChange(order.id, item.item_id, "preparing")}
-                                                                />
-                                                                <FaCheckCircle
-                                                                    title="Served"
-                                                                    color={item.status === "served" ? "green" : "grey"}
-                                                                    style={{ cursor: "pointer" }}
-                                                                    onClick={() => handleItemStatusChange(order.id, item.item_id, "served")}
-                                                                />
-                                                            </div>
-                                                            {/* <button
-                                                                className="delete-item-btn"
-                                                                onClick={() => {
-                                                                    setDeleteItemTarget({ orderId: order.id, itemId: item.item_id });
-                                                                    setShowDeleteItemModal(true);
-                                                                }}
-                                                                title="Delete Item"
-                                                                style={{ marginLeft: "12px", color: "red", cursor: "pointer" }}
-                                                            >
-                                                                <FaTrash />
-                                                            </button> */}
-                                                        </>
-                                                    )}
-                                                    {!isEditing && !isAdding && (
-                                                        <div className="item-measure" style={{ marginLeft: "12px" }}>
-                                                            {item.measure || ""}
-                                                        </div>
-                                                    )}
-                                                </div>
-                                            ))}
+        const orderNewItems = newlyAddedItemsRef.current[order.id];
+        if (!orderNewItems) {
+            console.log(`❌ No newlyAddedItems for order ${order.id}`);
+            return false;
+        }
+
+        const timestamp = orderNewItems[item.unique_key];
+        if (!timestamp) {
+            console.log(`❌ No timestamp for unique_key ${item.unique_key}`);
+            return false;
+        }
+
+        const age = Date.now() - timestamp;
+        const maxAge = 30 * 60 * 1000; // 30 minutes
+
+        if (age > maxAge) {
+            delete newlyAddedItemsRef.current[order.id][item.unique_key];
+            console.log(`⏰ Item ${item.item_name} expired`);
+            return false;
+        }
+
+        console.log(`✅ Item ${item.item_name} is newly added! (age: ${Math.floor(age / 1000)}s)`);
+        return true;
+    };
+
+    const isNewlyAdded = checkIfNewlyAdded();
+
+    return (
+        <div
+            key={item.unique_key || item.item_id || index}
+            className={`item-row ${isNewlyAdded ? "newly-added" : ""}`}
+            style={{
+                alignItems: "center",
+                cursor: isEditing ? "pointer" : "default",
+            }}
+        >
+            <div className="item-name" style={{ flex: 1 }}>
+                {isEditing ? (
+                    <input
+                        value={item.item_name}
+                        onChange={(e) =>
+                            updateItemName(order.id, item.item_id, e.target.value)
+                        }
+                    />
+                ) : (
+                    `${item.quantity}x ${item.item_name || "Unnamed Item"}`
+                )}
+            </div>
+
+            {order.status !== "served" && (
+                <div
+                    className="status-icons"
+                    style={{ display: "flex", gap: "8px", marginLeft: "12px" }}
+                >
+                    {item.status === "served" ? (
+                        <FaCheckCircle
+                            className="served-status spin"
+                            title="Served"
+                            color="green"
+                            style={{ cursor: "default" }}
+                        />
+                    ) : (
+                        <>
+                            <FaClock
+                                className={`pending-status ${item.status === "pending" ? "spin" : ""}`}
+                                title="Pending"
+                                color={item.status === "pending" ? "blue" : "grey"}
+                                style={{ cursor: "pointer" }}
+                                onClick={() =>
+                                    handleItemStatusChange(order.id, item.item_id, "pending")
+                                }
+                            />
+                            <FaHourglassHalf
+                                className={`preparing-status ${item.status === "preparing" ? "spin" : ""}`}
+                                title="Preparing"
+                                color={item.status === "preparing" ? "orange" : "grey"}
+                                style={{ cursor: "pointer" }}
+                                onClick={() =>
+                                    handleItemStatusChange(order.id, item.item_id, "preparing")
+                                }
+                            />
+                            <FaCheckCircle
+                                className={`served-status ${item.status === "served" ? "spin" : ""}`}
+                                title="Served"
+                                color={item.status === "served" ? "green" : "grey"}
+                                style={{ cursor: "pointer" }}
+                                onClick={() =>
+                                    handleItemStatusChange(order.id, item.item_id, "served")
+                                }
+                            />
+                        </>
+                    )}
+                </div>
+            )}
+
+            {!isEditing && !isAdding && (
+                <div className="item-measure" style={{ marginLeft: "12px" }}>
+                    {item.measure || ""}
+                </div>
+            )}
+        </div>
+    );
+})}
+
                                             {isAdding && (
                                                 <div style={{ marginTop: "12px" }}>
                                                     <input
