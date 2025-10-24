@@ -209,11 +209,15 @@ useEffect(() => {
             });
         });
     
-        // ✅ Use ref instead of state
+        // ✅ Store in ref
         if (!newlyAddedItemsRef.current[orderId]) {
             newlyAddedItemsRef.current[orderId] = {};
         }
         newlyAddedItemsRef.current[orderId][uniqueItemKey] = timestamp;
+    
+        // ✅ Store in localStorage for cross-component sync
+        const storageKey = `new_item_${orderId}_${uniqueItemKey}`;
+        localStorage.setItem(storageKey, timestamp.toString());
     
         setTimeout(() => {
             updateOrderItems(orderId, targetItems);
@@ -784,148 +788,168 @@ useEffect(() => {
                                         </div> */}
                                         </div>
                                         <div className="kds-card-body">
-                                        {order.items.map((item, index) => {
-    const checkIfNewlyAdded = () => {
-        if (!item.unique_key) {
-            console.log(`❌ Item ${item.item_name} has NO unique_key`);
-            return false;
+    {order.items.map((item, index) => {
+        const checkIfNewlyAdded = () => {
+            if (!item.unique_key) {
+                return false;
+            }
+
+            const orderNewItems = newlyAddedItemsRef.current[order.id];
+            if (!orderNewItems) {
+                return false;
+            }
+
+            const timestamp = orderNewItems[item.unique_key];
+            if (!timestamp) {
+                // Check localStorage as fallback
+                const storageKey = `new_item_${order.id}_${item.unique_key}`;
+                const storedTimestamp = localStorage.getItem(storageKey);
+                if (storedTimestamp) {
+                    const ts = parseInt(storedTimestamp, 10);
+                    const age = Date.now() - ts;
+                    const maxAge = 30 * 60 * 1000;
+                    return age <= maxAge;
+                }
+                return false;
+            }
+
+            const age = Date.now() - timestamp;
+            const maxAge = 30 * 60 * 1000; // 30 minutes
+
+            if (age > maxAge) {
+                delete newlyAddedItemsRef.current[order.id][item.unique_key];
+                return false;
+            }
+
+            return true;
+        };
+
+        const isNewlyAdded = checkIfNewlyAdded();
+
+        // ✅ Check if we need to show divider (transition from old to new items)
+        let showDivider = false;
+        if (index > 0 && isNewlyAdded) {
+            const prevItem = order.items[index - 1];
+            const prevIsNew = prevItem.unique_key && 
+                (newlyAddedItemsRef.current[order.id]?.[prevItem.unique_key] ||
+                 localStorage.getItem(`new_item_${order.id}_${prevItem.unique_key}`));
+            showDivider = !prevIsNew;
         }
 
-        const orderNewItems = newlyAddedItemsRef.current[order.id];
-        if (!orderNewItems) {
-            console.log(`❌ No newlyAddedItems for order ${order.id}`);
-            return false;
-        }
-
-        const timestamp = orderNewItems[item.unique_key];
-        if (!timestamp) {
-            console.log(`❌ No timestamp for unique_key ${item.unique_key}`);
-            return false;
-        }
-
-        const age = Date.now() - timestamp;
-        const maxAge = 30 * 60 * 1000; // 30 minutes
-
-        if (age > maxAge) {
-            delete newlyAddedItemsRef.current[order.id][item.unique_key];
-            console.log(`⏰ Item ${item.item_name} expired`);
-            return false;
-        }
-
-        console.log(`✅ Item ${item.item_name} is newly added! (age: ${Math.floor(age / 1000)}s)`);
-        return true;
-    };
-
-    const isNewlyAdded = checkIfNewlyAdded();
-
-    return (
-        <div
-            key={item.unique_key || item.item_id || index}
-            className={`item-row ${isNewlyAdded ? "newly-added" : ""}`}
-            style={{
-                alignItems: "center",
-                cursor: isEditing ? "pointer" : "default",
-            }}
-        >
-            <div className="item-name" style={{ flex: 1 }}>
-                {isEditing ? (
-                    <input
-                        value={item.item_name}
-                        onChange={(e) =>
-                            updateItemName(order.id, item.item_id, e.target.value)
-                        }
-                    />
-                ) : (
-                    `${item.quantity}x ${item.item_name || "Unnamed Item"}`
+        return (
+            <React.Fragment key={item.unique_key || item.item_id || index}>
+                {showDivider && (
+                    <div className="kds-item-divider">
+                        <span>Newly Added Items</span>
+                    </div>
                 )}
-            </div>
-
-            {order.status !== "served" && (
                 <div
-                    className="status-icons"
-                    style={{ display: "flex", gap: "8px", marginLeft: "12px" }}
+                    className={`item-row ${isNewlyAdded ? "newly-added" : ""}`}
+                    style={{
+                        alignItems: "center",
+                        cursor: isEditing ? "pointer" : "default",
+                    }}
                 >
-                    {item.status === "served" ? (
-                        <FaCheckCircle
-                            className="served-status spin"
-                            title="Served"
-                            color="green"
-                            style={{ cursor: "default" }}
-                        />
-                    ) : (
-                        <>
-                            <FaClock
-                                className={`pending-status ${item.status === "pending" ? "spin" : ""}`}
-                                title="Pending"
-                                color={item.status === "pending" ? "blue" : "grey"}
-                                style={{ cursor: "pointer" }}
-                                onClick={() =>
-                                    handleItemStatusChange(order.id, item.item_id, "pending")
+                    <div className="item-name" style={{ flex: 1 }}>
+                        {isEditing ? (
+                            <input
+                                value={item.item_name}
+                                onChange={(e) =>
+                                    updateItemName(order.id, item.item_id, e.target.value)
                                 }
                             />
-                            <FaHourglassHalf
-                                className={`preparing-status ${item.status === "preparing" ? "spin" : ""}`}
-                                title="Preparing"
-                                color={item.status === "preparing" ? "orange" : "grey"}
-                                style={{ cursor: "pointer" }}
-                                onClick={() =>
-                                    handleItemStatusChange(order.id, item.item_id, "preparing")
-                                }
-                            />
-                            <FaCheckCircle
-                                className={`served-status ${item.status === "served" ? "spin" : ""}`}
-                                title="Served"
-                                color={item.status === "served" ? "green" : "grey"}
-                                style={{ cursor: "pointer" }}
-                                onClick={() =>
-                                    handleItemStatusChange(order.id, item.item_id, "served")
-                                }
-                            />
-                        </>
+                        ) : (
+                            `${item.quantity}x ${item.item_name || "Unnamed Item"}`
+                        )}
+                    </div>
+
+                    {order.status !== "served" && (
+                        <div
+                            className="status-icons"
+                            style={{ display: "flex", gap: "8px", marginLeft: "12px" }}
+                        >
+                            {item.status === "served" ? (
+                                <FaCheckCircle
+                                    className="served-status spin"
+                                    title="Served"
+                                    color="green"
+                                    style={{ cursor: "default" }}
+                                />
+                            ) : (
+                                <>
+                                    <FaClock
+                                        className={`pending-status ${item.status === "pending" ? "spin" : ""}`}
+                                        title="Pending"
+                                        color={item.status === "pending" ? "blue" : "grey"}
+                                        style={{ cursor: "pointer" }}
+                                        onClick={() =>
+                                            handleItemStatusChange(order.id, item.item_id, "pending")
+                                        }
+                                    />
+                                    <FaHourglassHalf
+                                        className={`preparing-status ${item.status === "preparing" ? "spin" : ""}`}
+                                        title="Preparing"
+                                        color={item.status === "preparing" ? "orange" : "grey"}
+                                        style={{ cursor: "pointer" }}
+                                        onClick={() =>
+                                            handleItemStatusChange(order.id, item.item_id, "preparing")
+                                        }
+                                    />
+                                    <FaCheckCircle
+                                        className={`served-status ${item.status === "served" ? "spin" : ""}`}
+                                        title="Served"
+                                        color={item.status === "served" ? "green" : "grey"}
+                                        style={{ cursor: "pointer" }}
+                                        onClick={() =>
+                                            handleItemStatusChange(order.id, item.item_id, "served")
+                                        }
+                                    />
+                                </>
+                            )}
+                        </div>
+                    )}
+
+                    {!isEditing && !isAdding && (
+                        <div className="item-measure" style={{ marginLeft: "12px" }}>
+                            {item.measure || ""}
+                        </div>
                     )}
                 </div>
-            )}
+            </React.Fragment>
+        );
+    })}
 
-            {!isEditing && !isAdding && (
-                <div className="item-measure" style={{ marginLeft: "12px" }}>
-                    {item.measure || ""}
-                </div>
+    {isAdding && (
+        <div style={{ marginTop: "12px" }}>
+            <input
+                type="text"
+                placeholder="Search inventory items to add..."
+                value={itemSearchQuery}
+                onChange={(e) => setItemSearchQuery(e.target.value)}
+                style={{ width: "100%", padding: "6px" }}
+            />
+            {itemSearchResults.length > 0 && (
+                <ul
+                    style={{ maxHeight: "150px", overflowY: "auto", marginTop: "6px" }}
+                >
+                    {itemSearchResults.map((item) => (
+                        <li
+                            key={item.id}
+                            style={{
+                                cursor: "pointer",
+                                padding: "4px",
+                                borderBottom: "1px solid #ddd",
+                            }}
+                            onClick={() => addItemToOrder(order.id, item)}
+                        >
+                            {item.name} - ₹{item.price}
+                        </li>
+                    ))}
+                </ul>
             )}
         </div>
-    );
-})}
-
-                                            {isAdding && (
-                                                <div style={{ marginTop: "12px" }}>
-                                                    <input
-                                                        type="text"
-                                                        placeholder="Search inventory items to add..."
-                                                        value={itemSearchQuery}
-                                                        onChange={(e) => setItemSearchQuery(e.target.value)}
-                                                        style={{ width: "100%", padding: "6px" }}
-                                                    />
-                                                    {itemSearchResults.length > 0 && (
-                                                        <ul
-                                                            style={{ maxHeight: "150px", overflowY: "auto", marginTop: "6px" }}
-                                                        >
-                                                            {itemSearchResults.map((item) => (
-                                                                <li
-                                                                    key={item.id}
-                                                                    style={{
-                                                                        cursor: "pointer",
-                                                                        padding: "4px",
-                                                                        borderBottom: "1px solid #ddd",
-                                                                    }}
-                                                                    onClick={() => addItemToOrder(order.id, item)}
-                                                                >
-                                                                    {item.name} - ₹{item.price}
-                                                                </li>
-                                                            ))}
-                                                        </ul>
-                                                    )}
-                                                </div>
-                                            )}
-                                        </div>
+    )}
+</div>
                                         {!isAdding && !isEditing && order.status !== "served" && (
                                             <div className="kds-card-footer">
                                                 {order.status === "new" && (
