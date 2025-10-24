@@ -76,10 +76,10 @@ const flattenCategoryTree = (tree, level = 0, parentId = null) => {
     if (!selectedClient || !token) return;
   
     axios.all([
-      axios.get(`${import.meta.env.VITE_API_INVENTORY_SERVICE_URL}/${selectedClient}/inventory/read_category`, {
+      axios.get(`${import.meta.env.VITE_API_INVENTORY_SERVICE_URL}/${selectedClient.id}/inventory/read_category`, {
         headers: { Authorization: `Bearer ${token}` },
       }),
-      axios.get(`${import.meta.env.VITE_API_INVENTORY_SERVICE_URL}/${selectedClient}/inventory/read`, {
+      axios.get(`${import.meta.env.VITE_API_INVENTORY_SERVICE_URL}/${selectedClient.id}/inventory/read`, {
         headers: { Authorization: `Bearer ${token}` },
       }),
     ])
