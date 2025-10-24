@@ -1,4 +1,4 @@
-import React, { useEffect, useState,useRef } from "react";
+import React, { useEffect, useState, useRef } from "react";
 import axios from 'axios';
 import { useParams } from "react-router-dom";
 import { useTheme } from "../../ThemeChangerComponent/ThemeProvider";
@@ -31,7 +31,9 @@ const OrdersVisiblePage = () => {
     const [showInvoiceModal, setShowInvoiceModal] = useState(false);
     const [invoiceOrder, setInvoiceOrder] = useState(null);
     const [tableId, setTableId] = useState(null)
-    const [tables, setTables] = useState([]);const newlyAddedItemsRef = useRef({});
+    const [tables, setTables] = useState([]); const newlyAddedItemsRef = useRef({});
+    const [showOrderDetailModal, setShowOrderDetailModal] = useState(false);
+    const [selectedOrder, setSelectedOrder] = useState(null);
 
     const [newlyAddedItems, setNewlyAddedItems] = useState({});
     useEffect(() => {
@@ -141,9 +143,7 @@ const OrdersVisiblePage = () => {
     const addItemToOrder = (orderId, selectedItem) => {
         console.log("🟢 Adding item to order:", selectedItem);
     
-        let targetItems = [];
         const timestamp = Date.now();
-        const uniqueItemKey = `${selectedItem.id}_${timestamp}`;
     
         setOrders(prevOrders => {
             return prevOrders.map(order => {
@@ -157,32 +157,25 @@ const OrdersVisiblePage = () => {
                     status: "new",
                     note: "",
                     slug: selectedItem.slug || generateSlug(selectedItem.name),
-                    unique_key: uniqueItemKey
+                    added_at_frontend: timestamp, // Mark when it was added
                 };
     
                 const newItems = [...order.items, newItem];
-                targetItems = newItems;
     
                 return {
                     ...order,
-                    items: newItems
+                    items: newItems,
+                    has_new_items: true // Flag to indicate this order has new items
                 };
             });
         });
     
-        // ✅ Store in ref
-        if (!newlyAddedItemsRef.current[orderId]) {
-            newlyAddedItemsRef.current[orderId] = {};
-        }
-        newlyAddedItemsRef.current[orderId][uniqueItemKey] = timestamp;
-    
-        // ✅ ALSO store in localStorage for cross-component sync
-        const storageKey = `new_item_${orderId}_${uniqueItemKey}`;
-        localStorage.setItem(storageKey, timestamp.toString());
-    
-        setTimeout(() => {
-            updateOrderItems(orderId, targetItems);
-        }, 0);
+        // Mark this order as having new items in localStorage
+        const storageKey = `order_${orderId}_has_new_items`;
+        const existingNewItemsCount = parseInt(localStorage.getItem(`order_${orderId}_new_items_count`) || '0');
+        localStorage.setItem(storageKey, 'true');
+        localStorage.setItem(`order_${orderId}_new_items_count`, (existingNewItemsCount + 1).toString());
+        localStorage.setItem(`order_${orderId}_first_new_index`, (existingNewItemsCount === 0 ? 'pending' : localStorage.getItem(`order_${orderId}_first_new_index`)));
     
         setItemSearchQuery("");
         setItemSearchResults([]);
@@ -233,32 +226,50 @@ const OrdersVisiblePage = () => {
                 });
     
                 const allOrders = res.data?.data || [];
-                // const today = new Date();
-                // const todayString = today.toLocaleDateString("en-CA");
     
-                // const todayOrders = allOrders.filter(order => {
-                //     const orderDate = new Date(order.created_at || order.createdAt)
-                //         .toLocaleDateString("en-CA");
-                //     return orderDate === todayString ;
-                // });
-
-                // ✅ Preserve unique_key on refresh
+                // Preserve frontend-only fields and check localStorage
                 setOrders(prevOrders => {
                     return allOrders.map(newOrder => {
                         const prevOrder = prevOrders.find(o => o.id === newOrder.id);
-                        if (!prevOrder) return newOrder;
+                        
+                        // Check if this order has new items flag in localStorage
+                        const hasNewItemsInStorage = localStorage.getItem(`order_${newOrder.id}_has_new_items`) === 'true';
+                        const newItemsCount = parseInt(localStorage.getItem(`order_${newOrder.id}_new_items_count`) || '0');
+                        
+                        // If order is served, clear the new items flag
+                        if (newOrder.status === 'served') {
+                            localStorage.removeItem(`order_${newOrder.id}_has_new_items`);
+                            localStorage.removeItem(`order_${newOrder.id}_new_items_count`);
+                            localStorage.removeItem(`order_${newOrder.id}_first_new_index`);
+                            return newOrder;
+                        }
     
-                        const mergedItems = newOrder.items.map(newItem => {
-                            const prevItem = prevOrder.items.find(
-                                pi => (pi.id && pi.id === newItem.id) || 
-                                      (pi.item_id === newItem.item_id && pi.quantity === newItem.quantity)
-                            );
-                            return prevItem?.unique_key 
-                                ? { ...newItem, unique_key: prevItem.unique_key }
-                                : newItem;
-                        });
+                        // Merge items with frontend flags
+                        let mergedItems = newOrder.items;
+                        if (prevOrder && prevOrder.items) {
+                            mergedItems = newOrder.items.map((newItem, idx) => {
+                                const prevItem = prevOrder.items.find(
+                                    pi => pi.id === newItem.id || 
+                                          (pi.item_id === newItem.item_id && !pi.id && !newItem.id)
+                                );
+                                
+                                // Preserve frontend timestamp
+                                if (prevItem?.added_at_frontend) {
+                                    return { ...newItem, added_at_frontend: prevItem.added_at_frontend };
+                                }
+                                return newItem;
+                            });
+                        }
     
-                        return { ...newOrder, items: mergedItems };
+                        // Calculate the divider position (count of old items)
+                        const oldItemsCount = mergedItems.length - newItemsCount;
+    
+                        return { 
+                            ...newOrder, 
+                            items: mergedItems,
+                            has_new_items: hasNewItemsInStorage,
+                            new_items_start_index: oldItemsCount > 0 ? oldItemsCount : null
+                        };
                     });
                 });
     
@@ -272,7 +283,7 @@ const OrdersVisiblePage = () => {
         fetchOrders();
         const interval = setInterval(fetchOrders, 10000);
         return () => clearInterval(interval);
-    }, [clientId, token]); // ✅ No orders dependency
+    }, [clientId, token]);
 
     // Only one expanded order at a time
     const toggleExpand = (index) => {
@@ -289,46 +300,46 @@ const OrdersVisiblePage = () => {
             setServedClickCountMap((prev) => ({ ...prev, [orderId]: 0 }));
         }
     };
-// Add this in both OrdersVisiblePage.jsx and KitchenDisplay.jsx
-useEffect(() => {
-    const cleanupInterval = setInterval(() => {
-        const keysToRemove = [];
-        const maxAge = 30 * 60 * 1000; // 30 minutes
-        
-        for (let i = 0; i < localStorage.length; i++) {
-            const key = localStorage.key(i);
-            if (key && key.startsWith('new_item_')) {
-                const timestamp = parseInt(localStorage.getItem(key), 10);
-                const age = Date.now() - timestamp;
-                
-                if (age > maxAge) {
-                    keysToRemove.push(key);
-                    
-                    // Also remove from ref
-                    const parts = key.replace('new_item_', '').split('_');
-                    if (parts.length >= 3) {
-                        const orderId = parseInt(parts[0], 10);
-                        const uniqueKey = parts.slice(1).join('_');
-                        
-                        if (newlyAddedItemsRef.current[orderId]) {
-                            delete newlyAddedItemsRef.current[orderId][uniqueKey];
+    // Add this in both OrdersVisiblePage.jsx and KitchenDisplay.jsx
+    useEffect(() => {
+        const cleanupInterval = setInterval(() => {
+            const keysToRemove = [];
+            const maxAge = 30 * 60 * 1000; // 30 minutes
+
+            for (let i = 0; i < localStorage.length; i++) {
+                const key = localStorage.key(i);
+                if (key && key.startsWith('new_item_')) {
+                    const timestamp = parseInt(localStorage.getItem(key), 10);
+                    const age = Date.now() - timestamp;
+
+                    if (age > maxAge) {
+                        keysToRemove.push(key);
+
+                        // Also remove from ref
+                        const parts = key.replace('new_item_', '').split('_');
+                        if (parts.length >= 3) {
+                            const orderId = parseInt(parts[0], 10);
+                            const uniqueKey = parts.slice(1).join('_');
+
+                            if (newlyAddedItemsRef.current[orderId]) {
+                                delete newlyAddedItemsRef.current[orderId][uniqueKey];
+                            }
                         }
                     }
                 }
             }
-        }
-        
-        keysToRemove.forEach(key => localStorage.removeItem(key));
-    }, 60000); // Check every minute
-    
-    return () => clearInterval(cleanupInterval);
-}, []);
+
+            keysToRemove.forEach(key => localStorage.removeItem(key));
+        }, 60000); // Check every minute
+
+        return () => clearInterval(cleanupInterval);
+    }, []);
     const handleStatusChange = async (orderId, newStatus) => {
         const order = orders.find((o) => o.id === orderId);
         if (!order || order.status === "served") return;
-
+    
         const tableObj = tables.find((t) => t.id === order.table_id);
-
+    
         try {
             // Update order status in order service
             await axios.post(
@@ -336,29 +347,43 @@ useEffect(() => {
                 { id: orderId, client_id: clientId, status: newStatus },
                 { headers: { Authorization: `Bearer ${token}` } }
             );
-
-            // If served, free the table
-            if (newStatus === "served" && tableObj) {
-                await axios.post(
-                    `${import.meta.env.VITE_API_TABLE_SERVICE_URL}/${clientId}/tables/update`,
-                    {
-                        id: order.table_id,
-                        client_id: clientId,
-                        name: tableObj.name,
-                        table_type: tableObj.table_type,
-                        status: "Vacant",
-                        location_zone: tableObj.location_zone,
-                    },
-                    { headers: { Authorization: `Bearer ${token}` } }
-                );
+    
+            // If served, free the table AND clear new items flags
+            if (newStatus === "served") {
+                localStorage.removeItem(`order_${orderId}_has_new_items`);
+                localStorage.removeItem(`order_${orderId}_new_items_count`);
+                localStorage.removeItem(`order_${orderId}_first_new_index`);
+                
+                if (tableObj) {
+                    await axios.post(
+                        `${import.meta.env.VITE_API_TABLE_SERVICE_URL}/${clientId}/tables/update`,
+                        {
+                            id: order.table_id,
+                            client_id: clientId,
+                            name: tableObj.name,
+                            table_type: tableObj.table_type,
+                            status: "Vacant",
+                            location_zone: tableObj.location_zone,
+                        },
+                        { headers: { Authorization: `Bearer ${token}` } }
+                    );
+                }
             }
-
-            // Update UI state orders as before
+    
             toast.success("Order status updated");
             setOrders((prev) =>
-                prev.map((o) => (o.id === orderId ? { ...o, status: newStatus } : o))
+                prev.map((o) => (o.id === orderId ? { ...o, status: newStatus, has_new_items: newStatus === 'served' ? false : o.has_new_items } : o))
             );
-
+    
+            // Update selectedOrder if modal is open
+            if (selectedOrder?.id === orderId) {
+                setSelectedOrder(prev => ({
+                    ...prev,
+                    status: newStatus,
+                    has_new_items: newStatus === 'served' ? false : prev.has_new_items
+                }));
+            }
+    
             if (newStatus === "served") setEditOrderId(null);
         } catch (error) {
             toast.error("❌ Failed to update order status.");
@@ -654,7 +679,8 @@ useEffect(() => {
                                                 className="orders-visible-expand-btn"
                                                 onClick={(e) => {
                                                     e.stopPropagation();
-                                                    toggleExpand(index);
+                                                    setSelectedOrder(order);
+                                                    setShowOrderDetailModal(true);
                                                 }}
                                             >
                                                 <span className={`orders-visible-arrow-icon${expandedOrderIndex === index ? " " : "up"}`}>
@@ -663,184 +689,246 @@ useEffect(() => {
                                             </button>
                                         </div>
 
-                                        <div
-                                            className="orders-visible-card-expand-section"
-                                            style={{
-                                                display: expandedOrderIndex === index ? "block" : "none",
-                                            }}
-                                            onClick={(e) => e.stopPropagation()}
-                                        >
-                                            <div className="orders-visible-expanded-info">
-                                                <span>Date: {new Date(order.created_at).toLocaleDateString()}</span>
-                                                <span>
-                                                    Total: ₹{order.items.reduce(
-                                                        (sum, item) =>
-                                                            sum +
-                                                            ((inventoryMap[item.item_id]?.unit_price || item.unit_price || item.price || 0) * (item.quantity || 1))
-                                                        ,
-                                                        0
-                                                    ).toFixed(2)}
-                                                </span>
-                                            </div>
-                                            <div className="orders-visible-items-preview">
-                                                {editOrderId === order.id ? (
-                                                    <div className="orders-visible-edit-panel">
-                                                        <div className="orders-visible-edit-items-list">
-                                                            {order.items.map((item, idx) => (
-                                                                <div key={idx} className="orders-visible-edit-item-row">
-                                                                    <span>{item.item_name || item.item_id}</span>
-                                                                    <div className="orders-visible-edit-qty-controls">
-                                                                        <button
-                                                                            onClick={() => updateItemQuantity(order.id, item.item_id, item.quantity - 1)}
-                                                                            disabled={item.quantity <= 1}
-                                                                        >
-                                                                            −
-                                                                        </button>
-                                                                        <span>{item.quantity}</span>
-                                                                        <button onClick={() => updateItemQuantity(order.id, item.item_id, item.quantity + 1)}>+</button>
-                                                                    </div>
-                                                                    <button
-                                                                        className="orders-visible-btn orders-visible-edit-delete-btn"
-                                                                        onClick={() => {
-                                                                            setDeleteTarget({ orderId: order.id, itemBackendId: item.id }); // ✅ CORRECT
-                                                                            setShowDeleteModals(true);
-                                                                        }}
-                                                                        disabled={item.status === "cancelled"}
-                                                                    >
-                                                                        Delete
-                                                                    </button>
-                                                                </div>
-                                                            ))}
-                                                        </div>
-                                                        <div className="orders-visible-add-item-row">
-                                                            <input
-                                                                type="text"
-                                                                className="orders-visible-item-search"
-                                                                placeholder="Search item to add..."
-                                                                value={itemSearchQuery}
-                                                                onChange={(e) => setItemSearchQuery(e.target.value)}
-                                                            />
-                                                            {itemSearchResults.length > 0 && (
-                                                                <ul className="orders-visible-search-results">
-                                                                    {itemSearchResults.map((item) => (
-                                                                        <li key={item.id} onClick={() => addItemToOrder(order.id, item)}>
-                                                                            {item.name} - ₹{item.unit_price}
-                                                                        </li>
-                                                                    ))}
-                                                                </ul>
-                                                            )}
-                                                        </div>
-                                                        <div className="orders-visible-save-row">
-                                                            <button className="orders-visible-btn orders-visible-save-btn" onClick={() => updateOrderItems(order.id, order.items)}>
-                                                                Save Items
-                                                            </button>
-                                                        </div>
-                                                    </div>
-                                                ) : (
-                                                    order.items.map((item, idx) => (
-                                                        <div key={idx} className="orders-visible-item-row">
-                                                            <span>{item.item_name || item.item_id}</span>
-                                                            <span>Qty: {item.quantity}</span>
-                                                        </div>
-                                                    ))
-                                                )}
-                                            </div>
 
-
-                                            <div className="orders-visible-expanded-actions">
-
-
-                                                {editOrderId === order.id ? (
-                                                    <button
-                                                        className="orders-visible-btn orders-visible-edit-btn active"
-                                                        onClick={() => setEditOrderId(prev => (prev === order.id ? null : order.id))}
-                                                    >
-                                                        Done Editing
-                                                    </button>
-                                                ) : (
-                                                    <button className="orders-visible-btn orders-visible-edit-btn" onClick={() => setEditOrderId(order.id)}>
-                                                        Edit
-                                                    </button>
-                                                )}
-                                                <button
-                                                    className="orders-visible-btn orders-visible-served-btn"
-                                                    disabled={order.status === "served"}
-                                                    onClick={() => handleStatusChange(order.id, "served")}
-                                                >
-                                                    Served
-                                                </button>
-                                                <button
-                                                    className="orders-visible-btn orders-visible-delete-btn"
-                                                    onClick={() => {
-                                                        setOrderToDelete(order.id);
-                                                        setShowDeleteModal(true);
-                                                    }}
-                                                >
-                                                    Delete
-                                                </button>
-                                            </div>
-                                            {/* {editOrderId === order.id && (
-                                                <div className="orders-visible-edit-panel">
-                                                    <div className="orders-visible-edit-items-list">
-                                                        {order.items.map((item, idx) => (
-                                                            <div key={idx} className="orders-visible-edit-item-row">
-                                                                <span>{item.item_name || item.item_id}</span>
-                                                                <div className="orders-visible-edit-qty-controls">
-                                                                    <button
-                                                                        onClick={() => updateItemQuantity(order.id, item.item_id, item.quantity - 1)}
-                                                                        disabled={item.quantity <= 1}
-                                                                    >
-                                                                        −
-                                                                    </button>
-                                                                    <span>{item.quantity}</span>
-                                                                    <button onClick={() => updateItemQuantity(order.id, item.item_id, item.quantity + 1)}>+</button>
-                                                                </div>
-                                                                <button
-                                                                    className="orders-visible-btn orders-visible-edit-delete-btn"
-                                                                    onClick={() => {
-                                                                        setDeleteTarget({ orderId: order.id, itemId: item.item_id });
-                                                                        setShowDeleteModals(true);
-                                                                    }}
-                                                                    disabled={item.status === "cancelled"}
-                                                                >
-                                                                    Delete
-                                                                </button>
-                                                            </div>
-                                                        ))}
-                                                    </div>
-                                                    <div className="orders-visible-add-item-row">
-                                                        <input
-                                                            type="text"
-                                                            className="orders-visible-item-search"
-                                                            placeholder="Search item to add..."
-                                                            value={itemSearchQuery}
-                                                            onChange={(e) => setItemSearchQuery(e.target.value)}
-                                                        />
-                                                        {itemSearchResults.length > 0 && (
-                                                            <ul className="orders-visible-search-results">
-                                                                {itemSearchResults.map((item) => (
-                                                                    <li key={item.id} onClick={() => addItemToOrder(order.id, item)}>
-                                                                        {item.name} - ₹{item.unit_price}
-                                                                    </li>
-                                                                ))}
-                                                            </ul>
-                                                        )}
-                                                    </div>
-                                                    <div className="orders-visible-save-row">
-                                                        <button className="orders-visible-btn orders-visible-save-btn" onClick={() => updateOrderItems(order.id, order.items)}>
-                                                            Save Items
-                                                        </button>
-                                                    </div>
-                                                </div>
-                                            )} */}
-                                        </div>
                                     </div>
                                 );
                             })
                         )}
                     </div>
                 )}
+                {showOrderDetailModal && selectedOrder && (
+                    <div className="orders-visible-modal-overlay" onClick={() => setShowOrderDetailModal(false)}>
+                        <div className="orders-detail-popup" onClick={(e) => e.stopPropagation()}>
+                            {/* Left Side - Available Items */}
+                            <div className="orders-detail-left">
+                                <h3>Available Items</h3>
+                                <input
+                                    type="text"
+                                    className="orders-visible-item-search"
+                                    placeholder="Search items..."
+                                    value={itemSearchQuery}
+                                    onChange={(e) => setItemSearchQuery(e.target.value)}
+                                />
+                                <div className="orders-detail-items-list">
+                                    {itemSearchResults.length > 0 ? (
+                                        <ul className="orders-visible-search-results">
+                                            {itemSearchResults.map((item) => (
+                                                <li key={item.id} onClick={() => {
+                                                    addItemToOrder(selectedOrder.id, item);
+                                                    setSelectedOrder(prev => ({
+                                                        ...prev,
+                                                        items: [...prev.items, {
+                                                            item_id: item.id,
+                                                            item_name: item.name,
+                                                            quantity: 1,
+                                                            price: item.unit_price,
+                                                            status: "new",
+                                                        }]
+                                                    }));
+                                                }}>
+                                                    <span>{item.name}</span>
+                                                    <span>₹{item.unit_price}</span>
+                                                </li>
+                                            ))}
+                                        </ul>
+                                    ) : (
+                                        <div className="orders-detail-all-items">
+                                            {allInventoryItems.map((item) => (
+                                                <div
+                                                    key={item.id}
+                                                    className="orders-detail-item-card"
+                                                    onClick={() => {
+                                                        addItemToOrder(selectedOrder.id, item);
+                                                        setSelectedOrder(prev => ({
+                                                            ...prev,
+                                                            items: [...prev.items, {
+                                                                item_id: item.id,
+                                                                item_name: item.name,
+                                                                quantity: 1,
+                                                                price: item.unit_price,
+                                                                status: "new",
+                                                            }]
+                                                        }));
+                                                    }}
+                                                >
+                                                    <span>{item.name}</span>
+                                                    <span>₹{item.unit_price}</span>
+                                                </div>
+                                            ))}
+                                        </div>
+                                    )}
+                                </div>
+                            </div>
 
+                            {/* Right Side - Order Details */}
+                            <div className="orders-detail-right">
+                                <div className="orders-detail-header">
+                                    <button
+                                        className="orders-detail-close"
+                                        onClick={() => setShowOrderDetailModal(false)}
+                                    >
+                                        ×
+                                    </button>
+                                    <h2>{tablesMap[selectedOrder.table_id] || selectedOrder.table_id}</h2>
+                                    <span className="orders-visible-items-count">
+                                        {selectedOrder.items.length} items
+                                    </span>
+                                    <button
+                                        className="orders-visible-invoice-btn"
+                                        onClick={() => openInvoiceModal(selectedOrder)}
+                                    >
+                                        Invoice
+                                    </button>
+                                </div>
+
+                                <div className="orders-detail-info">
+                                    <span>Date: {new Date(selectedOrder.created_at).toLocaleDateString()}</span>
+                                    <span>
+                                        Total: ₹{selectedOrder.items.reduce(
+                                            (sum, item) =>
+                                                sum + ((inventoryMap[item.item_id]?.unit_price || item.unit_price || item.price || 0) * (item.quantity || 1)),
+                                            0
+                                        ).toFixed(2)}
+                                    </span>
+                                </div>
+                                <div className="orders-detail-items">
+    {editOrderId === selectedOrder.id ? (
+        <div className="orders-visible-edit-items-list">
+            {selectedOrder.items.map((item, idx) => {
+                // Show divider only at the transition point (once)
+                const showDivider = selectedOrder.has_new_items && 
+                                   selectedOrder.new_items_start_index !== null &&
+                                   idx === selectedOrder.new_items_start_index;
+
+                return (
+                    <React.Fragment key={item.id || idx}>
+                        {showDivider && (
+                            <div className="orders-item-divider">
+                                <span>Newly Added Items</span>
+                            </div>
+                        )}
+                        <div className="orders-visible-edit-item-row">
+                            <span>{item.item_name || item.item_id}</span>
+                            <div className="orders-visible-edit-qty-controls">
+                                <button
+                                    onClick={() => {
+                                        updateItemQuantity(selectedOrder.id, item.item_id, item.quantity - 1);
+                                        setSelectedOrder(prev => ({
+                                            ...prev,
+                                            items: prev.items.map(i => 
+                                                i.id === item.id
+                                                    ? {...i, quantity: Math.max(1, i.quantity - 1)}
+                                                    : i
+                                            )
+                                        }));
+                                    }}
+                                    disabled={item.quantity <= 1}
+                                >
+                                    −
+                                </button>
+                                <span>{item.quantity}</span>
+                                <button onClick={() => {
+                                    updateItemQuantity(selectedOrder.id, item.item_id, item.quantity + 1);
+                                    setSelectedOrder(prev => ({
+                                        ...prev,
+                                        items: prev.items.map(i => 
+                                            i.id === item.id
+                                                ? {...i, quantity: i.quantity + 1}
+                                                : i
+                                        )
+                                    }));
+                                }}>+</button>
+                            </div>
+                            <button
+                                className="orders-visible-btn orders-visible-edit-delete-btn"
+                                onClick={() => {
+                                    setDeleteTarget({ orderId: selectedOrder.id, itemBackendId: item.id });
+                                    setShowDeleteModals(true);
+                                }}
+                                disabled={item.status === "cancelled"}
+                            >
+                                Delete
+                            </button>
+                        </div>
+                    </React.Fragment>
+                );
+            })}
+        </div>
+    ) : (
+        selectedOrder.items.map((item, idx) => {
+            // Show divider only at the transition point (once)
+            const showDivider = selectedOrder.has_new_items && 
+                               selectedOrder.new_items_start_index !== null &&
+                               idx === selectedOrder.new_items_start_index;
+
+            return (
+                <React.Fragment key={item.id || idx}>
+                    {showDivider && (
+                        <div className="orders-item-divider">
+                            <span>Newly Added Items</span>
+                        </div>
+                    )}
+                    <div className="orders-visible-item-row">
+                        <span>{item.item_name || item.item_id}</span>
+                        <span>Qty: {item.quantity}</span>
+                    </div>
+                </React.Fragment>
+            );
+        })
+    )}
+</div>
+
+                                <div className="orders-detail-actions">
+                                    {editOrderId === selectedOrder.id ? (
+                                        <>
+                                            <button
+                                                className="orders-visible-btn orders-visible-save-btn"
+                                                onClick={() => {
+                                                    updateOrderItems(selectedOrder.id, selectedOrder.items);
+                                                }}
+                                            >
+                                                Save Items
+                                            </button>
+                                            <button
+                                                className="orders-visible-btn orders-visible-edit-btn active"
+                                                onClick={() => setEditOrderId(null)}
+                                            >
+                                                Done Editing
+                                            </button>
+                                        </>
+                                    ) : (
+                                        <button
+                                            className="orders-visible-btn orders-visible-edit-btn"
+                                            onClick={() => setEditOrderId(selectedOrder.id)}
+                                        >
+                                            Edit
+                                        </button>
+                                    )}
+                                    <button
+                                        className="orders-visible-btn orders-visible-served-btn"
+                                        disabled={selectedOrder.status === "served"}
+                                        onClick={() => {
+                                            handleStatusChange(selectedOrder.id, "served");
+                                            setShowOrderDetailModal(false);
+                                        }}
+                                    >
+                                        Served
+                                    </button>
+                                    <button
+                                        className="orders-visible-btn orders-visible-delete-btn"
+                                        onClick={() => {
+                                            setOrderToDelete(selectedOrder.id);
+                                            setShowDeleteModal(true);
+                                            setShowOrderDetailModal(false);
+                                        }}
+                                    >
+                                        Delete
+                                    </button>
+                                </div>
+                            </div>
+                        </div>
+                    </div>
+                )}
                 {showDeleteModals && deleteTarget && (
                     <div className="orders-visible-modal-overlay">
                         <div className="orders-visible-modal orders-visible-delete-modal">

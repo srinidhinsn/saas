@@ -187,7 +187,7 @@ const SaasClientRoutes = ({
               <Route path="role-config" element={<RoleConfig />} />
               <Route path="/billing" element={<BillingPage />} />
               <Route path="add-users" element={<Add_user />} />
-              <Route path="client-details" element={<ClientDetails />} />
+              <Route path="client-details" element={<ClientDetails selectedRealm={selectedRealm} />} />
               <Route path="*" element={<Navigate to="/" />} />
             </Routes>
           )}

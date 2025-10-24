@@ -317,7 +317,7 @@ const OrderForm = ({ table, onOrderCreated }) => {
 
 
                 <div className="table-meta">
-                    {mode === "Dine In" ? (
+                    {/* {mode === "Dine In" ? (
                         <div
                             className="table-id clickable"
                             title="Click to change table"
@@ -353,7 +353,7 @@ const OrderForm = ({ table, onOrderCreated }) => {
 
                     ) : (
                         <div className="table-id">Order #{Math.floor(Math.random() * 9000 + 1000)}</div>
-                    )}
+                    )} */}
                     <div className="zone-type">
                         {(mode === "Delivery" || mode === "Pick Up") ? "Charges Apply" : (selectedTable?.type || "Non AC")}
                     </div>
