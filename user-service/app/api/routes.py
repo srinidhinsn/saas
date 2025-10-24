@@ -13,7 +13,7 @@ from utils.send_email_otp import otpEmailService, otp_store
 from utils.create_notification import  get_template_body, render_template
 import random
 from datetime import datetime, timedelta
-from app.services.add_users import create_user_and_person,getting_screen_id
+from services.add_users import create_user_and_person,getting_screen_id
 from jose import jwt
 
 router = APIRouter()
