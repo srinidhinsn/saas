@@ -85,7 +85,7 @@ const Navbar = () => {
                     </ClickSpark>
                     <ClickSpark>
                         <li title="Table Selection" onClick={() => go('/view-tables')} className={isActive('/main/view-tables') ? 'page-active' : ''}>
-                            <FaTableCells /><span>Table Selection</span>
+                            <FaTableCells /><span>Place an Order</span>
                             {!isActive('/main/view-tables') && <span className="arrow-indicator"><MdKeyboardArrowRight /></span>}
                         </li>
                     </ClickSpark>
