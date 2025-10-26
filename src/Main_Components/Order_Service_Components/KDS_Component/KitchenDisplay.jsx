@@ -74,82 +74,70 @@ const KitchenDisplay = () => {
             .catch(() => toast.error("Failed to fetch inventory items"));
     }, [clientId, token]);
 
-  // Fetch today's orders
-// Fetch today's orders
-useEffect(() => {
-    const fetchOrders = async () => {
-        if (!token || !clientId) {
-            setLoading(false);
-            return;
-        }
-        try {
-            const res = await axios.get(`${import.meta.env.VITE_API_ORDER_SERVICE_URL}/${clientId}/dinein/table`, {
-                headers: { Authorization: `Bearer ${token}` },
-            });
-
-            const allOrders = res.data?.data || [];
-            const today = new Date();
-            const todayString = today.toLocaleDateString("en-CA");
-
-            const todayOrders = allOrders.filter(order => {
-                const orderDate = new Date(order.created_at || order.createdAt)
-                    .toLocaleDateString("en-CA");
-                return orderDate === todayString && order.status !== "served";
-            });
-
-            // ✅ NEW: Attach unique_key from localStorage to backend items
-            const ordersWithUniqueKeys = todayOrders.map(order => {
-                const enhancedItems = order.items.map(item => {
-                    // Check all localStorage keys for this order
-                    for (let i = 0; i < localStorage.length; i++) {
-                        const key = localStorage.key(i);
-                        if (key && key.startsWith(`new_item_${order.id}_`)) {
-                            const timestamp = parseInt(localStorage.getItem(key), 10);
-                            const age = Date.now() - timestamp;
-                            const maxAge = 30 * 60 * 1000; // 30 minutes
-                            
-                            // Skip expired items
-                            if (age > maxAge) continue;
-                            
-                            // Extract unique_key from localStorage key
-                            const uniqueKey = key.replace(`new_item_${order.id}_`, '');
-                            const itemIdFromKey = parseInt(uniqueKey.split('_')[0], 10);
-                            
-                            // Match by item_id
-                            if (itemIdFromKey === item.item_id) {
-                                console.log(`✅ Matched backend item ${item.item_id} with localStorage key: ${uniqueKey}`);
-                                
-                                // Update ref as well
-                                if (!newlyAddedItemsRef.current[order.id]) {
-                                    newlyAddedItemsRef.current[order.id] = {};
-                                }
-                                newlyAddedItemsRef.current[order.id][uniqueKey] = timestamp;
-                                
-                                return { ...item, unique_key: uniqueKey };
-                            }
-                        }
-                    }
-                    
-                    return item;
+    useEffect(() => {
+        const fetchOrders = async () => {
+            if (!token || !clientId) {
+                setLoading(false);
+                return;
+            }
+            try {
+                const res = await axios.get(`${import.meta.env.VITE_API_ORDER_SERVICE_URL}/${clientId}/dinein/table`, {
+                    headers: { Authorization: `Bearer ${token}` },
                 });
 
-                return { ...order, items: enhancedItems };
-            });
+                const allOrders = res.data?.data || [];
+                const today = new Date();
+                const todayString = today.toLocaleDateString("en-CA");
 
-            setOrders(ordersWithUniqueKeys);
-            console.log('📦 Orders with unique_keys:', ordersWithUniqueKeys);
+                const todayOrders = allOrders.filter(order => {
+                    const orderDate = new Date(order.created_at || order.createdAt)
+                        .toLocaleDateString("en-CA");
+                    return orderDate === todayString && order.status !== "served";
+                });
 
-        } catch {
-            toast.error("Failed to fetch orders");
-        } finally {
-            setLoading(false);
-        }
-    };
+                // ✅ Process orders and restore new items from localStorage (same as OrdersVisiblePage)
+                setOrders(todayOrders.map(order => {
+                    // If order is served, clear localStorage flags
+                    if (order.status === 'served') {
+                        clearNewItemsStorage(order.id);
+                        return order;
+                    }
 
-    fetchOrders();
-    const interval = setInterval(fetchOrders, 10000);
-    return () => clearInterval(interval);
-}, [clientId, token]);
+                    // ✅ Get new items from localStorage
+                    const newItemIds = getNewItemsFromStorage(order.id);
+
+                    if (newItemIds.length === 0) {
+                        return order;
+                    }
+
+                    // ✅ Mark items as new based on localStorage
+                    const processedItems = order.items.map(item => {
+                        const isNew = newItemIds.some(nid => nid.item_id === item.item_id);
+                        return isNew ? { ...item, is_new_item: true } : item;
+                    });
+
+                    // ✅ Calculate divider position
+                    const oldItemsCount = processedItems.filter(i => !i.is_new_item).length;
+
+                    return {
+                        ...order,
+                        items: processedItems,
+                        has_new_items: newItemIds.length > 0,
+                        new_items_start_index: oldItemsCount > 0 ? oldItemsCount : null,
+                    };
+                }));
+
+            } catch {
+                toast.error("Failed to fetch orders");
+            } finally {
+                setLoading(false);
+            }
+        };
+
+        fetchOrders();
+        const interval = setInterval(fetchOrders, 10000);
+        return () => clearInterval(interval);
+    }, [clientId, token]);
 
 
     // Inventory filtering for add item search excluding already added items
@@ -179,15 +167,13 @@ useEffect(() => {
 
     const addItemToOrder = (orderId, selectedItem) => {
         console.log("🟢 Adding item to order:", selectedItem);
-    
-        let targetItems = [];
+
         const timestamp = Date.now();
-        const uniqueItemKey = `${selectedItem.id}_${timestamp}`;
-    
+
         setOrders(prevOrders => {
             return prevOrders.map(order => {
                 if (order.id !== orderId) return order;
-    
+
                 const newItem = {
                     item_id: selectedItem.id,
                     item_name: selectedItem.name,
@@ -196,36 +182,52 @@ useEffect(() => {
                     status: "new",
                     note: "",
                     slug: selectedItem.slug || generateSlug(selectedItem.name),
-                    unique_key: uniqueItemKey
+                    added_at_frontend: timestamp,
+                    is_new_item: true, // ✅ Flag for new item
                 };
-    
+
                 const newItems = [...order.items, newItem];
-                targetItems = newItems;
-    
+
+                // ✅ Calculate where new items start
+                const oldItemsCount = order.items.filter(i => !i.is_new_item).length;
+
                 return {
                     ...order,
-                    items: newItems
+                    items: newItems,
+                    has_new_items: true,
+                    new_items_start_index: oldItemsCount,
                 };
             });
         });
-    
-        // ✅ Store in ref
-        if (!newlyAddedItemsRef.current[orderId]) {
-            newlyAddedItemsRef.current[orderId] = {};
-        }
-        newlyAddedItemsRef.current[orderId][uniqueItemKey] = timestamp;
-    
-        // ✅ Store in localStorage for cross-component sync
-        const storageKey = `new_item_${orderId}_${uniqueItemKey}`;
-        localStorage.setItem(storageKey, timestamp.toString());
-    
+
+        // ✅ Store new item markers in localStorage (SAME FORMAT as OrdersVisiblePage)
+        const storageKey = `order_${orderId}_new_item_${selectedItem.id}_${timestamp}`;
+        localStorage.setItem(storageKey, JSON.stringify({
+            item_id: selectedItem.id,
+            added_at: timestamp,
+        }));
+
+        // Save to backend
         setTimeout(() => {
-            updateOrderItems(orderId, targetItems);
+            const order = orders.find(o => o.id === orderId);
+            if (order) {
+                updateOrderItems(orderId, [...order.items, {
+                    item_id: selectedItem.id,
+                    item_name: selectedItem.name,
+                    quantity: 1,
+                    price: selectedItem.price,
+                    status: "new",
+                    note: "",
+                    slug: selectedItem.slug || generateSlug(selectedItem.name),
+                }]);
+            }
         }, 0);
-    
+
         setItemSearchQuery("");
         setItemSearchResults([]);
     };
+
+
     const updateOrderItems = async (orderId, updatedItemsWithStatuses) => {
         const cleanedItems = updatedItemsWithStatuses.map(item => ({
             item_id: item.item_id || item.inventory_id,
@@ -572,11 +574,8 @@ useEffect(() => {
     // Order status buttons
     const statusButtons = ["pending", "preparing", "served"];
 
-    // Update order status backend and state
     const handleStatusChange = async (orderId, newStatus) => {
         try {
-            // Update order status and items status in backend
-            // First get current order to modify its items
             const order = orders.find(o => o.id === orderId);
             if (!order) return;
 
@@ -617,16 +616,26 @@ useEffect(() => {
                 { headers: { Authorization: `Bearer ${token}` } }
             );
 
+            // ✅ If served, clear new items tracking
+            if (newStatus === "served") {
+                clearNewItemsStorage(orderId);
+            }
+
             // Update local state accordingly
             setOrders(prev =>
                 prev.map(o =>
                     o.id === orderId
-                        ? { ...o, status: newStatus, items: updatedItems, total_price: totalPrice }
+                        ? {
+                            ...o,
+                            status: newStatus,
+                            items: updatedItems,
+                            total_price: totalPrice,
+                            has_new_items: newStatus === 'served' ? false : o.has_new_items,
+                            new_items_start_index: newStatus === 'served' ? null : o.new_items_start_index,
+                        }
                         : o
                 )
             );
-
-            // toast.success("Order and item statuses updated");
 
             // Exit edit/add modes if served
             if (newStatus === "served") {
@@ -638,6 +647,7 @@ useEffect(() => {
             toast.error("Failed to update order status");
         }
     };
+
 
 
     // Delete order confirmation and delete
@@ -658,90 +668,119 @@ useEffect(() => {
         }
     };
 
-useEffect(() => {
-    // Load newly added items from localStorage on mount
-    const loadNewlyAddedItems = () => {
-        const newItems = {};
-        const keysToRemove = [];
-        
-        for (let i = 0; i < localStorage.length; i++) {
-            const key = localStorage.key(i);
-            if (key && key.startsWith('new_item_')) {
-                const timestampStr = localStorage.getItem(key);
-                const timestamp = parseInt(timestampStr, 10);
-                const age = Date.now() - timestamp;
-                const maxAge = 30 * 60 * 1000; // 30 minutes
-                
-                if (age > maxAge) {
-                    keysToRemove.push(key);
-                } else {
-                    // ✅ Parse key: "new_item_{orderId}_{itemId}_{timestamp}"
-                    // Example: "new_item_123_456_1704067200000"
-                    const withoutPrefix = key.replace('new_item_', '');
-                    const firstUnderscoreIndex = withoutPrefix.indexOf('_');
-                    
-                    if (firstUnderscoreIndex !== -1) {
-                        const orderId = parseInt(withoutPrefix.substring(0, firstUnderscoreIndex), 10);
-                        const uniqueKey = withoutPrefix.substring(firstUnderscoreIndex + 1);
-                        
-                        if (!isNaN(orderId)) {
-                            if (!newItems[orderId]) {
-                                newItems[orderId] = {};
-                            }
-                            newItems[orderId][uniqueKey] = timestamp;
-                            console.log(`✅ Loaded: orderId=${orderId}, uniqueKey=${uniqueKey}, timestamp=${timestamp}`);
-                        }
-                    }
-                }
-            }
-        }
-        
-        // Remove expired items
-        keysToRemove.forEach(key => localStorage.removeItem(key));
-        
-        // Update ref
-        newlyAddedItemsRef.current = newItems;
-        console.log('📦 Final loaded items:', newItems);
-    };
-    
-    loadNewlyAddedItems();
-}, []);
+    useEffect(() => {
+        // Load newly added items from localStorage on mount
+        const loadNewlyAddedItems = () => {
+            const newItems = {};
+            const keysToRemove = [];
 
-useEffect(() => {
-    const cleanupInterval = setInterval(() => {
-        const keysToRemove = [];
-        const maxAge = 30 * 60 * 1000; // 30 minutes
-        
-        for (let i = 0; i < localStorage.length; i++) {
-            const key = localStorage.key(i);
-            if (key && key.startsWith('new_item_')) {
-                const timestamp = parseInt(localStorage.getItem(key), 10);
-                const age = Date.now() - timestamp;
-                
-                if (age > maxAge) {
-                    keysToRemove.push(key);
-                    
-                    // Also remove from ref
-                    const withoutPrefix = key.replace('new_item_', '');
-                    const firstUnderscoreIndex = withoutPrefix.indexOf('_');
-                    
-                    if (firstUnderscoreIndex !== -1) {
-                        const orderId = parseInt(withoutPrefix.substring(0, firstUnderscoreIndex), 10);
-                        const uniqueKey = withoutPrefix.substring(firstUnderscoreIndex + 1);
-                        
-                        if (newlyAddedItemsRef.current[orderId]) {
-                            delete newlyAddedItemsRef.current[orderId][uniqueKey];
+            for (let i = 0; i < localStorage.length; i++) {
+                const key = localStorage.key(i);
+                if (key && key.startsWith('new_item_')) {
+                    const timestampStr = localStorage.getItem(key);
+                    const timestamp = parseInt(timestampStr, 10);
+                    const age = Date.now() - timestamp;
+                    const maxAge = 30 * 60 * 1000; // 30 minutes
+
+                    if (age > maxAge) {
+                        keysToRemove.push(key);
+                    } else {
+                        // ✅ Parse key: "new_item_{orderId}_{itemId}_{timestamp}"
+                        // Example: "new_item_123_456_1704067200000"
+                        const withoutPrefix = key.replace('new_item_', '');
+                        const firstUnderscoreIndex = withoutPrefix.indexOf('_');
+
+                        if (firstUnderscoreIndex !== -1) {
+                            const orderId = parseInt(withoutPrefix.substring(0, firstUnderscoreIndex), 10);
+                            const uniqueKey = withoutPrefix.substring(firstUnderscoreIndex + 1);
+
+                            if (!isNaN(orderId)) {
+                                if (!newItems[orderId]) {
+                                    newItems[orderId] = {};
+                                }
+                                newItems[orderId][uniqueKey] = timestamp;
+                                console.log(`✅ Loaded: orderId=${orderId}, uniqueKey=${uniqueKey}, timestamp=${timestamp}`);
+                            }
                         }
                     }
                 }
             }
+
+            // Remove expired items
+            keysToRemove.forEach(key => localStorage.removeItem(key));
+
+            // Update ref
+            newlyAddedItemsRef.current = newItems;
+            console.log('📦 Final loaded items:', newItems);
+        };
+
+        loadNewlyAddedItems();
+    }, []);
+
+    useEffect(() => {
+        const cleanupInterval = setInterval(() => {
+            const keysToRemove = [];
+            const maxAge = 30 * 60 * 1000; // 30 minutes
+
+            for (let i = 0; i < localStorage.length; i++) {
+                const key = localStorage.key(i);
+                if (key && key.startsWith('new_item_')) {
+                    const timestamp = parseInt(localStorage.getItem(key), 10);
+                    const age = Date.now() - timestamp;
+
+                    if (age > maxAge) {
+                        keysToRemove.push(key);
+
+                        // Also remove from ref
+                        const withoutPrefix = key.replace('new_item_', '');
+                        const firstUnderscoreIndex = withoutPrefix.indexOf('_');
+
+                        if (firstUnderscoreIndex !== -1) {
+                            const orderId = parseInt(withoutPrefix.substring(0, firstUnderscoreIndex), 10);
+                            const uniqueKey = withoutPrefix.substring(firstUnderscoreIndex + 1);
+
+                            if (newlyAddedItemsRef.current[orderId]) {
+                                delete newlyAddedItemsRef.current[orderId][uniqueKey];
+                            }
+                        }
+                    }
+                }
+            }
+
+            keysToRemove.forEach(key => localStorage.removeItem(key));
+        }, 60000); // Check every minute
+
+        return () => clearInterval(cleanupInterval);
+    }, []);
+
+
+    const getNewItemsFromStorage = (orderId) => {
+        const newItems = [];
+        for (let i = 0; i < localStorage.length; i++) {
+            const key = localStorage.key(i);
+            if (key && key.startsWith(`order_${orderId}_new_item_`)) {
+                try {
+                    const data = JSON.parse(localStorage.getItem(key));
+                    newItems.push(data);
+                } catch (e) {
+                    console.error("Error parsing localStorage item:", e);
+                }
+            }
         }
-        
+        return newItems;
+    };
+
+    const clearNewItemsStorage = (orderId) => {
+        const keysToRemove = [];
+        for (let i = 0; i < localStorage.length; i++) {
+            const key = localStorage.key(i);
+            if (key && key.startsWith(`order_${orderId}_new_item_`)) {
+                keysToRemove.push(key);
+            }
+        }
         keysToRemove.forEach(key => localStorage.removeItem(key));
-    }, 60000); // Check every minute
-    
-    return () => clearInterval(cleanupInterval);
-}, []);
+    };
+
     return (
         <div className="KDS-Container">
             <>
@@ -788,168 +827,126 @@ useEffect(() => {
                                         </div> */}
                                         </div>
                                         <div className="kds-card-body">
-    {order.items.map((item, index) => {
-        const checkIfNewlyAdded = () => {
-            if (!item.unique_key) {
-                return false;
-            }
+                                            {order.items.map((item, idx) => {
+                                                // ✅ Show divider only at the transition point (once)
+                                                const showDivider = order.has_new_items &&
+                                                    order.new_items_start_index !== null &&
+                                                    idx === order.new_items_start_index;
 
-            const orderNewItems = newlyAddedItemsRef.current[order.id];
-            if (!orderNewItems) {
-                return false;
-            }
+                                                return (
+                                                    <React.Fragment key={item.id || idx}>
+                                                        {showDivider && (
+                                                            <div className="kds-item-divider">
+                                                                <span>Newly Added Items</span>
+                                                            </div>
+                                                        )}
 
-            const timestamp = orderNewItems[item.unique_key];
-            if (!timestamp) {
-                // Check localStorage as fallback
-                const storageKey = `new_item_${order.id}_${item.unique_key}`;
-                const storedTimestamp = localStorage.getItem(storageKey);
-                if (storedTimestamp) {
-                    const ts = parseInt(storedTimestamp, 10);
-                    const age = Date.now() - ts;
-                    const maxAge = 30 * 60 * 1000;
-                    return age <= maxAge;
-                }
-                return false;
-            }
+                                                        <div
+                                                            className={`item-row ${item.is_new_item ? "newly-added" : ""}`}
+                                                            style={{
+                                                                alignItems: "center",
+                                                                cursor: isEditing ? "pointer" : "default",
+                                                            }}
+                                                        >
+                                                            <div className="item-name" style={{ flex: 1 }}>
+                                                                {isEditing ? (
+                                                                    <input
+                                                                        value={item.item_name}
+                                                                        onChange={(e) =>
+                                                                            updateItemName(order.id, item.item_id, e.target.value)
+                                                                        }
+                                                                    />
+                                                                ) : (
+                                                                    `${item.quantity}x ${item.item_name || "Unnamed Item"}`
+                                                                )}
+                                                            </div>
 
-            const age = Date.now() - timestamp;
-            const maxAge = 30 * 60 * 1000; // 30 minutes
+                                                            {order.status !== "served" && (
+                                                                <div
+                                                                    className="status-icons"
+                                                                    style={{ display: "flex", gap: "8px", marginLeft: "12px" }}
+                                                                >
+                                                                    {item.status === "served" ? (
+                                                                        <FaCheckCircle
+                                                                            className="served-status spin"
+                                                                            title="Served"
+                                                                            color="green"
+                                                                            style={{ cursor: "default" }}
+                                                                        />
+                                                                    ) : (
+                                                                        <>
+                                                                            <FaClock
+                                                                                className={`pending-status ${item.status === "pending" ? "spin" : ""}`}
+                                                                                title="Pending"
+                                                                                color={item.status === "pending" ? "blue" : "grey"}
+                                                                                style={{ cursor: "pointer" }}
+                                                                                onClick={() =>
+                                                                                    handleItemStatusChange(order.id, item.item_id, "pending")
+                                                                                }
+                                                                            />
+                                                                            <FaHourglassHalf
+                                                                                className={`preparing-status ${item.status === "preparing" ? "spin" : ""}`}
+                                                                                title="Preparing"
+                                                                                color={item.status === "preparing" ? "orange" : "grey"}
+                                                                                style={{ cursor: "pointer" }}
+                                                                                onClick={() =>
+                                                                                    handleItemStatusChange(order.id, item.item_id, "preparing")
+                                                                                }
+                                                                            />
+                                                                            <FaCheckCircle
+                                                                                className={`served-status ${item.status === "served" ? "spin" : ""}`}
+                                                                                title="Served"
+                                                                                color={item.status === "served" ? "green" : "grey"}
+                                                                                style={{ cursor: "pointer" }}
+                                                                                onClick={() =>
+                                                                                    handleItemStatusChange(order.id, item.item_id, "served")
+                                                                                }
+                                                                            />
+                                                                        </>
+                                                                    )}
+                                                                </div>
+                                                            )}
 
-            if (age > maxAge) {
-                delete newlyAddedItemsRef.current[order.id][item.unique_key];
-                return false;
-            }
+                                                            {!isEditing && !isAdding && (
+                                                                <div className="item-measure" style={{ marginLeft: "12px" }}>
+                                                                    {item.measure || ""}
+                                                                </div>
+                                                            )}
+                                                        </div>
+                                                    </React.Fragment>
+                                                );
+                                            })}
 
-            return true;
-        };
+                                            {isAdding && (
+                                                <div style={{ marginTop: "12px" }}>
+                                                    <input
+                                                        type="text"
+                                                        placeholder="Search inventory items to add..."
+                                                        value={itemSearchQuery}
+                                                        onChange={(e) => setItemSearchQuery(e.target.value)}
+                                                        style={{ width: "100%", padding: "6px" }}
+                                                    />
+                                                    {itemSearchResults.length > 0 && (
+                                                        <ul style={{ maxHeight: "150px", overflowY: "auto", marginTop: "6px" }}>
+                                                            {itemSearchResults.map((item) => (
+                                                                <li
+                                                                    key={item.id}
+                                                                    style={{
+                                                                        cursor: "pointer",
+                                                                        padding: "4px",
+                                                                        borderBottom: "1px solid #ddd",
+                                                                    }}
+                                                                    onClick={() => addItemToOrder(order.id, item)}
+                                                                >
+                                                                    {item.name} - ₹{item.price}
+                                                                </li>
+                                                            ))}
+                                                        </ul>
+                                                    )}
+                                                </div>
+                                            )}
+                                        </div>
 
-        const isNewlyAdded = checkIfNewlyAdded();
-
-        // ✅ Check if we need to show divider (transition from old to new items)
-        let showDivider = false;
-        if (index > 0 && isNewlyAdded) {
-            const prevItem = order.items[index - 1];
-            const prevIsNew = prevItem.unique_key && 
-                (newlyAddedItemsRef.current[order.id]?.[prevItem.unique_key] ||
-                 localStorage.getItem(`new_item_${order.id}_${prevItem.unique_key}`));
-            showDivider = !prevIsNew;
-        }
-
-        return (
-            <React.Fragment key={item.unique_key || item.item_id || index}>
-                {showDivider && (
-                    <div className="kds-item-divider">
-                        <span>Newly Added Items</span>
-                    </div>
-                )}
-                <div
-                    className={`item-row ${isNewlyAdded ? "newly-added" : ""}`}
-                    style={{
-                        alignItems: "center",
-                        cursor: isEditing ? "pointer" : "default",
-                    }}
-                >
-                    <div className="item-name" style={{ flex: 1 }}>
-                        {isEditing ? (
-                            <input
-                                value={item.item_name}
-                                onChange={(e) =>
-                                    updateItemName(order.id, item.item_id, e.target.value)
-                                }
-                            />
-                        ) : (
-                            `${item.quantity}x ${item.item_name || "Unnamed Item"}`
-                        )}
-                    </div>
-
-                    {order.status !== "served" && (
-                        <div
-                            className="status-icons"
-                            style={{ display: "flex", gap: "8px", marginLeft: "12px" }}
-                        >
-                            {item.status === "served" ? (
-                                <FaCheckCircle
-                                    className="served-status spin"
-                                    title="Served"
-                                    color="green"
-                                    style={{ cursor: "default" }}
-                                />
-                            ) : (
-                                <>
-                                    <FaClock
-                                        className={`pending-status ${item.status === "pending" ? "spin" : ""}`}
-                                        title="Pending"
-                                        color={item.status === "pending" ? "blue" : "grey"}
-                                        style={{ cursor: "pointer" }}
-                                        onClick={() =>
-                                            handleItemStatusChange(order.id, item.item_id, "pending")
-                                        }
-                                    />
-                                    <FaHourglassHalf
-                                        className={`preparing-status ${item.status === "preparing" ? "spin" : ""}`}
-                                        title="Preparing"
-                                        color={item.status === "preparing" ? "orange" : "grey"}
-                                        style={{ cursor: "pointer" }}
-                                        onClick={() =>
-                                            handleItemStatusChange(order.id, item.item_id, "preparing")
-                                        }
-                                    />
-                                    <FaCheckCircle
-                                        className={`served-status ${item.status === "served" ? "spin" : ""}`}
-                                        title="Served"
-                                        color={item.status === "served" ? "green" : "grey"}
-                                        style={{ cursor: "pointer" }}
-                                        onClick={() =>
-                                            handleItemStatusChange(order.id, item.item_id, "served")
-                                        }
-                                    />
-                                </>
-                            )}
-                        </div>
-                    )}
-
-                    {!isEditing && !isAdding && (
-                        <div className="item-measure" style={{ marginLeft: "12px" }}>
-                            {item.measure || ""}
-                        </div>
-                    )}
-                </div>
-            </React.Fragment>
-        );
-    })}
-
-    {isAdding && (
-        <div style={{ marginTop: "12px" }}>
-            <input
-                type="text"
-                placeholder="Search inventory items to add..."
-                value={itemSearchQuery}
-                onChange={(e) => setItemSearchQuery(e.target.value)}
-                style={{ width: "100%", padding: "6px" }}
-            />
-            {itemSearchResults.length > 0 && (
-                <ul
-                    style={{ maxHeight: "150px", overflowY: "auto", marginTop: "6px" }}
-                >
-                    {itemSearchResults.map((item) => (
-                        <li
-                            key={item.id}
-                            style={{
-                                cursor: "pointer",
-                                padding: "4px",
-                                borderBottom: "1px solid #ddd",
-                            }}
-                            onClick={() => addItemToOrder(order.id, item)}
-                        >
-                            {item.name} - ₹{item.price}
-                        </li>
-                    ))}
-                </ul>
-            )}
-        </div>
-    )}
-</div>
                                         {!isAdding && !isEditing && order.status !== "served" && (
                                             <div className="kds-card-footer">
                                                 {order.status === "new" && (

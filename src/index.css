@@ -3761,3 +3761,46 @@ input:focus {
       margin-bottom: 8px;
   }
 }
+
+
+/* -------------------kds differ line style ----------------------------- */
+.kds-item-divider {
+  display: flex;
+  align-items: center;
+  margin: 16px 0;
+  position: relative;
+}
+
+.kds-item-divider::before,
+.kds-item-divider::after {
+  content: '';
+  flex: 1;
+  height: 2px;
+  background: linear-gradient(90deg, transparent, #f59e0b, transparent);
+}
+
+.kds-item-divider span {
+  padding: 6px 16px;
+  background: #fef3c7;
+  color: #92400e;
+  font-weight: 600;
+  font-size: 12px;
+  border-radius: 20px;
+  margin: 0 12px;
+  text-transform: uppercase;
+  letter-spacing: 0.5px;
+}
+
+[data-theme="dark"] .kds-item-divider span {
+  background: #78350f;
+  color: #fbbf24;
+}
+
+.item-row.newly-added {
+  animation: highlightNew 2s ease-in-out;
+}
+
+@keyframes highlightNew {
+  0%, 100% { background-color: transparent; }
+  50% { background-color: rgba(245, 158, 11, 0.2); }
+}
