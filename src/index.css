@@ -1886,6 +1886,9 @@ input:focus {
   overflow: hidden;
 }
 
+.inv--document-number{
+  padding-right: 5px;
+}
 /* Orders list - sidebar */
 .inv--orders-list {
   background: var(--bg-chart-container);
@@ -2257,7 +2260,7 @@ input:focus {
     padding: 20px;
   }
   .inv--modal-close {
-    font-size: 2.5rem;
+    font-size: 1.3rem;
     right: 10px;
     top: 10px;
   }

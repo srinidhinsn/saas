@@ -147,6 +147,7 @@ const OrdersVisiblePage = () => {
         console.log("🟢 Adding item to order:", selectedItem);
         
         const timestamp = Date.now();
+        const uniqueKey = `${selectedItem.id}_${timestamp}`; // ✅ Unique key for this instance
     
         setOrders(prevOrders => {
             return prevOrders.map(order => {
@@ -160,13 +161,12 @@ const OrdersVisiblePage = () => {
                     status: "new",
                     note: "",
                     slug: selectedItem.slug || generateSlug(selectedItem.name),
-                    added_at_frontend: timestamp, // ✅ Track when added
-                    is_new_item: true, // ✅ Flag for new item
+                    added_at_frontend: timestamp,
+                    frontend_unique_key: uniqueKey, // ✅ Use frontend_unique_key
+                    is_new_item: true,
                 };
     
                 const newItems = [...order.items, newItem];
-    
-                // ✅ Calculate where new items start
                 const oldItemsCount = order.items.filter(i => !i.is_new_item).length;
     
                 return {
@@ -178,10 +178,11 @@ const OrdersVisiblePage = () => {
             });
         });
     
-        // ✅ Store new item markers in localStorage with order_id prefix
-        const storageKey = `order_${orderId}_new_item_${selectedItem.id}_${timestamp}`;
+        // ✅ Store in localStorage
+        const storageKey = `order_${orderId}_new_item_${uniqueKey}`;
         localStorage.setItem(storageKey, JSON.stringify({
             item_id: selectedItem.id,
+            unique_key: uniqueKey,
             added_at: timestamp,
         }));
     
@@ -260,8 +261,6 @@ const OrdersVisiblePage = () => {
         }
         keysToRemove.forEach(key => localStorage.removeItem(key));
     };
-    
-    
     useEffect(() => {
         const fetchOrders = async () => {
             if (!token || !clientId) {
@@ -284,16 +283,50 @@ const OrdersVisiblePage = () => {
                     }
     
                     // ✅ Get new items from localStorage
-                    const newItemIds = getNewItemsFromStorage(order.id);
+                    const newItemsFromStorage = getNewItemsFromStorage(order.id);
                     
-                    if (newItemIds.length === 0) {
+                    if (newItemsFromStorage.length === 0) {
                         return order;
                     }
     
-                    // ✅ Mark items as new based on localStorage
-                    const processedItems = order.items.map(item => {
-                        const isNew = newItemIds.some(nid => nid.item_id === item.item_id);
-                        return isNew ? { ...item, is_new_item: true } : item;
+                    // ✅ Count how many times each item_id appears in the order
+                    const itemCounts = {};
+                    order.items.forEach(item => {
+                        itemCounts[item.item_id] = (itemCounts[item.item_id] || 0) + 1;
+                    });
+    
+                    // ✅ Track how many of each item_id we've seen (to handle duplicates)
+                    const seenCounts = {};
+                    
+                    // ✅ Process items from the END (newest items are at the end)
+                    const processedItems = order.items.map((item, index) => {
+                        const itemId = item.item_id;
+                        seenCounts[itemId] = (seenCounts[itemId] || 0) + 1;
+                        
+                        // ✅ Check if this item_id has new additions in localStorage
+                        const newItemsWithThisId = newItemsFromStorage.filter(
+                            nid => nid.item_id === itemId
+                        );
+                        
+                        if (newItemsWithThisId.length === 0) {
+                            return item; // Not a new item
+                        }
+    
+                        // ✅ If we've seen this item_id fewer times than total count,
+                        // and there are new items with this ID, mark later occurrences as new
+                        const totalWithThisId = itemCounts[itemId];
+                        const oldItemsWithThisId = totalWithThisId - newItemsWithThisId.length;
+                        
+                        // ✅ Mark as new if this is one of the later occurrences
+                        if (seenCounts[itemId] > oldItemsWithThisId) {
+                            return { 
+                                ...item, 
+                                is_new_item: true,
+                                frontend_unique_key: newItemsWithThisId[seenCounts[itemId] - oldItemsWithThisId - 1]?.unique_key
+                            };
+                        }
+                        
+                        return item;
                     });
     
                     // ✅ Calculate divider position
@@ -302,7 +335,7 @@ const OrdersVisiblePage = () => {
                     return {
                         ...order,
                         items: processedItems,
-                        has_new_items: newItemIds.length > 0,
+                        has_new_items: newItemsFromStorage.length > 0,
                         new_items_start_index: oldItemsCount > 0 ? oldItemsCount : null,
                     };
                 }));
@@ -318,7 +351,6 @@ const OrdersVisiblePage = () => {
         const interval = setInterval(fetchOrders, 10000);
         return () => clearInterval(interval);
     }, [clientId, token]);
-    
 
     // Only one expanded order at a time
     const toggleExpand = (index) => {
@@ -474,15 +506,9 @@ const OrdersVisiblePage = () => {
             });
     
             // ✅ Remove from localStorage if it's a new item
-            if (item.is_new_item) {
-                const keysToRemove = [];
-                for (let i = 0; i < localStorage.length; i++) {
-                    const key = localStorage.key(i);
-                    if (key && key.startsWith(`order_${orderId}_new_item_`) && key.includes(`_${item.item_id}_`)) {
-                        keysToRemove.push(key);
-                    }
-                }
-                keysToRemove.forEach(key => localStorage.removeItem(key));
+            if (item.is_new_item && item.frontend_unique_key) {
+                const storageKey = `order_${orderId}_new_item_${item.frontend_unique_key}`;
+                localStorage.removeItem(storageKey);
             }
     
             // ✅ Update orders state
@@ -496,7 +522,6 @@ const OrdersVisiblePage = () => {
                     return sum + (item.quantity || 1) * price;
                 }, 0);
     
-                // ✅ Recalculate new items start index
                 const oldItemsCount = updatedItems.filter(i => !i.is_new_item).length;
     
                 return { 
@@ -510,7 +535,6 @@ const OrdersVisiblePage = () => {
     
             setOrders(updatedOrders);
     
-            // ✅ CRITICAL: Update selectedOrder state if modal is open
             if (selectedOrder?.id === orderId) {
                 const updatedOrder = updatedOrders.find(o => o.id === orderId);
                 if (updatedOrder) {
@@ -537,7 +561,6 @@ const OrdersVisiblePage = () => {
             toast.error("❌ Failed to cancel item.");
         }
     };
-    
 
     const updateOrderItems = async (orderId, updatedItemsWithStatuses) => {
         const cleanedItems = updatedItemsWithStatuses.map((item) => ({
@@ -788,6 +811,8 @@ const OrdersVisiblePage = () => {
                                     <li 
                                         key={item.id} 
                                         onClick={() => {
+                                            const timestamp = Date.now();
+                                            const uniqueKey = `${item.id}_${timestamp}`;
                                             addItemToOrder(selectedOrder.id, item);
                                             setSelectedOrder(prev => ({
                                                 ...prev,
@@ -797,7 +822,8 @@ const OrdersVisiblePage = () => {
                                                     quantity: 1,
                                                     price: item.unit_price,
                                                     status: "new",
-                                                    is_new_item: true,
+                                                    is_new_item: true,frontend_unique_key: uniqueKey,
+                                                    added_at_frontend: timestamp,
                                                 }]
                                             }));
                                         }}
@@ -814,6 +840,8 @@ const OrdersVisiblePage = () => {
                                         key={item.id}
                                         className="orders-detail-item-card"
                                         onClick={() => {
+                                            const timestamp = Date.now();
+                                            const uniqueKey = `${item.id}_${timestamp}`;
                                             addItemToOrder(selectedOrder.id, item);
                                             setSelectedOrder(prev => ({
                                                 ...prev,
@@ -823,7 +851,8 @@ const OrdersVisiblePage = () => {
                                                     quantity: 1,
                                                     price: item.unit_price,
                                                     status: "new",
-                                                    is_new_item: true,
+                                                    is_new_item: true,frontend_unique_key: uniqueKey,
+                                                    added_at_frontend: timestamp,
                                                 }]
                                             }));
                                         }}
@@ -1143,3 +1172,26 @@ export default OrdersVisiblePage;
 // ================
 // ================
 // ================
+// ================
+// ================
+// ================
+// ================
+// ================
+// ================
+// ================
+// ================
+// ================
+// ================
+// ================
+// ================
+// ================
+// ================
+// ================
+// ================
+// ================
+// ================
+// ================
+// ================
+// ================
+// ================
+

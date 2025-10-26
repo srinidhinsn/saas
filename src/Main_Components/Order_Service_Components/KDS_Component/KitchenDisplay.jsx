@@ -31,6 +31,7 @@ const KitchenDisplay = () => {
     const [newlyAddedItems, setNewlyAddedItems] = useState({});
     const [tableIds, setTableId] = useState(null)
     const newlyAddedItemsRef = useRef({});
+    const [currentTime, setCurrentTime] = useState(Date.now());
 
     useEffect(() => {
         if (tableIds) {
@@ -104,25 +105,55 @@ const KitchenDisplay = () => {
                     }
 
                     // ✅ Get new items from localStorage
-                    const newItemIds = getNewItemsFromStorage(order.id);
+                    // ✅ Get new items from localStorage
+                const newItemsFromStorage = getNewItemsFromStorage(order.id);
+                
+                if (newItemsFromStorage.length === 0) {
+                    return order;
+                }
 
-                    if (newItemIds.length === 0) {
-                        return order;
+                // ✅ Count how many times each item_id appears in the order
+                const itemCounts = {};
+                order.items.forEach(item => {
+                    itemCounts[item.item_id] = (itemCounts[item.item_id] || 0) + 1;
+                });
+
+                // ✅ Track how many of each item_id we've seen
+                const seenCounts = {};
+                
+                // ✅ Process items
+                const processedItems = order.items.map((item, index) => {
+                    const itemId = item.item_id;
+                    seenCounts[itemId] = (seenCounts[itemId] || 0) + 1;
+                    
+                    const newItemsWithThisId = newItemsFromStorage.filter(
+                        nid => nid.item_id === itemId
+                    );
+                    
+                    if (newItemsWithThisId.length === 0) {
+                        return item;
                     }
 
-                    // ✅ Mark items as new based on localStorage
-                    const processedItems = order.items.map(item => {
-                        const isNew = newItemIds.some(nid => nid.item_id === item.item_id);
-                        return isNew ? { ...item, is_new_item: true } : item;
-                    });
+                    const totalWithThisId = itemCounts[itemId];
+                    const oldItemsWithThisId = totalWithThisId - newItemsWithThisId.length;
+                    
+                    if (seenCounts[itemId] > oldItemsWithThisId) {
+                        return { 
+                            ...item, 
+                            is_new_item: true,
+                            frontend_unique_key: newItemsWithThisId[seenCounts[itemId] - oldItemsWithThisId - 1]?.unique_key
+                        };
+                    }
+                    
+                    return item;
+                });
 
-                    // ✅ Calculate divider position
-                    const oldItemsCount = processedItems.filter(i => !i.is_new_item).length;
-
+                // ✅ Calculate divider position
+                const oldItemsCount = processedItems.filter(i => !i.is_new_item).length;
                     return {
                         ...order,
                         items: processedItems,
-                        has_new_items: newItemIds.length > 0,
+                        has_new_items: newItemsFromStorage.length > 0,
                         new_items_start_index: oldItemsCount > 0 ? oldItemsCount : null,
                     };
                 }));
@@ -169,7 +200,7 @@ const KitchenDisplay = () => {
         console.log("🟢 Adding item to order:", selectedItem);
 
         const timestamp = Date.now();
-
+        const uniqueKey = `${selectedItem.id}_${timestamp}`;
         setOrders(prevOrders => {
             return prevOrders.map(order => {
                 if (order.id !== orderId) return order;
@@ -182,7 +213,7 @@ const KitchenDisplay = () => {
                     status: "new",
                     note: "",
                     slug: selectedItem.slug || generateSlug(selectedItem.name),
-                    added_at_frontend: timestamp,
+                    added_at_frontend: timestamp, frontend_unique_key: uniqueKey, 
                     is_new_item: true, // ✅ Flag for new item
                 };
 
@@ -200,12 +231,13 @@ const KitchenDisplay = () => {
             });
         });
 
-        // ✅ Store new item markers in localStorage (SAME FORMAT as OrdersVisiblePage)
-        const storageKey = `order_${orderId}_new_item_${selectedItem.id}_${timestamp}`;
-        localStorage.setItem(storageKey, JSON.stringify({
-            item_id: selectedItem.id,
-            added_at: timestamp,
-        }));
+       // ✅ Store in localStorage with unique key
+    const storageKey = `order_${orderId}_new_item_${uniqueKey}`;
+    localStorage.setItem(storageKey, JSON.stringify({
+        item_id: selectedItem.id,
+        unique_key: uniqueKey, // ✅ ADD THIS LINE
+        added_at: timestamp,
+    }));
 
         // Save to backend
         setTimeout(() => {
@@ -331,7 +363,7 @@ const KitchenDisplay = () => {
             })
         );
     };
-    const handleItemStatusChange = async (orderId, itemId, newStatus) => {
+    const handleItemStatusChange = async (orderId, itemBackendId, newStatus) => {
         try {
             // Get the order from state
             const order = orders.find(o => o.id === orderId);
@@ -342,7 +374,7 @@ const KitchenDisplay = () => {
 
             // Modify only the item you care about
             const updatedItems = order.items.map(item =>
-                item.item_id === itemId
+                item.id === itemBackendId
                     ? { ...item, status: newStatus }
                     : item
             );
@@ -648,8 +680,26 @@ const KitchenDisplay = () => {
         }
     };
 
+// Calculate elapsed time since item was created
+const calculateElapsedTime = (createdAt) => {
+    if (!createdAt) return "0:00";
+    
+    const now = new Date();
+    const created = new Date(createdAt);
+    const diffMs = now - created;
+    const diffMins = Math.floor(diffMs / 60000);
+    const diffSecs = Math.floor((diffMs % 60000) / 1000);
+    
+    return `${diffMins}:${diffSecs.toString().padStart(2, '0')}`;
+};
+// Update timer every second
+useEffect(() => {
+    const timerInterval = setInterval(() => {
+        setCurrentTime(Date.now());
+    }, 1000);
 
-
+    return () => clearInterval(timerInterval);
+}, []);
     // Delete order confirmation and delete
     const confirmDeleteOrder = async () => {
         if (!orderToDelete) return;
@@ -848,18 +898,35 @@ const KitchenDisplay = () => {
                                                                 cursor: isEditing ? "pointer" : "default",
                                                             }}
                                                         >
-                                                            <div className="item-name" style={{ flex: 1 }}>
-                                                                {isEditing ? (
-                                                                    <input
-                                                                        value={item.item_name}
-                                                                        onChange={(e) =>
-                                                                            updateItemName(order.id, item.item_id, e.target.value)
-                                                                        }
-                                                                    />
-                                                                ) : (
-                                                                    `${item.quantity}x ${item.item_name || "Unnamed Item"}`
-                                                                )}
-                                                            </div>
+                                                          <div className="item-name" style={{ flex: 1 }}>
+    {isEditing ? (
+        <input
+            value={item.item_name}
+            onChange={(e) =>
+                updateItemName(order.id, item.item_id, e.target.value)
+            }
+        />
+    ) : (
+        <div style={{ 
+            display: "flex", 
+            justifyContent: "space-between", 
+            alignItems: "center",
+            width: "100%"
+        }}>
+            <span>{`${item.quantity}x ${item.item_name || "Unnamed Item"}`}</span>
+            <span style={{ 
+                fontSize: "1em", 
+                color: calculateElapsedTime(item.created_at || order.created_at).split(':')[0] > 15 ? "#ff4444" : "#4CAF50",
+                fontWeight: "bold",
+                backgroundColor: "rgba(255, 255, 255, 0.2)",
+                padding: "4px 8px",
+                borderRadius: "4px"
+            }}>
+                {calculateElapsedTime(item.created_at || order.created_at)}
+            </span>
+        </div>
+    )}
+</div>
 
                                                             {order.status !== "served" && (
                                                                 <div
@@ -875,33 +942,33 @@ const KitchenDisplay = () => {
                                                                         />
                                                                     ) : (
                                                                         <>
-                                                                            <FaClock
-                                                                                className={`pending-status ${item.status === "pending" ? "spin" : ""}`}
-                                                                                title="Pending"
-                                                                                color={item.status === "pending" ? "blue" : "grey"}
-                                                                                style={{ cursor: "pointer" }}
-                                                                                onClick={() =>
-                                                                                    handleItemStatusChange(order.id, item.item_id, "pending")
-                                                                                }
-                                                                            />
-                                                                            <FaHourglassHalf
-                                                                                className={`preparing-status ${item.status === "preparing" ? "spin" : ""}`}
-                                                                                title="Preparing"
-                                                                                color={item.status === "preparing" ? "orange" : "grey"}
-                                                                                style={{ cursor: "pointer" }}
-                                                                                onClick={() =>
-                                                                                    handleItemStatusChange(order.id, item.item_id, "preparing")
-                                                                                }
-                                                                            />
-                                                                            <FaCheckCircle
-                                                                                className={`served-status ${item.status === "served" ? "spin" : ""}`}
-                                                                                title="Served"
-                                                                                color={item.status === "served" ? "green" : "grey"}
-                                                                                style={{ cursor: "pointer" }}
-                                                                                onClick={() =>
-                                                                                    handleItemStatusChange(order.id, item.item_id, "served")
-                                                                                }
-                                                                            />
+                                                                         <FaClock
+    className={`pending-status ${item.status === "pending" ? "spin" : ""}`}
+    title="Pending"
+    color={item.status === "pending" ? "blue" : "grey"}
+    style={{ cursor: "pointer" }}
+    onClick={() =>
+        handleItemStatusChange(order.id, item.id, "pending")
+    }
+/>
+<FaHourglassHalf
+    className={`preparing-status ${item.status === "preparing" ? "spin" : ""}`}
+    title="Preparing"
+    color={item.status === "preparing" ? "orange" : "grey"}
+    style={{ cursor: "pointer" }}
+    onClick={() =>
+        handleItemStatusChange(order.id, item.id, "preparing")
+    }
+/>
+<FaCheckCircle
+    className={`served-status ${item.status === "served" ? "spin" : ""}`}
+    title="Served"
+    color={item.status === "served" ? "green" : "grey"}
+    style={{ cursor: "pointer" }}
+    onClick={() =>
+        handleItemStatusChange(order.id, item.id, "served")
+    }
+/>
                                                                         </>
                                                                     )}
                                                                 </div>
