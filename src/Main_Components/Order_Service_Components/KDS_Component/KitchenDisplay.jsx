@@ -106,50 +106,50 @@ const KitchenDisplay = () => {
 
                     // ✅ Get new items from localStorage
                     // ✅ Get new items from localStorage
-                const newItemsFromStorage = getNewItemsFromStorage(order.id);
-                
-                if (newItemsFromStorage.length === 0) {
-                    return order;
-                }
+                    const newItemsFromStorage = getNewItemsFromStorage(order.id);
 
-                // ✅ Count how many times each item_id appears in the order
-                const itemCounts = {};
-                order.items.forEach(item => {
-                    itemCounts[item.item_id] = (itemCounts[item.item_id] || 0) + 1;
-                });
+                    if (newItemsFromStorage.length === 0) {
+                        return order;
+                    }
 
-                // ✅ Track how many of each item_id we've seen
-                const seenCounts = {};
-                
-                // ✅ Process items
-                const processedItems = order.items.map((item, index) => {
-                    const itemId = item.item_id;
-                    seenCounts[itemId] = (seenCounts[itemId] || 0) + 1;
-                    
-                    const newItemsWithThisId = newItemsFromStorage.filter(
-                        nid => nid.item_id === itemId
-                    );
-                    
-                    if (newItemsWithThisId.length === 0) {
+                    // ✅ Count how many times each item_id appears in the order
+                    const itemCounts = {};
+                    order.items.forEach(item => {
+                        itemCounts[item.item_id] = (itemCounts[item.item_id] || 0) + 1;
+                    });
+
+                    // ✅ Track how many of each item_id we've seen
+                    const seenCounts = {};
+
+                    // ✅ Process items
+                    const processedItems = order.items.map((item, index) => {
+                        const itemId = item.item_id;
+                        seenCounts[itemId] = (seenCounts[itemId] || 0) + 1;
+
+                        const newItemsWithThisId = newItemsFromStorage.filter(
+                            nid => nid.item_id === itemId
+                        );
+
+                        if (newItemsWithThisId.length === 0) {
+                            return item;
+                        }
+
+                        const totalWithThisId = itemCounts[itemId];
+                        const oldItemsWithThisId = totalWithThisId - newItemsWithThisId.length;
+
+                        if (seenCounts[itemId] > oldItemsWithThisId) {
+                            return {
+                                ...item,
+                                is_new_item: true,
+                                frontend_unique_key: newItemsWithThisId[seenCounts[itemId] - oldItemsWithThisId - 1]?.unique_key
+                            };
+                        }
+
                         return item;
-                    }
+                    });
 
-                    const totalWithThisId = itemCounts[itemId];
-                    const oldItemsWithThisId = totalWithThisId - newItemsWithThisId.length;
-                    
-                    if (seenCounts[itemId] > oldItemsWithThisId) {
-                        return { 
-                            ...item, 
-                            is_new_item: true,
-                            frontend_unique_key: newItemsWithThisId[seenCounts[itemId] - oldItemsWithThisId - 1]?.unique_key
-                        };
-                    }
-                    
-                    return item;
-                });
-
-                // ✅ Calculate divider position
-                const oldItemsCount = processedItems.filter(i => !i.is_new_item).length;
+                    // ✅ Calculate divider position
+                    const oldItemsCount = processedItems.filter(i => !i.is_new_item).length;
                     return {
                         ...order,
                         items: processedItems,
@@ -170,8 +170,6 @@ const KitchenDisplay = () => {
         return () => clearInterval(interval);
     }, [clientId, token]);
 
-
-    // Inventory filtering for add item search excluding already added items
     useEffect(() => {
         if (!addingOrderId) {
             setItemSearchResults([]);
@@ -190,8 +188,6 @@ const KitchenDisplay = () => {
         setItemSearchResults(filtered);
     }, [itemSearchQuery, addingOrderId, inventoryItems, orders]);
 
-    // Add item to order locally & save backend
-    // ✅ ADD THIS FUNCTION
     const generateSlug = (name) => {
         return name.toLowerCase().replace(/[\s]+/g, "-");
     };
@@ -213,7 +209,7 @@ const KitchenDisplay = () => {
                     status: "new",
                     note: "",
                     slug: selectedItem.slug || generateSlug(selectedItem.name),
-                    added_at_frontend: timestamp, frontend_unique_key: uniqueKey, 
+                    added_at_frontend: timestamp, frontend_unique_key: uniqueKey,
                     is_new_item: true, // ✅ Flag for new item
                 };
 
@@ -231,13 +227,13 @@ const KitchenDisplay = () => {
             });
         });
 
-       // ✅ Store in localStorage with unique key
-    const storageKey = `order_${orderId}_new_item_${uniqueKey}`;
-    localStorage.setItem(storageKey, JSON.stringify({
-        item_id: selectedItem.id,
-        unique_key: uniqueKey, // ✅ ADD THIS LINE
-        added_at: timestamp,
-    }));
+        // ✅ Store in localStorage with unique key
+        const storageKey = `order_${orderId}_new_item_${uniqueKey}`;
+        localStorage.setItem(storageKey, JSON.stringify({
+            item_id: selectedItem.id,
+            unique_key: uniqueKey, // ✅ ADD THIS LINE
+            added_at: timestamp,
+        }));
 
         // Save to backend
         setTimeout(() => {
@@ -332,41 +328,11 @@ const KitchenDisplay = () => {
         }
     };
 
-    // Toggle edit mode
-    const toggleEdit = (orderId) => {
-        if (addingOrderId && addingOrderId !== orderId) setAddingOrderId(null);
-        setEditOrderId((prev) => (prev === orderId ? null : orderId));
-    };
-
-    // Update item quantity locally
-    const updateItemQuantity = (orderId, itemId, newQty) => {
-        setOrders((prev) =>
-            prev.map((o) => {
-                if (o.id !== orderId) return o;
-                const updatedItems = o.items.map((item) =>
-                    item.item_id === itemId ? { ...item, quantity: newQty < 1 ? 1 : newQty } : item
-                );
-                return { ...o, items: updatedItems };
-            })
-        );
-    };
-
-    // Update item status locally
-    const updateItemStatus = (orderId, itemId, newStatus) => {
-        setOrders((prev) =>
-            prev.map((o) => {
-                if (o.id !== orderId) return o;
-                const updatedItems = o.items.map((item) =>
-                    item.item_id === itemId ? { ...item, status: newStatus } : item
-                );
-                return { ...o, items: updatedItems };
-            })
-        );
-    };
     const handleItemStatusChange = async (orderId, itemBackendId, newStatus) => {
         try {
+            const orderIdInt = parseInt(orderId, 10);
             // Get the order from state
-            const order = orders.find(o => o.id === orderId);
+            const order = orders.find(o => o.id === orderIdInt);
             if (!order) {
                 toast.error("Order not found in state");
                 return;
@@ -391,7 +357,7 @@ const KitchenDisplay = () => {
 
             // Send full updated list without 'id'
             await axios.post(
-                `${import.meta.env.VITE_API_ORDER_SERVICE_URL}/${clientId}/order_items/update?order_id=${orderId}`,
+                `${import.meta.env.VITE_API_ORDER_SERVICE_URL}/${clientId}/order_items/update?order_id=${orderIdInt}`,
                 itemsForUpdate,
                 { headers: { Authorization: `Bearer ${token}` } }
             );
@@ -399,7 +365,7 @@ const KitchenDisplay = () => {
             // Update order total price in backend
             await axios.post(
                 `${import.meta.env.VITE_API_ORDER_SERVICE_URL}/${clientId}/dinein/update`,
-                { id: orderId, total_price: totalPrice },
+                { id: orderIdInt, total_price: totalPrice },
                 { headers: { Authorization: `Bearer ${token}` } }
             );
 
@@ -430,166 +396,6 @@ const KitchenDisplay = () => {
             })
         );
     };
-    const cancelItem = async (orderId, itemId) => {
-        const order = orders.find(o => o.id === orderId);
-        const item = order?.items.find(i => i.item_id === itemId);
-        if (!item?.id) return;
-
-        try {
-            // 1. Delete item from DB
-            await axios.delete(`${import.meta.env.VITE_API_ORDER_SERVICE_URL}/${clientId}/order_item/delete`, {
-                params: { order_item_id: item.id, client_id: clientId },
-                headers: { Authorization: `Bearer ${token}` },
-            });
-
-            // 2. Remove item from local state
-            const updatedOrders = orders.map(o => {
-                if (o.id !== orderId) return o;
-
-                const updatedItems = o.items.filter(i => i.item_id !== itemId);
-                const newTotal = updatedItems.reduce((sum, item) => {
-                    const price = inventoryMap[item.item_id]?.price || item.price || 0;
-                    return sum + (item.quantity || 1) * price;
-                }, 0);
-
-                return {
-                    ...o,
-                    items: updatedItems,
-                    total_price: newTotal
-                };
-            });
-
-            setOrders(updatedOrders);
-
-            // 3. Update backend total_price
-            const newOrder = updatedOrders.find(o => o.id === orderId);
-            if (newOrder) {
-                await axios.post(
-                    `${import.meta.env.VITE_API_ORDER_SERVICE_URL}/${clientId}/dinein/update`,
-                    {
-                        id: orderId,
-                        total_price: newOrder.total_price
-                    },
-                    {
-                        headers: {
-                            Authorization: `Bearer ${token}`,
-                        },
-                    }
-                );
-            }
-
-            // 4. Update editable map (optional)
-            setEditedItemsMap(prev => {
-                const updated = (prev[orderId] || []).filter(i => i.item_id !== itemId);
-                return { ...prev, [orderId]: updated };
-            });
-
-            toast.success("Item cancelled and total updated");
-        } catch (err) {
-            const msg = err?.response?.data?.detail || "❌ Failed to cancel item.";
-            console.error(msg, err);
-            toast.error(msg);
-        }
-    };
-
-
-    // Delete item from backend and local state
-    const deleteItemFromOrder = async (orderId, itemId) => {
-        // Find the item id in order with backend id reference
-        const order = orders.find((o) => o.id === orderId);
-        if (!order) return;
-
-        const item = order.items.find((i) => i.item_id === itemId);
-        if (!item) return;
-
-        if (!item.id) {
-            // Item may not have 'id' if newly added and unsaved - remove locally
-            setOrders((prev) =>
-                prev.map((o) => {
-                    if (o.id !== orderId) return o;
-                    return { ...o, items: o.items.filter((i) => i.item_id !== itemId) };
-                })
-            );
-            toast.success("Item removed locally");
-            return;
-        }
-
-        try {
-            // Delete from backend
-            await axios.delete(`${import.meta.env.VITE_API_ORDER_SERVICE_URL}/${clientId}/order_item/delete`, {
-                params: { order_item_id: item.id, client_id: clientId },
-                headers: { Authorization: `Bearer ${token}` },
-            });
-
-            // Remove locally
-            setOrders((prev) =>
-                prev.map((o) => {
-                    if (o.id !== orderId) return o;
-                    const updatedItems = o.items.filter((i) => i.item_id !== itemId);
-                    // Update total price locally reflects immediately
-                    const newTotal = updatedItems.reduce(
-                        (sum, i) => sum + (i.price || 0) * (i.quantity || 1),
-                        0
-                    );
-                    return { ...o, items: updatedItems, total_price: newTotal };
-                })
-            );
-
-            toast.success("Item deleted");
-        } catch {
-            toast.error("Failed to delete item");
-        }
-    };
-
-    // Save order items and updated total price to backend
-    const saveOrderItems = async (order) => {
-        try {
-            // Prepare cleaned items (remove any transient properties)
-            const cleanedItems = order.items.map((item) => ({
-                item_id: item.item_id,
-                item_name: item.item_name,
-                quantity: item.quantity,
-                status: item.status || "new",
-                note: item.note || "",
-                slug: item.slug || "",
-                price: item.price || inventoryMap[item.item_id]?.price || 0,
-                client_id: clientId,
-                order_id: order.id,
-            }));
-
-            await axios.post(
-                `${import.meta.env.VITE_API_ORDER_SERVICE_URL}/${clientId}/order_items/update?order_id=${order.id}`,
-                cleanedItems,
-                {
-                    headers: { Authorization: `Bearer ${token}` },
-                }
-            );
-
-            const totalPrice = cleanedItems.reduce(
-                (acc, i) => acc + (i.price || 0) * (i.quantity || 1),
-                0
-            );
-
-            await axios.post(
-                `${import.meta.env.VITE_API_ORDER_SERVICE_URL}/${clientId}/dinein/update`,
-                { id: order.id, total_price: totalPrice },
-                {
-                    headers: { Authorization: `Bearer ${token}` },
-                }
-            );
-
-            // Update local total price as well
-            setOrders((prev) =>
-                prev.map((o) => (o.id === order.id ? { ...o, total_price: totalPrice } : o))
-            );
-
-            toast.success("Order items saved");
-            setEditOrderId(null);
-            setAddingOrderId(null);
-        } catch {
-            toast.error("Failed to save order items");
-        }
-    };
 
     // Card color helper
     const cardColors = (order) => {
@@ -603,12 +409,10 @@ const KitchenDisplay = () => {
         return "default";
     };
 
-    // Order status buttons
-    const statusButtons = ["pending", "preparing", "served"];
-
     const handleStatusChange = async (orderId, newStatus) => {
         try {
-            const order = orders.find(o => o.id === orderId);
+            const orderIdInt = parseInt(orderId, 10);
+            const order = orders.find(o => o.id === orderIdInt);
             if (!order) return;
 
             // Update all items if order status is "served"
@@ -636,7 +440,7 @@ const KitchenDisplay = () => {
 
             // Save updated items with their statuses
             await axios.post(
-                `${import.meta.env.VITE_API_ORDER_SERVICE_URL}/${clientId}/order_items/update?order_id=${orderId}`,
+                `${import.meta.env.VITE_API_ORDER_SERVICE_URL}/${clientId}/order_items/update?order_id=${orderIdInt}`,
                 cleanedItems,
                 { headers: { Authorization: `Bearer ${token}` } }
             );
@@ -644,7 +448,7 @@ const KitchenDisplay = () => {
             // Update overall order status and total price
             await axios.post(
                 `${import.meta.env.VITE_API_ORDER_SERVICE_URL}/${clientId}/dinein/update`,
-                { id: orderId, status: newStatus, total_price: totalPrice },
+                { id: orderIdInt, status: newStatus, total_price: totalPrice },
                 { headers: { Authorization: `Bearer ${token}` } }
             );
 
@@ -680,26 +484,26 @@ const KitchenDisplay = () => {
         }
     };
 
-// Calculate elapsed time since item was created
-const calculateElapsedTime = (createdAt) => {
-    if (!createdAt) return "0:00";
-    
-    const now = new Date();
-    const created = new Date(createdAt);
-    const diffMs = now - created;
-    const diffMins = Math.floor(diffMs / 60000);
-    const diffSecs = Math.floor((diffMs % 60000) / 1000);
-    
-    return `${diffMins}:${diffSecs.toString().padStart(2, '0')}`;
-};
-// Update timer every second
-useEffect(() => {
-    const timerInterval = setInterval(() => {
-        setCurrentTime(Date.now());
-    }, 1000);
+    // Calculate elapsed time since item was created
+    const calculateElapsedTime = (createdAt) => {
+        if (!createdAt) return "0:00";
 
-    return () => clearInterval(timerInterval);
-}, []);
+        const now = new Date();
+        const created = new Date(createdAt);
+        const diffMs = now - created;
+        const diffMins = Math.floor(diffMs / 60000);
+        const diffSecs = Math.floor((diffMs % 60000) / 1000);
+
+        return `${diffMins}:${diffSecs.toString().padStart(2, '0')}`;
+    };
+    // Update timer every second
+    useEffect(() => {
+        const timerInterval = setInterval(() => {
+            setCurrentTime(Date.now());
+        }, 1000);
+
+        return () => clearInterval(timerInterval);
+    }, []);
     // Delete order confirmation and delete
     const confirmDeleteOrder = async () => {
         if (!orderToDelete) return;
@@ -898,35 +702,35 @@ useEffect(() => {
                                                                 cursor: isEditing ? "pointer" : "default",
                                                             }}
                                                         >
-                                                          <div className="item-name" style={{ flex: 1 }}>
-    {isEditing ? (
-        <input
-            value={item.item_name}
-            onChange={(e) =>
-                updateItemName(order.id, item.item_id, e.target.value)
-            }
-        />
-    ) : (
-        <div style={{ 
-            display: "flex", 
-            justifyContent: "space-between", 
-            alignItems: "center",
-            width: "100%"
-        }}>
-            <span>{`${item.quantity}x ${item.item_name || "Unnamed Item"}`}</span>
-            <span style={{ 
-                fontSize: "1em", 
-                color: calculateElapsedTime(item.created_at || order.created_at).split(':')[0] > 15 ? "#ff4444" : "#4CAF50",
-                fontWeight: "bold",
-                backgroundColor: "rgba(255, 255, 255, 0.2)",
-                padding: "4px 8px",
-                borderRadius: "4px"
-            }}>
-                {calculateElapsedTime(item.created_at || order.created_at)}
-            </span>
-        </div>
-    )}
-</div>
+                                                            <div className="item-name" style={{ flex: 1 }}>
+                                                                {isEditing ? (
+                                                                    <input
+                                                                        value={item.item_name}
+                                                                        onChange={(e) =>
+                                                                            updateItemName(order.id, item.item_id, e.target.value)
+                                                                        }
+                                                                    />
+                                                                ) : (
+                                                                    <div style={{
+                                                                        display: "flex",
+                                                                        justifyContent: "space-between",
+                                                                        alignItems: "center",
+                                                                        width: "100%"
+                                                                    }}>
+                                                                        <span>{`${item.quantity}x ${item.item_name || "Unnamed Item"}`}</span>
+                                                                        <span style={{
+                                                                            fontSize: "1em",
+                                                                            color: calculateElapsedTime(item.created_at || order.created_at).split(':')[0] > 15 ? "#ff4444" : "#4CAF50",
+                                                                            fontWeight: "bold",
+                                                                            backgroundColor: "rgba(255, 255, 255, 0.2)",
+                                                                            padding: "4px 8px",
+                                                                            borderRadius: "4px"
+                                                                        }}>
+                                                                            {calculateElapsedTime(item.created_at || order.created_at)}
+                                                                        </span>
+                                                                    </div>
+                                                                )}
+                                                            </div>
 
                                                             {order.status !== "served" && (
                                                                 <div
@@ -942,33 +746,33 @@ useEffect(() => {
                                                                         />
                                                                     ) : (
                                                                         <>
-                                                                         <FaClock
-    className={`pending-status ${item.status === "pending" ? "spin" : ""}`}
-    title="Pending"
-    color={item.status === "pending" ? "blue" : "grey"}
-    style={{ cursor: "pointer" }}
-    onClick={() =>
-        handleItemStatusChange(order.id, item.id, "pending")
-    }
-/>
-<FaHourglassHalf
-    className={`preparing-status ${item.status === "preparing" ? "spin" : ""}`}
-    title="Preparing"
-    color={item.status === "preparing" ? "orange" : "grey"}
-    style={{ cursor: "pointer" }}
-    onClick={() =>
-        handleItemStatusChange(order.id, item.id, "preparing")
-    }
-/>
-<FaCheckCircle
-    className={`served-status ${item.status === "served" ? "spin" : ""}`}
-    title="Served"
-    color={item.status === "served" ? "green" : "grey"}
-    style={{ cursor: "pointer" }}
-    onClick={() =>
-        handleItemStatusChange(order.id, item.id, "served")
-    }
-/>
+                                                                            <FaClock
+                                                                                className={`pending-status ${item.status === "pending" ? "spin" : ""}`}
+                                                                                title="Pending"
+                                                                                color={item.status === "pending" ? "blue" : "grey"}
+                                                                                style={{ cursor: "pointer" }}
+                                                                                onClick={() =>
+                                                                                    handleItemStatusChange(order.id, item.id, "pending")
+                                                                                }
+                                                                            />
+                                                                            <FaHourglassHalf
+                                                                                className={`preparing-status ${item.status === "preparing" ? "spin" : ""}`}
+                                                                                title="Preparing"
+                                                                                color={item.status === "preparing" ? "orange" : "grey"}
+                                                                                style={{ cursor: "pointer" }}
+                                                                                onClick={() =>
+                                                                                    handleItemStatusChange(order.id, item.id, "preparing")
+                                                                                }
+                                                                            />
+                                                                            <FaCheckCircle
+                                                                                className={`served-status ${item.status === "served" ? "spin" : ""}`}
+                                                                                title="Served"
+                                                                                color={item.status === "served" ? "green" : "grey"}
+                                                                                style={{ cursor: "pointer" }}
+                                                                                onClick={() =>
+                                                                                    handleItemStatusChange(order.id, item.id, "served")
+                                                                                }
+                                                                            />
                                                                         </>
                                                                     )}
                                                                 </div>

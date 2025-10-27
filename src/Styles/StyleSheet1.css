@@ -556,6 +556,13 @@ body.sidebar-minimized .sidebar li .arrow-indicator {
         grid-template-columns: 1fr;
     }
 }
+/* ----------------------------------------------------------------------------------------------------------------------- */
+/* ----------------------------------------------------------------------------------------------------------------------- */
+/* ------------------------------------------------ Table Management StyleSheet ------------------------------------------ */
+/* ----------------------------------------------------------------------------------------------------------------------- */
+/* ----------------------------------------------------------------------------------------------------------------------- */
+/* ----------------------------------------------------------------------------------------------------------------------- */
+
 
 .Table-Management-container {
     padding-right: var(--main-page-padding);
@@ -946,6 +953,69 @@ body.sidebar-minimized .sidebar li .arrow-indicator {
         background-color: transparent;
     }
 }
+/* Show number input spinners on mobile devices (under 768px) */
+@media (max-width: 768px) {
+    /* Force show spinners for number inputs */
+    input[type="number"]::-webkit-inner-spin-button,
+    input[type="number"]::-webkit-outer-spin-button {
+      -webkit-appearance: auto !important;
+      appearance: auto !important;
+      opacity: 1 !important;
+      margin: 0;
+      height: auto;
+    }
+  
+    /* For Firefox */
+    input[type="number"] {
+      -moz-appearance: textfield;
+      appearance: auto !important;
+    }
+  
+    /* Ensure the input has enough padding for the spinners */
+    .tm-modal-field input[type="number"],
+    .tm-edit-modal-field input[type="number"],
+    .tm-bulk-field input[type="number"] {
+      padding-right: 20px;
+    }
+  
+    /* Make the spinners more touch-friendly */
+    input[type="number"]::-webkit-inner-spin-button {
+      width: 30px;
+      height: 30px;
+      cursor: pointer;
+    }
+  }
+  /* Mobile-friendly number input with custom buttons */
+@media (max-width: 768px) {
+    .tm-number-input-wrapper {
+      display: flex;
+      align-items: center;
+      gap: 8px;
+    }
+  
+    .tm-number-input-wrapper input[type="number"] {
+      flex: 1;
+      text-align: center;
+    }
+  
+    .tm-number-btn {
+      width: 40px;
+      height: 40px;
+      font-size: 18px;
+      font-weight: bold;
+      border: 1px solid #ccc;
+      border-radius: 4px;
+      background: #f5f5f5;
+      cursor: pointer;
+      display: flex;
+      align-items: center;
+      justify-content: center;
+    }
+  
+    .tm-number-btn:active {
+      background: #e0e0e0;
+    }
+  }
 
 /* ======================================================================================================================================= */
 /* =============================================== Table Selection StyleSheet ============================================================ */

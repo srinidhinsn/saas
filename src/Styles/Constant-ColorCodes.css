@@ -203,7 +203,7 @@ body.client-easyfood{
 }
 
 body.client-shanmugam{
-    --bg-color: red;
+    --bg-color: lightgreen;
 
 /* container color */
 --bg-container: rgb(237, 237, 237);
@@ -284,4 +284,32 @@ body.client-shanmugam{
 --placeholder-bg: rgb(240, 240, 240);
 --placeholder-color: rgb(170, 170, 170);
 --grids: white;
+}
+
+body.client-shanmugam.theme-dark {
+    --bg-color: gray;
+    --bg-container: lightgray;
+    --bg-chart-container: lightgray;
+    --bg-text-color: white;
+    --bg-number-color: rgb(224, 224, 224);
+    --dash-icon-color: rgb(23, 196, 179);
+    --delete-icon-bg: rgb(223, 176, 176);
+    --delete-icon: rgb(145, 47, 47);
+    --edit-icon-bg: rgb(137, 137, 223);
+    --edit-icon: blue;
+    --dash-cards-bg: rgb(58, 58, 58);
+    --sidebar-bg: rgb(30, 30, 30);
+    --text-color: rgb(224, 224, 224);
+    --brand-color: rgb(0, 207, 200);
+    --active-bg: rgb(38, 50, 56);
+    --active-text: rgb(0, 207, 200);
+    --card-back: rgb(31, 31, 31);
+    --hover-bg: rgb(44, 44, 44);
+    --card-bg: rgb(31, 31, 31);
+    --card-icon: rgb(21, 175, 163);
+    --value-color: rgb(21, 175, 163);
+    --growth-color: green;
+    --placeholder-bg: rgb(240, 240, 240);
+    --placeholder-color: rgb(170, 170, 170);
+    --grids: gray
 }
