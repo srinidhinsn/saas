@@ -125,25 +125,29 @@ const OrdersVisiblePage = () => {
     }, [clientId, token]);
 
     useEffect(() => {
+        // Only show search results when modal is open AND in edit mode
         if (
-            expandedOrderIndex === null ||
-            expandedOrderIndex === undefined ||
-            !orders[expandedOrderIndex] ||
+            !showOrderDetailModal ||
+            !selectedOrder ||
+            editOrderId !== selectedOrder?.id ||
             itemSearchQuery.trim() === ""
         ) {
             setItemSearchResults([]);
             return;
         }
-        // ✅ Don't filter out existing items - allow duplicates
+        
+        // ✅ Filter items based on search query
         const filtered = allInventoryItems.filter((item) =>
             (item.name || "").toLowerCase().includes(itemSearchQuery.toLowerCase())
         );
         setItemSearchResults(filtered);
-    }, [itemSearchQuery, allInventoryItems, expandedOrderIndex, orders]);
+    }, [itemSearchQuery, allInventoryItems, showOrderDetailModal, selectedOrder, editOrderId]);
+    
     const addItemToOrder = (orderId, selectedItem) => {
         console.log("🟢 Adding item to order:", selectedItem);
-    
+        
         const timestamp = Date.now();
+        const uniqueKey = `${selectedItem.id}_${timestamp}`; // ✅ Unique key for this instance
     
         setOrders(prevOrders => {
             return prevOrders.map(order => {
@@ -157,30 +161,35 @@ const OrdersVisiblePage = () => {
                     status: "new",
                     note: "",
                     slug: selectedItem.slug || generateSlug(selectedItem.name),
-                    added_at_frontend: timestamp, // Mark when it was added
+                    added_at_frontend: timestamp,
+                    frontend_unique_key: uniqueKey, // ✅ Use frontend_unique_key
+                    is_new_item: true,
                 };
     
                 const newItems = [...order.items, newItem];
+                const oldItemsCount = order.items.filter(i => !i.is_new_item).length;
     
                 return {
                     ...order,
                     items: newItems,
-                    has_new_items: true // Flag to indicate this order has new items
+                    has_new_items: true,
+                    new_items_start_index: oldItemsCount,
                 };
             });
         });
     
-        // Mark this order as having new items in localStorage
-        const storageKey = `order_${orderId}_has_new_items`;
-        const existingNewItemsCount = parseInt(localStorage.getItem(`order_${orderId}_new_items_count`) || '0');
-        localStorage.setItem(storageKey, 'true');
-        localStorage.setItem(`order_${orderId}_new_items_count`, (existingNewItemsCount + 1).toString());
-        localStorage.setItem(`order_${orderId}_first_new_index`, (existingNewItemsCount === 0 ? 'pending' : localStorage.getItem(`order_${orderId}_first_new_index`)));
+        // ✅ Store in localStorage
+        const storageKey = `order_${orderId}_new_item_${uniqueKey}`;
+        localStorage.setItem(storageKey, JSON.stringify({
+            item_id: selectedItem.id,
+            unique_key: uniqueKey,
+            added_at: timestamp,
+        }));
     
         setItemSearchQuery("");
         setItemSearchResults([]);
     };
-
+    
     const updateItemQuantity = (orderId, itemId, newQty) => {
         setOrders((prev) =>
             prev.map((order) => {
@@ -199,6 +208,17 @@ const OrdersVisiblePage = () => {
                 };
             })
         );
+    
+        // ✅ Update selectedOrder if modal is open
+        if (selectedOrder?.id === orderId) {
+            setSelectedOrder(prev => ({
+                ...prev,
+                items: prev.items.map(item =>
+                    item.item_id === itemId ? { ...item, quantity: newQty > 0 ? newQty : 1 } : item
+                )
+            }));
+        }
+    
         setEditedItemsMap((prev) => {
             const currentItems = orders.find((o) => o.id === orderId)?.items || [];
             const updated = currentItems.map((item) =>
@@ -214,6 +234,33 @@ const OrdersVisiblePage = () => {
     const generateSlug = (name) => {
         return name.toLowerCase().replace(/[\s]+/g, "-");
     };
+
+    const getNewItemsFromStorage = (orderId) => {
+        const newItems = [];
+        for (let i = 0; i < localStorage.length; i++) {
+            const key = localStorage.key(i);
+            if (key && key.startsWith(`order_${orderId}_new_item_`)) {
+                try {
+                    const data = JSON.parse(localStorage.getItem(key));
+                    newItems.push(data);
+                } catch (e) {
+                    console.error("Error parsing localStorage item:", e);
+                }
+            }
+        }
+        return newItems;
+    };
+    
+    const clearNewItemsStorage = (orderId) => {
+        const keysToRemove = [];
+        for (let i = 0; i < localStorage.length; i++) {
+            const key = localStorage.key(i);
+            if (key && key.startsWith(`order_${orderId}_new_item_`)) {
+                keysToRemove.push(key);
+            }
+        }
+        keysToRemove.forEach(key => localStorage.removeItem(key));
+    };
     useEffect(() => {
         const fetchOrders = async () => {
             if (!token || !clientId) {
@@ -227,51 +274,71 @@ const OrdersVisiblePage = () => {
     
                 const allOrders = res.data?.data || [];
     
-                // Preserve frontend-only fields and check localStorage
-                setOrders(prevOrders => {
-                    return allOrders.map(newOrder => {
-                        const prevOrder = prevOrders.find(o => o.id === newOrder.id);
-                        
-                        // Check if this order has new items flag in localStorage
-                        const hasNewItemsInStorage = localStorage.getItem(`order_${newOrder.id}_has_new_items`) === 'true';
-                        const newItemsCount = parseInt(localStorage.getItem(`order_${newOrder.id}_new_items_count`) || '0');
-                        
-                        // If order is served, clear the new items flag
-                        if (newOrder.status === 'served') {
-                            localStorage.removeItem(`order_${newOrder.id}_has_new_items`);
-                            localStorage.removeItem(`order_${newOrder.id}_new_items_count`);
-                            localStorage.removeItem(`order_${newOrder.id}_first_new_index`);
-                            return newOrder;
-                        }
+                // ✅ Process orders and restore new items from localStorage
+                setOrders(allOrders.map(order => {
+                    // If order is served, clear localStorage flags
+                    if (order.status === 'served') {
+                        clearNewItemsStorage(order.id);
+                        return order;
+                    }
     
-                        // Merge items with frontend flags
-                        let mergedItems = newOrder.items;
-                        if (prevOrder && prevOrder.items) {
-                            mergedItems = newOrder.items.map((newItem, idx) => {
-                                const prevItem = prevOrder.items.find(
-                                    pi => pi.id === newItem.id || 
-                                          (pi.item_id === newItem.item_id && !pi.id && !newItem.id)
-                                );
-                                
-                                // Preserve frontend timestamp
-                                if (prevItem?.added_at_frontend) {
-                                    return { ...newItem, added_at_frontend: prevItem.added_at_frontend };
-                                }
-                                return newItem;
-                            });
-                        }
+                    // ✅ Get new items from localStorage
+                    const newItemsFromStorage = getNewItemsFromStorage(order.id);
+                    
+                    if (newItemsFromStorage.length === 0) {
+                        return order;
+                    }
     
-                        // Calculate the divider position (count of old items)
-                        const oldItemsCount = mergedItems.length - newItemsCount;
-    
-                        return { 
-                            ...newOrder, 
-                            items: mergedItems,
-                            has_new_items: hasNewItemsInStorage,
-                            new_items_start_index: oldItemsCount > 0 ? oldItemsCount : null
-                        };
+                    // ✅ Count how many times each item_id appears in the order
+                    const itemCounts = {};
+                    order.items.forEach(item => {
+                        itemCounts[item.item_id] = (itemCounts[item.item_id] || 0) + 1;
                     });
-                });
+    
+                    // ✅ Track how many of each item_id we've seen (to handle duplicates)
+                    const seenCounts = {};
+                    
+                    // ✅ Process items from the END (newest items are at the end)
+                    const processedItems = order.items.map((item, index) => {
+                        const itemId = item.item_id;
+                        seenCounts[itemId] = (seenCounts[itemId] || 0) + 1;
+                        
+                        // ✅ Check if this item_id has new additions in localStorage
+                        const newItemsWithThisId = newItemsFromStorage.filter(
+                            nid => nid.item_id === itemId
+                        );
+                        
+                        if (newItemsWithThisId.length === 0) {
+                            return item; // Not a new item
+                        }
+    
+                        // ✅ If we've seen this item_id fewer times than total count,
+                        // and there are new items with this ID, mark later occurrences as new
+                        const totalWithThisId = itemCounts[itemId];
+                        const oldItemsWithThisId = totalWithThisId - newItemsWithThisId.length;
+                        
+                        // ✅ Mark as new if this is one of the later occurrences
+                        if (seenCounts[itemId] > oldItemsWithThisId) {
+                            return { 
+                                ...item, 
+                                is_new_item: true,
+                                frontend_unique_key: newItemsWithThisId[seenCounts[itemId] - oldItemsWithThisId - 1]?.unique_key
+                            };
+                        }
+                        
+                        return item;
+                    });
+    
+                    // ✅ Calculate divider position
+                    const oldItemsCount = processedItems.filter(i => !i.is_new_item).length;
+    
+                    return {
+                        ...order,
+                        items: processedItems,
+                        has_new_items: newItemsFromStorage.length > 0,
+                        new_items_start_index: oldItemsCount > 0 ? oldItemsCount : null,
+                    };
+                }));
     
             } catch {
                 toast.error("Failed to fetch orders");
@@ -341,18 +408,15 @@ const OrdersVisiblePage = () => {
         const tableObj = tables.find((t) => t.id === order.table_id);
     
         try {
-            // Update order status in order service
             await axios.post(
                 `${import.meta.env.VITE_API_ORDER_SERVICE_URL}/${clientId}/dinein/update`,
                 { id: orderId, client_id: clientId, status: newStatus },
                 { headers: { Authorization: `Bearer ${token}` } }
             );
     
-            // If served, free the table AND clear new items flags
+            // ✅ If served, clear new items tracking
             if (newStatus === "served") {
-                localStorage.removeItem(`order_${orderId}_has_new_items`);
-                localStorage.removeItem(`order_${orderId}_new_items_count`);
-                localStorage.removeItem(`order_${orderId}_first_new_index`);
+                clearNewItemsStorage(orderId);
                 
                 if (tableObj) {
                     await axios.post(
@@ -371,16 +435,23 @@ const OrdersVisiblePage = () => {
             }
     
             toast.success("Order status updated");
+            
+            // ✅ Update both orders and selectedOrder states
             setOrders((prev) =>
-                prev.map((o) => (o.id === orderId ? { ...o, status: newStatus, has_new_items: newStatus === 'served' ? false : o.has_new_items } : o))
+                prev.map((o) => (o.id === orderId ? { 
+                    ...o, 
+                    status: newStatus, 
+                    has_new_items: newStatus === 'served' ? false : o.has_new_items,
+                    new_items_start_index: newStatus === 'served' ? null : o.new_items_start_index,
+                } : o))
             );
     
-            // Update selectedOrder if modal is open
             if (selectedOrder?.id === orderId) {
                 setSelectedOrder(prev => ({
                     ...prev,
                     status: newStatus,
-                    has_new_items: newStatus === 'served' ? false : prev.has_new_items
+                    has_new_items: newStatus === 'served' ? false : prev.has_new_items,
+                    new_items_start_index: newStatus === 'served' ? null : prev.new_items_start_index,
                 }));
             }
     
@@ -389,6 +460,7 @@ const OrdersVisiblePage = () => {
             toast.error("❌ Failed to update order status.");
         }
     };
+    
 
     const handleItemStatusChange = async (orderId, itemId, newStatus) => {
         try {
@@ -422,33 +494,54 @@ const OrdersVisiblePage = () => {
     };
 
 
-    // ✅ Updated cancelItem to accept backend id
     const cancelItem = async (orderId, itemBackendId) => {
         const order = orders.find((o) => o.id === orderId);
         const item = order?.items.find((i) => i.id === itemBackendId);
         if (!item) return;
-
+    
         try {
             await axios.delete(`${import.meta.env.VITE_API_ORDER_SERVICE_URL}/${clientId}/order_item/delete`, {
                 params: { order_item_id: itemBackendId, client_id: clientId },
                 headers: { Authorization: `Bearer ${token}` },
             });
-
+    
+            // ✅ Remove from localStorage if it's a new item
+            if (item.is_new_item && item.frontend_unique_key) {
+                const storageKey = `order_${orderId}_new_item_${item.frontend_unique_key}`;
+                localStorage.removeItem(storageKey);
+            }
+    
+            // ✅ Update orders state
             const updatedOrders = orders.map((o) => {
                 if (o.id !== orderId) return o;
-
+    
                 const updatedItems = o.items.filter((i) => i.id !== itemBackendId);
-
+    
                 const newTotal = updatedItems.reduce((sum, item) => {
                     const price = inventoryMap[item.item_id]?.unit_price || item.price || 0;
                     return sum + (item.quantity || 1) * price;
                 }, 0);
-
-                return { ...o, items: updatedItems, total_price: newTotal };
+    
+                const oldItemsCount = updatedItems.filter(i => !i.is_new_item).length;
+    
+                return { 
+                    ...o, 
+                    items: updatedItems, 
+                    total_price: newTotal,
+                    has_new_items: updatedItems.some(i => i.is_new_item),
+                    new_items_start_index: oldItemsCount > 0 && updatedItems.some(i => i.is_new_item) ? oldItemsCount : null,
+                };
             });
-
+    
             setOrders(updatedOrders);
-
+    
+            if (selectedOrder?.id === orderId) {
+                const updatedOrder = updatedOrders.find(o => o.id === orderId);
+                if (updatedOrder) {
+                    setSelectedOrder(updatedOrder);
+                }
+            }
+    
             const newOrder = updatedOrders.find((o) => o.id === orderId);
             if (newOrder) {
                 await axios.post(
@@ -457,12 +550,12 @@ const OrdersVisiblePage = () => {
                     { headers: { Authorization: `Bearer ${token}` } }
                 );
             }
-
+    
             setEditedItemsMap((prev) => {
                 const updated = (prev[orderId] || []).filter((i) => i.id !== itemBackendId);
                 return { ...prev, [orderId]: updated };
             });
-
+    
             toast.success("Item cancelled and total updated");
         } catch (err) {
             toast.error("❌ Failed to cancel item.");
@@ -696,239 +789,271 @@ const OrdersVisiblePage = () => {
                         )}
                     </div>
                 )}
-                {showOrderDetailModal && selectedOrder && (
-                    <div className="orders-visible-modal-overlay" onClick={() => setShowOrderDetailModal(false)}>
-                        <div className="orders-detail-popup" onClick={(e) => e.stopPropagation()}>
-                            {/* Left Side - Available Items */}
-                            <div className="orders-detail-left">
-                                <h3>Available Items</h3>
-                                <input
-                                    type="text"
-                                    className="orders-visible-item-search"
-                                    placeholder="Search items..."
-                                    value={itemSearchQuery}
-                                    onChange={(e) => setItemSearchQuery(e.target.value)}
-                                />
-                                <div className="orders-detail-items-list">
-                                    {itemSearchResults.length > 0 ? (
-                                        <ul className="orders-visible-search-results">
-                                            {itemSearchResults.map((item) => (
-                                                <li key={item.id} onClick={() => {
-                                                    addItemToOrder(selectedOrder.id, item);
-                                                    setSelectedOrder(prev => ({
-                                                        ...prev,
-                                                        items: [...prev.items, {
-                                                            item_id: item.id,
-                                                            item_name: item.name,
-                                                            quantity: 1,
-                                                            price: item.unit_price,
-                                                            status: "new",
-                                                        }]
-                                                    }));
-                                                }}>
-                                                    <span>{item.name}</span>
-                                                    <span>₹{item.unit_price}</span>
-                                                </li>
-                                            ))}
-                                        </ul>
-                                    ) : (
-                                        <div className="orders-detail-all-items">
-                                            {allInventoryItems.map((item) => (
-                                                <div
-                                                    key={item.id}
-                                                    className="orders-detail-item-card"
-                                                    onClick={() => {
-                                                        addItemToOrder(selectedOrder.id, item);
-                                                        setSelectedOrder(prev => ({
-                                                            ...prev,
-                                                            items: [...prev.items, {
-                                                                item_id: item.id,
-                                                                item_name: item.name,
-                                                                quantity: 1,
-                                                                price: item.unit_price,
-                                                                status: "new",
-                                                            }]
-                                                        }));
-                                                    }}
-                                                >
-                                                    <span>{item.name}</span>
-                                                    <span>₹{item.unit_price}</span>
-                                                </div>
-                                            ))}
-                                        </div>
-                                    )}
-                                </div>
+               {showOrderDetailModal && selectedOrder && (
+    <div className="orders-visible-modal-overlay" onClick={() => setShowOrderDetailModal(false)}>
+        <div className="orders-detail-popup" onClick={(e) => e.stopPropagation()}>
+            
+            {/* Left Side - Available Items - ONLY SHOW IN EDIT MODE */}
+            {editOrderId === selectedOrder.id && (
+                <div className="orders-detail-left">
+                    <h3>Available Items</h3>
+                    <input
+                        type="text"
+                        className="orders-visible-item-search"
+                        placeholder="Search items..."
+                        value={itemSearchQuery}
+                        onChange={(e) => setItemSearchQuery(e.target.value)}
+                    />
+                    <div className="orders-detail-items-list">
+                        {itemSearchResults.length > 0 ? (
+                            <ul className="orders-visible-search-results">
+                                {itemSearchResults.map((item) => (
+                                    <li 
+                                        key={item.id} 
+                                        onClick={() => {
+                                            const timestamp = Date.now();
+                                            const uniqueKey = `${item.id}_${timestamp}`;
+                                            addItemToOrder(selectedOrder.id, item);
+                                            setSelectedOrder(prev => ({
+                                                ...prev,
+                                                items: [...prev.items, {
+                                                    item_id: item.id,
+                                                    item_name: item.name,
+                                                    quantity: 1,
+                                                    price: item.unit_price,
+                                                    status: "new",
+                                                    is_new_item: true,frontend_unique_key: uniqueKey,
+                                                    added_at_frontend: timestamp,
+                                                }]
+                                            }));
+                                        }}
+                                    >
+                                        <span>{item.name}</span>
+                                        <span>₹{item.unit_price}</span>
+                                    </li>
+                                ))}
+                            </ul>
+                        ) : itemSearchQuery.trim() === "" ? (
+                            <div className="orders-detail-all-items">
+                                {allInventoryItems.map((item) => (
+                                    <div
+                                        key={item.id}
+                                        className="orders-detail-item-card"
+                                        onClick={() => {
+                                            const timestamp = Date.now();
+                                            const uniqueKey = `${item.id}_${timestamp}`;
+                                            addItemToOrder(selectedOrder.id, item);
+                                            setSelectedOrder(prev => ({
+                                                ...prev,
+                                                items: [...prev.items, {
+                                                    item_id: item.id,
+                                                    item_name: item.name,
+                                                    quantity: 1,
+                                                    price: item.unit_price,
+                                                    status: "new",
+                                                    is_new_item: true,frontend_unique_key: uniqueKey,
+                                                    added_at_frontend: timestamp,
+                                                }]
+                                            }));
+                                        }}
+                                    >
+                                        <span>{item.name}</span>
+                                        <span>₹{item.unit_price}</span>
+                                    </div>
+                                ))}
                             </div>
-
-                            {/* Right Side - Order Details */}
-                            <div className="orders-detail-right">
-                                <div className="orders-detail-header">
-                                    <button
-                                        className="orders-detail-close"
-                                        onClick={() => setShowOrderDetailModal(false)}
-                                    >
-                                        ×
-                                    </button>
-                                    <h2>{tablesMap[selectedOrder.table_id] || selectedOrder.table_id}</h2>
-                                    <span className="orders-visible-items-count">
-                                        {selectedOrder.items.length} items
-                                    </span>
-                                    <button
-                                        className="orders-visible-invoice-btn"
-                                        onClick={() => openInvoiceModal(selectedOrder)}
-                                    >
-                                        Invoice
-                                    </button>
-                                </div>
-
-                                <div className="orders-detail-info">
-                                    <span>Date: {new Date(selectedOrder.created_at).toLocaleDateString()}</span>
-                                    <span>
-                                        Total: ₹{selectedOrder.items.reduce(
-                                            (sum, item) =>
-                                                sum + ((inventoryMap[item.item_id]?.unit_price || item.unit_price || item.price || 0) * (item.quantity || 1)),
-                                            0
-                                        ).toFixed(2)}
-                                    </span>
-                                </div>
-                                <div className="orders-detail-items">
-    {editOrderId === selectedOrder.id ? (
-        <div className="orders-visible-edit-items-list">
-            {selectedOrder.items.map((item, idx) => {
-                // Show divider only at the transition point (once)
-                const showDivider = selectedOrder.has_new_items && 
-                                   selectedOrder.new_items_start_index !== null &&
-                                   idx === selectedOrder.new_items_start_index;
-
-                return (
-                    <React.Fragment key={item.id || idx}>
-                        {showDivider && (
-                            <div className="orders-item-divider">
-                                <span>Newly Added Items</span>
+                        ) : (
+                            <div className="orders-visible-no-results">
+                                No items found matching "{itemSearchQuery}"
                             </div>
                         )}
-                        <div className="orders-visible-edit-item-row">
-                            <span>{item.item_name || item.item_id}</span>
-                            <div className="orders-visible-edit-qty-controls">
-                                <button
-                                    onClick={() => {
-                                        updateItemQuantity(selectedOrder.id, item.item_id, item.quantity - 1);
-                                        setSelectedOrder(prev => ({
-                                            ...prev,
-                                            items: prev.items.map(i => 
-                                                i.id === item.id
-                                                    ? {...i, quantity: Math.max(1, i.quantity - 1)}
-                                                    : i
-                                            )
-                                        }));
-                                    }}
-                                    disabled={item.quantity <= 1}
-                                >
-                                    −
-                                </button>
-                                <span>{item.quantity}</span>
-                                <button onClick={() => {
-                                    updateItemQuantity(selectedOrder.id, item.item_id, item.quantity + 1);
-                                    setSelectedOrder(prev => ({
-                                        ...prev,
-                                        items: prev.items.map(i => 
-                                            i.id === item.id
-                                                ? {...i, quantity: i.quantity + 1}
-                                                : i
-                                        )
-                                    }));
-                                }}>+</button>
-                            </div>
-                            <button
-                                className="orders-visible-btn orders-visible-edit-delete-btn"
-                                onClick={() => {
-                                    setDeleteTarget({ orderId: selectedOrder.id, itemBackendId: item.id });
-                                    setShowDeleteModals(true);
-                                }}
-                                disabled={item.status === "cancelled"}
-                            >
-                                Delete
-                            </button>
-                        </div>
-                    </React.Fragment>
-                );
-            })}
-        </div>
-    ) : (
-        selectedOrder.items.map((item, idx) => {
-            // Show divider only at the transition point (once)
-            const showDivider = selectedOrder.has_new_items && 
-                               selectedOrder.new_items_start_index !== null &&
-                               idx === selectedOrder.new_items_start_index;
-
-            return (
-                <React.Fragment key={item.id || idx}>
-                    {showDivider && (
-                        <div className="orders-item-divider">
-                            <span>Newly Added Items</span>
-                        </div>
-                    )}
-                    <div className="orders-visible-item-row">
-                        <span>{item.item_name || item.item_id}</span>
-                        <span>Qty: {item.quantity}</span>
                     </div>
-                </React.Fragment>
-            );
-        })
-    )}
-</div>
+                </div>
+            )}
 
-                                <div className="orders-detail-actions">
-                                    {editOrderId === selectedOrder.id ? (
-                                        <>
+            {/* Right Side - Order Details */}
+            <div 
+                className="orders-detail-right" 
+                style={{
+                    width: editOrderId === selectedOrder.id ? '50%' : '100%',
+                }}
+            >
+                <div className="orders-detail-header">
+                    <button
+                        className="orders-detail-close"
+                        onClick={() => {
+                            setShowOrderDetailModal(false);
+                            setEditOrderId(null); // Exit edit mode when closing
+                            setItemSearchQuery(""); // Clear search
+                        }}
+                    >
+                        ×
+                    </button>
+                    <h2>{tablesMap[selectedOrder.table_id] || selectedOrder.table_id}</h2>
+                    <span className="orders-visible-items-count">
+                        {selectedOrder.items.length} items
+                    </span>
+                    <button
+                        className="orders-visible-invoice-btn"
+                        onClick={() => openInvoiceModal(selectedOrder)}
+                    >
+                        Invoice
+                    </button>
+                </div>
+
+                <div className="orders-detail-info">
+                    <span>Date: {new Date(selectedOrder.created_at).toLocaleDateString()}</span>
+                    <span>
+                        Total: ₹{selectedOrder.items.reduce(
+                            (sum, item) =>
+                                sum + ((inventoryMap[item.item_id]?.unit_price || item.unit_price || item.price || 0) * (item.quantity || 1)),
+                            0
+                        ).toFixed(2)}
+                    </span>
+                </div>
+                
+                <div className="orders-detail-items">
+                    {editOrderId === selectedOrder.id ? (
+                        <div className="orders-visible-edit-items-list">
+                            {selectedOrder.items.map((item, idx) => {
+                                const showDivider = selectedOrder.has_new_items && 
+                                                   selectedOrder.new_items_start_index !== null &&
+                                                   idx === selectedOrder.new_items_start_index;
+
+                                return (
+                                    <React.Fragment key={item.id || idx}>
+                                        {showDivider && (
+                                            <div className="orders-item-divider">
+                                                <span>Newly Added Items</span>
+                                            </div>
+                                        )}
+                                        <div className="orders-visible-edit-item-row">
+                                            <span>{item.item_name || item.item_id}</span>
+                                            <div className="orders-visible-edit-qty-controls">
+                                                <button
+                                                    onClick={() => {
+                                                        updateItemQuantity(selectedOrder.id, item.item_id, item.quantity - 1);
+                                                        setSelectedOrder(prev => ({
+                                                            ...prev,
+                                                            items: prev.items.map(i => 
+                                                                i.id === item.id
+                                                                    ? {...i, quantity: Math.max(1, i.quantity - 1)}
+                                                                    : i
+                                                            )
+                                                        }));
+                                                    }}
+                                                    disabled={item.quantity <= 1}
+                                                >
+                                                    −
+                                                </button>
+                                                <span>{item.quantity}</span>
+                                                <button onClick={() => {
+                                                    updateItemQuantity(selectedOrder.id, item.item_id, item.quantity + 1);
+                                                    setSelectedOrder(prev => ({
+                                                        ...prev,
+                                                        items: prev.items.map(i => 
+                                                            i.id === item.id
+                                                                ? {...i, quantity: i.quantity + 1}
+                                                                : i
+                                                        )
+                                                    }));
+                                                }}>+</button>
+                                            </div>
                                             <button
-                                                className="orders-visible-btn orders-visible-save-btn"
+                                                className="orders-visible-btn orders-visible-edit-delete-btn"
                                                 onClick={() => {
-                                                    updateOrderItems(selectedOrder.id, selectedOrder.items);
+                                                    setDeleteTarget({ orderId: selectedOrder.id, itemBackendId: item.id });
+                                                    setShowDeleteModals(true);
                                                 }}
+                                                disabled={item.status === "cancelled"}
                                             >
-                                                Save Items
+                                                Delete
                                             </button>
-                                            <button
-                                                className="orders-visible-btn orders-visible-edit-btn active"
-                                                onClick={() => setEditOrderId(null)}
-                                            >
-                                                Done Editing
-                                            </button>
-                                        </>
-                                    ) : (
-                                        <button
-                                            className="orders-visible-btn orders-visible-edit-btn"
-                                            onClick={() => setEditOrderId(selectedOrder.id)}
-                                        >
-                                            Edit
-                                        </button>
-                                    )}
-                                    <button
-                                        className="orders-visible-btn orders-visible-served-btn"
-                                        disabled={selectedOrder.status === "served"}
-                                        onClick={() => {
-                                            handleStatusChange(selectedOrder.id, "served");
-                                            setShowOrderDetailModal(false);
-                                        }}
-                                    >
-                                        Served
-                                    </button>
-                                    <button
-                                        className="orders-visible-btn orders-visible-delete-btn"
-                                        onClick={() => {
-                                            setOrderToDelete(selectedOrder.id);
-                                            setShowDeleteModal(true);
-                                            setShowOrderDetailModal(false);
-                                        }}
-                                    >
-                                        Delete
-                                    </button>
-                                </div>
-                            </div>
+                                        </div>
+                                    </React.Fragment>
+                                );
+                            })}
                         </div>
-                    </div>
-                )}
+                    ) : (
+                        selectedOrder.items.map((item, idx) => {
+                            const showDivider = selectedOrder.has_new_items && 
+                                               selectedOrder.new_items_start_index !== null &&
+                                               idx === selectedOrder.new_items_start_index;
+
+                            return (
+                                <React.Fragment key={item.id || idx}>
+                                    {showDivider && (
+                                        <div className="orders-item-divider">
+                                            <span>Newly Added Items</span>
+                                        </div>
+                                    )}
+                                    <div className="orders-visible-item-row">
+                                        <span>{item.item_name || item.item_id}</span>
+                                        <span>Qty: {item.quantity}</span>
+                                    </div>
+                                </React.Fragment>
+                            );
+                        })
+                    )}
+                </div>
+
+                <div className="orders-detail-actions">
+                    {editOrderId === selectedOrder.id ? (
+                        <>
+                            <button
+                                className="orders-visible-btn orders-visible-save-btn"
+                                onClick={() => {
+                                    updateOrderItems(selectedOrder.id, selectedOrder.items);
+                                }}
+                            >
+                                Save Items
+                            </button>
+                            <button
+                                className="orders-visible-btn orders-visible-edit-btn active"
+                                onClick={() => {
+                                    setEditOrderId(null);
+                                    setItemSearchQuery(""); // Clear search when exiting edit mode
+                                }}
+                            >
+                                Done Editing
+                            </button>
+                        </>
+                    ) : (
+                        <button
+                            className="orders-visible-btn orders-visible-edit-btn"
+                            onClick={() => setEditOrderId(selectedOrder.id)}
+                        >
+                            Edit
+                        </button>
+                    )}
+                    <button
+                        className="orders-visible-btn orders-visible-served-btn"
+                        disabled={selectedOrder.status === "served"}
+                        onClick={() => {
+                            handleStatusChange(selectedOrder.id, "served");
+                            setShowOrderDetailModal(false);
+                            setEditOrderId(null);
+                        }}
+                    >
+                        Served
+                    </button>
+                    <button
+                        className="orders-visible-btn orders-visible-delete-btn"
+                        onClick={() => {
+                            setOrderToDelete(selectedOrder.id);
+                            setShowDeleteModal(true);
+                            setShowOrderDetailModal(false);
+                            setEditOrderId(null);
+                        }}
+                    >
+                        Delete
+                    </button>
+                </div>
+            </div>
+        </div>
+    </div>
+)}
+
                 {showDeleteModals && deleteTarget && (
                     <div className="orders-visible-modal-overlay">
                         <div className="orders-visible-modal orders-visible-delete-modal">
@@ -1047,3 +1172,26 @@ export default OrdersVisiblePage;
 // ================
 // ================
 // ================
+// ================
+// ================
+// ================
+// ================
+// ================
+// ================
+// ================
+// ================
+// ================
+// ================
+// ================
+// ================
+// ================
+// ================
+// ================
+// ================
+// ================
+// ================
+// ================
+// ================
+// ================
+// ================
+
