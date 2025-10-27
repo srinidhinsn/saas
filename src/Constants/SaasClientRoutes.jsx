@@ -3,15 +3,16 @@ import { Routes, Route, useParams, Navigate, useLocation } from "react-router-do
 import { jwtDecode } from "jwt-decode";
 import api, { getValidToken } from "./Api";
 import Navbar from "./Navbar";
-import NavbarA from "./Navbar1";
-import NavbarB from "./Navbar2";
-import NavbarC from "./Navbar3";
-// import NavbarC from "./NavbarC";
+import NavbarA from "./Navbar_Versions/Navbar1";
+import NavbarB from "./Navbar_Versions/Navbar2";
+import NavbarC from "./Navbar_Versions/Navbar3";
+import Navbar_V4 from "./Navbar_Versions/Navbar_V4";
 import HeaderBar from "./HeaderPage";
 import AuthModal from "./AuthModel";
 import Add_user from "../Main_Components/Add_Users/Add_user";
 import DashBoardPage from "./DashBoardPage";
 import DashBoard_V3 from "./DashBoard_Versions/DashBoard_V3";
+import DashBoard_V4 from "./DashBoard_Versions/DashBoard_V4";
 import MenuManager from "../Main_Components/Inventory_Services_Components/MenuManager";
 import ViewTables from "../Main_Components/Table_Service_Components/Table_Inventory_Order";
 import TableManagement from "../Main_Components/Table_Service_Components/TableManagement";
@@ -26,7 +27,9 @@ import NotificationTable from "../Main_Components/Notification_Services_Componen
 import PopupNotification from "../Main_Components/Notification_Services_Components/Popup_Notifications";
 import RoleConfig from '../Main_Components/Role_Configuration/RoleConfig'
 import BillingPage from '../Main_Components/Invoice_Services_Components/BillingUI'
-import ClientDetails from "../Main_Components/Client-Services/ClientDetails";
+import ClientDetails_V3 from "../Main_Components/Client-Services/ClientDetails_V3";
+import ClientDetails_V4 from "../Main_Components/Client-Services/ClientDetails_V4";
+import Document from "../Main_Components/Document_Service_Components/Document";
 
 const AccessDenied = ({ onAuthClick }) => (
   <div style={{ textAlign: "center", padding: "2rem" }}>
@@ -124,6 +127,8 @@ const SaasClientRoutes = ({
         return <NavbarB />;
       case "user_v3":
         return <NavbarC />;
+      case "user_v4":
+        return <Navbar_V4/>  
       default:
         return <Navbar />; // fallback
     }
@@ -134,6 +139,8 @@ const SaasClientRoutes = ({
         return <DashBoard_V3 realm={selectedRealm} />;
       case "user_v2":
         return <DashBoardPage version="v2" realm={selectedRealm} />;
+      case "user_v4":
+        return <DashBoard_V4 realm={selectedRealm}  /> 
       default:
         return <DashBoardPage realm={selectedRealm} />;
     }
@@ -187,7 +194,9 @@ const SaasClientRoutes = ({
               <Route path="role-config" element={<RoleConfig />} />
               <Route path="/billing" element={<BillingPage />} />
               <Route path="add-users" element={<Add_user />} />
-              <Route path="client-details" element={<ClientDetails selectedRealm={selectedRealm} />} />
+              <Route path="client-details_v3" element={<ClientDetails_V3 selectedRealm={selectedRealm} />} />
+              <Route path="client-details_v4" element={<ClientDetails_V4 selectedRealm={selectedRealm} />} />
+              <Route path="documents-download" element={<Document/>} />
               <Route path="*" element={<Navigate to="/" />} />
             </Routes>
           )}

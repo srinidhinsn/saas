@@ -2682,21 +2682,20 @@ input:focus {
 
   .mpc-backdrop {
     width: 100%;
-    min-height: 100vh;
-    background: linear-gradient(120deg,#e4ecfa 0%, #fff6e7 100%);
+    min-height: 89vh;
+    background:var(--bg-color);
     display: flex;
     justify-content: center;
     align-items: flex-start;
     padding: 2.5vw 0 3vw 0;
   }
   .mpc-card {
-    background: #fff;
+    background: var(--bg-container);
     border-radius: 20px;
     box-shadow: 0 8px 40px rgba(80,103,212,.16);
     padding: 2.5rem 2rem 2.2rem 2rem;
-    min-width: 350px;
+    min-width: 250px;
     max-width: 640px;
-    width: 100%;
     margin: auto;
   }
   .mpc-profile-header {
@@ -2795,14 +2794,25 @@ input:focus {
   }
   /* Responsive */
   @media (max-width: 730px) {
+    .mpc-backdrop{
+      width: 270px;
+    }.mpc-name,.mpc-email{
+      font-size: 10px;
+    }
     .mpc-card { padding: 1.6rem 0.95rem; }
     .mpc-details-grid { grid-template-columns: 1fr; gap: 1.05rem 0;}
-    .mpc-avatar { width: 56px; height: 56px; }
+    .mpc-avatar { display: none; }
+    .mpc-edit-btn{
+      padding: 5px;
+    }
   }
   @media (max-width: 450px) {
     .mpc-card { border-radius: 10px; min-width: 0; padding: .9rem .49rem;}
     .mpc-profile-header { gap: 1rem; }
     .mpc-btn { width: 100%; }
+    .mpc-card {
+      width: 250px;
+    }
   }
 /* ================================ */
 /* ================================ */
@@ -3321,6 +3331,167 @@ input:focus {
 /* ============================================
  RIGHT PANEL - ORDER DETAILS
  ============================================ */
+/* Main container */
+.orders-detail-items {
+  display: flex;
+  flex-direction: column;
+  gap: 10px;
+  padding: 10px 15px;
+  border-radius: 12px;
+  box-shadow: 0 2px 6px rgba(0,0,0,0.2);
+  max-height: 65vh;
+  overflow-y: auto;
+}
+
+/* Divider for batches */
+.orders-item-divider {
+  text-align: center;
+  margin: 12px 0 8px;
+  position: relative;
+}
+
+.orders-item-divider span {
+  background: var(--bg-secondary, #1f1f1f);
+  color: var(--text-muted, #aaa);
+  font-size: 0.85rem;
+  padding: 2px 10px;
+  border-radius: 20px;
+  border: 1px solid var(--border-color, #333);
+  text-transform: uppercase;
+  letter-spacing: 0.5px;
+}
+
+/* Item rows (non-edit mode) */
+.orders-visible-item-row {
+  display: flex;
+  justify-content: space-between;
+  align-items: center;
+  background: var(--bg-light, #292929);
+  padding: 10px 14px;
+  border-radius: 10px;
+  border: 1px solid var(--border-color, #333);
+  transition: background 0.2s ease;
+}
+
+
+
+/* Item rows (edit mode) */
+.orders-visible-edit-item-row {
+  display: flex;
+  align-items: center;
+  justify-content: space-between;
+  background: var(--bg-light, #292929);
+  padding: 10px 14px;
+  border-radius: 10px;
+  border: 1px solid var(--border-color, #333);
+  transition: background 0.2s ease;
+}
+
+
+/* Quantity controls */
+.orders-visible-edit-qty-controls {
+  display: flex;
+  align-items: center;
+  gap: 8px;
+}
+
+.orders-visible-edit-qty-controls button {
+  background: var(--accent, #4caf50);
+  border: none;
+  color: white;
+  font-weight: bold;
+  border-radius: 6px;
+  width: 26px;
+  height: 26px;
+  cursor: pointer;
+  transition: transform 0.1s ease, background 0.2s;
+}
+
+.orders-visible-edit-qty-controls button:hover {
+  transform: scale(1.05);
+  background: var(--accent-hover, #45a049);
+}
+
+/* Delete button */
+.orders-visible-btn.orders-visible-edit-delete-btn {
+  background: #ff4d4f;
+  color: #fff;
+  border: none;
+  border-radius: 6px;
+  padding: 6px 12px;
+  font-size: 0.85rem;
+  cursor: pointer;
+  transition: background 0.2s ease, transform 0.1s ease;
+}
+
+.orders-visible-btn.orders-visible-edit-delete-btn:hover {
+  background: #e04345;
+  transform: scale(1.05);
+}
+
+.orders-visible-btn.orders-visible-edit-delete-btn:disabled {
+  background: #555;
+  cursor: not-allowed;
+}
+
+/* Status badge */
+.item-status-badge {
+  display: inline-block;
+  padding: 3px 8px;
+  font-size: 0.75rem;
+  border-radius: 12px;
+  text-transform: capitalize;
+  font-weight: 500;
+  min-width: 65px;
+  text-align: center;
+}
+
+/* Status colors */
+.status-new {
+  background: #ff6347;
+  color: white;
+}
+
+.status-pending {
+  background: #ffcc00;
+  color: #000;
+}
+
+.status-preparing {
+  background: #ff9800;
+  color: #000;
+}
+
+.status-served {
+  background: #4caf50;
+  color: white;
+}
+
+.status-cancelled {
+  background: #777;
+  color: #eee;
+}
+
+/* Edit items container */
+.orders-visible-edit-items-list {
+  display: flex;
+  flex-direction: column;
+  gap: 8px;
+}
+
+/* Scrollbar customization (optional) */
+.orders-detail-items::-webkit-scrollbar {
+  width: 6px;
+}
+
+.orders-detail-items::-webkit-scrollbar-thumb {
+  background: #444;
+  border-radius: 4px;
+}
+
+.orders-detail-items::-webkit-scrollbar-thumb:hover {
+  background: #666;
+}
 
 .orders-detail-right {
   flex: 1;
