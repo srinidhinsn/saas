@@ -3373,7 +3373,11 @@ input:focus {
   transition: background 0.2s ease;
 }
 
-
+.orders-item-divider-line {
+  width: 100%;
+  border-top: 2px dashed #666;
+  margin: 12px 0;
+}
 
 /* Item rows (edit mode) */
 .orders-visible-edit-item-row {
