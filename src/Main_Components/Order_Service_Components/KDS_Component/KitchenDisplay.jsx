@@ -10,7 +10,7 @@ const KitchenDisplay = () => {
     const { clientId } = useParams();
     const token = localStorage.getItem("access_token");
     const { darkMode } = useTheme();
-
+    const [currentBatchTimestamp, setCurrentBatchTimestamp] = useState(null);
     const [orders, setOrders] = useState([]);
     const [tablesMap, setTablesMap] = useState({});
     const [inventoryItems, setInventoryItems] = useState([]);
@@ -55,7 +55,9 @@ const KitchenDisplay = () => {
             })
             .catch(() => toast.error("Failed to fetch tables"));
     }, [clientId, token]);
-
+    const generateSlug = (name) => {
+        return name ? name.toLowerCase().replace(/[\s]+/g, "-") : "";
+    };
     // Fetch inventory items
     useEffect(() => {
         if (!token || !clientId) return;
@@ -65,6 +67,7 @@ const KitchenDisplay = () => {
                 headers: { Authorization: `Bearer ${token}` },
             })
             .then((res) => {
+                console.log("📦 Sample inventory item:", res.data?.data?.[0]); // ✅ CHECK THIS
                 setInventoryItems(res.data?.data || []);
                 const map = {};
                 (res.data?.data || []).forEach((item) => {
@@ -74,7 +77,6 @@ const KitchenDisplay = () => {
             })
             .catch(() => toast.error("Failed to fetch inventory items"));
     }, [clientId, token]);
-
     useEffect(() => {
         const fetchOrders = async () => {
             if (!token || !clientId) {
@@ -96,69 +98,142 @@ const KitchenDisplay = () => {
                     return orderDate === todayString && order.status !== "served";
                 });
 
-                // ✅ Process orders and restore new items from localStorage (same as OrdersVisiblePage)
+                console.log(`📊 Processing ${todayOrders.length} orders`);
+
                 setOrders(todayOrders.map(order => {
-                    // If order is served, clear localStorage flags
+                    console.log(`\n🔄 Processing order ${order.id}`);
+
                     if (order.status === 'served') {
                         clearNewItemsStorage(order.id);
                         return order;
                     }
 
-                    // ✅ Get new items from localStorage
-                    // ✅ Get new items from localStorage
+                    // ✅ Get localStorage data
                     const newItemsFromStorage = getNewItemsFromStorage(order.id);
+                    console.log(`📦 localStorage items for order ${order.id}:`, newItemsFromStorage);
 
                     if (newItemsFromStorage.length === 0) {
+                        console.log(`✅ No new items for order ${order.id}`);
                         return order;
                     }
 
-                    // ✅ Count how many times each item_id appears in the order
-                    const itemCounts = {};
-                    order.items.forEach(item => {
-                        itemCounts[item.item_id] = (itemCounts[item.item_id] || 0) + 1;
+                    const storageUniqueKeys = new Set(newItemsFromStorage.map(item => item.unique_key));
+                    console.log(`🔑 Storage unique keys:`, Array.from(storageUniqueKeys));
+
+                    // ✅ Build a map: frontend_unique_key → batch_timestamp from localStorage
+                    const keyToBatchMap = new Map();
+                    newItemsFromStorage.forEach(storageItem => {
+                        if (storageItem.unique_key && storageItem.batch_timestamp) {
+                            keyToBatchMap.set(storageItem.unique_key, storageItem.batch_timestamp);
+                        }
                     });
 
-                    // ✅ Track how many of each item_id we've seen
-                    const seenCounts = {};
+                    // ✅ Separate items into OLD and items grouped by BATCH
+                    const oldItems = [];
+                    const batchItemsMap = new Map();
 
-                    // ✅ Process items
-                    const processedItems = order.items.map((item, index) => {
-                        const itemId = item.item_id;
-                        seenCounts[itemId] = (seenCounts[itemId] || 0) + 1;
+                    // ✅ Track which localStorage keys are already in backend
+                    const backendUniqueKeys = new Set(
+                        order.items
+                            .filter(item => item.frontend_unique_key)
+                            .map(item => item.frontend_unique_key)
+                    );
+                    console.log(`🔑 Backend unique keys:`, Array.from(backendUniqueKeys));
 
-                        const newItemsWithThisId = newItemsFromStorage.filter(
-                            nid => nid.item_id === itemId
-                        );
+                    // ✅ Process backend items
+                    order.items.forEach((item, idx) => {
+                        if (item.frontend_unique_key) {
+                            // Item has a unique key - determine if it's new
+                            let batchTimestamp = keyToBatchMap.get(item.frontend_unique_key);
 
-                        if (newItemsWithThisId.length === 0) {
-                            return item;
+                            if (!batchTimestamp) {
+                                // ✅ Extract timestamp from the key itself
+                                const parts = item.frontend_unique_key.split('_');
+                                if (parts.length >= 2) {
+                                    const extractedTimestamp = parseFloat(parts[parts.length - 1]);
+                                    if (!isNaN(extractedTimestamp)) {
+                                        batchTimestamp = Math.floor(extractedTimestamp / 1000) * 1000;
+                                    }
+                                }
+                            }
+
+                            if (batchTimestamp) {
+                                console.log(`✅ Item ${idx} "${item.item_name}" is NEW (batch: ${batchTimestamp})`);
+                                if (!batchItemsMap.has(batchTimestamp)) {
+                                    batchItemsMap.set(batchTimestamp, []);
+                                }
+                                batchItemsMap.get(batchTimestamp).push({
+                                    ...item,
+                                    is_new_item: true,
+                                    batch_timestamp: batchTimestamp,
+                                });
+                            } else {
+                                console.log(`❌ Item ${idx} "${item.item_name}" has unique_key but no batch - treating as OLD`);
+                                oldItems.push(item);
+                            }
+                        } else {
+                            console.log(`⬜ Item ${idx} "${item.item_name}" has no unique_key - OLD`);
+                            oldItems.push(item);
                         }
-
-                        const totalWithThisId = itemCounts[itemId];
-                        const oldItemsWithThisId = totalWithThisId - newItemsWithThisId.length;
-
-                        if (seenCounts[itemId] > oldItemsWithThisId) {
-                            return {
-                                ...item,
-                                is_new_item: true,
-                                frontend_unique_key: newItemsWithThisId[seenCounts[itemId] - oldItemsWithThisId - 1]?.unique_key
-                            };
-                        }
-
-                        return item;
                     });
 
-                    // ✅ Calculate divider position
-                    const oldItemsCount = processedItems.filter(i => !i.is_new_item).length;
+                    // ✅ Add truly unsaved items from localStorage
+                    newItemsFromStorage.forEach(storageItem => {
+                        if (!backendUniqueKeys.has(storageItem.unique_key)) {
+                            const itemInfo = inventoryMap[storageItem.item_id];
+                            if (itemInfo && storageItem.batch_timestamp) {
+                                console.log(`➕ Adding unsaved item from localStorage: ${itemInfo.name}`);
+                                if (!batchItemsMap.has(storageItem.batch_timestamp)) {
+                                    batchItemsMap.set(storageItem.batch_timestamp, []);
+                                }
+                                batchItemsMap.get(storageItem.batch_timestamp).push({
+                                    item_id: storageItem.item_id,
+                                    item_name: itemInfo.name,
+                                    quantity: storageItem.quantity || 1,
+                                    price: itemInfo.unit_price || itemInfo.price,
+                                    status: "new",
+                                    note: "",
+                                    slug: itemInfo.slug || generateSlug(itemInfo.name),
+                                    added_at_frontend: storageItem.added_at,
+                                    frontend_unique_key: storageItem.unique_key,
+                                    is_new_item: true,
+                                    batch_timestamp: storageItem.batch_timestamp,
+                                    id: storageItem.unique_key,
+                                });
+                            }
+                        }
+                    });
+
+                    // ✅ Build final items array with batch dividers
+                    const allItems = [...oldItems];
+                    const batchDividers = [];
+
+                    // Sort batches by timestamp
+                    const sortedBatchTimestamps = Array.from(batchItemsMap.keys()).sort((a, b) => a - b);
+
+                    sortedBatchTimestamps.forEach((timestamp, batchIdx) => {
+                        const batchItems = batchItemsMap.get(timestamp);
+                        if (batchItems && batchItems.length > 0) {
+                            batchDividers.push({
+                                index: allItems.length,
+                                batch_number: batchIdx + 2,
+                            });
+                            allItems.push(...batchItems);
+                        }
+                    });
+
+                    console.log(`📊 Order ${order.id} summary: ${oldItems.length} old items, ${sortedBatchTimestamps.length} batches`);
+
                     return {
                         ...order,
-                        items: processedItems,
-                        has_new_items: newItemsFromStorage.length > 0,
-                        new_items_start_index: oldItemsCount > 0 ? oldItemsCount : null,
+                        items: allItems,
+                        has_new_items: batchItemsMap.size > 0,
+                        batch_dividers: batchDividers,
                     };
                 }));
 
-            } catch {
+            } catch (err) {
+                console.error("❌ Error fetching orders:", err);
                 toast.error("Failed to fetch orders");
             } finally {
                 setLoading(false);
@@ -168,7 +243,7 @@ const KitchenDisplay = () => {
         fetchOrders();
         const interval = setInterval(fetchOrders, 10000);
         return () => clearInterval(interval);
-    }, [clientId, token]);
+    }, [clientId, token, inventoryMap]);
 
     useEffect(() => {
         if (!addingOrderId) {
@@ -188,15 +263,26 @@ const KitchenDisplay = () => {
         setItemSearchResults(filtered);
     }, [itemSearchQuery, addingOrderId, inventoryItems, orders]);
 
-    const generateSlug = (name) => {
-        return name.toLowerCase().replace(/[\s]+/g, "-");
-    };
 
     const addItemToOrder = (orderId, selectedItem) => {
         console.log("🟢 Adding item to order:", selectedItem);
 
-        const timestamp = Date.now();
+        const timestamp = Date.now() + Math.random();
         const uniqueKey = `${selectedItem.id}_${timestamp}`;
+
+        let batchTimestamp = currentBatchTimestamp;
+
+        if (!batchTimestamp) {
+            batchTimestamp = Date.now();
+            setCurrentBatchTimestamp(batchTimestamp);
+
+            const batchKey = `order_${orderId}_batch_${batchTimestamp}`;
+            localStorage.setItem(batchKey, JSON.stringify({
+                timestamp: batchTimestamp,
+                started_at: Date.now(),
+            }));
+        }
+
         setOrders(prevOrders => {
             return prevOrders.map(order => {
                 if (order.id !== orderId) return order;
@@ -205,18 +291,21 @@ const KitchenDisplay = () => {
                     item_id: selectedItem.id,
                     item_name: selectedItem.name,
                     quantity: 1,
-                    price: selectedItem.price,
+                    price: selectedItem.unit_price || selectedItem.price || 0, // ✅ Handle both
                     status: "new",
                     note: "",
                     slug: selectedItem.slug || generateSlug(selectedItem.name),
-                    added_at_frontend: timestamp, frontend_unique_key: uniqueKey,
-                    is_new_item: true, // ✅ Flag for new item
+                    added_at_frontend: timestamp,
+                    frontend_unique_key: uniqueKey,
+                    is_new_item: true,
+                    batch_timestamp: batchTimestamp,
+                    id: uniqueKey,
                 };
 
                 const newItems = [...order.items, newItem];
-
-                // ✅ Calculate where new items start
                 const oldItemsCount = order.items.filter(i => !i.is_new_item).length;
+
+                console.log(`✅ Added item, oldItems: ${oldItemsCount}, totalItems: ${newItems.length}`);
 
                 return {
                     ...order,
@@ -227,33 +316,29 @@ const KitchenDisplay = () => {
             });
         });
 
-        // ✅ Store in localStorage with unique key
+        // ✅ Store in localStorage
         const storageKey = `order_${orderId}_new_item_${uniqueKey}`;
         localStorage.setItem(storageKey, JSON.stringify({
             item_id: selectedItem.id,
-            unique_key: uniqueKey, // ✅ ADD THIS LINE
+            unique_key: uniqueKey,
             added_at: timestamp,
+            batch_timestamp: batchTimestamp,
+            quantity: 1,
         }));
+        console.log(`💾 Saved to localStorage: ${storageKey}`);
 
         // Save to backend
         setTimeout(() => {
             const order = orders.find(o => o.id === orderId);
             if (order) {
-                updateOrderItems(orderId, [...order.items, {
-                    item_id: selectedItem.id,
-                    item_name: selectedItem.name,
-                    quantity: 1,
-                    price: selectedItem.price,
-                    status: "new",
-                    note: "",
-                    slug: selectedItem.slug || generateSlug(selectedItem.name),
-                }]);
+                updateOrderItems(orderId, order.items);
             }
         }, 0);
 
         setItemSearchQuery("");
         setItemSearchResults([]);
     };
+
 
 
     const updateOrderItems = async (orderId, updatedItemsWithStatuses) => {
@@ -264,9 +349,10 @@ const KitchenDisplay = () => {
             status: item.status || "new",
             note: item.note || "",
             slug: item.slug || "",
-            price: item.price || inventoryMap[item.item_id || item.inventory_id]?.price || 0,
+            price: item.price || inventoryMap[item.item_id || item.inventory_id]?.unit_price || 0,
             client_id: clientId,
-            order_id: orderId
+            order_id: orderId,
+            frontend_unique_key: item.frontend_unique_key || null, // ✅ ADDED
         }));
 
         console.log("📤 Final payload to order_items/update:");
@@ -277,8 +363,7 @@ const KitchenDisplay = () => {
         }, 0);
 
         try {
-            // ✅ Save items and get response with backend IDs
-            const response = await axios.post(
+            await axios.post(
                 `${import.meta.env.VITE_API_ORDER_SERVICE_URL}/${clientId}/order_items/update?order_id=${orderId}`,
                 cleanedItems,
                 { headers: { Authorization: `Bearer ${token}` } }
@@ -293,37 +378,9 @@ const KitchenDisplay = () => {
                 { headers: { Authorization: `Bearer ${token}` } }
             );
 
-            // ✅ Update localStorage with backend IDs for newly added items
-            updatedItemsWithStatuses.forEach((item) => {
-                if (item.temp_id) {
-                    const oldKey = `new_item_${orderId}_${item.temp_id}`;
-                    const timestamp = localStorage.getItem(oldKey);
-
-                    if (timestamp && response.data?.data) {
-                        // Find the backend item by matching item_id
-                        const backendItem = response.data.data.find(
-                            (bi) => bi.item_id === item.item_id
-                        );
-
-                        if (backendItem?.id) {
-                            // Create new key with backend id
-                            const newKey = `new_item_${orderId}_${backendItem.id}`;
-                            localStorage.setItem(newKey, timestamp);
-                            // Remove old temp key
-                            localStorage.removeItem(oldKey);
-
-                            console.log(`✅ Migrated ${oldKey} → ${newKey}`);
-                        }
-                    }
-                }
-            });
-
             toast.success("Item statuses & total updated!");
         } catch (err) {
             console.error("❌ Failed to update order items:", err);
-            if (err.response?.data) {
-                console.error("🚨 Response data:", err.response.data);
-            }
             toast.error("Failed to update items or total.");
         }
     };
@@ -615,20 +672,27 @@ const KitchenDisplay = () => {
             if (key && key.startsWith(`order_${orderId}_new_item_`)) {
                 try {
                     const data = JSON.parse(localStorage.getItem(key));
-                    newItems.push(data);
+                    if (data && data.item_id) { // ✅ Validate data
+                        newItems.push(data);
+                    }
                 } catch (e) {
                     console.error("Error parsing localStorage item:", e);
                 }
             }
         }
+        console.log(`🔍 Found ${newItems.length} new items for order ${orderId}:`, newItems);
         return newItems;
     };
+
 
     const clearNewItemsStorage = (orderId) => {
         const keysToRemove = [];
         for (let i = 0; i < localStorage.length; i++) {
             const key = localStorage.key(i);
-            if (key && key.startsWith(`order_${orderId}_new_item_`)) {
+            if (key && (
+                key.startsWith(`order_${orderId}_new_item_`) ||
+                key.startsWith(`order_${orderId}_batch_`)
+            )) {
                 keysToRemove.push(key);
             }
         }
@@ -682,16 +746,14 @@ const KitchenDisplay = () => {
                                         </div>
                                         <div className="kds-card-body">
                                             {order.items.map((item, idx) => {
-                                                // ✅ Show divider only at the transition point (once)
-                                                const showDivider = order.has_new_items &&
-                                                    order.new_items_start_index !== null &&
-                                                    idx === order.new_items_start_index;
+                                                const divider = order.batch_dividers?.find(d => d.index === idx);
 
                                                 return (
                                                     <React.Fragment key={item.id || idx}>
-                                                        {showDivider && (
+                                                        {/* ✅ Dashed line divider for new batch */}
+                                                        {divider && (
                                                             <div className="kds-item-divider">
-                                                                <span>Newly Added Items</span>
+                                                                {/* <span>New</span> */}
                                                             </div>
                                                         )}
 
@@ -718,7 +780,7 @@ const KitchenDisplay = () => {
                                                                         width: "100%"
                                                                     }}>
                                                                         <span>{`${item.quantity}x ${item.item_name || "Unnamed Item"}`}</span>
-                                                                        <span style={{
+                                                                        {/* <span style={{
                                                                             fontSize: "1em",
                                                                             color: calculateElapsedTime(item.created_at || order.created_at).split(':')[0] > 15 ? "#ff4444" : "#4CAF50",
                                                                             fontWeight: "bold",
@@ -727,7 +789,7 @@ const KitchenDisplay = () => {
                                                                             borderRadius: "4px"
                                                                         }}>
                                                                             {calculateElapsedTime(item.created_at || order.created_at)}
-                                                                        </span>
+                                                                        </span> */}
                                                                     </div>
                                                                 )}
                                                             </div>

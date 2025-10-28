@@ -668,9 +668,7 @@ const OrdersVisiblePage = () => {
                 { headers: { Authorization: `Bearer ${token}` } }
             );
 
-            // ✅ If served, clear new items tracking
-            if (newStatus === "served") {
-                clearNewItemsStorage(orderId);
+        
 
                 if (tableObj) {
                     await axios.post(
@@ -686,7 +684,7 @@ const OrdersVisiblePage = () => {
                         { headers: { Authorization: `Bearer ${token}` } }
                     );
                 }
-            }
+            
 
             toast.success("Order status updated");
 
@@ -1237,7 +1235,7 @@ const OrdersVisiblePage = () => {
                 )}
                 {showOrderDetailModal && selectedOrder && (
                     <div className="orders-visible-modal-overlay" onClick={() => setShowOrderDetailModal(false)}>
-                        <div className="orders-detail-popup" onClick={(e) => e.stopPropagation()}>
+                        <div className={`orders-detail-popup${editOrderId === selectedOrder.id ? ' edit-mode-active' : ''}`}  onClick={(e) => e.stopPropagation()}>
 
                             {/* Left Side - Available Items - ONLY SHOW IN EDIT MODE */}
                             {editOrderId === selectedOrder.id && (

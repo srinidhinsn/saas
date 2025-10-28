@@ -2823,7 +2823,6 @@ input:focus {
 .kds-item-divider {
   display: flex;
   align-items: center;
-  margin: 15px 0;
   position: relative;
 }
 
@@ -2831,23 +2830,12 @@ input:focus {
 .kds-item-divider::after {
   content: '';
   flex: 1;
-  border-bottom: 2px solid #ff6b6b;
+  border-bottom: 2px dashed black;
 }
 
-.kds-item-divider span {
-  padding: 0 12px;
-  color: #ff6b6b;
-  font-weight: 600;
-  font-size: 12px;
-  text-transform: uppercase;
-  letter-spacing: 0.5px;
-  white-space: nowrap;
-}
 
 /* Optional: Highlight newly added items with subtle background */
 .item-row.newly-added {
-  background: rgba(255, 107, 107, 0.15);
-  border-left: 3px solid #ff6b6b;
   padding-left: 8px;
   margin-left: -8px;
   border-radius: 4px;
@@ -3107,17 +3095,25 @@ input:focus {
 }
 
 /* Main Popup Container */
+/* Main Popup Container - NARROWER BY DEFAULT */
 .orders-detail-popup {
   display: flex;
   gap: 0;
-  max-width: 1400px;
-  width: 95%;
+  max-width: 700px; /* ✅ Narrow in read mode */
+  width: 90%;
   max-height: 80vh;
   background: var(--bg-primary, #ffffff);
   border-radius: 16px;
   box-shadow: 0 20px 60px rgba(0, 0, 0, 0.3);
   overflow: hidden;
   animation: slideUp 0.3s ease-out;
+  transition: max-width 0.3s ease, width 0.3s ease; /* ✅ Smooth transition */
+}
+
+/* ✅ EXPAND WHEN EDIT MODE IS ACTIVE */
+.orders-detail-popup.edit-mode-active {
+  max-width: 1400px;
+  width: 95%;
 }
 
 @keyframes slideUp {
@@ -3942,37 +3938,20 @@ input:focus {
 
 
 /* -------------------kds differ line style ----------------------------- */
-.kds-item-divider {
-  display: flex;
-  align-items: center;
-  margin: 16px 0;
-  position: relative;
-}
 
-.kds-item-divider::before,
-.kds-item-divider::after {
-  content: '';
-  flex: 1;
-  height: 2px;
-  background: linear-gradient(90deg, transparent, #f59e0b, transparent);
-}
+
 
 .kds-item-divider span {
-  padding: 6px 16px;
-  background: #fef3c7;
-  color: #92400e;
+  padding: 6px 10px;
+  background: var(--bg-chart-container);
+  color: var(--bg-number-color);
   font-weight: 600;
   font-size: 12px;
   border-radius: 20px;
-  margin: 0 12px;
   text-transform: uppercase;
   letter-spacing: 0.5px;
 }
 
-[data-theme="dark"] .kds-item-divider span {
-  background: #78350f;
-  color: #fbbf24;
-}
 
 .item-row.newly-added {
   animation: highlightNew 2s ease-in-out;
@@ -3981,4 +3960,15 @@ input:focus {
 @keyframes highlightNew {
   0%, 100% { background-color: transparent; }
   50% { background-color: rgba(245, 158, 11, 0.2); }
+}
+
+.kds-item-divider {
+  background-color: rgba(255, 107, 107, 0.1);
+}
+
+.kds-item-divider span {
+  font-weight:600;
+  font-size: 0.4rem;
+  text-transform: uppercase;
+  letter-spacing: 0.5px;
 }
