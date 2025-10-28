@@ -3,8 +3,8 @@ import CategoryList from "./CategoryList";
 import MenuItemList from "./MenuList";
 import { jwtDecode } from "jwt-decode";
 
-function MenuManager() {
-    const [clientId, setClientId] = useState(null);
+function MenuManager({ clientId, realm }) {
+  
     const [activeTab, setActiveTab] = useState("Categories/Items");
     const [selectedCategory, setSelectedCategory] = useState(null);
 
@@ -17,17 +17,7 @@ function MenuManager() {
         }
     }, [tableId]);
 
-    useEffect(() => {
-        const token = localStorage.getItem("access_token");
-        if (token) {
-            try {
-                const decoded = jwtDecode(token);
-                setClientId(decoded.client_id);
-            } catch (e) {
-                console.error("Failed to decode token:", e);
-            }
-        }
-    }, []);
+
 
     useEffect(() => {
         if (activeTab === "Categories/Items") {

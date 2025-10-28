@@ -3,6 +3,8 @@ import { useTheme } from "../../ThemeChangerComponent/ThemeProvider";
 import { FaEdit, FaTrash, FaCheck, FaTimes, FaSearch, FaUsers, FaClock, FaPlus } from "react-icons/fa";
 import axios from 'axios';
 import { useParams } from 'react-router-dom';
+import "react-toastify/dist/ReactToastify.css";
+
 
 const statusConfig = {
     Vacant: { card: "tm-status-card-available", icon: <FaCheck className="tm-status-icon tm-available" />, label: "Available" },
@@ -110,52 +112,72 @@ const TableManagement = () => {
 
     // Generate tables
     const generateTables = async () => {
-        const newErrors = tableRanges.map(row => ({
-            range: !row.range,
-            table_type: !row.table_type,
-            type: !row.type
-        }));
-        setFieldErrors(newErrors);
-
-        const validRows = tableRanges.filter((row, index) => !newErrors[index].range && !newErrors[index].table_type && !newErrors[index].type);
-        if (validRows.length === 0) return;
-        const payload = [];
-        for (let row of validRows) {
-            const tableNumbers = parseTableRange(row.range);
-            tableNumbers.forEach(num => {
-                payload.push({
-                    client_id: clientId,
-                    name: num,
-                    table_type: row.table_type.toString(),
-                    status: row.remark || "Vacant",
-                    location_zone: row.type,
-                    description: row.description,
-                    section: row.section,
-                    sort_order: row.sort_order ? parseInt(row.sort_order) : null,
-                    is_active: row.is_active,
-                    qr_code_url: row.qr_code_url || "",
-                    slug: `${clientId}-${(row.slug || num).toLowerCase().replace(/[^a-z0-9-]/g, '')}`
-                });
-            });
-        }
-
-        try {
-            for (let data of payload) {
-                await axios.post(
-                    `${import.meta.env.VITE_API_TABLE_SERVICE_URL}/${clientId}/tables/create`,
-                    data,
-                    { headers: { Authorization: `Bearer ${token}` } }
-                );
+      const newErrors = tableRanges.map(row => ({
+        range: !row.range,
+        table_type: !row.table_type,
+        type: !row.type
+      }));
+      setFieldErrors(newErrors);
+    
+      const validRows = tableRanges.filter((row, index) => 
+        !newErrors[index].range && 
+        !newErrors[index].table_type && 
+        !newErrors[index].type
+      );
+      if (validRows.length === 0) return;
+    
+      const payload = [];
+      for (let row of validRows) {
+        const tableNumbers = parseTableRange(row.range);
+        tableNumbers.forEach(num => {
+          payload.push({
+            client_id: clientId,
+            name: num,
+            table_type: row.table_type.toString(),
+            status: row.remark || "Vacant",
+            location_zone: row.type,
+            description: row.description,
+            section: row.section,
+            sort_order: row.sort_order ? parseInt(row.sort_order) : null,
+            is_active: row.is_active,
+            qr_code_url: row.qr_code_url || "",
+            slug: `${clientId}-${(row.slug || num)
+              .toLowerCase()
+              .replace(/[^a-z0-9-]/g, '')}`
+          });
+        });
+      }
+    
+      try {
+        for (let data of payload) {
+          try {
+            await axios.post(
+              `${import.meta.env.VITE_API_TABLE_SERVICE_URL}/${clientId}/tables/create`,
+              data,
+              { headers: { Authorization: `Bearer ${token}` } }
+            );
+          } catch (err) {
+            if (err.response && err.response.status === 400) {
+              // assuming backend returns 400 for duplicate name/slug
+              toast.warning(`Table "${data.name}" already exists!`);
+            } else {
+              console.error("Error creating table:", err);
+              toast.error(`You are trying to create an existing table "${data.name}".`);
             }
-            fetchTables();
-            setShowAddTable(false);
-            setTableRanges([]);
-            setFieldErrors([]);
-        } catch (err) {
-            console.error("Error generating tables", err);
+          }
         }
+    
+        fetchTables();
+        setShowAddTable(false);
+        setTableRanges([]);
+        setFieldErrors([]);
+    
+      } catch (err) {
+        console.error("Error generating tables", err);
+        toast.error("Something went wrong while generating tables.");
+      }
     };
-
+    
     const handleEditChange = (id, field, value) => {
         setTables(prev =>
           prev.map(table =>
