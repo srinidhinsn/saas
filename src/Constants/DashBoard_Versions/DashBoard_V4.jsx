@@ -287,16 +287,31 @@ const DashBoardPage = ({realm}) => {
                 </div>
                 {/* <div className="sub">Active: {pendingOrders}</div> */}
               </div>
-
               <div className="grids dash-cards">
+                <div className="card-icons"><PiHamburgerThin /></div>
+                <div>
+                  <div className="value">{pendingOrders}</div>
+                  <div className="title">Total MenuItems</div>
+                </div>
+                {/* <div className="sub">Active: {pendingOrders}</div> */}
+              </div>
+              <div className="grids dash-cards">
+                <div className="card-icons"><PiHamburgerThin /></div>
+                <div>
+                  <div className="value">{pendingOrders}</div>
+                  <div className="title">Total Table</div>
+                </div>
+                {/* <div className="sub">Active: {pendingOrders}</div> */}
+              </div>
+              {/* <div className="grids dash-cards">
                 <div className="card-icons"><MdDeliveryDining /></div>
                 <div>
                 <div className="title">Track Order</div>
                   <div className="value">On the Way</div>
                  
                 </div>
-                {/* <div className="sub">Bill</div> */}
-              </div>
+                <div className="sub">Bill</div>
+              </div> */}
 
             </div>
 

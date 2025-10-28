@@ -28,6 +28,7 @@ const navigate = useNavigate();
 
   const handleClientSelect = (selected) => {
     setClientId(selected.id);
+navigate(`/saas/${selected.id}/main/client-details_v4`);
   };
 
 
