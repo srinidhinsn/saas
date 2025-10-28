@@ -88,15 +88,15 @@ const SaasClientRoutes = ({
     }
   }, [token]);
 
-  useEffect(() => {
-    const storedClient = localStorage.getItem("clientId");
-    if (storedClient && storedClient !== clientId) {
-      localStorage.clear();
-      window.location.href = `/saas/${clientId}/login`;
-    } else if (clientId) {
-      localStorage.setItem("clientId", clientId);
-    }
-  }, [clientId]);
+  // useEffect(() => {
+  //   const storedClient = localStorage.getItem("clientId");
+  //   if (storedClient && storedClient !== clientId) {
+  //     localStorage.clear();
+  //     window.location.href = `/saas/${clientId}/login`;
+  //   } else if (clientId) {
+  //     localStorage.setItem("clientId", clientId);
+  //   }
+  // }, [clientId]);
 
   useEffect(() => {
     const handleDenied = () => setAccessDenied(true);

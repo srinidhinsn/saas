@@ -3,7 +3,7 @@ import { jwtDecode } from "jwt-decode";
 import { useParams } from "react-router-dom";
 import axios from 'axios';
 
-function AddInventoryItemForm({ onItemCreated, selectedCategory }) {
+function AddInventoryItemForm({ onItemCreated, selectedCategory,setCurrentClientId }) {
   const { clientId } = useParams();
   const token = localStorage.getItem("access_token");
   const [realm, setRealm] = useState("");
