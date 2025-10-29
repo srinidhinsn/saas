@@ -1,13 +1,13 @@
 import uuid
 from database.postgres import Base
-from sqlalchemy import Column , Integer, String, ARRAY, UUID, event, Date,TIMESTAMP,func,DateTime,Text
+from sqlalchemy import Column , Integer, String, ARRAY, UUID, event, Date,TIMESTAMP,func,DateTime
 from models.user_model import UserModel, PageDefinitionModel,PersonModel
 
 
 
 class Person(Base):
     __tablename__ = "person"
-    id = Column(Text, primary_key=True)
+    id = Column(UUID(as_uuid=True), primary_key=True, default=uuid.uuid4)
     first_name = Column(String, index=True, nullable=False)
     last_name = Column(String, nullable=True)
     dob = Column(Date, nullable=True)
