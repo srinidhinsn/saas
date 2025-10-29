@@ -8,7 +8,7 @@ import axios from 'axios';
 
 
 
-function CategoryList({ onCategorySelect }) {
+function CategoryList({ onCategorySelect,clientId }) {
     const [categories, setCategories] = useState([]);
     const [editingId, setEditingId] = useState(null);
     const [editName, setEditName] = useState("");
@@ -26,7 +26,7 @@ function CategoryList({ onCategorySelect }) {
     const [editNewSubcategoryName, setEditNewSubcategoryName] = useState("");
     const [parentMap, setParentMap] = useState({});
 
-    const { clientId } = useParams();
+    // const { clientId } = useParams();
     const token = localStorage.getItem("access_token");
 
     useEffect(() => {

@@ -16,7 +16,7 @@ import DocumentPickerModal from '../Document_Service_Components/DocumentPickerMo
 // import jwtDecode from "jwt-decode";
 // (left out intentionally to avoid breaking existing imports — add if needed)
 
-function InventoryItemList({ selectedCategory }) {
+function InventoryItemList({ selectedCategory ,clientId}) {
     const [items, setItems] = useState([]);
     const [editingItem, setEditingItem] = useState(null);
     const [showEditModal, setShowEditModal] = useState(false);
@@ -40,7 +40,6 @@ function InventoryItemList({ selectedCategory }) {
     const headers = { Authorization: `Bearer ${token}` };
 
     const [categories, setCategories] = useState([]);
-    const { clientId } = useParams();
 
     const flattenCategories = (categoryTree) => {
         const flat = [];
