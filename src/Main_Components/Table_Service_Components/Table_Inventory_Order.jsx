@@ -6,6 +6,8 @@ import { FiSearch } from "react-icons/fi";
 import axios from 'axios';
 import { FaCheck, FaUsers, FaClock, FaChartLine } from "react-icons/fa";
 import { toast } from 'react-toastify';
+import ImagePreview from "../../Constants/ImagePreview";
+
 
 const Table_Inventory_Order = ({ onOrderUpdate }) => {
     const { darkMode } = useTheme();
@@ -472,15 +474,38 @@ const Table_Inventory_Order = ({ onOrderUpdate }) => {
                             </div>
 
                             <div className="item-pane">
-                                <div className="grid-layout">
+                                <div className="menu-grid">
                                     {getFilteredItems().map(item => (
-                                        <div
-                                            key={item.id}
-                                            className="menu-card"
-                                            onClick={() => handleItemClick(item)}
-                                        >
-                                            <h4>{item.name}</h4>
-                                            <div className="item-price">₹{item.unit_price}</div>
+                                        <div key={item.id} className="menu-card" onClick={() => handleItemClick(item)}>
+                                            <div className="discount">
+                                                {item.discount && item.unit_price ? (
+                                                    <p className="discount">
+                                                        {((item.discount * 100) / item.unit_price)}% OFF
+                                                    </p>
+                                                ) : (
+                                                    <p className="discount"></p>
+                                                )}
+                                            </div>
+                                            <div className="menu-info" key={item.id}>
+                                                <div className="info">
+                                                    <h4>{item.name}</h4>
+                                                    <p className="price">{item.unit_price}</p>
+
+                                                </div>
+                                                <div className="img">
+                                                    <ImagePreview
+                                                        clientId={clientId}
+                                                        imageId={item.image_id}
+                                                        token={token}
+                                                    />
+                                                </div>
+
+
+
+                                            </div>
+                                            <div className="footer-info">
+                                                <h6 className="desc">Description : {item.description}</h6>
+                                            </div>
                                         </div>
                                     ))}
                                 </div>

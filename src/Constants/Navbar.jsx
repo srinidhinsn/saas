@@ -128,6 +128,11 @@ const Navbar = () => {
                             <FaUserPlus /><span>Add Users</span>
                             {!isActive('/main/add-users') && <span className="arrow-indicator"><MdKeyboardArrowRight /></span>}
                         </li>
+                        
+                        <li title="Documents" onClick={() => go('documents')} className={isActive('/main/documents') ? 'page-active' : ''}>
+                            <FaUserPlus /><span>Documents</span>
+                            {!isActive('/main/documents') && <span className="arrow-indicator"><MdKeyboardArrowRight /></span>}
+                        </li>
                     </ClickSpark>
                     <ClickSpark></ClickSpark>
                     <ClickSpark></ClickSpark>
