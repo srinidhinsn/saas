@@ -184,6 +184,8 @@ const OrdersVisiblePage = () => {
             added_at_frontend: timestamp,
             frontend_unique_key: uniqueKey,
             is_new_item: true,
+            unit_price: selectedItem.unit_price || 0,  
+    line_total: (selectedItem.unit_price || 0) * 1, 
             batch_timestamp: batchTimestamp,
             id: uniqueKey,
         };
@@ -885,7 +887,8 @@ const OrdersVisiblePage = () => {
             note: item.note || "",
             slug: item.slug || "",
             price: item.unit_price || item.price || inventoryMap[item.item_id || item.inventory_id]?.unit_price || 0,
-            client_id: clientId,
+            unit_price: item.unit_price || item.price || inventoryMap[item.item_id || item.inventory_id]?.unit_price || 0,  // ✅ Add this line
+            line_total: (item.unit_price || item.price || 0) * (item.quantity || 1),  client_id: clientId,
             order_id: orderId,
             frontend_unique_key: item.frontend_unique_key || null,
         }));
