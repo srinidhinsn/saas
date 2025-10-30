@@ -501,3 +501,6 @@ INSERT INTO category (id, client_id, name, description, sub_categories, slug, cr
 UPDATE category
 SET sub_categories = array_cat(sub_categories, ARRAY['person-details', 'persons','realm'])
 WHERE id = 'users' AND client_id = 'saas';
+
+-- order-item update
+ALTER table order_item add COLUMN frontend_unique_key type text

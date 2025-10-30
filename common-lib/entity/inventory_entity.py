@@ -17,6 +17,7 @@ class InventoryEntity(Base):
     realm = Column(Text, nullable=True)
     availability = Column(Integer, nullable=True)
     unit = Column(Text, nullable=True)
+    image_id= Column(Text, nullable=True)
     unit_price = Column(Float, nullable=True)
     unit_cst = Column(Float, nullable=True)
     unit_gst = Column(Float, nullable=True)
