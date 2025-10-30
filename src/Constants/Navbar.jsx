@@ -146,7 +146,7 @@ const Navbar = () => {
                             <FaUserPlus /><span>Role Config</span>
                             {!isActive('/main/roleconfig') && <span className="arrow-indicator"><MdKeyboardArrowRight /></span>}
                         </li>
-                    </ClickSpark>
+                   
                     <ClickSpark></ClickSpark>
                     <ClickSpark></ClickSpark>
                     <ClickSpark></ClickSpark>
