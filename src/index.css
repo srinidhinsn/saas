@@ -4446,16 +4446,10 @@ height: 89vh;border-top-right-radius: 8px;border-bottom-right-radius: 8px;
   box-shadow: 0 0 0 3px rgba(59, 130, 246, 0.1);
 }
 
-.dark-mode .category-dropdown {
-  background: #374151;
-  border-color: #4b5563;
-  color: #f9fafb;
-}
-
 /* Menu Items Grid */
 .menu-items-grid {
   display: grid;
-  grid-template-columns: repeat(auto-fill, minmax(280px, 1fr));
+  grid-template-columns: repeat(auto-fill, minmax(180px, 1fr));
   gap: 20px;
 }
 
@@ -5022,7 +5016,7 @@ height: 89vh;border-top-right-radius: 8px;border-bottom-right-radius: 8px;
 
 @media (max-width: 768px) {
   .order-page-container-full {
-      padding: 16px;
+      padding: 6px;
   }
 
   .search-filter-bar {
@@ -5106,3 +5100,4 @@ height: 89vh;border-top-right-radius: 8px;border-bottom-right-radius: 8px;
 .dark-mode .order-sidebar::-webkit-scrollbar-thumb:hover {
   background: #6b7280;
 }
+

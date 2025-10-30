@@ -6,8 +6,9 @@ import axios from 'axios';
 import { FaCheck, FaUsers, FaClock, FaChartLine, FaPlus, FaTrash, FaMinus, FaShoppingCart } from "react-icons/fa";
 import { BsCash, BsCreditCard, BsQrCode } from "react-icons/bs";
 import { toast } from 'react-toastify';
-import ImagePreview from "../../Constants/ImagePreview";
+import Modal from "react-modal";
 
+Modal.setAppElement("#root");
 
 const Table_Inventory_Order = ({ onOrderUpdate }) => {
     const { darkMode } = useTheme();
@@ -417,40 +418,6 @@ const Table_Inventory_Order = ({ onOrderUpdate }) => {
                         </div>
                     </div>
 
-                            <div className="item-pane">
-                                <div className="menu-grid">
-                                    {getFilteredItems().map(item => (
-                                        <div key={item.id} className="menu-card" onClick={() => handleItemClick(item)}>
-                                            <div className="discount">
-                                                {item.discount && item.unit_price ? (
-                                                    <p className="discount">
-                                                        {((item.discount * 100) / item.unit_price)}% OFF
-                                                    </p>
-                                                ) : (
-                                                    <p className="discount"></p>
-                                                )}
-                                            </div>
-                                            <div className="menu-info" key={item.id}>
-                                                <div className="info">
-                                                    <h4>{item.name}</h4>
-                                                    <p className="price">{item.unit_price}</p>
-
-                                                </div>
-                                                <div className="img">
-                                                    <ImagePreview
-                                                        clientId={clientId}
-                                                        imageId={item.image_id}
-                                                        token={token}
-                                                    />
-                                                </div>
-
-
-
-                                            </div>
-                                            <div className="footer-info">
-                                                <h6 className="desc">Description : {item.description}</h6>
-                                            </div>
-                                        </div>
                     {/* Order Sidebar */}
                     <div className="order-sidebar">
                         <div className="order-sidebar-content">
