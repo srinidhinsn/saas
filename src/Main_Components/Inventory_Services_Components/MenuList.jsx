@@ -7,6 +7,9 @@ import * as XLSX from "xlsx";
 import { saveAs } from "file-saver";
 import "ag-grid-community/styles/ag-grid.css";
 import "ag-grid-community/styles/ag-theme-alpine.css";
+import ImagePreview from "../../Constants/ImagePreview";
+import DocumentPickerModal from '../Document_Service_Components/DocumentPickerModal'
+
 
 // NOTE: Your file earlier referenced jwtDecode in import logic for Excel import.
 // If you don't already import jwtDecode in the project, add:
@@ -20,6 +23,10 @@ function InventoryItemList({ selectedCategory ,clientId}) {
     const [deleteTarget, setDeleteTarget] = useState(null);
     const [showAddModal, setShowAddModal] = useState(false);
     const [originalItems, setOriginalItems] = useState([]);
+    const [openPicker, setOpenPicker] = useState(false);
+    const [editImageFile, setEditImageFile] = useState(null);
+
+
 
     // Bulk update states
     const [showBulkModal, setShowBulkModal] = useState(false);
@@ -124,6 +131,15 @@ function InventoryItemList({ selectedCategory ,clientId}) {
         }
     }, [selectedCategory, originalItems, categories]);
 
+    const handleSelectDocumentForEdit = (doc) => {
+        setEditingItem((prev) => ({
+            ...prev,
+            image_id: doc.id, // store document service image_id
+        }));
+        setOpenPicker(false);
+    };
+
+
     const handleEdit = (item) => {
         setEditingItem({ ...item });
         setShowEditModal(true);
@@ -144,16 +160,42 @@ function InventoryItemList({ selectedCategory ,clientId}) {
         updatedItem.slug = buildCategoryPath(updatedItem.category_id, updatedItem.name);
 
         try {
-            await axios.post(`${import.meta.env.VITE_API_INVENTORY_SERVICE_URL}/${clientId}/menu/update`, updatedItem, { headers });
+            let imageId = editingItem.image_id;
+
+            // If user selected a new image, upload first
+            if (editImageFile) {
+                const formData = new FormData();
+                formData.append("file", editImageFile);
+                const uploadRes = await axios.post(
+                    `${import.meta.env.VITE_API_INVENTORY_SERVICE_URL}/${clientId}/menu/upload_image`,
+                    formData,
+                    {
+                        headers: {
+                            Authorization: `Bearer ${token}`,
+                            "Content-Type": "multipart/form-data",
+                        },
+                    }
+                );
+                imageId = uploadRes.data?.image_id;
+                updatedItem.image_id = imageId;
+            }
+
+            await axios.post(
+                `${import.meta.env.VITE_API_INVENTORY_SERVICE_URL}/${clientId}/menu/update`,
+                updatedItem,
+                { headers }
+            );
 
             await fetchInventoryItems();
             setShowEditModal(false);
             setEditingItem(null);
+            setEditImageFile(null);
         } catch (err) {
             console.error("Edit failed:", err.response?.data || err.message);
             alert("Edit failed.");
         }
     };
+
 
     const handleDelete = async (id) => {
         try {
@@ -587,13 +629,38 @@ function InventoryItemList({ selectedCategory ,clientId}) {
                         const finalPrice = (item.unit_price || 0) + totalPrice;
 
                         return (
-                            <div className="menu-card" key={item.id}>
-                                <h4>{item.name}</h4>
-                                <h6 className="line-items">Line Items: {names}</h6>
-                                <p className="price">₹{finalPrice}</p>
-                                <div className="card-actions">
-                                    <button className="btn-edit" onClick={() => handleEdit(item)}><FaEdit /></button>
-                                    <button className="btn-delete" onClick={() => setDeleteTarget(item)}><FaTrash /></button>
+                            <div className="menu-card">
+                                <div className="discount">
+                                {item.discount && item.unit_price ? (
+                                            <p className="discount">
+                                             {((item.discount * 100) / item.unit_price)}% OFF
+                                            </p>
+                                        ) : (
+                                            <p className="discount"></p>
+                                        )}
+                                </div>
+                                <div className="menu-info" key={item.id}>
+                                    <div className="info">
+                                        <h4>{item.name}</h4>
+                                        <p className="price">₹{finalPrice}</p>
+
+                                    </div>
+                                    <div className="img">
+                                        <ImagePreview
+                                            clientId={clientId}
+                                            imageId={item.image_id}
+                                            token={token}
+                                        />
+                                    </div>
+
+                                </div>
+                                <div className="footer-info">
+                                    <h6 className="line-items">Line Items: {names}</h6>
+                                    <h6 className="desc">Description : {item.description}</h6>
+                                    <div className="card-actions">
+                                        <button className="btn-edit" onClick={() => handleEdit(item)}><FaEdit /></button>
+                                        <button className="btn-delete" onClick={() => setDeleteTarget(item)}><FaTrash /></button>
+                                    </div>
                                 </div>
                             </div>
                         );
@@ -603,37 +670,37 @@ function InventoryItemList({ selectedCategory ,clientId}) {
 
             {/* Add Modal (existing) */}
             {showAddModal && (
-    <div className="modal-overlay" onClick={(e) => {
-        if (e.target.classList.contains("modal-overlay")) {
-            setShowAddModal(false);
-        }
-    }}>
-        <div className="menu-modal-content" style={{ position: "relative" }}>
-            {/* X button */}
-            <button
-                style={{
-                    position: "absolute",
-                    top: 8,
-                    right: 8,
-                    background: "transparent",
-                    border: "none",
-                    fontSize: 20,
-                    cursor: "pointer"
-                }}
-                onClick={() => setShowAddModal(false)}
-            >
-                ✖
-            </button>
+                <div className="modal-overlay" onClick={(e) => {
+                    if (e.target.classList.contains("modal-overlay")) {
+                        setShowAddModal(false);
+                    }
+                }}>
+                    <div className="menu-modal-content" style={{ position: "relative" }}>
+                        {/* X button */}
+                        <button
+                            style={{
+                                position: "absolute",
+                                top: 8,
+                                right: 8,
+                                background: "transparent",
+                                border: "none",
+                                fontSize: 20,
+                                cursor: "pointer"
+                            }}
+                            onClick={() => setShowAddModal(false)}
+                        >
+                            ✖
+                        </button>
 
-            <h3>Add New Menu Item</h3>
-            <AddMenuForm
-                clientId={clientId}
-                onItemCreated={handleItemCreated}
-                selectedCategory={selectedCategory}
-            />
-        </div>
-    </div>
-)}
+                        <h3>Add New Menu Item</h3>
+                        <AddMenuForm
+                            clientId={clientId}
+                            onItemCreated={handleItemCreated}
+                            selectedCategory={selectedCategory}
+                        />
+                    </div>
+                </div>
+            )}
 
 
 
@@ -730,6 +797,25 @@ function InventoryItemList({ selectedCategory ,clientId}) {
                                         placeholder="Discount"
                                         className="form-input short"
                                     />
+                                    <div className="form-row">
+                                        <label>Image:</label>
+                                        <div className="image-selector-section">
+                                            <ImagePreview
+                                                clientId={clientId}
+                                                imageId={editingItem.image_id}
+                                                token={token}
+                                            />
+
+                                            <button
+                                                type="button"
+                                                className="btn-browse-doc"
+                                                onClick={() => setOpenPicker(true)}
+                                            >
+                                                Browse from Documents
+                                            </button>
+                                        </div>
+                                    </div>
+
                                 </div>
                             </div>
 
@@ -738,9 +824,21 @@ function InventoryItemList({ selectedCategory ,clientId}) {
                                 <button type="button" className="btn-cancel" onClick={() => setShowEditModal(false)}>Cancel</button>
                             </div>
                         </form>
+                        {openPicker && (
+                            <DocumentPickerModal
+                                isOpen={openPicker}
+                                onClose={() => setOpenPicker(false)}
+                                clientId={clientId}
+                                token={token}
+                                onSelect={handleSelectDocumentForEdit}
+                            />
+                        )}
+
                     </div>
+
                 </div>
             )}
+
 
             {/* Delete Confirmation (existing) */}
             {deleteTarget && (

@@ -133,6 +133,16 @@ const Navbar = () => {
                         </li>
                     </ClickSpark> */}
 
+                        <li title="Add Users" onClick={() => go('/add-users')} className={isActive('/main/add-users') ? 'page-active' : ''}>
+                            <FaUserPlus /><span>Add Users</span>
+                            {!isActive('/main/add-users') && <span className="arrow-indicator"><MdKeyboardArrowRight /></span>}
+                        </li>
+                        
+                        <li title="Documents" onClick={() => go('documents')} className={isActive('/main/documents') ? 'page-active' : ''}>
+                            <FaUserPlus /><span>Documents</span>
+                            {!isActive('/main/documents') && <span className="arrow-indicator"><MdKeyboardArrowRight /></span>}
+                        </li>
+                    </ClickSpark>
                     <ClickSpark></ClickSpark>
                     <ClickSpark></ClickSpark>
                     <ClickSpark></ClickSpark>

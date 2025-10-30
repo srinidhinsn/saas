@@ -23,6 +23,7 @@ import KitchenDisplay from "../Main_Components/Order_Service_Components/KDS_Comp
 import ReportService from "../Main_Components/Report_Service_Components/ReportService";
 import Notifications from "./Notifications";
 import PersonForm from "../Util_Components/PersonForm";
+import Documents from '../Main_Components/Document_Service_Components/Document'
 import NotificationTable from "../Main_Components/Notification_Services_Components/All_NotificationsPage";
 import PopupNotification from "../Main_Components/Notification_Services_Components/Popup_Notifications";
 import RoleConfig from '../Main_Components/Role_Configuration/RoleConfig'
@@ -194,9 +195,8 @@ const SaasClientRoutes = ({
               <Route path="role-config" element={<RoleConfig />} />
               <Route path="/billing" element={<BillingPage />} />
               <Route path="add-users" element={<Add_user />} />
-              <Route path="client-details_v3" element={<ClientDetails_V3 selectedRealm={selectedRealm} />} />
-              <Route path="client-details_v4" element={<ClientDetails_V4 selectedRealm={selectedRealm} />} />
-              <Route path="documents-download" element={<Document/>} />
+              <Route path="documents" element={<Documents />} />
+              <Route path="client-details" element={<ClientDetails selectedRealm={selectedRealm} />} />
               <Route path="*" element={<Navigate to="/" />} />
             </Routes>
           )}
