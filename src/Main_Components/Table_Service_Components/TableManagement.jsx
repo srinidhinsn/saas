@@ -16,7 +16,7 @@ const TableManagement = () => {
     const { clientId } = useParams();
     const { darkMode } = useTheme();
     const [noChangeRowId, setNoChangeRowId] = useState(null);
-    const [highlightRow, setHighlightRow] = useState(null);
+    const [isGenerating, setIsGenerating] = useState(false);
     const [searchTerm, setSearchTerm] = useState("");
     const [statusFilter, setStatusFilter] = useState("");
     const [tableRanges, setTableRanges] = useState([]);
@@ -112,6 +112,7 @@ const TableManagement = () => {
 
     // Generate tables
     const generateTables = async () => {
+      if (isGenerating) return;
       const newErrors = tableRanges.map(row => ({
         range: !row.range,
         table_type: !row.table_type,
@@ -125,7 +126,7 @@ const TableManagement = () => {
         !newErrors[index].type
       );
       if (validRows.length === 0) return;
-    
+      setIsGenerating(true); 
       const payload = [];
       for (let row of validRows) {
         const tableNumbers = parseTableRange(row.range);
@@ -175,6 +176,8 @@ const TableManagement = () => {
       } catch (err) {
         console.error("Error generating tables", err);
         toast.error("Something went wrong while generating tables.");
+      } finally {
+        setIsGenerating(false); 
       }
     };
     
@@ -822,7 +825,7 @@ const TableManagement = () => {
                                         a) Table Range: T01:T10<br />
                                         b) Multi-Table Range: A01:A10,B01:B05
                                     </div>
-                                    <button className="tm-modal-generate-table" onClick={generateTables}>Generate Table</button>
+                                    <button className="tm-modal-generate-table"  disabled={isGenerating}  onClick={generateTables}>{isGenerating ? "Generating..." : "Generate Table"}</button>
                                 </div>
                             </div>
                         </div>
