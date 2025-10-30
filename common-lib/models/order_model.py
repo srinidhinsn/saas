@@ -23,6 +23,7 @@ class OrderItemModel(BaseModel):
     unit_price: Optional[float] = None
     line_total: Optional[float] = None
     status: Optional[OrderStatusEnum] = OrderStatusEnum.new
+    frontend_unique_key: Optional[str] = None
 
     class Config:
         orm_mode = True
