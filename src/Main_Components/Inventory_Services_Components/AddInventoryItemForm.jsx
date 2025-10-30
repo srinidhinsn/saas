@@ -5,7 +5,7 @@ import axios from 'axios';
 import DocumentPickerModal from '../Document_Service_Components/DocumentPickerModal'
 import ImagePreview from "../../Constants/ImagePreview";
 
-function AddInventoryItemForm({ onItemCreated, selectedCategory }) {
+function AddInventoryItemForm({ onItemCreated, selectedCategory,setCurrentClientId }) {
   const { clientId } = useParams();
   const token = localStorage.getItem("access_token");
   const [realm, setRealm] = useState("");

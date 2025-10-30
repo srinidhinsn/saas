@@ -1,13 +1,13 @@
 import React, { useEffect } from 'react';
 import { useNavigate, useLocation, useParams } from 'react-router-dom';
-import { useTheme } from "../ThemeChangerComponent/ThemeProvider";
+import { useTheme } from "../../ThemeChangerComponent/ThemeProvider";
 import { GiHamburgerMenu } from "react-icons/gi";
 import { FaHamburger } from "react-icons/fa";
 import { MdOutlineMenuBook, MdOutlineTableBar } from "react-icons/md";
 import { FaKitchenSet, FaUserPlus, FaTableCells } from "react-icons/fa6";
 import { MdKeyboardArrowRight } from "react-icons/md";
 import { IoDocumentTextOutline } from "react-icons/io5";
-import ClickSpark from '../Sub_Components/SparkArrow';
+import ClickSpark from '../../Sub_Components/SparkArrow';
 const Navbar = () => {
     const navigate = useNavigate();
     const location = useLocation();
@@ -78,15 +78,27 @@ const Navbar = () => {
                         </li>
                     </ClickSpark>
                     <ClickSpark>
-                        <li title="Realm" onClick={() => go('/client-details')} className={isActive('/main/client-details') ? 'page-active' : ''}>
-                            <FaHamburger /><span>Menu</span>
-                            {!isActive('/main/client-details') && <span className="arrow-indicator"><MdKeyboardArrowRight /></span>}
+                        <li title="Table Management" onClick={() => go('/table-selection')} className={isActive('/main/table-selection') ? 'page-active' : ''}>
+                            <MdOutlineTableBar /><span>Counter Management</span>
+                            {!isActive('/main/table-selection') && <span className="arrow-indicator"><MdKeyboardArrowRight /></span>}
                         </li>
                     </ClickSpark>
-                    {/* <ClickSpark>
+                    <ClickSpark>
+                        <li title="Table Selection" onClick={() => go('/view-tables')} className={isActive('/main/view-tables') ? 'page-active' : ''}>
+                            <FaTableCells /><span>Counter Selection</span>
+                            {!isActive('/main/view-tables') && <span className="arrow-indicator"><MdKeyboardArrowRight /></span>}
+                        </li>
+                    </ClickSpark>
+                    <ClickSpark>
                         <li title="Menu" onClick={() => go('/menu-page')} className={isActive('/main/menu-page') ? 'page-active' : ''}>
                             <MdOutlineMenuBook /><span>Menu</span>
                             {!isActive('/main/menu-page') && <span className="arrow-indicator"><MdKeyboardArrowRight /></span>}
+                        </li>
+                    </ClickSpark>
+                    {/* <ClickSpark>
+                        <li title="KDS" onClick={() => go('/kds-page')} className={isActive('/main/kds-page') ? 'page-active' : ''}>
+                            <FaKitchenSet /><span>KDS</span>
+                            {!isActive('/main/kds-page') && <span className="arrow-indicator"><MdKeyboardArrowRight /></span>}
                         </li>
                     </ClickSpark> */}
                     <ClickSpark>
@@ -109,14 +121,14 @@ const Navbar = () => {
                             {!isActive('/main/reports') && <span className="arrow-indicator"><MdKeyboardArrowRight /></span>}
                         </li>
                     </ClickSpark> */}
-                    {/* <ClickSpark>
+                    <ClickSpark>
 
 
                         <li title="Add Users" onClick={() => go('/add-users')} className={isActive('/main/add-users') ? 'page-active' : ''}>
                             <FaUserPlus /><span>Add Users</span>
                             {!isActive('/main/add-users') && <span className="arrow-indicator"><MdKeyboardArrowRight /></span>}
                         </li>
-                    </ClickSpark> */}
+                    </ClickSpark>
                     <ClickSpark></ClickSpark>
                     <ClickSpark></ClickSpark>
                     <ClickSpark></ClickSpark>
