@@ -194,7 +194,7 @@ const SaasClientRoutes = ({
               <Route path="role-config" element={<RoleConfig />} />
               <Route path="/billing" element={<BillingPage />} />
               <Route path="add-users" element={<Add_user />} />
-              <Route path="documents" element={<Documents />} />
+              <Route path="documents" element={<Document />} />
               <Route path="client-details_v3" element={<ClientDetails_V3 selectedRealm={selectedRealm} />} />
               <Route path="client-details_v4" element={<ClientDetails_V4 selectedRealm={selectedRealm} />} />
               <Route path="documents-download" element={<Document/>} />
