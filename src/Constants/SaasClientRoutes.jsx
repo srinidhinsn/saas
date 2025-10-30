@@ -191,7 +191,7 @@ const SaasClientRoutes = ({
               <Route path="user-details" element={<PersonForm />} />
               <Route path="all-notifications" element={<NotificationTable />} />
               <Route path="popup-notifications" element={<PopupNotification />} />
-              <Route path="role-config" element={<RoleConfig />} />
+              <Route path="roleconfig" element={<RoleConfig />} />
               <Route path="/billing" element={<BillingPage />} />
               <Route path="add-users" element={<Add_user />} />
               <Route path="documents" element={<Document />} />

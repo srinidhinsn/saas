@@ -6,21 +6,22 @@ import axios from 'axios';
 import { FaCheck, FaUsers, FaClock, FaChartLine, FaPlus, FaTrash, FaMinus, FaShoppingCart } from "react-icons/fa";
 import { BsCash, BsCreditCard, BsQrCode } from "react-icons/bs";
 import { toast } from 'react-toastify';
-import ImagePreview from "../../Constants/ImagePreview";
+import Modal from "react-modal";
 
+Modal.setAppElement("#root");
 
 const Table_Inventory_Order = ({ onOrderUpdate }) => {
     const { darkMode } = useTheme();
     const navigate = useNavigate();
     const { clientId } = useParams();
-
+    
     const [tables, setTables] = useState([]);
     const [selectedTable, setSelectedTable] = useState("");
     const [categories, setCategories] = useState([]);
     const [items, setItems] = useState([]);
     const [activeCategory, setActiveCategory] = useState("All Categories");
     const [searchTerm, setSearchTerm] = useState("");
-
+    
     // Order Form States
     const [customer, setCustomer] = useState({ name: "", phone: "", location: "" });
     const [orderItems, setOrderItems] = useState([]);
@@ -37,10 +38,10 @@ const Table_Inventory_Order = ({ onOrderUpdate }) => {
     const token = localStorage.getItem("access_token");
 
     // Filter only vacant/available tables for dropdown
-    const availableTables = tables.filter(t =>
+    const availableTables = tables.filter(t => 
         ["vacant", "available"].includes(t.status?.trim().toLowerCase())
     );
-
+    
     const available = tables.filter(t => t.status === 'Vacant').length;
     const occupied = tables.filter(t => t.status === 'Occupied').length;
     const reserved = tables.filter(t => t.status === 'Reserved').length;
@@ -316,18 +317,18 @@ const Table_Inventory_Order = ({ onOrderUpdate }) => {
     };
 
     return (
-        <div className="Restaurant-Order_Placing">
-            <div className={`restaurant-order-system ${darkMode ? "dark-mode" : "light-mode"}`}>
-                <div className="order-page-container-full">
-                    {/* <div className="page-header-main">
+      <div className="Restaurant-Order_Placing">
+          <div className={`restaurant-order-system ${darkMode ? "dark-mode" : "light-mode"}`}>
+            <div className="order-page-container-full">
+                {/* <div className="page-header-main">
                     <div>
                         <h1 className="page-title">Place Order</h1>
                         <p className="page-subtitle">Dine-in order management</p>
                     </div>
                 </div> */}
 
-                    {/* Stats Cards */}
-                    {/* <div className="stats-grid-inline">
+                {/* Stats Cards */}
+                {/* <div className="stats-grid-inline">
                     <div className="stat-card available">
                         <div className="stat-icon"><FaCheck /></div>
                         <div className="stat-content">
@@ -358,171 +359,137 @@ const Table_Inventory_Order = ({ onOrderUpdate }) => {
                     </div>
                 </div> */}
 
-                    <div className="order-layout">
-                        {/* Menu Section */}
-                        <div className="menu-section">
-                            <div className="menu-container">
-                                <div className="search-filter-bar">
-                                    <div className="search-input-wrapper">
-                                        <FiSearch className="search-icon" />
-                                        <input
-                                            type="text"
-                                            placeholder="Search menu items..."
-                                            value={searchTerm}
-                                            onChange={(e) => setSearchTerm(e.target.value)}
-                                            className="search-input"
-                                        />
-                                    </div>
-                                    <select
-                                        value={activeCategory}
-                                        onChange={(e) => setActiveCategory(e.target.value)}
-                                        className="category-dropdown"
-                                    >
-                                        {categories.map(cat => (
-                                            <option key={cat.id} value={cat.name}>
-                                                {cat.name}
-                                            </option>
-                                        ))}
-                                    </select>
+                <div className="order-layout">
+                    {/* Menu Section */}
+                    <div className="menu-section">
+                        <div className="menu-container">
+                            <div className="search-filter-bar">
+                                <div className="search-input-wrapper">
+                                    <FiSearch className="search-icon" />
+                                    <input
+                                        type="text"
+                                        placeholder="Search menu items..."
+                                        value={searchTerm}
+                                        onChange={(e) => setSearchTerm(e.target.value)}
+                                        className="search-input"
+                                    />
                                 </div>
-
-                                <div className="menu-items-grid">
-                                    {getFilteredItems().map(item => (
-                                        <div
-                                            key={item.id}
-                                            className="menu-item-card"
-                                            onClick={() => handleItemClick(item)}
-                                        >
-                                            <div className="menu-item-image">
-                                                <img
-                                                    src={item.image || "https://images.unsplash.com/photo-1546069901-ba9599a7e63c?w=400&h=300&fit=crop"}
-                                                    alt={item.name}
-                                                    onError={(e) => {
-                                                        e.target.src = "https://images.unsplash.com/photo-1546069901-ba9599a7e63c?w=400&h=300&fit=crop";
-                                                    }}
-                                                />
-                                            </div>
-                                            <div className="menu-item-content">
-                                                <h4 className="menu-item-name">{item.name}</h4>
-                                                <div className="menu-item-footer">
-                                                    <span className="menu-item-price">₹{item.unit_price}</span>
-                                                    <button className="add-item-btn">
-                                                        <FaPlus />
-                                                    </button>
-                                                </div>
-                                            </div>
-                                        </div>
+                                <select
+                                    value={activeCategory}
+                                    onChange={(e) => setActiveCategory(e.target.value)}
+                                    className="category-dropdown"
+                                >
+                                    {categories.map(cat => (
+                                        <option key={cat.id} value={cat.name}>
+                                            {cat.name}
+                                        </option>
                                     ))}
-                                </div>
+                                </select>
                             </div>
-                        </div>
 
-                        <div className="item-pane">
-                            <div className="menu-grid">
+                            <div className="menu-items-grid">
                                 {getFilteredItems().map(item => (
-                                    <div key={item.id} className="menu-card" onClick={() => handleItemClick(item)}>
-                                        <div className="discount">
-                                            {item.discount && item.unit_price ? (
-                                                <p className="discount">
-                                                    {((item.discount * 100) / item.unit_price)}% OFF
-                                                </p>
-                                            ) : (
-                                                <p className="discount"></p>
-                                            )}
+                                    <div
+                                        key={item.id}
+                                        className="menu-item-card"
+                                        onClick={() => handleItemClick(item)}
+                                    >
+                                        <div className="menu-item-image">
+                                            <img 
+                                                src={item.image || "https://images.unsplash.com/photo-1546069901-ba9599a7e63c?w=400&h=300&fit=crop"} 
+                                                alt={item.name}
+                                                onError={(e) => {
+                                                    e.target.src = "https://images.unsplash.com/photo-1546069901-ba9599a7e63c?w=400&h=300&fit=crop";
+                                                }}
+                                            />
                                         </div>
-                                        <div className="menu-info" key={item.id}>
-                                            <div className="info">
-                                                <h4>{item.name}</h4>
-                                                <p className="price">{item.unit_price}</p>
-
+                                        <div className="menu-item-content">
+                                            <h4 className="menu-item-name">{item.name}</h4>
+                                            <div className="menu-item-footer">
+                                                <span className="menu-item-price">₹{item.unit_price}</span>
+                                                <button className="add-item-btn">
+                                                    <FaPlus />
+                                                </button>
                                             </div>
-                                            <div className="img">
-                                                <ImagePreview
-                                                    clientId={clientId}
-                                                    imageId={item.image_id}
-                                                    token={token}
-                                                />
-                                            </div>
-                                        </div>
-                                        <div className="footer-info">
-                                            <h6 className="desc">Description : {item.description}</h6>
                                         </div>
                                     </div>
                                 ))}
-                                </div>
+                            </div>
                         </div>
-                        {/* Order Sidebar */}
-                        <div className="order-sidebar">
-                            <div className="order-sidebar-content">
-                                {/* Table Selection Section */}
-                                <div className="table-selection-section">
-                                    <h3 className="sidebar-section-title">Table Selection</h3>
-                                    <select
-                                        value={selectedTable}
-                                        onChange={(e) => setSelectedTable(e.target.value)}
-                                        className="table-dropdown"
-                                    >
-                                        <option value="">Select a table</option>
-                                        {availableTables.map(table => (
-                                            <option key={table.id} value={table.id}>
-                                                {table.table_number} - {table.location_zone}
-                                            </option>
-                                        ))}
-                                    </select>
+                    </div>
+
+                    {/* Order Sidebar */}
+                    <div className="order-sidebar">
+                        <div className="order-sidebar-content">
+                            {/* Table Selection Section */}
+                            <div className="table-selection-section">
+                                <h3 className="sidebar-section-title">Table Selection</h3>
+                                <select
+                                    value={selectedTable}
+                                    onChange={(e) => setSelectedTable(e.target.value)}
+                                    className="table-dropdown"
+                                >
+                                    <option value="">Select a table</option>
+                                    {availableTables.map(table => (
+                                        <option key={table.id} value={table.id}>
+                                            {table.table_number} - {table.location_zone}
+                                        </option>
+                                    ))}
+                                </select>
+                            </div>
+
+                            {/* Order Cart Section */}
+                            <div className="order-cart-section">
+                                <div className="cart-header">
+                                    <FaShoppingCart className="cart-icon" />
+                                    <h3 className="sidebar-section-title">Order Cart</h3>
                                 </div>
 
-                                {/* Order Cart Section */}
-                                <div className="order-cart-section">
-                                    <div className="cart-header">
-                                        <FaShoppingCart className="cart-icon" />
-                                        <h3 className="sidebar-section-title">Order Cart</h3>
+                                {orderItems.length === 0 ? (
+                                    <div className="empty-cart">
+                                        <FaShoppingCart className="empty-cart-icon" />
+                                        <p className="empty-cart-text">Cart is empty</p>
                                     </div>
-
-                                    {orderItems.length === 0 ? (
-                                        <div className="empty-cart">
-                                            <FaShoppingCart className="empty-cart-icon" />
-                                            <p className="empty-cart-text">Cart is empty</p>
-                                        </div>
-                                    ) : (
-                                        <div className="cart-items-list">
-                                            {orderItems.map(item => (
-                                                <div key={item.id} className="cart-item">
-                                                    <div className="cart-item-header">
-                                                        <h4 className="cart-item-name" onClick={() => openNoteEditor(item)}>
-                                                            {item.name}
-                                                            {item.note && <span className="note-indicator">📝</span>}
-                                                        </h4>
-                                                        <button
-                                                            className="remove-item-btn"
-                                                            onClick={() => removeItem(item.id)}
-                                                        >
-                                                            <FaTrash />
+                                ) : (
+                                    <div className="cart-items-list">
+                                        {orderItems.map(item => (
+                                            <div key={item.id} className="cart-item">
+                                                <div className="cart-item-header">
+                                                    <h4 className="cart-item-name" onClick={() => openNoteEditor(item)}>
+                                                        {item.name}
+                                                        {item.note && <span className="note-indicator">📝</span>}
+                                                    </h4>
+                                                    <button
+                                                        className="remove-item-btn"
+                                                        onClick={() => removeItem(item.id)}
+                                                    >
+                                                        <FaTrash />
+                                                    </button>
+                                                </div>
+                                                <div className="cart-item-details">
+                                                    <span className="cart-item-price">₹{item.unit_price}</span>
+                                                    <div className="quantity-controls">
+                                                        <button onClick={() => updateQuantity(item.id, -1)}>
+                                                            <FaMinus />
+                                                        </button>
+                                                        <span className="quantity-value">{item.quantity}</span>
+                                                        <button onClick={() => updateQuantity(item.id, 1)}>
+                                                            <FaPlus />
                                                         </button>
                                                     </div>
-                                                    <div className="cart-item-details">
-                                                        <span className="cart-item-price">₹{item.unit_price}</span>
-                                                        <div className="quantity-controls">
-                                                            <button onClick={() => updateQuantity(item.id, -1)}>
-                                                                <FaMinus />
-                                                            </button>
-                                                            <span className="quantity-value">{item.quantity}</span>
-                                                            <button onClick={() => updateQuantity(item.id, 1)}>
-                                                                <FaPlus />
-                                                            </button>
-                                                        </div>
-                                                    </div>
-                                                    <div className="cart-item-total">
-                                                        Total: ₹{(item.unit_price * item.quantity).toFixed(2)}
-                                                    </div>
                                                 </div>
-                                            ))}
+                                                <div className="cart-item-total">
+                                                    Total: ₹{(item.unit_price * item.quantity).toFixed(2)}
+                                                </div>
+                                            </div>
+                                        ))}
 
-                                            <div className="cart-summary">
-                                                <div className="cart-total">
-                                                    <span className="total-label">Total</span>
-                                                    <span className="total-value">₹{calculateTotalPrice()}</span>
-                                                </div>
-                                                {/* 
+                                        <div className="cart-summary">
+                                            <div className="cart-total">
+                                                <span className="total-label">Total</span>
+                                                <span className="total-value">₹{calculateTotalPrice()}</span>
+                                            </div>
+{/* 
                                             <div className="payment-methods">
                                                 <button
                                                     className={`payment-method-btn cash ${paymentMode === "Cash" ? "active" : ""}`}
@@ -544,85 +511,84 @@ const Table_Inventory_Order = ({ onOrderUpdate }) => {
                                                 </button>
                                             </div> */}
 
-                                                <button
-                                                    className="place-order-btn"
-                                                    onClick={handlePlaceOrder}
-                                                    disabled={!selectedTable || orderItems.length === 0}
-                                                >
-                                                    Place Order
-                                                </button>
-                                            </div>
+                                            <button
+                                                className="place-order-btn"
+                                                onClick={handlePlaceOrder}
+                                                disabled={!selectedTable || orderItems.length === 0}
+                                            >
+                                                Place Order
+                                            </button>
                                         </div>
-                                    )}
-                                </div>
+                                    </div>
+                                )}
                             </div>
                         </div>
                     </div>
                 </div>
-
-                {/* Notes Modal */}
-                <Modal
-                    isOpen={notesModalOpen}
-                    onRequestClose={() => setNotesModalOpen(false)}
-                    className="custom-modal"
-                    overlayClassName="custom-overlay"
-                >
-                    <h3>Edit Note for {currentItemForNote?.name}</h3>
-                    <textarea
-                        value={noteText}
-                        onChange={(e) => setNoteText(e.target.value)}
-                        autoFocus
-                        placeholder="Add special instructions..."
-                    />
-                    <div className="modal-buttons">
-                        <button onClick={() => setNotesModalOpen(false)} className="cancel-btn">Cancel</button>
-                        <button onClick={saveNoteToItem} className="confirm-btn">Save Note</button>
-                    </div>
-                </Modal>
-
-                {/* Cash Payment Modal */}
-                <Modal
-                    isOpen={cashPopupOpen}
-                    onRequestClose={() => setCashPopupOpen(false)}
-                    className="custom-modal"
-                    overlayClassName="custom-overlay"
-                >
-                    <h3>Cash Payment</h3>
-                    <div className="modal-info"><strong>Total Bill:</strong> ₹{calculateTotalPrice()}</div>
-                    <input
-                        type="number"
-                        placeholder="Amount Received"
-                        value={cashReceived}
-                        onChange={(e) => setCashReceived(e.target.value)}
-                    />
-                    {parseFloat(cashReceived) >= parseFloat(calculateTotalPrice()) && cashReceived !== "" && (
-                        <div className="return-amount">
-                            Return Amount: ₹{(parseFloat(cashReceived) - parseFloat(calculateTotalPrice())).toFixed(2)}
-                        </div>
-                    )}
-                    {parseFloat(cashReceived) < parseFloat(calculateTotalPrice()) && cashReceived !== "" && (
-                        <div className="error-message">Amount received is less than total.</div>
-                    )}
-                    <div className="modal-buttons">
-                        <button onClick={() => setCashPopupOpen(false)} className="cancel-btn">Cancel</button>
-                        <button
-                            onClick={() => {
-                                if (parseFloat(cashReceived) >= parseFloat(calculateTotalPrice())) {
-                                    setPaymentMode("Cash");
-                                    setCashPopupOpen(false);
-                                } else {
-                                    toast.error("Received amount must be greater than or equal to bill total.");
-                                }
-                            }}
-                            className="confirm-btn"
-                        >
-                            Confirm
-                        </button>
-                    </div>
-                </Modal>
             </div>
-    
+
+            {/* Notes Modal */}
+            <Modal
+                isOpen={notesModalOpen}
+                onRequestClose={() => setNotesModalOpen(false)}
+                className="custom-modal"
+                overlayClassName="custom-overlay"
+            >
+                <h3>Edit Note for {currentItemForNote?.name}</h3>
+                <textarea 
+                    value={noteText} 
+                    onChange={(e) => setNoteText(e.target.value)} 
+                    autoFocus 
+                    placeholder="Add special instructions..."
+                />
+                <div className="modal-buttons">
+                    <button onClick={() => setNotesModalOpen(false)} className="cancel-btn">Cancel</button>
+                    <button onClick={saveNoteToItem} className="confirm-btn">Save Note</button>
+                </div>
+            </Modal>
+
+            {/* Cash Payment Modal */}
+            <Modal
+                isOpen={cashPopupOpen}
+                onRequestClose={() => setCashPopupOpen(false)}
+                className="custom-modal"
+                overlayClassName="custom-overlay"
+            >
+                <h3>Cash Payment</h3>
+                <div className="modal-info"><strong>Total Bill:</strong> ₹{calculateTotalPrice()}</div>
+                <input 
+                    type="number" 
+                    placeholder="Amount Received" 
+                    value={cashReceived} 
+                    onChange={(e) => setCashReceived(e.target.value)} 
+                />
+                {parseFloat(cashReceived) >= parseFloat(calculateTotalPrice()) && cashReceived !== "" && (
+                    <div className="return-amount">
+                        Return Amount: ₹{(parseFloat(cashReceived) - parseFloat(calculateTotalPrice())).toFixed(2)}
+                    </div>
+                )}
+                {parseFloat(cashReceived) < parseFloat(calculateTotalPrice()) && cashReceived !== "" && (
+                    <div className="error-message">Amount received is less than total.</div>
+                )}
+                <div className="modal-buttons">
+                    <button onClick={() => setCashPopupOpen(false)} className="cancel-btn">Cancel</button>
+                    <button
+                        onClick={() => {
+                            if (parseFloat(cashReceived) >= parseFloat(calculateTotalPrice())) {
+                                setPaymentMode("Cash");
+                                setCashPopupOpen(false);
+                            } else {
+                                toast.error("Received amount must be greater than or equal to bill total.");
+                            }
+                        }}
+                        className="confirm-btn"
+                    >
+                        Confirm
+                    </button>
+                </div>
+            </Modal>
         </div>
+      </div>
     );
 };
 
