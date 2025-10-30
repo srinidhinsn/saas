@@ -81,9 +81,6 @@ const token=localStorage.getItem("access_token")
     return (
         <div className="Navbar-container">
             <aside className="sidebar">
-
-
-                {/* <div className="brand">DineIn Software</div> */}
                 <ul className="menu">
                     <ClickSpark>
                         <li title="Dashboard" onClick={() => go('/')} className={isActive('/main') ? 'page-active' : ''}>
@@ -92,12 +89,6 @@ const token=localStorage.getItem("access_token")
                             {!isActive('/main') && <span className="arrow-indicator"><MdKeyboardArrowRight /></span>}
                         </li>
                     </ClickSpark>
-                    {/* <ClickSpark>
-                        <li title="Order" onClick={() => go('/orders-view')} className={isActive('/main/orders-view') ? 'page-active' : ''}>
-                            <FaHamburger /><span>Order Summary </span>
-                            {!isActive('/main/orders-view') && <span className="arrow-indicator"><MdKeyboardArrowRight /></span>}
-                        </li>
-                    </ClickSpark> */}
                     <ClickSpark>
                         <li title="Realm" onClick={() => go('/client-details_v4')} className={isActive('/main/client-details_v4') ? 'page-active' : ''}>
                             <FaHamburger /><span>Menu</span>
@@ -110,61 +101,6 @@ const token=localStorage.getItem("access_token")
                             {!isActive('/main/orders-view') && <span className="arrow-indicator"><MdKeyboardArrowRight /></span>}
                         </li>
                     </ClickSpark>
-                    <ClickSpark>
-                        <li title="Table Management" onClick={() => go('/table-selection')} className={isActive('/main/table-selection') ? 'page-active' : ''}>
-                            <MdOutlineTableBar /><span>Managing Table</span>
-                            {!isActive('/main/table-selection') && <span className="arrow-indicator"><MdKeyboardArrowRight /></span>}
-                        </li>
-                    </ClickSpark>
-                    {/* <ClickSpark>
-                        <li title="Menu" onClick={() => go('/menu-page')} className={isActive('/main/menu-page') ? 'page-active' : ''}>
-                            <MdOutlineMenuBook /><span>Menu</span>
-                            {!isActive('/main/menu-page') && <span className="arrow-indicator"><MdKeyboardArrowRight /></span>}
-                        </li>
-                    </ClickSpark> */}
-                    {/* <ClickSpark>
-                        <li title="Billing" onClick={() => go('/billing')} className={isActive('/main/billing') ? 'page-active' : ''}>
-                            <IoDocumentTextOutline /><span>Billing</span>
-                            {!isActive('/main/billing') && <span className="arrow-indicator"><MdKeyboardArrowRight /></span>}
-                        </li>
-                    </ClickSpark> */}
-                    {/* <ClickSpark>
-
-
-                        <li title="Invoice" onClick={() => go('/invoice')} className={isActive('/main/invoice') ? 'page-active' : ''}>
-                            <IoDocumentTextOutline /><span>Invoice</span>
-                            {!isActive('/main/invoice') && <span className="arrow-indicator"><MdKeyboardArrowRight /></span>}
-                        </li>
-                    </ClickSpark> */}
-                    {/* <ClickSpark>
-
-
-                        <li title="Report" onClick={() => go('/reports')} className={isActive('/main/reports') ? 'page-active' : ''}>
-                            <FaFileInvoiceDollar /><span>Report</span>
-                            {!isActive('/main/reports') && <span className="arrow-indicator"><MdKeyboardArrowRight /></span>}
-                        </li>
-                    </ClickSpark> */}
-                    {/* <ClickSpark>
-
-
-
-                        <li title="Add Users" onClick={() => go('/add-users')} className={isActive('/main/add-users') ? 'page-active' : ''}>
-                            <FaUserPlus /><span>Add Users</span>
-                            {!isActive('/main/add-users') && <span className="arrow-indicator"><MdKeyboardArrowRight /></span>}
-                        </li>
-                    </ClickSpark> */}
-                    <ClickSpark></ClickSpark>
-                    <ClickSpark></ClickSpark>
-                    <ClickSpark></ClickSpark>
-                    <ClickSpark></ClickSpark>
-                    <ClickSpark></ClickSpark>
-
-
-
-
-
-
-
                 </ul>
             </aside>
         </div>

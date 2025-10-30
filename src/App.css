@@ -1163,7 +1163,6 @@ body[data-theme="dark"] .date-filter-dropdown {
 }
 
 .stat-card {
-    background: rgba(255, 255, 255, 0.7);
     backdrop-filter: blur(4px);
     border-radius: 1rem;
     padding: 1.5rem;
@@ -1172,7 +1171,7 @@ body[data-theme="dark"] .date-filter-dropdown {
 }
 
 .stat-card:hover {
-    transform: translateY(-8px);
+    /* transform: translateY(-8px); */
     box-shadow: 0 25px 50px -12px rgba(0, 0, 0, 0.25);
 }
 
@@ -1185,14 +1184,14 @@ body[data-theme="dark"] .date-filter-dropdown {
 .stat-label {
     font-size: 0.875rem;
     font-weight: 500;
-    color: #6b7280;
+    color: var(--bg-text-color);
     margin: 0 0 0.25rem 0;
 }
 
 .stat-value {
     font-size: 1.875rem;
     font-weight: 700;
-    color: #1f2937;
+    color: var(--bg-number-color);
     margin: 0 0 0.25rem 0;
 }
 
@@ -1290,7 +1289,7 @@ body[data-theme="dark"] .date-filter-dropdown {
 .search-input {
     width: 100%;
     padding: 0.75rem 0.75rem 0.75rem 2.5rem;
-    background: #f9fafb;
+    background: var(--bg-container);
     border: 1px solid #d1d5db;
     border-radius: 0.75rem;
     font-size: 0.875rem;
