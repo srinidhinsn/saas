@@ -16,6 +16,7 @@ class Inventory(BaseModel):
     realm: Optional[str] = None
     availability: Optional[int] = None
     unit: Optional[str] = None
+    image_id: Optional[str] = None
     unit_price: Optional[float] = None
     unit_cst: Optional[float] = None
     unit_gst: Optional[float] = None
