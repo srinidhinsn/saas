@@ -181,7 +181,7 @@ function AddInventoryItemForm({ onItemCreated, selectedCategory }) {
           const payload = {
             ...item,
             client_id: clientId,
-            category_id: selectedCategory ? selectedCategory.id : null, // enforce category
+            category_id: selectedCategory ? selectedCategory.id : null, 
             line_item_id: item.line_item_id.map(id => parseInt(id)),
             availability: parseInt(item.availability) || 0,
             dietary_type: ["veg", "nonveg"].includes(item.dietary_type) ? item.dietary_type : "veg",
@@ -439,9 +439,6 @@ function AddInventoryItemForm({ onItemCreated, selectedCategory }) {
                 Browse from Documents
               </button>
             </div>
-
-
-
             <button
               type="button"
               className="btn-cancel-row"
@@ -460,7 +457,6 @@ function AddInventoryItemForm({ onItemCreated, selectedCategory }) {
         <button type="submit" className="btn-add-item">
           Submit
         </button>
-
       </div>
 
 
@@ -476,8 +472,4 @@ function AddInventoryItemForm({ onItemCreated, selectedCategory }) {
     </form>
   );
 }
-
-
-
-
 export default AddInventoryItemForm;

@@ -1,5 +1,5 @@
 import React, { useEffect, useState } from "react";
-import documentServicesPort from "../../Backend_Port_Files/DocumentServices";
+import axios from "axios";
 
 const DocumentPickerModal = ({ isOpen, onClose, clientId, token, onSelect }) => {
   const [docs, setDocs] = useState([]);
@@ -12,7 +12,7 @@ const DocumentPickerModal = ({ isOpen, onClose, clientId, token, onSelect }) => 
 
   const fetchDocuments = async () => {
     try {
-      const res = await documentServicesPort.get(`/${clientId}/document/read`, {
+      const res = await axios.get(`${import.meta.env.VITE_API_DOCUMENT_SERVICE_URL}/${clientId}/document/read`, {
         headers: { Authorization: `Bearer ${token}` },
       });
 

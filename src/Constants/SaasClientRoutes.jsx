@@ -29,6 +29,7 @@ import RoleConfig from '../Main_Components/Role_Configuration/RoleConfig'
 import BillingPage from '../Main_Components/Invoice_Services_Components/BillingUI'
 import ClientDetails from "../Main_Components/Client-Services/ClientDetails";
 
+
 const AccessDenied = ({ onAuthClick }) => (
   <div style={{ textAlign: "center", padding: "2rem" }}>
     <h2>🚫 Access Denied</h2>
@@ -189,6 +190,7 @@ const SaasClientRoutes = ({
               <Route path="/billing" element={<BillingPage />} />
               <Route path="add-users" element={<Add_user />} />
               <Route path="documents" element={<Documents />} />
+              <Route path="roleconfig" element={<RoleConfig />} />
               <Route path="client-details" element={<ClientDetails selectedRealm={selectedRealm} />} />
               <Route path="*" element={<Navigate to="/" />} />
             </Routes>

@@ -133,6 +133,10 @@ const Navbar = () => {
                             <FaUserPlus /><span>Documents</span>
                             {!isActive('/main/documents') && <span className="arrow-indicator"><MdKeyboardArrowRight /></span>}
                         </li>
+                        <li title="roleconfig" onClick={() => go('roleconfig')} className={isActive('/main/roleconfig') ? 'page-active' : ''}>
+                            <FaUserPlus /><span>Role Config</span>
+                            {!isActive('/main/roleconfig') && <span className="arrow-indicator"><MdKeyboardArrowRight /></span>}
+                        </li>
                     </ClickSpark>
                     <ClickSpark></ClickSpark>
                     <ClickSpark></ClickSpark>
