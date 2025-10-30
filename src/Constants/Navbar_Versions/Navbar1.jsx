@@ -1,13 +1,13 @@
 import React, { useEffect } from 'react';
 import { useNavigate, useLocation, useParams } from 'react-router-dom';
-import { useTheme } from "../ThemeChangerComponent/ThemeProvider";
+import { useTheme } from "../../ThemeChangerComponent/ThemeProvider";
 import { GiHamburgerMenu } from "react-icons/gi";
 import { FaHamburger } from "react-icons/fa";
 import { MdOutlineMenuBook, MdOutlineTableBar } from "react-icons/md";
 import { FaKitchenSet, FaUserPlus, FaTableCells } from "react-icons/fa6";
 import { MdKeyboardArrowRight } from "react-icons/md";
 import { IoDocumentTextOutline } from "react-icons/io5";
-import ClickSpark from '../Sub_Components/SparkArrow';
+import ClickSpark from '../../Sub_Components/SparkArrow';
 const Navbar = () => {
     const navigate = useNavigate();
     const location = useLocation();

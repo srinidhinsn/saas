@@ -1,4 +1,4 @@
-import React, { useState } from "react";
+import React, { useState,useEffect } from "react";
 import { useNavigate, useParams } from "react-router-dom";
 import { FaUser, FaLock } from "react-icons/fa";
 import { toast } from "react-toastify";
@@ -16,8 +16,18 @@ export default function Login() {
         const { name, value } = e.target;
         setForm((prev) => ({ ...prev, [name]: value }));
     };
-
-
+    // useEffect(() => {
+    //     if (!clientId) return; 
+    //     document.body.classList.forEach(cls => {
+    //       if (cls.startsWith("client-")) document.body.classList.remove(cls);
+    //     });
+    
+    //     // Add new class
+    //     document.body.classList.add(`client-${clientId.toLowerCase()}`);
+    //     console.log("Added body class:", `client-${clientId.toLowerCase()}`);
+    //   }, [clientId]);
+      
+      
 
     const handleLogin = async (e) => {
         e.preventDefault();

@@ -2,11 +2,14 @@ import React, { useState, useEffect, useRef } from "react";
 import { jwtDecode } from "jwt-decode";
 import { useParams } from "react-router-dom";
 import axios from 'axios';
+import DocumentPickerModal from '../Document_Service_Components/DocumentPickerModal'
+import ImagePreview from "../../Constants/ImagePreview";
 
-function AddInventoryItemForm({ onItemCreated, selectedCategory }) {
+function AddInventoryItemForm({ onItemCreated, selectedCategory,setCurrentClientId }) {
   const { clientId } = useParams();
   const token = localStorage.getItem("access_token");
   const [realm, setRealm] = useState("");
+  const [openPickerIndex, setOpenPickerIndex] = useState(null);
 
   useEffect(() => {
     if (token) {
@@ -24,10 +27,11 @@ function AddInventoryItemForm({ onItemCreated, selectedCategory }) {
     line_item_id: [],
     name: "",
     description: "",
-    category_id: selectedCategory || "",  
+    category_id: selectedCategory || "",
     dietary_type: "",
     availability: "",
     unit: "",
+    image_id: "",
     unit_price: "",
     unit_cst: "",
     unit_gst: "",
@@ -48,11 +52,11 @@ function AddInventoryItemForm({ onItemCreated, selectedCategory }) {
       setItems([{ ...emptyItem, category_id: selectedCategory, realm }]);
     }
   }, [realm, selectedCategory]);
-  
+
   // Whenever selectedCategory changes, update all items
   useEffect(() => {
     if (!selectedCategory) return;
-  
+
     setItems((prevItems) =>
       prevItems.map((item) => {
         const updatedName = item.name?.trim() || "";
@@ -64,7 +68,7 @@ function AddInventoryItemForm({ onItemCreated, selectedCategory }) {
       })
     );
   }, [selectedCategory]);
-  
+
 
   // Recursive flattening of nested category tree
   const flattenCategories = (categoryTree) => {
@@ -136,10 +140,19 @@ function AddInventoryItemForm({ onItemCreated, selectedCategory }) {
     setItems(updated);
   };
 
+
+  const handleSelectDocument = (index, doc) => {
+    const updated = [...items];
+    updated[index].image_id = doc.id; // ✅ store only the ID
+    setItems(updated);
+    setOpenPickerIndex(null);
+  };
+
+
   const handleAddItem = () => {
     setItems([...items, { ...emptyItem, category_id: selectedCategory, realm }]);
   };
-  
+
 
   const handleCancel = (index) => {
     if (items.length === 1) {
@@ -150,7 +163,7 @@ function AddInventoryItemForm({ onItemCreated, selectedCategory }) {
       setItems(updated);
     }
   };
-  
+
 
   const handleSubmit = async (e) => {
     e.preventDefault();
@@ -172,6 +185,7 @@ function AddInventoryItemForm({ onItemCreated, selectedCategory }) {
             line_item_id: item.line_item_id.map(id => parseInt(id)),
             availability: parseInt(item.availability) || 0,
             dietary_type: ["veg", "nonveg"].includes(item.dietary_type) ? item.dietary_type : "veg",
+            image_id: item.image_id,
             unit_price: parseFloat(item.unit_price) || 0,
             unit_cst: parseFloat(item.unit_cst) || 0,
             unit_gst: parseFloat(item.unit_gst) || 0,
@@ -184,7 +198,7 @@ function AddInventoryItemForm({ onItemCreated, selectedCategory }) {
             created_by,
             updated_by,
           };
-
+          console.log("the Paylaod", payload)
           const response = await axios.post(
             `${import.meta.env.VITE_API_INVENTORY_SERVICE_URL}/${clientId}/menu/create`,
             payload,
@@ -408,6 +422,26 @@ function AddInventoryItemForm({ onItemCreated, selectedCategory }) {
               placeholder="Slug"
               className="form-input"
             /> */}
+
+
+            <div className="image-selector-section">
+              <ImagePreview
+                clientId={clientId}
+                imageId={item.image_id}
+                token={token}
+              />
+
+              <button
+                type="button"
+                className="btn-browse-doc"
+                onClick={() => setOpenPickerIndex(index)}
+              >
+                Browse from Documents
+              </button>
+            </div>
+
+
+
             <button
               type="button"
               className="btn-cancel-row"
@@ -426,10 +460,24 @@ function AddInventoryItemForm({ onItemCreated, selectedCategory }) {
         <button type="submit" className="btn-add-item">
           Submit
         </button>
-        
+
       </div>
+
+
+      {openPickerIndex !== null && (
+        <DocumentPickerModal
+          isOpen={openPickerIndex !== null}
+          onClose={() => setOpenPickerIndex(null)}
+          clientId={clientId}
+          token={token}
+          onSelect={(doc) => handleSelectDocument(openPickerIndex, doc)}
+        />
+      )}
     </form>
   );
 }
+
+
+
 
 export default AddInventoryItemForm;
