@@ -103,14 +103,6 @@ const Navbar = () => {
                         </li>
                     </ClickSpark>
                     <ClickSpark>
-
-
-                        <li title="Add Users" onClick={() => go('/add-users')} className={isActive('/main/add-users') ? 'page-active' : ''}>
-                            <FaUserPlus /><span>Add Users</span>
-                            {!isActive('/main/add-users') && <span className="arrow-indicator"><MdKeyboardArrowRight /></span>}
-                        </li>
-                    </ClickSpark>
-                    <ClickSpark>
                         <li title="Menu" onClick={() => go('/menu-page')} className={isActive('/main/menu-page') ? 'page-active' : ''}>
                             <MdOutlineMenuBook /><span>Menu</span>
                             {!isActive('/main/menu-page') && <span className="arrow-indicator"><MdKeyboardArrowRight /></span>}
@@ -132,12 +124,14 @@ const Navbar = () => {
                             {!isActive('/main/reports') && <span className="arrow-indicator"><MdKeyboardArrowRight /></span>}
                         </li>
                     </ClickSpark> */}
-
-                        <li title="Add Users" onClick={() => go('/add-users')} className={isActive('/main/add-users') ? 'page-active' : ''}>
+ <ClickSpark>
+ <li title="Add Users" onClick={() => go('/add-users')} className={isActive('/main/add-users') ? 'page-active' : ''}>
                             <FaUserPlus /><span>Add Users</span>
                             {!isActive('/main/add-users') && <span className="arrow-indicator"><MdKeyboardArrowRight /></span>}
                         </li>
-                        
+ </ClickSpark>
+                      
+                        <ClickSpark>
                         <li title="Documents" onClick={() => go('documents')} className={isActive('/main/documents') ? 'page-active' : ''}>
                             <FaUserPlus /><span>Documents</span>
                             {!isActive('/main/documents') && <span className="arrow-indicator"><MdKeyboardArrowRight /></span>}

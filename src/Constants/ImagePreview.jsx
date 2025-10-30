@@ -30,12 +30,18 @@ function ImagePreview({ clientId, imageId, token }) {
       };
   
       fetchImageFromServer();
+      return () => {
+        if (imageUrl) {
+          URL.revokeObjectURL(imageUrl);
+        }
+      };
     }, [clientId, imageId, token]);
   
     return imageUrl ? (
       <img src={imageUrl} alt="Preview" className="menu-image-preview" />
     ) : (
-      <span className="no-image"></span>
+      <div>
+      </div>
     );
   }
   
