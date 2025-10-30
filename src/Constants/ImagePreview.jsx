@@ -38,23 +38,9 @@ function ImagePreview({ clientId, imageId, token }) {
     }, [clientId, imageId, token]);
   
     return imageUrl ? (
-      <img src={imageUrl} alt="Preview" className="menu-image-preview" style={{
-        width: '100%',
-        height: '100%',
-        objectFit: 'cover'
-      }}/>
+      <img src={imageUrl} alt="Preview" className="menu-image-preview" />
     ) : (
-      <div style={{
-        width: '100%',
-        height: '100%',
-        backgroundColor: '#f0f0f0',
-        display: 'flex',
-        alignItems: 'center',
-        justifyContent: 'center',
-        fontSize: '12px',
-        color: '#999'
-      }}>
-        No Image
+      <div>
       </div>
     );
   }
