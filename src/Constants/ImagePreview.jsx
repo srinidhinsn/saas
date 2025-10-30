@@ -30,12 +30,32 @@ function ImagePreview({ clientId, imageId, token }) {
       };
   
       fetchImageFromServer();
+      return () => {
+        if (imageUrl) {
+          URL.revokeObjectURL(imageUrl);
+        }
+      };
     }, [clientId, imageId, token]);
   
     return imageUrl ? (
-      <img src={imageUrl} alt="Preview" className="menu-image-preview" />
+      <img src={imageUrl} alt="Preview" className="menu-image-preview" style={{
+        width: '100%',
+        height: '100%',
+        objectFit: 'cover'
+      }}/>
     ) : (
-      <span className="no-image"></span>
+      <div style={{
+        width: '100%',
+        height: '100%',
+        backgroundColor: '#f0f0f0',
+        display: 'flex',
+        alignItems: 'center',
+        justifyContent: 'center',
+        fontSize: '12px',
+        color: '#999'
+      }}>
+        No Image
+      </div>
     );
   }
   

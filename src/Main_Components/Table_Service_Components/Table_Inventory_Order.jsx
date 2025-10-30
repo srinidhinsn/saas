@@ -7,6 +7,7 @@ import { FaCheck, FaUsers, FaClock, FaChartLine, FaPlus, FaTrash, FaMinus, FaSho
 import { BsCash, BsCreditCard, BsQrCode } from "react-icons/bs";
 import { toast } from 'react-toastify';
 import Modal from "react-modal";
+import ImagePreview from "../../Constants/ImagePreview";
 
 Modal.setAppElement("#root");
 
@@ -320,45 +321,6 @@ const Table_Inventory_Order = ({ onOrderUpdate }) => {
       <div className="Restaurant-Order_Placing">
           <div className={`restaurant-order-system ${darkMode ? "dark-mode" : "light-mode"}`}>
             <div className="order-page-container-full">
-                {/* <div className="page-header-main">
-                    <div>
-                        <h1 className="page-title">Place Order</h1>
-                        <p className="page-subtitle">Dine-in order management</p>
-                    </div>
-                </div> */}
-
-                {/* Stats Cards */}
-                {/* <div className="stats-grid-inline">
-                    <div className="stat-card available">
-                        <div className="stat-icon"><FaCheck /></div>
-                        <div className="stat-content">
-                            <p className="stat-label">Available</p>
-                            <p className="stat-value">{available}</p>
-                        </div>
-                    </div>
-                    <div className="stat-card occupied">
-                        <div className="stat-icon"><FaUsers /></div>
-                        <div className="stat-content">
-                            <p className="stat-label">Occupied</p>
-                            <p className="stat-value">{occupied}</p>
-                        </div>
-                    </div>
-                    <div className="stat-card reserved">
-                        <div className="stat-icon"><FaClock /></div>
-                        <div className="stat-content">
-                            <p className="stat-label">Reserved</p>
-                            <p className="stat-value">{reserved}</p>
-                        </div>
-                    </div>
-                    <div className="stat-card total">
-                        <div className="stat-icon"><FaChartLine /></div>
-                        <div className="stat-content">
-                            <p className="stat-label">Total Tables</p>
-                            <p className="stat-value">{total}</p>
-                        </div>
-                    </div>
-                </div> */}
-
                 <div className="order-layout">
                     {/* Menu Section */}
                     <div className="menu-section">
@@ -395,12 +357,10 @@ const Table_Inventory_Order = ({ onOrderUpdate }) => {
                                         onClick={() => handleItemClick(item)}
                                     >
                                         <div className="menu-item-image">
-                                            <img 
-                                                src={item.image || "https://images.unsplash.com/photo-1546069901-ba9599a7e63c?w=400&h=300&fit=crop"} 
-                                                alt={item.name}
-                                                onError={(e) => {
-                                                    e.target.src = "https://images.unsplash.com/photo-1546069901-ba9599a7e63c?w=400&h=300&fit=crop";
-                                                }}
+                                            <ImagePreview
+                                                clientId={clientId}
+                                                imageId={item.image_id}
+                                                token={token}
                                             />
                                         </div>
                                         <div className="menu-item-content">
@@ -489,27 +449,6 @@ const Table_Inventory_Order = ({ onOrderUpdate }) => {
                                                 <span className="total-label">Total</span>
                                                 <span className="total-value">₹{calculateTotalPrice()}</span>
                                             </div>
-{/* 
-                                            <div className="payment-methods">
-                                                <button
-                                                    className={`payment-method-btn cash ${paymentMode === "Cash" ? "active" : ""}`}
-                                                    onClick={() => setCashPopupOpen(true)}
-                                                >
-                                                    <BsCash /> Cash
-                                                </button>
-                                                <button
-                                                    className={`payment-method-btn card ${paymentMode === "Card" ? "active" : ""}`}
-                                                    onClick={() => setPaymentMode("Card")}
-                                                >
-                                                    <BsCreditCard /> Card
-                                                </button>
-                                                <button
-                                                    className={`payment-method-btn upi ${paymentMode === "UPI" ? "active" : ""}`}
-                                                    onClick={() => setPaymentMode("UPI")}
-                                                >
-                                                    <BsQrCode /> UPI
-                                                </button>
-                                            </div> */}
 
                                             <button
                                                 className="place-order-btn"

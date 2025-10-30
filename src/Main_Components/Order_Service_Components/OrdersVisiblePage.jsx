@@ -1529,7 +1529,7 @@ const OrdersVisiblePage = () => {
 
                 {showInvoiceModal && invoiceOrder && <InvoiceModal order={invoiceOrder} onClose={closeInvoiceModal} />}
             </div>
-            <div style={{ position: 'absolute', bottom: '15px', right: '10px' }}>
+            {/* <div style={{ position: 'absolute', bottom: '15px', right: '10px' }}>
                 <p style={{ color: 'var(--bg-number-color)' }}>
                     <span
                         style={{
@@ -1582,38 +1582,10 @@ const OrdersVisiblePage = () => {
                     ></span>
                     New
                 </p>
-            </div>
+            </div> */}
         </div>
         </div>
     );
 };
 
 export default OrdersVisiblePage;
-// ================
-// ================
-// ================
-// ================
-// ================
-// ================
-// ================
-// ================
-// ================
-// ================
-// ================
-// ================
-// ================
-// ================
-// ================
-// ================
-// ================
-// ================
-// ================
-// ================
-// ================
-// ================
-// ================
-// ================
-// ================
-// ================
-// ================
-
