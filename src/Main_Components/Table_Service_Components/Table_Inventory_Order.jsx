@@ -265,7 +265,7 @@ const Table_Inventory_Order = ({ onOrderUpdate }) => {
                 client_id: clientId,
                 item_id: Number(item.id),
                 quantity: Number(item.quantity),
-                status: item.status || "new",
+                status: item.status || "pending",
                 note: item.note || "",
                 item_name: item.name,
                 slug: item.slug || generateSlug(item.name),

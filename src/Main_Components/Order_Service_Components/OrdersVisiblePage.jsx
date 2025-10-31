@@ -1075,7 +1075,7 @@ const OrdersVisiblePage = () => {
             toast.success("Order deleted and table marked vacant.");
             fetchTables();
         } catch (err) {
-            toast.error("❌ Failed to delete order or update table status");
+            toast.error("❌ Failed to delete served order ");
         }
     };
 
