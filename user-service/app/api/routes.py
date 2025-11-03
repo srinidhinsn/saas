@@ -1,7 +1,7 @@
 from fastapi import Depends, HTTPException, APIRouter, Request
 from sqlalchemy.orm import Session
 from database.postgres import get_db
-from entity.user_entity import User, Person
+from entity.user_entity import User, Person,PageDefinition
 from entity.client_entity import Client
 from utils.auth import hash_password, verify_password, create_access_token, verify_token, SECRET_KEY, ALGORITHM
 from models.saas_context import SaasContext
@@ -280,3 +280,92 @@ async def delegate_access(
     token = jwt.encode(payload, SECRET_KEY, algorithm=ALGORITHM)
 
     return {"delegated_token": token, "expires_at": expire}
+
+
+
+@router.get("/users")
+async def get_users_by_client(
+    client_id: str,
+    context: SaasContext = Depends(verify_token),
+    db: Session = Depends(get_db)
+):
+    users = db.query(User).filter(User.client_id == client_id).all()
+
+    if not users:
+        raise HTTPException(status_code=404, detail="No users found for this client")
+
+    user_models = User.copyToModels(users)
+    return ResponseModel(screen_id=context.screen_id, data={"users": user_models})
+
+
+@router.get("/screens")
+async def get_screens_by_role(
+    client_id: str,
+    role: str,
+    context: SaasContext = Depends(verify_token),
+    db: Session = Depends(get_db)
+):
+    try:
+        # ✅ Fetch screen_id, module, load_type, and operations for the given client and role
+        screens = (
+            db.query(
+                PageDefinition.screen_id,
+                PageDefinition.module,
+                PageDefinition.load_type,
+                PageDefinition.operations
+            )
+            .filter(PageDefinition.client_id == client_id, PageDefinition.role == role)
+            .all()
+        )
+
+        # ✅ Convert SQLAlchemy result objects into dicts
+        screen_data = [
+            {
+                "screen_id": s.screen_id,
+                "module": s.module,
+                "load_type": s.load_type,
+                "operations": s.operations,
+            }
+            for s in screens
+        ]
+
+        # ✅ Wrap inside "data" so frontend `.data.data.screen_ids` still works
+        return ResponseModel(
+            screen_id=context.screen_id,
+            data={"screens": screen_data}
+        )
+
+    except Exception as e:
+        return ResponseModel(
+            screen_id=context.screen_id,
+            status="error",
+            message=f"Failed to fetch screens: {str(e)}"
+        )
+
+
+
+@router.post("/screens/configure")
+async def save_role_screens(
+    client_id: str,
+    role: str,
+    payload: dict,
+    db: Session = Depends(get_db),
+    context: SaasContext = Depends(verify_token)
+):
+    try:
+        screen_ids = payload.get("accessible", [])
+
+        # Delete old role-screen mappings
+        db.query(PageDefinition).filter(
+            PageDefinition.client_id == client_id,
+            PageDefinition.role == role
+        ).delete()
+
+        # Insert new mappings
+        for sid in screen_ids:
+            db.add(PageDefinition(client_id=client_id, role=role, screen_id=sid))
+        db.commit()
+        return ResponseModel( screen_id=context.screen_id, message=f"Updated screen configuration for {role}", data={"accessible": screen_ids})
+    except Exception as e:
+        db.rollback()
+        return ResponseModel( screen_id=context.screen_id, status="error", message=f"Failed to save config: {str(e)}")
