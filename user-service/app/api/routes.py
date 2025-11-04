@@ -8,7 +8,7 @@ from models.saas_context import SaasContext
 from models.user_model import UserModel, ResetpasswordRequest, LoginRequest,PersonModel
 from models.response_model import ResponseModel
 from models.user_model import DelegatedAccessRequest
-from sqlalchemy import and_
+from sqlalchemy import and_,cast
 from utils.send_email_otp import otpEmailService, otp_store
 from utils.create_notification import  get_template_body, render_template
 from entity.inventory_entity import CategoryEntity
@@ -17,6 +17,7 @@ import random
 from datetime import datetime, timedelta
 from services.add_users import create_user_and_person,getting_screen_id
 from jose import jwt
+import uuid
 
 router = APIRouter()
 # ================== ADD USER ==================
@@ -205,25 +206,20 @@ async def reset_password(client_id: str, req_data: ResetpasswordRequest, context
 
 # ================== PERSON DETAILS ==================
 @router.post("/person-details")
-async def update_person_details(
-    client_id: str,
-    person_req: PersonModel,
-    context: SaasContext = Depends(verify_token),
-    db: Session = Depends(get_db)
-):
-    user = db.query(User).filter(
-        User.id == context.user_id, 
-        User.client_id == client_id
-    ).first()
+async def update_person_details(client_id: str,person_req: PersonModel,context: SaasContext = Depends(verify_token),db: Session = Depends(get_db)):
+    try:
+        user_uuid = uuid.UUID(str(context.user_id))
+    except ValueError:
+        raise HTTPException(status_code=400, detail="Invalid user_id format in token")
+
+    user = db.query(User).filter(User.id == user_uuid,User.client_id == client_id).first()
     if not user:
         raise HTTPException(status_code=404, detail="User not found")
 
-    # Fetch existing person
-    person = db.query(Person).filter(Person.id == user.id).first()
+    person = db.query(Person).filter(Person.id == user_uuid).first()
     action = "added"
 
     if person:
-        # Update existing
         person.first_name = person_req.first_name
         person.last_name = person_req.last_name
         person.dob = person_req.dob
@@ -233,47 +229,33 @@ async def update_person_details(
         db.refresh(person)
         action = "updated"
     else:
-        # Create new
-        person = Person(
-            id=user.id,
-            first_name=person_req.first_name,
-            last_name=person_req.last_name,
-            dob=person_req.dob,
-            email=person_req.email,
-            phone=person_req.phone
-        )
+        person = Person(id=user.id,**person_req.dict(exclude_unset=True))
         db.add(person)
         db.commit()
         db.refresh(person)
 
-    # Send email notification if email exists
     if person_req.email:
         body = f"Dear {person_req.first_name}, your details have been {action} successfully."
-        try:
-            otpEmailService(person_req.email, body)
-        except Exception as e:
-            # Log email failure but don't fail the request
-            print(f"Email failed: {e}")
+        otpEmailService(person_req.email, body)
 
-    return ResponseModel(
-        screen_id=context.screen_id,
-        data={
-            "message": f"Person details {action} successfully",
-            "person": PersonModel.from_orm(person)
-        }
-    )
-
+    return ResponseModel(screen_id=context.screen_id,
+        data={"message": f"Person details {action} successfully","person": PersonModel.from_orm(person)})\
+        
 @router.get("/person-details")
 async def get_person_details(
     client_id: str,
     context: SaasContext = Depends(verify_token),
     db: Session = Depends(get_db),
 ):
-    person = db.query(Person).filter(Person.id == context.user_id).first()
+    try:
+        user_uuid = uuid.UUID(str(context.user_id))
+    except ValueError:
+        raise HTTPException(status_code=400, detail="Invalid user_id format in token")
+
+    person = db.query(Person).filter(Person.id == user_uuid).first()
 
     if not person:
-        # Create empty Person record so user can later update it
-        person = Person(id=context.user_id, email=None, phone=None, first_name=None, last_name=None, dob=None)
+        person = Person(id=user_uuid, email=None, phone=None, first_name=None, last_name=None, dob=None)
         db.add(person)
         db.commit()
         db.refresh(person)
@@ -304,19 +286,24 @@ async def get_all_persons(client_id: str, context: SaasContext = Depends(verify_
         .all()
     )
 
-    persons = [
-        {
+    persons = []
+    for person, username, roles in results:
+        if isinstance(roles, str):
+            roles = [roles.strip("{}")]
+        elif roles is None:
+            roles = []
+
+        persons.append({
             **Person.copyToModel(person).dict(),
             "username": username,
             "role": (roles[0] if roles else "")
-        }
-        for person, username, roles in results
-    ]
+        })
 
     return ResponseModel(
         screen_id=context.screen_id,
         data={"persons": persons}
     )
+
 
 
 @router.post("/delegate-access")
@@ -361,40 +348,40 @@ async def delegate_access(
 
     return {"delegated_token": token, "expires_at": expire}
 
-# ================================= Client Table Service ==================================== #
+
 @router.get("/realm")
-async def get_clients_by_realm(
-    realm: str = "",  
-    db: Session = Depends(get_db),
-    context: SaasContext = Depends(verify_token)
-):
+async def get_clients_by_realm(realm: str = "",context: SaasContext = Depends(verify_token),db: Session = Depends(get_db)):
     query = db.query(Client)
     if realm:
         query = query.filter(Client.realm == realm)
     clients = query.all()
     client_models = [Client.copyToModel(c) for c in clients]
-    return ResponseModel(screen_id=context.screen_id, data={"clients": client_models})
+    
+    return ResponseModel(screen_id=context.screen_id,data={"clients": client_models})
 
 @router.get("/realm/ordersummary")
-async def get_order_summary_by_realm(
-    realm: str = None,  
-    db: Session = Depends(get_db),
-    context: SaasContext = Depends(verify_token)
-):
+async def get_order_summary_by_realm(realm: str = None,context: SaasContext = Depends(verify_token),db: Session = Depends(get_db)):
     query = db.query(DineinOrder).join(Client, DineinOrder.client_id == Client.id)
     if realm:
         query = query.filter(Client.realm == realm)
+    
     total_orders = query.count()
     pending_orders = query.filter(DineinOrder.status == "pending").count()
 
-    return ResponseModel(
-        screen_id=context.screen_id,
-        data={"total_orders": total_orders, "pending_orders": pending_orders}
-    )
+    return ResponseModel(screen_id=context.screen_id,
+        data={"total_orders": total_orders,"pending_orders": pending_orders})
 
 @router.get("/realms")
-async def get_realms(realm: str, db: Session = Depends(get_db)):
-    category = db.query(CategoryEntity).filter(CategoryEntity.id == realm).first()
+async def get_realms(realm: str,context: SaasContext = Depends(verify_token),db: Session = Depends(get_db)):
+    category = db.query(CategoryEntity).filter(
+        CategoryEntity.id == realm
+    ).first()
+    
     if not category:
-        raise HTTPException(status_code=404, detail=f"Category with id '{realm}' not found")
-    return {"data": category.sub_categories or []}
+        raise HTTPException(
+            status_code=404, 
+            detail=f"Category with id '{realm}' not found"
+        )
+    
+    return ResponseModel(screen_id=context.screen_id,
+        data={"realms": category.sub_categories or []})
