@@ -497,76 +497,7 @@ const TableManagement = () => {
         const matchesStatus = !statusFilter || table.status === statusFilter;
         return matchesSearch && matchesStatus;
     });
-    const handleBulkDelete = async () => {
-        try {
-            const tablesToDelete = tables.filter(t => t.name.startsWith(bulkDeleteSeries));
-            for (const table of tablesToDelete) {
-                await tableServicesPort.post(`/${clientId}/tables/delete`, {
-                    id: table.id,
-                    client_id: clientId,
-                    name: "",
-                    table_type: "",
-                    location_zone: "",
-                }, { headers: { Authorization: `Bearer ${token}` } });
-            }
-            fetchTables();
-        } catch (err) {
-            console.error("Bulk delete error", err);
-        } finally {
-            setShowSecondDeleteConfirm(false);
-            setBulkDeleteSeries("");
-        }
-    };
-    const handleBulkUpdate = async () => {
-        if (!bulkUpdateSeries || (!bulkUpdateSeating && !bulkUpdateZone)) {
-            alert("Enter a series and at least one change (seating/zone)");
-            return;
-        }
-        try {
-            const tablesToUpdate = tables.filter(t => t.name.startsWith(bulkUpdateSeries));
-            for (const table of tablesToUpdate) {
-                const updatedTable = {
-                    ...table,
-                    ...(bulkUpdateSeating && { table_type: bulkUpdateSeating.toString() }),
-                    ...(bulkUpdateZone && { location_zone: bulkUpdateZone })
-                };
-                await tableServicesPort.post(`/${clientId}/tables/update`, updatedTable, {
-                    headers: { Authorization: `Bearer ${token}` }
-                });
-            }
-            fetchTables();
-            setBulkUpdateSeries("");
-            setBulkUpdateSeating("");
-            setBulkUpdateZone("");
-        } catch (err) {
-            console.error("Bulk update error", err);
-        }
-    };
-    const handleCloseAddTableModal = () => {
-        // Validate each row for required fields
-        let errors = {};
-        tableRanges.forEach((row, index) => {
-          if (!row.tabletype || row.tabletype.trim() === '') {
-            errors[index] = {...errors[index], tabletype: true};
-          }
-          if (!row.range || row.range.trim() === '') {
-            errors[index] = {...errors[index], range: true};
-          }
-          if (!row.type || row.type.trim() === '') {
-            errors[index] = {...errors[index], type: true};
-          }
-        });
-      
-        if (Object.keys(errors).length > 0) {
-          setFieldErrors(errors); // Update error state to highlight fields
-          return; // prevent modal close
-        }
-      
-        // No validation errors, close modal
-        setShowAddTable(false);
-        setTableRanges([]);
-        setFieldErrors([]);
-      };
+  
       
       const closeEditModal = () => {
         setEditRowId(null);

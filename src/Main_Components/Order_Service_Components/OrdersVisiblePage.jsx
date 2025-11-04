@@ -5,6 +5,9 @@ import { useTheme } from "../../ThemeChangerComponent/ThemeProvider";
 import { toast } from "react-toastify";
 import InvoiceModal from "../Invoice_Services_Components/Invoice_Page";
 import { MdOutlineKeyboardDoubleArrowDown } from "react-icons/md";
+import Modal from "react-modal";
+
+Modal.setAppElement("#root");
 
 const OrdersVisiblePage = () => {
     const { clientId } = useParams();
@@ -30,12 +33,20 @@ const OrdersVisiblePage = () => {
     const [filterMode, setFilterMode] = useState(0);
     const [showInvoiceModal, setShowInvoiceModal] = useState(false);
     const [invoiceOrder, setInvoiceOrder] = useState(null);
-    const [tableId, setTableId] = useState(null)
-    const [tables, setTables] = useState([]); const newlyAddedItemsRef = useRef({});
+    const [tableId, setTableId] = useState(null);
+    const [tables, setTables] = useState([]);
+    const newlyAddedItemsRef = useRef({});
     const [showOrderDetailModal, setShowOrderDetailModal] = useState(false);
     const [selectedOrder, setSelectedOrder] = useState(null);
     const [newlyAddedItems, setNewlyAddedItems] = useState({});
     const [currentBatchTimestamp, setCurrentBatchTimestamp] = useState(null);
+
+    // Line Items Modal States
+    const [lineItemsModalOpen, setLineItemsModalOpen] = useState(false);
+    const [selectedMainItem, setSelectedMainItem] = useState(null);
+    const [lineItemsDetails, setLineItemsDetails] = useState([]);
+    const [pendingOrderId, setPendingOrderId] = useState(null);
+
     useEffect(() => {
         if (tableId) {
             document.body.classList.add("sidebar-minimized");
@@ -50,18 +61,15 @@ const OrdersVisiblePage = () => {
         new: "rgb(191, 170, 124)",
     };
 
-    // New: Fetch invoice payment_status by order IDs to mark paid visually
     const fetchInvoicesForOrders = async (ordersList) => {
         if (!ordersList || ordersList.length === 0) return;
         try {
             const orderIds = ordersList.map(o => o.id);
-            // Fetch all invoices for client
             const res = await axios.get(`${import.meta.env.VITE_API_BILLING_SERVICE_URL}/${clientId}/invoice/read_document`, {
                 headers: { Authorization: `Bearer ${token}` },
                 params: { client_id: clientId },
             });
             const invoices = res.data?.data || [];
-            // Map orders with their payment_status from invoices
             const updatedOrders = ordersList.map(order => {
                 const matchedInvoice = invoices.find(inv => inv.order_id?.toString() === order.id.toString());
                 if (matchedInvoice && matchedInvoice.payment_status?.toLowerCase() === "paid") {
@@ -71,7 +79,6 @@ const OrdersVisiblePage = () => {
             });
             setOrders(updatedOrders);
         } catch (error) {
-            // Still set orders even if invoices fail
             setOrders(ordersList);
         }
     };
@@ -97,7 +104,6 @@ const OrdersVisiblePage = () => {
                 headers: { Authorization: `Bearer ${token}` },
             });
             setTables(res.data?.data || []);
-            // Optionally build tablesMap from this as well
             const map = {};
             (res.data?.data || []).forEach(t => { map[t.id] = t.name; });
             setTablesMap(map);
@@ -112,7 +118,7 @@ const OrdersVisiblePage = () => {
 
     useEffect(() => {
         axios
-            .get(`${import.meta.env.VITE_API_INVENTORY_SERVICE_URL}/${clientId}/inventory/read`, {
+            .get(`${import.meta.env.VITE_API_INVENTORY_SERVICE_URL}/${clientId}/menu/read`, {
                 headers: { Authorization: `Bearer ${token}` },
             })
             .then((res) => {
@@ -125,7 +131,6 @@ const OrdersVisiblePage = () => {
     }, [clientId, token]);
 
     useEffect(() => {
-        // Only show search results when modal is open AND in edit mode
         if (
             !showOrderDetailModal ||
             !selectedOrder ||
@@ -136,12 +141,239 @@ const OrdersVisiblePage = () => {
             return;
         }
 
-        // ✅ Filter items based on search query
         const filtered = allInventoryItems.filter((item) =>
             (item.name || "").toLowerCase().includes(itemSearchQuery.toLowerCase())
         );
         setItemSearchResults(filtered);
     }, [itemSearchQuery, allInventoryItems, showOrderDetailModal, selectedOrder, editOrderId]);
+
+    // Modified addItemToOrder to check for line items
+    const handleItemSelection = (orderId, selectedItem) => {
+        // Check if item has line_item_id
+        if (selectedItem.line_item_id && Array.isArray(selectedItem.line_item_id) && selectedItem.line_item_id.length > 0) {
+            // Show modal with line items
+            const lineItems = selectedItem.line_item_id
+                .map(id => allInventoryItems.find(i => i.id === id))
+                .filter(Boolean);
+            
+            setSelectedMainItem(selectedItem);
+            setLineItemsDetails(lineItems);
+            setPendingOrderId(orderId);
+            setLineItemsModalOpen(true);
+        } else {
+            // No line items, add directly
+            addItemToOrder(orderId, selectedItem);
+        }
+    };
+
+   // Replace the handleAddMainItemWithLineItems function with this improved version
+
+const handleAddMainItemWithLineItems = () => {
+    if (!selectedMainItem || !pendingOrderId) return;
+    
+    // Create a single batch timestamp for all items (main + line items)
+    let batchTimestamp = currentBatchTimestamp;
+    
+    if (!batchTimestamp) {
+        batchTimestamp = Date.now();
+        setCurrentBatchTimestamp(batchTimestamp);
+        
+        const batchKey = `order_${pendingOrderId}_batch_${batchTimestamp}`;
+        localStorage.setItem(batchKey, JSON.stringify({
+            timestamp: batchTimestamp,
+            started_at: Date.now(),
+        }));
+    }
+    
+    // Add main item with the batch timestamp
+    addItemToOrderWithBatch(pendingOrderId, selectedMainItem, batchTimestamp, true);
+    
+    // Add all line items with the SAME batch timestamp
+    lineItemsDetails.forEach(lineItem => {
+        addItemToOrderWithBatch(pendingOrderId, lineItem, batchTimestamp, false);
+    });
+
+    // Close modal and reset
+    setLineItemsModalOpen(false);
+    setSelectedMainItem(null);
+    setLineItemsDetails([]);
+    setPendingOrderId(null);
+};
+
+// New helper function that accepts a batch timestamp parameter
+const addItemToOrderWithBatch = (orderId, selectedItem, forcedBatchTimestamp, isMainItem = false) => {
+    const existingItemInCurrentBatch = selectedOrder?.items.find(item =>
+        item.item_id === selectedItem.id &&
+        item.is_new_item &&
+        item.batch_timestamp === forcedBatchTimestamp
+    );
+
+    if (existingItemInCurrentBatch) {
+        const itemIdentifier = existingItemInCurrentBatch.id || existingItemInCurrentBatch.frontend_unique_key;
+        updateItemQuantity(orderId, itemIdentifier, existingItemInCurrentBatch.quantity + 1);
+        if (isMainItem) {
+            setItemSearchQuery("");
+            setItemSearchResults([]);
+        }
+        return;
+    }
+
+    const timestamp = Date.now() + Math.random();
+    const uniqueKey = `${selectedItem.id}_${timestamp}`;
+
+    const newItem = {
+        item_id: selectedItem.id,
+        item_name: selectedItem.name,
+        quantity: 1,
+        price: selectedItem.unit_price,
+        status: "pending",
+        note: "",
+        slug: selectedItem.slug || generateSlug(selectedItem.name),
+        added_at_frontend: timestamp,
+        frontend_unique_key: uniqueKey,
+        is_new_item: true,
+        unit_price: selectedItem.unit_price || 0,
+        line_total: (selectedItem.unit_price || 0) * 1,
+        batch_timestamp: forcedBatchTimestamp, // Use the forced timestamp
+        id: uniqueKey,
+        is_line_item: !isMainItem, // Mark if it's a line item
+    };
+
+    const storageKey = `order_${orderId}_new_item_${uniqueKey}`;
+    localStorage.setItem(storageKey, JSON.stringify({
+        item_id: selectedItem.id,
+        unique_key: uniqueKey,
+        added_at: timestamp,
+        batch_timestamp: forcedBatchTimestamp,
+        quantity: 1,
+        is_line_item: !isMainItem,
+    }));
+
+    setOrders(prevOrders => {
+        return prevOrders.map(order => {
+            if (order.id !== orderId) return order;
+
+            const batches = getBatchesFromStorage(orderId);
+            batches.sort((a, b) => a.timestamp - b.timestamp);
+
+            const oldItems = order.items.filter(item => !item.is_new_item);
+            const newItemsByBatch = new Map();
+            batches.forEach(batch => {
+                newItemsByBatch.set(batch.timestamp, []);
+            });
+
+            order.items.forEach(item => {
+                if (item.is_new_item && item.batch_timestamp) {
+                    if (!newItemsByBatch.has(item.batch_timestamp)) {
+                        newItemsByBatch.set(item.batch_timestamp, []);
+                    }
+                    newItemsByBatch.get(item.batch_timestamp).push(item);
+                }
+            });
+
+            if (!newItemsByBatch.has(forcedBatchTimestamp)) {
+                newItemsByBatch.set(forcedBatchTimestamp, []);
+            }
+            newItemsByBatch.get(forcedBatchTimestamp).push(newItem);
+
+            const allItems = [...oldItems];
+            const batchDividers = [];
+
+            const sortedTimestamps = Array.from(newItemsByBatch.keys()).sort((a, b) => a - b);
+
+            sortedTimestamps.forEach((ts, idx) => {
+                const batchItems = newItemsByBatch.get(ts);
+                if (batchItems && batchItems.length > 0) {
+                    batchDividers.push({
+                        index: allItems.length,
+                        batch_number: idx + 2,
+                    });
+                    allItems.push(...batchItems);
+                }
+            });
+
+            return {
+                ...order,
+                items: allItems,
+                has_new_items: true,
+                batch_dividers: batchDividers,
+            };
+        });
+    });
+
+    if (selectedOrder?.id === orderId) {
+        setSelectedOrder(prev => {
+            const batches = getBatchesFromStorage(orderId);
+            batches.sort((a, b) => a.timestamp - b.timestamp);
+
+            const oldItems = prev.items.filter(item => !item.is_new_item);
+
+            const newItemsByBatch = new Map();
+            batches.forEach(batch => {
+                newItemsByBatch.set(batch.timestamp, []);
+            });
+
+            prev.items.forEach(item => {
+                if (item.is_new_item && item.batch_timestamp) {
+                    if (!newItemsByBatch.has(item.batch_timestamp)) {
+                        newItemsByBatch.set(item.batch_timestamp, []);
+                    }
+                    newItemsByBatch.get(item.batch_timestamp).push(item);
+                }
+            });
+
+            if (!newItemsByBatch.has(forcedBatchTimestamp)) {
+                newItemsByBatch.set(forcedBatchTimestamp, []);
+            }
+            newItemsByBatch.get(forcedBatchTimestamp).push(newItem);
+
+            const allItems = [...oldItems];
+            const batchDividers = [];
+
+            const sortedTimestamps = Array.from(newItemsByBatch.keys()).sort((a, b) => a - b);
+
+            sortedTimestamps.forEach((ts, idx) => {
+                const batchItems = newItemsByBatch.get(ts);
+                if (batchItems && batchItems.length > 0) {
+                    batchDividers.push({
+                        index: allItems.length,
+                        batch_number: idx + 2,
+                    });
+                    allItems.push(...batchItems);
+                }
+            });
+
+            return {
+                ...prev,
+                items: allItems,
+                has_new_items: true,
+                batch_dividers: batchDividers,
+            };
+        });
+    }
+
+    if (isMainItem) {
+        setItemSearchQuery("");
+        setItemSearchResults([]);
+    }
+};
+
+// Also update the handleAddMainItemOnly to use the same batch timestamp
+const handleAddMainItemOnly = () => {
+    if (!selectedMainItem || !pendingOrderId) return;
+    
+    // Add only main item using the current or new batch timestamp
+    addItemToOrder(pendingOrderId, selectedMainItem);
+    
+    // Close modal and reset
+    setLineItemsModalOpen(false);
+    setSelectedMainItem(null);
+    setLineItemsDetails([]);
+    setPendingOrderId(null);
+};
+
+    
+
     const addItemToOrder = (orderId, selectedItem) => {
         const existingItemInCurrentBatch = selectedOrder?.items.find(item =>
             item.item_id === selectedItem.id &&
@@ -178,14 +410,14 @@ const OrdersVisiblePage = () => {
             item_name: selectedItem.name,
             quantity: 1,
             price: selectedItem.unit_price,
-            status: "new",
+            status: "pending",
             note: "",
             slug: selectedItem.slug || generateSlug(selectedItem.name),
             added_at_frontend: timestamp,
             frontend_unique_key: uniqueKey,
             is_new_item: true,
-            unit_price: selectedItem.unit_price || 0,  
-    line_total: (selectedItem.unit_price || 0) * 1, 
+            unit_price: selectedItem.unit_price || 0,
+            line_total: (selectedItem.unit_price || 0) * 1,
             batch_timestamp: batchTimestamp,
             id: uniqueKey,
         };
@@ -199,7 +431,6 @@ const OrdersVisiblePage = () => {
             quantity: 1,
         }));
 
-        // ✅ Update orders state with proper batch grouping
         setOrders(prevOrders => {
             return prevOrders.map(order => {
                 if (order.id !== orderId) return order;
@@ -207,16 +438,12 @@ const OrdersVisiblePage = () => {
                 const batches = getBatchesFromStorage(orderId);
                 batches.sort((a, b) => a.timestamp - b.timestamp);
 
-                // Separate old items
                 const oldItems = order.items.filter(item => !item.is_new_item);
-
-                // Group new items by batch
                 const newItemsByBatch = new Map();
                 batches.forEach(batch => {
                     newItemsByBatch.set(batch.timestamp, []);
                 });
 
-                // Add existing new items to their batches
                 order.items.forEach(item => {
                     if (item.is_new_item && item.batch_timestamp) {
                         if (!newItemsByBatch.has(item.batch_timestamp)) {
@@ -226,13 +453,11 @@ const OrdersVisiblePage = () => {
                     }
                 });
 
-                // Add the new item to its batch
                 if (!newItemsByBatch.has(batchTimestamp)) {
                     newItemsByBatch.set(batchTimestamp, []);
                 }
                 newItemsByBatch.get(batchTimestamp).push(newItem);
 
-                // Build final items array
                 const allItems = [...oldItems];
                 const batchDividers = [];
 
@@ -258,7 +483,6 @@ const OrdersVisiblePage = () => {
             });
         });
 
-        // ✅ Update selectedOrder
         if (selectedOrder?.id === orderId) {
             setSelectedOrder(prev => {
                 const batches = getBatchesFromStorage(orderId);
@@ -313,6 +537,7 @@ const OrdersVisiblePage = () => {
         setItemSearchQuery("");
         setItemSearchResults([]);
     };
+
     const updateItemQuantity = (orderId, itemIdentifier, newQty) => {
         setOrders((prev) =>
             prev.map((order) => {
@@ -321,7 +546,6 @@ const OrdersVisiblePage = () => {
                 const updatedItems = order.items.map((item) => {
                     const itemKey = item.id || item.frontend_unique_key;
                     if (itemKey === itemIdentifier) {
-                        // ✅ Update localStorage if it's an unsaved item
                         if (item.frontend_unique_key && item.is_new_item) {
                             const storageKey = `order_${orderId}_new_item_${item.frontend_unique_key}`;
                             const storageData = localStorage.getItem(storageKey);
@@ -353,7 +577,6 @@ const OrdersVisiblePage = () => {
             })
         );
 
-        // ✅ Update selectedOrder if modal is open
         if (selectedOrder?.id === orderId) {
             setSelectedOrder(prev => ({
                 ...prev,
@@ -383,6 +606,7 @@ const OrdersVisiblePage = () => {
     useEffect(() => {
         document.body.setAttribute("data-theme", darkMode ? "dark" : "light");
     }, [darkMode]);
+
     const generateSlug = (name) => {
         return name.toLowerCase().replace(/[\s]+/g, "-");
     };
@@ -406,7 +630,6 @@ const OrdersVisiblePage = () => {
     const getBatchesFromStorage = (orderId) => {
         const batchMap = new Map();
 
-        // ✅ First, collect all batch timestamps from batch keys
         for (let i = 0; i < localStorage.length; i++) {
             const key = localStorage.key(i);
             if (key && key.startsWith(`order_${orderId}_batch_`)) {
@@ -419,7 +642,6 @@ const OrdersVisiblePage = () => {
             }
         }
 
-        // ✅ Then, collect all items and assign them to their batches
         for (let i = 0; i < localStorage.length; i++) {
             const key = localStorage.key(i);
             if (key && key.startsWith(`order_${orderId}_new_item_`)) {
@@ -437,7 +659,6 @@ const OrdersVisiblePage = () => {
             }
         }
 
-        // Convert map to sorted array of batch objects
         const batches = Array.from(batchMap.entries())
             .sort((a, b) => a[0] - b[0])
             .map(([timestamp, item_ids]) => ({
@@ -448,7 +669,6 @@ const OrdersVisiblePage = () => {
         return batches;
     };
 
-    // Clear batches when order is served
     const clearNewItemsStorage = (orderId) => {
         const keysToRemove = [];
         for (let i = 0; i < localStorage.length; i++) {
@@ -462,6 +682,7 @@ const OrdersVisiblePage = () => {
         }
         keysToRemove.forEach(key => localStorage.removeItem(key));
     };
+
     useEffect(() => {
         const fetchOrders = async () => {
             if (!token || !clientId) {
@@ -472,60 +693,49 @@ const OrdersVisiblePage = () => {
                 const res = await axios.get(`${import.meta.env.VITE_API_ORDER_SERVICE_URL}/${clientId}/dinein/table`, {
                     headers: { Authorization: `Bearer ${token}` },
                 });
-    
+
                 const allOrders = res.data?.data || [];
-    
+
                 setOrders(allOrders.map(order => {
                     if (order.status === 'served') {
                         clearNewItemsStorage(order.id);
                         return order;
                     }
-    
-                    // ✅ Get localStorage data
+
                     const newItemsFromStorage = getNewItemsFromStorage(order.id);
                     const storageUniqueKeys = new Set(newItemsFromStorage.map(item => item.unique_key));
-    
-                    // ✅ Build a map: frontend_unique_key → batch_timestamp from localStorage
+
                     const keyToBatchMap = new Map();
                     newItemsFromStorage.forEach(storageItem => {
                         if (storageItem.unique_key && storageItem.batch_timestamp) {
                             keyToBatchMap.set(storageItem.unique_key, storageItem.batch_timestamp);
                         }
                     });
-    
-                    // ✅ Separate items into categories
-                    const oldItems = []; // Items WITHOUT frontend_unique_key
-                    const batchItemsMap = new Map(); // Items WITH frontend_unique_key, grouped by batch
-                    const unsavedItems = []; // Items in localStorage but NOT in backend yet
-    
-                    // ✅ Track which localStorage keys are already in backend
+
+                    const oldItems = [];
+                    const batchItemsMap = new Map();
+                    const unsavedItems = [];
+
                     const backendUniqueKeys = new Set(
                         order.items
                             .filter(item => item.frontend_unique_key)
                             .map(item => item.frontend_unique_key)
                     );
-    
-                    // ✅ Process backend items
+
                     order.items.forEach((item) => {
                         if (item.frontend_unique_key) {
-                            // Item has a unique key - it's part of a batch
-                            // Get batch timestamp from localStorage OR extract from the key itself
                             let batchTimestamp = keyToBatchMap.get(item.frontend_unique_key);
-                            
+
                             if (!batchTimestamp) {
-                                // ✅ CRITICAL: If not in localStorage, extract timestamp from the key
-                                // Format: {item_id}_{timestamp}
                                 const parts = item.frontend_unique_key.split('_');
                                 if (parts.length >= 2) {
                                     const extractedTimestamp = parseFloat(parts[parts.length - 1]);
                                     if (!isNaN(extractedTimestamp)) {
-                                        // Round to batch start (e.g., group items added within same session)
-                                        // We'll use the key's timestamp directly as batch identifier
-                                        batchTimestamp = Math.floor(extractedTimestamp / 1000) * 1000; // Round to nearest second
+                                        batchTimestamp = Math.floor(extractedTimestamp / 1000) * 1000;
                                     }
                                 }
                             }
-    
+
                             if (batchTimestamp) {
                                 if (!batchItemsMap.has(batchTimestamp)) {
                                     batchItemsMap.set(batchTimestamp, []);
@@ -536,16 +746,13 @@ const OrdersVisiblePage = () => {
                                     batch_timestamp: batchTimestamp,
                                 });
                             } else {
-                                // Fallback: treat as old item if we can't determine batch
                                 oldItems.push(item);
                             }
                         } else {
-                            // No frontend_unique_key = OLD item
                             oldItems.push(item);
                         }
                     });
-    
-                    // ✅ Add truly unsaved items from localStorage
+
                     newItemsFromStorage.forEach(storageItem => {
                         if (!backendUniqueKeys.has(storageItem.unique_key)) {
                             const itemInfo = inventoryMap[storageItem.item_id];
@@ -558,7 +765,7 @@ const OrdersVisiblePage = () => {
                                     item_name: itemInfo.name,
                                     quantity: storageItem.quantity || 1,
                                     price: itemInfo.unit_price,
-                                    status: "new",
+                                    status: "pending",
                                     note: "",
                                     slug: itemInfo.slug || generateSlug(itemInfo.name),
                                     added_at_frontend: storageItem.added_at,
@@ -570,14 +777,12 @@ const OrdersVisiblePage = () => {
                             }
                         }
                     });
-    
-                    // ✅ Build final items array with dividers
+
                     const allItems = [...oldItems];
                     const batchDividers = [];
-    
-                    // Sort batches by timestamp
+
                     const sortedBatchTimestamps = Array.from(batchItemsMap.keys()).sort((a, b) => a - b);
-    
+
                     sortedBatchTimestamps.forEach((timestamp, batchIdx) => {
                         const batchItems = batchItemsMap.get(timestamp);
                         if (batchItems && batchItems.length > 0) {
@@ -588,7 +793,7 @@ const OrdersVisiblePage = () => {
                             allItems.push(...batchItems);
                         }
                     });
-    
+
                     return {
                         ...order,
                         items: allItems,
@@ -596,24 +801,23 @@ const OrdersVisiblePage = () => {
                         batch_dividers: batchDividers,
                     };
                 }));
-    
+
             } catch {
                 toast.error("Failed to fetch orders");
             } finally {
                 setLoading(false);
             }
         };
-    
+
         fetchOrders();
         const interval = setInterval(fetchOrders, 10000);
         return () => clearInterval(interval);
     }, [clientId, token, inventoryMap]);
-    // Only one expanded order at a time
+
     const toggleExpand = (index) => {
         setExpandedOrderIndex((prev) => (prev === index ? null : index));
     };
 
-    // Click 3 times to mark served
     const handleContainerClick = (orderId) => {
         const count = servedClickCountMap[orderId] || 0;
         const newCount = count + 1;
@@ -623,11 +827,11 @@ const OrdersVisiblePage = () => {
             setServedClickCountMap((prev) => ({ ...prev, [orderId]: 0 }));
         }
     };
-    // Add this in both OrdersVisiblePage.jsx and KitchenDisplay.jsx
+
     useEffect(() => {
         const cleanupInterval = setInterval(() => {
             const keysToRemove = [];
-            const maxAge = 30 * 60 * 1000; // 30 minutes
+            const maxAge = 30 * 60 * 1000;
 
             for (let i = 0; i < localStorage.length; i++) {
                 const key = localStorage.key(i);
@@ -638,7 +842,6 @@ const OrdersVisiblePage = () => {
                     if (age > maxAge) {
                         keysToRemove.push(key);
 
-                        // Also remove from ref
                         const parts = key.replace('new_item_', '').split('_');
                         if (parts.length >= 3) {
                             const orderId = parseInt(parts[0], 10);
@@ -653,10 +856,11 @@ const OrdersVisiblePage = () => {
             }
 
             keysToRemove.forEach(key => localStorage.removeItem(key));
-        }, 60000); // Check every minute
+        }, 60000);
 
         return () => clearInterval(cleanupInterval);
     }, []);
+
     const handleStatusChange = async (orderId, newStatus) => {
         const order = orders.find((o) => o.id === orderId);
         if (!order || order.status === "served") return;
@@ -670,27 +874,23 @@ const OrdersVisiblePage = () => {
                 { headers: { Authorization: `Bearer ${token}` } }
             );
 
-        
-
-                if (tableObj) {
-                    await axios.post(
-                        `${import.meta.env.VITE_API_TABLE_SERVICE_URL}/${clientId}/tables/update`,
-                        {
-                            id: order.table_id,
-                            client_id: clientId,
-                            name: tableObj.name,
-                            table_type: tableObj.table_type,
-                            status: "Vacant",
-                            location_zone: tableObj.location_zone,
-                        },
-                        { headers: { Authorization: `Bearer ${token}` } }
-                    );
-                }
-            
+            if (tableObj) {
+                await axios.post(
+                    `${import.meta.env.VITE_API_TABLE_SERVICE_URL}/${clientId}/tables/update`,
+                    {
+                        id: order.table_id,
+                        client_id: clientId,
+                        name: tableObj.name,
+                        table_type: tableObj.table_type,
+                        status: "Vacant",
+                        location_zone: tableObj.location_zone,
+                    },
+                    { headers: { Authorization: `Bearer ${token}` } }
+                );
+            }
 
             toast.success("Order status updated");
 
-            // ✅ Update both orders and selectedOrder states
             setOrders((prev) =>
                 prev.map((o) => (o.id === orderId ? {
                     ...o,
@@ -714,7 +914,6 @@ const OrdersVisiblePage = () => {
             toast.error("❌ Failed to update order status.");
         }
     };
-
 
     const handleItemStatusChange = async (orderId, itemId, newStatus) => {
         try {
@@ -753,18 +952,14 @@ const OrdersVisiblePage = () => {
         if (!item) return;
 
         try {
-            // ✅ If it's an unsaved item (temporary ID), just remove from localStorage
             if (typeof itemBackendId === 'string' && (itemBackendId.startsWith('temp_') || !itemBackendId.includes('_'))) {
-                // This is an unsaved item, just remove from localStorage
                 const storageKey = `order_${orderId}_new_item_${item.frontend_unique_key}`;
                 localStorage.removeItem(storageKey);
 
-                // Update state
                 const updatedOrders = orders.map((o) => {
                     if (o.id !== orderId) return o;
                     const updatedItems = o.items.filter((i) => i.id !== itemBackendId);
 
-                    // Recalculate dividers
                     const batches = getBatchesFromStorage(orderId);
                     batches.sort((a, b) => a.timestamp - b.timestamp);
                     const batchDividers = [];
@@ -801,19 +996,16 @@ const OrdersVisiblePage = () => {
                 return;
             }
 
-            // ✅ Otherwise, it's a saved item - delete from backend
             await axios.delete(`${import.meta.env.VITE_API_ORDER_SERVICE_URL}/${clientId}/order_item/delete`, {
                 params: { order_item_id: itemBackendId, client_id: clientId },
                 headers: { Authorization: `Bearer ${token}` },
             });
 
-            // ✅ Remove from localStorage if it's a new item
             if (item.is_new_item && item.frontend_unique_key) {
                 const storageKey = `order_${orderId}_new_item_${item.frontend_unique_key}`;
                 localStorage.removeItem(storageKey);
             }
 
-            // ✅ Update orders state
             const updatedOrders = orders.map((o) => {
                 if (o.id !== orderId) return o;
 
@@ -824,7 +1016,6 @@ const OrdersVisiblePage = () => {
                     return sum + (item.quantity || 1) * price;
                 }, 0);
 
-                // ✅ Recalculate batch dividers
                 const batches = getBatchesFromStorage(orderId);
                 batches.sort((a, b) => a.timestamp - b.timestamp);
 
@@ -852,7 +1043,6 @@ const OrdersVisiblePage = () => {
 
             setOrders(updatedOrders);
 
-            // ✅ Update selectedOrder with recalculated dividers
             if (selectedOrder?.id === orderId) {
                 const updatedOrder = updatedOrders.find(o => o.id === orderId);
                 if (updatedOrder) {
@@ -874,6 +1064,7 @@ const OrdersVisiblePage = () => {
             toast.error("❌ Failed to cancel item.");
         }
     };
+
     const updateOrderItems = async (orderId, updatedItemsWithStatuses) => {
         const itemsToSave = updatedItemsWithStatuses.filter(item => {
             return typeof item.id === 'number' || item.is_new_item;
@@ -883,12 +1074,13 @@ const OrdersVisiblePage = () => {
             item_id: item.item_id || item.inventory_id,
             item_name: item.name || item.item_name,
             quantity: item.quantity || 1,
-            status: item.status || "new",
+            status: item.status || "pending",
             note: item.note || "",
             slug: item.slug || "",
             price: item.unit_price || item.price || inventoryMap[item.item_id || item.inventory_id]?.unit_price || 0,
-            unit_price: item.unit_price || item.price || inventoryMap[item.item_id || item.inventory_id]?.unit_price || 0,  // ✅ Add this line
-            line_total: (item.unit_price || item.price || 0) * (item.quantity || 1),  client_id: clientId,
+            unit_price: item.unit_price || item.price || inventoryMap[item.item_id || item.inventory_id]?.unit_price || 0,
+            line_total: (item.unit_price || item.price || 0) * (item.quantity || 1),
+            client_id: clientId,
             order_id: orderId,
             frontend_unique_key: item.frontend_unique_key || null,
         }));
@@ -907,24 +1099,19 @@ const OrdersVisiblePage = () => {
                 { headers: { Authorization: `Bearer ${token}` } }
             );
 
-            // ✅ DON'T clear localStorage - keep it for batch tracking
-            // ✅ Reset current batch timestamp so next additions create NEW batch
             setCurrentBatchTimestamp(null);
 
             toast.success("Items saved successfully!");
 
-            // ✅ Fetch fresh data - localStorage will still differentiate batches
             const res = await axios.get(`${import.meta.env.VITE_API_ORDER_SERVICE_URL}/${clientId}/dinein/table`, {
                 headers: { Authorization: `Bearer ${token}` },
             });
 
             const allOrders = res.data?.data || [];
 
-            // ✅ Re-process with localStorage intact
             const updatedOrderFromBackend = allOrders.find(o => o.id === orderId);
 
             if (updatedOrderFromBackend) {
-                // Process with existing fetchOrders logic
                 const batches = getBatchesFromStorage(orderId);
                 const newItemsFromStorage = getNewItemsFromStorage(orderId);
 
@@ -990,7 +1177,7 @@ const OrdersVisiblePage = () => {
                                 item_name: itemInfo.name,
                                 quantity: storageItem.quantity || 1,
                                 price: itemInfo.unit_price,
-                                status: "new",
+                                status: "pending",
                                 note: "",
                                 slug: itemInfo.slug || generateSlug(itemInfo.name),
                                 added_at_frontend: storageItem.added_at,
@@ -1100,7 +1287,7 @@ const OrdersVisiblePage = () => {
         const fetchInventory = async () => {
             if (!token || !clientId) return;
             try {
-                const res = await axios.get(`${import.meta.env.VITE_API_INVENTORY_SERVICE_URL}/${clientId}/inventory/read`, {
+                const res = await axios.get(`${import.meta.env.VITE_API_INVENTORY_SERVICE_URL}/${clientId}/menu/read`, {
                     headers: { Authorization: `Bearer ${token}` },
                 });
                 const inventoryList = res.data?.data || [];
@@ -1142,450 +1329,465 @@ const OrdersVisiblePage = () => {
     }
 
     return (
-        <div className="OrderSummary-Page-Container"><div className="orders-visible-root">
-            <div className="orders-visible-content">
-                <div className="orders-visible-header">
-                    <h2>Table Orders</h2>
-                    <div className="orders-visible-actions">
-                        <select
-                            className="orders-visible-date-filter"
-                            value={selectedDate}
-                            onChange={(e) => setSelectedDate(e.target.value)}
-                        >
-                            <option value="">All Dates</option>
-                            {[...Array(15)].map((_, i) => {
-                                const d = new Date();
-                                d.setDate(d.getDate() - i);
-                                const dateString = d.toLocaleDateString("en-CA");
-                                const label = i === 0 ? "Today" : dateString;
-                                return (
-                                    <option key={dateString} value={dateString}>
-                                        {label}
-                                    </option>
-                                );
-                            })}
-                        </select>
-                        <button className="orders-visible-btn orders-visible-export-btn">Export</button>
-                        <button
-                            className="orders-visible-btn orders-visible-filter-btn"
-                            onClick={() => setFilterMode((prev) => (prev + 1) % 5)}
-                        >
-                            Filter
-                        </button>
+        <div className="OrderSummary-Page-Container">
+            <div className="orders-visible-root">
+                <div className="orders-visible-content">
+                    <div className="orders-visible-header">
+                        <h2>Table Orders</h2>
+                        <div className="orders-visible-actions">
+                            <select
+                                className="orders-visible-date-filter"
+                                value={selectedDate}
+                                onChange={(e) => setSelectedDate(e.target.value)}
+                            >
+                                <option value="">All Dates</option>
+                                {[...Array(15)].map((_, i) => {
+                                    const d = new Date();
+                                    d.setDate(d.getDate() - i);
+                                    const dateString = d.toLocaleDateString("en-CA");
+                                    const label = i === 0 ? "Today" : dateString;
+                                    return (
+                                        <option key={dateString} value={dateString}>
+                                            {label}
+                                        </option>
+                                    );
+                                })}
+                            </select>
+                            <button className="orders-visible-btn orders-visible-export-btn">Export</button>
+                            <button
+                                className="orders-visible-btn orders-visible-filter-btn"
+                                onClick={() => setFilterMode((prev) => (prev + 1) % 5)}
+                            >
+                                Filter
+                            </button>
+                        </div>
                     </div>
-                </div>
 
-                {loading ? (
-                    <div className="orders-visible-loading">Loading orders...</div>
-                ) : (
-                    <div className="orders-visible-order-grid">
-                        {filteredOrders.length === 0 ? (
-                            <div className="orders-visible-no-orders">No orders found.</div>
-                        ) : (
-                            filteredOrders.map((order, index) => {
-                                const isPaid = order.payment_status?.toLowerCase() === "paid";
-                                return (
-                                    <div
-                                        key={order.id || index}
-                                        className={`orders-visible-order-card${expandedOrderIndex === index ? " expanded" : ""}`}
-                                        style={{
-                                            backgroundColor: statusColorMap[order.status?.toLowerCase()] || "var(--status-prepare-bg)",
-                                            border: isPaid ? "2px dashed red" : undefined,
-                                            position: "relative",
-                                        }}
-                                        onClick={() => handleContainerClick(order.id)}
-                                    >
-                                        {isPaid && (
-                                            <div style={{
-                                                position: "absolute",
-                                                top: 2,
-                                                right: 6,
-                                                fontSize: "24px",
-                                                fontWeight: "bold",
-                                                color: "red",
-                                                userSelect: "none",
-                                                pointerEvents: "none",
-                                            }}>
-                                                ×
+                    {loading ? (
+                        <div className="orders-visible-loading">Loading orders...</div>
+                    ) : (
+                        <div className="orders-visible-order-grid">
+                            {filteredOrders.length === 0 ? (
+                                <div className="orders-visible-no-orders">No orders found.</div>
+                            ) : (
+                                filteredOrders.map((order, index) => {
+                                    const isPaid = order.payment_status?.toLowerCase() === "paid";
+                                    return (
+                                        <div
+                                            key={order.id || index}
+                                            className={`orders-visible-order-card${expandedOrderIndex === index ? " expanded" : ""}`}
+                                            style={{
+                                                backgroundColor: statusColorMap[order.status?.toLowerCase()] || "var(--status-prepare-bg)",
+                                                border: isPaid ? "2px dashed red" : undefined,
+                                                position: "relative",
+                                            }}
+                                            onClick={() => handleContainerClick(order.id)}
+                                        >
+                                            {isPaid && (
+                                                <div style={{
+                                                    position: "absolute",
+                                                    top: 2,
+                                                    right: 6,
+                                                    fontSize: "24px",
+                                                    fontWeight: "bold",
+                                                    color: "red",
+                                                    userSelect: "none",
+                                                    pointerEvents: "none",
+                                                }}>
+                                                    ×
+                                                </div>
+                                            )}
+                                            <div className="orders-visible-card-top-row">
+                                                <span className="orders-visible-tablename">{tablesMap[order.table_id] || order.table_id}</span>
+                                                <span className="orders-visible-items-count">{order.items.length} items</span>
+                                                <button className="orders-visible-invoice-btn" onClick={(e) => { e.stopPropagation(); openInvoiceModal(order); }}>
+                                                    Invoice
+                                                </button>
+                                                <button
+                                                    className="orders-visible-expand-btn"
+                                                    onClick={(e) => {
+                                                        e.stopPropagation();
+                                                        setSelectedOrder(order);
+                                                        setShowOrderDetailModal(true);
+                                                    }}
+                                                >
+                                                    <span className={`orders-visible-arrow-icon${expandedOrderIndex === index ? " " : "up"}`}>
+                                                        <MdOutlineKeyboardDoubleArrowDown />
+                                                    </span>
+                                                </button>
                                             </div>
-                                        )}
-                                        <div className="orders-visible-card-top-row">
-                                            <span className="orders-visible-tablename">{tablesMap[order.table_id] || order.table_id}</span>
-                                            <span className="orders-visible-items-count">{order.items.length} items</span>
-                                            <button className="orders-visible-invoice-btn" onClick={(e) => { e.stopPropagation(); openInvoiceModal(order); }}>
-                                                Invoice
-                                            </button>
-                                            <button
-                                                className="orders-visible-expand-btn"
-                                                onClick={(e) => {
-                                                    e.stopPropagation();
-                                                    setSelectedOrder(order);
-                                                    setShowOrderDetailModal(true);
-                                                }}
-                                            >
-                                                <span className={`orders-visible-arrow-icon${expandedOrderIndex === index ? " " : "up"}`}>
-                                                    <MdOutlineKeyboardDoubleArrowDown />
-                                                </span>
-                                            </button>
                                         </div>
+                                    );
+                                })
+                            )}
+                        </div>
+                    )}
 
+                    {/* Line Items Modal */}
+                    <Modal
+                        isOpen={lineItemsModalOpen}
+                        onRequestClose={() => setLineItemsModalOpen(false)}
+                        className="custom-modal"
+                        overlayClassName="custom-overlay"
+                    >
+                        <h3>{selectedMainItem?.name}</h3>
+                        <p style={{ marginBottom: '20px', color: '#666' }}>
+                            This item comes with the following add-ons:
+                        </p>
 
+                        <div style={{ marginBottom: '24px' }}>
+                            {lineItemsDetails.map((lineItem, index) => (
+                                <div key={lineItem.id} style={{
+                                    padding: '12px',
+                                    backgroundColor: darkMode ? '#333' : '#f5f5f5',
+                                    borderRadius: '8px',
+                                    marginBottom: '8px',
+                                    display: 'flex',
+                                    justifyContent: 'space-between',
+                                    alignItems: 'center'
+                                }}>
+                                    <span style={{ color: darkMode ? 'white' : 'black' }}>
+                                        {index + 1}. {lineItem.name}
+                                    </span>
+                                    <span style={{ color: '#4CAF50', fontWeight: 'bold' }}>
+                                        ₹{lineItem.unit_price}
+                                    </span>
+                                </div>
+                            ))}
+                        </div>
+
+                        <p style={{ marginBottom: '20px', fontStyle: 'italic', color: '#666' }}>
+                            Would you like to add the main item with all add-ons, or just the main item?
+                        </p>
+
+                        <div className="modal-buttons">
+                            <button
+                                onClick={() => setLineItemsModalOpen(false)}
+                                className="cancel-btn"
+                            >
+                                Cancel
+                            </button>
+                            <button
+                                onClick={handleAddMainItemOnly}
+                                className="warning-btn"
+                                style={{ backgroundColor: '#FF9800' }}
+                            >
+                                Main Only
+                            </button>
+                            <button
+                                onClick={handleAddMainItemWithLineItems}
+                                className="confirm-btn"
+                            >
+                                With Add-ons
+                            </button>
+                        </div>
+                    </Modal>
+
+                    {showOrderDetailModal && selectedOrder && (
+                        <div className="orders-visible-modal-overlay" onClick={() => setShowOrderDetailModal(false)}>
+                            <div className={`orders-detail-popup${editOrderId === selectedOrder.id ? ' edit-mode-active' : ''}`} onClick={(e) => e.stopPropagation()}>
+
+                                {editOrderId === selectedOrder.id && (
+                                    <div className="orders-detail-left">
+                                        <h3>Available Items</h3>
+                                        <input
+                                            type="text"
+                                            className="orders-visible-item-search"
+                                            placeholder="Search items..."
+                                            value={itemSearchQuery}
+                                            onChange={(e) => setItemSearchQuery(e.target.value)}
+                                        />
+                                        <div className="orders-detail-items-list">
+                                            {itemSearchResults.length > 0 ? (
+                                                <ul className="orders-visible-search-results">
+                                                    {itemSearchResults.map((item) => (
+                                                        <li
+                                                            key={item.id}
+                                                            onClick={() => handleItemSelection(selectedOrder.id, item)}
+                                                        >
+                                                            <span>{item.name}</span>
+                                                            <span>₹{item.unit_price}</span>
+                                                            {item.line_item_id && item.line_item_id.length > 0 && (
+                                                                <span style={{
+                                                                    backgroundColor: '#FF9800',
+                                                                    color: 'white',
+                                                                    padding: '2px 6px',
+                                                                    borderRadius: '10px',
+                                                                    fontSize: '10px',
+                                                                    marginLeft: '8px'
+                                                                }}>
+                                                                    +{item.line_item_id.length}
+                                                                </span>
+                                                            )}
+                                                        </li>
+                                                    ))}
+                                                </ul>
+                                            ) : itemSearchQuery.trim() === "" ? (
+                                                <div className="orders-detail-all-items">
+                                                    {allInventoryItems.map((item) => (
+                                                        <div
+                                                            key={item.id}
+                                                            className="orders-detail-item-card"
+                                                            onClick={() => handleItemSelection(selectedOrder.id, item)}
+                                                        >
+                                                            <span>{item.name}</span>
+                                                            <span>₹{item.unit_price}</span>
+                                                            {item.line_item_id && item.line_item_id.length > 0 && (
+                                                                <span style={{
+                                                                    backgroundColor: '#FF9800',
+                                                                    color: 'white',
+                                                                    padding: '2px 6px',
+                                                                    borderRadius: '10px',
+                                                                    fontSize: '10px',
+                                                                    marginLeft: '8px'
+                                                                }}>
+                                                                    +{item.line_item_id.length}
+                                                                </span>
+                                                            )}
+                                                        </div>
+                                                    ))}
+                                                </div>
+                                            ) : (
+                                                <div className="orders-visible-no-results">
+                                                    No items found matching "{itemSearchQuery}"
+                                                </div>
+                                            )}
+                                        </div>
                                     </div>
-                                );
-                            })
-                        )}
-                    </div>
-                )}
-                {showOrderDetailModal && selectedOrder && (
-                    <div className="orders-visible-modal-overlay" onClick={() => setShowOrderDetailModal(false)}>
-                        <div className={`orders-detail-popup${editOrderId === selectedOrder.id ? ' edit-mode-active' : ''}`}  onClick={(e) => e.stopPropagation()}>
+                                )}
 
-                            {/* Left Side - Available Items - ONLY SHOW IN EDIT MODE */}
-                            {editOrderId === selectedOrder.id && (
-                                <div className="orders-detail-left">
-                                    <h3>Available Items</h3>
-                                    <input
-                                        type="text"
-                                        className="orders-visible-item-search"
-                                        placeholder="Search items..."
-                                        value={itemSearchQuery}
-                                        onChange={(e) => setItemSearchQuery(e.target.value)}
-                                    />
-                                    <div className="orders-detail-items-list">
-                                        {itemSearchResults.length > 0 ? (
-                                            <ul className="orders-visible-search-results">
-                                                {itemSearchResults.map((item) => (
-                                                    <li
-                                                        key={item.id}
-                                                        onClick={() => {
-                                                            const timestamp = Date.now();
-                                                            const uniqueKey = `${item.id}_${timestamp}`;
-                                                            addItemToOrder(selectedOrder.id, item);
+                                <div
+                                    className="orders-detail-right"
+                                    style={{
+                                        width: editOrderId === selectedOrder.id ? '50%' : '100%',
+                                    }}
+                                >
+                                    <div className="orders-detail-header">
+                                        <button
+                                            className="orders-detail-close"
+                                            onClick={() => {
+                                                setShowOrderDetailModal(false);
+                                                setEditOrderId(null);
+                                                setItemSearchQuery("");
+                                            }}
+                                        >
+                                            ×
+                                        </button>
+                                        <h2>{tablesMap[selectedOrder.table_id] || selectedOrder.table_id}</h2>
+                                        <span className="orders-visible-items-count">
+                                            {selectedOrder.items.length} items
+                                        </span>
+                                        <button
+                                            className="orders-visible-invoice-btn"
+                                            onClick={() => openInvoiceModal(selectedOrder)}
+                                        >
+                                            Invoice
+                                        </button>
+                                    </div>
 
-                                                        }}
-                                                    >
-                                                        <span>{item.name}</span>
-                                                        <span>₹{item.unit_price}</span>
-                                                    </li>
-                                                ))}
-                                            </ul>
-                                        ) : itemSearchQuery.trim() === "" ? (
-                                            <div className="orders-detail-all-items">
-                                                {allInventoryItems.map((item) => (
-                                                    <div
-                                                        key={item.id}
-                                                        className="orders-detail-item-card"
-                                                        onClick={() => {
-                                                            const timestamp = Date.now();
-                                                            const uniqueKey = `${item.id}_${timestamp}`;
-                                                            addItemToOrder(selectedOrder.id, item);
+                                    <div className="orders-detail-info">
+                                        <span>Date: {new Date(selectedOrder.created_at).toLocaleDateString()}</span>
+                                        <span>
+                                            Total: ₹{selectedOrder.items.reduce(
+                                                (sum, item) =>
+                                                    sum + ((inventoryMap[item.item_id]?.unit_price || item.unit_price || item.price || 0) * (item.quantity || 1)),
+                                                0
+                                            ).toFixed(2)}
+                                        </span>
+                                    </div>
 
-                                                        }}
-                                                    >
-                                                        <span>{item.name}</span>
-                                                        <span>₹{item.unit_price}</span>
-                                                    </div>
-                                                ))}
+                                    <div className="orders-detail-items">
+                                        {editOrderId === selectedOrder.id ? (
+                                            <div className="orders-visible-edit-items-list">
+                                                {selectedOrder.items.map((item, idx) => {
+                                                    const divider = selectedOrder.batch_dividers?.find(d => d.index === idx);
+
+                                                    return (
+                                                        <React.Fragment key={item.id || `item-${idx}`}>
+                                                            {divider && (
+                                                                <div className="orders-item-divider-line"></div>
+                                                            )}
+
+                                                            <div className="orders-visible-edit-item-row">
+                                                                <span>{item.item_name || item.item_id}</span>
+                                                                <span className={`item-status-badge status-${item.status}`}>
+                                                                    {item.status}
+                                                                </span>
+                                                                <div className="orders-visible-edit-qty-controls">
+                                                                    <button
+                                                                        onClick={() => {
+                                                                            const itemIdentifier = item.id || item.frontend_unique_key;
+                                                                            updateItemQuantity(selectedOrder.id, itemIdentifier, item.quantity - 1);
+                                                                        }}
+                                                                        disabled={item.quantity <= 1}
+                                                                    >
+                                                                        −
+                                                                    </button>
+                                                                    <span>{item.quantity}</span>
+                                                                    <button onClick={() => {
+                                                                        const itemIdentifier = item.id || item.frontend_unique_key;
+                                                                        updateItemQuantity(selectedOrder.id, itemIdentifier, item.quantity + 1);
+                                                                    }}>+</button>
+                                                                </div>
+
+                                                                <button
+                                                                    className="orders-visible-btn orders-visible-edit-delete-btn"
+                                                                    onClick={() => {
+                                                                        setDeleteTarget({ orderId: selectedOrder.id, itemBackendId: item.id });
+                                                                        setShowDeleteModals(true);
+                                                                    }}
+                                                                    disabled={item.status === "cancelled"}
+                                                                >
+                                                                    Delete
+                                                                </button>
+                                                            </div>
+                                                        </React.Fragment>
+                                                    );
+                                                })}
                                             </div>
                                         ) : (
-                                            <div className="orders-visible-no-results">
-                                                No items found matching "{itemSearchQuery}"
-                                            </div>
-                                        )}
-                                    </div>
-                                </div>
-                            )}
-
-                            {/* Right Side - Order Details */}
-                            <div
-                                className="orders-detail-right"
-                                style={{
-                                    width: editOrderId === selectedOrder.id ? '50%' : '100%',
-                                }}
-                            >
-                                <div className="orders-detail-header">
-                                    <button
-                                        className="orders-detail-close"
-                                        onClick={() => {
-
-                                            setShowOrderDetailModal(false);
-                                            setEditOrderId(null);
-                                            setItemSearchQuery("");
-                                        }}
-                                    >
-                                        ×
-                                    </button>
-                                    <h2>{tablesMap[selectedOrder.table_id] || selectedOrder.table_id}</h2>
-                                    <span className="orders-visible-items-count">
-                                        {selectedOrder.items.length} items
-                                    </span>
-                                    <button
-                                        className="orders-visible-invoice-btn"
-                                        onClick={() => openInvoiceModal(selectedOrder)}
-                                    >
-                                        Invoice
-                                    </button>
-                                </div>
-
-                                <div className="orders-detail-info">
-                                    <span>Date: {new Date(selectedOrder.created_at).toLocaleDateString()}</span>
-                                    <span>
-                                        Total: ₹{selectedOrder.items.reduce(
-                                            (sum, item) =>
-                                                sum + ((inventoryMap[item.item_id]?.unit_price || item.unit_price || item.price || 0) * (item.quantity || 1)),
-                                            0
-                                        ).toFixed(2)}
-                                    </span>
-                                </div>
-
-                                <div className="orders-detail-items">
-                                    {editOrderId === selectedOrder.id ? (
-                                        <div className="orders-visible-edit-items-list">
-                                            {selectedOrder.items.map((item, idx) => {
+                                            selectedOrder.items.map((item, idx) => {
                                                 const divider = selectedOrder.batch_dividers?.find(d => d.index === idx);
 
                                                 return (
-                                                    <React.Fragment key={item.id || `item-${idx}`}>
-                                                        {/* ✅ Just dashed line, no text */}
+                                                    <React.Fragment key={item.id || idx}>
                                                         {divider && (
                                                             <div className="orders-item-divider-line"></div>
                                                         )}
 
-                                                        <div className="orders-visible-edit-item-row">
+                                                        <div className="orders-visible-item-row">
                                                             <span>{item.item_name || item.item_id}</span>
-                                                            {/* Status badge */}
+                                                            <span>Qty: {item.quantity}</span>
                                                             <span className={`item-status-badge status-${item.status}`}>
                                                                 {item.status}
                                                             </span>
-                                                            <div className="orders-visible-edit-qty-controls">
-                                                                <button
-                                                                    onClick={() => {
-                                                                        // ✅ Use backend id if available, otherwise frontend unique key
-                                                                        const itemIdentifier = item.id || item.frontend_unique_key;
-                                                                        updateItemQuantity(selectedOrder.id, itemIdentifier, item.quantity - 1);
-                                                                    }}
-                                                                    disabled={item.quantity <= 1}
-                                                                >
-                                                                    −
-                                                                </button>
-                                                                <span>{item.quantity}</span>
-                                                                <button onClick={() => {
-                                                                    // ✅ Use backend id if available, otherwise frontend unique key
-                                                                    const itemIdentifier = item.id || item.frontend_unique_key;
-                                                                    updateItemQuantity(selectedOrder.id, itemIdentifier, item.quantity + 1);
-                                                                }}>+</button>
-                                                            </div>
-
-                                                            <button
-                                                                className="orders-visible-btn orders-visible-edit-delete-btn"
-                                                                onClick={() => {
-                                                                    setDeleteTarget({ orderId: selectedOrder.id, itemBackendId: item.id });
-                                                                    setShowDeleteModals(true);
-                                                                }}
-                                                                disabled={item.status === "cancelled"}
-                                                            >
-                                                                Delete
-                                                            </button>
                                                         </div>
                                                     </React.Fragment>
                                                 );
-                                            })}
-                                        </div>
-                                    ) : (
-                                        // Non-edit mode
-                                        selectedOrder.items.map((item, idx) => {
-                                            const divider = selectedOrder.batch_dividers?.find(d => d.index === idx);
+                                            })
+                                        )}
+                                    </div>
 
-                                            return (
-                                                <React.Fragment key={item.id || idx}>
-                                                    {/* ✅ Just dashed line */}
-                                                    {divider && (
-                                                        <div className="orders-item-divider-line"></div>
-                                                    )}
-
-                                                    <div className="orders-visible-item-row">
-                                                        <span>{item.item_name || item.item_id}</span>
-                                                        <span>Qty: {item.quantity}</span>
-                                                        <span className={`item-status-badge status-${item.status}`}>
-                                                            {item.status}
-                                                        </span>
-                                                    </div>
-                                                </React.Fragment>
-                                            );
-                                        })
-                                    )}
-                                </div>
-
-                                <div className="orders-detail-actions">
-                                    {editOrderId === selectedOrder.id ? (
-                                        <>
+                                    <div className="orders-detail-actions">
+                                        {editOrderId === selectedOrder.id ? (
+                                            <>
+                                                <button
+                                                    className="orders-visible-btn orders-visible-save-btn"
+                                                    onClick={() => {
+                                                        updateOrderItems(selectedOrder.id, selectedOrder.items);
+                                                    }}
+                                                >
+                                                    Save Items
+                                                </button>
+                                                <button
+                                                    className="orders-visible-btn orders-visible-edit-btn active"
+                                                    onClick={() => {
+                                                        setCurrentBatchTimestamp(null);
+                                                        setEditOrderId(null);
+                                                        setItemSearchQuery("");
+                                                    }}
+                                                >
+                                                    Done Editing
+                                                </button>
+                                            </>
+                                        ) : (
                                             <button
-                                                className="orders-visible-btn orders-visible-save-btn"
+                                                className="orders-visible-btn orders-visible-edit-btn"
                                                 onClick={() => {
-                                                    updateOrderItems(selectedOrder.id, selectedOrder.items);
-                                                }}
-                                            >
-                                                Save Items
-                                            </button>
-                                            <button
-                                                className="orders-visible-btn orders-visible-edit-btn active"
-                                                onClick={() => {
+                                                    setEditOrderId(selectedOrder.id);
                                                     setCurrentBatchTimestamp(null);
-                                                    setEditOrderId(null);
-                                                    setItemSearchQuery("");
                                                 }}
                                             >
-                                                Done Editing
+                                                Edit
                                             </button>
-                                        </>
-                                    ) : (
+                                        )}
                                         <button
-                                            className="orders-visible-btn orders-visible-edit-btn"
+                                            className="orders-visible-btn orders-visible-served-btn"
+                                            disabled={selectedOrder.status === "served"}
                                             onClick={() => {
-                                                setEditOrderId(selectedOrder.id); setCurrentBatchTimestamp(null);
+                                                handleStatusChange(selectedOrder.id, "served");
+                                                setShowOrderDetailModal(false);
+                                                setEditOrderId(null);
                                             }}
                                         >
-                                            Edit
+                                            Served
                                         </button>
-                                    )}
+                                        <button
+                                            className="orders-visible-btn orders-visible-delete-btn"
+                                            onClick={() => {
+                                                setOrderToDelete(selectedOrder.id);
+                                                setShowDeleteModal(true);
+                                                setShowOrderDetailModal(false);
+                                                setEditOrderId(null);
+                                            }}
+                                        >
+                                            Delete
+                                        </button>
+                                    </div>
+                                </div>
+                            </div>
+                        </div>
+                    )}
+
+                    {showDeleteModals && deleteTarget && (
+                        <div className="orders-visible-modal-overlay">
+                            <div className="orders-visible-modal orders-visible-delete-modal">
+                                <p>Delete this item?</p>
+                                <div className="orders-visible-modal-buttons">
                                     <button
-                                        className="orders-visible-btn orders-visible-served-btn"
-                                        disabled={selectedOrder.status === "served"}
+                                        className="orders-visible-btn orders-visible-modal-yes"
                                         onClick={() => {
-                                            handleStatusChange(selectedOrder.id, "served");
-                                            setShowOrderDetailModal(false);
-                                            setEditOrderId(null);
+                                            cancelItem(deleteTarget.orderId, deleteTarget.itemBackendId);
+                                            setShowDeleteModals(false);
+                                            setDeleteTarget({ orderId: null, itemBackendId: null });
                                         }}
                                     >
-                                        Served
+                                        Yes
                                     </button>
                                     <button
-                                        className="orders-visible-btn orders-visible-delete-btn"
+                                        className="orders-visible-btn orders-visible-modal-no"
                                         onClick={() => {
-                                            setOrderToDelete(selectedOrder.id);
-                                            setShowDeleteModal(true);
-                                            setShowOrderDetailModal(false);
-                                            setEditOrderId(null);
+                                            setShowDeleteModals(false);
+                                            setDeleteTarget({ orderId: null, itemBackendId: null });
                                         }}
                                     >
-                                        Delete
+                                        No
                                     </button>
                                 </div>
                             </div>
                         </div>
-                    </div>
-                )}
+                    )}
 
-                {showDeleteModals && deleteTarget && (
-                    <div className="orders-visible-modal-overlay">
-                        <div className="orders-visible-modal orders-visible-delete-modal">
-                            <p>Delete this item?</p>
-                            <div className="orders-visible-modal-buttons">
-                                <button
-                                    className="orders-visible-btn orders-visible-modal-yes"
-                                    onClick={() => {
-                                        cancelItem(deleteTarget.orderId, deleteTarget.itemBackendId);
-                                        setShowDeleteModals(false);
-                                        setDeleteTarget({ orderId: null, itemBackendId: null });
-                                    }}
-                                >
-                                    Yes
-                                </button>
-                                <button
-                                    className="orders-visible-btn orders-visible-modal-no"
-                                    onClick={() => {
-                                        setShowDeleteModals(false);
-                                        setDeleteTarget({ orderId: null, itemBackendId: null });
-                                    }}
-                                >
-                                    No
-                                </button>
+                    {showDeleteModal && (
+                        <div className="orders-visible-modal-overlay">
+                            <div className="orders-visible-modal orders-visible-confirm-delete-modal">
+                                <h3>Delete this order?</h3>
+                                <div className="orders-visible-modal-buttons">
+                                    <button className="orders-visible-btn orders-visible-modal-yes" onClick={confirmDeleteOrder}>
+                                        Yes
+                                    </button>
+                                    <button
+                                        className="orders-visible-btn orders-visible-modal-no"
+                                        onClick={() => {
+                                            setShowDeleteModal(false);
+                                            setOrderToDelete(null);
+                                        }}
+                                    >
+                                        No
+                                    </button>
+                                </div>
                             </div>
                         </div>
-                    </div>
-                )}
+                    )}
 
-                {showDeleteModal && (
-                    <div className="orders-visible-modal-overlay">
-                        <div className="orders-visible-modal orders-visible-confirm-delete-modal">
-                            <h3>Delete this order?</h3>
-                            <div className="orders-visible-modal-buttons">
-                                <button className="orders-visible-btn orders-visible-modal-yes" onClick={confirmDeleteOrder}>
-                                    Yes
-                                </button>
-                                <button
-                                    className="orders-visible-btn orders-visible-modal-no"
-                                    onClick={() => {
-                                        setShowDeleteModal(false);
-                                        setOrderToDelete(null);
-                                    }}
-                                >
-                                    No
-                                </button>
-                            </div>
-                        </div>
-                    </div>
-                )}
-
-                {showInvoiceModal && invoiceOrder && <InvoiceModal order={invoiceOrder} onClose={closeInvoiceModal} />}
+                    {showInvoiceModal && invoiceOrder && <InvoiceModal order={invoiceOrder} onClose={closeInvoiceModal} />}
+                </div>
             </div>
-            {/* <div style={{ position: 'absolute', bottom: '15px', right: '10px' }}>
-                <p style={{ color: 'var(--bg-number-color)' }}>
-                    <span
-                        style={{
-                            display: "inline-block",
-                            width: "12px",
-                            height: "12px",
-                            borderRadius: "50%",
-                            backgroundColor: "blue",
-                            marginRight: "6px",
-                        }}
-                    ></span>
-                    Ready
-                </p>
-                <p style={{ color: 'var(--bg-number-color)' }}>
-                    <span
-                        style={{
-                            display: "inline-block",
-                            width: "12px",
-                            height: "12px",
-                            borderRadius: "50%",
-                            backgroundColor: "green",
-                            marginRight: "6px",
-                        }}
-                    ></span>
-                    Served
-                </p>
-                <p style={{ color: 'var(--bg-number-color)' }}>
-                    <span
-                        style={{
-                            display: "inline-block",
-                            width: "12px",
-                            height: "12px",
-                            borderRadius: "50%",
-                            backgroundColor: "lightblue",
-                            marginRight: "6px",
-                        }}
-                    ></span>
-                    Preparing
-                </p>
-                <p style={{ color: 'var(--bg-number-color)' }}>
-                    <span
-                        style={{
-                            display: "inline-block",
-                            width: "12px",
-                            height: "12px",
-                            borderRadius: "50%",
-                            backgroundColor: "rgb(191, 170, 124)",
-                            marginRight: "6px",
-                        }}
-                    ></span>
-                    New
-                </p>
-            </div> */}
-        </div>
         </div>
     );
 };
 
 export default OrdersVisiblePage;
+
+
+// ===========================   ========================      ===================================== ======================

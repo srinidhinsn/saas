@@ -794,7 +794,7 @@ const KitchenDisplay = () => {
                                                                 )}
                                                             </div>
 
-                                                            {order.status !== "served" && (
+                                                            {/* {order.status !== "served" && (
                                                                 <div
                                                                     className="status-icons"
                                                                     style={{ display: "flex", gap: "8px", marginLeft: "12px" }}
@@ -838,7 +838,39 @@ const KitchenDisplay = () => {
                                                                         </>
                                                                     )}
                                                                 </div>
-                                                            )}
+                                                            )} */}
+                                                            <div
+                                                                className="status-icons"
+                                                                style={{ display: "flex", gap: "8px", marginLeft: "12px" }}
+                                                            >
+                                                                <FaClock
+                                                                    className={`pending-status ${item.status === "pending" ? "spin" : ""}`}
+                                                                    title="Pending"
+                                                                    color={item.status === "pending" ? "blue" : "grey"}
+                                                                    style={{ cursor: "pointer" }}
+                                                                    onClick={() =>
+                                                                        handleItemStatusChange(order.id, item.id, "pending")
+                                                                    }
+                                                                />
+                                                                <FaHourglassHalf
+                                                                    className={`preparing-status ${item.status === "preparing" ? "spin" : ""}`}
+                                                                    title="Preparing"
+                                                                    color={item.status === "preparing" ? "orange" : "grey"}
+                                                                    style={{ cursor: "pointer" }}
+                                                                    onClick={() =>
+                                                                        handleItemStatusChange(order.id, item.id, "preparing")
+                                                                    }
+                                                                />
+                                                                <FaCheckCircle
+                                                                    className={`served-status ${item.status === "served" ? "spin" : ""}`}
+                                                                    title="Served"
+                                                                    color={item.status === "served" ? "green" : "grey"}
+                                                                    style={{ cursor: "pointer" }}
+                                                                    onClick={() =>
+                                                                        handleItemStatusChange(order.id, item.id, "served")
+                                                                    }
+                                                                />
+                                                            </div>
 
                                                             {!isEditing && !isAdding && (
                                                                 <div className="item-measure" style={{ marginLeft: "12px" }}>
