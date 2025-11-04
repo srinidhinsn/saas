@@ -7,7 +7,7 @@ import { useNavigate, useParams } from "react-router-dom";
 import ClickSpark from "../Sub_Components/SparkArrow";
 import { MdKeyboardDoubleArrowRight } from "react-icons/md";
 
-const HeaderBar = ({ screenId, selectedRealm, setSelectedRealm }) => {
+const HeaderBar = ({ screenId,selectedRealm,setSelectedRealm }) => {
   const [notifications, setNotifications] = useState([]);
   const [showPopup, setShowPopup] = useState(false);
   const [showDropdown, setShowDropdown] = useState(false);
@@ -22,7 +22,6 @@ const HeaderBar = ({ screenId, selectedRealm, setSelectedRealm }) => {
 
   const [realms, setRealms] = useState([]);
 
-  // ✅ Fetch realms for user_v3 screen
   useEffect(() => {
     if (!token || !clientId || screenId !== "user_v3") return;
 
