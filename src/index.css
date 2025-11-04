@@ -5864,9 +5864,6 @@ background: #6b7280;
 /* ====================    =======================================  */
 /* ====================    =======================================  */
 /* ====================    =======================================  */
-
-/* Add these styles to visually distinguish line items from main items */
-
 .orders-visible-edit-item-row.is-line-item {
   padding-left: 30px;
   background: rgba(255, 152, 0, 0.05);
