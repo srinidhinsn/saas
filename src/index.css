@@ -5848,21 +5848,57 @@ background: #6b7280;
   }
 }
 
+/* =Person = */
+/* =Person = */
+/* =Person = */
 
-/* ====================    =======================================  */
-/* ====================    =======================================  */
-/* ====================    =======================================  */
-/* ====================    =======================================  */
-/* ====================    =======================================  */
-/* ====================    =======================================  */
-.orders-visible-edit-item-row.is-line-item {
-  padding-left: 30px;
-  background: rgba(255, 152, 0, 0.05);
-  border-left: 3px solid #FF9800;
+.Person-Details-Updation{
+  height: 89vh;
+  overflow: auto;padding-right: 5px;
+}
+/* Person Form Container */
+.person-form-container {
+  display: flex;
+  align-items: center;border-top-right-radius: 8px;border-bottom-right-radius: 8px;
+  justify-content: center;
+  padding: 20px;
+  background:var(--bg-color);
 }
 
-.orders-visible-edit-item-row.is-line-item::before {
-  content: "↳";
+.person-form-card {
+  width: 100%;
+  max-width: 800px;
+  background: white;
+  border-radius: 20px;
+  box-shadow: 0 20px 60px rgba(0, 0, 0, 0.3);
+  overflow: hidden;
+  animation: slideIn 0.5s ease-out;
+}
+
+@keyframes slideIn {
+  from {
+    opacity: 0;
+    transform: translateY(30px);
+  }
+  to {
+    opacity: 1;
+    transform: translateY(0);
+  }
+}
+
+/* Header Section */
+.person-form-header {
+  background:var(--personform-header);
+  padding: 30px 30px;
+  display: flex;
+  align-items: center;
+  gap: 50px;
+  position: relative;
+  overflow: hidden;
+}
+
+.person-form-header::before {
+  content: '';
   position: absolute;
   top: -50%;
   right: -50%;
