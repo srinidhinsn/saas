@@ -351,7 +351,6 @@ body.sidebar-minimized .sidebar li .arrow-indicator {
     min-height: 89vh;
     height: 89vh;
     overflow-y: auto;
-    font-family: "Poppins", sans-serif;
     background: var(--bg-color);
     border-top-right-radius: 8px;
     border-bottom-right-radius: 8px;
@@ -369,7 +368,6 @@ body.sidebar-minimized .sidebar li .arrow-indicator {
 .dash-cards .value {
     text-align: start;
     font-size: 16px;
-    font-family: cursive;
 }
 
 .dash-cards .card-icons {
@@ -503,7 +501,6 @@ body.sidebar-minimized .sidebar li .arrow-indicator {
 .dashboard .main .charts .chart .amount {
     font-size: 20px;
     font-weight: 700;
-    font-family: cursive;
     margin-bottom: 5px;
     color: var(--value-color);
 }
@@ -581,7 +578,6 @@ body.sidebar-minimized .sidebar li .arrow-indicator {
 
     flex: 1;
     padding: 20px;
-    font-family: var(--font-family);
     background: var(--bg-color);
     color: var(--text-light);
     transition: all 0.3s ease;
@@ -1054,7 +1050,6 @@ body.sidebar-minimized .sidebar li .arrow-indicator {
     border-top-right-radius: 8px;
     display: flex;
     flex-direction: column;
-    font-family: "Segoe UI", sans-serif;
     transition: background-color 0.3s, color 0.3s;
     /* overflow-y: auto; */
 
@@ -1234,7 +1229,6 @@ body.sidebar-minimized .sidebar li .arrow-indicator {
     margin-top: auto;
     font-size: 0.85rem;
     font-weight: 500;
-    font-family: cursive;
     color: var(--item-price);
 }
 
@@ -1820,7 +1814,6 @@ body.sidebar-minimized .sidebar li .arrow-indicator {
     text-align: right;
     font-size: 14px;
     font-weight: 500;
-    font-family: cursive;
     color: var(--bg-text-color);
 }
 
@@ -1877,7 +1870,6 @@ body.sidebar-minimized .sidebar li .arrow-indicator {
 .order-bottom .split-total .total-price {
     font-weight: bold;
     font-size: 1.1rem;
-    font-family: cursive;
     color: var(--bg-text-color);
 }
 
@@ -2268,7 +2260,6 @@ body.sidebar-minimized .sidebar li .arrow-indicator {
     font-weight: 700;
     color: var(--bg-number-color);
     padding-top: 2px;
-    font-family: cursive;
 }
 
 
@@ -2432,9 +2423,9 @@ body.sidebar-minimized .sidebar li .arrow-indicator {
     color: var(--bg-text-color);
 }
 
-.tm-table-card-capacity span {
+/* .tm-table-card-capacity span {
     font-family: cursive;
-}
+} */
 
 .tm-table-card-status-row {
     margin-bottom: 6px;
@@ -2462,9 +2453,9 @@ body.sidebar-minimized .sidebar li .arrow-indicator {
     color: var(--bg-number-color);
 }
 
-.tm-edit-modal-field input[type="number"] {
+/* .tm-edit-modal-field input[type="number"] {
     font-family: cursive;
-}
+} */
 
 .tm-edit-modal-field input[type="number"],
 .tm-edit-modal-field select {
@@ -3575,7 +3566,6 @@ body.sidebar-minimized .sidebar li .arrow-indicator {
     padding: 20px;
     background: #f9fafb;
     border-radius: 12px;
-    font-family: 'Segoe UI', sans-serif;
 }
 
 .form-item-block {
@@ -3686,7 +3676,6 @@ input[type="checkbox"] {
     position: relative;
     width: 100%;
     max-width: 250px;
-    font-family: 'Segoe UI', sans-serif;
 }
 
 .dropdown-header {
@@ -4229,7 +4218,6 @@ input[type="checkbox"] {
     max-width: 1200px;
     margin: 0 auto;
     padding: 20px;
-    font-family: 'Inter', sans-serif;
 }
 
 .menu-header {
@@ -4910,7 +4898,6 @@ input[type="checkbox"] {
 /* Outer wrapper for entire page */
 .manager-wrapper {
     padding: 1.5rem;
-    font-family: "Segoe UI", Tahoma, Geneva, Verdana, sans-serif;
     background-color: #f5f7fa;
     min-height: 100vh;
     box-sizing: border-box;
@@ -4955,7 +4942,6 @@ input[type="checkbox"] {
     border-bottom-right-radius: 8px;
     padding: 16px;
     box-sizing: border-box;
-    font-family: 'Segoe UI', sans-serif;
 }
 
 .menu-manager-container1 {
@@ -4963,7 +4949,6 @@ input[type="checkbox"] {
     height: 100vh;
     padding: 16px;
     box-sizing: border-box;
-    font-family: 'Segoe UI', sans-serif;
 }
 
 
@@ -5032,7 +5017,6 @@ input[type="checkbox"] {
     justify-content: center;
     align-items: flex-start;
     padding: 40px 20px;
-    font-family: "Segoe UI", Tahoma, Geneva, Verdana, sans-serif;
 }
 
 /* Container */
@@ -5069,7 +5053,7 @@ input[type="checkbox"] {
 .form-group {
     display: flex;
     flex-direction: column;
-    margin-bottom: 16px;
+    margin-bottom: 16px;justify-content: space-between;
 }
 
 .form-group label {
@@ -5252,7 +5236,6 @@ input[type="checkbox"] {
     line-height: 1.2;
     font-size: 12px;
     align-items: center;
-    font-family: 'Trebuchet MS', 'Lucida Sans Unicode', 'Lucida Grande', 'Lucida Sans', Arial, sans-serif;
     width: 275px;
 }
 
@@ -5532,7 +5515,6 @@ input[type="checkbox"] {
 
 .orders-visible-items-count {
     font-size: 0.8rem;
-    font-family: cursive;
     color: var(--bg-number-color);
 }
 
@@ -5570,9 +5552,9 @@ input[type="checkbox"] {
     font-size: 0.8rem;
 }
 
-.orders-visible-expanded-info span {
+/* .orders-visible-expanded-info span {
     font-family: cursive;
-}
+} */
 
 .orders-visible-expanded-actions {
     display: flex;
@@ -5943,18 +5925,7 @@ input[type="checkbox"] {
     padding: 4px;
 }
 
-.orders-visible-item-row span:last-child {
-    padding: 2px;
-    font-weight: 600;
-}
-
-
-
 /* (****************************** New categorylist Styles****************************************88 */
-body {
-    font-family: 'Inter', sans-serif;
-    background: #f7f7f7;
-}
 
 .category-sidebar {
     width: 320px;
@@ -6171,7 +6142,7 @@ body {
 }
 
 .form-group input {
-    width: 100%;
+    width: 100%;display: flex;justify-content: space-between;
     padding: 0.75rem;
     border: 1px solid #d1d5db;
     border-radius: 0.5rem;
@@ -6421,7 +6392,6 @@ body {
     padding: 30px;
     background-color: var(--bg-color, #f4f6fa);
     min-height: 100vh;
-    font-family: "Segoe UI", Tahoma, Geneva, Verdana, sans-serif;
 }
 
 .doc-manager-wrapper {

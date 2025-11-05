@@ -10,6 +10,7 @@
 
 body {
     transition: all;
+    font-family: "Poppins", sans-serif;
 }
 
 .app-wrapper {
