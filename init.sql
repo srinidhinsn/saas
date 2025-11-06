@@ -503,5 +503,4 @@ SET sub_categories = array_cat(sub_categories, ARRAY['person-details', 'persons'
 WHERE id = 'users' AND client_id = 'saas';
 
 -- order-item update
--- order-item update
 ALTER TABLE "public"."order_item" ADD COLUMN frontend_unique_key TEXT;
