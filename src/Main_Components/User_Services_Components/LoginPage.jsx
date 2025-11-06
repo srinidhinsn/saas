@@ -100,13 +100,14 @@ export default function Login() {
                         />
                     </div>
 
-                    <div style={{ display: 'flex', justifyContent: 'space-between' }}>
-                        <div className="options-row login-link">
+                    <div style={{ display: 'flex', justifyContent: 'center' }}>
+                        {/* <div className="options-row login-link">
                             <span onClick={() => navigate(`/saas/${clientId}/reset`)}>Reset Password?</span>
-                        </div>
+                        </div> */}
                         <div className="options-row login-link">
                             <span onClick={() => navigate(`/saas/${clientId}/forgot`)}>Forgot Password?</span>
                         </div>
+                       
                     </div>
 
                     <button type="submit" className="login-button" disabled={loading}>

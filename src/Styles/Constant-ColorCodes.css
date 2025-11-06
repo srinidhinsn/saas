@@ -87,6 +87,26 @@
     --placeholder-color: rgb(170, 170, 170);
     --grids: white;
 
+
+    --primary: #3b82f6;
+    --primary-hover: #2563eb;
+    --success: #10b981;
+    --success-hover: #059669;
+    --danger: #ef4444;
+    --warning: #f59e0b;
+    
+    --bg-main: #f8fafc;
+    --bg-white: #ffffff;
+    --bg-gray: #f1f5f9;
+    
+    --text-dark: #1e293b;
+    --text-gray: #64748b;
+    --text-light: #94a3b8;
+    
+    --border: #e2e8f0;
+    --radius: 8px;
+    --shadow: 0 1px 3px rgba(0, 0, 0, 0.1); 
+
 }
 
 body.theme-dark {
@@ -94,7 +114,7 @@ body.theme-dark {
     --bg-container: rgb(58, 58, 58);
     --bg-chart-container: rgb(39, 38, 38);
     --bg-text-color: rgb(172, 170, 170);
-    --bg-number-color: rgb(234, 232, 232);
+    --bg-number-color: rgb(142, 141, 141);
     --dash-icon-color: rgb(48, 211, 195);
     --delete-icon-bg: rgb(223, 176, 176);
     --delete-icon: rgb(145, 47, 47);
