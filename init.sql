@@ -276,7 +276,7 @@ CREATE TABLE person (
     id UUID PRIMARY KEY DEFAULT gen_random_uuid(),
     first_name text,
     last_name text,
-    dob date,
+    dob text,
     email text,
     phone text,
     person_type text,
