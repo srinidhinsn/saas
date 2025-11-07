@@ -273,10 +273,10 @@ ALTER TABLE page_definition ALTER COLUMN id ADD GENERATED ALWAYS AS IDENTITY (
 --
 
 CREATE TABLE person (
-    id text NOT NULL,
+    id uuid PRIMARY KEY DEFAULT uuid_generate_v4(),
     first_name text,
     last_name text,
-    dob text,
+    dob date,
     email text,
     phone text,
     person_type text,
@@ -286,6 +286,7 @@ CREATE TABLE person (
     created_at timestamp without time zone DEFAULT CURRENT_TIMESTAMP,
     updated_at timestamp without time zone DEFAULT CURRENT_TIMESTAMP
 );
+
 
 --
 -- TOC entry 230 (class 1259 OID 49797)
