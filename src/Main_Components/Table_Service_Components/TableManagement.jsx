@@ -1,4 +1,4 @@
-import React, { useEffect, useState } from "react"; import { toast } from "react-toastify";
+import React, { useEffect, useState, useRef } from "react"; import { toast } from "react-toastify";
 import { useTheme } from "../../ThemeChangerComponent/ThemeProvider";
 import { FaEdit, FaTrash, FaCheck, FaTimes, FaSearch, FaUsers, FaClock, FaPlus } from "react-icons/fa";
 import axios from 'axios';
@@ -28,7 +28,7 @@ const TableManagement = () => {
   const [editRowId, setEditRowId] = useState(null);
   const [showConfirmDelete, setShowConfirmDelete] = useState(false);
   const [deleteTableId, setDeleteTableId] = useState(null);
-
+  const generatingRef = useRef(false);
   // Bulk Update States
   const [showBulkUpdate, setShowBulkUpdate] = useState(false);
   const [bulkUpdateSearch, setBulkUpdateSearch] = useState("");
@@ -112,44 +112,52 @@ const TableManagement = () => {
 
   // Generate tables
   const generateTables = async () => {
-    if (isGenerating) return;
-    const newErrors = tableRanges.map(row => ({
-      range: !row.range,
-      table_type: !row.table_type,
-      type: !row.type
-    }));
-    setFieldErrors(newErrors);
-
-    const validRows = tableRanges.filter((row, index) =>
-      !newErrors[index].range &&
-      !newErrors[index].table_type &&
-      !newErrors[index].type
-    );
-    if (validRows.length === 0) return;
+    // synchronous guard to prevent re-entrancy on fast double/triple clicks
+    if (generatingRef.current) return;
+    generatingRef.current = true;
     setIsGenerating(true);
-    const payload = [];
-    for (let row of validRows) {
-      const tableNumbers = parseTableRange(row.range);
-      tableNumbers.forEach(num => {
-        payload.push({
-          client_id: clientId,
-          name: num,
-          table_type: row.table_type.toString(),
-          status: row.remark || "Vacant",
-          location_zone: row.type,
-          description: row.description,
-          section: row.section,
-          sort_order: row.sort_order ? parseInt(row.sort_order) : null,
-          is_active: row.is_active,
-          qr_code_url: row.qr_code_url || "",
-          slug: `${clientId}-${(row.slug || num)
-            .toLowerCase()
-            .replace(/[^a-z0-9-]/g, '')}`
-        });
-      });
-    }
 
     try {
+      const newErrors = tableRanges.map(row => ({
+        range: !row.range,
+        table_type: !row.table_type,
+        type: !row.type
+      }));
+      setFieldErrors(newErrors);
+
+      const validRows = tableRanges.filter((row, index) =>
+        !newErrors[index].range &&
+        !newErrors[index].table_type &&
+        !newErrors[index].type
+      );
+      if (validRows.length === 0) {
+        toast.warning("Please fix highlighted rows before generating tables.");
+        return;
+      }
+      
+
+      const payload = [];
+      for (let row of validRows) {
+        const tableNumbers = parseTableRange(row.range);
+        tableNumbers.forEach(num => {
+          payload.push({
+            client_id: clientId,
+            name: num,
+            table_type: row.table_type.toString(),
+            status: row.remark || "Vacant",
+            location_zone: row.type,
+            description: row.description,
+            section: row.section,
+            sort_order: row.sort_order ? parseInt(row.sort_order) : null,
+            is_active: row.is_active,
+            qr_code_url: row.qr_code_url || "",
+            slug: `${clientId}-${(row.slug || num)
+              .toLowerCase()
+              .replace(/[^a-z0-9-]/g, '')}`
+          });
+        });
+      }
+
       for (let data of payload) {
         try {
           await axios.post(
@@ -159,7 +167,6 @@ const TableManagement = () => {
           );
         } catch (err) {
           if (err.response && err.response.status === 400) {
-            // assuming backend returns 400 for duplicate name/slug
             toast.warning(`Table "${data.name}" already exists!`);
           } else {
             console.error("Error creating table:", err);
@@ -168,7 +175,7 @@ const TableManagement = () => {
         }
       }
 
-      fetchTables();
+      await fetchTables();
       setShowAddTable(false);
       setTableRanges([]);
       setFieldErrors([]);
@@ -177,10 +184,11 @@ const TableManagement = () => {
       console.error("Error generating tables", err);
       toast.error("Something went wrong while generating tables.");
     } finally {
+      // release guard AND update UI state
+      generatingRef.current = false;
       setIsGenerating(false);
     }
   };
-
   const handleEditChange = (id, field, value) => {
     setTables(prev =>
       prev.map(table =>
@@ -756,7 +764,15 @@ const TableManagement = () => {
                     a) Table Range: T01:T10<br />
                     b) Multi-Table Range: A01:A10,B01:B05
                   </div>
-                  <button className="tm-modal-generate-table" disabled={isGenerating} onClick={generateTables}>{isGenerating ? "Generating..." : "Generate Table"}</button>
+                  <button
+                    className="tm-modal-generate-table"
+                    disabled={isGenerating}
+                    aria-busy={isGenerating}
+                    onClick={generateTables}
+                  >
+                    {isGenerating ? "Generating..." : "Generate Table"}
+                  </button>
+
                 </div>
               </div>
             </div>
