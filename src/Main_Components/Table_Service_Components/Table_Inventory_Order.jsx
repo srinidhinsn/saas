@@ -29,6 +29,8 @@ const Table_Inventory_Order = ({ onOrderUpdate, clientId, darkMode }) => {
     const [showScrollBottom, setShowScrollBottom] = useState(false);
     const [isMobileWidth, setIsMobileWidth] = useState(typeof window !== "undefined" ? window.innerWidth < 1024 : false);
     const orderFormRef = useRef(null);
+    const isPlacingRef = useRef(false);
+
     // Line Items Modal States
     const [lineItemsModalOpen, setLineItemsModalOpen] = useState(false);
     const [selectedMainItem, setSelectedMainItem] = useState(null);
@@ -328,105 +330,120 @@ const Table_Inventory_Order = ({ onOrderUpdate, clientId, darkMode }) => {
         setOrderItems(orderItems.filter(i => i.id !== id));
     };
 
-    const handlePlaceOrder = async () => {
-        if (isPlacingOrder) return;
-        setIsPlacingOrder(true);
+  // replace your handlePlaceOrder with this
+const handlePlaceOrder = async () => {
+  // synchronous guard: prevents immediate re-entry
+  if (isPlacingRef.current) return;
 
-        try {
-            if (!selectedTable) {
-                toast.error("Please select a table before placing the order.");
-                setIsPlacingOrder(false);
-                return;
-            }
+  // another defensive check (UI-level)
+  if (!selectedTable) {
+    toast.error("Please select a table before placing the order.");
+    return;
+  }
+  if (orderItems.length === 0) {
+    toast.error("Please select at least one item before placing the order.");
+    return;
+  }
 
-            if (orderItems.length === 0) {
-                toast.error("Please select at least one item before placing the order.");
-                setIsPlacingOrder(false);
-                return;
-            }
+  // set both ref and state so UI shows loading
+  isPlacingRef.current = true;
+  setIsPlacingOrder(true);
 
-            const subtotal = orderItems.reduce(
-                (sum, item) => sum + (item.unit_price || 0) * (item.quantity || 0),
-                0
-            );
+  try {
+    // compute totals
+    const subtotal = orderItems.reduce(
+      (sum, item) => sum + (item.unit_price || 0) * (item.quantity || 0),
+      0
+    );
 
-            const gstValue = (subtotal * gstRate) / 100;
-            const cstValue = (subtotal * cstRate) / 100;
-            const discountValue = discount;
-            const total_price = subtotal + gstValue + cstValue - discountValue;
+    const gstValue = (subtotal * gstRate) / 100;
+    const cstValue = (subtotal * cstRate) / 100;
+    const discountValue = discount;
+    const total_price = subtotal + gstValue + cstValue - discountValue;
 
-            const dinein_order_id = generateNextOrderId();
-            const invoice_id = generateNextInvoiceId();
-            const invoice_status = "unpaid";
+    // generate client-side order id (use as idempotency key)
+    const dinein_order_id = generateNextOrderId(); // e.g. "order_3"
+    const invoice_id = generateNextInvoiceId();
+    const invoice_status = "unpaid";
 
-            const selectedTableObj = tables.find(t => t.id.toString() === selectedTable);
+    const selectedTableObj = tables.find(t => t.id.toString() === selectedTable);
 
-            const payload = {
-                client_id: clientId,
-                table_id: selectedTableObj?.id,
-                status: "new",
-                price: subtotal,
-                gst: gstValue,
-                cst: cstValue,
-                discount: discountValue,
-                total_price,
-                mode: "Dine In",
-                paymentMode,
-                customer,
-                dinein_order_id,
-                invoice_id,
-                invoice_status,
-                items: orderItems.map(item => ({
-                    client_id: clientId,
-                    item_id: Number(item.id),
-                    quantity: Number(item.quantity),
-                    status: item.status || "pending",
-                    note: item.note || "",
-                    item_name: item.name,
-                    slug: item.slug || generateSlug(item.name),
-                    unit_price: item.unit_price || 0,
-                    line_total: (item.unit_price || 0) * (item.quantity || 0),
-                })),
-            };
-
-            console.log("📦 Sending payload:", JSON.stringify(payload, null, 2));
-
-            const res = await axios.post(
-                `${import.meta.env.VITE_API_ORDER_SERVICE_URL}/${clientId}/dinein/create`,
-                payload,
-                { headers: { Authorization: `Bearer ${token}` } }
-            );
-
-            toast.success("Order created successfully!");
-            console.log("Order placed:", res.data);
-
-            if (selectedTableObj?.id) {
-                await axios.post(
-                    `${import.meta.env.VITE_API_TABLE_SERVICE_URL}/${clientId}/tables/update`,
-                    {
-                        id: selectedTableObj.id,
-                        client_id: clientId,
-                        name: selectedTableObj?.name || `Table ${selectedTableObj.id}`,
-                        table_type: selectedTableObj?.table_type,
-                        status: "Occupied",
-                        location_zone: selectedTableObj?.location_zone,
-                    },
-                    { headers: { Authorization: `Bearer ${token}` } }
-                );
-                await fetchTables();
-            }
-
-            setOrderItems([]);
-            setSelectedTable("");
-            setPaymentMode("Cash");
-            onOrderUpdate?.(res.data);
-        } catch (err) {
-            console.error("❌ Order failed:", err);
-            toast.error("Order failed. Please check console for details.");
-        } finally {
-            setIsPlacingOrder(false);
-        }
+    const payload = {
+      client_id: clientId,
+      table_id: selectedTableObj?.id,
+      status: "new",
+      price: subtotal,
+      gst: gstValue,
+      cst: cstValue,
+      discount: discountValue,
+      total_price,
+      mode: "Dine In",
+      paymentMode,
+      customer,
+      dinein_order_id,
+      invoice_id,
+      invoice_status,
+      items: orderItems.map(item => ({
+        client_id: clientId,
+        item_id: Number(item.id),
+        quantity: Number(item.quantity),
+        status: item.status || "pending",
+        note: item.note || "",
+        item_name: item.name,
+        slug: item.slug || generateSlug(item.name),
+        unit_price: item.unit_price || 0,
+        line_total: (item.unit_price || 0) * (item.quantity || 0),
+      })),
     };
+
+    // send idempotency key header — if backend supports it, duplicate requests are ignored
+    const headers = { Authorization: `Bearer ${token}`, 'Idempotency-Key': dinein_order_id };
+
+    console.log("📦 Sending payload:", JSON.stringify(payload, null, 2));
+
+    const res = await axios.post(
+      `${import.meta.env.VITE_API_ORDER_SERVICE_URL}/${clientId}/dinein/create`,
+      payload,
+      { headers }
+    );
+
+    toast.success("Order created successfully!");
+    console.log("Order placed:", res.data);
+
+    // update table status to Occupied (best effort)
+    if (selectedTableObj?.id) {
+      await axios.post(
+        `${import.meta.env.VITE_API_TABLE_SERVICE_URL}/${clientId}/tables/update`,
+        {
+          id: selectedTableObj.id,
+          client_id: clientId,
+          name: selectedTableObj?.name || `Table ${selectedTableObj.id}`,
+          table_type: selectedTableObj?.table_type,
+          status: "Occupied",
+          location_zone: selectedTableObj?.location_zone,
+        },
+        { headers: { Authorization: `Bearer ${token}` } }
+      );
+      await fetchTables();
+    }
+
+    // reset form
+    setOrderItems([]);
+    setSelectedTable("");
+    setPaymentMode("Cash");
+    onOrderUpdate?.(res.data);
+  } catch (err) {
+    console.error("❌ Order failed:", err);
+
+    // if backend returned an error that indicates duplicate, show user-friendly msg
+    const serverMsg = err?.response?.data?.message || err?.message || "Order failed. Please try again.";
+    toast.error(serverMsg);
+  } finally {
+    // clear both ref and state
+    isPlacingRef.current = false;
+    setIsPlacingOrder(false);
+  }
+};
 
     return (
         <div className="Restaurant-Order_Placing" ref={containerRef}>
