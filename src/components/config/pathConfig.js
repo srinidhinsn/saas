@@ -1,5 +1,5 @@
 // ===== Root path for the application (change this once for all routes) =====
-export const APP_ROOT = "saas-application";
+export const APP_ROOT = "saas";
 
 // ===== Default client when URL does not contain one =====
 export const DEFAULT_CLIENT = "easyfood";
