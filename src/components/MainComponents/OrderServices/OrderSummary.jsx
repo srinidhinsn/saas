@@ -875,24 +875,19 @@ const OrderSummaryVisible = ({ clientId, token }) => {
 
   return (
     <div className="min-h-screen" style={{ backgroundColor: 'var(--color-bg-secondary)' }}>
-      <div className="container mx-auto px-4 py-6 lg:py-8">
-        <div className="text-center mb-6 lg:mb-8">
+      <div className="container mx-auto px-4 py-2">
+        {/* <div className="text-center mb-6 lg:mb-8">
           <h1 className="text-3xl md:text-4xl lg:text-5xl font-serif italic mb-3 lg:mb-4" style={{ color: 'var(--color-text-primary)' }}>Order Summary</h1>
           <p className="text-sm md:text-base" style={{ color: 'var(--color-text-secondary)' }}>Manage and track all active orders</p>
-        </div>
+        </div> */}
 
-        <div className="rounded-lg p-4 lg:p-6 mb-6 lg:mb-8" style={{ backgroundColor: 'var(--color-bg-primary)', boxShadow: 'var(--shadow-card)', border: `1px solid var(--color-border-default)` }}>
-          <div className="grid md:grid-cols-2 gap-4">
-            <div className="relative">
-              <Search className="absolute left-3 top-1/2 transform -translate-y-1/2" size={20} style={{ color: 'var(--color-text-secondary)' }} />
-              <input type="text" placeholder="Search by table or order id..." className="w-full pl-10 pr-4 py-2 rounded-lg" style={{ border: `1px solid var(--color-border-default)`, backgroundColor: 'var(--color-bg-primary)', color: 'var(--color-text-primary)' }} />
-            </div>
-
+        <div className="rounded-lg p-2 mb-2 flex justify-end">
+          <div className="">
             <div className="relative">
               <Filter className="absolute left-3 top-1/2 transform -translate-y-1/2" size={20} style={{ color: 'var(--color-text-secondary)' }} />
-              <select value={filterMode} onChange={(e) => setFilterMode(Number(e.target.value))} className="w-full pl-10 pr-4 py-2 rounded-lg" style={{ border: `1px solid var(--color-border-default)`, backgroundColor: 'var(--color-bg-primary)', color: 'var(--color-text-primary)' }}>
-                <option value={0}>Oldest First</option>
-                <option value={1}>Newest First</option>
+              <select value={filterMode} onChange={(e) => setFilterMode(Number(e.target.value))} className="w-full pl-10 pr-4 py-2 rounded-lg" >
+                <option value={0}>Orders</option>
+                <option value={1}>New</option>
                 <option value={2}>New Orders</option>
                 <option value={3}>Preparing</option>
                 <option value={4}>Served</option>
