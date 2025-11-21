@@ -2,29 +2,19 @@ import React from 'react';
 import { Routes, Route, Navigate, useParams } from 'react-router-dom';
 import TakeOrder from '../MainComponents/OrderServices/TakeOrder'
 import OrderSummary from '../MainComponents/OrderServices/OrderSummary';
-<<<<<<< HEAD
-// import TableManagement from '../MainComponents/TableServices/TableManagement'
-=======
-import Dashboard from '../Constants/Dashboard'
-import Kds from '../MainComponents/OrderServices/Kds'
->>>>>>> a8b30567d1c5e7e2e10e717de9303baec73072ee
+import Kds from '../MainComponents/OrderServices/Kds';
+import TableManagement from '../MainComponents/TableServices/TableManagement'
+import DashBoardPage from '../Constants/Dashboard';
 
 const RoutesManager = ({ token }) => {
   const { clientId } = useParams();
   return (
     <Routes>
-      <Route path="/" element={<Navigate to="home" replace />} />
-<<<<<<< HEAD
-      <Route path="home" element={<div className="container mx-auto px-4 py-12 text-center"><h2 className="text-2xl font-semibold text-text-primary">Welcome</h2></div>} />
-      {/* <Route path="managing-tables" element={<TableManagement token={token} clientId={clientId} />} /> */}
+      <Route path="/" element={<DashBoardPage />} />
+      <Route path="home" element={<DashBoardPage />}/>
+      <Route path="managing-tables" element={<TableManagement token={token} clientId={clientId} />} />
       <Route path="order" element={<TakeOrder token={token} clientId={clientId} />} />
       <Route path="summary" element={<OrderSummary token={token} clientId={clientId} />} />
-=======
-      <Route path="home" element={<Dashboard/>}/>
-      <Route path="managing-tables"element={<div className="p-8">Table Page (placeholder)</div>} />
-      <Route path="order" element={<TakeOrder token={token}clientId={clientId} />} />
-      <Route path="summary" element={<OrderSummary token={token} clientId={clientId}/>} />
->>>>>>> a8b30567d1c5e7e2e10e717de9303baec73072ee
 
       {/* Placeholder routes — replace with your components */}
       <Route path="menu" element={<div className="p-8">Menu Page (placeholder)</div>} />
