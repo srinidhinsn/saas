@@ -189,6 +189,7 @@ export const navMap = {
     summary:   (clientId) => `/${APP_ROOT}/${clientId}/summary`,
     kds:       (clientId) => `/${APP_ROOT}/${clientId}/kds`,
     details:   (clientId) => `/${APP_ROOT}/${clientId}/details`,
+    documents:   (clientId) => `/${APP_ROOT}/${clientId}/documents`,
 };
 
 const HeaderShared = ({ onLogout }) => {
@@ -297,6 +298,7 @@ const HeaderShared = ({ onLogout }) => {
           <NavLink id="summary">Summary</NavLink>
           <NavLink id="kds">KDS</NavLink>
           <NavLink id="details">Details</NavLink>
+          <NavLink id="documents">Documents</NavLink>
 
           <button
             onClick={() => onLogout?.()}
@@ -364,6 +366,7 @@ const HeaderShared = ({ onLogout }) => {
             <NavLink id="summary">Summary</NavLink>
             <NavLink id="kds">KDS</NavLink>
             <NavLink id="details">Details</NavLink>
+            <NavLink id="documents">Documents</NavLink>
             
             <button
               onClick={() => { onLogout?.(); setMobileOpen(false); }}
