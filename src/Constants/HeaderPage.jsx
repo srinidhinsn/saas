@@ -102,7 +102,6 @@ const HeaderBar = ({ screenId,selectedRealm,setSelectedRealm }) => {
   };
 
   const handleSignOut = () => {
-    localStorage.removeItem("access_token");
     setTokenAvailable(false);
     setProfileImage(null);
     navigate(`/saas/${clientId}/login`);
