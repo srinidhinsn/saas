@@ -110,54 +110,38 @@ const LineItemsModal = ({ isOpen, onClose, mainItem, lineItems, onAddWithLineIte
   if (!isOpen) return null;
 
   return (
-    <div className="fixed inset-0 z-50 flex items-center justify-center p-4" style={{ backgroundColor: 'rgba(0,0,0,0.5)' }}>
-      <div className="rounded-lg max-w-lg w-full p-6" style={{ backgroundColor: 'var(--color-bg-primary)' }}>
-        <h3 className="text-xl font-semibold mb-2" style={{ color: 'var(--color-text-primary)' }}>{mainItem?.name}</h3>
-        <p className="text-gray-600 mb-4" style={{ color: 'var(--color-text-secondary)' }}>This item comes with the following add-ons:</p>
+    <div className="fixed inset-0 z-50 flex items-center justify-center p-4 bg-color-modalsbg" >
+      <div className="rounded-lg max-w-lg w-full p-6 bg-bg-primary">
+        <h3 className="text-xl font-semibold mb-2 text-text-primary">{mainItem?.name}</h3>
+        <p className="mb-4 text-text-secondary">Item add-ons : </p>
         
         <div className="space-y-2 mb-6">
           {lineItems.map((item, index) => (
-            <div key={item.id} className="flex justify-between items-center p-3 rounded-lg" style={{ backgroundColor: 'var(--color-bg-tertiary)', border: `1px solid var(--color-border-default)` }}>
-              <span style={{ color: 'var(--color-text-primary)' }}>{index + 1}. {item.name}</span>
-              <span className="font-semibold" style={{ color: 'var(--color-action-success)' }}>Rs.{item.unit_price}</span>
+            <div key={item.id} className="flex justify-between items-center p-3 rounded-lg bg-bg-tertiary border-border-default">
+              <span className='text-text-primary'>{index + 1}. {item.name}</span>
+              <span className="font-semibold text-action-primary">Rs.{item.unit_price}</span>
             </div>
           ))}
         </div>
 
-        <p className="text-gray-600 italic mb-4" style={{ color: 'var(--color-text-secondary)' }}>
-          Would you like to add the main item with all add-ons, or just the main item?
+        <p className="text-text-secondary italic mb-4">
+          Want add-ons?
         </p>
 
         <div className="flex gap-3">
           <button
             onClick={onClose}
-            className="flex-1 px-4 py-2 rounded-lg transition-colors"
-            style={{
-              border: `1px solid var(--color-border-default)`,
-              backgroundColor: 'transparent',
-              color: 'var(--color-text-primary)',
-            }}
-          >
+            className="flex-1 px-4 py-2 rounded-lg transition-colors border-border-default bg-bg-tertiary text-text-primary">
             Cancel
           </button>
           <button
             onClick={onAddMainOnly}
-            className="flex-1 px-4 py-2 rounded-lg transition-colors"
-            style={{
-              backgroundColor: 'var(--color-action-primary)',
-              color: 'var(--color-text-white)',
-            }}
-          >
+            className="flex-1 px-4 py-2 rounded-lg transition-colors bg-action-primary text-text-white">
             Main Only
           </button>
           <button
             onClick={onAddWithLineItems}
-            className="flex-1 px-4 py-2 rounded-lg transition-colors"
-            style={{
-              backgroundColor: 'var(--color-action-primary)',
-              color: 'var(--color-text-white)',
-            }}
-          >
+            className="flex-1 px-4 py-2 rounded-lg transition-colors bg-action-primary text-text-white">
             With Add-ons
           </button>
         </div>
@@ -601,12 +585,11 @@ const searchInputRef = useRef(null);
     <div className="min-h-screen bg-bg-primary">
 
 <div
-  className={`fixed top-20% right-5 z-50 flex items-center transition-all duration-300 ease-in-out ${searchOpen ? 'w-90' : 'w-22'}`}
-  style={{ pointerEvents: 'auto' }}
+  className={`fixed top-[80px] right-5 z-50 flex items-center transition-all duration-300 ease-in-out ${searchOpen ? 'w-120' : 'w-22'}`}
   aria-hidden={false}
 >
   <div
-    className={`flex items-center gap-2 rounded-full shadow-lg overflow-hidden transition-colors duration-200 ${searchOpen ? 'bg-bg-primary px-3 py-2' : 'bg-action-primary p-2'}`}
+    className={`flex items-center gap-2 rounded-full shadow-lg overflow-hidden transition-colors duration-200 ${searchOpen ? 'bg-action-primary px-3 py-2' : 'bg-action-primary p-2'}`}
     title={searchOpen ? 'Search items' : 'Open search'}
     role="button"
     aria-expanded={searchOpen}
@@ -614,10 +597,8 @@ const searchInputRef = useRef(null);
     <button
       onClick={() => setSearchOpen(s => !s)}
       aria-label={searchOpen ? 'Close search' : 'Open search'}
-      className={`flex items-center justify-center ${searchOpen ? 'text-text-primary' : 'text-text-white'}`}
-      style={{ background: 'transparent', border: 'none', padding: 0 }}
-    >
-      <Search size={18} />
+      className={`flex items-center justify-center border-none p-0 h-[25px] w-[25px] ${searchOpen ? 'text-text-primary' : 'text-text-white'}`}>
+      <Search size={20} />
     </button>
 
     <input
@@ -625,10 +606,7 @@ const searchInputRef = useRef(null);
       value={searchQuery}
       onChange={(e) => setSearchQuery(e.target.value)}
       placeholder="Search items..."
-      className={`transition-all duration-200 bg-transparent outline-none text-sm ${searchOpen ? 'opacity-100 w-full' : 'opacity-0 w-0 pointer-events-none'}`}
-      style={{
-        color: 'var(--color-text-primary)',
-      }}
+      className={`transition-all duration-200 bg-action-primary text-text-white outline-none text-sm ${searchOpen ? 'opacity-100 w-full' : 'opacity-0 w-0 pointer-events-none'}`}  
       onKeyDown={(e) => {
         if (e.key === 'Enter') {
           // optional: close on Enter or keep open — keeping open so user can refine
@@ -636,15 +614,24 @@ const searchInputRef = useRef(null);
       }}
     />
     {searchOpen && (
-      <button
-        onClick={() => { setSearchQuery(''); searchInputRef.current?.focus(); }}
-        aria-label="Clear search"
-        className="ml-1 text-xs px-2 py-1 rounded"
-        style={{ border: '1px solid var(--color-border-default)', background: 'transparent', color: 'var(--color-text-secondary)' }}
-        title="Clear"
-      >
-        Clear
-      </button>
+   <button
+   onClick={() => {
+     if (searchQuery.trim() !== "") {
+       // First click → clear text
+       setSearchQuery("");
+       setTimeout(() => searchInputRef.current?.focus(), 50);
+     } else {
+       // Second click → close search box
+       setSearchOpen(false);
+     }
+   }}
+   aria-label="Clear or close"
+   className="ml-1 text-xs px-2 py-1 rounded border-border-default bg-transparent text-text-secondary"
+   title={searchQuery.trim() === "" ? "Close" : "Clear search"}
+ >
+   {searchQuery.trim() === "" ? "Close" : "Clear"}
+ </button>
+ 
     )}
   </div>
 </div>
@@ -668,7 +655,7 @@ const searchInputRef = useRef(null);
             <div className="mb-4">
               <h2 className="text-xl lg:text-2xl font-semibold text-text-primary">
                 {selectedCategory}
-                <span className="text-sm ml-2 text-text-secondary">
+                <span className="text-sm ml-2 text-text-primary">
                   ({filteredItems.length} items)
                 </span>
               </h2>
@@ -687,7 +674,7 @@ const searchInputRef = useRef(null);
                       
                       {/* Discount Badge */}
                       {discountPercent && (
-                        <div className="absolute top-2 left-2 bg-action-danger text-white text-xs font-bold px-2 py-1 rounded-md z-10 shadow-md">
+                        <div className="absolute top-2 left-2 bg-action-danger text-text-white text-xs font-bold px-2 py-1 rounded-md z-10 shadow-md">
                           {discountPercent}% OFF
                         </div>
                       )}
@@ -756,55 +743,44 @@ const searchInputRef = useRef(null);
         {cart.length > 0 && (
           <button
             onClick={() => setShowCart(true)}
-            className="fixed bottom-6 right-6 lg:bottom-8 lg:right-8 p-4 rounded-full shadow-lg transition-all flex items-center space-x-2 z-40"
-            style={{
-              backgroundColor: 'var(--color-action-primary)',
-              color: 'var(--color-text-white)',
-            }}
-          >
+            className="fixed bottom-6 right-6 bg-action-primary  text-text-white lg:bottom-8 lg:right-8 p-4 rounded-full shadow-lg transition-all flex items-center space-x-2 z-40">
             <ShoppingCart size={24} />
-            <span className="rounded-full w-6 h-6 flex items-center justify-center text-sm font-bold" style={{ backgroundColor: 'var(--color-bg-primary)', color: 'var(--color-action-primary)' }}>
+            <span className="rounded-full w-6 h-6 flex items-center justify-center text-sm font-bold bg-bg-primary text-action-primary">
               {cart.length}
             </span>
           </button>
         )}
 
         {showCart && (
-          <div className="fixed inset-0 z-50 flex justify-end" style={{ backgroundColor: 'rgba(0,0,0,0.5)' }}>
-            <div className="w-full md:w-96 lg:w-[28rem] h-full overflow-y-auto" style={{ backgroundColor: 'var(--color-bg-primary)' }}>
+          <div className="fixed inset-0 z-50 flex justify-end bg-color-modalsbg">
+            <div className="w-full md:w-96 lg:w-[28rem] h-full overflow-y-auto bg-bg-primary">
               <div className="p-4 lg:p-6">
                 <div className="flex justify-between items-center mb-6">
-                  <h2 className="text-xl lg:text-2xl font-bold" style={{ color: 'var(--color-text-primary)' }}>Your Order</h2>
-                  <button onClick={() => setShowCart(false)} style={{ color: 'var(--color-text-secondary)' }}>
+                  <h2 className="text-xl lg:text-2xl font-bold text-text-primary">Your Order</h2>
+                  <button onClick={() => setShowCart(false)} className='text-text-secondary'>
                     <X size={24} />
                   </button>
                 </div>
 
                 {orderPlaced ? (
                   <div className="text-center py-12">
-                    <div className="rounded-full w-20 h-20 flex items-center justify-center mx-auto mb-4" style={{ backgroundColor: 'var(--color-action-success)' }}>
-                      <Check size={40} style={{ color: 'var(--color-bg-primary)' }} />
+                    <div className="rounded-full w-20 h-20 flex items-center justify-center mx-auto mb-4 bg-action-success">
+                      <Check size={40} className='text-bg-primary'/>
                     </div>
-                    <h3 className="text-xl font-semibold mb-2" style={{ color: 'var(--color-action-success)' }}>Order Placed!</h3>
-                    <p style={{ color: 'var(--color-text-secondary)' }}>Your order has been successfully placed.</p>
+                    <h3 className="text-xl font-semibold mb-2 text-action-success">Order Placed!</h3>
+                    <p className='text-text-secondary'>Your order has been successfully placed.</p>
                   </div>
                 ) : (
                   <>
-                    <div className="mb-6 p-4 rounded-lg" style={{ backgroundColor: 'var(--color-bg-tertiary)', border: `1px solid var(--color-border-default)` }}>
-                      <div className="text-sm" style={{ color: 'var(--color-text-primary)' }}>
+                    <div className="mb-6 p-4 rounded-lg bg-bg-tertiary border-border-default">
+                      <div className="text-sm text-text-primary">
                         <span className="font-semibold">Table:</span>
                         <div className="mt-2">
-                          <label className="block text-sm font-semibold mb-2" style={{ color: 'var(--color-text-primary)' }}>Select Table</label>
+                          <label className="block text-sm font-semibold mb-2 text-text-primary">Select Table</label>
                           <select
                             value={selectedTable}
                             onChange={(e) => setSelectedTable(e.target.value)}
-                            className="w-full px-4 py-2 rounded-lg focus:outline-none"
-                            style={{
-                              border: `1px solid var(--color-border-default)`,
-                              backgroundColor: 'var(--color-bg-primary)',
-                              color: 'var(--color-text-primary)',
-                            }}
-                          >
+                            className="w-full px-4 py-2 rounded-lg focus:outline-none border-border-default bg-bg-primary text-text-primary">
                             <option value="">Choose a table</option>
                             {availableTables.map(table => (
                               <option key={table.id} value={table.id}>
@@ -818,7 +794,7 @@ const searchInputRef = useRef(null);
 
                     <div className="space-y-4 mb-6 max-h-[calc(100vh-400px)] overflow-y-auto">
                       {cart.map(item => (
-                        <div key={item.id} className="flex items-center space-x-3 p-3 lg:p-4 rounded-lg" style={{ backgroundColor: 'var(--color-bg-tertiary)', border: `1px solid var(--color-border-default)` }}>
+                        <div key={item.id} className="flex items-center space-x-3 p-3 lg:p-4 rounded-lg bg-bg-tertiary border-border-default">
               <div className="w-16 h-16 rounded-md overflow-hidden flex-shrink-0">
   <ImagePreview
     clientId={clientId}
@@ -836,25 +812,21 @@ const searchInputRef = useRef(null);
 
 
                           <div className="flex-1 min-w-0">
-                            <h4 className="font-semibold text-sm lg:text-base truncate flex items-center gap-2" style={{ color: 'var(--color-text-primary)' }}>
+                            <h4 className="font-semibold text-sm lg:text-base truncate flex items-center gap-2 text-text-primary">
                               {item.name}
                               {item.note && (
                                 <button
                                   onClick={() => openNoteEditor(item)}
-                                  title="Has note"
-                                  style={{ color: 'var(--color-action-primary)' }}
-                                >
+                                  title="Has note" className='text-action-primary'>
                                   <StickyNote size={16} />
                                 </button>
                               )}
                             </h4>
-                            <p style={{ color: 'var(--color-action-primary)', fontWeight: 700 }}>Rs.{item.unit_price?.toFixed(2)}</p>
+                            <p className='text-action-primary font-bold'>Rs.{item.unit_price?.toFixed(2)}</p>
                             {!item.note && (
                               <button
                                 onClick={() => openNoteEditor(item)}
-                                className="text-xs mt-1"
-                                style={{ color: 'var(--color-text-secondary)' }}
-                              >
+                                className="text-xs mt-1 text-text-secondary">
                                 + Add note
                               </button>
                             )}
@@ -862,35 +834,30 @@ const searchInputRef = useRef(null);
                           <div className="flex items-center space-x-2">
                             <button
                               onClick={() => updateQuantity(item.id, -1)}
-                              className="p-1 rounded"
-                              style={{ backgroundColor: 'var(--color-bg-primary)', border: `1px solid var(--color-border-default)` }}
+                              className="p-1 rounded bg-bg-primary border-border-default"
                             >
                               <Minus size={16} />
                             </button>
-                            <span className="w-8 text-center font-semibold" style={{ color: 'var(--color-text-primary)' }}>{item.quantity}</span>
+                            <span className="w-8 text-center font-semibold text-text-primary">{item.quantity}</span>
                             <button
                               onClick={() => updateQuantity(item.id, 1)}
-                              className="p-1 rounded"
-                              style={{ backgroundColor: 'var(--color-bg-primary)', border: `1px solid var(--color-border-default)` }}
-                            >
+                              className="p-1 rounded bg-bg-primary border-border-default">
                               <Plus size={16} />
                             </button>
                           </div>
                           <button
                             onClick={() => removeFromCart(item.id)}
-                            title="Remove item"
-                            style={{ color: 'var(--color-action-danger)' }}
-                          >
+                            title="Remove item" className='text-action-danger'>
                             <X size={20} />
                           </button>
                         </div>
                       ))}
                     </div>
 
-                    <div className="border-t pt-4 mb-6" style={{ borderColor: 'var(--color-border-default)' }}>
+                    <div className="border-t pt-4 mb-6 border-border-default" >
                       <div className="flex justify-between items-center text-xl font-bold">
-                        <span style={{ color: 'var(--color-text-primary)' }}>Total:</span>
-                        <span style={{ color: 'var(--color-action-primary)', fontWeight: 700 }}>Rs.{getTotalPrice()}</span>
+                        <span className='text-text-primary'>Total:</span>
+                        <span className='text-action-primary font-bold'>Rs.{getTotalPrice()}</span>
                       </div>
                     </div>
 
@@ -908,7 +875,7 @@ const searchInputRef = useRef(null);
                     </button>
 
                     {(!selectedTable) && cart.length > 0 && (
-                      <p className="text-sm text-center mt-2" style={{ color: 'var(--color-action-danger)' }}>
+                      <p className="text-sm text-center mt-2 text-action-danger">
                         Select a table
                       </p>
                     )}

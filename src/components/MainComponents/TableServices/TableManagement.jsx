@@ -5,9 +5,9 @@ import { toast } from "react-toastify";
 import { injectThemeVars } from '../../utils/injectThemeVars'
 
 const statusConfig = {
-    Vacant: { card: "bg-green-200 border-green-300", icon: <FaCheck className="text-green-600 text-2xl" />, label: "Available" },
-    Occupied: { card: "bg-red-200 border-red-300", icon: <FaUsers className="text-red-600 text-2xl" />, label: "Occupied" },
-    Reserved: { card: "bg-yellow-200 border-yellow-300", icon: <FaClock className="text-yellow-600 text-2xl" />, label: "Reserved" }
+    Vacant: { card: "bg-tableStatusBg-vacant border-green-300", icon: <FaCheck className="text-action-success text-xl" />, label: "Available" },
+    Occupied: { card: "bg-tableStatusBg-occupied border-red-300", icon: <FaUsers className="text-action-danger text-xl" />, label: "Occupied" },
+    Reserved: { card: "bg-tableStatusBg-reserved border-yellow-300", icon: <FaClock className="text-action-primary text-xl" />, label: "Reserved" }
 };
 
 const TableManagement = ({ clientId, token }) => {
@@ -480,19 +480,19 @@ const TableManagement = ({ clientId, token }) => {
                     <div className="flex flex-col lg:flex-row gap-3 lg:items-center lg:justify-between">
                         <div className="flex flex-col sm:flex-row gap-2 flex-1">
                             <div className="relative ">
-                                <FaSearch className="absolute left-3 top-1/2 transform -translate-y-1/2 text-gray-400" />
+                                <FaSearch className="absolute left-3 top-1/2 transform -translate-y-1/2 text-text-secondary" />
                                 <input
                                     type="text"
                                     value={searchTerm}
                                     onChange={e => setSearchTerm(e.target.value)}
                                     placeholder="Search tables..."
-                                    className="w-full pl-10 pr-3 py-2 border border-gray-300 rounded-lg focus:outline-none focus:ring-1 focus:ring-orange-500 bg-white text-gray-700"
+                                    className="w-full pl-10 pr-3 py-2 border-default border-border-default rounded-lg focus:outline-none  focus:border-action-primary bg-bg-primary text-text-primary"
                                 />
                             </div>
                             <select
                                 value={statusFilter}
                                 onChange={e => setStatusFilter(e.target.value)}
-                                className="px-3 py-2 border border-gray-300 rounded-lg focus:outline-none focus:ring-2 focus:ring-orange-500 bg-white text-gray-700"
+                                className="px-3 py-2 border-default border-border-default rounded-lg focus:outline-none focus:ring-2 focus:border-action-primary bg-bg-primary text-text-primary"
                             >
                                 <option value="">All Status</option>
                                 <option value="Vacant">Available</option>
@@ -503,19 +503,19 @@ const TableManagement = ({ clientId, token }) => {
 
                         <div className="flex flex-wrap gap-2">
                             <button
-                                className="flex items-center gap-2 px-4 py-2 bg-blue-500 text-white rounded-lg hover:bg-blue-600 transition-colors font-semibold text-sm shadow-md"
+                                className="flex items-center gap-2 px-4 py-2 bg-bulkActions-update text-text-white rounded-lg hover:bg-bulkActionsHover-updateHover hover:text-text-primary transition-colors font-semibold text-sm shadow-md"
                                 onClick={openBulkUpdate}
                             >
-                                <FaEdit /> <span>Bulk Update</span>
+                                <FaEdit /> <span>Bulk Update</span> 
                             </button>
                             <button
-                                className="flex items-center gap-2 px-4 py-2 bg-red-500 text-white rounded-lg hover:bg-red-600 transition-colors font-semibold text-sm shadow-md"
+                                className="flex items-center gap-2 px-4 py-2 bg-bulkActions-delete text-white rounded-lg hover:bg-bulkActionsHover-deleteHover hover:text-text-primary transition-colors font-semibold text-sm shadow-md"
                                 onClick={openBulkDelete}
                             >
                                 <FaTrash /> <span>Bulk Delete</span>
                             </button>
                             <button
-                                className="flex items-center gap-2 px-4 py-2 bg-orange-500 text-white rounded-lg hover:bg-orange-600 transition-colors font-semibold text-sm shadow-md"
+                                className="flex items-center gap-2 px-4 py-2 bg-bulkActions-adding text-white rounded-lg hover:bg-bulkActionsHover-addingHover hover:text-text-primary transition-colors font-semibold text-sm shadow-md"
                                 onClick={() => {
                                     setShowAddTable(true);
                                     setTableRanges([{
@@ -537,35 +537,35 @@ const TableManagement = ({ clientId, token }) => {
                     {filteredTables.map(table => {
                         const config = statusConfig[table.status] || statusConfig['Vacant'];
                         return (
-                            <div key={table.id} className={`${config.card} rounded-lg shadow-sm overflow-hidden border-2 transition-all duration-200 hover:shadow-lg hover:scale-105`}>
-                                <div className="p-3 border-b bg-white bg-opacity-50">
+                            <div key={table.id} className={`${config.card} rounded-button shadow-sm overflow-hidden border-2 transition-all duration-200 hover:shadow-lg hover:scale-105`}>
+                                <div className="p-3 border-b bg-bg-primary bg-opacity-50">
                                     <div className="flex justify-between items-start mb-2">
                                         <div className="flex-1">
-                                            <div className="text-lg font-bold text-gray-800 mb-0.5">{table.name}</div>
-                                            <div className="text-xs text-gray-600">Seating : <span className="font-semibold text-gray-800">{table.table_type}</span></div>
-                                            <div className="text-xs text-gray-600">Zone : <span className="font-semibold text-gray-800">{table.location_zone}</span></div>
+                                            <div className="text-lg font-bold text-text-primary mb-0.5">{table.name}</div>
+                                            <div className="text-xs text-text-secondary">Seating : <span className="font-semibold text-text-primary">{table.table_type}</span></div>
+                                            <div className="text-xs text-text-secondary">Zone : <span className="font-semibold text-text-primary">{table.location_zone}</span></div>
                                         </div>
                                         {config.icon}
                                     </div>
                                     <div className="flex items-center justify-center">
-                                        <span className={`px-2.5 py-0.5 rounded-full text-xs font-bold ${table.status === 'Vacant' ? 'bg-green-100 text-green-700' :
-                                            table.status === 'Occupied' ? 'bg-red-100 text-red-700' :
-                                                'bg-yellow-100 text-yellow-700'
+                                        <span className={`px-2.5 py-0.5 rounded-full text-xs font-bold ${table.status === 'Vacant' ? 'bg-tableStatusBg-vacant text-tableStatusText-vacant' :
+                                            table.status === 'Occupied' ? 'bg-tableStatusBg-occupied text-tableStatusText-occupied' :
+                                                'bg-tableStatusBg-reserved text-tableStatusText-reserved'
                                             }`}>
                                             Status : {config.label}
                                         </span>
                                     </div>
                                 </div>
 
-                                <div className="p-2 bg-white bg-opacity-50 flex gap-1.5">
+                                <div className="p-2 bg-bg-primary bg-opacity-50 flex gap-1.5">
                                     <button
-                                        className="flex-1 flex items-center justify-center gap-1 bg-blue-500 text-white py-1.5 rounded hover:bg-blue-600 transition-colors font-semibold text-xs shadow-sm"
+                                        className="flex-1 flex items-center justify-center gap-1 bg-bulkActions-update text-text-white py-1.5 rounded hover:bg-bulkActionsHover-updateHover hover:text-text-primary transition-colors font-semibold text-xs shadow-sm"
                                         onClick={() => setEditRowId(table.id)}
                                     >
                                         <FaEdit className="text-xs" /> Edit
                                     </button>
                                     <button
-                                        className="flex-1 flex items-center justify-center gap-1 bg-red-500 text-white py-1.5 rounded hover:bg-red-600 transition-colors font-semibold text-xs shadow-sm"
+                                        className="flex-1 flex items-center justify-center gap-1 bg-bulkActions-delete text-white py-1.5 rounded hover:bg-bulkActionsHover-deleteHover hover:text-text-primary transition-colors font-semibold text-xs shadow-sm"
                                         onClick={() => { setDeleteTableId(table.id); setShowConfirmDelete(true); }}
                                     >
                                         <FaTrash className="text-xs" /> Delete
@@ -577,23 +577,23 @@ const TableManagement = ({ clientId, token }) => {
                 </div>
 
                 {filteredTables.length === 0 && (
-                    <div className="bg-white rounded-xl shadow-sm p-12 text-center border border-gray-200">
-                        <div className="text-gray-400 mb-3">
+                    <div className="bg-bg-primary rounded-xl shadow-sm p-12 text-center border border-border-default">
+                        <div className="text-text-secondary mb-3">
                             <FaSearch className="text-5xl mx-auto" />
                         </div>
-                        <p className="text-gray-500 text-lg font-medium">No tables found</p>
-                        <p className="text-gray-400 text-sm mt-1">Try adjusting your search or filter criteria</p>
+                        <p className="text-text-secondary text-lg font-medium">No tables found</p>
+                        <p className="text-text-secondary text-sm mt-1">Try adjusting your search or filter criteria</p>
                     </div>
                 )}
 
                 {/* Add Table Modal */}
                 {showAddTable && (
-                    <div className="fixed inset-0 bg-black bg-opacity-50 z-50 flex items-center justify-center p-4 overflow-y-auto">
-                        <div className="bg-white rounded-xl w-full max-w-4xl shadow-2xl border border-gray-200 my-8">
-                            <div className="sticky top-0 bg-white px-6 py-4 border-b flex justify-between items-center z-10 rounded-t-xl">
-                                <h3 className="text-xl font-bold text-gray-800">Add New Tables</h3>
+                    <div className="fixed inset-0 bg-color-modalsbg bg-opacity-50 z-50 flex items-center justify-center p-4 overflow-y-auto">
+                        <div className="bg-bg-primary rounded-xl w-full max-w-xl shadow-2xl border border-border-default my-8">
+                            <div className="sticky top-0 bg-bg-primary px-4 py-2 border-b-border-default flex justify-between items-center z-10 rounded-t-xl">
+                                <h3 className="text-xl font-bold text-text-primary">Add Tables</h3>
                                 <button
-                                    className="text-gray-500 hover:text-gray-700 transition-colors p-1"
+                                    className="text-text-secondary hover:text-text-primary transition-colors p-1"
                                     onClick={() => {
                                         setShowAddTable(false);
                                         setTableRanges([]);
@@ -605,9 +605,9 @@ const TableManagement = ({ clientId, token }) => {
                             </div>
                             <div className="p-6 max-h-[calc(100vh-12rem)] overflow-y-auto">
                                 {tableRanges.map((row, index) => (
-                                    <div className="grid grid-cols-1 md:grid-cols-2 lg:grid-cols-3 gap-4 mb-6 p-4 bg-gray-50 rounded-lg border border-gray-200" key={index}>
+                                    <div className="grid grid-cols-1 md:grid-cols-2 lg:grid-cols-3 gap-4 mb-6 p-4 bg-bg-tertiary rounded-lg border-default border-border-default" key={index}>
                                         <div>
-                                            <label className="block text-sm font-semibold mb-2 text-gray-700">Table Range *</label>
+                                            <label className="block text-sm font-semibold mb-2 text-text-primary">Table Range *</label>
                                             <input
                                                 value={row.range}
                                                 onChange={e => {
@@ -615,14 +615,14 @@ const TableManagement = ({ clientId, token }) => {
                                                     updated[index].range = e.target.value;
                                                     setTableRanges(updated);
                                                 }}
-                                                className={`w-full px-4 py-2.5 border rounded-lg focus:outline-none focus:ring-2 focus:ring-orange-500 ${fieldErrors[index]?.range ? 'border-red-500 bg-red-50' : 'border-gray-300'
+                                                className={`w-full px-3 py-2 border rounded-lg focus:outline-none focus:ring-2 focus:ring-action-success ${fieldErrors[index]?.range ? 'border-bulkActions-delete bg-red-50' : 'border-border-default'
                                                     }`}
-                                                placeholder="T01:T10"
+                                                placeholder="S01:S10"
                                             />
-                                            {fieldErrors[index]?.range && <div className="text-red-500 text-xs mt-1 font-medium">Enter table range</div>}
+                                            {fieldErrors[index]?.range && <div className="text-action-danger text-xs mt-1 font-medium">Enter table range</div>}
                                         </div>
                                         <div>
-                                            <label className="block text-sm font-semibold mb-2 text-gray-700">No of Seating *</label>
+                                            <label className="block text-sm font-semibold mb-2 text-text-primary">No of Seating *</label>
                                             <input
                                                 type="number"
                                                 min="1"
@@ -633,14 +633,14 @@ const TableManagement = ({ clientId, token }) => {
                                                     updated[index].table_type = value;
                                                     setTableRanges(updated);
                                                 }}
-                                                className={`w-full px-4 py-2.5 border rounded-lg focus:outline-none focus:ring-2 focus:ring-orange-500 ${fieldErrors[index]?.table_type ? 'border-red-500 bg-red-50' : 'border-gray-300'
+                                                className={`w-full px-3 py-2 border rounded-lg focus:outline-none focus:ring-2 focus:ring-action-primary ${fieldErrors[index]?.table_type ? 'border-bulkActions-delete bg-red-50' : 'border-border-default'
                                                     }`}
                                                 placeholder="4"
                                             />
-                                            {fieldErrors[index]?.table_type && <div className="text-red-500 text-xs mt-1 font-medium">Enter seating</div>}
+                                            {fieldErrors[index]?.table_type && <div className="text-action-danger text-xs mt-1 font-medium">Enter seating</div>}
                                         </div>
                                         <div>
-                                            <label className="block text-sm font-semibold mb-2 text-gray-700">Type *</label>
+                                            <label className="block text-sm font-semibold mb-2 text-text-secondary">Type *</label>
                                             <select
                                                 value={row.type}
                                                 onChange={e => {
@@ -648,17 +648,17 @@ const TableManagement = ({ clientId, token }) => {
                                                     updated[index].type = e.target.value;
                                                     setTableRanges(updated);
                                                 }}
-                                                className={`w-full px-4 py-2.5 border rounded-lg focus:outline-none focus:ring-2 focus:ring-orange-500 ${fieldErrors[index]?.type ? 'border-red-500 bg-red-50' : 'border-gray-300'
+                                                className={`w-full px-3  py-2 border-default border-border-default rounded-lg focus:outline-none focus:ring-2 focus:ring-action-primary ${fieldErrors[index]?.type ? 'border-bulkActions-delete bg-red-50' : 'border-border-default'
                                                     }`}
                                             >
                                                 <option value="">Select</option>
                                                 <option value="AC">AC</option>
                                                 <option value="Non-AC">Non-AC</option>
                                             </select>
-                                            {fieldErrors[index]?.type && <div className="text-red-500 text-xs mt-1 font-medium">Select type</div>}
+                                            {fieldErrors[index]?.type && <div className="text-action-danger text-xs mt-1 font-medium">Select type</div>}
                                         </div>
                                         <div>
-                                            <label className="block text-sm font-semibold mb-2 text-gray-700">Remark</label>
+                                            <label className="block text-sm font-semibold mb-2 text-text-secondary">Remark</label>
                                             <select
                                                 value={row.remark}
                                                 onChange={e => {
@@ -666,7 +666,7 @@ const TableManagement = ({ clientId, token }) => {
                                                     updated[index].remark = e.target.value;
                                                     setTableRanges(updated);
                                                 }}
-                                                className="w-full px-4 py-2.5 border border-gray-300 rounded-lg focus:outline-none focus:ring-2 focus:ring-orange-500"
+                                                className="w-full px-3 py-2 border-default border-border-default rounded-lg focus:outline-none focus:ring-2 focus:ring-action-primary"
                                             >
                                                 <option value="Vacant">Vacant</option>
                                                 <option value="Reserved">Reserved</option>
@@ -676,29 +676,28 @@ const TableManagement = ({ clientId, token }) => {
                                 ))}
                                 <div className="bg-gradient-to-r from-blue-50 to-cyan-50 border-2 border-blue-200 rounded-lg p-5 mb-6">
                                     <div className="flex items-start gap-3">
-                                        <div className="text-blue-600 mt-1">
+                                        <div className="text-tableStatusText-vacant mt-1">
                                             <svg className="w-6 h-6" fill="currentColor" viewBox="0 0 20 20">
                                                 <path fillRule="evenodd" d="M18 10a8 8 0 11-16 0 8 8 0 0116 0zm-7-4a1 1 0 11-2 0 1 1 0 012 0zM9 9a1 1 0 000 2v3a1 1 0 001 1h1a1 1 0 100-2v-3a1 1 0 00-1-1H9z" clipRule="evenodd" />
                                             </svg>
                                         </div>
                                         <div>
-                                            <div className="text-sm font-bold text-blue-900 mb-2">Table Range Examples:</div>
+                                            <div className="text-sm font-bold text-text-primary mb-2">Table Range Examples:</div>
                                             <div className="text-sm text-gray-700 space-y-1">
-                                                <div><strong>Single Range:</strong> T01:T10 (Creates T01, T02, ..., T10)</div>
-                                                <div><strong>Multiple Ranges:</strong> A01:A10,B01:B05 (Creates A01-A10 and B01-B05)</div>
-                                                <div><strong>Single Table:</strong> C15 (Creates just C15)</div>
+                                                <div><strong>Single Table:</strong> S1</div>
+                                                <div><strong>Single & Multi Range:</strong> T01:T10 & A01:A10,B01:B05</div>
                                             </div>
                                         </div>
                                     </div>
                                 </div>
                                 <button
-                                    className="w-full bg-orange-500 text-white py-4 rounded-lg hover:bg-orange-600 transition-colors font-bold text-lg shadow-lg disabled:bg-gray-300 disabled:cursor-not-allowed"
+                                    className="w-full bg-action-primary text-text-white py-2 rounded-lg hover:bg-bulkActionsHover-addingHover hover:text-text-primary transition-colors font-bold text-lg shadow-lg disabled:bg-gray-300 disabled:cursor-not-allowed"
                                     disabled={isGenerating}
                                     onClick={generateTables}
                                 >
                                     {isGenerating ? (
                                         <span className="flex items-center justify-center gap-2">
-                                            <div className="animate-spin rounded-full h-5 w-5 border-b-2 border-white"></div>
+                                            <div className="animate-spin rounded-full h-5 w-5 border-b-2 border-border-default"></div>
                                             Generating Tables...
                                         </span>
                                     ) : (
@@ -716,21 +715,21 @@ const TableManagement = ({ clientId, token }) => {
                 {editRowId && (
                     <div className="fixed inset-0 bg-black bg-opacity-50 z-50 flex items-center justify-center p-4">
                         <div className="bg-white rounded-xl w-full max-w-md shadow-2xl border border-gray-200 animate-scale-in">
-                            <div className="px-5 py-3 border-b flex justify-between items-center bg-gradient-to-r from-blue-50 to-cyan-50">
-                                <h3 className="text-lg font-bold text-gray-800">Edit Table</h3>
-                                <button className="text-gray-500 hover:text-gray-700 transition-colors p-1 hover:bg-gray-200 rounded-full" onClick={() => { setEditRowId(null); setEditFieldErrors({}); }}>
+                            <div className="px-5 py-3 rounded-xl border-b-default flex justify-between items-center bg-gradient-to-r from-blue-50 to-cyan-50">
+                                <h3 className="text-lg font-bold text-text-primary">Edit Table</h3>
+                                <button className="text-text-secondary hover:text-text-primary transition-colors p-1 rounded-full" onClick={() => { setEditRowId(null); setEditFieldErrors({}); }}>
                                     <FaTimes size={20} />
                                 </button>
                             </div>
                             {tables.filter(table => table.id === editRowId).map(table => (
                                 <div className="p-5" key={table.id}>
-                                    <div className="bg-gradient-to-r from-orange-100 via-white to-yellow-100  rounded-lg border border-orange-200 p-3 mb-4 text-center">
-                                        <span className="text-xs font-semibold text-gray-600 uppercase tracking-wide">Table Name</span>
-                                        <div className="text-2xl font-bold text-gray-900 mt-0.5">{table.name}</div>
+                                    <div className="bg-gradient-to-r from-action-primary via-text-white to-bulkActionsHover-deleteHover  rounded-lg border border-orange-200 p-3 mb-4 text-center">
+                                        <span className="text-xs font-semibold text-text-secondary uppercase tracking-wide">Table Name</span>
+                                        <div className="text-2xl font-bold text-text-primary mt-0.5">{table.name}</div>
                                     </div>
                                     <div className="space-y-3">
                                         <div>
-                                            <label className="block text-sm font-semibold mb-1.5 text-gray-700">No of Seating</label>
+                                            <label className="block text-sm font-semibold mb-1.5 text-text-secondary">No of Seating</label>
                                             <input
                                                 type="number"
                                                 min="1"
@@ -739,48 +738,48 @@ const TableManagement = ({ clientId, token }) => {
                                                     const value = Math.max(1, Number(e.target.value) || 1);
                                                     handleEditChange(table.id, "table_type", value);
                                                 }}
-                                                className={`w-full px-3 py-2 border rounded-lg focus:outline-none focus:ring-2 focus:ring-orange-500 ${editFieldErrors.table_type ? 'border-red-500 bg-red-50' : 'border-gray-300'
+                                                className={`w-full px-3 py-2 border-default rounded-lg focus:outline-none focus:ring-2 focus:ring-action-primary ${editFieldErrors.table_type ? 'border-bulkActions-delete bg-red-50' : 'border-border-default'
                                                     }`}
                                             />
-                                            {editFieldErrors.table_type && <div className="text-red-500 text-xs mt-1 font-medium">{editFieldErrors.table_type}</div>}
+                                            {editFieldErrors.table_type && <div className="text-action-danger text-xs mt-1 font-medium">{editFieldErrors.table_type}</div>}
                                         </div>
                                         <div>
-                                            <label className="block text-sm font-semibold mb-1.5 text-gray-700">Type</label>
+                                            <label className="block text-sm font-semibold mb-1.5 text-text-secondary0">Type</label>
                                             <select
                                                 value={table.location_zone}
                                                 onChange={e => handleEditChange(table.id, "location_zone", e.target.value)}
-                                                className={`w-full px-3 py-2 border rounded-lg focus:outline-none focus:ring-2 focus:ring-orange-500 ${editFieldErrors.location_zone ? 'border-red-500 bg-red-50' : 'border-gray-300'
+                                                className={`w-full px-3 py-2 border rounded-lg focus:outline-none focus:ring-2 focus:ring-action-primary ${editFieldErrors.location_zone ? 'border-bulkActions-delete bg-red-50' : 'border-border-default'
                                                     }`}
                                             >
                                                 <option value="AC">AC</option>
                                                 <option value="Non-AC">Non-AC</option>
                                             </select>
-                                            {editFieldErrors.location_zone && <div className="text-red-500 text-xs mt-1 font-medium">{editFieldErrors.location_zone}</div>}
+                                            {editFieldErrors.location_zone && <div className="text-action-danger text-xs mt-1 font-medium">{editFieldErrors.location_zone}</div>}
                                         </div>
                                         <div>
-                                            <label className="block text-sm font-semibold mb-1.5 text-gray-700">Status</label>
+                                            <label className="block text-sm font-semibold mb-1.5 text-text-secondary">Status</label>
                                             <select
                                                 value={table.status || ""}
                                                 onChange={e => handleEditChange(table.id, "status", e.target.value)}
-                                                className={`w-full px-3 py-2 border rounded-lg focus:outline-none focus:ring-2 focus:ring-orange-500 ${editFieldErrors.status ? 'border-red-500 bg-red-50' : 'border-gray-300'
+                                                className={`w-full px-3 py-2 border rounded-lg focus:outline-none focus:ring-2 focus:ring-action-primary ${editFieldErrors.status ? 'border-bulkActions-delete bg-red-50' : 'border-border-default'
                                                     }`}
                                             >
                                                 <option value="Vacant">Vacant</option>
                                                 {/* <option value="Occupied">Occupied</option> */}
                                                 <option value="Reserved">Reserved</option>
                                             </select>
-                                            {editFieldErrors.status && <div className="text-red-500 text-xs mt-1 font-medium">{editFieldErrors.status}</div>}
+                                            {editFieldErrors.status && <div className="text-action-danger text-xs mt-1 font-medium">{editFieldErrors.status}</div>}
                                         </div>
                                     </div>
                                     <div className="flex gap-2 mt-5">
                                         <button
-                                            className="flex-1 bg-green-500 text-white py-2.5 rounded-lg hover:bg-green-600 transition-colors font-bold shadow-md flex items-center justify-center gap-2"
+                                            className="flex-1 bg-modalsUpdateBg-save text-text-white py-2.5 rounded-lg hover:bg-green-600 transition-colors font-bold shadow-md flex items-center justify-center gap-2"
                                             onClick={() => saveEdit(table)}
                                         >
                                             <FaCheck /> Save
                                         </button>
                                         <button
-                                            className="flex-1 bg-gray-200 text-gray-700 py-2.5 rounded-lg hover:bg-gray-300 transition-colors font-bold flex items-center justify-center gap-2"
+                                            className="flex-1 bg-modalsUpdateBg-cancel text-text-white py-2.5 rounded-lg hover:bg-gray-300 transition-colors font-bold flex items-center justify-center gap-2"
                                             onClick={() => { setEditRowId(null); setEditFieldErrors({}); }}
                                         >
                                             <FaTimes /> Cancel
@@ -794,12 +793,12 @@ const TableManagement = ({ clientId, token }) => {
 
                 {/* Bulk Update Modal */}
                 {showBulkUpdate && (
-                    <div className="fixed inset-0 bg-black bg-opacity-50 z-50 flex items-center justify-center p-4">
-                        <div className="bg-white rounded-xl w-full max-w-4xl shadow-2xl border border-gray-200 max-h-[90vh] overflow-hidden flex flex-col">
-                            <div className="px-6 py-4 border-b flex justify-between items-center bg-gradient-to-r from-blue-50 to-cyan-50">
-                                <h3 className="text-xl font-bold text-gray-800">Bulk Update Tables</h3>
+                    <div className="fixed inset-0 bg-color-modalsbg z-50 flex items-center justify-center p-4">
+                        <div className="bg-bg-primary rounded-xl w-full max-w-xl shadow-2xl border border-border-default max-h-[90vh] overflow-hidden flex flex-col">
+                            <div className="px-3 py-2 border-b flex justify-between items-center bg-gradient-to-r from-action-primary via-text-white to-action-success">
+                                <h3 className="text-xl font-bold text-text-primary">Bulk Update Tables</h3>
                                 <button
-                                    className="text-gray-500 hover:text-gray-700 transition-colors p-1"
+                                    className="text-text-primary hover:text-text-secondary transition-colors p-1"
                                     onClick={() => {
                                         setShowBulkUpdate(false);
                                         setSelectedUpdateTables([]);
@@ -813,13 +812,10 @@ const TableManagement = ({ clientId, token }) => {
                             </div>
 
                             {/* Global Update Section */}
-                            <div className="px-6 py-4 bg-gradient-to-r from-orange-50 to-yellow-50 border-b">
-                                <h4 className="text-sm font-bold text-gray-800 mb-3 flex items-center gap-2">
-                                    <span className="text-orange-600">⚙️</span> Apply to All Selected Tables
-                                </h4>
-                                <div className="grid grid-cols-1 md:grid-cols-3 gap-4">
+                            <div className="px-6 py-2 bg-gradient-to-r from-orange-50 to-yellow-50 border-b">
+                                <div className="grid grid-cols-1 md:grid-cols-3 gap-2">
                                     <div>
-                                        <label className="block text-xs font-semibold mb-1.5 text-gray-700">Global Seating</label>
+                                        <label className="block text-xs font-semibold mb-border-default text-text-secondary">Global Seating</label>
                                         <input
                                             type="number"
                                             min="1"
@@ -829,15 +825,15 @@ const TableManagement = ({ clientId, token }) => {
                                                 setBulkUpdateGlobal(prev => ({ ...prev, table_type: value }));
                                             }}
                                             placeholder="Apply to all selected"
-                                            className="w-full px-3 py-2 border border-gray-300 rounded-lg focus:outline-none focus:ring-2 focus:ring-orange-500 text-sm"
+                                            className="w-full px-2 py-2 border border-border-default rounded-lg focus:outline-none focus:ring-1 focus:ring-action-primary text-sm"
                                         />
                                     </div>
                                     <div>
-                                        <label className="block text-xs font-semibold mb-1.5 text-gray-700">Global Status</label>
+                                        <label className="block text-xs font-semibold mb-border-default text-text-secondary">Global Status</label>
                                         <select
                                             value={bulkUpdateGlobal.status}
                                             onChange={e => setBulkUpdateGlobal(prev => ({ ...prev, status: e.target.value }))}
-                                            className="w-full px-3 py-2 border border-gray-300 rounded-lg focus:outline-none focus:ring-2 focus:ring-orange-500 text-sm"
+                                            className="w-full px-2 py-2 border border-border-default rounded-lg focus:outline-none focus:ring-1 focus:ring-action-primary text-sm"
                                         >
                                             <option value="">-- No Change --</option>
                                             <option value="Vacant">Vacant</option>
@@ -846,11 +842,11 @@ const TableManagement = ({ clientId, token }) => {
                                         </select>
                                     </div>
                                     <div>
-                                        <label className="block text-xs font-semibold mb-1.5 text-gray-700">Global Zone</label>
+                                        <label className="block text-xs font-semibold mb-border-default text-text-secondary">Global Zone</label>
                                         <select
                                             value={bulkUpdateGlobal.location_zone}
                                             onChange={e => setBulkUpdateGlobal(prev => ({ ...prev, location_zone: e.target.value }))}
-                                            className="w-full px-3 py-2 border border-gray-300 rounded-lg focus:outline-none focus:ring-2 focus:ring-orange-500 text-sm"
+                                            className="w-full px-3 py-2 border border-border-default rounded-lg focus:outline-none focus:ring-1 focus:ring-action-primary text-sm"
                                         >
                                             <option value="">-- No Change --</option>
                                             <option value="AC">AC</option>
@@ -861,63 +857,63 @@ const TableManagement = ({ clientId, token }) => {
                             </div>
 
                             {/* Search Bar */}
-                            <div className="px-6 py-4 border-b bg-white">
+                            <div className="px-4 py-2 border-b bg-bg-primary">
                                 <div className="relative">
-                                    <FaSearch className="absolute left-4 top-1/2 transform -translate-y-1/2 text-gray-400" />
+                                    <FaSearch className="absolute left-4 top-1/2 transform -translate-y-1/2 text-text-secondary" />
                                     <input
                                         type="text"
                                         placeholder="Search tables to update..."
                                         value={bulkUpdateSearch}
                                         onChange={e => setBulkUpdateSearch(e.target.value)}
-                                        className="w-full pl-12 pr-4 py-2.5 border border-gray-300 rounded-lg focus:outline-none focus:ring-2 focus:ring-orange-500"
+                                        className="w-full pl-12 pr-4 py-1 border border-border-default rounded-lg focus:outline-none focus:ring-1 focus:ring-action-primary"
                                     />
                                 </div>
                             </div>
 
                             {/* Select All */}
-                            <div className="px-6 py-3 bg-gray-50 border-b">
-                                <label className="flex items-center gap-3 cursor-pointer hover:bg-gray-100 p-2 rounded-lg transition-colors">
+                            <div className="px-4 bg-bg-tertiary border-b-default">
+                                <label className="flex items-center gap-3 cursor-pointer hover:bg-bg-primary p-1 rounded-lg transition-colors">
                                     <input
                                         type="checkbox"
                                         checked={selectedUpdateTables.length === getFilteredUpdateTables().length && getFilteredUpdateTables().length > 0}
                                         onChange={selectAllUpdateTables}
-                                        className="w-5 h-5 text-orange-500 rounded focus:ring-2 focus:ring-orange-500"
+                                        className="w-3 h-3 text-action-primary rounded  focus:ring-action-primary"
                                     />
-                                    <span className="font-semibold text-gray-800">
-                                        Select All <span className="text-orange-600">({selectedUpdateTables.length} selected)</span>
+                                    <span className="font-semibold text-text-primary">
+                                        Select All <span className="text-action-primary">({selectedUpdateTables.length} selected)</span>
                                     </span>
                                 </label>
                             </div>
 
                             {/* Table List */}
-                            <div className="flex-1 overflow-y-auto px-6 py-4">
+                            <div className="flex-1 overflow-y-auto px-4 py-2">
                                 <div className="space-y-3">
                                     {getFilteredUpdateTables().length === 0 ? (
                                         <div className="text-center py-12">
-                                            <FaSearch className="text-gray-300 text-5xl mx-auto mb-3" />
-                                            <p className="text-gray-500 font-medium">No tables found</p>
+                                            <FaSearch className="text-text-secondary text-3xl mx-auto mb-3" />
+                                            <p className="text-text-secondary font-medium">No tables found</p>
                                         </div>
                                     ) : (
                                         getFilteredUpdateTables().map(table => (
-                                            <div key={table.id} className={`border-2 rounded-lg p-4 bg-white transition-all ${selectedUpdateTables.includes(table.id) ? 'border-orange-300 shadow-md' : 'border-gray-200 hover:shadow-md'
+                                            <div key={table.id} className={`border-2 rounded-lg p-2 bg-bg-primary transition-all ${selectedUpdateTables.includes(table.id) ? 'border-orange-300 shadow-md' : 'border-gray-200 hover:shadow-md'
                                                 }`}>
-                                                <div className="flex items-center gap-3 mb-3">
+                                                <div className="flex items-center gap-2">
                                                     <input
                                                         type="checkbox"
                                                         checked={selectedUpdateTables.includes(table.id)}
                                                         onChange={() => toggleUpdateTableSelection(table.id)}
-                                                        className="w-5 h-5 text-orange-500 rounded focus:ring-2 focus:ring-orange-500"
+                                                        className="w-3 h-3 text-action-primary rounded "
                                                     />
-                                                    <span className="font-bold text-lg text-gray-800">{table.name}</span>
+                                                    <span className="font-bold text-lg text-text-primary">{table.name}</span>
                                                     {selectedUpdateTables.includes(table.id) && (
-                                                        <span className="ml-auto text-xs bg-orange-100 text-orange-700 px-2 py-1 rounded-full font-semibold">Selected</span>
+                                                        <span className="ml-auto text-xs bg-bg-tertiary text-action-primary px-2 py-1 rounded-full font-semibold">Selected</span>
                                                     )}
                                                 </div>
 
                                                 {selectedUpdateTables.includes(table.id) ? (
-                                                    <div className="grid grid-cols-3 gap-3 ml-8">
+                                                    <div className="grid xl:grid-cols-3 xl:gap-3 sm:grid-cols-1 sm:gap-2">
                                                         <div>
-                                                            <label className="block text-xs font-semibold mb-1 text-gray-600">Seating</label>
+                                                            <label className="block text-xs font-semibold mb-1 text-text-secondary">Seating</label>
                                                             <input
                                                                 type="number"
                                                                 min="1"
@@ -927,15 +923,15 @@ const TableManagement = ({ clientId, token }) => {
                                                                     handleBulkUpdateChange(table.id, "table_type", value);
                                                                 }}
                                                                 placeholder={bulkUpdateGlobal.table_type ? `Global: ${bulkUpdateGlobal.table_type}` : ""}
-                                                                className="w-full px-3 py-1.5 border border-gray-300 rounded text-sm focus:outline-none focus:ring-2 focus:ring-orange-500"
+                                                                className="w-full px-4 py-1.5 border border-border-default rounded text-sm focus:outline-none focus:ring-1 focus:ring-action-primary"
                                                             />
                                                         </div>
                                                         <div>
-                                                            <label className="block text-xs font-semibold mb-1 text-gray-600">Status</label>
+                                                            <label className="block text-xs font-semibold mb-1 text-text-secondary">Status</label>
                                                             <select
                                                                 value={bulkUpdateData[table.id]?.status ?? table.status}
                                                                 onChange={e => handleBulkUpdateChange(table.id, 'status', e.target.value)}
-                                                                className="w-full px-3 py-1.5 border border-gray-300 rounded text-sm focus:outline-none focus:ring-2 focus:ring-orange-500"
+                                                                className="w-full px-4 py-1.5 border border-border-default rounded text-sm focus:outline-none focus:ring-1 focus:ring-action-primary"
                                                             >
                                                                 <option value="Vacant">Vacant</option>
                                                                 {/* <option value="Occupied">Occupied</option> */}
@@ -943,11 +939,11 @@ const TableManagement = ({ clientId, token }) => {
                                                             </select>
                                                         </div>
                                                         <div>
-                                                            <label className="block text-xs font-semibold mb-1 text-gray-600">Zone</label>
+                                                            <label className="block text-xs font-semibold mb-1 text-text-secondary">Zone</label>
                                                             <select
                                                                 value={bulkUpdateData[table.id]?.location_zone ?? table.location_zone}
                                                                 onChange={e => handleBulkUpdateChange(table.id, 'location_zone', e.target.value)}
-                                                                className="w-full px-3 py-1.5 border border-gray-300 rounded text-sm focus:outline-none focus:ring-2 focus:ring-orange-500"
+                                                                className="w-full px-4 py-1.5 border border-border-default rounded text-sm focus:outline-none focus:ring-1 focus:ring-action-primary"
                                                             >
                                                                 <option value="AC">AC</option>
                                                                 <option value="Non-AC">Non-AC</option>
@@ -955,7 +951,7 @@ const TableManagement = ({ clientId, token }) => {
                                                         </div>
                                                     </div>
                                                 ) : (
-                                                    <div className="ml-8 text-sm text-gray-600 bg-gray-50 p-2 rounded">
+                                                    <div className=" text-sm text-text-secondary bg-bg-tertiary p-2 rounded">
                                                         <strong>Seating:</strong> {table.table_type} | <strong>Status:</strong> {table.status} | <strong>Zone:</strong> {table.location_zone}
                                                     </div>
                                                 )}
@@ -966,16 +962,16 @@ const TableManagement = ({ clientId, token }) => {
                             </div>
 
                             {/* Footer */}
-                            <div className="px-6 py-4 bg-gray-50 border-t flex gap-3">
+                            <div className="px-4 py-2 bg-bg-tertiary border-t-default flex gap-5">
                                 <button
-                                    className="flex-1 bg-orange-500 text-white py-3 rounded-lg hover:bg-orange-600 transition-colors font-bold shadow-md disabled:bg-gray-300 disabled:cursor-not-allowed flex items-center justify-center gap-2"
+                                    className="flex-1 bg-modalsUpdateBg-save text-text-white py-3 rounded-lg hover:bg-action-primary transition-colors font-bold shadow-md disabled:bg-bg-tertiary disabled:cursor-not-allowed flex items-center justify-center p-2 gap-2"
                                     onClick={saveBulkUpdate}
                                     disabled={selectedUpdateTables.length === 0}
                                 >
                                     <FaCheck /> Update {selectedUpdateTables.length} Table(s)
                                 </button>
                                 <button
-                                    className="flex-1 bg-gray-200 text-gray-700 py-3 rounded-lg hover:bg-gray-300 transition-colors font-bold flex items-center justify-center gap-2"
+                                    className="flex-1 bg-modalsUpdateBg-cancel text-text-white py-3 rounded-lg hover:bg-bg-primary hover:text-text-primary transition-colors font-bold flex items-center justify-center gap-2"
                                     onClick={() => {
                                         setShowBulkUpdate(false);
                                         setSelectedUpdateTables([]);
@@ -993,58 +989,58 @@ const TableManagement = ({ clientId, token }) => {
 
                 {/* Bulk Delete Modal */}
                 {showBulkDelete && (
-                    <div className="fixed inset-0 bg-black bg-opacity-50 z-50 flex items-center justify-center p-4">
-                        <div className="bg-white rounded-xl w-full max-w-3xl shadow-2xl border border-gray-200 max-h-[90vh] overflow-hidden flex flex-col">
-                            <div className="px-6 py-4 border-b flex justify-between items-center bg-gradient-to-r from-red-50 to-pink-50">
-                                <h3 className="text-xl font-bold text-red-600 flex items-center gap-2">
-                                    <FaTrash /> Bulk Delete Tables
+                    <div className="fixed inset-0 bg-color-modalsbg z-50 flex items-center justify-center p-4">
+                        <div className="bg-bg-primary rounded-xl w-full max-w-xl shadow-card border-default border-border-default max-h-[90vh] overflow-hidden flex flex-col">
+                            <div className="px-4 py-2 border-b-default flex justify-between items-center bg-gradient-to-r from-red-50 to-pink-50">
+                                <h3 className="text-xl font-bold text-action-danger flex items-center gap-2">
+                                    Bulk Delete Tables
                                 </h3>
-                                <button className="text-gray-500 hover:text-gray-700 transition-colors p-1" onClick={() => setShowBulkDelete(false)}>
+                                <button className="text-text-primary hover:text-text-secondary transition-colors p-1" onClick={() => setShowBulkDelete(false)}>
                                     <FaTimes size={24} />
                                 </button>
                             </div>
 
                             {/* Search */}
-                            <div className="px-6 py-4 border-b bg-white">
+                            <div className="px-4 py-2 border-b-default bg-bg-primary">
                                 <div className="relative">
-                                    <FaSearch className="absolute left-4 top-1/2 transform -translate-y-1/2 text-gray-400" />
+                                    <FaSearch className="absolute left-4 top-1/2 transform -translate-y-1/2 text-text-secondary" />
                                     <input
                                         type="text"
                                         placeholder="Search tables to delete..."
                                         value={bulkDeleteSearch}
                                         onChange={e => setBulkDeleteSearch(e.target.value)}
-                                        className="w-full pl-12 pr-4 py-2.5 border border-gray-300 rounded-lg focus:outline-none focus:ring-2 focus:ring-red-500"
+                                        className="w-full pl-12 pr-4 py-2.5 border border-border-default rounded-lg focus:outline-none focus:ring-1 focus:ring-action-primary"
                                     />
                                 </div>
                             </div>
 
                             {/* Select All */}
-                            <div className="px-6 py-3 bg-gray-50 border-b">
-                                <label className="flex items-center gap-3 cursor-pointer hover:bg-gray-100 p-2 rounded-lg transition-colors">
+                            <div className="px-2 py-1 bg-bg-tertiary border-b-default">
+                                <label className="flex items-center gap-2 cursor-pointer hover:bg-bg-primary p-2 rounded-lg transition-colors">
                                     <input
                                         type="checkbox"
                                         checked={selectedDeleteTables.length === getFilteredDeleteTables().length && getFilteredDeleteTables().length > 0}
                                         onChange={selectAllDeleteTables}
-                                        className="w-5 h-5 text-red-500 rounded focus:ring-2 focus:ring-red-500"
+                                        className="w-3 h-3 text-action-danger rounded"
                                     />
-                                    <span className="font-semibold text-gray-800">
-                                        Select All <span className="text-red-600">({selectedDeleteTables.length} selected)</span>
+                                    <span className="font-semibold text-text-primary">
+                                        Select All <span className="text-action-danger">({selectedDeleteTables.length} selected)</span>
                                     </span>
                                 </label>
                             </div>
 
                             {/* Table List */}
-                            <div className="flex-1 overflow-y-auto px-6 py-4">
-                                <div className="space-y-3">
+                            <div className="flex-1 overflow-y-auto p-2">
+                                <div className="space-y-2">
                                     {getFilteredDeleteTables().map(table => (
-                                        <div key={table.id} className={`border-2 rounded-lg p-4 bg-white transition-all ${selectedDeleteTables.includes(table.id) ? 'border-red-300 shadow-md bg-red-50' : 'border-gray-200 hover:shadow-md'
+                                        <div key={table.id} className={`border-2 rounded-lg p-2 bg-bg-primary transition-all ${selectedDeleteTables.includes(table.id) ? 'border-action-danger shadow-card bg-red-50' : 'border-border-default hover:shadow-md'
                                             }`}>
-                                            <label className="flex items-start gap-3 cursor-pointer">
+                                            <label className="flex items-start gap-2 cursor-pointer">
                                                 <input
                                                     type="checkbox"
                                                     checked={selectedDeleteTables.includes(table.id)}
                                                     onChange={() => toggleDeleteTableSelection(table.id)}
-                                                    className="w-5 h-5 text-red-500 rounded focus:ring-2 focus:ring-red-500 mt-1"
+                                                    className="w-3 h-3 text-action-danger rounded focus:ring-1 focus:ring-action-danger"
                                                 />
                                                 <div className="flex-1">
                                                     <div className="flex items-center justify-between mb-1">

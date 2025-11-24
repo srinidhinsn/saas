@@ -257,7 +257,7 @@ const HeaderShared = ({ onLogout }) => {
     return (
       <button
         onClick={() => handleNavigate(id)}
-        className={`px-2 py-1 rounded transition-colors ${isActive ? 'text-action-primary font-semibold' : 'text-text-secondary dark:text-text-secondary-dark hover:text-action-primary'}`}
+        className={`px-2 py-1 rounded transition-colors ${isActive ? 'text-action-primary font-semibold' : 'text-text-primary dark:text-text-secondary-dark hover:text-action-primary'}`}
         aria-current={isActive ? 'page' : undefined}
       >
         {children}
@@ -268,7 +268,7 @@ const HeaderShared = ({ onLogout }) => {
   return (
     <header className="shadow-md sticky top-0 z-50 bg-bg-primary dark:bg-bg-primary-dark border-b border-border-default dark:border-border-default-dark transition-colors duration-300">
       <div className="container mx-auto px-4 md:px-2 py-3 lg:py-4 flex items-center justify-between">
-        <div className="hidden lg:flex items-center space-x-8 md:space-x-2">
+        <div className="hidden lg:flex items-center space-x-8 md:space-x-2 text-text-primary">
           <NavLink id="home">DashBoard</NavLink>
           <NavLink id="table">Manage-Table</NavLink>
           <NavLink id="menu">Manage-Menu</NavLink>
@@ -290,7 +290,7 @@ const HeaderShared = ({ onLogout }) => {
           )} */}
         </button>
 
-        <div className="hidden lg:flex items-center space-x-8">
+        <div className="hidden lg:flex items-center space-x-8 text-text-primary">
           <NavLink id="inventory">Inventory</NavLink>
           <NavLink id="role">Role</NavLink>
           <NavLink id="order">Order</NavLink>
@@ -300,7 +300,7 @@ const HeaderShared = ({ onLogout }) => {
 
           <button
             onClick={() => onLogout?.()}
-            className="px-2 py-1 rounded text-text-secondary dark:text-text-secondary-dark hover:text-action-primary transition-colors"
+            className="px-2 py-1 rounded text-text-primary dark:text-text-secondary-dark hover:text-action-primary transition-colors"
             aria-label="Logout"
           >
             Logout
@@ -367,7 +367,7 @@ const HeaderShared = ({ onLogout }) => {
             
             <button
               onClick={() => { onLogout?.(); setMobileOpen(false); }}
-              className="px-2 py-1 rounded text-text-secondary dark:text-text-secondary-dark text-left hover:text-action-primary"
+              className="px-2 py-1 rounded text-text-primary dark:text-text-secondary-dark text-left hover:text-action-primary"
             >
               Logout
             </button>

@@ -10,37 +10,26 @@ Modal.setAppElement("#root");
 const SimpleDeleteConfirm = ({ isOpen, onClose, onConfirm, title = 'Delete', message = 'Are you sure?' }) => {
   if (!isOpen) return null;
   return (
-    <div className="fixed inset-0 z-50 flex items-center justify-center p-4" style={{ backgroundColor: 'rgba(0,0,0,0.5)' }}>
-      <div className="rounded-lg w-full max-w-sm" style={{ backgroundColor: 'var(--color-bg-primary)', boxShadow: 'var(--shadow-card)', border: `1px solid var(--color-border-default)` }}>
-        <div className="px-6 py-4 border-b flex justify-between items-center" style={{ borderColor: 'var(--color-border-default)' }}>
-          <h2 className="text-lg font-bold" style={{ color: 'var(--color-action-danger)' }}>{title}</h2>
-          <button onClick={onClose} className="text-gray-500 hover:text-gray-700 transition-colors" style={{ color: 'var(--color-text-secondary)' }}>
+    <div className="fixed inset-0 z-50 flex items-center justify-center p-4 bg-color-modalsbg">
+      <div className="rounded-lg w-full max-w-sm bg-bg-primary border-border-default shadow-card">
+        <div className="px-6 py-4 border-b flex justify-between items-center border-border-default">
+          <h2 className="text-lg font-bold text-action-danger">{title}</h2>
+          <button onClick={onClose} className="text-text-secondary hover:text-gray-700 transition-colors ">
             <X size={20} />
           </button>
         </div>
         <div className="px-6 py-5">
-          <p className="text-sm" style={{ color: 'var(--color-text-primary)' }}>{message}</p>
+          <p className="text-sm text-text-primary">{message}</p>
         </div>
-        <div className="px-6 py-4 rounded-b-lg flex gap-3" style={{ backgroundColor: 'var(--color-bg-tertiary)', borderTop: `1px solid var(--color-border-default)` }}>
+        <div className="px-6 py-4 rounded-b-lg flex gap-3 bg-bg-tertiary border-t-border-default">
           <button
             onClick={onClose}
-            className="flex-1 py-2.5 rounded-lg font-medium text-sm transition-colors"
-            style={{
-              backgroundColor: 'var(--color-bg-primary)',
-              border: `1px solid var(--color-border-default)`,
-              color: 'var(--color-text-primary)'
-            }}
-          >
+            className="flex-1 py-2.5 rounded-lg font-medium text-sm transition-colors bg-bg-primary border-border-default border-default text-text-primary">
             Cancel
           </button>
           <button
             onClick={() => { onConfirm(); onClose(); }}
-            className="flex-1 py-2.5 rounded-lg font-medium text-sm transition-colors"
-            style={{
-              backgroundColor: 'var(--color-action-danger)',
-              color: 'var(--color-text-white)'
-            }}
-          >
+            className="flex-1 py-2.5 rounded-lg bg-action-danger text-text-white font-medium text-sm transition-colors">
             Delete
           </button>
         </div>
@@ -53,41 +42,36 @@ const SimpleDeleteConfirm = ({ isOpen, onClose, onConfirm, title = 'Delete', mes
 const LineItemsModal = ({ isOpen, onClose, mainItem, lineItems, onAddMainOnly, onAddWithAddons }) => {
   if (!isOpen) return null;
   return (
-    <div className="fixed inset-0 z-50 flex items-center justify-center p-4" style={{ backgroundColor: 'rgba(0,0,0,0.5)' }}>
-      <div className="rounded-lg w-full max-w-lg" style={{ backgroundColor: 'var(--color-bg-primary)', boxShadow: 'var(--shadow-card)', border: `1px solid var(--color-border-default)` }}>
-        <div className="px-6 py-4 border-b flex justify-between items-center" style={{ borderColor: 'var(--color-border-default)' }}>
-          <h3 className="text-lg font-semibold" style={{ color: 'var(--color-text-primary)' }}>{mainItem?.name}</h3>
-          <button onClick={onClose} className="text-gray-500 hover:text-gray-700 transition-colors" style={{ color: 'var(--color-text-secondary)' }}>
+    <div className="fixed inset-0 z-50 flex items-center justify-center p-4 bg-color-modalsbg">
+      <div className="rounded-lg w-full max-w-lg bg-bg-primary shadow-card border-border-default border-default">
+        <div className="px-6 py-4 border-b flex justify-between items-center border-border-default">
+          <h3 className="text-lg font-semibold text-text-primary">{mainItem?.name}</h3>
+          <button onClick={onClose} className="text-text-secondary hover:text-gray-700 transition-colors">
             <X size={20} />
           </button>
         </div>
 
         <div className="px-6 py-5">
-          <p className="text-sm mb-4" style={{ color: 'var(--color-text-secondary)' }}>This item comes with the following add-ons:</p>
+          <p className="text-sm mb-4 text-text-secondary">Add-ons for this item:</p>
           <div className="space-y-2">
             {lineItems.map((li, idx) => (
-              <div key={li.id} className="flex justify-between items-center px-4 py-3 rounded-lg" style={{ backgroundColor: 'var(--color-bg-tertiary)', border: `1px solid var(--color-border-default)` }}>
-                <span className="text-sm font-medium" style={{ color: 'var(--color-text-primary)' }}>{idx + 1}. {li.name}</span>
-                <span className="text-sm font-bold" style={{ color: 'var(--color-action-primary)' }}>₹{li.unit_price}</span>
+              <div key={li.id} className="flex justify-between items-center px-4 py-3 rounded-lg bg-bg-tertiary border-default border-border-default">
+                <span className="text-sm font-medium text-text-primary">{idx + 1}. {li.name}</span>
+                <span className="text-sm font-bold text-action-primary">₹{li.unit_price}</span>
               </div>
             ))}
           </div>
         </div>
 
-        <div className="px-6 py-4 rounded-b-lg flex gap-3" style={{ backgroundColor: 'var(--color-bg-primary)', borderTop: `1px solid var(--color-border-default)` }}>
-          <button onClick={onClose} className="px-4 py-2.5 rounded-lg font-medium text-sm transition-colors"
-            style={{ backgroundColor: 'var(--color-bg-tertiary)', color: 'var(--color-text-primary)', border: `1px solid var(--color-border-default)` }}
+        <div className="px-6 py-4 rounded-b-lg flex gap-3 bg-bg-primary border-t-border-default border-default">
+          <button onClick={onClose} className="bg-bg-tertiary text-text-primary border-default border-border-default px-4 py-2.5 rounded-lg font-medium text-sm transition-colors"
           >
             Cancel
           </button>
-          <button onClick={onAddMainOnly} className="flex-1 px-4 py-2.5 rounded-lg font-medium text-sm transition-colors"
-            style={{ backgroundColor: 'var(--color-action-primary)', color: 'var(--color-text-white)' }}
-          >
+          <button onClick={onAddMainOnly} className="flex-1 bg-action-primary text-text-white px-4 py-2.5 rounded-lg font-medium text-sm transition-colors">
             Main Only
           </button>
-          <button onClick={onAddWithAddons} className="flex-1 px-4 py-2.5 rounded-lg font-medium text-sm transition-colors"
-            style={{ backgroundColor: 'var(--color-action-success)', color: 'var(--color-text-white)' }}
-          >
+          <button onClick={onAddWithAddons} className="flex-1 bg-action-success text-text-white px-4 py-2.5 rounded-lg font-medium text-sm transition-colors">
             With Add-ons
           </button>
         </div>
@@ -874,7 +858,7 @@ const OrderSummaryVisible = ({ clientId, token }) => {
   }
 
   return (
-    <div className="min-h-screen" style={{ backgroundColor: 'var(--color-bg-secondary)' }}>
+    <div className="min-h-screen bg-bg-primary">
       <div className="container mx-auto px-4 py-2">
         {/* <div className="text-center mb-6 lg:mb-8">
           <h1 className="text-3xl md:text-4xl lg:text-5xl font-serif italic mb-3 lg:mb-4" style={{ color: 'var(--color-text-primary)' }}>Order Summary</h1>
@@ -884,7 +868,7 @@ const OrderSummaryVisible = ({ clientId, token }) => {
         <div className="rounded-lg p-2 mb-2 flex justify-end">
           <div className="">
             <div className="relative">
-              <Filter className="absolute left-3 top-1/2 transform -translate-y-1/2" size={20} style={{ color: 'var(--color-text-secondary)' }} />
+              <Filter className="absolute left-3 top-1/2 text-text-secondary transform -translate-y-1/2" size={20} />
               <select value={filterMode} onChange={(e) => setFilterMode(Number(e.target.value))} className="w-full pl-10 pr-4 py-2 rounded-lg" >
                 <option value={0}>Orders</option>
                 <option value={1}>New</option>
@@ -898,8 +882,8 @@ const OrderSummaryVisible = ({ clientId, token }) => {
 
         <div className="grid grid-cols-1 sm:grid-cols-2 lg:grid-cols-3 gap-6">
           {filteredOrders.length === 0 ? (
-            <div className="rounded-lg p-8 lg:p-12 text-center col-span-full" style={{ backgroundColor: 'var(--color-bg-primary)', border: `1px solid var(--color-border-default)`, boxShadow: 'var(--shadow-card)' }}>
-              <p style={{ color: 'var(--color-text-secondary)', fontSize: '1rem' }}>No orders found</p>
+            <div className="rounded-lg p-8 lg:p-12 text-center col-span-full bg-bg-primary border-default border-border-default shadow-card">
+              <p className="text-text-secondary text-base">No orders found</p>
             </div>
           ) : (
             filteredOrders.map(order => {
@@ -911,41 +895,41 @@ const OrderSummaryVisible = ({ clientId, token }) => {
                         'var(--color-border-default)';
 
               return (
-                <div key={order.id} className="rounded-lg overflow-hidden self-start" style={{ backgroundColor: order.status?.toLowerCase() === 'served' ? 'var(--color-bg-primary)' : 'var(--color-bg-primary)', border: `2px solid ${borderColor}`, boxShadow: 'var(--shadow-card)' }}>
-                  <div className="p-3 lg:p-6 border-b flex items-start justify-between" style={{ backgroundColor: 'var(--color-bg-tertiary)', borderColor: 'var(--color-border-default)' }}>
+                <div key={order.id} className="rounded-lg overflow-hidden self-start shadow-card" style={{ backgroundColor: order.status?.toLowerCase() === 'served' ? 'var(--color-bg-primary)' : 'var(--color-bg-primary)', border: `2px solid ${borderColor}` }}>
+                  <div className="p-3 lg:p-6 border-b flex items-start justify-between bg-bg-tertiary border-border-default">
                     <div>
                       <div className="flex items-center space-x-3 mb-2">
-                        <h3 className="text-sm font-bold" style={{ color: 'var(--color-text-primary)' }}>Table: {tablesMap[order.table_id] || order.table || order.table_id}</h3>
-                        <span className="px-2 py-1 rounded-full text-[12px] font-semibold" style={{ backgroundColor: 'var(--color-status-new)', color: 'var(--color-action-primary)' }}>{order.status}</span>
+                        <h3 className="text-sm font-bold text-text-primary">Table: {tablesMap[order.table_id] || order.table || order.table_id}</h3>
+                        <span className="px-2 py-1 rounded-full text-[12px] font-semibold bg-status-new text-action-primary">{order.status}</span>
                       </div>
-                      <div className="flex flex-wrap gap-x-3 gap-y-2 text-sm" style={{ color: 'var(--color-text-secondary)' }}>
-                        <span className="px-2 py-1 rounded" style={{ backgroundColor: 'var(--color-bg-tertiary)', border: `1px solid var(--color-border-default)` }}>Order Id: #{order.id}</span>
-                        <span className="px-2 py-1 rounded" style={{ backgroundColor: 'var(--color-bg-tertiary)', border: `1px solid var(--color-border-default)` }}>Time: {new Date(order.created_at).toLocaleTimeString()}</span>
+                      <div className="flex flex-wrap gap-x-3 gap-y-2 text-sm text-text-secondary">
+                        <span className="px-2 py-1 rounded bg-bg-tertiary border-default border-border-default">Order Id: #{order.id}</span>
+                        <span className="px-2 py-1 rounded bg-bg-tertiary border-default border-border-default">Time: {new Date(order.created_at).toLocaleTimeString()}</span>
                       </div>
                     </div>
 
                     <div className="flex items-center space-x-2">
-                      <button onClick={(e) => { e.stopPropagation(); toggleVisibleItems(order.id); }} title="View items" className="p-2 rounded" style={{ color: 'var(--color-text-secondary)' }}>
+                      <button onClick={(e) => { e.stopPropagation(); toggleVisibleItems(order.id); }} title="View items" className="p-2 rounded text-text-secondary">
                         <MdOutlineKeyboardDoubleArrowDown size={20} />
                       </button>
-                      <button onClick={() => { setSelectedOrder(order); setShowOrderDetailModal(true); }} className="px-4 py-2 rounded-lg" style={{ backgroundColor: 'var(--color-action-primary)', color: 'var(--color-text-white)' }}>Manage</button>
-                      <button onClick={() => { setOrderToDelete(order.id); setShowDeleteModal(true); }} className="p-2 rounded-lg" style={{ color: 'var(--color-action-danger)' }}><Trash2 size={18} /></button>
+                      <button onClick={() => { setSelectedOrder(order); setShowOrderDetailModal(true); }} className="px-4 py-2 rounded-lg bg-action-primary text-text-white">Manage</button>
+                      <button onClick={() => { setOrderToDelete(order.id); setShowDeleteModal(true); }} className="p-2 rounded-lg text-action-primary"><Trash2 size={18} /></button>
                     </div>
                   </div>
 
                   {visibleOrderId === order.id && (
                     <div className="p-4 lg:p-6 border-t">
-                      <div className="space-y-2 text-sm" style={{ color: 'var(--color-text-primary)' }}>
+                      <div className="space-y-2 text-sm text-text-primary">
                         {order.items.map((it, idx) => (
                           <div key={idx}>
                             {it._isBatchStart && (
                               <div className="flex items-center my-3">
-                                <div className="flex-1 h-px" style={{ backgroundColor: 'var(--color-action-primary)' }}></div>
-                                <span className="px-3 text-xs font-semibold" style={{ color: 'var(--color-action-primary)', backgroundColor: 'var(--color-primary-50)', borderRadius: '9999px' }}>New Items</span>
-                                <div className="flex-1 h-px" style={{ backgroundColor: 'var(--color-action-primary)' }}></div>
+                                <div className="flex-1 h-px bg-action-primary"></div>
+                                <span className="px-3 text-xs font-semibold text-action-primary bg-bg-primary rounded-badge">New Items</span>
+                                <div className="flex-1 h-px bg-action-primary"></div>
                               </div>
                             )}
-                            <div className="flex justify-between" style={{ color: 'var(--color-text-primary)' }}>
+                            <div className="flex justify-between text-text-primary">
                               <div>{it.item_name || it.name}</div>
                               <div className="text-right">x{it.quantity} &nbsp; ₹{(inventoryMap[it.item_id]?.unit_price || it.unit_price || it.price || 0).toFixed(2)}</div>
                             </div>
@@ -955,9 +939,9 @@ const OrderSummaryVisible = ({ clientId, token }) => {
                     </div>
                   )}
 
-                  <div className="p-4 lg:p-6 flex items-center justify-between" style={{ borderTop: `1px solid var(--color-border-default)` }}>
-                    <div className="text-sm" style={{ color: 'var(--color-text-secondary)' }}>Total items: {order.items.length}</div>
-                    <div className="text-lg font-bold" style={{ color: 'var(--color-action-primary)' }}>
+                  <div className="p-4 lg:p-6 flex items-center justify-between border-t-border-default border-default">
+                    <div className="text-sm text-text-secondary">Total items: {order.items.length}</div>
+                    <div className="text-lg font-bold text-action-primary">
                       Rs.{order.items.reduce((s, it) => s + ((inventoryMap[it.item_id]?.unit_price || it.unit_price || it.price || 0) * (it.quantity || 1)), 0).toFixed(2)}
                     </div>
                   </div>
@@ -970,108 +954,79 @@ const OrderSummaryVisible = ({ clientId, token }) => {
 
       {showOrderDetailModal && selectedOrder && (
         <div
-          className="fixed top-16 inset-0 z-40 flex items-center justify-center p-2 sm:p-4 overflow-y-auto"
-          onClick={() => setShowOrderDetailModal(false)}
-          style={{ backgroundColor: 'rgba(0,0,0,0.3)' }}
-        >
+          className="fixed top-16 inset-0 z-40 flex items-center justify-center  p-2 sm:p-4 overflow-y-auto bg-color-smallModal"
+          onClick={() => setShowOrderDetailModal(false)}>
           <div
-            className="rounded-xl w-full max-w-4xl my-4 flex flex-col"
-            onClick={(e) => e.stopPropagation()}
-            style={{
-              backgroundColor: 'var(--color-bg-primary)',
-              boxShadow: 'var(--shadow-card)',
-              border: `1px solid var(--color-border-default)`
-            }}
-          >
+            className={`rounded-xl w-full  my-4 flex flex-col  bg-bg-primary shadow-card border-default border-border-default ${editOrderId ? 'max-w-4xl':'max-w-xl'}`}
+            onClick={(e) => e.stopPropagation()}>
             <div
-              className="flex px-3 sm:px-4 py-2.5 sm:py-3 border-b items-center justify-between flex-shrink-0"
-              style={{
-                background: 'linear-gradient(90deg,var(--color-primary-50),var(--color-bg-primary))',
-                borderColor: 'var(--color-border-default)'
-              }}
+              className="flex px-3 sm:px-4 rounded-xl py-2.5 sm:py-3 border-b items-center justify-between flex-shrink-0 bg-gradient-to-r from-action-primary to-bg-primary border-default border-border-default"
             >
               <div className="flex-1 min-w-0 mr-2">
                 <h3
-                  className="text-base sm:text-lg font-bold truncate"
-                  style={{ color: 'var(--color-text-primary)' }}
-                >
+                  className="text-base sm:text-lg font-bold truncate text-text-primary">
                   {tablesMap[selectedOrder.table_id] || selectedOrder.table || selectedOrder.table_id}
                 </h3>
-                <div className="text-xs" style={{ color: 'var(--color-text-secondary)' }}>
+                <div className="text-xs text-text-secondary">
                   {selectedOrder.items.length} items • {new Date(selectedOrder.created_at).toLocaleDateString()}
                 </div>
               </div>
 
               <div className="flex items-center gap-2 flex-shrink-0">
                 <div className="text-right">
-                  <div className="text-xs" style={{ color: 'var(--color-text-secondary)' }}>Total</div>
-                  <div className="text-sm sm:text-base font-bold" style={{ color: 'var(--color-action-primary)' }}>
+                  <div className="text-xs text-text-secondary">Total</div>
+                  <div className="text-sm sm:text-base font-bold text-action-primary">
                     ₹{selectedOrder.items.reduce((sum, item) => sum + ((inventoryMap[item.item_id]?.unit_price || item.unit_price || item.price || 0) * (item.quantity || 1)), 0).toFixed(2)}
                   </div>
                 </div>
 
                 <button
-                  className="p-1.5 rounded-lg transition-all duration-200 flex-shrink-0"
+                  className="p-1.5 rounded-lg transition-all duration-200 flex-shrink-0 text-text-secondary bg-transparent hover:bg-bg-tertiary border-default border-transparent"
                   onClick={() => { setShowOrderDetailModal(false); setEditOrderId(null); }}
                   aria-label="Close order details"
-                  style={{
-                    color: 'var(--color-text-secondary)',
-                    backgroundColor: 'transparent',
-                    border: `1px solid transparent`
-                  }}
-                  onMouseEnter={e => e.currentTarget.style.backgroundColor = 'var(--color-bg-hover)'}
-                  onMouseLeave={e => e.currentTarget.style.backgroundColor = 'transparent'}
+                // onMouseEnter={e => e.currentTarget.style.backgroundColor = 'var(--color-bg-hover)'}
+                // onMouseLeave={e => e.currentTarget.style.backgroundColor = 'transparent'}
                 >
                   <X size={18} />
                 </button>
               </div>
             </div>
 
-            <div className="flex-1 overflow-y-auto" style={{ maxHeight: 'calc(100vh - 200px)' }}>
+            <div className="flex-1 max-h-[calc(100vh-200px)] overflow-y-auto">
               <div className="flex flex-col lg:flex-row h-full">
                 {editOrderId === selectedOrder.id && (
-                  <div className="w-full lg:w-1/2 border-b lg:border-b-0 lg:border-r" style={{ backgroundColor: 'var(--color-bg-tertiary)', borderColor: 'var(--color-border-default)' }}>
-                    <div className="p-3 sticky top-0 z-10" style={{ backgroundColor: 'var(--color-bg-tertiary)', borderBottom: `1px solid var(--color-border-default)` }}>
-                      <h4 className="font-bold text-sm mb-2" style={{ color: 'var(--color-text-primary)' }}>Available Items</h4>
+                  <div className="w-full lg:w-1/2 border-border-default bg-bg-tertiary border-b lg:border-b-0 lg:border-r">
+                    <div className="p-3 sticky top-0 z-10 bg-bg-tertiary border-b-border-default border-default">
+                      <h4 className="font-bold text-sm mb-2 text-text-primary">Available Items</h4>
                       <div className="relative">
-                        <Search size={14} style={{ position: 'absolute', left: 10, top: '50%', transform: 'translateY(-50%)', color: 'var(--color-text-secondary)' }} />
+                        <Search size={14} className="absolute left-2 top-[50%] text-text-secondary -translate-y-1/2" />
                         <input
                           type="text"
-                          className="w-full pl-8 pr-2 py-1.5 text-xs rounded-lg transition-all"
+                          className="w-full pl-8 pr-2 py-1.5 text-xs rounded-lg transition-all border-default border-border-default bg-bg-primary text-text-primary"
                           placeholder="Search items..."
                           value={itemSearchQuery}
-                          onChange={(e) => setItemSearchQuery(e.target.value)}
-                          style={{
-                            border: `1px solid var(--color-border-default)`,
-                            backgroundColor: 'var(--color-bg-primary)',
-                            color: 'var(--color-text-primary)'
-                          }}
-                        />
+                          onChange={(e) => setItemSearchQuery(e.target.value)} />
                       </div>
                     </div>
 
-                    <div className="p-3 space-y-1.5 overflow-y-auto" style={{ maxHeight: 'calc(100vh - 320px)' }}>
+                    <div className="p-3 space-y-1.5 max-h-[calc(100vh-320px)] overflow-y-auto">
                       {(itemSearchResults.length > 0 ? itemSearchResults : allInventoryItems).map(item => (
                         <div
                           key={item.id}
-                          className="flex items-center gap-2 p-2 rounded-lg cursor-pointer transition-all active:scale-95"
+                          className="flex items-center gap-2 p-2 bg-bg-primary border-default hover:shadow-border-hovering border-border-default rounded-lg cursor-pointer transition-all active:scale-95"
                           onClick={() => handleItemSelection(selectedOrder.id, item)}
-                          style={{
-                            backgroundColor: 'var(--color-bg-primary)',
-                            border: `1px solid var(--color-border-default)`
-                          }}
-                          onMouseEnter={e => { e.currentTarget.style.borderColor = 'var(--color-action-primary)'; e.currentTarget.style.boxShadow = '0 4px 10px rgba(0,0,0,0.03)'; }}
-                          onMouseLeave={e => { e.currentTarget.style.borderColor = 'var(--color-border-default)'; e.currentTarget.style.boxShadow = 'none'; }}
+                        // onMouseEnter={e => { e.currentTarget.style.borderColor = 'var(--color-action-primary)'; e.currentTarget.style.boxShadow = '0 4px 10px rgba(0,0,0,0.03)'; }}
+                        // onMouseLeave={e => { e.currentTarget.style.borderColor = 'var(--color-border-default)'; e.currentTarget.style.boxShadow = 'none'; }}
                         >
                           {item.image && (
                             <img src={item.image} alt={item.name} className="w-9 h-9 object-cover rounded-lg flex-shrink-0" />
                           )}
                           <div className="flex-1 min-w-0">
-                            <div className="font-medium text-xs truncate" style={{ color: 'var(--color-text-primary)' }}>{item.name}</div>
-                            <div className="text-xs font-bold" style={{ color: 'var(--color-action-primary)' }}>₹{item.unit_price}</div>
+                            <div className="font-medium text-xs truncate text-text-primary">{item.name}</div>
+                            <div className="text-xs font-bold text-action-primary">₹{item.unit_price}</div>
                           </div>
                           {item.line_item_id && item.line_item_id.length > 0 && (
-                            <span className="text-xs px-1.5 py-0.5 rounded-full font-medium flex-shrink-0" style={{ backgroundColor: 'var(--color-action-primary)', color: 'var(--color-text-white)' }}>
+                            <span className="text-xs px-1.5 py-0.5 rounded-full font-medium flex-shrink-0 bg-action-primary text-text-white">
                               +{item.line_item_id.length}
                             </span>
                           )}
@@ -1079,18 +1034,18 @@ const OrderSummaryVisible = ({ clientId, token }) => {
                       ))}
 
                       {itemSearchQuery && itemSearchResults.length === 0 && (
-                        <div className="text-center py-6 text-xs" style={{ color: 'var(--color-text-secondary)' }}>No items found</div>
+                        <div className="text-center py-6 text-xs text-text-secondary">No items found</div>
                       )}
                     </div>
                   </div>
                 )}
 
                 <div className={editOrderId === selectedOrder.id ? 'w-full lg:w-1/2' : 'w-full'}>
-                  <div className="p-3 sticky top-0 z-10" style={{ backgroundColor: 'var(--color-bg-primary)', borderBottom: `1px solid var(--color-border-default)` }}>
-                    <h4 className="font-bold text-sm" style={{ color: 'var(--color-text-primary)' }}>Order Items</h4>
+                  <div className="p-3 sticky top-0 z-10 bg-bg-primary border-b-border-default">
+                    <h4 className="font-bold text-sm text-text-primary">Order Items</h4>
                   </div>
 
-                  <div className="p-3 space-y-1.5 overflow-y-auto" style={{ maxHeight: 'calc(100vh - 320px)' }}>
+                  <div className="p-3 space-y-1.5 overflow-y-auto max-h-[calc(100vh - 320px)]">
                     {selectedOrder.items.map((item, idx) => {
                       const prev = selectedOrder.items[idx - 1];
                       const showDivider = item._isBatchStart || (item.is_new_item && (!prev || (prev.batch_timestamp || null) !== (item.batch_timestamp || null)));
@@ -1099,26 +1054,30 @@ const OrderSummaryVisible = ({ clientId, token }) => {
                         <div key={item.id || idx}>
                           {showDivider && (
                             <div className="flex items-center my-2">
-                              <div className="flex-1 h-px" style={{ backgroundColor: 'var(--color-action-primary)' }}></div>
+                              <div className="flex-1 h-px bg-action-primary"></div>
                               <span
-                                className="px-2 py-0.5 text-xs font-bold rounded-full mx-2"
-                                style={{ color: 'var(--color-action-primary)', backgroundColor: 'var(--color-primary-50)', border: `1px solid var(--color-border-default)` }}
+                                className="px-2 py-0.5 text-action-primary bg-bg-primary border-default border-border-default text-xs font-bold rounded-full mx-2"
                               >
                                 New Items
                               </span>
-                              <div className="flex-1 h-px" style={{ backgroundColor: 'var(--color-action-primary)' }}></div>
+                              <div className="flex-1 h-px bg-action-primary"></div>
                             </div>
                           )}
 
-                          <div className="flex items-start gap-2 p-2 rounded-lg" style={{ backgroundColor: 'var(--color-bg-primary)', border: `1px solid var(--color-border-default)` }}>
+                          <div className="flex items-start gap-2 p-2 rounded-lg bg-bg-primary border-default border-border-default">
                             <div className="flex-1 min-w-0">
-                              <div className="font-semibold text-xs" style={{ color: 'var(--color-text-primary)' }}>{item.item_name || item.item_id}</div>
+                              <div className="font-semibold text-xs text-text-primary">{item.item_name || item.item_id}</div>
                               <span
-                                className="inline-block px-1.5 py-0.5 rounded-full text-xs font-medium mt-1"
-                                style={{
-                                  backgroundColor: item.status === 'pending' ? 'var(--color-status-pending)' : item.status === 'completed' ? 'var(--color-status-served)' : 'var(--color-bg-tertiary)',
-                                  color: item.status === 'pending' ? 'var(--color-action-warning)' : item.status === 'completed' ? 'var(--color-action-success)' : 'var(--color-text-secondary)'
-                                }}
+                                className={`  ${item.status === 'pending'
+                                  ? 'bg-status-pending text-yellow-700'
+                                  : item.status === 'completed'
+                                    ? 'bg-status-served text-action-success'
+                                    : 'bg-bg-tertiary text-text-secondary'
+                                  } inline-block px-1.5 py-0.5 rounded-full text-xs font-medium mt-1`}
+                                // style={{
+                                //   backgroundColor: item.status === 'pending' ? 'var(--color-status-pending)' : item.status === 'completed' ? 'var(--color-status-served)' : 'var(--color-bg-tertiary)',
+                                //   color: item.status === 'pending' ? 'var(--color-action-warning)' : item.status === 'completed' ? 'var(--color-action-success)' : 'var(--color-text-secondary)'
+                                // }}
                               >
                                 {item.status}
                               </span>
@@ -1127,41 +1086,37 @@ const OrderSummaryVisible = ({ clientId, token }) => {
                             <div className="flex flex-col items-end gap-1 flex-shrink-0">
                               {editOrderId === selectedOrder.id ? (
                                 <>
-                                  <div className="flex items-center rounded-lg overflow-hidden" style={{ border: `1px solid var(--color-border-default)`, backgroundColor: 'var(--color-bg-primary)' }}>
+                                  <div className="flex items-center rounded-lg overflow-hidden border-default border-border-default bg-bg-primary">
                                     <button
-                                      className="px-2 py-1 text-xs font-bold transition-colors"
+                                      className="px-2 py-1 text-xs font-bold transition-colors text-text-primary"
                                       onClick={() => updateItemQuantity(selectedOrder.id, item.id || item.frontend_unique_key, Math.max(1, (item.quantity || 1) - 1))}
-                                      style={{ color: 'var(--color-text-primary)' }}
                                     >
                                       −
                                     </button>
-                                    <div className="px-2 py-1 font-bold text-xs text-center" style={{ borderLeft: `1px solid var(--color-border-default)`, borderRight: `1px solid var(--color-border-default)`, color: 'var(--color-text-primary)', minWidth: 28 }}>
+                                    <div className="px-2 py-1 font-bold text-xs text-center border-l-border-default border-default border-r-border-default min-w-[28px]">
                                       {item.quantity}
                                     </div>
                                     <button
-                                      className="px-2 py-1 text-xs font-bold transition-colors"
-                                      onClick={() => updateItemQuantity(selectedOrder.id, item.id || item.frontend_unique_key, (item.quantity || 1) + 1)}
-                                      style={{ color: 'var(--color-text-primary)' }}
-                                    >
+                                      className="px-2 py-1 text-xs font-bold transition-colors text-text-primary"
+                                      onClick={() => updateItemQuantity(selectedOrder.id, item.id || item.frontend_unique_key, (item.quantity || 1) + 1)}>
                                       +
                                     </button>
                                   </div>
 
                                   <button
-                                    className="p-1.5 rounded-lg transition-colors"
+                                    className="p-1.5 rounded-lg transition-colors bg-bg-primary hover:bg-bg-secondary hover:text-text-white text-action-danger"
                                     onClick={() => { setDeleteTarget({ orderId: selectedOrder.id, itemBackendId: item.id }); setShowDeleteModals(true); }}
                                     title="Delete item"
-                                    style={{ backgroundColor: 'var(--color-bg-primary)', color: 'var(--color-action-danger)' }}
-                                    onMouseEnter={e => e.currentTarget.style.backgroundColor = 'var(--color-bg-hover)'}
-                                    onMouseLeave={e => e.currentTarget.style.backgroundColor = 'var(--color-bg-primary)'}
+                                    // onMouseEnter={e => e.currentTarget.style.backgroundColor = 'var(--color-bg-hover)'}
+                                    // onMouseLeave={e => e.currentTarget.style.backgroundColor = 'var(--color-bg-primary)'}
                                   >
                                     <Trash2 size={12} />
                                   </button>
                                 </>
                               ) : (
                                 <>
-                                  <span className="text-xs font-medium" style={{ color: 'var(--color-text-secondary)' }}>×{item.quantity}</span>
-                                  <span className="text-xs font-bold" style={{ color: 'var(--color-text-primary)' }}>
+                                  <span className="text-xs font-medium text-text-secondary">×{item.quantity}</span>
+                                  <span className="text-xs font-bold text-text-primary">
                                     ₹{((inventoryMap[item.item_id]?.unit_price || item.unit_price || item.price || 0) * item.quantity).toFixed(2)}
                                   </span>
                                 </>
@@ -1176,20 +1131,17 @@ const OrderSummaryVisible = ({ clientId, token }) => {
               </div>
             </div>
 
-            <div className="p-3" style={{ borderTop: `1px solid var(--color-border-default)`, backgroundColor: 'var(--color-bg-primary)' }}>
+            <div className="p-3 rounded-xl border-t-border-default border-default bg-bg-primary">
               {editOrderId === selectedOrder.id ? (
                 <div className="flex flex-col sm:flex-row gap-2">
                   <button
-                    className="flex-1 rounded-lg font-semibold text-xs sm:text-sm transition-colors"
-                    onClick={() => updateOrderItems(selectedOrder.id, selectedOrder.items)}
-                    style={{ backgroundColor: 'var(--color-action-secondary)', color: 'var(--color-text-white)', padding: '0.6rem' }}
-                  >
+                    className="flex-1 bg-bg-secondary text-text-white p-2 rounded-lg font-semibold text-xs sm:text-sm transition-colors"
+                    onClick={() => updateOrderItems(selectedOrder.id, selectedOrder.items)}>
                     Save Changes
                   </button>
                   <button
-                    className="flex-1 rounded-lg font-semibold text-xs sm:text-sm transition-colors"
+                    className="flex-1 rounded-lg bg-bg-tertiary text-text-primary p-2 border-default border-border-default font-semibold text-xs sm:text-sm transition-colors"
                     onClick={() => { setEditOrderId(null); setCurrentBatchTimestamp(null); setItemSearchQuery(''); }}
-                    style={{ backgroundColor: 'var(--color-bg-tertiary)', color: 'var(--color-text-primary)', padding: '0.6rem', border: `1px solid var(--color-border-default)` }}
                   >
                     Cancel
                   </button>
@@ -1197,28 +1149,22 @@ const OrderSummaryVisible = ({ clientId, token }) => {
               ) : (
                 <div className="space-y-2">
                   <button
-                    className="w-full rounded-lg font-semibold text-xs sm:text-sm transition-colors flex items-center justify-center gap-2"
-                    onClick={() => { setEditOrderId(selectedOrder.id); }}
-                    style={{ backgroundColor: 'var(--color-action-primary)', color: 'var(--color-text-white)', padding: '0.6rem' }}
-                  >
+                    className="w-full rounded-lg bg-action-primary text-text-white p-2 font-semibold text-xs sm:text-sm transition-colors flex items-center justify-center gap-2"
+                    onClick={() => { setEditOrderId(selectedOrder.id); }}>
                     <Edit2 size={14} />
                     Edit Order
                   </button>
 
                   <div className="flex gap-2">
                     <button
-                      className="flex-1 rounded-lg font-semibold text-xs sm:text-sm transition-colors"
-                      onClick={() => { handleStatusChange(selectedOrder.id, 'served'); setShowOrderDetailModal(false); setEditOrderId(null); }}
-                      style={{ backgroundColor: 'var(--color-action-success)', color: 'var(--color-text-white)', padding: '0.6rem' }}
-                    >
+                      className="flex-1 rounded-lg bg-action-success text-text-white p-2 font-semibold text-xs sm:text-sm transition-colors"
+                      onClick={() => { handleStatusChange(selectedOrder.id, 'served'); setShowOrderDetailModal(false); setEditOrderId(null); }}>
                       Mark as Served
                     </button>
 
                     <button
-                      className="flex-1 rounded-lg font-semibold text-xs sm:text-sm transition-colors"
-                      onClick={() => { setOrderToDelete(selectedOrder.id); setShowDeleteModal(true); setShowOrderDetailModal(false); }}
-                      style={{ backgroundColor: 'var(--color-action-danger)', color: 'var(--color-text-white)', padding: '0.6rem' }}
-                    >
+                      className="flex-1 bg-action-danger text-text-white p-2 rounded-lg font-semibold text-xs sm:text-sm transition-colors"
+                      onClick={() => { setOrderToDelete(selectedOrder.id); setShowDeleteModal(true); setShowOrderDetailModal(false); }}>
                       Delete Order
                     </button>
                   </div>
@@ -1244,7 +1190,7 @@ const OrderSummaryVisible = ({ clientId, token }) => {
         onClose={() => setShowDeleteModal(false)}
         onConfirm={confirmDeleteOrder}
         title="Delete Order"
-        message="Are you sure you want to delete this order? This action cannot be undone."
+        message="Want to Delete this Order ?"
       />
 
       <SimpleDeleteConfirm
