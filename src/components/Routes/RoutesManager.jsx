@@ -5,6 +5,7 @@ import OrderSummary from '../MainComponents/OrderServices/OrderSummary';
 import Kds from '../MainComponents/OrderServices/Kds';
 import TableManagement from '../MainComponents/TableServices/TableManagement'
 import DashBoardPage from '../Constants/Dashboard';
+import Documents from '../MainComponents/DocumentServices/Document'
 
 const RoutesManager = ({ token }) => {
   const { clientId } = useParams();
@@ -23,6 +24,7 @@ const RoutesManager = ({ token }) => {
       <Route path="inventory" element={<div className="p-8">Inventory Page (placeholder)</div>} />
       <Route path="role" element={<div className="p-8">Role Page (placeholder)</div>} />
       <Route path="kds" element={<Kds/>}/>
+      <Route path="documents" element={<Documents token={token} clientId={clientId} />}/>
       <Route path="details" element={<div className="p-8">Details Page (placeholder)</div>} />
 
       {/* catch-all for unknown client subpaths -> redirect to home */}
