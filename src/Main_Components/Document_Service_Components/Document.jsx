@@ -1,6 +1,6 @@
 import React, { useEffect, useState } from "react";
 import { useParams } from "react-router-dom";
-import documentServicesPort from "../../Backend_Port_Files/DocumentServices";
+import axios from "axios";
 import { useTheme } from "../../ThemeChangerComponent/ThemeProvider";
 
 const DocumentManager = () => {
@@ -25,8 +25,7 @@ const DocumentManager = () => {
 
     const fetchDocuments = async () => {
         try {
-            const res = await documentServicesPort.get(
-                `/${clientId}/document/read`,
+            const res = await axios.get(`${import.meta.env.VITE_API_DOCUMENT_SERVICE_URL}/${clientId}/document/read`,
                 { headers }
             );
             setDocuments(res.data.data);
@@ -47,8 +46,7 @@ const DocumentManager = () => {
         formData.append("created_by", userId);
 
         try {
-            await documentServicesPort.post(
-                `/${clientId}/document/upload`,
+            await axios.post(`${import.meta.env.VITE_API_DOCUMENT_SERVICE_URL}/${clientId}/document/upload`,
                 formData,
                 {
                     headers: {
@@ -78,8 +76,7 @@ const DocumentManager = () => {
         formData.append("updated_by", userId);
 
         try {
-            await documentServicesPort.post(
-                `/${clientId}/document/replace?doc_id=${selectedDocId}`,
+            await axios.post(`${import.meta.env.VITE_API_DOCUMENT_SERVICE_URL}/${clientId}/document/replace?doc_id=${selectedDocId}`,
                 formData,
                 {
                     headers: {
@@ -100,8 +97,7 @@ const DocumentManager = () => {
 
     const handleDownload = async (docId) => {
         try {
-            const res = await documentServicesPort.get(
-                `/${clientId}/document/download?doc_id=${docId}`,
+            const res = await axios.get(`${import.meta.env.VITE_API_DOCUMENT_SERVICE_URL}/${clientId}/document/download?doc_id=${docId}`,
                 {
                     headers,
                     responseType: "blob",
