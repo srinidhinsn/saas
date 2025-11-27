@@ -6,9 +6,13 @@ import Kds from '../MainComponents/OrderServices/Kds';
 import TableManagement from '../MainComponents/TableServices/TableManagement'
 import DashBoardPage from '../Constants/DashBoards/DashBoard';
 import Documents from '../MainComponents/DocumentServices/Document'
+import InventoryManager from '../MainComponents/InventoryServices/InventoryManagement';
+import { jwtDecode } from "jwt-decode";
 
 const RoutesManager = ({ token }) => {
   const { clientId } = useParams();
+  const decoded = jwtDecode(token);
+  const realm=decoded.realm;
   return (
     <Routes>
       <Route path="/" element={<DashBoardPage />} />
@@ -21,7 +25,7 @@ const RoutesManager = ({ token }) => {
       <Route path="menu" element={<div className="p-8">Menu Page (placeholder)</div>} />
       <Route path="billing" element={<div className="p-8">Billing Page (placeholder)</div>} />
       <Route path="users" element={<div className="p-8">Users Page (placeholder)</div>} />
-      <Route path="inventory" element={<div className="p-8">Inventory Page (placeholder)</div>} />
+      <Route path="inventory" element={< InventoryManager token={token} clientId={clientId} realm={realm} />}></Route>
       <Route path="role" element={<div className="p-8">Role Page (placeholder)</div>} />
       <Route path="kds" element={<Kds/>}/>
       <Route path="documents" element={<Documents token={token} clientId={clientId} />}/>

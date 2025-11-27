@@ -17,6 +17,7 @@ export default {
           primary: "#111827",   // strong text
           secondary: "#6b7280", // muted text
           white: "#ffffff",
+          black:"rgba(0,0,0,0.5)",
         },
         border: {
           default: "#d1d5db",
