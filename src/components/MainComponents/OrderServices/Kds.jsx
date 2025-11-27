@@ -701,7 +701,7 @@ const KitchenDisplay = () => {
         
             <>
             <div className="min-h-screen w-full bg-gray-50 text-gray-900">
-            <div className="container mx-auto px-4 py-6 lg:py-8">
+            <div className="mx-auto px-4 py-6 lg:py-8">
                 <div className="text-center mb-6 lg:mb-8">
                     <h1 className="text-3xl md:text-4xl lg:text-5xl font-serif italic mb-3 lg:mb-4" style={{ color: 'var(--color-text-primary)' }}>Kitchen Display System</h1>
                 </div>

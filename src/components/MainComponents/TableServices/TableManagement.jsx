@@ -474,7 +474,7 @@ const TableManagement = ({ clientId, token }) => {
           }
         `}
             </style>
-            <main className="container mx-auto px-3 py-2">
+            <main className="mx-auto px-3 py-2">
                 {/* Controls */}
                 <div className="rounded-xl p-2 mb-4">
                     <div className="flex flex-col lg:flex-row gap-3 lg:items-center lg:justify-between">

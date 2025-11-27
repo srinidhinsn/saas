@@ -8,6 +8,8 @@ import DashBoardPage from '../Constants/DashBoards/DashBoard';
 import Documents from '../MainComponents/DocumentServices/Document'
 import InventoryManager from '../MainComponents/InventoryServices/InventoryManagement';
 import { jwtDecode } from "jwt-decode";
+import MenuManagement from '../MainComponents/InventoryServices/MenuManagement';
+
 
 const RoutesManager = ({ token }) => {
   const { clientId } = useParams();
@@ -18,11 +20,11 @@ const RoutesManager = ({ token }) => {
       <Route path="/" element={<DashBoardPage />} />
       <Route path="home" element={<DashBoardPage />}/>
       <Route path="managing-tables" element={<TableManagement token={token} clientId={clientId} />} />
-      <Route path="order" element={<TakeOrder token={token} clientId={clientId} />} />
+      <Route path="order" element={<TakeOrder token={token} clientId={clientId} realm={realm} />} />
       <Route path="summary" element={<OrderSummary token={token} clientId={clientId} />} />
 
       {/* Placeholder routes — replace with your components */}
-      <Route path="menu" element={<div className="p-8">Menu Page (placeholder)</div>} />
+      <Route path="menu" element={<MenuManagement token={token} clientId={clientId} realm={realm}/>} />
       <Route path="billing" element={<div className="p-8">Billing Page (placeholder)</div>} />
       <Route path="users" element={<div className="p-8">Users Page (placeholder)</div>} />
       <Route path="inventory" element={< InventoryManager token={token} clientId={clientId} realm={realm} />}></Route>

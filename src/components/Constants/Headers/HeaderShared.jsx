@@ -268,7 +268,7 @@ const HeaderShared = ({ onLogout }) => {
 
   return (
     <header className="shadow-md sticky top-0 z-50 bg-bg-primary dark:bg-bg-primary-dark border-b border-border-default dark:border-border-default-dark transition-colors duration-300">
-      <div className="container mx-auto px-4 md:px-2 py-3 lg:py-4 flex items-center justify-between">
+      <div className="mx-auto px-4 md:px-2 py-3 lg:py-4 flex items-center justify-between">
         <div className="hidden lg:flex items-center space-x-8 md:space-x-2 text-text-primary">
           <NavLink id="home">DashBoard</NavLink>
           <NavLink id="table">Manage-Table</NavLink>

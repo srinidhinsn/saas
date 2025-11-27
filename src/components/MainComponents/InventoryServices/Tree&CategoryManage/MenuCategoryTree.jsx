@@ -1,0 +1,1166 @@
+import { useState, useEffect, useCallback } from "react";
+import { createPortal } from "react-dom";
+import MenuTreeNode from "./MenuTreeNode";
+import { Plus, X } from 'lucide-react';
+import axios from 'axios';
+import { v4 as uuidv4 } from 'uuid';
+import { jwtDecode } from 'jwt-decode';
+
+const MenuCategoryTree = ({ 
+  categories = [], 
+  selectedCategory, 
+  onSelectCategory, 
+  defaultOpenCategoryName = 'Dietery',
+  clientId,
+  token,
+  onCategoriesUpdate
+}) => {
+  const [expandedCategories, setExpandedCategories] = useState(['All Categories']);
+  const [parentMap, setParentMap] = useState({});
+  
+  // Modal states
+  const [showAddModal, setShowAddModal] = useState(false);
+  const [showEditModal, setShowEditModal] = useState(false);
+  const [showDeleteModal, setShowDeleteModal] = useState(false);
+  
+  // Form states
+  const [newCategoryName, setNewCategoryName] = useState("");
+  const [newCategoryDescription, setNewCategoryDescription] = useState("");
+  const [editingCategory, setEditingCategory] = useState(null);
+  const [editName, setEditName] = useState("");
+  const [editDescription, setEditDescription] = useState("");
+  const [editNewSubcategoryName, setEditNewSubcategoryName] = useState("");
+  const [deleteTarget, setDeleteTarget] = useState(null);
+
+  // Stabilize handlers with useCallback
+  const handleNewCategoryNameChange = useCallback((e) => {
+    setNewCategoryName(e.target.value);
+  }, []);
+
+  const handleNewCategoryDescriptionChange = useCallback((e) => {
+    setNewCategoryDescription(e.target.value);
+  }, []);
+
+  const handleEditNameChange = useCallback((e) => {
+    setEditName(e.target.value);
+  }, []);
+
+  const handleEditDescriptionChange = useCallback((e) => {
+    setEditDescription(e.target.value);
+  }, []);
+
+  const handleEditNewSubcategoryNameChange = useCallback((e) => {
+    setEditNewSubcategoryName(e.target.value);
+  }, []);
+
+  const closeAddModal = useCallback(() => {
+    setShowAddModal(false);
+    setNewCategoryName("");
+    setNewCategoryDescription("");
+  }, []);
+
+  const closeEditModal = useCallback(() => {
+    setShowEditModal(false);
+    setEditingCategory(null);
+  }, []);
+
+  const closeDeleteModal = useCallback(() => {
+    setShowDeleteModal(false);
+    setDeleteTarget(null);
+  }, []);
+
+  const findCategoryByName = (items, targetName) => {
+    if (!Array.isArray(items) || !targetName) return null;
+
+    const stack = items.map(item => ({ node: item, path: [item.name] }));
+    while (stack.length) {
+      const { node, path } = stack.pop();
+      if (node && node.name && node.name.toLowerCase() === targetName.toLowerCase()) {
+        return path;
+      }
+      if (node.children && node.children.length > 0) {
+        node.children.forEach(child => stack.push({ node: child, path: [...path, child.name] }));
+      }
+    }
+    return null;
+  };
+
+  useEffect(() => {
+    if (!categories || categories.length === 0) {
+      setExpandedCategories(['All Categories']);
+      return;
+    }
+
+    const path = findCategoryByName(categories, defaultOpenCategoryName);
+
+    if (path && path.length > 0) {
+      setExpandedCategories(path);
+    } else {
+      setExpandedCategories(['All Categories']);
+    }
+
+    buildParentMapFromCategories(categories);
+  }, [categories, defaultOpenCategoryName]);
+
+  const buildParentMapFromCategories = (cats) => {
+    const tempMap = {};
+    const traverse = (items, parentId = null) => {
+      items.forEach(cat => {
+        if (parentId && cat.id !== 'all') tempMap[cat.id] = parentId;
+        if (cat.children && cat.children.length > 0) {
+          traverse(cat.children, cat.id);
+        }
+      });
+    };
+    traverse(cats);
+    setParentMap(tempMap);
+  };
+
+  const toggleCategory = (categoryName) => {
+    setExpandedCategories(prev =>
+      prev.includes(categoryName)
+        ? prev.filter(c => c !== categoryName)
+        : [...prev, categoryName]
+    );
+  };
+
+  const generateSlugFromParents = (categoryId, currentName, overrideParentMap = null) => {
+    const path = [];
+    const categoryMap = {};
+    
+    const buildMap = (cats) => {
+      for (const cat of cats) {
+        categoryMap[cat.id] = cat;
+        if (cat.children) buildMap(cat.children);
+      }
+    };
+    buildMap(categories);
+
+    const mapToUse = { ...parentMap, ...(overrideParentMap || {}) };
+    let currentId = categoryId;
+    const ancestors = [];
+
+    while (mapToUse[currentId]) {
+      const parentId = mapToUse[currentId];
+      ancestors.unshift(parentId);
+      currentId = parentId;
+    }
+
+    ancestors.forEach(id => {
+      const cat = categoryMap[id];
+      if (cat && cat.id !== 'all') path.push(cat.name.trim().replace(/\s+/g, " "));
+    });
+
+    if (currentName) {
+      path.push(currentName.trim().replace(/\s+/g, " "));
+    } else {
+      const cat = categoryMap[categoryId];
+      if (cat) path.push(cat.name.trim().replace(/\s+/g, " "));
+    }
+
+    return "_" + path.join(" _");
+  };
+
+  const handleAddCategory = async () => {
+    if (!newCategoryName.trim()) {
+      alert("Category name is required");
+      return;
+    }
+
+    const newId = uuidv4();
+    let createdBy = "null";
+    let updatedBy = "null";
+
+    try {
+      const decoded = jwtDecode(token);
+      createdBy = String(decoded.user_id);
+      updatedBy = String(decoded.user_id);
+    } catch (err) {
+      console.error("Token decode failed:", err);
+    }
+
+    const tempParentMap = { [newId]: "dietery" };
+    const slug = generateSlugFromParents(newId, newCategoryName.trim(), tempParentMap);
+
+    const newCategoryPayload = {
+      id: newId,
+      client_id: clientId,
+      name: newCategoryName.trim(),
+      description: newCategoryDescription.trim(),
+      sub_categories: [],
+      created_by: createdBy,
+      updated_by: updatedBy,
+      slug,
+    };
+
+    try {
+      await axios.post(
+        `${import.meta.env.VITE_API_INVENTORY_SERVICE_URL}/${clientId}/menu/create_category`,
+        newCategoryPayload,
+        { headers: { Authorization: `Bearer ${token}` } }
+      );
+
+      const parentRes = await axios.get(
+        `${import.meta.env.VITE_API_INVENTORY_SERVICE_URL}/${clientId}/menu/read_category?category_id=dietery`,
+        { headers: { Authorization: `Bearer ${token}` } }
+      );
+
+      const dietaryCategory = parentRes.data.data[0];
+      const existingSubs = dietaryCategory?.sub_categories || dietaryCategory?.subCategories?.map(sub => sub.id) || [];
+
+      const updatePayload = {
+        id: "dietery",
+        client_id: clientId,
+        name: dietaryCategory.name,
+        description: dietaryCategory.description || "",
+        sub_categories: [...existingSubs, newId],
+        slug: "_Dietery",
+        overwrite_subcategories: true,
+      };
+
+      await axios.post(
+        `${import.meta.env.VITE_API_INVENTORY_SERVICE_URL}/${clientId}/menu/update_category?client_id=${clientId}`,
+        updatePayload,
+        {
+          headers: {
+            Authorization: `Bearer ${token}`,
+            "Content-Type": "application/json",
+          },
+        }
+      );
+
+      closeAddModal();
+      alert("✅ New category added successfully!");
+      
+      if (onCategoriesUpdate) onCategoriesUpdate();
+    } catch (err) {
+      console.error("❌ Error adding category:", err.response?.data || err);
+      alert("Failed to add category");
+    }
+  };
+
+  const handleEditCategory = async () => {
+    if (!editingCategory) return;
+
+    let finalSubcategories = editingCategory.children?.map(c => c.id) || [];
+    let createdBy = "null";
+    let updatedBy = "null";
+
+    try {
+      const decoded = jwtDecode(token);
+      createdBy = String(decoded.user_id);
+      updatedBy = String(decoded.user_id);
+    } catch (err) {
+      console.error("Token decode failed:", err);
+    }
+
+    if (editNewSubcategoryName.trim()) {
+      const newSubId = uuidv4();
+      const tempParentMap = { [newSubId]: editingCategory.id };
+
+      const newSubPayload = {
+        id: newSubId,
+        client_id: clientId,
+        name: editNewSubcategoryName.trim(),
+        description: "",
+        sub_categories: [],
+        created_by: createdBy,
+        updated_by: updatedBy,
+        slug: generateSlugFromParents(newSubId, editNewSubcategoryName.trim(), tempParentMap),
+      };
+
+      try {
+        await axios.post(
+          `${import.meta.env.VITE_API_INVENTORY_SERVICE_URL}/${clientId}/menu/create_category`,
+          newSubPayload,
+          { headers: { Authorization: `Bearer ${token}` } }
+        );
+        finalSubcategories.push(newSubId);
+      } catch (err) {
+        console.error("Error creating subcategory:", err.response?.data || err);
+        alert("Failed to create subcategory");
+        return;
+      }
+    }
+
+    const slug = generateSlugFromParents(editingCategory.id, editName.trim());
+
+    const payload = {
+      id: editingCategory.id,
+      client_id: clientId,
+      name: editName.trim(),
+      description: editDescription.trim(),
+      sub_categories: finalSubcategories,
+      slug,
+      overwrite_subcategories: true,
+    };
+
+    try {
+      await axios.post(
+        `${import.meta.env.VITE_API_INVENTORY_SERVICE_URL}/${clientId}/menu/update_category?client_id=${clientId}`,
+        payload,
+        {
+          headers: {
+            Authorization: `Bearer ${token}`,
+            "Content-Type": "application/json",
+          },
+        }
+      );
+
+      setEditNewSubcategoryName("");
+      closeEditModal();
+      alert("✅ Category updated successfully!");
+      
+      if (onCategoriesUpdate) onCategoriesUpdate();
+    } catch (err) {
+      console.error("Error editing category:", err.response?.data || err);
+      alert("Failed to update category");
+    }
+  };
+
+  const handleDeleteCategory = async () => {
+    if (!deleteTarget) return;
+
+    try {
+      await axios.post(
+        `${import.meta.env.VITE_API_INVENTORY_SERVICE_URL}/${clientId}/menu/delete_category`,
+        { id: deleteTarget.id },
+        {
+          headers: {
+            Authorization: `Bearer ${token}`,
+            "Content-Type": "application/json",
+          },
+        }
+      );
+
+      closeDeleteModal();
+      alert("✅ Category deleted successfully!");
+      
+      if (onCategoriesUpdate) onCategoriesUpdate();
+    } catch (err) {
+      console.error("Delete error:", err.response?.data || err);
+      alert(err.response?.data?.detail || "Failed to delete category");
+    }
+  };
+
+  const handleEdit = (category) => {
+    if (category.id === 'all') {
+      alert("Cannot edit 'All Categories'");
+      return;
+    }
+    setEditingCategory(category);
+    setEditName(category.name);
+    setEditDescription(category.description || "");
+    setEditNewSubcategoryName("");
+    setShowEditModal(true);
+  };
+
+  const handleDelete = (category) => {
+    if (category.id === 'all') {
+      alert("Cannot delete 'All Categories'");
+      return;
+    }
+    setDeleteTarget(category);
+    setShowDeleteModal(true);
+  };
+
+  const renderTree = (items, level = 0) => {
+    return items.map((category) => {
+      const isExpanded = expandedCategories.includes(category.name);
+      const isSelected = selectedCategory === category.name;
+      const hasChildren = category.children && category.children.length > 0;
+
+      return (
+        <div key={category.id || category.name} className="px-1">
+          <MenuTreeNode
+            category={category}
+            isExpanded={isExpanded}
+            onToggle={() => toggleCategory(category.name)}
+            isSelected={isSelected}
+            onSelect={() => onSelectCategory(category.name)}
+            hasChildren={hasChildren}
+            level={level}
+            onEdit={handleEdit}
+            onDelete={handleDelete}
+          />
+          {hasChildren && isExpanded && (
+            <div className="mt-1 ml-3">
+              {renderTree(category.children, level + 1)}
+            </div>
+          )}
+        </div>
+      );
+    });
+  };
+
+  return (
+    <>
+      <div className="rounded-lg p-4 bg-bg-primary shadow-md border border-border-default">
+        <div className="flex items-center justify-between mb-3 px-3">
+          <h3 className="text-lg font-semibold text-text-primary">
+            Categories
+          </h3>
+          <button
+            onClick={() => setShowAddModal(true)}
+            className="p-1.5 rounded-lg bg-action-primary text-text-white hover:opacity-90 transition-opacity"
+            title="Add new category"
+          >
+            <Plus size={18} />
+          </button>
+        </div>
+        <div className="space-y-1">
+          {categories && categories.length > 0 ? (
+            renderTree(categories)
+          ) : (
+            <div className="px-3 py-4 text-text-secondary">
+              No categories
+            </div>
+          )}
+        </div>
+      </div>
+  
+      {/* Add Modal */}
+      {showAddModal && createPortal(
+        <div className="fixed inset-0 z-[9999] flex items-center justify-center p-4 bg-black bg-opacity-50">
+          <div className="rounded-lg max-w-md w-full p-6 bg-bg-primary shadow-xl">
+            <div className="flex justify-between items-center mb-4">
+              <h3 className="text-xl font-semibold text-text-primary">Add New Category</h3>
+              <button onClick={closeAddModal} className="text-text-secondary hover:text-text-primary">
+                <X size={24} />
+              </button>
+            </div>
+  
+            <div className="space-y-4">
+              <div>
+                <label className="block text-sm font-medium mb-2 text-text-primary">
+                  Category Name *
+                </label>
+                <input
+                  type="text"
+                  value={newCategoryName}
+                  onChange={handleNewCategoryNameChange}
+                  placeholder="Enter category name"
+                  className="w-full px-4 py-2 rounded-lg bg-bg-tertiary border border-border-default text-text-primary focus:outline-none focus:ring-2 focus:ring-action-primary"
+                  autoFocus
+                />
+              </div>
+  
+              <div>
+                <label className="block text-sm font-medium mb-2 text-text-primary">
+                  Description (optional)
+                </label>
+                <textarea
+                  value={newCategoryDescription}
+                  onChange={handleNewCategoryDescriptionChange}
+                  placeholder="Enter description"
+                  className="w-full px-4 py-2 rounded-lg bg-bg-tertiary border border-border-default text-text-primary focus:outline-none focus:ring-2 focus:ring-action-primary"
+                  rows="3"
+                />
+              </div>
+  
+              <div className="flex gap-3 pt-4">
+                <button
+                  onClick={closeAddModal}
+                  className="flex-1 px-4 py-2 rounded-lg bg-bg-tertiary text-text-primary border border-border-default hover:bg-bg-secondary transition-colors"
+                >
+                  Cancel
+                </button>
+                <button
+                  onClick={handleAddCategory}
+                  className="flex-1 px-4 py-2 rounded-lg bg-action-primary text-white hover:opacity-90 transition-opacity"
+                >
+                  Add Category
+                </button>
+              </div>
+            </div>
+          </div>
+        </div>,
+        document.body
+      )}
+  
+      {/* Edit Modal */}
+      {showEditModal && editingCategory && createPortal(
+        <div className="fixed inset-0 z-[9999] flex items-center justify-center p-4 bg-black bg-opacity-50">
+          <div className="rounded-lg max-w-md w-full p-6 bg-bg-primary shadow-xl">
+            <div className="flex justify-between items-center mb-4">
+              <h3 className="text-xl font-semibold text-text-primary">Edit Category</h3>
+              <button onClick={closeEditModal} className="text-text-secondary hover:text-text-primary">
+                <X size={24} />
+              </button>
+            </div>
+  
+            <div className="space-y-4">
+              <div>
+                <label className="block text-sm font-medium mb-2 text-text-primary">
+                  Category Name *
+                </label>
+                <input
+                  type="text"
+                  value={editName}
+                  onChange={handleEditNameChange}
+                  placeholder="Enter category name"
+                  className="w-full px-4 py-2 rounded-lg bg-bg-tertiary border border-border-default text-text-primary focus:outline-none focus:ring-2 focus:ring-action-primary"
+                />
+              </div>
+  
+              <div>
+                <label className="block text-sm font-medium mb-2 text-text-primary">
+                  Description
+                </label>
+                <textarea
+                  value={editDescription}
+                  onChange={handleEditDescriptionChange}
+                  placeholder="Enter description"
+                  className="w-full px-4 py-2 rounded-lg bg-bg-tertiary border border-border-default text-text-primary focus:outline-none focus:ring-2 focus:ring-action-primary"
+                  rows="3"
+                />
+              </div>
+  
+              <div>
+                <label className="block text-sm font-medium mb-2 text-text-primary">
+                  Add New Subcategory (optional)
+                </label>
+                <input
+                  type="text"
+                  value={editNewSubcategoryName}
+                  onChange={handleEditNewSubcategoryNameChange}
+                  placeholder="New subcategory name"
+                  className="w-full px-4 py-2 rounded-lg bg-bg-tertiary border border-border-default text-text-primary focus:outline-none focus:ring-2 focus:ring-action-primary"
+                />
+              </div>
+  
+              <div className="flex gap-3 pt-4">
+                <button
+                  onClick={closeEditModal}
+                  className="flex-1 px-4 py-2 rounded-lg bg-bg-tertiary text-text-primary border border-border-default hover:bg-bg-secondary transition-colors"
+                >
+                  Cancel
+                </button>
+                <button
+                  onClick={handleEditCategory}
+                  className="flex-1 px-4 py-2 rounded-lg bg-action-primary text-white hover:opacity-90 transition-opacity"
+                >
+                  Save Changes
+                </button>
+              </div>
+            </div>
+          </div>
+        </div>,
+        document.body
+      )}
+  
+      {/* Delete Modal */}
+      {showDeleteModal && deleteTarget && createPortal(
+        <div className="fixed inset-0 z-[9999] flex items-center justify-center p-4 bg-black bg-opacity-50">
+          <div className="rounded-lg max-w-md w-full p-6 bg-bg-primary shadow-xl">
+            <h3 className="text-xl font-semibold mb-4 text-text-primary">Confirm Delete</h3>
+            <p className="mb-6 text-text-secondary">
+              Are you sure you want to delete <strong className="text-text-primary">{deleteTarget?.name}</strong>? 
+              This action cannot be undone.
+            </p>
+  
+            <div className="flex gap-3">
+              <button
+                onClick={closeDeleteModal}
+                className="flex-1 px-4 py-2 rounded-lg bg-bg-tertiary text-text-primary border border-border-default hover:bg-bg-secondary transition-colors"
+              >
+                Cancel
+              </button>
+              <button
+                onClick={handleDeleteCategory}
+                className="flex-1 px-4 py-2 rounded-lg bg-action-danger text-white hover:opacity-90 transition-opacity"
+              >
+                Delete
+              </button>
+            </div>
+          </div>
+        </div>,
+        document.body
+      )}
+    </>
+  );
+};
+
+export default MenuCategoryTree;
+
+
+//  ------------         =========================    ----------------------------- ====================================== //
+//  ------------         =========================    ----------------------------- ====================================== //
+//  ------------         =========================    ----------------------------- ====================================== //
+//  ------------         =========================    ----------------------------- ====================================== //
+//  ------------         =========================    ----------------------------- ====================================== //
+
+
+// import { useState, useEffect } from "react";
+// import MenuTreeNode from "./MenuTreeNode";
+// import { Plus, X } from 'lucide-react';
+// import axios from 'axios';
+// import { v4 as uuidv4 } from 'uuid';
+// import { jwtDecode } from 'jwt-decode';
+
+// const MenuCategoryTree = ({ 
+//   categories = [], 
+//   selectedCategory, 
+//   onSelectCategory, 
+//   defaultOpenCategoryName = 'Dietery',
+//   clientId,
+//   token,
+//   onCategoriesUpdate
+// }) => {
+//   const [expandedCategories, setExpandedCategories] = useState(['All Categories']);
+//   const [parentMap, setParentMap] = useState({});
+  
+//   // Modal states
+//   const [showAddModal, setShowAddModal] = useState(false);
+//   const [showEditModal, setShowEditModal] = useState(false);
+//   const [showDeleteModal, setShowDeleteModal] = useState(false);
+  
+//   // Form states
+//   const [newCategoryName, setNewCategoryName] = useState("");
+//   const [newCategoryDescription, setNewCategoryDescription] = useState("");
+//   const [editingCategory, setEditingCategory] = useState(null);
+//   const [editName, setEditName] = useState("");
+//   const [editDescription, setEditDescription] = useState("");
+//   const [editNewSubcategoryName, setEditNewSubcategoryName] = useState("");
+//   const [deleteTarget, setDeleteTarget] = useState(null);
+
+//   const findCategoryByName = (items, targetName) => {
+//     if (!Array.isArray(items) || !targetName) return null;
+
+//     const stack = items.map(item => ({ node: item, path: [item.name] }));
+//     while (stack.length) {
+//       const { node, path } = stack.pop();
+//       if (node && node.name && node.name.toLowerCase() === targetName.toLowerCase()) {
+//         return path;
+//       }
+//       if (node.children && node.children.length > 0) {
+//         node.children.forEach(child => stack.push({ node: child, path: [...path, child.name] }));
+//       }
+//     }
+//     return null;
+//   };
+
+//   useEffect(() => {
+//     if (!categories || categories.length === 0) {
+//       setExpandedCategories(['All Categories']);
+//       return;
+//     }
+
+//     const path = findCategoryByName(categories, defaultOpenCategoryName);
+
+//     if (path && path.length > 0) {
+//       setExpandedCategories(path);
+//     } else {
+//       setExpandedCategories(['All Categories']);
+//     }
+
+//     // Build parent map
+//     buildParentMapFromCategories(categories);
+//   }, [categories, defaultOpenCategoryName]);
+
+//   const buildParentMapFromCategories = (cats) => {
+//     const tempMap = {};
+//     const traverse = (items, parentId = null) => {
+//       items.forEach(cat => {
+//         if (parentId && cat.id !== 'all') tempMap[cat.id] = parentId;
+//         if (cat.children && cat.children.length > 0) {
+//           traverse(cat.children, cat.id);
+//         }
+//       });
+//     };
+//     traverse(cats);
+//     setParentMap(tempMap);
+//   };
+
+//   const toggleCategory = (categoryName) => {
+//     setExpandedCategories(prev =>
+//       prev.includes(categoryName)
+//         ? prev.filter(c => c !== categoryName)
+//         : [...prev, categoryName]
+//     );
+//   };
+
+//   const generateSlugFromParents = (categoryId, currentName, overrideParentMap = null) => {
+//     const path = [];
+//     const categoryMap = {};
+    
+//     const buildMap = (cats) => {
+//       for (const cat of cats) {
+//         categoryMap[cat.id] = cat;
+//         if (cat.children) buildMap(cat.children);
+//       }
+//     };
+//     buildMap(categories);
+
+//     const mapToUse = { ...parentMap, ...(overrideParentMap || {}) };
+//     let currentId = categoryId;
+//     const ancestors = [];
+
+//     while (mapToUse[currentId]) {
+//       const parentId = mapToUse[currentId];
+//       ancestors.unshift(parentId);
+//       currentId = parentId;
+//     }
+
+//     ancestors.forEach(id => {
+//       const cat = categoryMap[id];
+//       if (cat && cat.id !== 'all') path.push(cat.name.trim().replace(/\s+/g, " "));
+//     });
+
+//     if (currentName) {
+//       path.push(currentName.trim().replace(/\s+/g, " "));
+//     } else {
+//       const cat = categoryMap[categoryId];
+//       if (cat) path.push(cat.name.trim().replace(/\s+/g, " "));
+//     }
+
+//     return "_" + path.join(" _");
+//   };
+
+//   const handleAddCategory = async () => {
+//     if (!newCategoryName.trim()) {
+//       alert("Category name is required");
+//       return;
+//     }
+
+//     const newId = uuidv4();
+//     let createdBy = "null";
+//     let updatedBy = "null";
+
+//     try {
+//       const decoded = jwtDecode(token);
+//       createdBy = String(decoded.user_id);
+//       updatedBy = String(decoded.user_id);
+//     } catch (err) {
+//       console.error("Token decode failed:", err);
+//     }
+
+//     const tempParentMap = { [newId]: "dietery" };
+//     const slug = generateSlugFromParents(newId, newCategoryName.trim(), tempParentMap);
+
+//     const newCategoryPayload = {
+//       id: newId,
+//       client_id: clientId,
+//       name: newCategoryName.trim(),
+//       description: newCategoryDescription.trim(),
+//       sub_categories: [],
+//       created_by: createdBy,
+//       updated_by: updatedBy,
+//       slug,
+//     };
+
+//     try {
+//       await axios.post(
+//         `${import.meta.env.VITE_API_INVENTORY_SERVICE_URL}/${clientId}/menu/create_category`,
+//         newCategoryPayload,
+//         { headers: { Authorization:  `Bearer ${token}` } }
+//       );
+
+//       const parentRes = await axios.get(
+//         `${import.meta.env.VITE_API_INVENTORY_SERVICE_URL}/${clientId}/menu/read_category?category_id=dietery`,
+//         { headers: { Authorization:  `Bearer ${token}` } }
+//       );
+
+//       const dietaryCategory = parentRes.data.data[0];
+//       const existingSubs = dietaryCategory?.sub_categories || dietaryCategory?.subCategories?.map(sub => sub.id) || [];
+
+//       const updatePayload = {
+//         id: "dietery",
+//         client_id: clientId,
+//         name: dietaryCategory.name,
+//         description: dietaryCategory.description || "",
+//         sub_categories: [...existingSubs, newId],
+//         slug: "_Dietery",
+//         overwrite_subcategories: true,
+//       };
+
+//       await axios.post(
+//         `${import.meta.env.VITE_API_INVENTORY_SERVICE_URL}/${clientId}/menu/update_category?client_id=${clientId}`,
+//         updatePayload,
+//         {
+//           headers: {
+//             Authorization:  `Bearer ${token}`,
+//             "Content-Type": "application/json",
+//           },
+//         }
+//       );
+
+//       setNewCategoryName("");
+//       setNewCategoryDescription("");
+//       setShowAddModal(false);
+//       alert("✅ New category added successfully!");
+      
+//       if (onCategoriesUpdate) onCategoriesUpdate();
+//     } catch (err) {
+//       console.error("❌ Error adding category:", err.response?.data || err);
+//       alert("Failed to add category");
+//     }
+//   };
+
+//   const handleEditCategory = async () => {
+//     if (!editingCategory) return;
+
+//     let finalSubcategories = editingCategory.children?.map(c => c.id) || [];
+//     let createdBy = "null";
+//     let updatedBy = "null";
+
+//     try {
+//       const decoded = jwtDecode(token);
+//       createdBy = String(decoded.user_id);
+//       updatedBy = String(decoded.user_id);
+//     } catch (err) {
+//       console.error("Token decode failed:", err);
+//     }
+
+//     if (editNewSubcategoryName.trim()) {
+//       const newSubId = uuidv4();
+//       const tempParentMap = { [newSubId]: editingCategory.id };
+
+//       const newSubPayload = {
+//         id: newSubId,
+//         client_id: clientId,
+//         name: editNewSubcategoryName.trim(),
+//         description: "",
+//         sub_categories: [],
+//         created_by: createdBy,
+//         updated_by: updatedBy,
+//         slug: generateSlugFromParents(newSubId, editNewSubcategoryName.trim(), tempParentMap),
+//       };
+
+//       try {
+//         const subRes = await axios.post(
+//          ` ${import.meta.env.VITE_API_INVENTORY_SERVICE_URL}/${clientId}/menu/create_category`,
+//           newSubPayload,
+//           { headers: { Authorization:  `Bearer ${token}` } }
+//         );
+//         finalSubcategories.push(newSubId);
+//       } catch (err) {
+//         console.error("Error creating subcategory:", err.response?.data || err);
+//         alert("Failed to create subcategory");
+//         return;
+//       }
+//     }
+
+//     const slug = generateSlugFromParents(editingCategory.id, editName.trim());
+
+//     const payload = {
+//       id: editingCategory.id,
+//       client_id: clientId,
+//       name: editName.trim(),
+//       description: editDescription.trim(),
+//       sub_categories: finalSubcategories,
+//       slug,
+//       overwrite_subcategories: true,
+//     };
+
+//     try {
+//       await axios.post(
+//         `${import.meta.env.VITE_API_INVENTORY_SERVICE_URL}/${clientId}/menu/update_category?client_id=${clientId}`,
+//         payload,
+//         {
+//           headers: {
+//             Authorization:  `Bearer ${token}`,
+//             "Content-Type": "application/json",
+//           },
+//         }
+//       );
+
+//       setEditingCategory(null);
+//       setEditNewSubcategoryName("");
+//       setShowEditModal(false);
+//       alert("✅ Category updated successfully!");
+      
+//       if (onCategoriesUpdate) onCategoriesUpdate();
+//     } catch (err) {
+//       console.error("Error editing category:", err.response?.data || err);
+//       alert("Failed to update category");
+//     }
+//   };
+
+//   const handleDeleteCategory = async () => {
+//     if (!deleteTarget) return;
+
+//     try {
+//       await axios.post(
+//       `  ${import.meta.env.VITE_API_INVENTORY_SERVICE_URL}/${clientId}/menu/delete_category`,
+//         { id: deleteTarget.id },
+//         {
+//           headers: {
+//             Authorization:  `Bearer ${token}`,
+//             "Content-Type": "application/json",
+//           },
+//         }
+//       );
+
+//       setDeleteTarget(null);
+//       setShowDeleteModal(false);
+//       alert("✅ Category deleted successfully!");
+      
+//       if (onCategoriesUpdate) onCategoriesUpdate();
+//     } catch (err) {
+//       console.error("Delete error:", err.response?.data || err);
+//       alert(err.response?.data?.detail || "Failed to delete category");
+//     }
+//   };
+
+//   const handleEdit = (category) => {
+//     if (category.id === 'all') {
+//       alert("Cannot edit 'All Categories'");
+//       return;
+//     }
+//     setEditingCategory(category);
+//     setEditName(category.name);
+//     setEditDescription(category.description || "");
+//     setEditNewSubcategoryName("");
+//     setShowEditModal(true);
+//   };
+
+//   const handleDelete = (category) => {
+//     if (category.id === 'all') {
+//       alert("Cannot delete 'All Categories'");
+//       return;
+//     }
+//     setDeleteTarget(category);
+//     setShowDeleteModal(true);
+//   };
+
+//   const renderTree = (items, level = 0) => {
+//     return items.map((category) => {
+//       const isExpanded = expandedCategories.includes(category.name);
+//       const isSelected = selectedCategory === category.name;
+//       const hasChildren = category.children && category.children.length > 0;
+
+//       return (
+//         <div key={category.id || category.name} className="px-1">
+//           <MenuTreeNode
+//             category={category}
+//             isExpanded={isExpanded}
+//             onToggle={() => toggleCategory(category.name)}
+//             isSelected={isSelected}
+//             onSelect={() => onSelectCategory(category.name)}
+//             hasChildren={hasChildren}
+//             level={level}
+//             onEdit={handleEdit}
+//             onDelete={handleDelete}
+//           />
+//           {hasChildren && isExpanded && (
+//             <div className="mt-1 ml-3">
+//               {renderTree(category.children, level + 1)}
+//             </div>
+//           )}
+//         </div>
+//       );
+//     });
+//   };
+
+//   return (
+//     <>
+//       <div className="rounded-lg p-4 bg-bg-primary shadow-md border border-border-default">
+//         <div className="flex items-center justify-between mb-3 px-3">
+//           <h3 className="text-lg font-semibold text-text-primary">
+//             Categories
+//           </h3>
+//           <button
+//             onClick={() => setShowAddModal(true)}
+//             className="p-1.5 rounded-lg bg-action-primary text-white hover:opacity-90 transition-opacity"
+//             title="Add new category"
+//           >
+//             <Plus size={18} />
+//           </button>
+//         </div>
+//         <div className="space-y-1">
+//           {categories && categories.length > 0 ? (
+//             renderTree(categories)
+//           ) : (
+//             <div className="px-3 py-4 text-text-secondary">
+//               No categories
+//             </div>
+//           )}
+//         </div>
+//       </div>
+  
+//       {/* Add Modal */}
+//       {showAddModal && (
+//         <div className="fixed inset-0 z-[99999] flex items-center justify-center p-4 bg-black bg-opacity-50">
+//           <div className="rounded-lg max-w-md w-full p-6 bg-bg-primary shadow-xl">
+//             <div className="flex justify-between items-center mb-4">
+//               <h3 className="text-xl font-semibold text-text-primary">Add New Category</h3>
+//               <button
+//                 onClick={() => {
+//                   setShowAddModal(false);
+//                   setNewCategoryName("");
+//                   setNewCategoryDescription("");
+//                 }}
+//                 className="text-text-secondary hover:text-text-primary"
+//               >
+//                 <X size={24} />
+//               </button>
+//             </div>
+  
+//             <div className="space-y-4">
+//               <div>
+//                 <label className="block text-sm font-medium mb-2 text-text-primary">
+//                   Category Name *
+//                 </label>
+//                 <input
+//                   type="text"
+//                   value={newCategoryName}
+//                   onChange={(e) => setNewCategoryName(e.target.value)}
+//                   placeholder="Enter category name"
+//                   className="w-full px-4 py-2 rounded-lg bg-bg-tertiary border border-border-default text-text-primary focus:outline-none focus:ring-2 focus:ring-action-primary"
+//                   required
+//                 />
+//               </div>
+  
+//               <div>
+//                 <label className="block text-sm font-medium mb-2 text-text-primary">
+//                   Description (optional)
+//                 </label>
+//                 <textarea
+//                   value={newCategoryDescription}
+//                   onChange={(e) => setNewCategoryDescription(e.target.value)}
+//                   placeholder="Enter description"
+//                   className="w-full px-4 py-2 rounded-lg bg-bg-tertiary border border-border-default text-text-primary focus:outline-none focus:ring-2 focus:ring-action-primary"
+//                   rows="3"
+//                 />
+//               </div>
+  
+//               <div className="flex gap-3 pt-4">
+//                 <button
+//                   onClick={() => {
+//                     setShowAddModal(false);
+//                     setNewCategoryName("");
+//                     setNewCategoryDescription("");
+//                   }}
+//                   className="flex-1 px-4 py-2 rounded-lg bg-bg-tertiary text-text-primary border border-border-default hover:bg-bg-secondary transition-colors"
+//                 >
+//                   Cancel
+//                 </button>
+//                 <button
+//                   onClick={handleAddCategory}
+//                   className="flex-1 px-4 py-2 rounded-lg bg-action-primary text-white hover:opacity-90 transition-opacity"
+//                 >
+//                   Add Category
+//                 </button>
+//               </div>
+//             </div>
+//           </div>
+//         </div>
+//       )}
+  
+//       {/* Edit Modal */}
+//       {showEditModal && editingCategory && (
+//         <div className="fixed inset-0 z-[99999] flex items-center justify-center p-4 bg-black bg-opacity-50">
+//           <div className="rounded-lg max-w-md w-full p-6 bg-bg-primary shadow-xl">
+//             <div className="flex justify-between items-center mb-4">
+//               <h3 className="text-xl font-semibold text-text-primary">Edit Category</h3>
+//               <button
+//                 onClick={() => {
+//                   setShowEditModal(false);
+//                   setEditingCategory(null);
+//                 }}
+//                 className="text-text-secondary hover:text-text-primary"
+//               >
+//                 <X size={24} />
+//               </button>
+//             </div>
+  
+//             <div className="space-y-4">
+//               <div>
+//                 <label className="block text-sm font-medium mb-2 text-text-primary">
+//                   Category Name *
+//                 </label>
+//                 <input
+//                   type="text"
+//                   value={editName}
+//                   onChange={(e) => setEditName(e.target.value)}
+//                   placeholder="Enter category name"
+//                   className="w-full px-4 py-2 rounded-lg bg-bg-tertiary border border-border-default text-text-primary focus:outline-none focus:ring-2 focus:ring-action-primary"
+//                   required
+//                 />
+//               </div>
+  
+//               <div>
+//                 <label className="block text-sm font-medium mb-2 text-text-primary">
+//                   Description
+//                 </label>
+//                 <textarea
+//                   value={editDescription}
+//                   onChange={(e) => setEditDescription(e.target.value)}
+//                   placeholder="Enter description"
+//                   className="w-full px-4 py-2 rounded-lg bg-bg-tertiary border border-border-default text-text-primary focus:outline-none focus:ring-2 focus:ring-action-primary"
+//                   rows="3"
+//                 />
+//               </div>
+  
+//               <div>
+//                 <label className="block text-sm font-medium mb-2 text-text-primary">
+//                   Add New Subcategory (optional)
+//                 </label>
+//                 <input
+//                   type="text"
+//                   value={editNewSubcategoryName}
+//                   onChange={(e) => setEditNewSubcategoryName(e.target.value)}
+//                   placeholder="New subcategory name"
+//                   className="w-full px-4 py-2 rounded-lg bg-bg-tertiary border border-border-default text-text-primary focus:outline-none focus:ring-2 focus:ring-action-primary"
+//                 />
+//               </div>
+  
+//               <div className="flex gap-3 pt-4">
+//                 <button
+//                   onClick={() => {
+//                     setShowEditModal(false);
+//                     setEditingCategory(null);
+//                   }}
+//                   className="flex-1 px-4 py-2 rounded-lg bg-bg-tertiary text-text-primary border border-border-default hover:bg-bg-secondary transition-colors"
+//                 >
+//                   Cancel
+//                 </button>
+//                 <button
+//                   onClick={handleEditCategory}
+//                   className="flex-1 px-4 py-2 rounded-lg bg-action-primary text-white hover:opacity-90 transition-opacity"
+//                 >
+//                   Save Changes
+//                 </button>
+//               </div>
+//             </div>
+//           </div>
+//         </div>
+//       )}
+  
+//       {/* Delete Modal */}
+//       {showDeleteModal && deleteTarget && (
+//         <div className="fixed inset-0 z-[99999] flex items-center justify-center p-4 bg-black bg-opacity-50">
+//           <div className="rounded-lg max-w-md w-full p-6 bg-bg-primary shadow-xl">
+//             <h3 className="text-xl font-semibold mb-4 text-text-primary">Confirm Delete</h3>
+//             <p className="mb-6 text-text-secondary">
+//               Are you sure you want to delete <strong className="text-text-primary">{deleteTarget.name}</strong>? 
+//               This action cannot be undone.
+//             </p>
+  
+//             <div className="flex gap-3">
+//               <button
+//                 onClick={() => {
+//                   setShowDeleteModal(false);
+//                   setDeleteTarget(null);
+//                 }}
+//                 className="flex-1 px-4 py-2 rounded-lg bg-bg-tertiary text-text-primary border border-border-default hover:bg-bg-secondary transition-colors"
+//               >
+//                 Cancel
+//               </button>
+//               <button
+//                 onClick={handleDeleteCategory}
+//                 className="flex-1 px-4 py-2 rounded-lg bg-action-danger text-white hover:opacity-90 transition-opacity"
+//               >
+//                 Delete
+//               </button>
+//             </div>
+//           </div>
+//         </div>
+//       )}
+//     </>
+//   );
+  
+// };
+
+// export default MenuCategoryTree;

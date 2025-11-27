@@ -150,7 +150,7 @@ const LineItemsModal = ({ isOpen, onClose, mainItem, lineItems, onAddWithLineIte
   );
 };
 
-const TakeOrder = ({ clientId, token, onOrderUpdate }) => {
+const TakeOrder = ({ clientId, token, onOrderUpdate,realm }) => {
 
 const [searchOpen, setSearchOpen] = useState(false);
 const [searchQuery, setSearchQuery] = useState('');
@@ -226,7 +226,7 @@ const searchInputRef = useRef(null);
             { headers: { Authorization: `Bearer ${token}` } }
           ),
           axios.get(
-            `${import.meta.env.VITE_API_INVENTORY_SERVICE_URL}/${clientId}/menu/read`,
+            `${import.meta.env.VITE_API_INVENTORY_SERVICE_URL}/${clientId}/menu/read?realm=${realm}`,
             { headers: { Authorization: `Bearer ${token}` } }
           )
         ]);
@@ -582,7 +582,7 @@ const searchInputRef = useRef(null);
   }
   
   return (
-    <div className="min-h-screen bg-bg-primary">
+    <div className="min-h-screen bg-bg-primary p-0">
 
 <div
   className={`fixed top-[80px] right-5 z-50 flex items-center transition-all duration-300 ease-in-out ${searchOpen ? 'w-120' : 'w-22'}`}
@@ -636,7 +636,7 @@ const searchInputRef = useRef(null);
   </div>
 </div>
 
-      <div className="container mx-auto px-4 py-2">
+      <div className="mx-auto px-4 py-2">
         <div className="grid lg:grid-cols-4 gap-6 lg:gap-8">
           {/* Sidebar */}
           <div className="lg:col-span-1">
@@ -669,7 +669,8 @@ const searchInputRef = useRef(null);
                   : null;
   
                 return (
-                  <div key={item.id} className="bg-bg-primary rounded-xl shadow-sm overflow-hidden hover:shadow-lg transition-all duration-300 group relative">
+                  <div key={item.id}   className="min-w-0 bg-bg-primary rounded-xl shadow-sm overflow-hidden hover:shadow-lg transition-all duration-300 group relative"
+>
                     <div className="relative h-36 sm:h-40 md:h-44 lg:h-48 overflow-hidden bg-gradient-to-br from-gray-100 to-gray-200">
                       
                       {/* Discount Badge */}
