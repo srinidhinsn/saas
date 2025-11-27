@@ -859,7 +859,7 @@ const OrderSummaryVisible = ({ clientId, token }) => {
 
   return (
     <div className="min-h-screen bg-bg-primary">
-      <div className="container mx-auto px-4 py-2">
+      <div className="mx-auto px-4 py-2">
         {/* <div className="text-center mb-6 lg:mb-8">
           <h1 className="text-3xl md:text-4xl lg:text-5xl font-serif italic mb-3 lg:mb-4" style={{ color: 'var(--color-text-primary)' }}>Order Summary</h1>
           <p className="text-sm md:text-base" style={{ color: 'var(--color-text-secondary)' }}>Manage and track all active orders</p>

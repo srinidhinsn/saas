@@ -4,7 +4,7 @@ import { ChevronDown, ChevronRight } from 'lucide-react';
 const TreeNode = ({ category, isExpanded, onToggle, isSelected, onSelect, hasChildren, level = 0 }) => {
   const [hover, setHover] = useState(false);
 
-  
+
   return (
     <div className="select-none">
       <div
@@ -15,7 +15,7 @@ const TreeNode = ({ category, isExpanded, onToggle, isSelected, onSelect, hasChi
         onMouseEnter={() => setHover(true)}
         onMouseLeave={() => setHover(false)}
         className={`flex items-center space-x-2 px-3 py-2 rounded-lg cursor-pointer transition-all  text-text-primary 
-       ${isSelected?"bg-bg-secondary":"bg-bg-primary" }`}
+       ${isSelected ? "bg-action-primary" : "bg-bg-primary"}`}
 
       >
         {hasChildren ? (
@@ -30,7 +30,7 @@ const TreeNode = ({ category, isExpanded, onToggle, isSelected, onSelect, hasChi
           <span className="w-[18px]" />
         )}
 
-        <span className="flex-1 text-text-primary">
+        <span className={`flex-1 text-sm ${isSelected ? "text-text-white" : "text-text-primary"}`}>
           {category.name}
         </span>
 
