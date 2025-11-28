@@ -3,20 +3,6 @@ import React, { useEffect, useMemo, useState } from "react";
 import axios from "axios";
 import { useParams } from "react-router-dom";
 
-
-/**
- * StockRecipeManager.jsx
- * - Tabs (Stock | Recipe)
- * - Stock CRUD, search, filters, CSV import/export
- * - Recipe CRUD (stored inside menu item) + CSV import/export
- * - No USER_ID / activity logging
- * - Tailwind-based white + orange theme
- *
- * Props:
- * - clientId (optional) — if not provided, uses useParams()
- * - token (optional) — if not provided, reads from localStorage
- */
-
 export default function StockRecipeManager(props) {
   const params = useParams();
   const clientId = props.clientId || params.clientId || params.client_id;
@@ -83,12 +69,18 @@ export default function StockRecipeManager(props) {
   const fetchStocks = async () => {
     try {
       setLoading(true);
-      const res = await axios.get(`${API_BASE_MENU}/stock?client_id=${clientId}`, getAuthHeaders());
+      const res = await axios.get(`${API_BASE_MENU}/read?client_id=${clientId}`, getAuthHeaders());
       const items = res.data?.data || [];
-      setStocks(items);
-      // derive categories
-      const cats = Array.from(new Set(items.map((s) => (s.category || "").toString()).filter(Boolean)));
+  
+      // Filter only items with realm = 'inventory'
+      const inventoryItems = items.filter((s) => s.realm === "inventory");
+  
+      setStocks(inventoryItems);
+  
+      // derive categories from filtered items
+      const cats = Array.from(new Set(inventoryItems.map((s) => (s.category || "").toString()).filter(Boolean)));
       setCategories(cats);
+  
     } catch (err) {
       console.error("fetchStocks:", err);
       showError("Failed to fetch stocks");
@@ -106,16 +98,7 @@ export default function StockRecipeManager(props) {
     }
   };
 
-  const fetchSuppliers = async () => {
-    // optional - some backends may not have suppliers endpoint
-    try {
-      const res = await axios.get(`${API_BASE_INVENTORY}/suppliers?client_id=${clientId}`, getAuthHeaders());
-      setSuppliers(res.data?.data || []);
-    } catch (err) {
-      // ignore if not present
-      setSuppliers([]);
-    }
-  };
+
 
   const fetchRecipe = async (menuId) => {
     if (!menuId) return;
@@ -139,7 +122,6 @@ export default function StockRecipeManager(props) {
     if (!clientId) return;
     fetchStocks();
     fetchMenuItems();
-    fetchSuppliers();
     // eslint-disable-next-line react-hooks/exhaustive-deps
   }, [clientId]);
 
@@ -500,11 +482,6 @@ export default function StockRecipeManager(props) {
               <option value="All">All Categories</option>
               {categories.map((c) => <option key={c} value={c}>{c}</option>)}
             </select>
-
-            <select className="border p-2 rounded text-sm" value={supplierFilter} onChange={(e) => setSupplierFilter(e.target.value)}>
-              <option value="All">All Suppliers</option>
-              {suppliers.map((s) => <option key={s.id} value={s.id}>{s.name}</option>)}
-            </select>
           </div>
 
           <div className="flex items-center gap-3">
@@ -542,7 +519,7 @@ export default function StockRecipeManager(props) {
                 <div className="flex items-center justify-between mb-4">
                   <h2 className="text-lg font-semibold text-gray-800">Stock Items</h2>
                   <div className="flex gap-2">
-                    <button onClick={openAddStock} className="px-3 py-2 rounded bg-gradient-to-r from-action-primary to-orange-400 text-text-white text-sm">+ Add Stock</button>
+                    <button onClick={openAddStock} className="px-3 py-2 rounded bg-gradient-to-r bg-action-primary  text-text-white text-sm">+ Add Stock</button>
                     <button onClick={fetchStocks} className="px-3 py-2 rounded bg-bg-primary border text-text-black">Refresh</button>
                   </div>
                 </div>
@@ -570,7 +547,7 @@ export default function StockRecipeManager(props) {
                           <td className="py-3 pr-4">{s.category || "-"}</td>
                           <td className="py-3 pr-4">
                             <div className="flex items-center gap-2">
-                              <div className={`${s.isLow ? "bg-red-100 text-red-600" : "bg-green-50 text-green-600"} px-2 py-0.5 rounded-full text-xs`}>
+                              <div className={`${s.isLow ? "bg-red-100 text-red-600" : "bg-cardBackgrounds-bg6 text-green-600"} px-2 py-0.5 rounded-full text-xs`}>
                                 {s.availability || 0}
                               </div>
                             </div>
@@ -632,10 +609,6 @@ export default function StockRecipeManager(props) {
               <section className="bg-white rounded-2xl shadow-sm p-6 border border-gray-100">
                 <div className="flex items-center justify-between mb-4">
                   <h2 className="text-lg font-semibold text-gray-800">Recipe Builder</h2>
-                  <div className="flex items-center gap-2">
-                    <button onClick={handleExportRecipeCSV} className="px-3 py-1 border rounded text-sm">Export Recipe CSV</button>
-                    <input id="recipe-import" type="file" accept=".csv" onChange={(e) => handleImportRecipeCSV(e.target.files?.[0])} className="text-sm" />
-                  </div>
                 </div>
 
                 <div className="grid grid-cols-1 md:grid-cols-3 gap-4 mb-4">
@@ -732,7 +705,7 @@ export default function StockRecipeManager(props) {
             <div className="bg-white rounded-xl p-4 shadow-sm border border-gray-100">
               <h3 className="text-sm text-gray-700 font-medium mb-2">Quick Actions</h3>
               <div className="flex flex-col gap-2">
-                <button onClick={() => { setActiveTab("stock"); openAddStock(); }} className="px-3 py-2 rounded bg-gradient-to-r from-action-primary to-orange-400 text-white">Add Stock</button>
+                <button onClick={() => { setActiveTab("stock"); openAddStock(); }} className="px-3 py-2 rounded bg-gradient-to-r bg-action-primary  text-white">Add Stock</button>
                 <button onClick={() => { setActiveTab("recipe"); }} className="px-3 py-2 rounded bg-white border">Open Recipe</button>
                 <button onClick={() => { fetchStocks(); fetchMenuItems(); }} className="px-3 py-2 rounded bg-white border">Refresh All</button>
               </div>

@@ -540,7 +540,12 @@ import {
 } from 'recharts';
 
 import { useNavigate, useParams } from 'react-router-dom';
-import axios from 'axios';
+import axios from 'axios';import resolveConfig from "tailwindcss/resolveConfig";
+import tailwindConfig from "../../../../tailwind.config";
+
+const fullConfig = resolveConfig(tailwindConfig);
+const ACTION_PRIMARY = fullConfig.theme.colors.action.primary;
+
 
 /*
   Redesigned Dashboard (white + orange theme)
@@ -808,28 +813,20 @@ const DashBoardPage = () => {
               <option value="Half Yearly">Half Yearly</option>
               <option value="Yearly">Yearly</option>
             </select>
-
-            <button
-              className="ml-2 px-4 py-2 bg-gradient-to-r from-action-primary to-orange-400 text-white rounded-lg shadow hover:from-orange-600 hover:to-orange-500 transition"
-              onClick={() => setShowDropdown(s => !s)}
-              ref={dropdownRef}
-            >
-              Actions
-            </button>
           </div>
         </div>
 
         {/* KPI Grid */}
         <div className="grid grid-cols-1 sm:grid-cols-2 lg:grid-cols-4 gap-6">
-          <KPICard icon={<FaHamburger />} bg="bg-orange-50" value={totalOrders} label="Total Orders" accent={null} />
-          <KPICard icon={<PiHamburgerThin />} bg="bg-yellow-50" value={pendingOrders} label="Pending Orders" accent={null} />
-          <KPICard icon={<RiMoneyRupeeCircleLine />} bg="bg-orange-50" value={`₹${totalEarnings}`} label="Total Earnings" accent="Updated" />
-          <KPICard icon={<BsPersonCheck />} bg="bg-indigo-50" value={totalCustomers} label="Customers" accent={null} />
+          <KPICard icon={<FaHamburger />} bg="bg-cardBackgrounds-bg1" value={totalOrders} label="Total Orders" accent={null} />
+          <KPICard icon={<PiHamburgerThin />} bg="bg-cardBackgrounds-bg2" value={pendingOrders} label="Pending Orders" accent={null} />
+          <KPICard icon={<RiMoneyRupeeCircleLine />} bg="bg-cardBackgrounds-bg1" value={`₹${totalEarnings}`} label="Total Earnings" accent="Updated" />
+          <KPICard icon={<BsPersonCheck />} bg="bg-cardBackgrounds-bg3" value={totalCustomers} label="Customers" accent={null} />
 
-          <KPICard icon={<MdOutlineTableBar />} bg="bg-pink-50" value={newOrders} label="New Orders" />
-          <KPICard icon={<MdOutlineSoupKitchen />} bg="bg-amber-50" value={preparingOrders} label="Preparing" />
-          <KPICard icon={<TbToolsKitchen3 />} bg="bg-teal-50" value={servedOrders} label="Served" />
-          <KPICard icon={<GoPackageDependents />} bg="bg-gray-50" value={'—'} label="Takeaway" />
+          <KPICard icon={<MdOutlineTableBar />} bg="bg-cardBackgrounds-bg4" value={newOrders} label="New Orders" />
+          <KPICard icon={<MdOutlineSoupKitchen />} bg="bg-cardBackgrounds-bg5" value={preparingOrders} label="Preparing" />
+          <KPICard icon={<TbToolsKitchen3 />} bg="bg-cardBackgrounds-bg6" value={servedOrders} label="Served" />
+          <KPICard icon={<GoPackageDependents />} bg="bg-cardBackgrounds-bg7" value={'—'} label="Takeaway" />
         </div>
 
         {/* Charts Row */}
@@ -862,7 +859,7 @@ const DashBoardPage = () => {
                   <XAxis dataKey="date" tick={{ fontSize: 12 }} tickLine={false} padding={{ left: 10, right: 10 }} />
                   <YAxis tick={{ fontSize: 12 }} tickLine={false} domain={["auto", "auto"]} allowDecimals={false} />
                   <Tooltip formatter={(value) => `₹${value}`} />
-                  <Bar dataKey="sales" fill="#f97316" radius={[8,8,0,0]} />
+                  <Bar dataKey="sales" fill={ACTION_PRIMARY} radius={[8,8,0,0]} />
                 </BarChart>
               </ResponsiveContainer>
             </div>
