@@ -3,6 +3,7 @@ import { Plus, Minus, X, Search, Edit, Trash2, Upload, Download } from 'lucide-r
 import axios from 'axios';
 import * as XLSX from 'xlsx';
 import MenuCategoryTree from './Tree&CategoryManage/MenuCategoryTree';
+import MenuTreeNode from './Tree&CategoryManage/MenuTreeNode';
 import MenuImagePreview from './Tree&CategoryManage/MenuImagePreview';
 
 
@@ -60,7 +61,7 @@ const DropdownCheckbox = ({ selected = [], options = [], onChange, label = "Sele
 };
 
 // Main Menu Management Component
-const MenuManagement = ({ clientId, token, realm}) => {
+const MenuManagement = ({ clientId, token }) => {
   const [searchOpen, setSearchOpen] = useState(false);
   const [searchQuery, setSearchQuery] = useState('');
   const searchInputRef = useRef(null);
@@ -131,7 +132,7 @@ const MenuManagement = ({ clientId, token, realm}) => {
             { headers: { Authorization: `Bearer ${token}` } }
           ),
           axios.get(
-            `${import.meta.env.VITE_API_INVENTORY_SERVICE_URL}/${clientId}/menu/read?realm=${realm}`,
+            `${import.meta.env.VITE_API_INVENTORY_SERVICE_URL}/${clientId}/menu/read`,
             { headers: { Authorization: `Bearer ${token}` } }
           )
         ]);
@@ -658,7 +659,7 @@ const MenuManagement = ({ clientId, token, realm}) => {
         <div className="grid lg:grid-cols-4 gap-6 lg:gap-8">
           {/* Sidebar */}
           <div className="lg:col-span-1">
-            <div className="lg:sticky lg:top-24">
+            <div className="lg:sticky lg:top-20">
               <MenuCategoryTree
                 categories={categories}
                 selectedCategory={selectedCategory}
@@ -887,7 +888,116 @@ const MenuManagement = ({ clientId, token, realm}) => {
         </div>
       )}
 
-    
+      {/* Edit Modal */}
+      {showEditModal && editingItem && (
+        <div className="fixed inset-0 z-50 flex items-center justify-center p-4 bg-color-modalsbg">
+          <div className="rounded-lg max-w-2xl w-full p-6 bg-bg-primary max-h-[90vh] overflow-y-auto">
+            <div className="flex justify-between items-center mb-4">
+              <h3 className="text-xl font-semibold text-text-primary">Edit Menu Item</h3>
+              <button
+                onClick={() => setShowEditModal(false)}
+                className="text-text-secondary hover:text-text-primary"
+              >
+                <X size={24} />
+              </button>
+            </div>
+
+            <div className="space-y-4">
+              <div>
+                <label className="block text-sm font-medium mb-2 text-text-primary">Item Name *</label>
+                <input
+                  type="text"
+                  value={editingItem.name}
+                  onChange={(e) => setEditingItem({ ...editingItem, name: e.target.value })}
+                  className="w-full px-4 py-2 rounded-lg bg-bg-tertiary border border-border-default text-text-primary focus:outline-none focus:ring-2 focus:ring-action-primary"
+                  required
+                />
+              </div>
+
+              <div>
+                <label className="block text-sm font-medium mb-2 text-text-primary">Description</label>
+                <textarea
+                  value={editingItem.description}
+                  onChange={(e) => setEditingItem({ ...editingItem, description: e.target.value })}
+                  className="w-full px-4 py-2 rounded-lg bg-bg-tertiary border border-border-default text-text-primary focus:outline-none focus:ring-2 focus:ring-action-primary"
+                  rows="3"
+                />
+              </div>
+
+              <div className="grid grid-cols-2 gap-4">
+                <div>
+                  <label className="block text-sm font-medium mb-2 text-text-primary">Unit Price *</label>
+                  <input
+                    type="number"
+                    value={editingItem.unit_price}
+                    onChange={(e) => setEditingItem({ ...editingItem, unit_price: e.target.value })}
+                    className="w-full px-4 py-2 rounded-lg bg-bg-tertiary border border-border-default text-text-primary focus:outline-none focus:ring-2 focus:ring-action-primary"
+                    required
+                  />
+                </div>
+
+                <div>
+                  <label className="block text-sm font-medium mb-2 text-text-primary">Discount</label>
+                  <input
+                    type="number"
+                    value={editingItem.discount}
+                    onChange={(e) => setEditingItem({ ...editingItem, discount: e.target.value })}
+                    className="w-full px-4 py-2 rounded-lg bg-bg-tertiary border border-border-default text-text-primary focus:outline-none focus:ring-2 focus:ring-action-primary"
+                  />
+                </div>
+              </div>
+
+              <div className="grid grid-cols-2 gap-4">
+                <div>
+                  <label className="block text-sm font-medium mb-2 text-text-primary">Availability</label>
+                  <input
+                    type="number"
+                    value={editingItem.availability}
+                    onChange={(e) => setEditingItem({ ...editingItem, availability: e.target.value })}
+                    className="w-full px-4 py-2 rounded-lg bg-bg-tertiary border border-border-default text-text-primary focus:outline-none focus:ring-2 focus:ring-action-primary"
+                  />
+                </div>
+
+                <div>
+                  <label className="block text-sm font-medium mb-2 text-text-primary">Unit</label>
+                  <input
+                    type="text"
+                    value={editingItem.unit}
+                    onChange={(e) => setEditingItem({ ...editingItem, unit: e.target.value })}
+                    className="w-full px-4 py-2 rounded-lg bg-bg-tertiary border border-border-default text-text-primary focus:outline-none focus:ring-2 focus:ring-action-primary"
+                  />
+                </div>
+              </div>
+
+              <div>
+                <label className="block text-sm font-medium mb-2 text-text-primary">Add-ons</label>
+                <DropdownCheckbox
+                  selected={Array.isArray(editingItem.line_item_id) ? editingItem.line_item_id : []}
+                  options={menuItems.filter(item => item.id !== editingItem.id)}
+                  onChange={(selected) => setEditingItem({ ...editingItem, line_item_id: selected })}
+                  label="Select Add-ons"
+                />
+              </div>
+
+              <div className="flex gap-3 pt-4">
+                <button
+                  onClick={() => setShowEditModal(false)}
+                  className="flex-1 px-4 py-2 rounded-lg bg-bg-tertiary text-text-primary border border-border-default hover:bg-bg-secondary transition-colors"
+                >
+                  Cancel
+                </button>
+                <button
+                  onClick={handleEditItem}
+                  className="flex-1 px-4 py-2 rounded-lg bg-action-primary text-text-white hover:opacity-90 transition-opacity"
+                >
+                  Save Changes
+                </button>
+              </div>
+            </div>
+          </div>
+        </div>
+      )}
+
       {/* Delete Modal */}
       {showDeleteModal && deleteTarget && (
         <div className="fixed inset-0 z-50 flex items-center justify-center p-4 bg-color-modalsbg">
