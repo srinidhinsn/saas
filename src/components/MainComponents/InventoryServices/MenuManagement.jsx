@@ -1,10 +1,9 @@
-
-import React, { useState, useEffect, useRef, useCallback } from 'react';
+import React, { useState, useEffect, useRef } from 'react';
 import { Plus, Minus, X, Search, Edit, Trash2, Upload, Download } from 'lucide-react';
 import axios from 'axios';
 import * as XLSX from 'xlsx';
 import MenuCategoryTree from './Tree&CategoryManage/MenuCategoryTree';
-import { jwtDecode } from "jwt-decode";
+import MenuTreeNode from './Tree&CategoryManage/MenuTreeNode';
 import MenuImagePreview from './Tree&CategoryManage/MenuImagePreview';
 
 
@@ -77,13 +76,7 @@ const MenuManagement = ({ clientId, token }) => {
   const [showEditModal, setShowEditModal] = useState(false);
   const [showDeleteModal, setShowDeleteModal] = useState(false);
   const [showBulkModal, setShowBulkModal] = useState(false);
-  //Image Picker
-  const [newItemImage, setNewItemImage] = useState(null);
-  const [newItemImageUrl, setNewItemImageUrl] = useState('');
-  const [dragActive, setDragActive] = useState(false);
-  // Add these states
-  const [editItemImage, setEditItemImage] = useState(null);
-  const [editItemImageUrl, setEditItemImageUrl] = useState('');
+
   // Form states
   const [editingItem, setEditingItem] = useState(null);
   const [deleteTarget, setDeleteTarget] = useState(null);
@@ -97,98 +90,11 @@ const MenuManagement = ({ clientId, token }) => {
     unit: '',
     line_item_id: []
   });
-  // add near your other state declarations
-  const [categoriesFlat, setCategoriesFlat] = useState([]);
 
   // Bulk operations
   const [selectedRows, setSelectedRows] = useState([]);
   const [selectAllChecked, setSelectAllChecked] = useState(false);
   const [bulkEditData, setBulkEditData] = useState({});
-  // realm + user metadata
-  const [realm, setRealm] = useState('');
-  const [currentUserId, setCurrentUserId] = useState(null);
-
-  // decode token once to extract realm & user id
-  useEffect(() => {
-    if (!token) return;
-    try {
-      const decoded = jwtDecode(token);
-      setRealm(decoded.realm || '');
-      setCurrentUserId(decoded.user_id || decoded.sub || null);
-    } catch (err) {
-      console.warn('Failed to decode token for realm/user:', err);
-    }
-  }, [token]);
-  // Robust flatten for your current category-tree shape (handles `children` or `subCategories`)
-  const flattenCategoriesGeneric = (tree) => {
-    const flat = [];
-    const recurse = (nodes, parentId = null) => {
-      (nodes || []).forEach(node => {
-        if (!node) return;
-        // unify fields (some components use subCategories, some use children)
-        const children = node.subCategories || node.children || [];
-        flat.push({
-          id: node.id,
-          name: (node.name || '').trim(),
-          parent_id: node.parentId ?? node.parent_id ?? parentId ?? null
-        });
-        if (children && children.length) recurse(children, node.id);
-      });
-    };
-    recurse(tree);
-    return flat;
-  };
-
-  // returns array of category names from root -> the given categoryId (works with UUID or cat_... ids)
-  const buildCategoryPath = (categoryId) => {
-    if (!categoryId) return [];
-
-    // categories is an array of { id, name, parent_id } from your fetch
-    const path = [];
-    let currentId = categoryId;
-
-    // Avoid infinite loop
-    const visited = new Set();
-
-    while (currentId && !visited.has(currentId)) {
-      visited.add(currentId);
-      const current = categories.find(cat => cat && cat.id === currentId);
-      if (!current) break;
-      // normalize name and replace whitespace with underscore
-      path.unshift((current.name || '').trim().replace(/\s+/g, '_'));
-      // support both parent_id and parentId fields
-      currentId = current.parent_id ?? current.parentId ?? null;
-    }
-
-    return path; // e.g. ['Dietery','Non_Veg','Gravies']
-  };
-
-  // generate slug from categoryId (or category object or name) + item name
-  const generateSlug = (categoryIdOrObjOrName, itemName) => {
-    // If caller passed a category object, extract id
-    let catId = null;
-    if (!categoryIdOrObjOrName) {
-      catId = null;
-    } else if (typeof categoryIdOrObjOrName === 'object' && categoryIdOrObjOrName.id) {
-      catId = categoryIdOrObjOrName.id;
-    } else {
-      catId = categoryIdOrObjOrName;
-    }
-
-    const parts = buildCategoryPath(catId);
-
-    const itemPart = (itemName || '')
-      .trim()
-      .replace(/\s+/g, '_')         // spaces -> underscore
-      .replace(/[^a-zA-Z0-9_]/g, ''); // remove special chars
-
-    if (itemPart) parts.push(itemPart);
-
-    // join with single underscore, no leading underscore
-    return parts.filter(Boolean).join(' _'); // e.g. Dietery_Non_Veg_Gravies_Mutton_Gravy
-  };
-
-
 
   const flattenCategoryTree = (tree, level = 0, parentId = null) => {
     let flatList = [];
@@ -208,254 +114,100 @@ const MenuManagement = ({ clientId, token }) => {
     });
     return flatList;
   };
-  // Add this helper function after your state declarations and before fetchData
 
-  // Helper function to get category ID from name
-  const getCategoryIdByName = (categoryName) => {
-    if (!categoryName || categoryName === 'All Categories' || categoryName === 'All') return '';
-    // search tree style first
-    const findInTree = (nodes) => {
-      for (const n of nodes || []) {
-        if (!n) continue;
-        if ((n.name || '').toLowerCase() === (categoryName || '').toLowerCase()) return n.id;
-        const children = n.subCategories || n.children;
-        if (children && children.length) {
-          const found = findInTree(children);
-          if (found) return found;
-        }
-      }
-      return null;
-    };
-    const byTree = findInTree(categories);
-    if (byTree) return byTree;
-    // fallback: search flattened list (if you've stored flattened categories elsewhere)
-    const flat = Array.isArray(categories) ? categories : [];
-    const matched = flat.find(c => c && (c.name || '').toLowerCase() === (categoryName || '').toLowerCase());
-    return matched ? matched.id : null;
-  };
-
-
-  // Updated handleAddItem function
-  const handleAddItem = async () => {
-    try {
-      let imageId = null;
-
-      if (newItemImage) {
-        imageId = await uploadImageToDocumentService(newItemImage);
+  useEffect(() => {
+    const fetchData = async () => {
+      if (!clientId || !token) {
+        console.error('Missing clientId or token');
+        setLoading(false);
+        return;
       }
 
-      const categoryId = typeof selectedCategory === 'object' && selectedCategory?.id
-        ? selectedCategory.id
-        : getCategoryIdByName(selectedCategory);
+      try {
+        setLoading(true);
 
-      // (optional) legacy generator kept — used only if you intentionally want to generate a new category id
-      const generateCategoryId = (parentId = null) => {
-        const timestamp = Date.now();
-        return parentId ? `subcat_${timestamp}` : `cat_${timestamp}`;
-      };
+        const [catRes, itemRes] = await Promise.all([
+          axios.get(
+            `${import.meta.env.VITE_API_INVENTORY_SERVICE_URL}/${clientId}/menu/read_category?category_id=dietery`,
+            { headers: { Authorization: `Bearer ${token}` } }
+          ),
+          axios.get(
+            `${import.meta.env.VITE_API_INVENTORY_SERVICE_URL}/${clientId}/menu/read`,
+            { headers: { Authorization: `Bearer ${token}` } }
+          )
+        ]);
 
-      // Choose category_id for DB (use existing if present; if you really want to generate a new category id, use generateCategoryId)
-      const finalCategoryId = categoryId
-        ? categoryId
-        : generateCategoryId(typeof selectedCategory === 'object' ? selectedCategory.id : null);
-
-      // Build slug using category name path (not the raw id)
-      const slug = generateSlug(finalCategoryId, newItem.name);
-
-
-      // who created this?
-      const created_by = currentUserId || localStorage.getItem('user_id') || 'system';
-
-      const payload = {
-        ...newItem,
-        client_id: clientId,
-        category_id: finalCategoryId,
-        image_id: imageId,
-        realm: realm || newItem.realm || '',
-        slug,
-        unit_price: parseFloat(newItem.unit_price) || 0,
-        discount: parseFloat(newItem.discount) || 0,
-        availability: parseInt(newItem.availability) || 0,
-        created_by,
-        updated_by: created_by
-      };
-
-      await axios.post(
-        `${import.meta.env.VITE_API_INVENTORY_SERVICE_URL}/${clientId}/menu/create`,
-        payload,
-        { headers: { Authorization: `Bearer ${token}` } }
-      );
-
-      await fetchData();
-      setShowAddModal(false);
-      setNewItem({
-        name: '',
-        description: '',
-        category_id: '',
-        unit_price: '',
-        discount: '',
-        availability: '',
-        unit: '',
-        line_item_id: []
-      });
-      setNewItemImage(null);
-      setNewItemImageUrl('');
-      alert('Item added successfully!');
-    } catch (error) {
-      console.error('Error adding item:', error);
-      alert('Failed to add item');
-    }
-  };
-  const handleEditItem = async () => {
-    try {
-      let imageId = editingItem.image_id;
-
-      if (editItemImage) {
-        imageId = await uploadImageToDocumentService(editItemImage);
-      }
-      const categoryId = editingItem.category_id || (typeof selectedCategory === 'object' ? selectedCategory.id : getCategoryIdByName(selectedCategory));
-      const finalCategoryId = categoryId || (editingItem.parent_id ? editingItem.parent_id : null); // fallback if you want
-
-      // Build readable slug from names (not raw id)
-      const slug = generateSlug(finalCategoryId, editingItem.name);
-
-
-      const updated_by = currentUserId || localStorage.getItem('user_id') || 'system';
-
-      const payload = {
-        ...editingItem,
-        client_id: clientId,
-        category_id: finalCategoryId, // unchanged (UUID)
-        image_id: imageId,
-        realm: editingItem.realm || realm || '',
-        slug,
-        unit_price: parseFloat(editingItem.unit_price) || 0,
-        discount: parseFloat(editingItem.discount) || 0,
-        availability: parseInt(editingItem.availability) || 0,
-        updated_by
-      };
-
-      await axios.post(
-        `${import.meta.env.VITE_API_INVENTORY_SERVICE_URL}/${clientId}/menu/update`,
-        payload,
-        { headers: { Authorization: `Bearer ${token}` } }
-      );
-
-      await fetchData();
-
-      setShowEditModal(false);
-      setEditingItem(null);
-      setEditItemImage(null);
-      setEditItemImageUrl('');
-      alert('Item updated successfully!');
-    } catch (error) {
-      console.error('Error updating item:', error);
-      alert('Failed to update item');
-    }
-  };
-
-  const fetchData = useCallback(async () => {
-    if (!clientId || !token) {
-      console.error('Missing clientId or token');
-      setLoading(false);
-      return;
-    }
-
-    try {
-      setLoading(true);
-
-      const [catRes, itemRes] = await Promise.all([
-        axios.get(
-          `${import.meta.env.VITE_API_INVENTORY_SERVICE_URL}/${clientId}/menu/read_category?category_id=dietery`,
-          { headers: { Authorization: `Bearer ${token}` } }
-        ),
-        axios.get(
-          `${import.meta.env.VITE_API_INVENTORY_SERVICE_URL}/${clientId}/menu/read`,
-          { headers: { Authorization: `Bearer ${token}` } }
-        )
-      ]);
-
-      const fullTree = catRes.data.data.filter(c => c.name?.toLowerCase() !== "all");
-      const subcategoryIds = new Set();
-      fullTree.forEach(cat => {
-        if (cat.subCategories && cat.subCategories.length > 0) {
-          cat.subCategories.forEach(sub => subcategoryIds.add(sub.id));
-        }
-      });
-
-      const topLevelCategories = fullTree.filter(cat => !subcategoryIds.has(cat.id));
-      const flatCategories = flattenCategoryTree(topLevelCategories);
-      // normalize flatCategories for lookup (ensure parent property name is consistent)
-      const normalizedFlat = flatCategories.map(cat => ({
-        id: cat.id,
-        name: (cat.name || '').trim(),
-        parentId: cat.parentId ?? cat.parent_id ?? null
-      }));
-      setCategoriesFlat(normalizedFlat);
-
-      const enrichedItems = itemRes.data.data.map(item => {
-        const cat = flatCategories.find(c => c.id === item.category_id);
-        return {
-          ...item,
-          category: cat ? cat.name : "Uncategorized"
-        };
-      });
-
-      setMenuItems(enrichedItems);
-
-      const getCategoryCount = (categoryName) => {
-        return enrichedItems.filter(item => {
-          if (categoryName === 'All Categories') return true;
-          return item.category === categoryName;
-        }).length;
-      };
-
-      const buildCategoryTree = (flatCats) => {
-        const categoryMap = new Map();
-        flatCats.forEach(cat => {
-          categoryMap.set(cat.id, {
-            ...cat,
-            count: getCategoryCount(cat.name),
-            children: []
-          });
-        });
-
-        const tree = [];
-        categoryMap.forEach(cat => {
-          if (cat.parentId && categoryMap.has(cat.parentId)) {
-            categoryMap.get(cat.parentId).children.push(cat);
-          } else {
-            tree.push(cat);
+        const fullTree = catRes.data.data.filter(c => c.name?.toLowerCase() !== "all");
+        const subcategoryIds = new Set();
+        fullTree.forEach(cat => {
+          if (cat.subCategories && cat.subCategories.length > 0) {
+            cat.subCategories.forEach(sub => subcategoryIds.add(sub.id));
           }
         });
 
-        return tree;
-      };
+        const topLevelCategories = fullTree.filter(cat => !subcategoryIds.has(cat.id));
+        const flatCategories = flattenCategoryTree(topLevelCategories);
 
-      const categoryTree = [
-        {
-          id: 'all',
-          name: 'All Categories',
-          count: enrichedItems.length,
-          children: []
-        },
-        ...buildCategoryTree(flatCategories)
-      ];
+        const enrichedItems = itemRes.data.data.map(item => {
+          const cat = flatCategories.find(c => c.id === item.category_id);
+          return {
+            ...item,
+            category: cat ? cat.name : "Uncategorized"
+          };
+        });
 
-      setCategories(categoryTree);
+        setMenuItems(enrichedItems);
 
-    } catch (error) {
-      console.error('Error fetching data:', error);
-    } finally {
-      setLoading(false);
-    }
-  }, [clientId, token]); // important dependencies
+        const getCategoryCount = (categoryName) => {
+          return enrichedItems.filter(item => {
+            if (categoryName === 'All Categories') return true;
+            return item.category === categoryName;
+          }).length;
+        };
 
-  useEffect(() => {
+        const buildCategoryTree = (flatCats) => {
+          const categoryMap = new Map();
+          flatCats.forEach(cat => {
+            categoryMap.set(cat.id, {
+              ...cat,
+              count: getCategoryCount(cat.name),
+              children: []
+            });
+          });
 
+          const tree = [];
+          categoryMap.forEach(cat => {
+            if (cat.parentId && categoryMap.has(cat.parentId)) {
+              categoryMap.get(cat.parentId).children.push(cat);
+            } else {
+              tree.push(cat);
+            }
+          });
+
+          return tree;
+        };
+
+        const categoryTree = [
+          {
+            id: 'all',
+            name: 'All Categories',
+            count: enrichedItems.length,
+            children: []
+          },
+          ...buildCategoryTree(flatCategories)
+        ];
+
+        setCategories(categoryTree);
+
+      } catch (error) {
+        console.error('Error fetching data:', error);
+      } finally {
+        setLoading(false);
+      }
+    };
 
     fetchData();
-  }, [fetchData]);
+  }, [clientId, token]);
 
   const getFilteredItems = () => {
     const q = (searchQuery || '').trim().toLowerCase();
@@ -472,111 +224,81 @@ const MenuManagement = ({ clientId, token }) => {
       (item.category || '').toLowerCase().includes(q)
     );
   };
-  // Add these functions after your existing handleDrag, handleDrop, etc.
-  const handleEditDrag = (e) => {
-    e.preventDefault();
-    e.stopPropagation();
-    if (e.type === "dragenter" || e.type === "dragover") {
-      setDragActive(true);
-    } else if (e.type === "dragleave") {
-      setDragActive(false);
-    }
-  };
 
-  const handleEditDrop = (e) => {
-    e.preventDefault();
-    e.stopPropagation();
-    setDragActive(false);
-
-    if (e.dataTransfer.files && e.dataTransfer.files[0]) {
-      handleEditImageFile(e.dataTransfer.files[0]);
-    }
-  };
-
-  const handleEditImageFile = (file) => {
-    if (file && file.type.startsWith('image/')) {
-      setEditItemImage(file);
-      setEditItemImageUrl(URL.createObjectURL(file));
-    } else {
-      alert('Please upload a valid image file');
-    }
-  };
-
-  const handleEditImageUrlPaste = async (url) => {
-    try {
-      const response = await fetch(url);
-      const blob = await response.blob();
-      const file = new File([blob], 'pasted-image.jpg', { type: blob.type });
-      handleEditImageFile(file);
-    } catch (error) {
-      alert('Failed to load image from URL');
-    }
-  };
   const filteredItems = getFilteredItems();
-  const uploadImageToDocumentService = async (imageFile) => {
-    try {
-      const formData = new FormData();
-      formData.append("file", imageFile);
-      formData.append("description", "Menu item image");
-      formData.append("category_id", "menu_images");
-      formData.append("realm", "menu");
-      formData.append("created_by", localStorage.getItem("user_id") || "system");
 
-      const response = await axios.post(
-        `${import.meta.env.VITE_API_DOCUMENT_SERVICE_URL}/${clientId}/document/upload`,
-        formData,
-        {
-          headers: {
-            Authorization: `Bearer ${token}`,
-            "Content-Type": "multipart/form-data",
-          },
-        }
+  // Add Item
+  const handleAddItem = async () => {
+    try {
+      const payload = {
+        ...newItem,
+        client_id: clientId,
+        unit_price: parseFloat(newItem.unit_price) || 0,
+        discount: parseFloat(newItem.discount) || 0,
+        availability: parseInt(newItem.availability) || 0
+      };
+
+      await axios.post(
+        `${import.meta.env.VITE_API_INVENTORY_SERVICE_URL}/${clientId}/menu/create`,
+        payload,
+        { headers: { Authorization: `Bearer ${token}` } }
       );
 
-      return response.data.data.id; // Returns document ID
+      // Refresh items
+      const itemRes = await axios.get(
+        `${import.meta.env.VITE_API_INVENTORY_SERVICE_URL}/${clientId}/menu/read`,
+        { headers: { Authorization: `Bearer ${token}` } }
+      );
+      setMenuItems(itemRes.data.data);
+
+      setShowAddModal(false);
+      setNewItem({
+        name: '',
+        description: '',
+        category_id: '',
+        unit_price: '',
+        discount: '',
+        availability: '',
+        unit: '',
+        line_item_id: []
+      });
+      alert('Item added successfully!');
     } catch (error) {
-      console.error('Image upload failed:', error);
-      throw error;
+      console.error('Error adding item:', error);
+      alert('Failed to add item');
     }
   };
 
-  const handleDrag = (e) => {
-    e.preventDefault();
-    e.stopPropagation();
-    if (e.type === "dragenter" || e.type === "dragover") {
-      setDragActive(true);
-    } else if (e.type === "dragleave") {
-      setDragActive(false);
-    }
-  };
-
-  const handleDrop = (e) => {
-    e.preventDefault();
-    e.stopPropagation();
-    setDragActive(false);
-
-    if (e.dataTransfer.files && e.dataTransfer.files[0]) {
-      handleImageFile(e.dataTransfer.files[0]);
-    }
-  };
-
-  const handleImageFile = (file) => {
-    if (file && file.type.startsWith('image/')) {
-      setNewItemImage(file);
-      setNewItemImageUrl(URL.createObjectURL(file));
-    } else {
-      alert('Please upload a valid image file');
-    }
-  };
-
-  const handleImageUrlPaste = async (url) => {
+  // Edit Item
+  const handleEditItem = async () => {
     try {
-      const response = await fetch(url);
-      const blob = await response.blob();
-      const file = new File([blob], 'pasted-image.jpg', { type: blob.type });
-      handleImageFile(file);
+      const payload = {
+        ...editingItem,
+        client_id: clientId,
+        unit_price: parseFloat(editingItem.unit_price) || 0,
+        discount: parseFloat(editingItem.discount) || 0,
+        availability: parseInt(editingItem.availability) || 0
+      };
+
+      await axios.post(
+        `${import.meta.env.VITE_API_INVENTORY_SERVICE_URL}/${clientId}/menu/update`,
+        payload,
+        { headers: { Authorization: `Bearer ${token}` } }
+      );
+
+      // Refresh items
+      const itemRes = await axios.get(
+        `${import.meta.env.VITE_API_INVENTORY_SERVICE_URL}/${clientId}/menu/read`,
+        { headers: { Authorization: `Bearer ${token}` } }
+      );
+      setMenuItems(itemRes.data.data);
+
+      setShowEditModal(false);
+      setEditingItem(null);
+      alert('Item updated successfully!');
     } catch (error) {
-      alert('Failed to load image from URL');
+      console.error('Error updating item:', error);
+      alert('Failed to update item');
     }
   };
 
@@ -932,7 +654,7 @@ const MenuManagement = ({ clientId, token }) => {
         <div className="grid lg:grid-cols-4 gap-6 lg:gap-8">
           {/* Sidebar */}
           <div className="lg:col-span-1">
-            <div className="lg:sticky lg:top-24">
+            <div className="lg:sticky lg:top-20">
               <MenuCategoryTree
                 categories={categories}
                 selectedCategory={selectedCategory}
@@ -1060,55 +782,6 @@ const MenuManagement = ({ clientId, token }) => {
             </div>
 
             <div className="space-y-4">
-              {/* Category Selector */}
-              <div>
-                <label className="block text-sm font-medium mb-2 text-text-primary">Category *</label>
-                <select
-                  value={getCategoryIdByName(selectedCategory) || ''}
-                  onChange={(e) => {
-                    const selectedCatId = e.target.value;
-                    const findCategoryName = (items, targetId) => {
-                      for (const item of items) {
-                        if (item.id === targetId) return item.name;
-                        if (item.children) {
-                          const found = findCategoryName(item.children, targetId);
-                          if (found) return found;
-                        }
-                      }
-                      return null;
-                    };
-                    const categoryName = findCategoryName(categories, selectedCatId);
-                    if (categoryName) {
-                      setSelectedCategory(categoryName);
-                    }
-                    setNewItem({ ...newItem, category_id: selectedCatId });
-                  }}
-                  className="w-full px-4 py-2 rounded-lg bg-bg-tertiary border border-border-default text-text-primary focus:outline-none focus:ring-2 focus:ring-action-primary"
-                  required
-                >
-                  <option value="">Select a category</option>
-                  {(() => {
-                    const flattenCategories = (items, level = 0) => {
-                      let result = [];
-                      items.forEach(item => {
-                        if (item.id !== 'all') {
-                          result.push({ ...item, level });
-                          if (item.children) {
-                            result = result.concat(flattenCategories(item.children, level + 1));
-                          }
-                        }
-                      });
-                      return result;
-                    };
-                    return flattenCategories(categories).map(cat => (
-                      <option key={cat.id} value={cat.id}>
-                        {'—'.repeat(cat.level)} {cat.name}
-                      </option>
-                    ));
-                  })()}
-                </select>
-              </div>
-
               <div>
                 <label className="block text-sm font-medium mb-2 text-text-primary">Item Name *</label>
                 <input
@@ -1180,6 +853,7 @@ const MenuManagement = ({ clientId, token }) => {
                   />
                 </div>
               </div>
+
               <div>
                 <label className="block text-sm font-medium mb-2 text-text-primary">Add-ons</label>
                 <DropdownCheckbox
@@ -1224,38 +898,6 @@ const MenuManagement = ({ clientId, token }) => {
             </div>
 
             <div className="space-y-4">
-              {/* Category Selector */}
-              <div>
-                <label className="block text-sm font-medium mb-2 text-text-primary">Category *</label>
-                <select
-                  value={editingItem.category_id || ''}
-                  onChange={(e) => setEditingItem({ ...editingItem, category_id: e.target.value })}
-                  className="w-full px-4 py-2 rounded-lg bg-bg-tertiary border border-border-default text-text-primary focus:outline-none focus:ring-2 focus:ring-action-primary"
-                  required
-                >
-                  <option value="">Select a category</option>
-                  {(() => {
-                    const flattenCategories = (items, level = 0) => {
-                      let result = [];
-                      items.forEach(item => {
-                        if (item.id !== 'all') {
-                          result.push({ ...item, level });
-                          if (item.children) {
-                            result = result.concat(flattenCategories(item.children, level + 1));
-                          }
-                        }
-                      });
-                      return result;
-                    };
-                    return flattenCategories(categories).map(cat => (
-                      <option key={cat.id} value={cat.id}>
-                        {'—'.repeat(cat.level)} {cat.name}
-                      </option>
-                    ));
-                  })()}
-                </select>
-              </div>
-
               <div>
                 <label className="block text-sm font-medium mb-2 text-text-primary">Item Name *</label>
                 <input
@@ -1321,6 +963,7 @@ const MenuManagement = ({ clientId, token }) => {
                   />
                 </div>
               </div>
+
               <div>
                 <label className="block text-sm font-medium mb-2 text-text-primary">Add-ons</label>
                 <DropdownCheckbox
@@ -1354,9 +997,9 @@ const MenuManagement = ({ clientId, token }) => {
       {showDeleteModal && deleteTarget && (
         <div className="fixed inset-0 z-50 flex items-center justify-center p-4 bg-color-modalsbg">
           <div className="rounded-lg max-w-md w-full p-6 bg-bg-primary">
-            <h3 className="text-xl font-semibold mb-4 text-text-primary">Confirm Delete</h3>
+            <h3 className="text-xl font-semibold mb-4 text-text-primary text-center">Confirm Delete</h3>
             <p className="mb-6 text-text-secondary">
-              Are you sure you want to delete <strong className="text-text-primary">{deleteTarget.name}</strong>? This action cannot be undone.
+              Want to delete <strong className="text-text-primary">{deleteTarget.name}</strong>?
             </p>
 
             <div className="flex gap-3">
