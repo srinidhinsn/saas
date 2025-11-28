@@ -61,7 +61,17 @@ export default {
         modalsUpdateBg:{
           save:'green',
           cancel:'gray'
+        },
+        cardBackgrounds: {
+          bg1: '#FFF7ED',  // orange-50
+          bg2: '#FEFCE8',  // yellow-50
+          bg3: '#EEF2FF',  // indigo-50
+          bg4: '#FDF2F8',  // pink-50
+          bg5: '#FFFBEB',  // amber-50
+          bg6: '#F0FDFA',  // teal-50
+          bg7: '#F9FAFB',  // gray-50
         }
+        
       },
 
       // ===== SPACING SYSTEM =====

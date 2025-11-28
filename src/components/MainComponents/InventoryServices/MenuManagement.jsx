@@ -400,13 +400,18 @@ const MenuManagement = ({ clientId, token }) => {
   const handleExportToExcel = () => {
     const exportData = filteredItems.map(item => ({
       ID: item.id,
+      Line_Items:item.line_item_id,
       Name: item.name,
       Description: item.description,
       Category: item.category,
+      Realm:item.realm,
+      Image: item.image_id,
       Unit_Price: item.unit_price,
       Discount: item.discount,
       Availability: item.availability,
-      Unit: item.unit
+      Unit: item.unit,
+      Serving_Quantity:item.serving_qyantity,
+      Serving_unit:item.serving_unit
     }));
 
     const worksheet = XLSX.utils.json_to_sheet(exportData);
@@ -507,7 +512,7 @@ const MenuManagement = ({ clientId, token }) => {
 
         // Step 3: Refresh items
         const itemRes = await axios.get(
-          `${import.meta.env.VITE_API_INVENTORY_SERVICE_URL}/${clientId}/menu/read`,
+          `${import.meta.env.VITE_API_INVENTORY_SERVICE_URL}/${clientId}/menu/read?realm=${realm}`,
           { headers: { Authorization: `Bearer ${token}` } }
         );
         setMenuItems(itemRes.data.data);
