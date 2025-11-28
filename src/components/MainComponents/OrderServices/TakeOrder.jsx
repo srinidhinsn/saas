@@ -150,7 +150,7 @@ const LineItemsModal = ({ isOpen, onClose, mainItem, lineItems, onAddWithLineIte
   );
 };
 
-const TakeOrder = ({ clientId, token, onOrderUpdate }) => {
+const TakeOrder = ({ clientId, token, onOrderUpdate,realm }) => {
 
 const [searchOpen, setSearchOpen] = useState(false);
 const [searchQuery, setSearchQuery] = useState('');
@@ -226,7 +226,7 @@ const searchInputRef = useRef(null);
             { headers: { Authorization: `Bearer ${token}` } }
           ),
           axios.get(
-            `${import.meta.env.VITE_API_INVENTORY_SERVICE_URL}/${clientId}/menu/read`,
+            `${import.meta.env.VITE_API_INVENTORY_SERVICE_URL}/${clientId}/menu/read?realm=${realm}`,
             { headers: { Authorization: `Bearer ${token}` } }
           )
         ]);

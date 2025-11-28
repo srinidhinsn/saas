@@ -3,7 +3,6 @@ import { Plus, Minus, X, Search, Edit, Trash2, Upload, Download } from 'lucide-r
 import axios from 'axios';
 import * as XLSX from 'xlsx';
 import MenuCategoryTree from './Tree&CategoryManage/MenuCategoryTree';
-import MenuTreeNode from './Tree&CategoryManage/MenuTreeNode';
 import MenuImagePreview from './Tree&CategoryManage/MenuImagePreview';
 
 
@@ -61,7 +60,7 @@ const DropdownCheckbox = ({ selected = [], options = [], onChange, label = "Sele
 };
 
 // Main Menu Management Component
-const MenuManagement = ({ clientId, token }) => {
+const MenuManagement = ({ clientId, token, realm}) => {
   const [searchOpen, setSearchOpen] = useState(false);
   const [searchQuery, setSearchQuery] = useState('');
   const searchInputRef = useRef(null);
@@ -132,7 +131,7 @@ const MenuManagement = ({ clientId, token }) => {
             { headers: { Authorization: `Bearer ${token}` } }
           ),
           axios.get(
-            `${import.meta.env.VITE_API_INVENTORY_SERVICE_URL}/${clientId}/menu/read`,
+            `${import.meta.env.VITE_API_INVENTORY_SERVICE_URL}/${clientId}/menu/read?realm=${realm}`,
             { headers: { Authorization: `Bearer ${token}` } }
           )
         ]);

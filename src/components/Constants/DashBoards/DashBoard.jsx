@@ -550,7 +550,7 @@ import axios from 'axios';
 */
 
 const KPICard = ({ icon, bg, value, label, accent }) => (
-  <div className="bg-white rounded-2xl shadow-sm p-4 flex items-center gap-4 border border-transparent hover:shadow-lg transition-shadow duration-200">
+  <div className="bg-bg-primary rounded-2xl shadow-sm p-4 flex items-center gap-4 border border-transparent hover:shadow-lg transition-shadow duration-200">
     <div className={`w-14 h-14 rounded-lg flex items-center justify-center ${bg} text-orange-600 text-2xl`}>
       {icon}
     </div>
@@ -563,7 +563,7 @@ const KPICard = ({ icon, bg, value, label, accent }) => (
 );
 
 const SmallStat = ({ title, value }) => (
-  <div className="bg-white rounded-lg p-3 text-center shadow-sm">
+  <div className="bg-bg-primary rounded-lg p-3 text-center shadow-sm">
     <div className="text-sm text-gray-500">{title}</div>
     <div className="text-lg font-semibold text-gray-800">{value}</div>
   </div>
@@ -810,7 +810,7 @@ const DashBoardPage = () => {
             </select>
 
             <button
-              className="ml-2 px-4 py-2 bg-gradient-to-r from-orange-500 to-orange-400 text-white rounded-lg shadow hover:from-orange-600 hover:to-orange-500 transition"
+              className="ml-2 px-4 py-2 bg-gradient-to-r from-action-primary to-orange-400 text-white rounded-lg shadow hover:from-orange-600 hover:to-orange-500 transition"
               onClick={() => setShowDropdown(s => !s)}
               ref={dropdownRef}
             >
@@ -869,7 +869,7 @@ const DashBoardPage = () => {
           </div>
 
           {/* Status Pie + Top Items */}
-          <div className="bg-white rounded-2xl shadow p-5 flex flex-col gap-4">
+          <div className="bg-bg-primary rounded-2xl shadow p-5 flex flex-col gap-4">
             <div className="flex items-center justify-between">
               <h3 className="text-lg font-semibold text-gray-800">Order Status</h3>
               <div className="text-sm text-gray-500">Realtime</div>
@@ -913,7 +913,7 @@ const DashBoardPage = () => {
 
         {/* Orders Line chart + small widgets */}
         <div className="grid grid-cols-1 lg:grid-cols-2 gap-6">
-          <div className="bg-white rounded-2xl shadow p-5">
+          <div className="bg-bg-primary rounded-2xl shadow p-5">
             <div className="flex items-center justify-between">
               <div>
                 <h3 className="text-lg font-semibold text-gray-800">Order sales</h3>
