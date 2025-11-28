@@ -5,9 +5,9 @@ import { toast } from "react-toastify";
 import { injectThemeVars } from '../../utils/injectThemeVars'
 
 const statusConfig = {
-    Vacant: { card: "bg-tableStatusBg-vacant border-green-300", icon: <FaCheck className="text-action-success text-xl" />, label: "Available" },
-    Occupied: { card: "bg-tableStatusBg-occupied border-red-300", icon: <FaUsers className="text-action-danger text-xl" />, label: "Occupied" },
-    Reserved: { card: "bg-tableStatusBg-reserved border-yellow-300", icon: <FaClock className="text-action-primary text-xl" />, label: "Reserved" }
+    Vacant: { card: "bg-tableStatusBg-vacant border-tableStatusBorder-vacant", icon: <FaCheck className="text-action-success text-xl" />, label: "Available" },
+    Occupied: { card: "bg-tableStatusBg-occupied border-tableStatusBorder-occupied", icon: <FaUsers className="text-action-danger text-xl" />, label: "Occupied" },
+    Reserved: { card: "bg-tableStatusBg-reserved border-tableStatusBorder-reserved", icon: <FaClock className="text-action-primary text-xl" />, label: "Reserved" }
 };
 
 const TableManagement = ({ clientId, token }) => {
@@ -503,19 +503,19 @@ const TableManagement = ({ clientId, token }) => {
 
                         <div className="flex flex-wrap gap-2">
                             <button
-                                className="flex items-center gap-2 px-4 py-2 bg-bulkActions-update text-text-white rounded-lg hover:bg-bulkActionsHover-updateHover hover:text-text-primary transition-colors font-semibold text-sm shadow-md"
+                                className="flex items-center gap-2 px-4 py-2 bg-action-primary text-text-white rounded-lg hover:bg-bulkActionsHover-updateHover hover:text-text-primary transition-colors font-semibold text-sm shadow-md"
                                 onClick={openBulkUpdate}
                             >
                                 <FaEdit /> <span>Bulk Update</span> 
                             </button>
                             <button
-                                className="flex items-center gap-2 px-4 py-2 bg-bulkActions-delete text-white rounded-lg hover:bg-bulkActionsHover-deleteHover hover:text-text-primary transition-colors font-semibold text-sm shadow-md"
+                                className="flex items-center gap-2 px-4 py-2 bg-bulkActions-delete text-text-white rounded-lg hover:bg-bulkActionsHover-deleteHover hover:text-text-primary transition-colors font-semibold text-sm shadow-md"
                                 onClick={openBulkDelete}
                             >
                                 <FaTrash /> <span>Bulk Delete</span>
                             </button>
                             <button
-                                className="flex items-center gap-2 px-4 py-2 bg-bulkActions-adding text-white rounded-lg hover:bg-bulkActionsHover-addingHover hover:text-text-primary transition-colors font-semibold text-sm shadow-md"
+                                className="flex items-center gap-2 px-4 py-2 bg-bulkActions-adding text-text-white rounded-lg hover:bg-bulkActionsHover-addingHover hover:text-text-primary transition-colors font-semibold text-sm shadow-md"
                                 onClick={() => {
                                     setShowAddTable(true);
                                     setTableRanges([{
@@ -559,13 +559,13 @@ const TableManagement = ({ clientId, token }) => {
 
                                 <div className="p-2 bg-bg-primary bg-opacity-50 flex gap-1.5">
                                     <button
-                                        className="flex-1 flex items-center justify-center gap-1 bg-bulkActions-update text-text-white py-1.5 rounded hover:bg-bulkActionsHover-updateHover hover:text-text-primary transition-colors font-semibold text-xs shadow-sm"
+                                        className="flex-1 flex items-center justify-center gap-1 bg-action-primary text-text-white py-1.5 rounded hover:bg-bulkActionsHover-updateHover hover:text-text-primary transition-colors font-semibold text-xs shadow-sm"
                                         onClick={() => setEditRowId(table.id)}
                                     >
                                         <FaEdit className="text-xs" /> Edit
                                     </button>
                                     <button
-                                        className="flex-1 flex items-center justify-center gap-1 bg-bulkActions-delete text-white py-1.5 rounded hover:bg-bulkActionsHover-deleteHover hover:text-text-primary transition-colors font-semibold text-xs shadow-sm"
+                                        className="flex-1 flex items-center justify-center gap-1 bg-action-danger text-text-white py-1.5 rounded hover:bg-bulkActionsHover-deleteHover hover:text-text-primary transition-colors font-semibold text-xs shadow-sm"
                                         onClick={() => { setDeleteTableId(table.id); setShowConfirmDelete(true); }}
                                     >
                                         <FaTrash className="text-xs" /> Delete
@@ -773,7 +773,7 @@ const TableManagement = ({ clientId, token }) => {
                                     </div>
                                     <div className="flex gap-2 mt-5">
                                         <button
-                                            className="flex-1 bg-modalsUpdateBg-save text-text-white py-2.5 rounded-lg hover:bg-green-600 transition-colors font-bold shadow-md flex items-center justify-center gap-2"
+                                            className="flex-1 bg-action-primary text-text-white py-2.5 rounded-lg hover:bg-green-600 transition-colors font-bold shadow-md flex items-center justify-center gap-2"
                                             onClick={() => saveEdit(table)}
                                         >
                                             <FaCheck /> Save
@@ -1044,12 +1044,12 @@ const TableManagement = ({ clientId, token }) => {
                                                 />
                                                 <div className="flex-1">
                                                     <div className="flex items-center justify-between mb-1">
-                                                        <span className="font-bold text-lg text-gray-800">{table.name}</span>
+                                                        <span className="font-bold text-lg text-text-primary">{table.name}</span>
                                                         {selectedDeleteTables.includes(table.id) && (
-                                                            <span className="text-xs bg-red-100 text-red-700 px-2 py-1 rounded-full font-semibold">Will be deleted</span>
+                                                            <span className="text-xs bg-tableStatusBg-occupied text-action-danger px-2 py-1 rounded-full font-semibold">Will be deleted</span>
                                                         )}
                                                     </div>
-                                                    <span className="text-sm text-gray-600">
+                                                    <span className="text-sm text-text-secondary">
                                                         <strong>Seating:</strong> {table.table_type} | <strong>Status:</strong> {table.status} | <strong>Zone:</strong> {table.location_zone}
                                                     </span>
                                                 </div>
@@ -1060,9 +1060,9 @@ const TableManagement = ({ clientId, token }) => {
                             </div>
 
                             {/* Footer */}
-                            <div className="px-6 py-4 bg-gray-50 border-t flex gap-3">
+                            <div className="px-4 py-2 bg-bg-primary border-t flex gap-3">
                                 <button
-                                    className="flex-1 bg-red-500 text-white py-3 rounded-lg hover:bg-red-600 transition-colors font-bold shadow-md disabled:bg-gray-300 disabled:cursor-not-allowed flex items-center justify-center gap-2"
+                                    className="flex-1 bg-action-danger text-text-white py-3 rounded-lg hover:bg-action-primary transition-colors font-bold shadow-md disabled:bg-gray-300 disabled:cursor-not-allowed flex items-center justify-center gap-2"
                                     onClick={() => {
                                         setShowBulkDelete(false);
                                         setShowFirstDeleteConfirm(true);
@@ -1072,7 +1072,7 @@ const TableManagement = ({ clientId, token }) => {
                                     <FaTrash /> Delete {selectedDeleteTables.length} Table(s)
                                 </button>
                                 <button
-                                    className="flex-1 bg-gray-200 text-gray-700 py-3 rounded-lg hover:bg-gray-300 transition-colors font-bold flex items-center justify-center gap-2"
+                                    className="flex-1 bg-modalsUpdateBg-cancel text-text-primary py-3 rounded-lg hover:bg-bg-tertiary transition-colors font-bold flex items-center justify-center gap-2"
                                     onClick={() => setShowBulkDelete(false)}
                                 >
                                     <FaTimes /> Cancel
@@ -1084,24 +1084,23 @@ const TableManagement = ({ clientId, token }) => {
 
                 {/* First Delete Confirmation */}
                 {showFirstDeleteConfirm && (
-                    <div className="fixed inset-0 bg-black bg-opacity-50 z-50 flex items-center justify-center p-4">
-                        <div className="bg-white rounded-xl w-full max-w-md shadow-2xl border-2 border-yellow-400 animate-scale-in">
+                    <div className="fixed inset-0 bg-color-modalsbg bg-opacity-50 z-50 flex items-center justify-center p-4">
+                        <div className="bg-bg-primary rounded-xl w-full max-w-md shadow-2xl border-2 border-border-default animate-scale-in">
                             <div className="p-6 text-center">
-                                <div className="text-5xl mb-3">⚠️</div>
-                                <h3 className="text-2xl font-bold text-gray-800 mb-2">Confirm Deletion</h3>
-                                <p className="text-gray-600 mb-3">
-                                    Delete <strong className="text-red-600 text-xl">{selectedDeleteTables.length}</strong> table(s)?
+                                <h3 className="text-2xl font-bold text-text-primary mb-2">Confirm Deletion</h3>
+                                <p className="text-text-secondary mb-3">
+                                    Delete <strong className="text-action-danger text-xl">{selectedDeleteTables.length}</strong> table(s)?
                                 </p>
-                                <div className="flex flex-wrap gap-2 justify-center mb-5 max-h-32 overflow-y-auto p-2 bg-gray-50 rounded-lg">
+                                <div className="flex flex-wrap gap-2 justify-center mb-5 max-h-32 overflow-y-auto p-2 bg-bg-tertiary rounded-lg">
                                     {tables.filter(t => selectedDeleteTables.includes(t.id)).map(t => (
-                                        <span key={t.id} className="px-2.5 py-1 bg-red-100 text-red-700 rounded-full text-sm font-bold border border-red-300">
+                                        <span key={t.id} className="px-2.5 py-1 bg-tableStatusBg-occupied text-action-danger rounded-full text-sm font-bold border border-red-300">
                                             {t.name}
                                         </span>
                                     ))}
                                 </div>
                                 <div className="flex gap-3">
                                     <button
-                                        className="flex-1 bg-yellow-500 text-white py-2.5 rounded-lg hover:bg-yellow-600 transition-colors font-bold shadow-md"
+                                        className="flex-1 bg-action-danger text-text-white py-2.5 rounded-lg hover:bg-action-primary transition-colors font-bold shadow-md"
                                         onClick={() => {
                                             setShowFirstDeleteConfirm(false);
                                             setShowSecondDeleteConfirm(true);
@@ -1110,7 +1109,7 @@ const TableManagement = ({ clientId, token }) => {
                                         Continue
                                     </button>
                                     <button
-                                        className="flex-1 bg-gray-200 text-gray-700 py-2.5 rounded-lg hover:bg-gray-300 transition-colors font-bold"
+                                        className="flex-1 bg-modalsUpdateBg-cancel text-text-primary py-2.5 rounded-lg hover:bg-bg-tertiary transition-colors font-bold"
                                         onClick={() => setShowFirstDeleteConfirm(false)}
                                     >
                                         Cancel
@@ -1123,28 +1122,27 @@ const TableManagement = ({ clientId, token }) => {
 
                 {/* Second Delete Confirmation */}
                 {showSecondDeleteConfirm && (
-                    <div className="fixed inset-0 bg-black bg-opacity-70 z-50 flex items-center justify-center p-4">
-                        <div className="bg-white rounded-xl w-full max-w-md shadow-2xl border-4 border-red-500 animate-scale-in">
+                    <div className="fixed inset-0 bg-color-modalsbg bg-opacity-70 z-50 flex items-center justify-center p-4">
+                        <div className="bg-bg-primary rounded-xl w-full max-w-md shadow-2xl border-default border-red-300 animate-scale-in">
                             <div className="p-6 text-center">
-                                <div className="text-6xl mb-3">🗑️</div>
-                                <h3 className="text-2xl font-bold text-red-600 mb-3">Final Confirmation</h3>
-                                <div className="bg-red-50 border-2 border-red-300 rounded-lg p-3 mb-5">
+                                <h3 className="text-2xl font-bold text-action-danger mb-3">Final Confirmation</h3>
+                                <div className="bg-tableStatusBg-occupied border-2 border-red-300 rounded-lg p-3 mb-5">
                                     <p className="text-gray-800 font-semibold text-base mb-1">
-                                        <span className="text-red-600 font-black text-lg">IRREVERSIBLE ACTION</span>
+                                        <span className="text-action-danger font-black text-lg">IRREVERSIBLE ACTION</span>
                                     </p>
-                                    <p className="text-gray-700 text-sm">
+                                    <p className="text-text-primary text-sm">
                                         All selected tables will be permanently deleted
                                     </p>
                                 </div>
                                 <div className="flex gap-3">
                                     <button
-                                        className="flex-1 bg-red-600 text-white py-3 rounded-lg hover:bg-red-700 transition-colors font-bold shadow-lg flex items-center justify-center gap-2"
+                                        className="flex-1 bg-action-danger text-text-white py-3 rounded-lg hover:bg-action-primary  transition-colors font-bold shadow-lg flex items-center justify-center gap-2"
                                         onClick={confirmBulkDelete}
                                     >
                                         <FaTrash /> Confirm Delete
                                     </button>
                                     <button
-                                        className="flex-1 bg-gray-200 text-gray-700 py-3 rounded-lg hover:bg-gray-300 transition-colors font-bold"
+                                        className="flex-1 bg-modalsUpdateBg-cancel text-text-primary py-3 rounded-lg hover:bg-bg-tertiary transition-colors font-bold"
                                         onClick={() => {
                                             setShowSecondDeleteConfirm(false);
                                             setShowFirstDeleteConfirm(false);
@@ -1160,28 +1158,28 @@ const TableManagement = ({ clientId, token }) => {
 
                 {/* Single Delete Confirmation */}
                 {showConfirmDelete && (
-                    <div className="fixed inset-0 bg-black bg-opacity-50 z-50 flex items-center justify-center p-4">
-                        <div className="bg-white rounded-xl w-full max-w-sm shadow-2xl border border-gray-200 animate-scale-in">
-                            <div className="px-5 py-3 border-b flex justify-between items-center bg-gradient-to-r from-red-50 to-pink-50">
-                                <h2 className="text-lg font-bold text-red-600 flex items-center gap-2">
+                    <div className="fixed inset-0 bg-color-modalsbg bg-opacity-50 z-50 flex items-center justify-center p-4">
+                        <div className="bg-bg-primary rounded-xl w-full max-w-sm shadow-2xl border border-border-default animate-scale-in">
+                            <div className="px-5 py-3 border-b rounded-xl flex justify-between items-center bg-gradient-to-r from-red-50 to-pink-50">
+                                <h2 className="text-lg font-bold text-action-danger flex items-center gap-2">
                                     <FaTrash /> Delete Table
                                 </h2>
-                                <button onClick={() => setShowConfirmDelete(false)} className="text-gray-500 hover:text-gray-700 transition-colors p-1 hover:bg-gray-200 rounded-full">
+                                <button onClick={() => setShowConfirmDelete(false)} className="text-text-primary hover:text-text-secondary transition-colors p-1 rounded-full">
                                     <FaTimes size={20} />
                                 </button>
                             </div>
                             <div className="p-5">
                                 <div className="text-center">
                                     {/* <div className="text-5xl mb-3">🗑️</div> */}
-                                    <p className="text-gray-700 mb-3">
-                                        Delete table <strong className="text-red-600 text-lg">{tables.find(t => t.id === deleteTableId)?.name || "this table"}</strong>?
+                                    <p className="text-text-primary mb-3">
+                                        Delete table <strong className="text-action-danger text-lg">{tables.find(t => t.id === deleteTableId)?.name || "this table"}</strong>?
                                     </p>
-                                    <p className="text-sm text-red-600 bg-red-200 p-2 rounded border border-red-400 mb-4">
+                                    <p className="text-sm text-action-danger bg-red-200 p-2 rounded border border-red-300 mb-4">
                                         This action cannot be undone
                                     </p>
                                     <div className="flex justify-center gap-3">
-                                        <button className="bg-red-500 text-white rounded-lg px-6 py-2 font-semibold hover:bg-red-700 transition-colors shadow-md" onClick={confirmDelete}>Delete</button>
-                                        <button className="bg-gray-200 text-gray-700 rounded-lg px-6 py-2 font-semibold hover:bg-gray-300 transition-colors" onClick={() => setShowConfirmDelete(false)}>Cancel</button>
+                                        <button className="bg-action-danger text-text-white rounded-lg px-6 py-2 font-semibold hover:bg-action-primary transition-colors shadow-md" onClick={confirmDelete}>Delete</button>
+                                        <button className="bg-modalsUpdateBg-cancel text-text-primary rounded-lg px-6 py-2 font-semibold hover:bg-bg-tertiary transition-colors" onClick={() => setShowConfirmDelete(false)}>Cancel</button>
                                     </div>
                                 </div>
                             </div>
