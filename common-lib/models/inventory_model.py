@@ -8,17 +8,13 @@ Q = TypeVar("Q")
 class Inventory(BaseModel):
     id: Optional[int] = None
     client_id: Optional[str] = None
-    # inventory_id: 1 => menu, 2 => stock
     inventory_id: Optional[int] = None
-    # For menu items: list of stock item ids used (legacy/quick lookup)
     line_item_id: Optional[List[int]] = None
-    # Optional structured recipe list: [{"stock_item_id": 5, "quantity_required": 2.0, "unit":"pcs"}, ...]
     recipe: Optional[List[Dict[str, Any]]] = None
-
     name: Optional[str] = None
     description: Optional[str] = None
     category_id: Optional[str] = None
-    realm: Optional[str] = None  # kept for compatibility if used elsewhere
+    realm: Optional[str] = None 
     serving_quantity: Optional[float] = None
     serving_unit: Optional[str] = None
     availability: Optional[float] = None
