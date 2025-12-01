@@ -274,32 +274,49 @@ export default function StockRecipeManager(props) {
 
   const applyStockBulkImport = async () => {
     if (!bulkPreview.length) return showError("No rows to import");
+  
     try {
-      // try bulk_create endpoint if present, otherwise create one-by-one
-      try {
-        await axios.post(`${API_BASE_MENU}/stock/bulk_create?client_id=${clientId}`, { items: bulkPreview }, getAuthHeaders());
-      } catch {
-        for (const row of bulkPreview) {
-          const payload = {
-            name: row.name || row.name?.trim() || "",
-            description: row.description || "",
-            category: row.category || "",
-            availability: row.availability || 0,
-            unit: row.unit || "",
-            unit_price: row.unit_price || 0,
+      // STEP 1 → Delete old records first
+      await axios.delete(
+        `${API_BASE_MENU}/stock/delete_by_realm_inventory`,
+        {
+          params: {
+            client_id: clientId,
+            realm: "inventory",
             inventory_id: 2,
-          };
-          await axios.post(`${API_BASE_MENU}/stock/create?client_id=${clientId}`, payload, getAuthHeaders());
+          },
+          ...getAuthHeaders()
         }
+      );
+  
+      // STEP 2 → Import rows one-by-one
+      for (const row of bulkPreview) {
+        const payload = {
+          name: row.name?.trim() || "",
+          description: row.description || "",
+          category: row.category || "",
+          availability: row.availability || 0,
+          unit: row.unit || "",
+          unit_price: row.unit_price || 0,
+          inventory_id: 2,
+          realm: "inventory",
+          recipe: row.recipe ? JSON.parse(row.recipe) : null
+        };
+  
+        await axios.post(`${API_BASE_MENU}/stock/create?client_id=${clientId}`, payload, getAuthHeaders());
       }
+  
+      // UI cleanup
       setBulkPreview([]);
       setBulkName("");
       await fetchStocks();
+  
     } catch (err) {
       console.error("applyStockBulkImport:", err);
       showError("Bulk import failed");
     }
   };
+  
 
   const handleExportStockCSV = () => {
     if (!stocks.length) return showError("No stock data to export");
@@ -375,62 +392,6 @@ export default function StockRecipeManager(props) {
     }
   };
 
-  // ---- Recipe CSV Export / Import (simple) ----
-  // Export columns: stock_item_id,stock_name,quantity_required,unit
-  const handleExportRecipeCSV = () => {
-    if (!selectedMenuId) return showError("Select a menu item to export recipe");
-    const headers = ["stock_item_id", "stock_name", "quantity_required", "unit"];
-    const lines = [headers.join(",")];
-    (recipe || []).forEach((r) => {
-      const stock = stocks.find((s) => Number(s.id) === Number(r.stock_item_id));
-      const row = [
-        escapeForCSV(r.stock_item_id),
-        escapeForCSV(stock?.name || ""),
-        escapeForCSV(r.quantity_required),
-        escapeForCSV(r.unit)
-      ];
-      lines.push(row.join(","));
-    });
-    const blob = new Blob([lines.join("\n")], { type: "text/csv;charset=utf-8;" });
-    const url = URL.createObjectURL(blob);
-    const a = document.createElement("a");
-    a.href = url;
-    a.download = `recipe_${selectedMenuId}_${clientId}_${new Date().toISOString().slice(0,10)}.csv`;
-    a.click();
-    URL.revokeObjectURL(url);
-  };
-
-  const handleImportRecipeCSV = (file) => {
-    if (!file) return;
-    if (!selectedMenuId) return showError("Select a menu item before importing recipe");
-    const reader = new FileReader();
-    reader.onload = async (e) => {
-      try {
-        const text = e.target.result;
-        const rows = parseCSVText(text);
-        if (!rows.length) return showError("Empty CSV");
-        const headers = rows[0].map(h => h.trim().toLowerCase());
-        const dataRows = rows.slice(1).map((r) => {
-          const obj = {};
-          for (let i = 0; i < headers.length; i++) obj[headers[i]] = r[i] ?? "";
-          return obj;
-        });
-        // map to recipe array (stock_item_id, quantity_required, unit)
-        const newRecipe = dataRows.map((row) => ({
-          stock_item_id: Number(row.stock_item_id || row.stock_id || row.id || ""),
-          quantity_required: row.quantity_required || row.qty || row.quantity || 0,
-          unit: row.unit || ""
-        })).filter(r => Number(r.stock_item_id));
-        await axios.post(`${API_BASE_MENU}/recipe/update?client_id=${clientId}&menu_item_id=${selectedMenuId}`, { recipe: newRecipe }, getAuthHeaders());
-        await fetchRecipe(selectedMenuId);
-      } catch (err) {
-        console.error("handleImportRecipeCSV:", err);
-        showError("Failed to import recipe CSV");
-      }
-    };
-    reader.readAsText(file);
-  };
-
   // ---- small helpers ----
   const resetStockForm = () => setStockForm({ id: null, name: "", description: "", category: "", availability: "", unit: "", unit_price: "" });
 
@@ -441,7 +402,7 @@ export default function StockRecipeManager(props) {
         {/* Header */}
         <div className="flex flex-col md:flex-row md:items-center md:justify-between gap-4 mb-6">
           <div>
-            <div className="w-1.5 h-8 rounded bg-gradient-to-b from-orange-400 to-orange-600 mb-2" />
+            <div className="w-1.5 h-8 rounded bg-gradient-to-b bg-action-primary mb-2" />
             <h1 className="text-2xl font-semibold text-gray-900">Inventory & Recipe Manager</h1>
             <p className="text-sm text-gray-500 mt-1">Manage stocks and link ingredients to menu items</p>
           </div>
@@ -686,7 +647,7 @@ export default function StockRecipeManager(props) {
                         <input placeholder="Unit (g, ml, pcs)" className="border p-2 rounded" value={newIngredient.unit} onChange={(e) => setNewIngredient((p) => ({ ...p, unit: e.target.value }))} />
 
                         <div className="flex gap-2">
-                          <button onClick={handleAddIngredient} className="px-3 py-2 rounded bg-gradient-to-r from-action-primary to-orange-400 text-white">+ Add Link</button>
+                          <button onClick={handleAddIngredient} className="px-3 py-2 rounded bg-gradient-to-r bg-action-primary text-white">+ Add Link</button>
                           <button onClick={() => setNewIngredient({ stock_item_id: "", quantity_required: "", unit: "" })} className="px-3 py-2 rounded bg-white border">Reset</button>
                         </div>
                       </div>

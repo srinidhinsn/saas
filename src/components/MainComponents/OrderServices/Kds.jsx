@@ -698,297 +698,297 @@ const KitchenDisplay = () => {
     };
 
     return (
-        
-            <>
+
+        <>
             <div className="min-h-screen w-full bg-gray-50 text-gray-900">
-            <div className="mx-auto px-4 py-6 lg:py-8">
-                <div className="text-center mb-6 lg:mb-8">
-                    <h1 className="text-3xl md:text-4xl lg:text-5xl font-serif italic mb-3 lg:mb-4" style={{ color: 'var(--color-text-primary)' }}>Kitchen Display System</h1>
-                </div>
-                <div className="w-full">
-                    {loading ? (
-                        <div className="flex items-center justify-center py-12">
-                            <div className="text-lg font-medium text-gray-500">Loading orders...</div>
-                        </div>
-                    ) : (
-                        <div className="grid grid-cols-1 sm:grid-cols-2 lg:grid-cols-3 xl:grid-cols-4 gap-5">
-                            {orders.map((order) => {
-                                const isEditing = editOrderId === order.id;
-                                const isAdding = addingOrderId === order.id;
-                                return (
-                                    <div
-                                        key={order.id}
-                                        className={`
+                <div className="mx-auto px-4 py-6 lg:py-8">
+                    <div className="text-center mb-6 lg:mb-8">
+                        <h1 className="text-3xl md:text-4xl lg:text-5xl font-serif italic mb-3 lg:mb-4" style={{ color: 'var(--color-text-primary)' }}>Kitchen Display System</h1>
+                    </div>
+                    <div className="w-full">
+                        {loading ? (
+                            <div className="flex items-center justify-center py-12">
+                                <div className="text-lg font-medium text-gray-500">Loading orders...</div>
+                            </div>
+                        ) : (
+                            <div className="grid grid-cols-1 sm:grid-cols-2 lg:grid-cols-3 xl:grid-cols-4 gap-5">
+                                {orders.map((order) => {
+                                    const isEditing = editOrderId === order.id;
+                                    const isAdding = addingOrderId === order.id;
+                                    return (
+                                        <div
+                                            key={order.id}
+                                            className={`
                           rounded-xl shadow-md overflow-hidden border border-gray-200 bg-white
                           transition-transform transform hover:-translate-y-0.5
                           ${cardColors(order)}
                         `}
-                                    >
-                                        {/* Card header */}
-                                        <div className="flex items-center justify-between px-4 py-3 bg-orange-500 text-white">
-                                            <div className="flex items-center gap-2">
-                                                <span className="text-sm md:text-base font-semibold">
-                                                    {tablesMap[order.table_id] || order.table_number || order.customer_name || "N/A"}
-                                                </span>
-                                                <span className="text-xs text-orange-100/80 ml-1">#{order.id}</span>
+                                        >
+                                            {/* Card header */}
+                                            <div className="flex items-center justify-between px-4 py-3 bg-action-primary text-text-white">
+                                                <div className="flex items-center gap-2">
+                                                    <span className="text-sm md:text-base font-semibold">
+                                                        {tablesMap[order.table_id] || order.table_number || order.customer_name || "N/A"}
+                                                    </span>
+                                                    <span className="text-xs text-orange-100/80 ml-1">#{order.id}</span>
+                                                </div>
+
+                                                <div className="flex items-center gap-2">
+                                                    {/* commented actions preserved but hidden visually */}
+                                                </div>
                                             </div>
 
-                                            <div className="flex items-center gap-2">
-                                                {/* commented actions preserved but hidden visually */}
-                                            </div>
-                                        </div>
+                                            {/* Card body */}
+                                            <div className="bg-bg-primary px-4 py-4 space-y-3">
+                                                {order.items.map((item, idx) => {
+                                                    const divider = order.batch_dividers?.find(d => d.index === idx);
 
-                                        {/* Card body */}
-                                        <div className="bg-gray-50 px-4 py-4 space-y-3">
-                                            {order.items.map((item, idx) => {
-                                                const divider = order.batch_dividers?.find(d => d.index === idx);
+                                                    return (
+                                                        <React.Fragment key={item.id || idx}>
+                                                            {/* Batch divider */}
+                                                            {divider && <div className="w-full border-t-2 border-dashed border-orange-200 my-2" />}
 
-                                                return (
-                                                    <React.Fragment key={item.id || idx}>
-                                                        {/* Batch divider */}
-                                                        {divider && <div className="w-full border-t-2 border-dashed border-orange-200 my-2" />}
-
-                                                        {/* Item row */}
-                                                        <div
-                                                            className={`
+                                                            {/* Item row */}
+                                                            <div
+                                                                className={`
                                     flex items-center w-full p-3 rounded-lg
                                     ${item.is_new_item ? "bg-orange-50" : "bg-white"}
                                     ${isEditing ? "cursor-pointer hover:shadow-sm" : "cursor-default"}
                                   `}
-                                                        >
-                                                            {/* Item name / editable */}
-                                                            <div className="flex-1">
-                                                                {isEditing ? (
-                                                                    <input
-                                                                        value={item.item_name}
-                                                                        onChange={(e) => updateItemName(order.id, item.item_id, e.target.value)}
-                                                                        className="w-full px-3 py-2 rounded-md border border-gray-300 focus:outline-none focus:ring-2 focus:ring-orange-500 bg-white text-gray-900"
-                                                                    />
-                                                                ) : (
-                                                                    <div className="flex items-center justify-between w-full">
-                                                                        <span className="font-medium text-sm">
-                                                                            {`${item.quantity}x ${item.item_name || "Unnamed Item"}`}
-                                                                        </span>
-                                                                    </div>
+                                                            >
+                                                                {/* Item name / editable */}
+                                                                <div className="flex-1">
+                                                                    {isEditing ? (
+                                                                        <input
+                                                                            value={item.item_name}
+                                                                            onChange={(e) => updateItemName(order.id, item.item_id, e.target.value)}
+                                                                            className="w-full px-3 py-2 rounded-md border border-gray-300 focus:outline-none focus:ring-2 focus:ring-orange-500 bg-white text-gray-900"
+                                                                        />
+                                                                    ) : (
+                                                                        <div className="flex items-center justify-between w-full">
+                                                                            <span className="font-medium text-sm">
+                                                                                {`${item.quantity}x ${item.item_name || "Unnamed Item"}`}
+                                                                            </span>
+                                                                        </div>
+                                                                    )}
+                                                                </div>
+
+                                                                {/* Status icons */}
+                                                                <div className="flex items-center gap-3 ml-3">
+                                                                    <button
+                                                                        type="button"
+                                                                        onClick={() => handleItemStatusChange(order.id, item.id, "pending")}
+                                                                        title="Pending"
+                                                                        className="p-2 rounded-md hover:bg-gray-100"
+                                                                    >
+                                                                        <FaClock
+                                                                            className={item.status === "pending" ? "text-blue-600" : "text-gray-500"}
+                                                                            title="Pending"
+                                                                        />
+                                                                    </button>
+
+                                                                    <button
+                                                                        type="button"
+                                                                        onClick={() => handleItemStatusChange(order.id, item.id, "preparing")}
+                                                                        title="Preparing"
+                                                                        className="p-2 rounded-md hover:bg-gray-100"
+                                                                    >
+                                                                        <FaHourglassHalf
+                                                                            className={item.status === "preparing" ? "text-orange-500" : "text-gray-500"}
+                                                                            title="Preparing"
+                                                                        />
+                                                                    </button>
+
+                                                                    <button
+                                                                        type="button"
+                                                                        onClick={() => handleItemStatusChange(order.id, item.id, "served")}
+                                                                        title="Served"
+                                                                        className="p-2 rounded-md hover:bg-gray-100"
+                                                                    >
+                                                                        <FaCheckCircle
+                                                                            className={item.status === "served" ? "text-green-500" : "text-gray-500"}
+                                                                            title="Served"
+                                                                        />
+                                                                    </button>
+                                                                </div>
+
+                                                                {/* Measure / extra */}
+                                                                {!isEditing && !isAdding && (
+                                                                    <div className="ml-3 text-sm text-gray-500">{item.measure || ""}</div>
                                                                 )}
                                                             </div>
+                                                        </React.Fragment>
+                                                    );
+                                                })}
 
-                                                            {/* Status icons */}
-                                                            <div className="flex items-center gap-3 ml-3">
-                                                                <button
-                                                                    type="button"
-                                                                    onClick={() => handleItemStatusChange(order.id, item.id, "pending")}
-                                                                    title="Pending"
-                                                                    className="p-2 rounded-md hover:bg-gray-100"
-                                                                >
-                                                                    <FaClock
-                                                                        className={item.status === "pending" ? "text-blue-600" : "text-gray-500"}
-                                                                        title="Pending"
-                                                                    />
-                                                                </button>
+                                                {/* Add item search UI when adding */}
+                                                {isAdding && (
+                                                    <div className="mt-2">
+                                                        <input
+                                                            type="text"
+                                                            placeholder="Search inventory items to add..."
+                                                            value={itemSearchQuery}
+                                                            onChange={(e) => setItemSearchQuery(e.target.value)}
+                                                            className="w-full px-3 py-2 rounded-md border border-gray-300 focus:outline-none focus:ring-2 focus:ring-orange-500 bg-white text-gray-900"
+                                                        />
+                                                        {itemSearchResults.length > 0 && (
+                                                            <ul className="mt-2 max-h-36 overflow-y-auto rounded-md border border-gray-200 bg-white">
+                                                                {itemSearchResults.map((it) => (
+                                                                    <li
+                                                                        key={it.id}
+                                                                        onClick={() => addItemToOrder(order.id, it)}
+                                                                        className="px-3 py-2 hover:bg-gray-100 cursor-pointer flex items-center justify-between text-sm border-b last:border-b-0"
+                                                                    >
+                                                                        <span>{it.name}</span>
+                                                                        <span className="text-gray-600">₹{it.price}</span>
+                                                                    </li>
+                                                                ))}
+                                                            </ul>
+                                                        )}
+                                                    </div>
+                                                )}
+                                            </div>
 
-                                                                <button
-                                                                    type="button"
-                                                                    onClick={() => handleItemStatusChange(order.id, item.id, "preparing")}
-                                                                    title="Preparing"
-                                                                    className="p-2 rounded-md hover:bg-gray-100"
-                                                                >
-                                                                    <FaHourglassHalf
-                                                                        className={item.status === "preparing" ? "text-orange-500" : "text-gray-500"}
-                                                                        title="Preparing"
-                                                                    />
-                                                                </button>
+                                            {/* Card footer (status action) */}
+                                            {!isAdding && !isEditing && order.status !== "served" && (
+                                                <div className="px-4 py-3 border-t border-gray-100 bg-white">
+                                                    <div className="flex items-center gap-3">
+                                                        {order.status === "new" && (
+                                                            <button
+                                                                className="px-3 py-2 rounded-lg bg-action-primary text-text-white font-semibold hover:bg-orange-600"
+                                                                onClick={() => handleStatusChange(order.id, "pending")}
+                                                            >
+                                                                New
+                                                            </button>
+                                                        )}
+                                                        {order.status === "pending" && (
+                                                            <button
+                                                                className="px-3 py-2 rounded-lg bg-yellow-100 text-yellow-700 font-semibold hover:bg-yellow-200"
+                                                                onClick={() => handleStatusChange(order.id, "preparing")}
+                                                            >
+                                                                Preparing!!!
+                                                            </button>
+                                                        )}
+                                                        {order.status === "preparing" && (
+                                                            <button
+                                                                className="px-3 py-2 rounded-lg bg-green-50 text-green-700 font-semibold hover:bg-green-100"
+                                                                onClick={() => {
+                                                                    handleStatusChange(order.id, "preparing");
 
-                                                                <button
-                                                                    type="button"
-                                                                    onClick={() => handleItemStatusChange(order.id, item.id, "served")}
-                                                                    title="Served"
-                                                                    className="p-2 rounded-md hover:bg-gray-100"
-                                                                >
-                                                                    <FaCheckCircle
-                                                                        className={item.status === "served" ? "text-green-500" : "text-gray-500"}
-                                                                        title="Served"
-                                                                    />
-                                                                </button>
-                                                            </div>
-
-                                                            {/* Measure / extra */}
-                                                            {!isEditing && !isAdding && (
-                                                                <div className="ml-3 text-sm text-gray-500">{item.measure || ""}</div>
-                                                            )}
-                                                        </div>
-                                                    </React.Fragment>
-                                                );
-                                            })}
-
-                                            {/* Add item search UI when adding */}
-                                            {isAdding && (
-                                                <div className="mt-2">
-                                                    <input
-                                                        type="text"
-                                                        placeholder="Search inventory items to add..."
-                                                        value={itemSearchQuery}
-                                                        onChange={(e) => setItemSearchQuery(e.target.value)}
-                                                        className="w-full px-3 py-2 rounded-md border border-gray-300 focus:outline-none focus:ring-2 focus:ring-orange-500 bg-white text-gray-900"
-                                                    />
-                                                    {itemSearchResults.length > 0 && (
-                                                        <ul className="mt-2 max-h-36 overflow-y-auto rounded-md border border-gray-200 bg-white">
-                                                            {itemSearchResults.map((it) => (
-                                                                <li
-                                                                    key={it.id}
-                                                                    onClick={() => addItemToOrder(order.id, it)}
-                                                                    className="px-3 py-2 hover:bg-gray-100 cursor-pointer flex items-center justify-between text-sm border-b last:border-b-0"
-                                                                >
-                                                                    <span>{it.name}</span>
-                                                                    <span className="text-gray-600">₹{it.price}</span>
-                                                                </li>
-                                                            ))}
-                                                        </ul>
-                                                    )}
+                                                                    const collectEvent = new CustomEvent("orderCollect", {
+                                                                        detail: {
+                                                                            tableName: tablesMap[order.table_id] || order.table_number || "Unknown Table",
+                                                                            orderId: order.id,
+                                                                        },
+                                                                    });
+                                                                    window.dispatchEvent(collectEvent);
+                                                                }}
+                                                            >
+                                                                Order Ready!!!
+                                                            </button>
+                                                        )}
+                                                    </div>
                                                 </div>
                                             )}
                                         </div>
+                                    );
+                                })}
+                            </div>
+                        )}
+                    </div>
 
-                                        {/* Card footer (status action) */}
-                                        {!isAdding && !isEditing && order.status !== "served" && (
-                                            <div className="px-4 py-3 border-t border-gray-100 bg-white">
-                                                <div className="flex items-center gap-3">
-                                                    {order.status === "new" && (
-                                                        <button
-                                                            className="px-3 py-2 rounded-lg bg-orange-500 text-white font-semibold hover:bg-orange-600"
-                                                            onClick={() => handleStatusChange(order.id, "pending")}
-                                                        >
-                                                            New
-                                                        </button>
-                                                    )}
-                                                    {order.status === "pending" && (
-                                                        <button
-                                                            className="px-3 py-2 rounded-lg bg-yellow-100 text-yellow-700 font-semibold hover:bg-yellow-200"
-                                                            onClick={() => handleStatusChange(order.id, "preparing")}
-                                                        >
-                                                            Preparing!!!
-                                                        </button>
-                                                    )}
-                                                    {order.status === "preparing" && (
-                                                        <button
-                                                            className="px-3 py-2 rounded-lg bg-green-50 text-green-700 font-semibold hover:bg-green-100"
-                                                            onClick={() => {
-                                                                handleStatusChange(order.id, "preparing");
+                    {/* Delete order confirmation modal */}
+                    {showDeleteModal && (
+                        <div className="fixed inset-0 z-50 flex items-center justify-center bg-black bg-opacity-50">
+                            <div className="w-full max-w-md rounded-xl overflow-hidden shadow-lg bg-white text-gray-900">
+                                <div className="px-6 py-5 border-b">
+                                    <h3 className="text-lg font-semibold">Confirm Delete</h3>
+                                </div>
+                                <div className="px-6 py-4">
+                                    <p className="text-sm text-gray-600">Delete this order?</p>
+                                </div>
+                                <div className="px-6 py-4 flex justify-end gap-3 border-t">
+                                    <button
+                                        onClick={confirmDeleteOrder}
+                                        className="px-4 py-2 rounded-md bg-red-500 text-white font-semibold hover:bg-red-600"
+                                    >
+                                        Yes
+                                    </button>
+                                    <button
+                                        onClick={() => {
+                                            setShowDeleteModal(false);
+                                            setOrderToDelete(null);
+                                        }}
+                                        className="px-4 py-2 rounded-md bg-gray-100 text-gray-700 hover:bg-gray-200"
+                                    >
+                                        No
+                                    </button>
+                                </div>
+                            </div>
+                        </div>
+                    )}
 
-                                                                const collectEvent = new CustomEvent("orderCollect", {
-                                                                    detail: {
-                                                                        tableName: tablesMap[order.table_id] || order.table_number || "Unknown Table",
-                                                                        orderId: order.id,
-                                                                    },
-                                                                });
-                                                                window.dispatchEvent(collectEvent);
-                                                            }}
-                                                        >
-                                                            Order Ready!!!
-                                                        </button>
-                                                    )}
-                                                </div>
-                                            </div>
-                                        )}
-                                    </div>
-                                );
-                            })}
+                    {/* Delete item confirmation modal */}
+                    {showDeleteItemModal && (
+                        <div className="fixed inset-0 z-50 flex items-center justify-center bg-black bg-opacity-50">
+                            <div className="w-full max-w-md rounded-xl overflow-hidden shadow-lg bg-white text-gray-900">
+                                <div className="px-6 py-5 border-b">
+                                    <h3 className="text-lg font-semibold">Confirm Delete Item</h3>
+                                </div>
+                                <div className="px-6 py-4">
+                                    <p className="text-sm text-gray-600">Delete this item?</p>
+                                </div>
+                                <div className="px-6 py-4 flex justify-end gap-3 border-t">
+                                    <button
+                                        className="px-4 py-2 rounded-md bg-red-500 text-white font-semibold hover:bg-red-600"
+                                        onClick={async () => {
+                                            if (deleteItemTarget.orderId && deleteItemTarget.itemId) {
+                                                try {
+                                                    await axios.delete(`${import.meta.env.VITE_API_ORDER_SERVICE_URL}/${clientId}/order_item/delete`, {
+                                                        params: { order_item_id: deleteItemTarget.itemId, client_id: clientId },
+                                                        headers: { Authorization: `Bearer ${token}` },
+                                                    });
+                                                    setOrders((prev) =>
+                                                        prev.map((o) => {
+                                                            if (o.id !== deleteItemTarget.orderId) return o;
+                                                            const updatedItems = o.items.filter((i) => i.item_id !== deleteItemTarget.itemId);
+                                                            const newTotal = updatedItems.reduce(
+                                                                (sum, i) => sum + (i.price || 0) * (i.quantity || 1),
+                                                                0
+                                                            );
+                                                            return { ...o, items: updatedItems, total_price: newTotal };
+                                                        })
+                                                    );
+                                                    toast.success("Item deleted");
+                                                } catch {
+                                                    toast.error("Failed to delete item");
+                                                } finally {
+                                                    setShowDeleteItemModal(false);
+                                                    setDeleteItemTarget({ orderId: null, itemId: null });
+                                                }
+                                            }
+                                        }}
+                                    >
+                                        Yes
+                                    </button>
+
+                                    <button
+                                        className="px-4 py-2 rounded-md bg-gray-100 text-gray-700 hover:bg-gray-200"
+                                        onClick={() => {
+                                            setShowDeleteItemModal(false);
+                                            setDeleteItemTarget({ orderId: null, itemId: null });
+                                        }}
+                                    >
+                                        No
+                                    </button>
+                                </div>
+                            </div>
                         </div>
                     )}
                 </div>
+            </div>
+        </>
 
-                {/* Delete order confirmation modal */}
-                {showDeleteModal && (
-                    <div className="fixed inset-0 z-50 flex items-center justify-center bg-black bg-opacity-50">
-                        <div className="w-full max-w-md rounded-xl overflow-hidden shadow-lg bg-white text-gray-900">
-                            <div className="px-6 py-5 border-b">
-                                <h3 className="text-lg font-semibold">Confirm Delete</h3>
-                            </div>
-                            <div className="px-6 py-4">
-                                <p className="text-sm text-gray-600">Delete this order?</p>
-                            </div>
-                            <div className="px-6 py-4 flex justify-end gap-3 border-t">
-                                <button
-                                    onClick={confirmDeleteOrder}
-                                    className="px-4 py-2 rounded-md bg-red-500 text-white font-semibold hover:bg-red-600"
-                                >
-                                    Yes
-                                </button>
-                                <button
-                                    onClick={() => {
-                                        setShowDeleteModal(false);
-                                        setOrderToDelete(null);
-                                    }}
-                                    className="px-4 py-2 rounded-md bg-gray-100 text-gray-700 hover:bg-gray-200"
-                                >
-                                    No
-                                </button>
-                            </div>
-                        </div>
-                    </div>
-                )}
-
-                {/* Delete item confirmation modal */}
-                {showDeleteItemModal && (
-                    <div className="fixed inset-0 z-50 flex items-center justify-center bg-black bg-opacity-50">
-                        <div className="w-full max-w-md rounded-xl overflow-hidden shadow-lg bg-white text-gray-900">
-                            <div className="px-6 py-5 border-b">
-                                <h3 className="text-lg font-semibold">Confirm Delete Item</h3>
-                            </div>
-                            <div className="px-6 py-4">
-                                <p className="text-sm text-gray-600">Delete this item?</p>
-                            </div>
-                            <div className="px-6 py-4 flex justify-end gap-3 border-t">
-                                <button
-                                    className="px-4 py-2 rounded-md bg-red-500 text-white font-semibold hover:bg-red-600"
-                                    onClick={async () => {
-                                        if (deleteItemTarget.orderId && deleteItemTarget.itemId) {
-                                            try {
-                                                await axios.delete(`${import.meta.env.VITE_API_ORDER_SERVICE_URL}/${clientId}/order_item/delete`, {
-                                                    params: { order_item_id: deleteItemTarget.itemId, client_id: clientId },
-                                                    headers: { Authorization: `Bearer ${token}` },
-                                                });
-                                                setOrders((prev) =>
-                                                    prev.map((o) => {
-                                                        if (o.id !== deleteItemTarget.orderId) return o;
-                                                        const updatedItems = o.items.filter((i) => i.item_id !== deleteItemTarget.itemId);
-                                                        const newTotal = updatedItems.reduce(
-                                                            (sum, i) => sum + (i.price || 0) * (i.quantity || 1),
-                                                            0
-                                                        );
-                                                        return { ...o, items: updatedItems, total_price: newTotal };
-                                                    })
-                                                );
-                                                toast.success("Item deleted");
-                                            } catch {
-                                                toast.error("Failed to delete item");
-                                            } finally {
-                                                setShowDeleteItemModal(false);
-                                                setDeleteItemTarget({ orderId: null, itemId: null });
-                                            }
-                                        }
-                                    }}
-                                >
-                                    Yes
-                                </button>
-
-                                <button
-                                    className="px-4 py-2 rounded-md bg-gray-100 text-gray-700 hover:bg-gray-200"
-                                    onClick={() => {
-                                        setShowDeleteItemModal(false);
-                                        setDeleteItemTarget({ orderId: null, itemId: null });
-                                    }}
-                                >
-                                    No
-                                </button>
-                            </div>
-                        </div>
-                    </div>
-                )}
-                </div>
-                </div>
-            </>
-        
     );
 
 };

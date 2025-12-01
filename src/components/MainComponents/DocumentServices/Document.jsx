@@ -1,14 +1,6 @@
 import React, { useEffect, useState, useRef } from "react";
 import { useParams } from "react-router-dom";
 
-/*
-  Premium DocumentManager (two-panel layout)
-  - Theme: white + orange
-  - Uses fetch + BASE_URL from env
-  - Adds search, sidebar filters, upload modal, and polished cards
-  - Keeps original endpoints and logic intact
-*/
-
 export default function DocumentManager() {
     const { clientId } = useParams();
     const token = localStorage.getItem("access_token") || null;
@@ -248,10 +240,10 @@ export default function DocumentManager() {
     return (
         <div className="min-h-screen bg-gray-50">
             {/* Topbar */}
-            <div className="bg-white border-b border-gray-200 sticky top-0 z-20 m-4">
+            <div className="bg-bg-primary border-b border-gray-200 sticky top-0 z-20 m-4">
                 <div className="max-w-7xl mx-auto px-6 py-3 flex items-center justify-between gap-4">
                     <div className="flex items-center gap-3">
-                        <div className="w-1.5 h-8 rounded bg-gradient-to-b from-orange-400 to-orange-600" />
+                        <div className="w-1.5 h-8 rounded bg-gradient-to-b bg-action-primary" />
                         <div>
                             <h1 className="text-xl font-semibold text-gray-900">Documents</h1>
                             <p className="text-xs text-gray-500">Manage files, uploads and replacements</p>
@@ -274,7 +266,7 @@ export default function DocumentManager() {
                         {/* Add Document Button */}
                         <button
                             onClick={openUploadModal}
-                            className="px-4 py-2 w-full sm:w-auto bg-gradient-to-r from-orange-500 to-orange-400 text-white rounded-lg shadow hover:from-orange-600 text-center"
+                            className="px-4 py-2 w-full sm:w-auto bg-gradient-to-r bg-action-primary  text-text-white rounded-lg shadow  text-center"
                             title="Add document"
                         >
                             + Add Document
@@ -290,7 +282,7 @@ export default function DocumentManager() {
                     {/* Left Sidebar (filters) */}
                     <aside className="lg:col-span-1">
                         <div className="sticky top-24 space-y-4">
-                            <div className="bg-white rounded-xl shadow-sm p-4 border border-gray-100">
+                            <div className="bg-bg-primary rounded-xl shadow-sm p-4 border border-gray-100">
                                 <h3 className="text-sm font-medium text-gray-700 mb-2">Filters</h3>
 
                                 <div className="mb-3">
@@ -298,7 +290,7 @@ export default function DocumentManager() {
                                     <div className="flex flex-wrap gap-2">
                                         <button
                                             onClick={() => setSelectedCategory("All")}
-                                            className={`px-2 py-1 text-xs rounded-full ${selectedCategory === "All" ? "bg-orange-100 text-orange-600" : "bg-gray-100 text-gray-600"}`}
+                                            className={`px-2 py-1 text-xs rounded-full ${selectedCategory === "All" ? "bg-action-primary text-text-white" : "bg-gray-100 text-gray-600"}`}
                                         >
                                             All
                                         </button>
@@ -319,7 +311,7 @@ export default function DocumentManager() {
                                     <div className="flex flex-wrap gap-2">
                                         <button
                                             onClick={() => setSelectedRealm("All")}
-                                            className={`px-2 py-1 text-xs rounded-full ${selectedRealm === "All" ? "bg-orange-100 text-orange-600" : "bg-gray-100 text-gray-600"}`}
+                                            className={`px-2 py-1 text-xs rounded-full ${selectedRealm === "All" ? "bg-action-primary text-text-white" : "bg-gray-100 text-gray-600"}`}
                                         >
                                             All
                                         </button>
@@ -345,7 +337,7 @@ export default function DocumentManager() {
                                 </div>
                             </div>
 
-                            <div className="bg-white rounded-xl shadow-sm p-4 border border-gray-100">
+                            <div className="bg-bg-primary rounded-xl shadow-sm p-4 border border-gray-100">
                                 <h3 className="text-sm font-medium text-gray-700 mb-2">Quick Stats</h3>
                                 <div className="text-xs text-gray-500">Showing</div>
                                 <div className="mt-2 text-lg font-semibold text-gray-900">{filteredDocuments.length}</div>
@@ -364,14 +356,14 @@ export default function DocumentManager() {
                                     onClick={closeUploadModal}
                                     aria-hidden
                                 />
-                                <div className="relative w-full max-w-3xl bg-white rounded-2xl shadow-2xl border border-gray-100 overflow-hidden transform transition-transform">
+                                <div className="relative w-full max-w-3xl bg-bg-primary rounded-2xl shadow-2xl border border-gray-100 overflow-hidden transform transition-transform">
                                     <div className="p-6">
                                         <div className="flex items-center justify-between gap-4">
                                             <div>
                                                 <h2 className="text-lg font-semibold text-gray-900">{selectedDocId ? "Replace Document" : "Upload Document"}</h2>
                                                 <p className="text-xs text-gray-500 mt-1">Drag & drop or choose a file. Allowed types: any</p>
                                             </div>
-                                            <button onClick={closeUploadModal} className="text-gray-400 hover:text-gray-600">✕</button>
+                                            <button onClick={closeUploadModal} className="text-gray-400 hover:text-action-primary">✕</button>
                                         </div>
 
                                         <div className="mt-4 grid grid-cols-1 md:grid-cols-3 gap-4">
@@ -434,7 +426,7 @@ export default function DocumentManager() {
                                                                 if (selectedDocId) handleReplace();
                                                                 else handleUpload();
                                                             }}
-                                                            className="px-3 py-2 rounded-lg bg-gradient-to-r from-orange-500 to-orange-400 text-white"
+                                                            className="px-3 py-2 rounded-lg bg-gradient-to-r bg-action-primary text-white"
                                                             disabled={uploading}
                                                         >
                                                             {uploading ? "Working..." : selectedDocId ? "Replace" : "Upload"}
@@ -475,10 +467,10 @@ export default function DocumentManager() {
                                         {filteredDocuments.map((doc) => (
                                             <article
                                                 key={doc.id}
-                                                className="bg-white rounded-2xl shadow-sm p-4 border border-gray-100 hover:shadow-lg transition group"
+                                                className="bg-bg-primary rounded-2xl shadow-sm p-4 border border-gray-100 hover:shadow-lg transition group"
                                             >
                                                 <div className="flex items-start gap-3">
-                                                    <div className="w-12 h-12 rounded-lg flex items-center justify-center bg-orange-50 text-orange-600">
+                                                    <div className="w-12 h-12 rounded-lg flex items-center justify-center bg-orange-50 text-action-primary">
                                                         {/* simple file icon */}
                                                         <svg width="20" height="20" viewBox="0 0 24 24" fill="none"><path d="M14 3H6a2 2 0 0 0-2 2v14a2 2 0 0 0 2 2h12a2 2 0 0 0 2-2V9z" stroke="currentColor" strokeWidth="1.5" strokeLinecap="round" strokeLinejoin="round" /></svg>
                                                     </div>
@@ -498,7 +490,7 @@ export default function DocumentManager() {
                                                 <div className="mt-4 flex gap-2">
                                                     <button
                                                         onClick={() => handleDownload(doc.id, doc.name)}
-                                                        className="flex-1 px-3 py-2 rounded-lg bg-gradient-to-r from-green-600 to-green-500 text-white text-sm"
+                                                        className="flex-1 px-3 py-2 rounded-lg bg-gradient-to-r bg-action-primary text-white text-sm"
                                                     >
                                                         Download
                                                     </button>
@@ -531,7 +523,7 @@ export default function DocumentManager() {
                 <div className="fixed right-6 bottom-6 z-30">
                     <button
                         onClick={openUploadModal}
-                        className="w-14 h-14 rounded-full bg-gradient-to-br from-orange-500 to-orange-400 text-white shadow-lg flex items-center justify-center hover:scale-105 transform transition"
+                        className="w-14 h-14 rounded-full bg-gradient-to-br bg-action-primary text-text-white shadow-lg flex items-center justify-center hover:scale-105 transform transition"
                         aria-label="Add document"
                     >
                         <svg width="22" height="22" viewBox="0 0 24 24" fill="none"><path d="M12 5v14M5 12h14" stroke="currentColor" strokeWidth="1.8" strokeLinecap="round" strokeLinejoin="round" /></svg>

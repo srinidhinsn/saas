@@ -556,14 +556,14 @@ const ACTION_PRIMARY = fullConfig.theme.colors.action.primary;
 
 const KPICard = ({ icon, bg, value, label, accent }) => (
   <div className="bg-bg-primary rounded-2xl shadow-sm p-4 flex items-center gap-4 border border-transparent hover:shadow-lg transition-shadow duration-200">
-    <div className={`w-14 h-14 rounded-lg flex items-center justify-center ${bg} text-orange-600 text-2xl`}>
+    <div className={`w-14 h-14 rounded-lg flex items-center justify-center ${bg} text-action-primary text-2xl`}>
       {icon}
     </div>
     <div className="flex-1">
       <div className="text-2xl font-semibold text-gray-800">{value}</div>
       <div className="text-sm text-gray-500">{label}</div>
     </div>
-    {accent && <div className="text-sm font-medium text-orange-500">{accent}</div>}
+    {accent && <div className="text-sm font-medium text-action-primary">{accent}</div>}
   </div>
 );
 
@@ -575,6 +575,9 @@ const SmallStat = ({ title, value }) => (
 );
 
 const COLORS = ["#fb923c", "#f97316", "#fb7185", "#34d399", "#60a5fa"];
+
+// const COLORS = Object.values(fullConfig.theme.colors.action);
+
 
 const DashBoardPage = () => {
   const nav = useNavigate();
@@ -804,7 +807,7 @@ const DashBoardPage = () => {
             <select
               value={timeFilter}
               onChange={(e) => setTimeFilter(e.target.value)}
-              className="px-3 py-2 border border-gray-200 rounded-lg focus:outline-none focus:ring-2 focus:ring-orange-400 bg-white"
+              className="px-3 py-2 border border-gray-200 rounded-lg focus:outline-none focus:ring-2 focus:ring-action-primary bg-white"
             >
               <option value="Daily">Daily</option>
               <option value="Weekly">Weekly</option>
@@ -896,7 +899,7 @@ const DashBoardPage = () => {
                           <div className="font-medium text-gray-800">{it.itemName}</div>
                           <div className="text-xs text-gray-500">Orders: {it.orders}</div>
                         </div>
-                        <div className="text-sm font-semibold text-orange-500">{it.orders}</div>
+                        <div className="text-sm font-semibold text-action-primary">{it.orders}</div>
                       </div>
                     ))
                   ) : (
@@ -916,7 +919,7 @@ const DashBoardPage = () => {
                 <h3 className="text-lg font-semibold text-gray-800">Order sales</h3>
                 <p className="text-sm text-gray-500 mt-1">{getOrdersLabel()}</p>
               </div>
-              <input className="px-3 py-2 border border-gray-200 rounded-lg focus:outline-none focus:ring-2 focus:ring-orange-400" type="date" />
+              <input className="px-3 py-2 border border-gray-200 rounded-lg focus:outline-none focus:ring-2 focus:ring-action-primary" type="date" />
             </div>
 
             <div className="mt-4 h-64">
@@ -926,7 +929,7 @@ const DashBoardPage = () => {
                   <XAxis dataKey="date" tick={{ fontSize: 12 }} tickLine={false} padding={{ left: 10, right: 10 }} />
                   <YAxis tick={{ fontSize: 12 }} tickLine={false} domain={["auto", "auto"]} allowDecimals={false} />
                   <Tooltip />
-                  <Line type="monotone" dataKey="count" stroke="#f97316" strokeWidth={2} dot={{ r: 3 }} activeDot={{ r: 6 }} />
+                  <Line type="monotone" dataKey="count" stroke={ACTION_PRIMARY} strokeWidth={2} dot={{ r: 3 }} activeDot={{ r: 6 }} />
                 </LineChart>
               </ResponsiveContainer>
             </div>
@@ -944,14 +947,14 @@ const DashBoardPage = () => {
             <div>
               <h4 className="text-sm font-medium text-gray-700 mb-2">Occupancy</h4>
               <div className="w-full bg-gray-100 rounded-full h-4 overflow-hidden">
-                <div className="h-4 rounded-full bg-gradient-to-r from-orange-400 to-orange-500" style={{ width: `${Math.min(100, (totalOrders || 0) % 100)}%` }}></div>
+                <div className="h-4 rounded-full bg-gradient-to-r bg-action-primary" style={{ width: `${Math.min(100, (totalOrders || 0) % 100)}%` }}></div>
               </div>
               <div className="text-xs text-gray-500 mt-2">Current active tables: {totalOrders}</div>
             </div>
 
             <div className="flex gap-2 mt-2">
               <button className="flex-1 px-3 py-2 rounded-lg bg-white border border-gray-200">Details</button>
-              <button className="flex-1 px-3 py-2 rounded-lg bg-gradient-to-r from-orange-500 to-orange-400 text-white">View Reports</button>
+              <button className="flex-1 px-3 py-2 rounded-lg bg-gradient-to-r bg-action-primary text-white">View Reports</button>
             </div>
           </div>
         </div>

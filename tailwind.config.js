@@ -24,7 +24,7 @@ export default {
           hovering: '0 4px 10px rgba(0,0,0,0.03)'
         },
         action: {
-          primary: "#f97316",   // orange-500
+          primary: "red",   // orange-500
           success: "#22c55e",   // green-500
           danger: "#ef4444",    // red-500
         },
