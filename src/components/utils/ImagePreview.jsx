@@ -125,7 +125,7 @@ export default function ImagePreview({
 
   return (
     <img
-      src={src || DEFAULT_PLACEHOLDER}
+      src={DEFAULT_PLACEHOLDER}
       alt={alt || "image"}
       className={className || "w-full h-full object-cover"}
       onError={(e) => { if (e?.currentTarget) e.currentTarget.src = DEFAULT_PLACEHOLDER; }}
