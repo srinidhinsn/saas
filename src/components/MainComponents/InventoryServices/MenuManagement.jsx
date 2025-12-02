@@ -272,6 +272,7 @@ const MenuManagement = ({ clientId, token }) => {
         client_id: clientId,
         category_id: finalCategoryId,
         image_id: imageId,
+        inventory_id:1,
         realm: realm || newItem.realm || '',
         slug,
         unit_price: parseFloat(newItem.unit_price) || 0,
