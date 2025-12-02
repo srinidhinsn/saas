@@ -293,12 +293,12 @@ const HeaderShared = ({ onLogout }) => {
 
         <div className="hidden lg:flex items-center space-x-8 text-text-primary">
           <NavLink id="inventory">Inventory</NavLink>
-          <NavLink id="role">Role</NavLink>
+          {/* <NavLink id="role">Role</NavLink> */}
           <NavLink id="order">Order</NavLink>
           <NavLink id="summary">Summary</NavLink>
           <NavLink id="kds">KDS</NavLink>
-          <NavLink id="details">Details</NavLink>
-          <NavLink id="documents">Documents</NavLink>
+          {/* <NavLink id="details">Details</NavLink>
+          <NavLink id="documents">Documents</NavLink> */}
 
           <button
             onClick={() => onLogout?.()}
@@ -361,12 +361,12 @@ const HeaderShared = ({ onLogout }) => {
 
           <div className="flex flex-col space-y-1">
             <NavLink id="inventory">Inventory</NavLink>
-            <NavLink id="role">Role</NavLink>
+            {/* <NavLink id="role">Role</NavLink> */}
             <NavLink id="order">Order</NavLink>
             <NavLink id="summary">Summary</NavLink>
             <NavLink id="kds">KDS</NavLink>
-            <NavLink id="details">Details</NavLink>
-            <NavLink id="documents">Documents</NavLink>
+            {/* <NavLink id="details">Details</NavLink>
+            <NavLink id="documents">Documents</NavLink> */}
             
             <button
               onClick={() => { onLogout?.(); setMobileOpen(false); }}

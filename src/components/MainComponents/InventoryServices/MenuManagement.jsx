@@ -5,7 +5,6 @@ import { Plus, Minus, X, Search, Edit, Trash2, Upload, Download } from 'lucide-r
 import axios from 'axios';
 import * as XLSX from 'xlsx';
 import MenuCategoryTree from './Tree&CategoryManage/MenuCategoryTree';
-import { jwtDecode } from "jwt-decode";
 import MenuImagePreview from './Tree&CategoryManage/MenuImagePreview';
 
 
@@ -63,7 +62,7 @@ const DropdownCheckbox = ({ selected = [], options = [], onChange, label = "Sele
 };
 
 // Main Menu Management Component
-const MenuManagement = ({ clientId, token }) => {
+const MenuManagement = ({ clientId, token,realm }) => {
   const [searchOpen, setSearchOpen] = useState(false);
   const [searchQuery, setSearchQuery] = useState('');
   const searchInputRef = useRef(null);
@@ -106,20 +105,9 @@ const MenuManagement = ({ clientId, token }) => {
   const [selectAllChecked, setSelectAllChecked] = useState(false);
   const [bulkEditData, setBulkEditData] = useState({});
   // realm + user metadata
-  const [realm, setRealm] = useState('');
   const [currentUserId, setCurrentUserId] = useState(null);
 
-  // decode token once to extract realm & user id
-  useEffect(() => {
-    if (!token) return;
-    try {
-      const decoded = jwtDecode(token);
-      setRealm(decoded.realm || '');
-      setCurrentUserId(decoded.user_id || decoded.sub || null);
-    } catch (err) {
-      console.warn('Failed to decode token for realm/user:', err);
-    }
-  }, [token]);
+
   // Robust flatten for your current category-tree shape (handles `children` or `subCategories`)
   const flattenCategoriesGeneric = (tree) => {
     const flat = [];
@@ -256,9 +244,7 @@ const MenuManagement = ({ clientId, token }) => {
       };
 
       // Choose category_id for DB (use existing if present; if you really want to generate a new category id, use generateCategoryId)
-      const finalCategoryId = categoryId
-        ? categoryId
-        : generateCategoryId(typeof selectedCategory === 'object' ? selectedCategory.id : null);
+      const finalCategoryId = `subcat_${Date.now()}`;
 
       // Build slug using category name path (not the raw id)
       const slug = generateSlug(finalCategoryId, newItem.name);
