@@ -96,6 +96,8 @@ const MenuManagement = ({ clientId, token }) => {
     discount: '',
     availability: '',
     unit: '',
+    serving_quantity:"",
+    serving_unit:"",
     line_item_id: []
   });
   // add near your other state declarations
@@ -683,7 +685,7 @@ const MenuManagement = ({ clientId, token }) => {
         if (!id) return "Uncategorized";
         // categoriesFlat entries: { id, name, parentId }
         const found = (categoriesFlat || []).find(c => c && c.id === id);
-        return found ? found.name : ( (typeof id === 'string' && id.startsWith('cat_')) ? id : "Unknown" );
+        return found ? found.name : ((typeof id === 'string' && id.startsWith('cat_')) ? id : "Unknown");
       };
 
       const exportData = filteredItems.map(item => {
@@ -723,16 +725,18 @@ const MenuManagement = ({ clientId, token }) => {
       });
 
       // Create worksheet and workbook
-      const worksheet = XLSX.utils.json_to_sheet(exportData, { header: [
-        "ID","Name","Description","Category","Unit","Unit_Price","Unit_CST","Unit_GST","Total_Unit_Price","Total_Price",
-        "CST","GST","Discount","Availability","Realm","Dietary","Slug","Line_Item_IDs"
-      ]});
+      const worksheet = XLSX.utils.json_to_sheet(exportData, {
+        header: [
+          "ID", "Name", "Description", "Category", "Unit", "Unit_Price", "Unit_CST", "Unit_GST", "Total_Unit_Price", "Total_Price",
+          "CST", "GST", "Discount", "Availability", "Realm", "Dietary", "Slug", "Line_Item_IDs"
+        ]
+      });
 
       const workbook = XLSX.utils.book_new();
       XLSX.utils.book_append_sheet(workbook, worksheet, "MenuItems");
 
       // Use a descriptive filename
-      const filename = `menu_items_${(new Date()).toISOString().slice(0,10)}.xlsx`;
+      const filename = `menu_items_${(new Date()).toISOString().slice(0, 10)}.xlsx`;
       XLSX.writeFile(workbook, filename);
     } catch (err) {
       console.error("Export failed:", err);
@@ -1226,6 +1230,27 @@ const MenuManagement = ({ clientId, token }) => {
                     placeholder="kg, pcs, etc."
                   />
                 </div>
+
+                <input
+                  value={newItem.serving_quantity || ""}
+                  onChange={(e) => setNewItem({ ...newItem, serving_quantity: e.target.value })}
+                  placeholder="Serving Quantity"
+                  type="number"
+                  className="w-full px-4 py-2 rounded-lg bg-bg-tertiary border border-border-default text-text-primary focus:outline-none focus:ring-2 focus:ring-action-primary"
+
+                />
+                <select
+                  value={newItem.serving_unit || ""}
+                  onChange={(e) => setNewItem({ ...newItem, serving_unit: e.target.value })}
+                  className="w-full px-4 py-2 rounded-lg bg-bg-tertiary border border-border-default text-text-primary focus:outline-none focus:ring-2 focus:ring-action-primary"
+                  >
+                  <option value="">Select Unit</option>
+                  <option value="kg">kg</option>
+                  <option value="g">g</option>
+                  <option value="litre">litre</option>
+                  <option value="ml">ml</option>
+                  <option value="pcs">pcs</option>
+                </select>
               </div>
 
               <div>
