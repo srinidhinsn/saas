@@ -1,7 +1,7 @@
 import React, { useEffect, useRef, useState } from "react";
 import axios from "axios";
 
-const DEFAULT_PLACEHOLDER = "https://encrypted-tbn0.gstatic.com/images?q=tbn:ANd9GcS2B3oOyF6yyLO9fTb-AWqyPZ6fhSDp8VP1Ag&s";
+const DEFAULT_PLACEHOLDER = "https://encrypted-tbn0.gstatic.com/images?q=tbn:ANd9GcR-PcqZ-z4phrEqORLLF0wdr7a6Ji25v4-lsdiYyNsWaMVE6STO9mNYzPc&s";
 
 
 export default function ImagePreview({
