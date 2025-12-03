@@ -1,68 +1,16 @@
-
-
 import React, { useState, useEffect, useRef, useCallback } from 'react';
 import { Plus, Minus, X, Search, Edit, Trash2, Upload, Download } from 'lucide-react';
 import axios from 'axios';
 import * as XLSX from 'xlsx';
 import MenuCategoryTree from './Tree&CategoryManage/MenuCategoryTree';
 import MenuImagePreview from './Tree&CategoryManage/MenuImagePreview';
+import UniversalAddModal from '../../utils/Modals/UniversalAddModal';
+import UniversalEditModal from '../../utils/Modals/UniversalEditModal';
+import UniversalBulkUpdateModal from '../../utils/Modals/UniversalBulkUpdateModal';
 
-
-
-// Dropdown Checkbox Component
-const DropdownCheckbox = ({ selected = [], options = [], onChange, label = "Select Add-ons" }) => {
-  const [open, setOpen] = useState(false);
-  const ref = useRef(null);
-
-  useEffect(() => {
-    const handleClickOutside = (event) => {
-      if (ref.current && !ref.current.contains(event.target)) {
-        setOpen(false);
-      }
-    };
-    document.addEventListener("mousedown", handleClickOutside);
-    return () => document.removeEventListener("mousedown", handleClickOutside);
-  }, []);
-
-  const toggleSelect = (id) => {
-    const newSelected = selected.includes(id)
-      ? selected.filter(val => val !== id)
-      : [...selected, id];
-    onChange(newSelected);
-  };
-
-  return (
-    <div ref={ref} className="relative w-full">
-      <div
-        onClick={() => setOpen(!open)}
-        className="w-full px-4 py-2 rounded-lg bg-bg-primary border border-border-default text-text-primary cursor-pointer flex items-center justify-between"
-      >
-        <span className="text-sm">
-          {selected.length > 0 ? `${selected.length} ${label} selected` : label}
-        </span>
-        <span className="text-text-secondary">▾</span>
-      </div>
-      {open && (
-        <div className="absolute z-10 w-full mt-1 bg-bg-primary border border-border-default rounded-lg shadow-lg max-h-48 overflow-y-auto">
-          {options.map(option => (
-            <label key={option.id} className="flex items-center px-4 py-2 hover:bg-bg-secondary cursor-pointer text-text-primary">
-              <input
-                type="checkbox"
-                checked={selected.includes(option.id)}
-                onChange={() => toggleSelect(option.id)}
-                className="mr-3"
-              />
-              <span className="text-sm">{option.name}</span>
-            </label>
-          ))}
-        </div>
-      )}
-    </div>
-  );
-};
 
 // Main Menu Management Component
-const MenuManagement = ({ clientId, token,realm }) => {
+const MenuManagement = ({ clientId, token, realm }) => {
   const [searchOpen, setSearchOpen] = useState(false);
   const [searchQuery, setSearchQuery] = useState('');
   const searchInputRef = useRef(null);
@@ -233,22 +181,26 @@ const MenuManagement = ({ clientId, token,realm }) => {
         imageId = await uploadImageToDocumentService(newItemImage);
       }
 
-      const categoryId = typeof selectedCategory === 'object' && selectedCategory?.id
+      // Prefer category from newItem (modal) first, then from selectedCategory,
+      // and only as a last resort generate an id (legacy behavior).
+      const categoryIdFromNewItem = newItem?.category_id || null;
+      const categoryIdFromSelected = (typeof selectedCategory === 'object' && selectedCategory?.id)
         ? selectedCategory.id
         : getCategoryIdByName(selectedCategory);
 
-      // (optional) legacy generator kept — used only if you intentionally want to generate a new category id
+      const resolvedCategoryId = categoryIdFromNewItem || categoryIdFromSelected || null;
+
       const generateCategoryId = (parentId = null) => {
         const timestamp = Date.now();
         return parentId ? `subcat_${timestamp}` : `cat_${timestamp}`;
       };
 
-      // Choose category_id for DB (use existing if present; if you really want to generate a new category id, use generateCategoryId)
-      const finalCategoryId = `subcat_${Date.now()}`;
+      const finalCategoryId = resolvedCategoryId
+        ? resolvedCategoryId
+        : generateCategoryId(typeof selectedCategory === 'object' ? selectedCategory.id : null);
 
       // Build slug using category name path (not the raw id)
       const slug = generateSlug(finalCategoryId, newItem.name);
-
 
       // who created this?
       const created_by = currentUserId || localStorage.getItem('user_id') || 'system';
@@ -258,14 +210,14 @@ const MenuManagement = ({ clientId, token,realm }) => {
         client_id: clientId,
         category_id: finalCategoryId,
         image_id: imageId,
-        inventory_id:1,
         realm: realm || newItem.realm || '',
         slug,
         unit_price: parseFloat(newItem.unit_price) || 0,
         discount: parseFloat(newItem.discount) || 0,
         availability: parseInt(newItem.availability) || 0,
         created_by,
-        updated_by: created_by
+        updated_by: created_by,
+        inventory_id:1
       };
 
       await axios.post(
@@ -274,7 +226,8 @@ const MenuManagement = ({ clientId, token,realm }) => {
         { headers: { Authorization: `Bearer ${token}` } }
       );
 
-      await fetchData();
+      await fetchData({ silent: true });
+
       setShowAddModal(false);
       setNewItem({
         name: '',
@@ -288,12 +241,12 @@ const MenuManagement = ({ clientId, token,realm }) => {
       });
       setNewItemImage(null);
       setNewItemImageUrl('');
-      alert('Item added successfully!');
     } catch (error) {
       console.error('Error adding item:', error);
       alert('Failed to add item');
     }
   };
+
   const handleEditItem = async () => {
     try {
       let imageId = editingItem.image_id;
@@ -329,28 +282,30 @@ const MenuManagement = ({ clientId, token,realm }) => {
         { headers: { Authorization: `Bearer ${token}` } }
       );
 
-      await fetchData();
+      await fetchData({ silent: true });
+
 
       setShowEditModal(false);
       setEditingItem(null);
       setEditItemImage(null);
       setEditItemImageUrl('');
-      alert('Item updated successfully!');
     } catch (error) {
       console.error('Error updating item:', error);
       alert('Failed to update item');
     }
   };
 
-  const fetchData = useCallback(async () => {
+  const fetchData = useCallback(async (options = { silent: false }) => {
+    const { silent = false } = options;
+
     if (!clientId || !token) {
       console.error('Missing clientId or token');
-      setLoading(false);
+      if (!silent) setLoading(false);
       return;
     }
 
     try {
-      setLoading(true);
+      if (!silent) setLoading(true);
 
       const [catRes, itemRes] = await Promise.all([
         axios.get(
@@ -363,7 +318,7 @@ const MenuManagement = ({ clientId, token,realm }) => {
         )
       ]);
 
-      const fullTree = catRes.data.data.filter(c => c.name?.toLowerCase() !== "all");
+      const fullTree = (catRes.data.data || []).filter(c => c.name?.toLowerCase() !== "all");
       const subcategoryIds = new Set();
       fullTree.forEach(cat => {
         if (cat.subCategories && cat.subCategories.length > 0) {
@@ -373,7 +328,6 @@ const MenuManagement = ({ clientId, token,realm }) => {
 
       const topLevelCategories = fullTree.filter(cat => !subcategoryIds.has(cat.id));
       const flatCategories = flattenCategoryTree(topLevelCategories);
-      // normalize flatCategories for lookup (ensure parent property name is consistent)
       const normalizedFlat = flatCategories.map(cat => ({
         id: cat.id,
         name: (cat.name || '').trim(),
@@ -381,7 +335,7 @@ const MenuManagement = ({ clientId, token,realm }) => {
       }));
       setCategoriesFlat(normalizedFlat);
 
-      const enrichedItems = itemRes.data.data.map(item => {
+      const enrichedItems = (itemRes.data.data || []).map(item => {
         const cat = flatCategories.find(c => c.id === item.category_id);
         return {
           ...item,
@@ -392,9 +346,9 @@ const MenuManagement = ({ clientId, token,realm }) => {
       setMenuItems(enrichedItems);
 
       const getCategoryCount = (categoryName) => {
-        return enrichedItems.filter(item => {
+        return enrichedItems.filter(it => {
           if (categoryName === 'All Categories') return true;
-          return item.category === categoryName;
+          return it.category === categoryName;
         }).length;
       };
 
@@ -420,24 +374,25 @@ const MenuManagement = ({ clientId, token,realm }) => {
         return tree;
       };
 
-      const categoryTree = [
-        {
-          id: 'all',
-          name: 'All Categories',
-          count: enrichedItems.length,
-          children: []
-        },
-        ...buildCategoryTree(flatCategories)
-      ];
+      const categoryTree = buildCategoryTree(flatCategories).map(cat => {
+        if (cat.id === 'dietery' || cat.name.toLowerCase() === 'dietery') {
+          return {
+            ...cat,
+            name: 'All Categories',
+            count: enrichedItems.length  // Total count of all items
+          };
+        }
+        return cat;
+      });
 
       setCategories(categoryTree);
 
     } catch (error) {
       console.error('Error fetching data:', error);
     } finally {
-      setLoading(false);
+      if (!silent) setLoading(false);
     }
-  }, [clientId, token]); // important dependencies
+  }, [clientId, token]);
 
   useEffect(() => {
 
@@ -580,7 +535,6 @@ const MenuManagement = ({ clientId, token,realm }) => {
       setMenuItems(menuItems.filter(item => item.id !== deleteTarget.id));
       setShowDeleteModal(false);
       setDeleteTarget(null);
-      alert('Item deleted successfully!');
     } catch (error) {
       console.error('Error deleting item:', error);
       alert('Failed to delete item');
@@ -611,7 +565,6 @@ const MenuManagement = ({ clientId, token,realm }) => {
       setMenuItems(menuItems.filter(item => !selectedRows.includes(item.id)));
       setSelectedRows([]);
       setSelectAllChecked(false);
-      alert('Selected items deleted successfully!');
     } catch (error) {
       console.error('Error deleting items:', error);
       alert('Failed to delete some items');
@@ -655,7 +608,6 @@ const MenuManagement = ({ clientId, token,realm }) => {
       setSelectedRows([]);
       setBulkEditData({});
       setSelectAllChecked(false);
-      alert('Selected items updated successfully!');
     } catch (error) {
       console.error('Error updating items:', error);
       alert('Failed to update some items');
@@ -670,7 +622,7 @@ const MenuManagement = ({ clientId, token,realm }) => {
         if (!id) return "Uncategorized";
         // categoriesFlat entries: { id, name, parentId }
         const found = (categoriesFlat || []).find(c => c && c.id === id);
-        return found ? found.name : ( (typeof id === 'string' && id.startsWith('cat_')) ? id : "Unknown" );
+        return found ? found.name : ((typeof id === 'string' && id.startsWith('cat_')) ? id : "Unknown");
       };
 
       const exportData = filteredItems.map(item => {
@@ -710,16 +662,18 @@ const MenuManagement = ({ clientId, token,realm }) => {
       });
 
       // Create worksheet and workbook
-      const worksheet = XLSX.utils.json_to_sheet(exportData, { header: [
-        "ID","Name","Description","Category","Unit","Unit_Price","Unit_CST","Unit_GST","Total_Unit_Price","Total_Price",
-        "CST","GST","Discount","Availability","Realm","Dietary","Slug","Line_Item_IDs"
-      ]});
+      const worksheet = XLSX.utils.json_to_sheet(exportData, {
+        header: [
+          "ID", "Name", "Description", "Category", "Unit", "Unit_Price", "Unit_CST", "Unit_GST", "Total_Unit_Price", "Total_Price",
+          "CST", "GST", "Discount", "Availability", "Realm", "Dietary", "Slug", "Line_Item_IDs"
+        ]
+      });
 
       const workbook = XLSX.utils.book_new();
       XLSX.utils.book_append_sheet(workbook, worksheet, "MenuItems");
 
       // Use a descriptive filename
-      const filename = `menu_items_${(new Date()).toISOString().slice(0,10)}.xlsx`;
+      const filename = `menu_items_${(new Date()).toISOString().slice(0, 10)}.xlsx`;
       XLSX.writeFile(workbook, filename);
     } catch (err) {
       console.error("Export failed:", err);
@@ -727,9 +681,6 @@ const MenuManagement = ({ clientId, token,realm }) => {
     }
   };
 
-
-  // Import from Excel
-  // Import from Excel
   const handleImportFromExcel = (e) => {
     const file = e.target.files[0];
     if (!file) return;
@@ -884,7 +835,7 @@ const MenuManagement = ({ clientId, token,realm }) => {
   return (
     <div className="min-h-screen bg-bg-primary">
       {/* Search Bar */}
-      <div className={`fixed top-36 right-5 z-50 flex items-center transition-all duration-300 ease-in-out ${searchOpen ? 'w-80' : 'w-12'}`}>
+      <div className={`fixed top-36 right-5  z-50 flex items-center transition-all duration-300 ease-in-out ${searchOpen ? 'w-80' : 'w-12'}`}>
         <div className={`flex items-center gap-2 rounded-full shadow-lg overflow-hidden transition-colors duration-200 ${searchOpen ? 'bg-action-primary px-3 py-2' : 'bg-action-primary p-2'}`}>
           <button
             onClick={() => setSearchOpen(s => !s)}
@@ -921,37 +872,41 @@ const MenuManagement = ({ clientId, token,realm }) => {
 
       <div className="mx-auto px-4 py-2">
         {/* Action Buttons */}
-        <div className="flex justify-end gap-3 mb-6">
+        <div className="flex flex-wrap justify-end gap-2 sm:gap-3 mb-4 sm:mb-6 px-2 sm:px-0">
           <button
             onClick={() => setShowAddModal(true)}
-            className="flex items-center gap-2 px-4 py-2 rounded-lg bg-action-primary text-text-white hover:opacity-90 transition-opacity"
+            className="flex items-center justify-center gap-2 sm:px-4 px-2.5 py-2 sm:py-2.5 rounded-lg bg-action-primary text-text-white hover:opacity-90 transition-all shadow-md hover:shadow-lg font-semibold text-xs sm:text-sm"
+            title="Add Item"
           >
-            <Plus size={20} />
-            Add Item
+            <Plus size={18} className="sm:w-5 sm:h-5" />
+            <span className="hidden sm:inline">Add Item</span>
           </button>
 
           <button
             onClick={() => setShowBulkModal(true)}
-            className="flex items-center gap-2 px-4 py-2 rounded-lg bg-bg-tertiary text-text-primary border border-border-default hover:bg-bg-secondary transition-colors"
+            className="flex items-center justify-center gap-2 sm:px-4 px-2.5 py-2 sm:py-2.5 rounded-lg bg-bg-tertiary text-text-primary border-2 border-border-default hover:bg-bg-secondary hover:border-action-primary transition-all shadow-sm hover:shadow-md font-semibold text-xs sm:text-sm"
+            title="Bulk Update"
           >
-            <Edit size={20} />
-            Bulk Update
+            <Edit size={18} className="sm:w-5 sm:h-5" />
+            <span className="hidden sm:inline">Bulk Update</span>
           </button>
 
           <button
             onClick={handleExportToExcel}
-            className="flex items-center gap-2 px-4 py-2 rounded-lg bg-bg-tertiary text-text-primary border border-border-default hover:bg-bg-secondary transition-colors"
+            className="flex items-center justify-center gap-2 sm:px-4 px-2.5 py-2 sm:py-2.5 rounded-lg bg-bg-tertiary text-text-primary border-2 border-border-default hover:bg-bg-secondary hover:border-action-primary transition-all shadow-sm hover:shadow-md font-semibold text-xs sm:text-sm"
+            title="Export to Excel"
           >
-            <Download size={20} />
-            Export
+            <Download size={18} className="sm:w-5 sm:h-5" />
+            <span className="hidden sm:inline">Export</span>
           </button>
 
           <button
             onClick={() => document.getElementById('excelInput').click()}
-            className="flex items-center gap-2 px-4 py-2 rounded-lg bg-bg-tertiary text-text-primary border border-border-default hover:bg-bg-secondary transition-colors"
+            className="flex items-center justify-center gap-2 sm:px-4 px-2.5 py-2 sm:py-2.5 rounded-lg bg-bg-tertiary text-text-primary border-2 border-border-default hover:bg-bg-secondary hover:border-action-primary transition-all shadow-sm hover:shadow-md font-semibold text-xs sm:text-sm"
+            title="Import from Excel"
           >
-            <Upload size={20} />
-            Import
+            <Upload size={18} className="sm:w-5 sm:h-5" />
+            <span className="hidden sm:inline">Import</span>
           </button>
 
           <input
@@ -1079,463 +1034,43 @@ const MenuManagement = ({ clientId, token,realm }) => {
         </div>
       </div>
 
-      {/* Add Modal */}
-      {showAddModal && (
-        <div className="fixed inset-0 z-50 flex items-center justify-center p-4 bg-color-modalsbg">
-          <div className="rounded-lg max-w-2xl w-full p-6 bg-bg-primary max-h-[90vh] overflow-y-auto">
-            <div className="flex justify-between items-center mb-4">
-              <h3 className="text-xl font-semibold text-text-primary">Add New Menu Item</h3>
-              <button
-                onClick={() => setShowAddModal(false)}
-                className="text-text-secondary hover:text-text-primary"
-              >
-                <X size={24} />
-              </button>
-            </div>
+      <UniversalAddModal
+        showModal={showAddModal}
+        setShowModal={setShowAddModal}
+        modalType="menu"
 
-            <div className="space-y-4">
-              {/* Category Selector */}
-              <div>
-                <label className="block text-sm font-medium mb-2 text-text-primary">Category *</label>
-                <select
-                  value={getCategoryIdByName(selectedCategory) || ''}
-                  onChange={(e) => {
-                    const selectedCatId = e.target.value;
-                    const findCategoryName = (items, targetId) => {
-                      for (const item of items) {
-                        if (item.id === targetId) return item.name;
-                        if (item.children) {
-                          const found = findCategoryName(item.children, targetId);
-                          if (found) return found;
-                        }
-                      }
-                      return null;
-                    };
-                    const categoryName = findCategoryName(categories, selectedCatId);
-                    if (categoryName) {
-                      setSelectedCategory(categoryName);
-                    }
-                    setNewItem({ ...newItem, category_id: selectedCatId });
-                  }}
-                  className="w-full px-4 py-2 rounded-lg bg-bg-tertiary border border-border-default text-text-primary focus:outline-none focus:ring-2 focus:ring-action-primary"
-                  required
-                >
-                  <option value="">Select a category</option>
-                  {(() => {
-                    const flattenCategories = (items, level = 0) => {
-                      let result = [];
-                      items.forEach(item => {
-                        if (item.id !== 'all') {
-                          result.push({ ...item, level });
-                          if (item.children) {
-                            result = result.concat(flattenCategories(item.children, level + 1));
-                          }
-                        }
-                      });
-                      return result;
-                    };
-                    return flattenCategories(categories).map(cat => (
-                      <option key={cat.id} value={cat.id}>
-                        {'—'.repeat(cat.level)} {cat.name}
-                      </option>
-                    ));
-                  })()}
-                </select>
-              </div>
+        // Menu-specific props
+        newItem={newItem}
+        setNewItem={setNewItem}
+        selectedCategory={selectedCategory}
+        setSelectedCategory={setSelectedCategory}
+        categories={categories}
+        menuItems={menuItems}
+        newItemImage={newItemImage}
+        setNewItemImage={setNewItemImage}
+        newItemImageUrl={newItemImageUrl}
+        setNewItemImageUrl={setNewItemImageUrl}
+        handleAddItem={handleAddItem}
+        getCategoryIdByName={getCategoryIdByName}
+      />
+      <UniversalEditModal
+        showModal={showEditModal}
+        setShowModal={setShowEditModal}
+        modalType="menu"
 
-              <div>
-                <label className="block text-sm font-medium mb-2 text-text-primary">Item Name *</label>
-                <input
-                  type="text"
-                  value={newItem.name}
-                  onChange={(e) => setNewItem({ ...newItem, name: e.target.value })}
-                  className="w-full px-4 py-2 rounded-lg bg-bg-tertiary border border-border-default text-text-primary focus:outline-none focus:ring-2 focus:ring-action-primary"
-                  placeholder="Enter item name"
-                  required
-                />
-              </div>
-
-              <div>
-                <label className="block text-sm font-medium mb-2 text-text-primary">Description</label>
-                <textarea
-                  value={newItem.description}
-                  onChange={(e) => setNewItem({ ...newItem, description: e.target.value })}
-                  className="w-full px-4 py-2 rounded-lg bg-bg-tertiary border border-border-default text-text-primary focus:outline-none focus:ring-2 focus:ring-action-primary"
-                  placeholder="Enter item description"
-                  rows="3"
-                />
-              </div>
-
-              <div className="grid grid-cols-2 gap-4">
-                <div>
-                  <label className="block text-sm font-medium mb-2 text-text-primary">Unit Price *</label>
-                  <input
-                    type="number"
-                    value={newItem.unit_price}
-                    onChange={(e) => setNewItem({ ...newItem, unit_price: e.target.value })}
-                    className="w-full px-4 py-2 rounded-lg bg-bg-tertiary border border-border-default text-text-primary focus:outline-none focus:ring-2 focus:ring-action-primary"
-                    placeholder="0.00"
-                    required
-                  />
-                </div>
-
-                <div>
-                  <label className="block text-sm font-medium mb-2 text-text-primary">Discount</label>
-                  <input
-                    type="number"
-                    value={newItem.discount}
-                    onChange={(e) => setNewItem({ ...newItem, discount: e.target.value })}
-                    className="w-full px-4 py-2 rounded-lg bg-bg-tertiary border border-border-default text-text-primary focus:outline-none focus:ring-2 focus:ring-action-primary"
-                    placeholder="0.00"
-                  />
-                </div>
-              </div>
-
-              <div className="grid grid-cols-2 gap-4">
-                <div>
-                  <label className="block text-sm font-medium mb-2 text-text-primary">Availability</label>
-                  <input
-                    type="number"
-                    value={newItem.availability}
-                    onChange={(e) => setNewItem({ ...newItem, availability: e.target.value })}
-                    className="w-full px-4 py-2 rounded-lg bg-bg-tertiary border border-border-default text-text-primary focus:outline-none focus:ring-2 focus:ring-action-primary"
-                    placeholder="0"
-                  />
-                </div>
-
-                <div>
-                  <label className="block text-sm font-medium mb-2 text-text-primary">Unit</label>
-                  <input
-                    type="text"
-                    value={newItem.unit}
-                    onChange={(e) => setNewItem({ ...newItem, unit: e.target.value })}
-                    className="w-full px-4 py-2 rounded-lg bg-bg-tertiary border border-border-default text-text-primary focus:outline-none focus:ring-2 focus:ring-action-primary"
-                    placeholder="kg, pcs, etc."
-                  />
-                </div>
-              </div>
-
-              <div>
-                <label className="block text-sm font-medium mb-2 text-text-primary">Item Image</label>
-
-                <div
-                  className={`relative border-2 border-dashed rounded-lg p-4 transition-colors ${dragActive ? 'border-action-primary bg-bg-secondary' : 'border-border-default'
-                    }`}
-                  onDragEnter={handleDrag}
-                  onDragLeave={handleDrag}
-                  onDragOver={handleDrag}
-                  onDrop={handleDrop}
-                >
-                  {newItemImageUrl ? (
-                    <div className="relative">
-                      <img
-                        src={newItemImageUrl}
-                        alt="Preview"
-                        className="w-full h-48 object-cover rounded-lg"
-                      />
-                      <button
-                        type="button"
-                        onClick={() => {
-                          setNewItemImage(null);
-                          setNewItemImageUrl('');
-                        }}
-                        className="absolute top-2 right-2 bg-action-danger text-text-white p-2 rounded-full hover:opacity-90"
-                      >
-                        <X size={16} />
-                      </button>
-                    </div>
-                  ) : (
-                    <div className="text-center py-8">
-                      <Upload className="mx-auto mb-2 text-text-secondary" size={32} />
-                      <p className="text-sm text-text-secondary mb-2">
-                        Drag & drop an image here, or click to browse
-                      </p>
-                      <input
-                        type="file"
-                        accept="image/*"
-                        onChange={(e) => e.target.files[0] && handleImageFile(e.target.files[0])}
-                        className="hidden"
-                        id="imageUpload"
-                      />
-                      <label
-                        htmlFor="imageUpload"
-                        className="inline-block px-4 py-2 bg-action-primary text-text-white rounded-lg cursor-pointer hover:opacity-90"
-                      >
-                        Choose File
-                      </label>
-                    </div>
-                  )}
-                </div>
-                {/* <div className="mt-3">
-                  <input
-                    type="text"
-                    placeholder="Or paste image URL here"
-                    onPaste={(e) => {
-                      const url = e.clipboardData.getData('text');
-                      if (url.startsWith('http')) {
-                        handleImageUrlPaste(url);
-                      }
-                    }}
-                    className="w-full px-4 py-2 rounded-lg bg-bg-tertiary border border-border-default text-text-primary focus:outline-none focus:ring-2 focus:ring-action-primary"
-                  />
-                </div> */}
-              </div>
-
-              <div>
-                <label className="block text-sm font-medium mb-2 text-text-primary">Add-ons</label>
-                <DropdownCheckbox
-                  selected={newItem.line_item_id}
-                  options={menuItems}
-                  onChange={(selected) => setNewItem({ ...newItem, line_item_id: selected })}
-                  label="Select Add-ons"
-                />
-              </div>
-
-              <div className="flex gap-3 pt-4">
-                <button
-                  onClick={() => setShowAddModal(false)}
-                  className="flex-1 px-4 py-2 rounded-lg bg-bg-tertiary text-text-primary border border-border-default hover:bg-bg-secondary transition-colors"
-                >
-                  Cancel
-                </button>
-                <button
-                  onClick={handleAddItem}
-                  className="flex-1 px-4 py-2 rounded-lg bg-action-primary text-text-white hover:opacity-90 transition-opacity"
-                >
-                  Add Item
-                </button>
-              </div>
-            </div>
-          </div>
-        </div>
-      )}
-
-      {/* Edit Modal */}
-      {showEditModal && editingItem && (
-        <div className="fixed inset-0 z-50 flex items-center justify-center p-4 bg-color-modalsbg">
-          <div className="rounded-lg max-w-2xl w-full p-6 bg-bg-primary max-h-[90vh] overflow-y-auto">
-            <div className="flex justify-between items-center mb-4">
-              <h3 className="text-xl font-semibold text-text-primary">Edit Menu Item</h3>
-              <button
-                onClick={() => setShowEditModal(false)}
-                className="text-text-secondary hover:text-text-primary"
-              >
-                <X size={24} />
-              </button>
-            </div>
-
-            <div className="space-y-4">
-              {/* Category Selector */}
-              <div>
-                <label className="block text-sm font-medium mb-2 text-text-primary">Category *</label>
-                <select
-                  value={editingItem.category_id || ''}
-                  onChange={(e) => setEditingItem({ ...editingItem, category_id: e.target.value })}
-                  className="w-full px-4 py-2 rounded-lg bg-bg-tertiary border border-border-default text-text-primary focus:outline-none focus:ring-2 focus:ring-action-primary"
-                  required
-                >
-                  <option value="">Select a category</option>
-                  {(() => {
-                    const flattenCategories = (items, level = 0) => {
-                      let result = [];
-                      items.forEach(item => {
-                        if (item.id !== 'all') {
-                          result.push({ ...item, level });
-                          if (item.children) {
-                            result = result.concat(flattenCategories(item.children, level + 1));
-                          }
-                        }
-                      });
-                      return result;
-                    };
-                    return flattenCategories(categories).map(cat => (
-                      <option key={cat.id} value={cat.id}>
-                        {'—'.repeat(cat.level)} {cat.name}
-                      </option>
-                    ));
-                  })()}
-                </select>
-              </div>
-
-              <div>
-                <label className="block text-sm font-medium mb-2 text-text-primary">Item Name *</label>
-                <input
-                  type="text"
-                  value={editingItem.name}
-                  onChange={(e) => setEditingItem({ ...editingItem, name: e.target.value })}
-                  className="w-full px-4 py-2 rounded-lg bg-bg-tertiary border border-border-default text-text-primary focus:outline-none focus:ring-2 focus:ring-action-primary"
-                  required
-                />
-              </div>
-
-              <div>
-                <label className="block text-sm font-medium mb-2 text-text-primary">Description</label>
-                <textarea
-                  value={editingItem.description}
-                  onChange={(e) => setEditingItem({ ...editingItem, description: e.target.value })}
-                  className="w-full px-4 py-2 rounded-lg bg-bg-tertiary border border-border-default text-text-primary focus:outline-none focus:ring-2 focus:ring-action-primary"
-                  rows="3"
-                />
-              </div>
-
-              <div className="grid grid-cols-2 gap-4">
-                <div>
-                  <label className="block text-sm font-medium mb-2 text-text-primary">Unit Price *</label>
-                  <input
-                    type="number"
-                    value={editingItem.unit_price}
-                    onChange={(e) => setEditingItem({ ...editingItem, unit_price: e.target.value })}
-                    className="w-full px-4 py-2 rounded-lg bg-bg-tertiary border border-border-default text-text-primary focus:outline-none focus:ring-2 focus:ring-action-primary"
-                    required
-                  />
-                </div>
-
-                <div>
-                  <label className="block text-sm font-medium mb-2 text-text-primary">Discount</label>
-                  <input
-                    type="number"
-                    value={editingItem.discount}
-                    onChange={(e) => setEditingItem({ ...editingItem, discount: e.target.value })}
-                    className="w-full px-4 py-2 rounded-lg bg-bg-tertiary border border-border-default text-text-primary focus:outline-none focus:ring-2 focus:ring-action-primary"
-                  />
-                </div>
-              </div>
-
-              <div className="grid grid-cols-2 gap-4">
-                <div>
-                  <label className="block text-sm font-medium mb-2 text-text-primary">Availability</label>
-                  <input
-                    type="number"
-                    value={editingItem.availability}
-                    onChange={(e) => setEditingItem({ ...editingItem, availability: e.target.value })}
-                    className="w-full px-4 py-2 rounded-lg bg-bg-tertiary border border-border-default text-text-primary focus:outline-none focus:ring-2 focus:ring-action-primary"
-                  />
-                </div>
-
-                <div>
-                  <label className="block text-sm font-medium mb-2 text-text-primary">Unit</label>
-                  <input
-                    type="text"
-                    value={editingItem.unit}
-                    onChange={(e) => setEditingItem({ ...editingItem, unit: e.target.value })}
-                    className="w-full px-4 py-2 rounded-lg bg-bg-tertiary border border-border-default text-text-primary focus:outline-none focus:ring-2 focus:ring-action-primary"
-                  />
-                </div>
-              </div>
-
-              <div>
-                <label className="block text-sm font-medium mb-1 text-text-primary">Item Image</label>
-
-                {editItemImageUrl || editingItem.image_id ? (
-                  <div className="mb-3">
-                    <label className="block text-xs text-text-secondary mb-1">Current Image:</label>
-                    {editItemImageUrl ? (
-                      <div className="relative">
-                        <img
-                          src={editItemImageUrl}
-                          alt="New Preview"
-                          className="w-full h-20 object-cover rounded-lg"
-                        />
-                        <button
-                          type="button"
-                          onClick={() => {
-                            setEditItemImage(null);
-                            setEditItemImageUrl('');
-                          }}
-                          className="absolute top-2 right-2 bg-action-danger text-text-white p-2 rounded-full hover:opacity-90"
-                        >
-                          <X size={16} />
-                        </button>
-                      </div>
-                    ) : (
-                      <MenuImagePreview
-                        clientId={clientId}
-                        imageId={editingItem.image_id}
-                        token={token}
-                        alt={editingItem.name}
-                        baseUrl={import.meta.env.VITE_API_DOCUMENT_SERVICE_URL}
-                        urlBuilder={({ baseUrl, clientId, imageId }) =>
-                          `${baseUrl}/${clientId}/document/download?doc_id=${imageId}`
-                        }
-                        className="w-full h-20 object-cover rounded-lg"
-                      />
-                    )}
-                  </div>
-                ) : null}
-
-                <div
-                  className={`relative border-2 border-dashed rounded-lg p-4 transition-colors ${dragActive ? 'border-action-primary bg-bg-secondary' : 'border-border-default'
-                    }`}
-                  onDragEnter={handleEditDrag}
-                  onDragLeave={handleEditDrag}
-                  onDragOver={handleEditDrag}
-                  onDrop={handleEditDrop}
-                >
-                  <div className="text-center ">
-                    <Upload className="mx-auto mb-2 text-text-secondary" size={32} />
-                    <p className="text-sm text-text-secondary mb-2">
-                      {editingItem.image_id ? 'Upload new image to replace' : 'Drag & drop an image here'}
-                    </p>
-                    <input
-                      type="file"
-                      accept="image/*"
-                      onChange={(e) => e.target.files[0] && handleEditImageFile(e.target.files[0])}
-                      className="hidden"
-                      id="editImageUpload"
-                    />
-                    <label
-                      htmlFor="editImageUpload"
-                      className="inline-block px-4 py-2 bg-action-primary text-text-white rounded-lg cursor-pointer hover:opacity-90"
-                    >
-                      Choose File
-                    </label>
-                  </div>
-                </div>
-
-                {/* <div className="mt-3">
-                  <input
-                    type="text"
-                    placeholder="Or paste image URL here"
-                    onPaste={(e) => {
-                      const url = e.clipboardData.getData('text');
-                      if (url.startsWith('http')) {
-                        handleEditImageUrlPaste(url);
-                      }
-                    }}
-                    className="w-full px-4 py-2 rounded-lg bg-bg-tertiary border border-border-default text-text-primary focus:outline-none focus:ring-2 focus:ring-action-primary"
-                  />
-                </div> */}
-              </div>
-
-              <div>
-                <label className="block text-sm font-medium mb-2 text-text-primary">Add-ons</label>
-                <DropdownCheckbox
-                  selected={Array.isArray(editingItem.line_item_id) ? editingItem.line_item_id : []}
-                  options={menuItems.filter(item => item.id !== editingItem.id)}
-                  onChange={(selected) => setEditingItem({ ...editingItem, line_item_id: selected })}
-                  label="Select Add-ons"
-                />
-              </div>
-
-              <div className="flex gap-3 pt-4">
-                <button
-                  onClick={() => setShowEditModal(false)}
-                  className="flex-1 px-4 py-2 rounded-lg bg-bg-tertiary text-text-primary border border-border-default hover:bg-bg-secondary transition-colors"
-                >
-                  Cancel
-                </button>
-                <button
-                  onClick={handleEditItem}
-                  className="flex-1 px-4 py-2 rounded-lg bg-action-primary text-text-white hover:opacity-90 transition-opacity"
-                >
-                  Save Changes
-                </button>
-              </div>
-            </div>
-          </div>
-        </div>
-      )}
-
+        // Menu-specific props
+        editingItem={editingItem}
+        setEditingItem={setEditingItem}
+        categories={categories}
+        menuItems={menuItems}
+        editItemImage={editItemImage}
+        setEditItemImage={setEditItemImage}
+        editItemImageUrl={editItemImageUrl}
+        setEditItemImageUrl={setEditItemImageUrl}
+        handleEditItem={handleEditItem}
+        clientId={clientId}
+        token={token}
+      />
       {/* Delete Modal */}
       {showDeleteModal && deleteTarget && (
         <div className="fixed inset-0 z-50 flex items-center justify-center p-4 bg-color-modalsbg">
@@ -1563,185 +1098,22 @@ const MenuManagement = ({ clientId, token,realm }) => {
         </div>
       )}
 
-      {/* Bulk Update Modal */}
-      {showBulkModal && (
-        <div className="fixed inset-0 z-50 flex items-center justify-center p-4 bg-color-modalsbg">
-          <div className="rounded-lg max-w-2xl w-full p-6 bg-bg-primary max-h-[90vh] overflow-y-auto">
-            <div className="flex justify-between items-center mb-4">
-              <h3 className="text-xl font-semibold text-text-primary">Bulk Update & Delete</h3>
-              <button
-                onClick={() => {
-                  setShowBulkModal(false);
-                  setSelectedRows([]);
-                  setBulkEditData({});
-                  setSelectAllChecked(false);
-                }}
-                className="text-text-secondary hover:text-text-primary"
-              >
-                <X size={24} />
-              </button>
-            </div>
+      <UniversalBulkUpdateModal
+        showModal={showBulkModal}
+        setShowModal={setShowBulkModal}
+        modalType="menu"
 
-            <div className="flex justify-between items-center mb-4">
-              <div className="flex items-center gap-4">
-                <label className="flex items-center gap-2 text-text-primary cursor-pointer">
-                  <input
-                    type="checkbox"
-                    checked={selectAllChecked}
-                    onChange={toggleSelectAll}
-                    className="w-4 h-4"
-                  />
-                  <span className="text-sm font-medium">Select All</span>
-                </label>
-                <span className="text-sm text-text-secondary">
-                  {selectedRows.length} item(s) selected
-                </span>
-              </div>
-
-              <div className="flex gap-3">
-                <button
-                  onClick={handleBulkUpdate}
-                  disabled={selectedRows.length === 0}
-                  className="flex items-center gap-2 px-4 py-2 rounded-lg bg-action-primary text-text-white hover:opacity-90 transition-opacity disabled:opacity-50 disabled:cursor-not-allowed"
-                >
-                  <Edit size={18} />
-                  Update Selected
-                </button>
-                <button
-                  onClick={handleBulkDelete}
-                  disabled={selectedRows.length === 0}
-                  className="flex items-center gap-2 px-4 py-2 rounded-lg bg-action-danger text-text-white hover:opacity-90 transition-opacity disabled:opacity-50 disabled:cursor-not-allowed"
-                >
-                  <Trash2 size={18} />
-                  Delete Selected
-                </button>
-              </div>
-            </div>
-
-            <div className="overflow-x-auto">
-              <table className="w-full">
-                <thead>
-                  <tr className="border-b border-border-default">
-                    <th className="px-4 py-3 text-left">
-                      <input
-                        type="checkbox"
-                        checked={selectAllChecked}
-                        onChange={toggleSelectAll}
-                        className="w-4 h-4"
-                      />
-                    </th>
-                    <th className="px-4 py-3 text-left text-sm font-semibold text-text-primary">Name</th>
-                    <th className="px-4 py-3 text-left text-sm font-semibold text-text-primary">Description</th>
-                    <th className="px-4 py-3 text-left text-sm font-semibold text-text-primary">Price</th>
-                    <th className="px-4 py-3 text-left text-sm font-semibold text-text-primary">Discount</th>
-                    <th className="px-4 py-3 text-left text-sm font-semibold text-text-primary">Availability</th>
-                  </tr>
-                </thead>
-                <tbody>
-                  {filteredItems.map(item => {
-                    const isSelected = selectedRows.includes(item.id);
-                    const editData = bulkEditData[item.id] || {};
-
-                    return (
-                      <tr key={item.id} className={`border-b border-border-default ${isSelected ? 'bg-bg-secondary' : ''}`}>
-                        <td className="px-4 py-3">
-                          <input
-                            type="checkbox"
-                            checked={isSelected}
-                            onChange={() => {
-                              if (isSelected) {
-                                setSelectedRows(selectedRows.filter(id => id !== item.id));
-                              } else {
-                                setSelectedRows([...selectedRows, item.id]);
-                              }
-                            }}
-                            className="w-4 h-4"
-                          />
-                        </td>
-                        <td className="px-4 py-3">
-                          {isSelected ? (
-                            <input
-                              type="text"
-                              value={editData.name !== undefined ? editData.name : item.name}
-                              onChange={(e) => setBulkEditData({
-                                ...bulkEditData,
-                                [item.id]: { ...editData, name: e.target.value }
-                              })}
-                              className="w-full px-2 py-1 rounded bg-bg-tertiary border border-border-default text-text-primary text-sm"
-                            />
-                          ) : (
-                            <span className="text-sm text-text-primary">{item.name}</span>
-                          )}
-                        </td>
-                        <td className="px-4 py-3">
-                          {isSelected ? (
-                            <input
-                              type="text"
-                              value={editData.description !== undefined ? editData.description : item.description}
-                              onChange={(e) => setBulkEditData({
-                                ...bulkEditData,
-                                [item.id]: { ...editData, description: e.target.value }
-                              })}
-                              className="w-full px-2 py-1 rounded bg-bg-tertiary border border-border-default text-text-primary text-sm"
-                            />
-                          ) : (
-                            <span className="text-sm text-text-secondary truncate block max-w-xs">{item.description}</span>
-                          )}
-                        </td>
-                        <td className="px-4 py-3">
-                          {isSelected ? (
-                            <input
-                              type="number"
-                              value={editData.unit_price !== undefined ? editData.unit_price : item.unit_price}
-                              onChange={(e) => setBulkEditData({
-                                ...bulkEditData,
-                                [item.id]: { ...editData, unit_price: e.target.value }
-                              })}
-                              className="w-full px-2 py-1 rounded bg-bg-tertiary border border-border-default text-text-primary text-sm"
-                            />
-                          ) : (
-                            <span className="text-sm text-text-primary">₹{item.unit_price}</span>
-                          )}
-                        </td>
-                        <td className="px-4 py-3">
-                          {isSelected ? (
-                            <input
-                              type="number"
-                              value={editData.discount !== undefined ? editData.discount : item.discount}
-                              onChange={(e) => setBulkEditData({
-                                ...bulkEditData,
-                                [item.id]: { ...editData, discount: e.target.value }
-                              })}
-                              className="w-full px-2 py-1 rounded bg-bg-tertiary border border-border-default text-text-primary text-sm"
-                            />
-                          ) : (
-                            <span className="text-sm text-text-primary">₹{item.discount || 0}</span>
-                          )}
-                        </td>
-                        <td className="px-4 py-3">
-                          {isSelected ? (
-                            <input
-                              type="number"
-                              value={editData.availability !== undefined ? editData.availability : item.availability}
-                              onChange={(e) => setBulkEditData({
-                                ...bulkEditData,
-                                [item.id]: { ...editData, availability: e.target.value }
-                              })}
-                              className="w-full px-2 py-1 rounded bg-bg-tertiary border border-border-default text-text-primary text-sm"
-                            />
-                          ) : (
-                            <span className="text-sm text-text-primary">{item.availability || 0}</span>
-                          )}
-                        </td>
-                      </tr>
-                    );
-                  })}
-                </tbody>
-              </table>
-            </div>
-          </div>
-        </div>
-      )}
+        // Menu-specific props
+        filteredItems={filteredItems}
+        selectedRows={selectedRows}
+        setSelectedRows={setSelectedRows}
+        selectAllChecked={selectAllChecked}
+        setSelectAllChecked={setSelectAllChecked}
+        bulkEditData={bulkEditData}
+        setBulkEditData={setBulkEditData}
+        handleBulkUpdate={handleBulkUpdate}
+        handleBulkDelete={handleBulkDelete}
+      />
     </div>
   );
 };

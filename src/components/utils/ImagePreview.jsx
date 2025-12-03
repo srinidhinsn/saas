@@ -109,7 +109,7 @@ export default function ImagePreview({clientId,imageId,token,alt,className,urlBu
         controllerRef.current = null;
       }
     };
-  }, [clientId, imageId, token, urlBuilder, base]);
+  }, [clientId, imageId, token]);
 
   useEffect(() => {
     return () => {
