@@ -43,6 +43,8 @@ const MenuManagement = ({ clientId, token, realm }) => {
     discount: '',
     availability: '',
     unit: '',
+    serving_quantity: "",
+    serving_unit: "",
     line_item_id: []
   });
   // add near your other state declarations
@@ -54,7 +56,6 @@ const MenuManagement = ({ clientId, token, realm }) => {
   const [bulkEditData, setBulkEditData] = useState({});
   // realm + user metadata
   const [currentUserId, setCurrentUserId] = useState(null);
-
 
   // Robust flatten for your current category-tree shape (handles `children` or `subCategories`)
   const flattenCategoriesGeneric = (tree) => {
@@ -313,7 +314,7 @@ const MenuManagement = ({ clientId, token, realm }) => {
           { headers: { Authorization: `Bearer ${token}` } }
         ),
         axios.get(
-          `${import.meta.env.VITE_API_INVENTORY_SERVICE_URL}/${clientId}/menu/read`,
+          `${import.meta.env.VITE_API_INVENTORY_SERVICE_URL}/${clientId}/menu/read?realm=${realm}`,
           { headers: { Authorization: `Bearer ${token}` } }
         )
       ]);
@@ -639,8 +640,13 @@ const MenuManagement = ({ clientId, token, realm }) => {
           try { lineItemStr = JSON.stringify(item.line_item_id); } catch { lineItemStr = String(item.line_item_id); }
         }
 
+        const formattedRecipe = item.recipe
+          ? JSON.stringify(item.recipe, null, 2)
+          : "";
+
         return {
           ID: item.id ?? item.inventory_id ?? "",
+          Inventory_Id: item.inventory_id,
           Name: item.name ?? "",
           Description: item.description ?? "",
           Category: catNameById(item.category_id) || item.category || "Unknown",
@@ -654,18 +660,20 @@ const MenuManagement = ({ clientId, token, realm }) => {
           GST: typeof item.gst === "number" ? item.gst : (item.gst ? parseFloat(item.gst) : 0),
           Discount: typeof item.discount === "number" ? item.discount : (item.discount ? parseFloat(item.discount) : 0),
           Availability: typeof item.availability === "number" ? item.availability : (item.availability ? parseInt(item.availability) : 0),
+          Serving_Quantity: item.serving_quantity,
+          Serving_Unit: item.serving_unit,
           Realm: item.realm ?? realm ?? "",
-          Dietary: item.dietary_type ?? item.dietary ?? "",
           Slug: item.slug ?? "",
-          Line_Item_IDs: lineItemStr
+          Line_Item_IDs: lineItemStr,
+          Recipe: formattedRecipe,
         };
       });
 
       // Create worksheet and workbook
       const worksheet = XLSX.utils.json_to_sheet(exportData, {
         header: [
-          "ID", "Name", "Description", "Category", "Unit", "Unit_Price", "Unit_CST", "Unit_GST", "Total_Unit_Price", "Total_Price",
-          "CST", "GST", "Discount", "Availability", "Realm", "Dietary", "Slug", "Line_Item_IDs"
+          "ID","Inventory_Id", "Name", "Description", "Category", "Unit", "Unit_Price", "Unit_CST", "Unit_GST", "Total_Unit_Price", "Total_Price",
+          "CST", "GST", "Discount", "Availability","Serving_Quantity","Serving_Unit", "Realm", "Dietary", "Slug", "Line_Item_IDs"
         ]
       });
 
@@ -684,6 +692,13 @@ const MenuManagement = ({ clientId, token, realm }) => {
   const handleImportFromExcel = (e) => {
     const file = e.target.files[0];
     if (!file) return;
+
+    let created_by = "unknown", updated_by = "unknown";
+    try {
+        const decoded = jwtDecode(token);
+        created_by = decoded.user_id || "unknown";
+        updated_by = decoded.user_id || "unknown";
+    } catch { }
 
     const reader = new FileReader();
     reader.onload = async (evt) => {
@@ -708,6 +723,8 @@ const MenuManagement = ({ clientId, token, realm }) => {
         let failCount = 0;
         const errors = [];
 
+
+
         // Step 1: Delete all existing items
         try {
           await Promise.all(
@@ -728,45 +745,57 @@ const MenuManagement = ({ clientId, token, realm }) => {
         }
 
         // Step 2: Import new items from Excel
-        for (let i = 0; i < parsedData.length; i++) {
-          const row = parsedData[i];
+        for (const row of parsedData) {
 
-          try {
-            // Match the exact column names from export
-            const newItem = {
-              client_id: clientId,
-              name: row.Name || row.name || "",
-              description: row.Description || row.description || "",
-              category_id: row.Category_ID || row.category_id || "",
-              unit_price: parseFloat(row.Unit_Price || row.unit_price || 0),
-              discount: parseFloat(row.Discount || row.discount || 0),
-              availability: parseInt(row.Availability || row.availability || 0),
-              unit: row.Unit || row.unit || "",
-              line_item_id: row.Line_Item_ID
-                ? (typeof row.Line_Item_ID === 'string'
-                  ? row.Line_Item_ID.split(',').filter(Boolean)
-                  : row.Line_Item_ID)
-                : []
-            };
-
-            // Validate required fields
-            if (!newItem.name) {
-              throw new Error('Name is required');
+          // Try converting "Recipe" column into JSON
+          let recipeData = null;
+          if (row.Recipe) {
+            try {
+              recipeData = JSON.parse(row.Recipe);
+            } catch (err) {
+              console.warn("⚠ Invalid Recipe JSON format in Excel, storing as null:", row.Recipe);
+              recipeData = null;
             }
-
-            await axios.post(
-              `${import.meta.env.VITE_API_INVENTORY_SERVICE_URL}/${clientId}/menu/create`,
-              newItem,
-              { headers: { Authorization: `Bearer ${token}` } }
-            );
-
-            successCount++;
-          } catch (itemErr) {
-            failCount++;
-            errors.push(`Row ${i + 2}: ${itemErr.response?.data?.message || itemErr.message}`);
-            console.error(`Error importing row ${i + 2}:`, itemErr.response?.data || itemErr);
           }
+
+          const newItem = {
+            client_id: clientId,
+            inventory_id: row.Inventory_Id,
+            name: row.Name || "",
+            description: row.Description || "",
+            category_id: getCategoryIdByName(row.Category),
+            realm: row.Realm || "",
+            availability: parseInt(row.Availability || 0),
+            serving_quantity: row.Serving_Quantity,
+            serving_unit:row.Serving_Unit,
+            unit: row.Unit || "",
+            image_id: row.Image,
+            unit_price: parseFloat(row.Unit_Price || 0),
+            unit_cst: parseFloat(row.Unit_CST || 0),
+            unit_gst: parseFloat(row.Unit_GST || 0),
+            unit_total_price: parseFloat(row.Total_Unit_Price || 0),
+            price: parseFloat(row.Price || 0),
+            cst: parseFloat(row.CST || 0),
+            gst: parseFloat(row.GST || 0),
+            discount: parseFloat(row.Discount || 0),
+            total_price: parseFloat(row.Total_Price || 0),
+            slug: row.Slug || "",
+            dietary_type: row.Dietary || "",
+            line_item_id: row.Line_Item_IDs
+              ? row.Line_Item_IDs.split(",").map(id => parseInt(id.trim()))
+              : [],
+            recipe: recipeData,  // ⬅ NEW: store JSONB back into DB
+            created_by,
+            updated_by
+          };
+
+          await axios.post(
+            `${import.meta.env.VITE_API_INVENTORY_SERVICE_URL}/${clientId}/menu/create`,
+            newItem,
+            { headers: { Authorization: `Bearer ${token}` } }
+          );
         }
+
 
         // Step 3: Refresh items
         const itemRes = await axios.get(
