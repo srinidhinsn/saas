@@ -32,7 +32,6 @@ def create_access_token(data: dict):
 
 
 def verify_token(req: Request = None, token: str = Depends(oauth2_scheme), db: Session = Depends(get_db)):
-    print("Received headers:", req.headers)
     try:
         print ("token - ", token)
         payload = jwt.decode(token, SECRET_KEY, algorithms=[ALGORITHM])
