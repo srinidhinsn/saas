@@ -212,15 +212,16 @@ const searchInputRef = useRef(null);
           return tree;
         };
 
-        const categoryTree = [
-          { 
-            id: 'all',
-            name: 'All Categories', 
-            count: enrichedItems.length,
-            children: []
-          },
-          ...buildCategoryTree(flatCategories)
-        ];
+        const categoryTree = buildCategoryTree(flatCategories).map(cat => {
+          if (cat.id === 'dietery' || cat.name.toLowerCase() === 'dietery') {
+            return {
+              ...cat,
+              name: 'All Categories',
+              count: enrichedItems.length  // Total count of all items
+            };
+          }
+          return cat;
+        });
 
         setCategories(categoryTree);
 

@@ -53,8 +53,8 @@ const MenuTreeNode = ({
           </span>
         )}
 
-        {/* Action buttons - only show on hover and if callbacks are provided */}
-        {(onEdit || onDelete) && (
+        {/* Action buttons - only show on hover and if callbacks are provided, but hide for "All Categories" */}
+        {(onEdit || onDelete) && category.id !== 'dietery' && category.name !== 'All Categories' && (
           <div className={`flex gap-1 transition-opacity ${isHovered ? 'opacity-100' : 'opacity-0'}`}>
             {onEdit && (
               <button

@@ -271,10 +271,11 @@ const HeaderShared = ({ onLogout }) => {
       <div className="mx-auto px-4 md:px-2 py-3 lg:py-4 flex items-center justify-between">
         <div className="hidden lg:flex items-center space-x-8 md:space-x-2 text-text-primary">
           <NavLink id="home">DashBoard</NavLink>
-          <NavLink id="table">Manage-Table</NavLink>
-          <NavLink id="menu">Manage-Menu</NavLink>
+          <NavLink id="table">Table</NavLink>
+          <NavLink id="menu">Menu</NavLink>
           <NavLink id="billing">Billing</NavLink>
-          <NavLink id="users">Users-Data</NavLink>
+          <NavLink id="inventory">Inventory</NavLink>
+         
         </div>
 
         {/* ClientId with Theme Toggle - Click to change theme */}
@@ -292,7 +293,7 @@ const HeaderShared = ({ onLogout }) => {
         </button>
 
         <div className="hidden lg:flex items-center space-x-8 text-text-primary">
-          <NavLink id="inventory">Inventory</NavLink>
+        <NavLink id="users">Users</NavLink>
           {/* <NavLink id="role">Role</NavLink> */}
           <NavLink id="order">Order</NavLink>
           <NavLink id="summary">Summary</NavLink>
