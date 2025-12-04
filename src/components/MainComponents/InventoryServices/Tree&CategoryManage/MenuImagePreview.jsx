@@ -1,12 +1,16 @@
-import { useEffect,useState } from "react";
+import { useEffect,useRef,useState } from "react";
 import axios from "axios";
 
 const MenuImagePreview = ({ clientId, imageId, token, alt = "Item image", baseUrl, urlBuilder, className = "" }) => {
   const [imageSrc, setImageSrc] = useState(null);
   const [loading, setLoading] = useState(true);
   const [error, setError] = useState(false);
-
+  const prevImageIdRef = useRef(imageId);
   useEffect(() => {
+    if (prevImageIdRef.current === imageId && imageSrc) {
+      return;
+    }
+    prevImageIdRef.current = imageId;
     if (!imageId || !clientId || !token) {
       setLoading(false);
       setError(true);
@@ -42,7 +46,7 @@ const MenuImagePreview = ({ clientId, imageId, token, alt = "Item image", baseUr
         URL.revokeObjectURL(imageSrc);
       }
     };
-  }, [imageId, clientId, token, baseUrl, urlBuilder]);
+  }, [imageId, clientId, token]);
 
   if (loading) {
     return <div className={`bg-gray-200 animate-pulse ${className}`}></div>;
@@ -51,7 +55,7 @@ const MenuImagePreview = ({ clientId, imageId, token, alt = "Item image", baseUr
   if (error || !imageSrc) {
     return (
       <div className={`bg-gradient-to-br from-gray-100 to-gray-200 flex items-center justify-center ${className}`}>
-        <span className="text-gray-400 text-xs">No Image</span>
+        <span className="text-gray-400 text-xs">+ Add Image</span>
       </div>
     );
   }

@@ -1,7 +1,7 @@
 import { useState, useEffect, useCallback } from "react";
 import { createPortal } from "react-dom";
 import MenuTreeNode from "./MenuTreeNode";
-import { Plus, X } from 'lucide-react';
+import { Plus, X, Edit, Trash2 } from 'lucide-react';
 import axios from 'axios';
 import { v4 as uuidv4 } from 'uuid';
 import { jwtDecode } from 'jwt-decode';
@@ -344,7 +344,7 @@ const MenuCategoryTree = ({
   };
 
   const handleEdit = (category) => {
-    if (category.id === 'all') {
+    if (category.id === 'all' || category.id === 'dietery' || category.name === 'All Categories') {
       alert("Cannot edit 'All Categories'");
       return;
     }
@@ -356,8 +356,8 @@ const MenuCategoryTree = ({
   };
 
   const handleDelete = (category) => {
-    if (category.id === 'all') {
-      alert("Cannot delete 'All Categories'");
+    if (category.id === 'all' || category.id === 'dietery' || category.name === 'All Categories') {
+      alert("Cannot edit 'All Categories'");
       return;
     }
     setDeleteTarget(category);
@@ -392,10 +392,89 @@ const MenuCategoryTree = ({
       );
     });
   };
+// Flatten all categories recursively for mobile view
+const flattenAllCategories = (cats) => {
+  let flat = [];
+  const traverse = (items) => {
+    items.forEach(cat => {
+      // Only include categories with items (count > 0)
+      if (cat.count > 0) {
+        flat.push(cat);
+      }
+      if (cat.children && cat.children.length > 0) {
+        traverse(cat.children);
+      }
+    });
+  };
+  traverse(cats);
+  return flat;
+};
 
+const renderMobileCategories = (items) => {
+  const flatCategories = flattenAllCategories(items);
+  
+  return flatCategories.map((category) => {
+    const isSelected = selectedCategory === category.name;
+    const canEdit = category.id !== 'dietery' && category.name !== 'All Categories';
+    
+    return (
+      <div
+        key={category.id || category.name}
+        className="relative flex-shrink-0"
+      >
+        <button
+          onClick={() => onSelectCategory(category.name)}
+          className={`flex items-center gap-2 px-4 py-2 rounded-full whitespace-nowrap font-semibold text-sm transition-all shadow-sm ${
+            isSelected 
+              ? 'bg-action-primary text-white shadow-md' 
+              : 'bg-bg-primary text-text-primary border-2 border-border-default hover:border-action-primary hover:bg-bg-tertiary'
+          }`}
+        >
+          <span>{category.name}</span>
+          {typeof category.count !== 'undefined' && (
+            <span className={`text-xs px-2 py-0.5 rounded-full font-bold ${
+              isSelected 
+                ? 'bg-white text-action-primary' 
+                : 'bg-bg-tertiary text-text-secondary'
+            }`}>
+              {category.count}
+            </span>
+          )}
+        </button>
+        
+        {/* Edit/Delete buttons for mobile - Only show for editable categories */}
+        {canEdit && (
+          <div className="absolute -top-1 -right-1 flex gap-1 z-10">
+            <button
+              onClick={(e) => {
+                e.stopPropagation();
+                handleEdit(category);
+              }}
+              className="w-6 h-6 rounded-full bg-action-primary text-white shadow-lg flex items-center justify-center hover:scale-110 transition-transform"
+              aria-label="Edit category"
+            >
+              <Edit size={12} />
+            </button>
+            <button
+              onClick={(e) => {
+                e.stopPropagation();
+                handleDelete(category);
+              }}
+              className="w-6 h-6 rounded-full bg-action-danger text-white shadow-lg flex items-center justify-center hover:scale-110 transition-transform"
+              aria-label="Delete category"
+            >
+              <Trash2 size={12} />
+            </button>
+          </div>
+        )}
+      </div>
+    );
+  });
+};
   return (
     <>
-      <div className="rounded-lg p-4 bg-bg-primary shadow-md border border-border-default">
+      {/* Desktop: Tree View */}
+      <div className="hidden lg:block rounded-lg p-4 bg-bg-primary shadow-md border border-border-default">
         <div className="flex items-center justify-between mb-3 px-3">
           <h3 className="text-lg font-semibold text-text-primary">
             Categories
@@ -418,8 +497,42 @@ const MenuCategoryTree = ({
           )}
         </div>
       </div>
+     {/* Mobile: Horizontal Scrollable List */}
+<div className="lg:hidden mb-4">
+  <div className="flex items-center justify-between mb-3 px-2">
+    <h3 className="text-base font-semibold text-text-primary">
+      Categories
+    </h3>
+    <button
+      onClick={() => setShowAddModal(true)}
+      className="p-1.5 rounded-lg bg-action-primary text-text-white hover:opacity-90 transition-opacity shadow-md flex-shrink-0"
+      title="Add new category"
+    >
+      <Plus size={16} />
+    </button>
+  </div>
   
-      {/* Add Modal */}
+  <div 
+    className="overflow-x-auto max-w-[350px] overflow-y-hidden scrollbar-hide px-2 touch-pan-x"
+    style={{ 
+      WebkitOverflowScrolling: 'touch',
+      scrollbarWidth: 'none',
+      msOverflowStyle: 'none'
+    }}
+  >
+    <div className="flex gap-2 pb-2 w-max">
+      {categories && categories.length > 0 ? (
+        renderMobileCategories(categories)
+      ) : (
+        <div className="text-text-secondary text-sm py-2">
+          No categories
+        </div>
+      )}
+    </div>
+  </div>
+</div>
+  
+      {/* Modals remain the same */}
       {showAddModal && createPortal(
         <div className="fixed inset-0 z-[9999] flex items-center justify-center p-4 bg-black bg-opacity-50">
           <div className="rounded-lg max-w-md w-full p-6 bg-bg-primary shadow-xl">
@@ -478,7 +591,6 @@ const MenuCategoryTree = ({
         document.body
       )}
   
-      {/* Edit Modal */}
       {showEditModal && editingCategory && createPortal(
         <div className="fixed inset-0 z-[9999] flex items-center justify-center p-4 bg-black bg-opacity-50">
           <div className="rounded-lg max-w-md w-full p-6 bg-bg-primary shadow-xl">
@@ -549,7 +661,6 @@ const MenuCategoryTree = ({
         document.body
       )}
   
-      {/* Delete Modal */}
       {showDeleteModal && deleteTarget && createPortal(
         <div className="fixed inset-0 z-[9999] flex items-center justify-center p-4 bg-black bg-opacity-50">
           <div className="rounded-lg max-w-md w-full p-6 bg-bg-primary shadow-xl">
