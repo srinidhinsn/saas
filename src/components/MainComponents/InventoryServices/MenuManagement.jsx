@@ -5,7 +5,6 @@ import { Plus, Minus, X, Search, Edit, Trash2, Upload, Download } from 'lucide-r
 import axios from 'axios';
 import * as XLSX from 'xlsx';
 import MenuCategoryTree from './Tree&CategoryManage/MenuCategoryTree';
-import { jwtDecode } from "jwt-decode";
 import MenuImagePreview from './Tree&CategoryManage/MenuImagePreview';
 
 
@@ -246,9 +245,7 @@ const MenuManagement = ({ clientId, token, realm }) => {
       };
 
       // Choose category_id for DB (use existing if present; if you really want to generate a new category id, use generateCategoryId)
-      const finalCategoryId = categoryId
-        ? categoryId
-        : generateCategoryId(typeof selectedCategory === 'object' ? selectedCategory.id : null);
+      const finalCategoryId = `subcat_${Date.now()}`;
 
       // Build slug using category name path (not the raw id)
       const slug = generateSlug(finalCategoryId, newItem.name);

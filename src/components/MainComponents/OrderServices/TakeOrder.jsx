@@ -2,80 +2,10 @@ import React, { useState, useEffect, useRef } from 'react';
 import { ShoppingCart, Plus, Minus, X, Check, StickyNote,Search } from 'lucide-react';
 import axios from 'axios';
 import CategoryTree from '../InventoryServices/CategoryTree';
-// import ImagePreview from '../../utils/ImagePreview';
+import ImagePreview from '../../utils/ImagePreview';
 
 
 
-const ItemImage = ({ clientId, imageId, token, altText }) => {
-  const [imageSrc, setImageSrc] = useState(null);
-  const [loading, setLoading] = useState(true);
-  const [error, setError] = useState(false);
-
-  useEffect(() => {
-    if (!imageId || !clientId || !token) {
-      setError(true);
-      setLoading(false);
-      return;
-    }
-
-    const fetchImage = async () => {
-      try {
-        setLoading(true);
-        const response = await axios.get(
-          `${import.meta.env.VITE_API_INVENTORY_SERVICE_URL}/${clientId}/menu/image/${imageId}`,
-          {
-            headers: { Authorization: `Bearer ${token}` },
-            responseType: 'blob'
-          }
-        );
-
-        const imageUrl = URL.createObjectURL(response.data);
-        setImageSrc(imageUrl);
-        setError(false);
-      } catch (err) {
-        console.error('Error loading image:', err);
-        setError(true);
-      } finally {
-        setLoading(false);
-      }
-    };
-
-    fetchImage();
-
-    // Cleanup function to revoke object URL
-    return () => {
-      if (imageSrc) {
-        URL.revokeObjectURL(imageSrc);
-      }
-    };
-  }, [clientId, imageId, token]);
-
-  if (loading) {
-    return (
-      <div className="w-full h-full flex items-center justify-center bg-gradient-to-br from-gray-100 to-gray-200 dark:from-gray-700 dark:to-gray-800">
-        <div className="animate-spin rounded-full h-8 w-8 border-b-2 border-action-primary"></div>
-      </div>
-    );
-  }
-
-  if (error || !imageSrc) {
-    return (
-      <img
-        src="https://images.unsplash.com/photo-1546069901-ba9599a7e63c?w=400&h=300&fit=crop"
-        alt={altText || 'Placeholder'}
-        className="w-full h-full object-cover group-hover:scale-110 transition-transform duration-500"
-      />
-    );
-  }
-
-  return (
-    <img
-      src={imageSrc}
-      alt={altText || 'Menu item'}
-      className="w-full h-full object-cover group-hover:scale-110 transition-transform duration-500"
-    />
-  );
-};
 
 const NoteModal = ({ isOpen, onClose, itemName }) => {
   if (!isOpen) return null;
@@ -689,7 +619,7 @@ const searchInputRef = useRef(null);
                       )}
   
                       {/* Item Image */}
-                      {/* <ImagePreview
+                      <ImagePreview
   clientId={clientId}
   imageId={item.image_id}
   token={token}
@@ -699,7 +629,7 @@ const searchInputRef = useRef(null);
     `${baseUrl}/${clientId}/document/download?doc_id=${imageId}`
   }
   className="w-full h-full object-cover group-hover:scale-110 transition-transform duration-500"
-/> */}
+/>
 
 
   
@@ -797,7 +727,7 @@ const searchInputRef = useRef(null);
                       {cart.map(item => (
                         <div key={item.id} className="flex items-center space-x-3 p-3 lg:p-4 rounded-lg bg-bg-tertiary border-border-default">
               <div className="w-16 h-16 rounded-md overflow-hidden flex-shrink-0">
-  {/* <ImagePreview
+  <ImagePreview
     clientId={clientId}
     imageId={item.image_id}
     token={token}
@@ -807,7 +737,7 @@ const searchInputRef = useRef(null);
       `${baseUrl}/${clientId}/document/download?doc_id=${imageId}`
     }
     className="w-full h-full object-cover"
-  /> */}
+  />
 </div>
 
 
