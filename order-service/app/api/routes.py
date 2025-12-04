@@ -2,7 +2,6 @@ from fastapi import APIRouter, Depends, HTTPException, Query, Request
 from fastapi.responses import FileResponse
 from sqlalchemy.orm import Session
 from typing import List
-from uuid import UUID
 from database.postgres import get_db
 from models.response_model import ResponseModel
 from entity.table_entity import DiningTable
@@ -314,7 +313,7 @@ def update_order_items(client_id: str, order_id: Optional[int] = Query(None), bo
     return response
 
 @router.post("/order_item/update")
-def update_order_items(client_id: str, order_id: Optional[int] = Query(None), order_item: Optional[OrderItemModel] = None, context: SaasContext = Depends(verify_token), db: Session = Depends(get_db)):
+def update_order_item(client_id: str, order_id: Optional[int] = Query(None), order_item: Optional[OrderItemModel] = None, context: SaasContext = Depends(verify_token), db: Session = Depends(get_db)):
     if not order_id or not order_item or not order_item.id:
         raise HTTPException(status_code=400, detail="Missing order_id or order_item_id")
 
@@ -331,35 +330,47 @@ def update_order_items(client_id: str, order_id: Optional[int] = Query(None), or
 
 
 @router.delete("/order_item/delete")
-def delete_order_items(client_id: str, order_item_id: Optional[str] = Query(None), context: SaasContext = Depends(verify_token), db: Session = Depends(get_db)):
-    order_item = db.query(Db_OrderItem_Entity).filter(Db_OrderItem_Entity.id == str(
-        order_item_id), Db_OrderItem_Entity.client_id == client_id).first()
+def delete_order_items(client_id: str,order_item_id: Optional[str] = Query(None),context: SaasContext = Depends(verify_token),db: Session = Depends(get_db)):
+    if not order_item_id:
+        raise HTTPException(status_code=400, detail="Missing order_item_id")
+
+    try:
+        order_item_id_int = int(str(order_item_id).strip())
+    except (TypeError, ValueError):
+        raise HTTPException(status_code=400, detail="Invalid order_item_id format")
+
+    order_item = db.query(Db_OrderItem_Entity).filter(Db_OrderItem_Entity.id == order_item_id_int,Db_OrderItem_Entity.client_id == client_id).first()
+
     if not order_item:
         raise HTTPException(status_code=404, detail="Order item not found")
 
     db.delete(order_item)
     db.commit()
-    response = ResponseModel(screen_id=context.screen_id, data={
-                             "message": "Order item deleted"})
-    return response
-
+    return ResponseModel(
+        screen_id=context.screen_id,
+        data={"message": "Order item deleted"}
+    )
 
 @router.delete("/dinein/delete")
-def delete_order(client_id: str, dinein_order_id: str, context: SaasContext = Depends(verify_token), db: Session = Depends(get_db)):
-    order = db.query(Db_Order_Entity).filter(Db_Order_Entity.id == dinein_order_id,
-                                     Db_Order_Entity.client_id == client_id).first()
+def delete_order(client_id: str,dinein_order_id: Optional[str] = Query(None),context: SaasContext = Depends(verify_token),db: Session = Depends(get_db)):
+    if not dinein_order_id:
+        raise HTTPException(status_code=400, detail="Missing dinein_order_id")
+
+    try:
+        dinein_order_id_int = int(str(dinein_order_id).strip())
+    except (TypeError, ValueError):
+        raise HTTPException(status_code=400, detail="Invalid dinein_order_id format")
+
+    order = (db.query(Db_Order_Entity).filter(Db_Order_Entity.id == dinein_order_id_int,Db_Order_Entity.client_id == client_id).first())
+
     if not order:
         raise HTTPException(status_code=404, detail="Order not found")
-    if order.status == OrderStatusEnum.served:
-        raise HTTPException(
-            status_code=400, detail="Cannot delete a served order")
 
+    if order.status == OrderStatusEnum.served:
+        raise HTTPException(status_code=400, detail="Cannot delete a served order")
     db.delete(order)
     db.commit()
-    response = ResponseModel(screen_id=context.screen_id, data={
-                             "message": "Order deleted"})
-    return response
-
+    return ResponseModel(screen_id=context.screen_id,data={"message": "Order deleted"})
 
 @router.get("/kds/orders")
 def get_kds_orders(client_id: str, context: SaasContext = Depends(verify_token), db: Session = Depends(get_db)):
@@ -386,6 +397,4 @@ def get_kds_orders(client_id: str, context: SaasContext = Depends(verify_token),
     '''
     response = ResponseModel(screen_id=context.screen_id, data=orders)
     return response
-
-# --------------------------------- for invoice ----------------------------------
 

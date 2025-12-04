@@ -273,7 +273,7 @@ ALTER TABLE page_definition ALTER COLUMN id ADD GENERATED ALWAYS AS IDENTITY (
 --
 
 CREATE TABLE person (
-    id text NOT NULL,
+    id UUID PRIMARY KEY DEFAULT gen_random_uuid(),
     first_name text,
     last_name text,
     dob text,
@@ -286,6 +286,7 @@ CREATE TABLE person (
     created_at timestamp without time zone DEFAULT CURRENT_TIMESTAMP,
     updated_at timestamp without time zone DEFAULT CURRENT_TIMESTAMP
 );
+
 
 --
 -- TOC entry 230 (class 1259 OID 49797)
@@ -502,7 +503,6 @@ UPDATE category
 SET sub_categories = array_cat(sub_categories, ARRAY['person-details', 'persons','realm'])
 WHERE id = 'users' AND client_id = 'saas';
 
--- order-item update
 -- order-item update
 ALTER TABLE "public"."order_item" ADD COLUMN frontend_unique_key TEXT;
 
