@@ -1,5 +1,3 @@
-
-
 import React, { useState, useEffect, useRef, useCallback } from 'react';
 import { Plus, Minus, X, Search, Edit, Trash2, Upload, Download } from 'lucide-react';
 import axios from 'axios';
