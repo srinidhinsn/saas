@@ -505,3 +505,13 @@ WHERE id = 'users' AND client_id = 'saas';
 -- order-item update
 -- order-item update
 ALTER TABLE "public"."order_item" ADD COLUMN frontend_unique_key TEXT;
+
+
+
+ALTER TABLE inventory ADD COLUMN recipe jsonb DEFAULT '[]'::jsonb;
+ALTER TABLE inventory ALTER COLUMN availability TYPE numeric(18,6) USING availability::numeric;
+ALTER TABLE inventory ADD COLUMN serving_quantity double precision;
+ALTER TABLE inventory ADD COLUMN serving_unit text;
+
+
+

@@ -124,219 +124,6 @@ def get_orders_for_table(client_id: str, table_id: Optional[str] = None, context
     response = ResponseModel(screen_id=context.screen_id, data=result)
     return response
 
-# @router.post("/dinein/update")
-# def update_order_status(client_id: str,body: DineinOrderModel, request: Request, context: SaasContext = Depends(verify_token),db: Session = Depends(get_db),):
-#     if not body.id:
-#         raise HTTPException(status_code=400, detail="Order ID is required")
-
-#     order = db.query(Db_Order_Entity).filter(Db_Order_Entity.id == 
-#         body.id, Db_Order_Entity.client_id == str(client_id)).first()
-#     if not order:
-#         raise HTTPException(status_code=404, detail="Order not found")
-
-#     # 1) Update status
-#     order.status = body.status.value
-#     db.commit()
-#     db.refresh(order)
-
-#     # 2) Forward the SAME user JWT to billing
-#     billing_sync = None
-#     if body.status == OrderStatusEnum.served:
-#         try:
-#             # Extract raw Authorization header from this request
-#             auth = request.headers.get("authorization", "")
-#             user_jwt = ""
-#             if auth and auth.lower().startswith("bearer "):
-#                 user_jwt = auth.split(" ", 1)[1].strip()
-
-#             if not user_jwt:
-#                 raise ValueError("Missing user JWT in request Authorization header")
-
-#             from app.services.order_service import sync_served_order_to_billing_public
-#             billing_sync = sync_served_order_to_billing_public(order, user_jwt)
-#         except Exception as e:
-#             billing_sync = {"error": str(e)}
-
-#     return ResponseModel(
-#         screen_id=context.screen_id,
-#         data={
-#             "message": "Status updated",
-#             "new_status": order.status,
-#             "billing_sync": billing_sync,
-#         },
-#     )
-
-
-# @router.post("/dinein/update")
-# def update_order_status(
-#     client_id: str,
-#     body: DineinOrderModel,
-#     request: Request,
-#     context: SaasContext = Depends(verify_token),
-#     db: Session = Depends(get_db),
-# ):
-#     if not body.id:
-#         raise HTTPException(status_code=400, detail="Order ID is required")
-
-#     # Fetch the order
-#     order = db.query(Db_Order_Entity).filter(
-#         Db_Order_Entity.id == body.id,
-#         Db_Order_Entity.client_id == str(client_id)
-#     ).first()
-#     if not order:
-#         raise HTTPException(status_code=404, detail="Order not found")
-
-#     # Update order status
-#     order.status = body.status.value
-#     db.commit()
-#     db.refresh(order)
-
-#     # -------------------------------
-#     # 🔹 If status = served → deduct inventory
-#     # -------------------------------
-#     if body.status == OrderStatusEnum.served:
-#         print(f"✅ Order {order.id} served — deducting inventory availability...")
-
-#         db_items = db.query(Db_OrderItem_Entity).filter(
-#             Db_OrderItem_Entity.order_id == order.id,
-#             Db_OrderItem_Entity.client_id == client_id
-#         ).all()
-
-#         # Helper conversion utilities
-#         from decimal import Decimal
-
-#         def convert_to_base(value, u):
-#             value = Decimal(value)
-#             u = (u or "").lower().strip()
-#             if u in ["litre", "litres", "l"]:
-#                 return value * Decimal(1000)  # ml
-#             elif u in ["millilitre", "millilitres", "ml"]:
-#                 return value
-#             elif u in ["kg", "kgs", "kilogram", "kilograms"]:
-#                 return value * Decimal(1000)  # g
-#             elif u in ["gram", "grams", "g"]:
-#                 return value
-#             else:
-#                 return value  # fallback, e.g. pcs
-
-#         def convert_from_base(value, u):
-#             value = Decimal(value)
-#             u = (u or "").lower().strip()
-#             if u in ["litre", "litres", "l"]:
-#                 return value / Decimal(1000)
-#             elif u in ["kg", "kgs", "kilogram", "kilograms"]:
-#                 return value / Decimal(1000)
-#             else:
-#                 return value
-
-#         # -----------------------------------------------------
-#         # 🔹 Deduct from menu item availability (existing logic)
-#         # -----------------------------------------------------
-#         for item in db_items:
-#             inventory_item = db.query(InventoryEntity).filter(
-#                 InventoryEntity.id == item.item_id,
-#                 InventoryEntity.client_id == client_id
-#             ).first()
-
-#             if not inventory_item:
-#                 print(f"⚠️ Inventory not found for item_id={item.item_id}")
-#                 continue
-
-#             if inventory_item.availability is None:
-#                 print(f"⚠️ No availability set for {inventory_item.name}")
-#                 continue
-
-#             prev_avail = inventory_item.availability
-#             inv_unit = (inventory_item.unit or "").lower().strip()
-#             serving_qty = inventory_item.serving_quantity or 1
-#             serving_unit = (inventory_item.serving_unit or inv_unit).lower().strip()
-
-#             avail_in_base = convert_to_base(prev_avail, inv_unit)
-#             used_in_base = convert_to_base(serving_qty, serving_unit) * Decimal(item.quantity)
-#             new_avail_base = max(Decimal(0), avail_in_base - used_in_base)
-#             new_avail = convert_from_base(new_avail_base, inv_unit)
-
-#             inventory_item.availability = new_avail
-
-#             print(
-#                 f"🔸 {inventory_item.name}: {prev_avail}{inv_unit} → {new_avail}{inv_unit} "
-#                 f"(served {serving_qty}{serving_unit} x {item.quantity})"
-#             )
-
-#             # -----------------------------------------------------
-#             # 🔹 Also deduct stock items linked via recipe_links
-#             # -----------------------------------------------------
-#             recipe_links = db.query(RecipeLinkEntity).filter(
-#                 RecipeLinkEntity.menu_item_id == item.item_id,
-#                 RecipeLinkEntity.client_id == client_id
-#             ).all()
-
-#             for link in recipe_links:
-#                 stock_item = db.query(StockItemEntity).filter(
-#                     StockItemEntity.id == link.stock_item_id,
-#                     StockItemEntity.client_id == client_id
-#                 ).first()
-
-#                 if not stock_item:
-#                     print(f"⚠️ Stock item not found for id={link.stock_item_id}")
-#                     continue
-
-#                 prev_stock_qty = Decimal(stock_item.quantity_available or 0)
-#                 stock_unit = (stock_item.unit or "").lower().strip()
-#                 req_qty = Decimal(link.quantity_required or 0)
-
-#                 used_in_base = convert_to_base(req_qty, link.unit) * Decimal(item.quantity)
-#                 stock_in_base = convert_to_base(prev_stock_qty, stock_unit)
-
-#                 new_stock_base = max(Decimal(0), stock_in_base - used_in_base)
-#                 new_stock_qty = convert_from_base(new_stock_base, stock_unit)
-#                 stock_item.quantity_available = new_stock_qty
-
-#                 print(
-#                     f"   🟠 Deducted from stock: {stock_item.name}: "
-#                     f"{prev_stock_qty}{stock_unit} → {new_stock_qty}{stock_unit} "
-#                     f"(used {req_qty}{link.unit} × {item.quantity})"
-#                 )
-
-#         db.commit()
-#         print(f"✅ Inventory and stock updated successfully for order {order.id}")
-
-#         # -------------------------------
-#         # 🔹 Continue billing sync
-#         # -------------------------------
-#         billing_sync = None
-#         try:
-#             auth = request.headers.get("authorization", "")
-#             user_jwt = ""
-#             if auth and auth.lower().startswith("bearer "):
-#                 user_jwt = auth.split(" ", 1)[1].strip()
-
-#             if not user_jwt:
-#                 raise ValueError("Missing user JWT in request Authorization header")
-
-#             from app.services.order_service import sync_served_order_to_billing_public
-#             billing_sync = sync_served_order_to_billing_public(order, user_jwt)
-#         except Exception as e:
-#             billing_sync = {"error": str(e)}
-
-#         return ResponseModel(
-#             screen_id=context.screen_id,
-#             data={
-#                 "message": "Order served, menu and stock updated",
-#                 "new_status": order.status,
-#                 "billing_sync": billing_sync,
-#             },
-#         )
-
-#     # -------------------------------
-#     # For all other statuses
-#     # -------------------------------
-#     return ResponseModel(
-#         screen_id=context.screen_id,
-#         data={"message": "Status updated", "new_status": order.status},
-#     )
-
-
 @router.post("/dinein/update")
 def update_order_status(
     client_id: str,
@@ -347,29 +134,19 @@ def update_order_status(
 ):
     from decimal import Decimal
 
-    # ---------------------------
-    # 1️⃣ Fetch order record
-    # ---------------------------
     order = (
         db.query(Db_Order_Entity)
         .filter(Db_Order_Entity.id == body.id, Db_Order_Entity.client_id == client_id)
-
         .first()
     )
 
     if not order:
         raise HTTPException(status_code=404, detail=f"Order {body.order_id} not found")
 
-    # ---------------------------
-    # 2️⃣ Update order status
-    # ---------------------------
     order.status = body.status
     db.commit()
     db.refresh(order)
 
-    # ---------------------------
-    # 3️⃣ If status == served → Deduct inventory
-    # ---------------------------
     if body.status == OrderStatusEnum.served:
         print(f"✅ Order {order.id} served — deducting inventory availability...")
 
@@ -425,7 +202,6 @@ def update_order_status(
                 inv_unit = (menu_item.unit or "").lower().strip()
                 serving_qty = safe_decimal(menu_item.serving_quantity or 1)
                 serving_unit = (menu_item.serving_unit or inv_unit).lower().strip()
-
                 menu_avail_base = convert_to_base_decimal(prev_menu_avail, inv_unit)
                 used_menu_base = convert_to_base_decimal(serving_qty, serving_unit) * safe_decimal(item.quantity)
                 new_menu_avail_base = max(Decimal(0), menu_avail_base - used_menu_base)
@@ -456,10 +232,7 @@ def update_order_status(
 
                     stock_row = (
                         db.query(InventoryEntity)
-                        .filter(
-                            InventoryEntity.id == stock_id,
-                            InventoryEntity.client_id == client_id,
-                            InventoryEntity.inventory_id == 2,
+                        .filter( InventoryEntity.id == stock_id, InventoryEntity.client_id == client_id, InventoryEntity.inventory_id == 2,
                         )
                         .first()
                     )
@@ -469,8 +242,7 @@ def update_order_status(
                         continue
 
                     prev_stock_avail = safe_decimal(stock_row.availability)
-                    stock_unit = (stock_row.unit or "").lower().strip()
-
+                    stock_unit = (stock_row.unit or "").lower() 
                     stock_avail_base = convert_to_base_decimal(prev_stock_avail, stock_unit)
                     used_stock_base = convert_to_base_decimal(qty_required, qty_unit) * safe_decimal(item.quantity)
                     new_stock_avail_base = max(Decimal(0), stock_avail_base - used_stock_base)
@@ -510,11 +282,7 @@ def update_order_status(
 
         return ResponseModel(
             screen_id=context.screen_id,
-            data={
-                "message": "Order served and inventory updated",
-                "new_status": order.status,
-                "billing_sync": billing_sync,
-            },
+            data={ "message": "Order served and inventory updated", "new_status": order.status, "billing_sync": billing_sync },
         )
 
     # ---------------------------
