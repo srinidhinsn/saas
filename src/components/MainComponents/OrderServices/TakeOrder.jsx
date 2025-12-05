@@ -501,16 +501,16 @@ const searchInputRef = useRef(null);
     return () => window.removeEventListener('keydown', onKey);
   }, []);
   
-  if (loading) {
-    return (
-      <div className="min-h-screen flex items-center justify-center bg-bg-secondary">
-        <div className="text-center">
-          <div className="animate-spin rounded-full h-12 w-12 border-b-2 mx-auto mb-4 border-action-primary"></div>
-          <p className="text-text-secondary">Loading...</p>
-        </div>
-      </div>
-    );
-  }
+  // if (loading) {
+  //   return (
+  //     <div className="min-h-screen flex items-center justify-center bg-bg-secondary">
+  //       <div className="text-center">
+  //         <div className="animate-spin rounded-full h-12 w-12 border-b-2 mx-auto mb-4 border-action-primary"></div>
+  //         <p className="text-text-secondary">Loading...</p>
+  //       </div>
+  //     </div>
+  //   );
+  // }
   
   return (
     <div className="min-h-screen bg-bg-primary p-0">
