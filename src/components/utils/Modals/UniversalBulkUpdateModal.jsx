@@ -322,11 +322,11 @@ const UniversalBulkUpdateModal = ({
     
     return (
       <div className="fixed inset-0 bg-color-modalsbg z-50 flex items-center justify-center p-2 sm:p-4">
-        <div className="bg-bg-primary rounded-xl w-full max-w-3xl shadow-2xl border-2 border-border-default max-h-[95vh] sm:max-h-[90vh] overflow-hidden flex flex-col">
+        <div className="bg-bg-primary rounded-xl w-full max-w-xl shadow-2xl border-2 border-border-default max-h-[95vh] sm:max-h-[80vh] overflow-hidden flex flex-col">
           
           {/* Header */}
-          <div className="px-4 sm:px-6 py-3 sm:py-4 border-b-2 border-border-default flex justify-between items-center bg-gradient-to-r from-action-primary to-action-success">
-            <h3 className="text-lg sm:text-xl font-bold text-text-white">Bulk Update Tables</h3>
+          <div className="px-2 sm:px-4 py-1 sm:py-2 border-b-2 border-border-default flex justify-between items-center bg-gradient-to-r from-action-primary to-action-success">
+            <h3 className="text-lg sm:text-xl font-semibold text-text-white">Update Tables</h3>
             <button 
               onClick={handleClose} 
               className="text-text-white hover:text-text-primary hover:bg-bg-primary transition-all p-2 rounded-lg"
@@ -336,11 +336,10 @@ const UniversalBulkUpdateModal = ({
           </div>
   
           {/* Global Update Section */}
-          <div className="px-4 sm:px-6 py-3 sm:py-4 bg-gradient-to-r from-orange-50 to-yellow-50 border-b-2 border-border-default">
-            <h4 className="text-xs sm:text-sm font-bold text-text-secondary mb-3 uppercase tracking-wide">Apply to All Selected</h4>
-            <div className="grid grid-cols-1 sm:grid-cols-3 gap-3 sm:gap-4">
+          <div className="px-4 sm:px-6 py-1 sm:py-2 bg-gradient-to-r from-orange-50 to-yellow-50 border-b-2 border-border-default">
+           <div className="grid grid-cols-1 sm:grid-cols-3 gap-3 sm:gap-4">
               <div>
-                <label className="block text-xs font-bold mb-1.5 text-text-secondary">Global Seating</label>
+                <label className="block text-xs font-bold mb-1 text-text-secondary">Global Seating</label>
                 <input
                   type="number"
                   min="1"
@@ -350,15 +349,15 @@ const UniversalBulkUpdateModal = ({
                     setBulkUpdateGlobal(prev => ({ ...prev, table_type: value }));
                   }}
                   placeholder="Apply to all"
-                  className="w-full px-3 py-2.5 border-2 border-border-default rounded-lg focus:outline-none focus:ring-2 focus:ring-action-primary focus:border-action-primary text-sm shadow-sm"
+                  className="w-full px-3 py-1.5 border-2 border-border-default rounded-lg focus:outline-none   text-sm shadow-sm"
                 />
               </div>
               <div>
-                <label className="block text-xs font-bold mb-1.5 text-text-secondary">Global Status</label>
+                <label className="block text-xs font-bold mb-1 text-text-secondary">Global Status</label>
                 <select
                   value={bulkUpdateGlobal.status}
                   onChange={e => setBulkUpdateGlobal(prev => ({ ...prev, status: e.target.value }))}
-                  className="w-full px-3 py-2.5 border-2 border-border-default rounded-lg focus:outline-none focus:ring-2 focus:ring-action-primary focus:border-action-primary text-sm shadow-sm"
+                  className="w-full px-3 py-1.5 border-2 border-border-default rounded-lg focus:outline-none  text-sm shadow-sm"
                 >
                   <option value="">-- No Change --</option>
                   <option value="Vacant">Vacant</option>
@@ -366,11 +365,11 @@ const UniversalBulkUpdateModal = ({
                 </select>
               </div>
               <div>
-                <label className="block text-xs font-bold mb-1.5 text-text-secondary">Global Zone</label>
+                <label className="block text-xs font-bold mb-1 text-text-secondary">Global Zone</label>
                 <select
                   value={bulkUpdateGlobal.location_zone}
                   onChange={e => setBulkUpdateGlobal(prev => ({ ...prev, location_zone: e.target.value }))}
-                  className="w-full px-3 py-2.5 border-2 border-border-default rounded-lg focus:outline-none focus:ring-2 focus:ring-action-primary focus:border-action-primary text-sm shadow-sm"
+                  className="w-full px-3 py-1.5 border-2 border-border-default rounded-lg focus:outline-none  text-sm shadow-sm"
                 >
                   <option value="">-- No Change --</option>
                   <option value="AC">AC</option>
@@ -381,7 +380,7 @@ const UniversalBulkUpdateModal = ({
           </div>
   
           {/* Search Bar */}
-          <div className="px-4 sm:px-6 py-3 border-b border-border-default bg-bg-primary">
+          <div className="px-2 sm:px-4 py-1 border-b border-border-default bg-bg-primary">
             <div className="relative">
               <FaSearch className="absolute left-4 top-1/2 transform -translate-y-1/2 text-text-secondary" />
               <input
@@ -389,7 +388,7 @@ const UniversalBulkUpdateModal = ({
                 placeholder="Search tables to update..."
                 value={bulkUpdateSearch}
                 onChange={e => setBulkUpdateSearch(e.target.value)}
-                className="w-full pl-11 pr-4 py-2.5 border-2 border-border-default rounded-lg focus:outline-none focus:ring-2 focus:ring-action-primary focus:border-action-primary text-sm shadow-sm"
+                className="w-full pl-11 pr-4 py-1.5 border-2 border-border-default rounded-lg focus:outline-none  text-sm shadow-sm"
               />
             </div>
           </div>

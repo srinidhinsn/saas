@@ -5,6 +5,7 @@ import { toast } from "react-toastify";
 import UniversalAddModal from "../../utils/Modals/UniversalAddModal";
 import UniversalEditModal from "../../utils/Modals/UniversalEditModal";
 import UniversalBulkUpdateModal from "../../utils/Modals/UniversalBulkUpdateModal";
+import UniversalBulkDeleteModal from "../../utils/Modals/UniversalBulkDeleteModal";
 
 const statusConfig = {
     Vacant: { card: "bg-tableStatusBg-vacant border-tableStatusBorder-vacant", icon: <FaCheck className="text-action-success text-xl" />, label: "Available" },
@@ -632,100 +633,22 @@ const TableManagement = ({ clientId, token }) => {
                     getFilteredUpdateTables={getFilteredUpdateTables}
                 />
 
-                {/* Bulk Delete Modal */}
-                {showBulkDelete && (
-                    <div className="fixed inset-0 bg-color-modalsbg z-50 flex items-center justify-center p-4">
-                        <div className="bg-bg-primary rounded-xl w-full max-w-xl shadow-card border-default border-border-default max-h-[90vh] overflow-hidden flex flex-col">
-                            <div className="px-4 py-2 border-b-default flex justify-between items-center bg-gradient-to-r from-red-50 to-pink-50">
-                                <h3 className="text-xl font-bold text-action-danger flex items-center gap-2">
-                                    Bulk Delete Tables
-                                </h3>
-                                <button className="text-text-primary hover:text-text-secondary transition-colors p-1" onClick={() => setShowBulkDelete(false)}>
-                                    <FaTimes size={24} />
-                                </button>
-                            </div>
-
-                            {/* Search */}
-                            <div className="px-4 py-2 border-b-default bg-bg-primary">
-                                <div className="relative">
-                                    <FaSearch className="absolute left-4 top-1/2 transform -translate-y-1/2 text-text-secondary" />
-                                    <input
-                                        type="text"
-                                        placeholder="Search tables to delete..."
-                                        value={bulkDeleteSearch}
-                                        onChange={e => setBulkDeleteSearch(e.target.value)}
-                                        className="w-full pl-12 pr-4 py-2.5 border border-border-default rounded-lg focus:outline-none focus:ring-1 focus:ring-action-primary"
-                                    />
-                                </div>
-                            </div>
-
-                            {/* Select All */}
-                            <div className="px-2 py-1 bg-bg-tertiary border-b-default">
-                                <label className="flex items-center gap-2 cursor-pointer hover:bg-bg-primary p-2 rounded-lg transition-colors">
-                                    <input
-                                        type="checkbox"
-                                        checked={selectedDeleteTables.length === getFilteredDeleteTables().length && getFilteredDeleteTables().length > 0}
-                                        onChange={selectAllDeleteTables}
-                                        className="w-3 h-3 text-action-danger rounded"
-                                    />
-                                    <span className="font-semibold text-text-primary">
-                                        Select All <span className="text-action-danger">({selectedDeleteTables.length} selected)</span>
-                                    </span>
-                                </label>
-                            </div>
-
-                            {/* Table List */}
-                            <div className="flex-1 overflow-y-auto p-2">
-                                <div className="space-y-2">
-                                    {getFilteredDeleteTables().map(table => (
-                                        <div key={table.id} className={`border-2 rounded-lg p-2 bg-bg-primary transition-all ${selectedDeleteTables.includes(table.id) ? 'border-action-danger shadow-card bg-red-50' : 'border-border-default hover:shadow-md'
-                                            }`}>
-                                            <label className="flex items-start gap-2 cursor-pointer">
-                                                <input
-                                                    type="checkbox"
-                                                    checked={selectedDeleteTables.includes(table.id)}
-                                                    onChange={() => toggleDeleteTableSelection(table.id)}
-                                                    className="w-3 h-3 text-action-danger rounded focus:ring-1 focus:ring-action-danger"
-                                                />
-                                                <div className="flex-1">
-                                                    <div className="flex items-center justify-between mb-1">
-                                                        <span className="font-bold text-lg text-text-primary">{table.name}</span>
-                                                        {selectedDeleteTables.includes(table.id) && (
-                                                            <span className="text-xs bg-tableStatusBg-occupied text-action-danger px-2 py-1 rounded-full font-semibold">Will be deleted</span>
-                                                        )}
-                                                    </div>
-                                                    <span className="text-sm text-text-secondary">
-                                                        <strong>Seating:</strong> {table.table_type} | <strong>Status:</strong> {table.status} | <strong>Zone:</strong> {table.location_zone}
-                                                    </span>
-                                                </div>
-                                            </label>
-                                        </div>
-                                    ))}
-                                </div>
-                            </div>
-
-                            {/* Footer */}
-                            <div className="px-4 py-2 bg-bg-primary border-t flex gap-3">
-                                <button
-                                    className="flex-1 bg-action-danger text-text-white py-3 rounded-lg hover:bg-action-primary transition-colors font-bold shadow-md disabled:bg-gray-300 disabled:cursor-not-allowed flex items-center justify-center gap-2"
-                                    onClick={() => {
-                                        setShowBulkDelete(false);
-                                        setShowFirstDeleteConfirm(true);
-                                    }}
-                                    disabled={selectedDeleteTables.length === 0}
-                                >
-                                    <FaTrash /> Delete {selectedDeleteTables.length} Table(s)
-                                </button>
-                                <button
-                                    className="flex-1 bg-modalsUpdateBg-cancel text-text-primary py-3 rounded-lg hover:bg-bg-tertiary transition-colors font-bold flex items-center justify-center gap-2"
-                                    onClick={() => setShowBulkDelete(false)}
-                                >
-                                    <FaTimes /> Cancel
-                                </button>
-                            </div>
-                        </div>
-                    </div>
-                )}
+                   <UniversalBulkDeleteModal
+                        showModal={showBulkDelete}
+                        setShowModal={setShowBulkDelete}
+                        modalType="table"
+                        tables={tables}
+                        bulkDeleteSearch={bulkDeleteSearch}
+                        setBulkDeleteSearch={setBulkDeleteSearch}
+                        selectedDeleteTables={selectedDeleteTables}
+                        setSelectedDeleteTables={setSelectedDeleteTables}
+                        showFirstDeleteConfirm={showFirstDeleteConfirm}
+                        setShowFirstDeleteConfirm={setShowFirstDeleteConfirm}
+                        showSecondDeleteConfirm={showSecondDeleteConfirm}
+                        setShowSecondDeleteConfirm={setShowSecondDeleteConfirm}
+                        confirmBulkDelete={confirmBulkDelete}
+                        getFilteredDeleteTables={getFilteredDeleteTables}
+                    />
 
                 {/* First Delete Confirmation */}
                 {showFirstDeleteConfirm && (
