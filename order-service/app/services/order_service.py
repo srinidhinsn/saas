@@ -74,4 +74,3 @@ def sync_served_order_to_billing_public(order: DBOrder, user_jwt: str) -> dict:
     """
     payload = build_billing_payload_from_order(order, list(order.items))
     return push_order_to_billing_public(order.client_id, user_jwt, payload)
-
