@@ -796,12 +796,10 @@ const searchInputRef = useRef(null);
                     <button
                       onClick={handlePlaceOrder}
                       disabled={ !selectedTable || cart.length === 0 || isPlacingOrder}
-                      className="w-full py-3 rounded-lg font-semibold transition-colors"
-                      style={{
-                        backgroundColor: selectedTable && cart.length > 0 && !isPlacingOrder ? 'var(--color-action-primary)' : 'var(--color-border-default)',
-                        color: selectedTable && cart.length > 0 && !isPlacingOrder ? 'var(--color-text-white)' : 'var(--color-text-secondary)',
-                        cursor: selectedTable && cart.length > 0 && !isPlacingOrder ? 'pointer' : 'not-allowed'
-                      }}
+                      className={`w-full py-3 rounded-lg font-semibold transition-colors  
+                        border-default
+                        ${selectedTable && cart.length>0 && !isPlacingOrder?'text-text-white':'text-text-primary'}
+                        ${selectedTable&& cart.length>0 && !isPlacingOrder ? 'bg-action-primary cursor-pointer':'bg-border-default cursor-not-allowed'}`}
                     >
                       {isPlacingOrder ? "Placing Order..." : "Place Order"}
                     </button>
