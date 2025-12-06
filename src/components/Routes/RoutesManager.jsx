@@ -10,6 +10,7 @@ import InventoryManager from '../MainComponents/InventoryServices/InventoryManag
 import { jwtDecode } from "jwt-decode";
 import MenuManagement from '../MainComponents/InventoryServices/MenuManagement';
 import BillingPage from '../MainComponents/BillingServices/Billing';
+import UserManagement from '../MainComponents/UserServices/UserManagement/UserManagement';
 
 
 const RoutesManager = ({ token }) => {
@@ -27,7 +28,7 @@ const RoutesManager = ({ token }) => {
       {/* Placeholder routes — replace with your components */}
       <Route path="menu" element={<MenuManagement token={token} clientId={clientId} realm={realm}/>} />
       <Route path="billing" element={<BillingPage/>} />
-      <Route path="users" element={<div className="p-8">Users Page (placeholder)</div>} />
+      <Route path="users" element={<UserManagement  token={token} clientId={clientId} realm={realm}/>} />
       <Route path="inventory" element={< InventoryManager token={token} clientId={clientId} realm={realm} />}></Route>
       <Route path="role" element={<div className="p-8">Role Page (placeholder)</div>} />
       <Route path="kds" element={<Kds/>}/>

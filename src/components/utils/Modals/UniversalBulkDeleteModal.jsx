@@ -1,5 +1,5 @@
 import React, { useState } from 'react';
-import { Trash2, X, Search, AlertTriangle, CheckCircle2 } from 'lucide-react';
+import { Trash2, X, Search, AlertCircle } from 'lucide-react';
 
 const UniversalBulkDeleteModal = ({
   showModal,
@@ -51,150 +51,101 @@ const UniversalBulkDeleteModal = ({
     const filteredTables = getFilteredDeleteTables();
 
     return (
-      <div className="fixed inset-0 bg-color-modalsbg backdrop-blur-sm z-50 flex items-center justify-center p-4 animate-in fade-in duration-200">
-        <div className="bg-bg-primary rounded-2xl w-full max-w-2xl shadow-2xl border border-border-default max-h-[85vh] overflow-hidden flex flex-col animate-in zoom-in-95 duration-200">
-          {/* Header with gradient */}
-          <div className="relative px-6 py-5 border-b border-border-default bg-gradient-to-r from-red-50 via-pink-50 to-red-50">
+      <div className="fixed inset-0 bg-black bg-opacity-50 z-50 flex items-center justify-center p-4">
+        <div className="bg-white rounded-lg w-full max-w-2xl shadow-xl max-h-[90vh] overflow-hidden flex flex-col">
+          
+          {/* Header */}
+          <div className="px-6 py-4 border-b border-gray-200">
             <div className="flex items-center justify-between">
-              <div className="flex items-center gap-3">
-                <div className="w-10 h-10 rounded-xl bg-action-danger bg-opacity-10 flex items-center justify-center">
-                  <Trash2 className="w-5 h-5 text-action-danger" />
-                </div>
-                <div>
-                  <h3 className="text-xl font-bold text-text-primary">Bulk Delete Tables</h3>
-                  <p className="text-sm text-text-secondary mt-0.5">Select tables to permanently remove</p>
-                </div>
-              </div>
+              <h2 className="text-xl font-semibold text-gray-900">Delete Tables</h2>
               <button 
-                className="w-8 h-8 rounded-lg hover:bg-bg-tertiary transition-all duration-200 flex items-center justify-center group" 
+                className="w-8 h-8 rounded hover:bg-gray-100 flex items-center justify-center" 
                 onClick={handleClose}
               >
-                <X className="w-5 h-5 text-text-secondary group-hover:text-text-primary transition-colors" />
+                <X className="w-5 h-5 text-gray-500" />
               </button>
             </div>
+            <p className="text-sm text-gray-600 mt-1">Select tables to remove from the system</p>
           </div>
 
           {/* Search Bar */}
-          <div className="px-6 py-4 border-b border-border-default bg-bg-primary">
+          <div className="px-6 py-4 border-b border-gray-200">
             <div className="relative">
-              <Search className="absolute left-4 top-1/2 transform -translate-y-1/2 w-4 h-4 text-text-secondary pointer-events-none" />
+              <Search className="absolute left-3 top-1/2 transform -translate-y-1/2 w-4 h-4 text-gray-400" />
               <input
                 type="text"
-                placeholder="Search tables by name, zone, or status..."
+                placeholder="Search tables..."
                 value={bulkDeleteSearch}
                 onChange={e => setBulkDeleteSearch(e.target.value)}
-                className="w-full pl-11 pr-4 py-3 border border-border-default rounded-xl bg-bg-primary focus:outline-none focus:ring-2 focus:ring-action-danger focus:border-transparent transition-all duration-200 text-text-primary placeholder-text-secondary"
+                className="w-full pl-10 pr-4 py-2 border border-gray-300 rounded-md focus:outline-none focus:ring-2 focus:ring-blue-500 focus:border-transparent"
               />
               {bulkDeleteSearch && (
                 <button
                   onClick={() => setBulkDeleteSearch('')}
-                  className="absolute right-3 top-1/2 transform -translate-y-1/2 w-6 h-6 rounded-full hover:bg-bg-tertiary flex items-center justify-center transition-colors"
+                  className="absolute right-3 top-1/2 transform -translate-y-1/2 text-gray-400 hover:text-gray-600"
                 >
-                  <X className="w-4 h-4 text-text-secondary" />
+                  <X className="w-4 h-4" />
                 </button>
               )}
             </div>
           </div>
 
-          {/* Select All Bar */}
-          <div className="px-6 py-3 bg-bg-tertiary border-b border-border-default">
-            <label className="flex items-center justify-between cursor-pointer group">
-              <div className="flex items-center gap-3">
-                <div className="relative">
-                  <input
-                    type="checkbox"
-                    checked={selectedDeleteTables.length === filteredTables.length && filteredTables.length > 0}
-                    onChange={selectAllDeleteTables}
-                    className="w-5 h-5 text-action-danger rounded border-2 border-border-default focus:ring-2 focus:ring-action-danger focus:ring-offset-0 cursor-pointer transition-all"
-                  />
-                </div>
-                <span className="font-semibold text-text-primary group-hover:text-action-danger transition-colors">
-                  Select All Tables
-                </span>
-              </div>
+          {/* Select All */}
+          <div className="px-6 py-3 bg-gray-50 border-b border-gray-200">
+            <label className="flex items-center justify-between cursor-pointer">
               <div className="flex items-center gap-2">
-                <span className="px-3 py-1 bg-action-danger bg-opacity-10 text-action-danger rounded-full text-sm font-semibold">
-                  {selectedDeleteTables.length} selected
-                </span>
-                <span className="text-sm text-text-secondary">
-                  of {filteredTables.length}
-                </span>
+                <input
+                  type="checkbox"
+                  checked={selectedDeleteTables.length === filteredTables.length && filteredTables.length > 0}
+                  onChange={selectAllDeleteTables}
+                  className="w-4 h-4 text-blue-600 border-gray-300 rounded focus:ring-blue-500"
+                />
+                <span className="text-sm font-medium text-gray-700">Select All</span>
               </div>
+              <span className="text-sm text-gray-600">
+                {selectedDeleteTables.length} of {filteredTables.length} selected
+              </span>
             </label>
           </div>
 
-          {/* Table List with improved cards */}
-          <div className="flex-1 overflow-y-auto p-4 bg-bg-primary">
+          {/* Table List */}
+          <div className="flex-1 overflow-y-auto px-6 py-4">
             {filteredTables.length === 0 ? (
-              <div className="flex flex-col items-center justify-center py-12">
-                <div className="w-16 h-16 rounded-full bg-bg-tertiary flex items-center justify-center mb-4">
-                  <Search className="w-8 h-8 text-text-secondary" />
-                </div>
-                <p className="text-text-secondary text-center">No tables found matching your search</p>
+              <div className="flex flex-col items-center justify-center py-12 text-center">
+                <Search className="w-12 h-12 text-gray-300 mb-3" />
+                <p className="text-gray-500">No tables found</p>
               </div>
             ) : (
-              <div className="space-y-3">
+              <div className="space-y-2">
                 {filteredTables.map(table => {
                   const isSelected = selectedDeleteTables.includes(table.id);
                   return (
-                    <div 
+                    <label 
                       key={table.id} 
-                      className={`group border-2 rounded-xl p-4 transition-all duration-200 cursor-pointer ${
+                      className={`flex items-center gap-3 p-3 rounded-md border cursor-pointer transition-colors ${
                         isSelected 
-                          ? 'border-action-danger bg-red-50 shadow-lg scale-[1.01]' 
-                          : 'border-border-default bg-bg-primary hover:border-action-danger hover:shadow-md'
+                          ? 'bg-blue-50 border-blue-300' 
+                          : 'bg-white border-gray-200 hover:bg-gray-50'
                       }`}
-                      onClick={() => toggleDeleteTableSelection(table.id)}
                     >
-                      <label className="flex items-start gap-4 cursor-pointer">
-                        <div className="relative mt-1">
-                          <input
-                            type="checkbox"
-                            checked={isSelected}
-                            onChange={() => toggleDeleteTableSelection(table.id)}
-                            className="w-5 h-5 text-action-danger rounded border-2 border-border-default focus:ring-2 focus:ring-action-danger focus:ring-offset-0 cursor-pointer transition-all"
-                            onClick={(e) => e.stopPropagation()}
-                          />
+                      <input
+                        type="checkbox"
+                        checked={isSelected}
+                        onChange={() => toggleDeleteTableSelection(table.id)}
+                        className="w-4 h-4 text-blue-600 border-gray-300 rounded focus:ring-blue-500"
+                      />
+                      
+                      <div className="flex-1 min-w-0">
+                        <div className="font-medium text-gray-900">{table.name}</div>
+                        <div className="flex flex-wrap gap-2 mt-1 text-xs text-gray-600">
+                          <span>Seating: {table.table_type}</span>
+                          <span>•</span>
+                          <span>Status: {table.status}</span>
+                          <span>•</span>
+                          <span>Zone: {table.location_zone}</span>
                         </div>
-                        
-                        <div className="flex-1 min-w-0">
-                          <div className="flex items-center justify-between mb-2">
-                            <h4 className="font-bold text-lg text-text-primary truncate">{table.name}</h4>
-                            {isSelected && (
-                              <span className="flex items-center gap-1.5 text-xs bg-action-danger text-text-white px-3 py-1 rounded-full font-semibold whitespace-nowrap ml-2 shadow-sm">
-                                <AlertTriangle className="w-3 h-3" />
-                                Will be deleted
-                              </span>
-                            )}
-                          </div>
-                          
-                          <div className="flex flex-wrap gap-3 text-sm">
-                            <div className="flex items-center gap-1.5">
-                              <span className="text-text-secondary">Seating:</span>
-                              <span className="font-semibold text-text-primary px-2 py-0.5 bg-bg-tertiary rounded">
-                                {table.table_type}
-                              </span>
-                            </div>
-                            <div className="flex items-center gap-1.5">
-                              <span className="text-text-secondary">Status:</span>
-                              <span className={`font-semibold px-2 py-0.5 rounded ${
-                                table.status === 'available' 
-                                  ? 'bg-green-100 text-green-700' 
-                                  : 'bg-tableStatusBg-occupied text-action-danger'
-                              }`}>
-                                {table.status}
-                              </span>
-                            </div>
-                            <div className="flex items-center gap-1.5">
-                              <span className="text-text-secondary">Zone:</span>
-                              <span className="font-semibold text-text-primary px-2 py-0.5 bg-bg-tertiary rounded">
-                                {table.location_zone}
-                              </span>
-                            </div>
-                          </div>
-                        </div>
-                      </label>
-                    </div>
+                      </div>
+                    </label>
                   );
                 })}
               </div>
@@ -202,22 +153,20 @@ const UniversalBulkDeleteModal = ({
           </div>
 
           {/* Footer */}
-          <div className="px-6 py-4 bg-bg-primary border-t border-border-default">
-            <div className="flex gap-3">
+          <div className="px-6 py-4 bg-gray-50 border-t border-gray-200">
+            <div className="flex gap-3 justify-end">
               <button
-                className="flex-1 bg-action-danger text-text-white py-3.5 rounded-xl hover:bg-opacity-90 transition-all duration-200 font-bold shadow-lg disabled:bg-gray-300 disabled:cursor-not-allowed disabled:shadow-none flex items-center justify-center gap-2 group"
+                className="px-4 py-2 text-gray-700 bg-white border border-gray-300 rounded-md hover:bg-gray-50 font-medium"
+                onClick={handleClose}
+              >
+                Cancel
+              </button>
+              <button
+                className="px-4 py-2 text-white bg-red-600 rounded-md hover:bg-red-700 font-medium disabled:bg-gray-300 disabled:cursor-not-allowed"
                 onClick={handleContinueToFirstConfirm}
                 disabled={selectedDeleteTables.length === 0}
               >
-                <Trash2 className="w-5 h-5 group-hover:scale-110 transition-transform" />
-                Delete {selectedDeleteTables.length} Table{selectedDeleteTables.length !== 1 ? 's' : ''}
-              </button>
-              <button
-                className="flex-1 bg-modalsUpdateBg-cancel text-text-primary py-3.5 rounded-xl hover:bg-bg-tertiary transition-all duration-200 font-bold border border-border-default flex items-center justify-center gap-2"
-                onClick={handleClose}
-              >
-                <X className="w-5 h-5" />
-                Cancel
+                Delete ({selectedDeleteTables.length})
               </button>
             </div>
           </div>
@@ -240,49 +189,46 @@ export const FirstDeleteConfirmModal = ({
   if (!showModal) return null;
 
   return (
-    <div className="fixed inset-0 bg-color-modalsbg backdrop-blur-sm z-50 flex items-center justify-center p-4 animate-in fade-in duration-200">
-      <div className="bg-bg-primary rounded-2xl w-full max-w-md shadow-2xl border border-border-default animate-in zoom-in-95 duration-200">
-        <div className="p-8 text-center">
-          <div className="w-16 h-16 rounded-full bg-action-danger bg-opacity-10 flex items-center justify-center mx-auto mb-4">
-            <AlertTriangle className="w-8 h-8 text-action-danger" />
+    <div className="fixed inset-0 bg-black bg-opacity-50 z-50 flex items-center justify-center p-4">
+      <div className="bg-white rounded-lg w-full max-w-md shadow-xl">
+        <div className="p-6">
+          <div className="w-12 h-12 rounded-full bg-red-100 flex items-center justify-center mx-auto mb-4">
+            <AlertCircle className="w-6 h-6 text-red-600" />
           </div>
           
-          <h3 className="text-2xl font-bold text-text-primary mb-2">Confirm Deletion</h3>
-          <p className="text-text-secondary mb-6">
-            You are about to delete{' '}
-            <strong className="text-action-danger text-xl">{selectedDeleteTables.length}</strong>{' '}
-            table{selectedDeleteTables.length !== 1 ? 's' : ''}
+          <h3 className="text-lg font-semibold text-gray-900 text-center mb-2">Confirm Deletion</h3>
+          <p className="text-sm text-gray-600 text-center mb-4">
+            You are about to delete <strong>{selectedDeleteTables.length}</strong> table{selectedDeleteTables.length !== 1 ? 's' : ''}
           </p>
           
-          <div className="mb-6 max-h-40 overflow-y-auto p-4 bg-bg-tertiary rounded-xl border border-border-default">
-            <div className="flex flex-wrap gap-2 justify-center">
+          <div className="mb-6 max-h-32 overflow-y-auto p-3 bg-gray-50 rounded-md border border-gray-200">
+            <div className="flex flex-wrap gap-2">
               {tables.filter(t => selectedDeleteTables.includes(t.id)).map(t => (
                 <span 
                   key={t.id} 
-                  className="inline-flex items-center gap-1.5 px-3 py-1.5 bg-tableStatusBg-occupied text-action-danger rounded-lg text-sm font-bold border border-red-300 shadow-sm"
+                  className="inline-block px-2 py-1 bg-white border border-gray-300 rounded text-xs text-gray-700"
                 >
-                  <Trash2 className="w-3 h-3" />
                   {t.name}
                 </span>
               ))}
             </div>
           </div>
           
-          <div className="flex gap-3">
+          <div className="flex gap-3 justify-end">
             <button
-              className="flex-1 bg-action-danger text-text-white py-3 rounded-xl hover:bg-opacity-90 transition-all duration-200 font-bold shadow-lg"
+              className="px-4 py-2 text-gray-700 bg-white border border-gray-300 rounded-md hover:bg-gray-50 font-medium"
+              onClick={() => setShowModal(false)}
+            >
+              Cancel
+            </button>
+            <button
+              className="px-4 py-2 text-white bg-red-600 rounded-md hover:bg-red-700 font-medium"
               onClick={() => {
                 setShowModal(false);
                 setShowSecondDeleteConfirm(true);
               }}
             >
               Continue
-            </button>
-            <button
-              className="flex-1 bg-modalsUpdateBg-cancel text-text-primary py-3 rounded-xl hover:bg-bg-tertiary transition-all duration-200 font-bold border border-border-default"
-              onClick={() => setShowModal(false)}
-            >
-              Cancel
             </button>
           </div>
         </div>
@@ -301,43 +247,36 @@ export const SecondDeleteConfirmModal = ({
   if (!showModal) return null;
 
   return (
-    <div className="fixed inset-0 bg-color-modalsbg backdrop-blur-sm z-50 flex items-center justify-center p-4 animate-in fade-in duration-200">
-      <div className="bg-bg-primary rounded-2xl w-full max-w-md shadow-2xl border-2 border-red-300 animate-in zoom-in-95 duration-200">
-        <div className="p-8 text-center">
-          <div className="w-20 h-20 rounded-full bg-action-danger bg-opacity-10 flex items-center justify-center mx-auto mb-4 animate-pulse">
-            <AlertTriangle className="w-10 h-10 text-action-danger" />
+    <div className="fixed inset-0 bg-black bg-opacity-50 z-50 flex items-center justify-center p-4">
+      <div className="bg-white rounded-lg w-full max-w-md shadow-xl">
+        <div className="p-6">
+          <div className="w-12 h-12 rounded-full bg-red-100 flex items-center justify-center mx-auto mb-4">
+            <AlertCircle className="w-6 h-6 text-red-600" />
           </div>
           
-          <h3 className="text-2xl font-bold text-action-danger mb-4">Final Confirmation</h3>
+          <h3 className="text-lg font-semibold text-gray-900 text-center mb-2">Final Confirmation</h3>
           
-          <div className="bg-tableStatusBg-occupied border-2 border-red-300 rounded-xl p-5 mb-6 shadow-inner">
-            <div className="flex items-center justify-center gap-2 mb-2">
-              <AlertTriangle className="w-5 h-5 text-action-danger" />
-              <p className="text-action-danger font-black text-lg uppercase tracking-wide">
-                Irreversible Action
-              </p>
-            </div>
-            <p className="text-text-primary text-sm font-medium">
-              All selected tables will be permanently deleted from the system
+          <div className="bg-red-50 border border-red-200 rounded-md p-4 mb-6">
+            <p className="text-sm text-red-800 font-medium text-center">
+              This action cannot be undone. All selected tables will be permanently deleted.
             </p>
           </div>
           
-          <div className="flex gap-3">
+          <div className="flex gap-3 justify-end">
             <button
-              className="flex-1 bg-action-danger text-text-white py-3.5 rounded-xl hover:bg-opacity-90 transition-all duration-200 font-bold shadow-lg flex items-center justify-center gap-2 group"
-              onClick={confirmBulkDelete}
-            >
-              <Trash2 className="w-5 h-5 group-hover:scale-110 transition-transform" />
-              Confirm Delete
-            </button>
-            <button
-              className="flex-1 bg-modalsUpdateBg-cancel text-text-primary py-3.5 rounded-xl hover:bg-bg-tertiary transition-all duration-200 font-bold border border-border-default"
+              className="px-4 py-2 text-gray-700 bg-white border border-gray-300 rounded-md hover:bg-gray-50 font-medium"
               onClick={() => {
                 setShowModal(false);
                 setShowFirstDeleteConfirm(false);
               }}
             >
               Cancel
+            </button>
+            <button
+              className="px-4 py-2 text-white bg-red-600 rounded-md hover:bg-red-700 font-medium"
+              onClick={confirmBulkDelete}
+            >
+              Delete Permanently
             </button>
           </div>
         </div>
