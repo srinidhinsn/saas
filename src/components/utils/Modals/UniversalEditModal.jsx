@@ -1,6 +1,5 @@
 import React, { useState } from 'react';
 import { X, Upload } from 'lucide-react';
-import { FaTimes, FaCheck } from 'react-icons/fa';
 import DropdownCheckbox from './DropdownCheckbox';
 import MenuImagePreview from '../../MainComponents/InventoryServices/Tree&CategoryManage/MenuImagePreview';
 
@@ -92,202 +91,216 @@ const UniversalEditModal = ({
   // Render Menu Edit Modal
   if (modalType === 'menu' && editingItem) {
     return (
-      <div className="fixed inset-0 z-50 flex items-center justify-center p-4 bg-color-modalsbg">
-        <div className="rounded-lg max-w-2xl w-full p-6 bg-bg-primary max-h-[90vh] overflow-y-auto">
-          <div className="flex justify-between items-center mb-4">
-            <h3 className="text-xl font-semibold text-text-primary">Edit Menu Item</h3>
-            <button onClick={handleClose} className="text-text-secondary hover:text-text-primary">
-              <X size={24} />
+      <div className="fixed inset-0 z-50 flex items-center justify-center p-4 bg-black bg-opacity-50">
+        <div className="rounded-lg max-w-2xl w-full bg-white max-h-[90vh] overflow-hidden flex flex-col shadow-xl">
+          
+          {/* Header */}
+          <div className="px-6 py-4 border-b border-gray-200 flex justify-between items-center">
+            <h2 className="text-xl font-semibold text-gray-900">Edit Menu Item</h2>
+            <button 
+              onClick={handleClose} 
+              className="w-8 h-8 rounded hover:bg-gray-100 flex items-center justify-center"
+            >
+              <X className="w-5 h-5 text-gray-500" />
             </button>
           </div>
 
-          <div className="space-y-4">
-            {/* Category Selector */}
-            <div>
-              <label className="block text-sm font-medium mb-2 text-text-primary">Category *</label>
-              <select
-                value={editingItem.category_id || ''}
-                onChange={(e) => setEditingItem({ ...editingItem, category_id: e.target.value })}
-                className="w-full px-4 py-2 rounded-lg bg-bg-tertiary border border-border-default text-text-primary focus:outline-none focus:ring-2 focus:ring-action-primary"
-                required
-              >
-                <option value="">Select a category</option>
-                {flattenCategories(categories || []).map(cat => (
-                  <option key={cat.id} value={cat.id}>
-                    {'—'.repeat(cat.level)} {cat.name}
-                  </option>
-                ))}
-              </select>
-            </div>
-
-            {/* Item Name */}
-            <div>
-              <label className="block text-sm font-medium mb-2 text-text-primary">Item Name *</label>
-              <input
-                type="text"
-                value={editingItem.name}
-                onChange={(e) => setEditingItem({ ...editingItem, name: e.target.value })}
-                className="w-full px-4 py-2 rounded-lg bg-bg-tertiary border border-border-default text-text-primary focus:outline-none focus:ring-2 focus:ring-action-primary"
-                required
-              />
-            </div>
-
-            {/* Description */}
-            <div>
-              <label className="block text-sm font-medium mb-2 text-text-primary">Description</label>
-              <textarea
-                value={editingItem.description}
-                onChange={(e) => setEditingItem({ ...editingItem, description: e.target.value })}
-                className="w-full px-4 py-2 rounded-lg bg-bg-tertiary border border-border-default text-text-primary focus:outline-none focus:ring-2 focus:ring-action-primary"
-                rows="3"
-              />
-            </div>
-
-            {/* Unit Price & Discount */}
-            <div className="grid grid-cols-2 gap-4">
+          {/* Content */}
+          <div className="flex-1 overflow-y-auto px-6 py-4">
+            <div className="space-y-4">
+              {/* Category Selector */}
               <div>
-                <label className="block text-sm font-medium mb-2 text-text-primary">Unit Price *</label>
+                <label className="block text-sm font-medium mb-1 text-gray-700">
+                  Category <span className="text-red-600">*</span>
+                </label>
+                <select
+                  value={editingItem.category_id || ''}
+                  onChange={(e) => setEditingItem({ ...editingItem, category_id: e.target.value })}
+                  className="w-full px-3 py-2 rounded-md border border-gray-300 text-gray-900 focus:outline-none focus:ring-2 focus:ring-blue-500 focus:border-transparent"
+                  required
+                >
+                  <option value="">Select a category</option>
+                  {flattenCategories(categories || []).map(cat => (
+                    <option key={cat.id} value={cat.id}>
+                      {'—'.repeat(cat.level)} {cat.name}
+                    </option>
+                  ))}
+                </select>
+              </div>
+
+              {/* Item Name */}
+              <div>
+                <label className="block text-sm font-medium mb-1 text-gray-700">
+                  Item Name <span className="text-red-600">*</span>
+                </label>
                 <input
-                  type="number"
-                  value={editingItem.unit_price}
-                  onChange={(e) => setEditingItem({ ...editingItem, unit_price: e.target.value })}
-                  className="w-full px-4 py-2 rounded-lg bg-bg-tertiary border border-border-default text-text-primary focus:outline-none focus:ring-2 focus:ring-action-primary"
+                  type="text"
+                  value={editingItem.name}
+                  onChange={(e) => setEditingItem({ ...editingItem, name: e.target.value })}
+                  className="w-full px-3 py-2 rounded-md border border-gray-300 text-gray-900 focus:outline-none focus:ring-2 focus:ring-blue-500 focus:border-transparent"
                   required
                 />
               </div>
 
+              {/* Description */}
               <div>
-                <label className="block text-sm font-medium mb-2 text-text-primary">Discount</label>
-                <input
-                  type="number"
-                  value={editingItem.discount}
-                  onChange={(e) => setEditingItem({ ...editingItem, discount: e.target.value })}
-                  className="w-full px-4 py-2 rounded-lg bg-bg-tertiary border border-border-default text-text-primary focus:outline-none focus:ring-2 focus:ring-action-primary"
-                />
-              </div>
-            </div>
-
-            {/* Availability & Unit */}
-            <div className="grid grid-cols-2 gap-4">
-              <div>
-                <label className="block text-sm font-medium mb-2 text-text-primary">Availability</label>
-                <input
-                  type="number"
-                  value={editingItem.availability}
-                  onChange={(e) => setEditingItem({ ...editingItem, availability: e.target.value })}
-                  className="w-full px-4 py-2 rounded-lg bg-bg-tertiary border border-border-default text-text-primary focus:outline-none focus:ring-2 focus:ring-action-primary"
+                <label className="block text-sm font-medium mb-1 text-gray-700">Description</label>
+                <textarea
+                  value={editingItem.description}
+                  onChange={(e) => setEditingItem({ ...editingItem, description: e.target.value })}
+                  className="w-full px-3 py-2 rounded-md border border-gray-300 text-gray-900 focus:outline-none focus:ring-2 focus:ring-blue-500 focus:border-transparent"
+                  rows="3"
                 />
               </div>
 
-              <div>
-                <label className="block text-sm font-medium mb-2 text-text-primary">Unit</label>
-                <input
-                  type="text"
-                  value={editingItem.unit}
-                  onChange={(e) => setEditingItem({ ...editingItem, unit: e.target.value })}
-                  className="w-full px-4 py-2 rounded-lg bg-bg-tertiary border border-border-default text-text-primary focus:outline-none focus:ring-2 focus:ring-action-primary"
-                />
-              </div>
-            </div>
-
-            {/* Item Image Upload */}
-            <div>
-              <label className="block text-sm font-medium mb-1 text-text-primary">Item Image</label>
-
-              {editItemImageUrl || editingItem.image_id ? (
-                <div className="mb-3">
-                  <label className="block text-xs text-text-secondary mb-1">Current Image:</label>
-                  {editItemImageUrl ? (
-                    <div className="relative">
-                      <img
-                        src={editItemImageUrl}
-                        alt="New Preview"
-                        className="w-full h-20 object-cover rounded-lg"
-                      />
-                      <button
-                        type="button"
-                        onClick={() => {
-                          setEditItemImage(null);
-                          setEditItemImageUrl('');
-                        }}
-                        className="absolute top-2 right-2 bg-action-danger text-text-white p-2 rounded-full hover:opacity-90"
-                      >
-                        <X size={16} />
-                      </button>
-                    </div>
-                  ) : (
-                    <MenuImagePreview
-                      clientId={clientId}
-                      imageId={editingItem.image_id}
-                      token={token}
-                      alt={editingItem.name}
-                      baseUrl={import.meta.env.VITE_API_DOCUMENT_SERVICE_URL}
-                      urlBuilder={({ baseUrl, clientId, imageId }) =>
-                        `${baseUrl}/${clientId}/document/download?doc_id=${imageId}`
-                      }
-                      className="w-full h-20 object-cover rounded-lg"
-                    />
-                  )}
-                </div>
-              ) : null}
-
-              <div
-                className={`relative border-2 border-dashed rounded-lg p-4 transition-colors ${
-                  dragActive ? 'border-action-primary bg-bg-secondary' : 'border-border-default'
-                }`}
-                onDragEnter={handleEditDrag}
-                onDragLeave={handleEditDrag}
-                onDragOver={handleEditDrag}
-                onDrop={handleEditDrop}
-              >
-                <div className="text-center">
-                  <Upload className="mx-auto mb-2 text-text-secondary" size={32} />
-                  <p className="text-sm text-text-secondary mb-2">
-                    {editingItem.image_id ? 'Upload new image to replace' : 'Drag & drop an image here'}
-                  </p>
-                  <input
-                    type="file"
-                    accept="image/*"
-                    onChange={(e) => e.target.files[0] && handleEditImageFile(e.target.files[0])}
-                    className="hidden"
-                    id="editImageUpload"
-                  />
-                  <label
-                    htmlFor="editImageUpload"
-                    className="inline-block px-4 py-2 bg-action-primary text-text-white rounded-lg cursor-pointer hover:opacity-90"
-                  >
-                    Choose File
+              {/* Unit Price & Discount */}
+              <div className="grid grid-cols-2 gap-4">
+                <div>
+                  <label className="block text-sm font-medium mb-1 text-gray-700">
+                    Unit Price <span className="text-red-600">*</span>
                   </label>
+                  <input
+                    type="number"
+                    value={editingItem.unit_price}
+                    onChange={(e) => setEditingItem({ ...editingItem, unit_price: e.target.value })}
+                    className="w-full px-3 py-2 rounded-md border border-gray-300 text-gray-900 focus:outline-none focus:ring-2 focus:ring-blue-500 focus:border-transparent"
+                    required
+                  />
+                </div>
+
+                <div>
+                  <label className="block text-sm font-medium mb-1 text-gray-700">Discount</label>
+                  <input
+                    type="number"
+                    value={editingItem.discount}
+                    onChange={(e) => setEditingItem({ ...editingItem, discount: e.target.value })}
+                    className="w-full px-3 py-2 rounded-md border border-gray-300 text-gray-900 focus:outline-none focus:ring-2 focus:ring-blue-500 focus:border-transparent"
+                  />
                 </div>
               </div>
-            </div>
 
-            {/* Add-ons */}
-            <div>
-              <label className="block text-sm font-medium mb-2 text-text-primary">Add-ons</label>
-              <DropdownCheckbox
-                selected={Array.isArray(editingItem.line_item_id) ? editingItem.line_item_id : []}
-                options={(menuItems || []).filter(item => item.id !== editingItem.id)}
-                onChange={(selected) => setEditingItem({ ...editingItem, line_item_id: selected })}
-                label="Select Add-ons"
-              />
-            </div>
+              {/* Availability & Unit */}
+              <div className="grid grid-cols-2 gap-4">
+                <div>
+                  <label className="block text-sm font-medium mb-1 text-gray-700">Availability</label>
+                  <input
+                    type="number"
+                    value={editingItem.availability}
+                    onChange={(e) => setEditingItem({ ...editingItem, availability: e.target.value })}
+                    className="w-full px-3 py-2 rounded-md border border-gray-300 text-gray-900 focus:outline-none focus:ring-2 focus:ring-blue-500 focus:border-transparent"
+                  />
+                </div>
 
-            {/* Action Buttons */}
-            <div className="flex gap-3 pt-4">
-              <button
-                onClick={handleClose}
-                className="flex-1 px-4 py-2 rounded-lg bg-bg-tertiary text-text-primary border border-border-default hover:bg-bg-secondary transition-colors"
-              >
-                Cancel
-              </button>
-              <button
-                onClick={handleEditItem}
-                className="flex-1 px-4 py-2 rounded-lg bg-action-primary text-text-white hover:opacity-90 transition-opacity"
-              >
-                Save Changes
-              </button>
+                <div>
+                  <label className="block text-sm font-medium mb-1 text-gray-700">Unit</label>
+                  <input
+                    type="text"
+                    value={editingItem.unit}
+                    onChange={(e) => setEditingItem({ ...editingItem, unit: e.target.value })}
+                    className="w-full px-3 py-2 rounded-md border border-gray-300 text-gray-900 focus:outline-none focus:ring-2 focus:ring-blue-500 focus:border-transparent"
+                  />
+                </div>
+              </div>
+
+              {/* Item Image Upload */}
+              <div>
+                <label className="block text-sm font-medium mb-1 text-gray-700">Item Image</label>
+
+                {editItemImageUrl || editingItem.image_id ? (
+                  <div className="mb-3">
+                    <p className="text-xs text-gray-600 mb-1">Current Image:</p>
+                    {editItemImageUrl ? (
+                      <div className="relative">
+                        <img
+                          src={editItemImageUrl}
+                          alt="New Preview"
+                          className="w-full h-32 object-cover rounded-md border border-gray-200"
+                        />
+                        <button
+                          type="button"
+                          onClick={() => {
+                            setEditItemImage(null);
+                            setEditItemImageUrl('');
+                          }}
+                          className="absolute top-2 right-2 bg-red-600 text-white p-1.5 rounded-full hover:bg-red-700"
+                        >
+                          <X className="w-4 h-4" />
+                        </button>
+                      </div>
+                    ) : (
+                      <MenuImagePreview
+                        clientId={clientId}
+                        imageId={editingItem.image_id}
+                        token={token}
+                        alt={editingItem.name}
+                        baseUrl={import.meta.env.VITE_API_DOCUMENT_SERVICE_URL}
+                        urlBuilder={({ baseUrl, clientId, imageId }) =>
+                          `${baseUrl}/${clientId}/document/download?doc_id=${imageId}`
+                        }
+                        className="w-full h-32 object-cover rounded-md border border-gray-200"
+                      />
+                    )}
+                  </div>
+                ) : null}
+
+                <div
+                  className={`relative border-2 border-dashed rounded-md p-6 transition-colors ${
+                    dragActive ? 'border-blue-500 bg-blue-50' : 'border-gray-300 bg-gray-50'
+                  }`}
+                  onDragEnter={handleEditDrag}
+                  onDragLeave={handleEditDrag}
+                  onDragOver={handleEditDrag}
+                  onDrop={handleEditDrop}
+                >
+                  <div className="text-center">
+                    <Upload className="mx-auto mb-2 text-gray-400" size={32} />
+                    <p className="text-sm text-gray-600 mb-2">
+                      {editingItem.image_id ? 'Upload new image to replace' : 'Drag & drop an image here'}
+                    </p>
+                    <input
+                      type="file"
+                      accept="image/*"
+                      onChange={(e) => e.target.files[0] && handleEditImageFile(e.target.files[0])}
+                      className="hidden"
+                      id="editImageUpload"
+                    />
+                    <label
+                      htmlFor="editImageUpload"
+                      className="inline-block px-4 py-2 bg-blue-600 text-white rounded-md cursor-pointer hover:bg-blue-700 text-sm font-medium"
+                    >
+                      Choose File
+                    </label>
+                  </div>
+                </div>
+              </div>
+
+              {/* Add-ons */}
+              <div>
+                <label className="block text-sm font-medium mb-1 text-gray-700">Add-ons</label>
+                <DropdownCheckbox
+                  selected={Array.isArray(editingItem.line_item_id) ? editingItem.line_item_id : []}
+                  options={(menuItems || []).filter(item => item.id !== editingItem.id)}
+                  onChange={(selected) => setEditingItem({ ...editingItem, line_item_id: selected })}
+                  label="Select Add-ons"
+                />
+              </div>
             </div>
+          </div>
+
+          {/* Footer */}
+          <div className="px-6 py-4 border-t border-border-default bg-gray-50 flex gap-3 justify-end">
+            <button
+              onClick={handleClose}
+              className="px-6 py-2 rounded-md bg-white text-gray-700 border border-gray-300 hover:bg-gray-50 font-medium"
+            >
+              Cancel
+            </button>
+            <button
+              onClick={handleEditItem}
+              className="px-6 py-2 rounded-md bg-action-primary text-text-white font-medium"
+            >
+              Save Changes
+            </button>
           </div>
         </div>
       </div>
@@ -301,27 +314,31 @@ const UniversalEditModal = ({
 
     return (
       <div className="fixed inset-0 bg-black bg-opacity-50 z-50 flex items-center justify-center p-4">
-        <div className="bg-white rounded-xl w-full max-w-md shadow-2xl border border-gray-200 animate-scale-in">
-          <div className="px-5 py-3 rounded-xl border-b-default flex justify-between items-center bg-gradient-to-r from-blue-50 to-cyan-50">
-            <h3 className="text-lg font-bold text-text-primary">Edit Table</h3>
+        <div className="bg-white rounded-lg w-full max-w-md shadow-xl">
+          
+          {/* Header */}
+          <div className="px-6 py-4 border-b border-gray-200 flex justify-between items-center">
+            <h2 className="text-xl font-semibold text-gray-900">Edit Table</h2>
             <button 
-              className="text-text-secondary hover:text-text-primary transition-colors p-1 rounded-full" 
+              className="w-8 h-8 rounded hover:bg-gray-100 flex items-center justify-center" 
               onClick={handleClose}
             >
-              <FaTimes size={20} />
+              <X className="w-5 h-5 text-gray-500" />
             </button>
           </div>
 
-          <div className="p-5">
-            <div className="bg-gradient-to-r from-action-primary via-text-white to-bulkActionsHover-deleteHover rounded-lg border border-orange-200 p-3 mb-4 text-center">
-              <span className="text-xs font-semibold text-text-secondary uppercase tracking-wide">Table Name</span>
-              <div className="text-2xl font-bold text-text-primary mt-0.5">{table.name}</div>
+          {/* Content */}
+          <div className="px-6 py-4">
+            {/* Table Name Display */}
+            <div className="bg-gray-50 border border-gray-200 rounded-md p-4 mb-4 text-center">
+              <p className="text-xs font-medium text-gray-600 uppercase tracking-wide mb-1">Table Name</p>
+              <p className="text-2xl font-bold text-gray-900">{table.name}</p>
             </div>
 
-            <div className="space-y-3">
+            <div className="space-y-4">
               {/* No of Seating */}
               <div>
-                <label className="block text-sm font-semibold mb-1.5 text-text-secondary">No of Seating</label>
+                <label className="block text-sm font-medium mb-1 text-gray-700">No of Seating</label>
                 <input
                   type="number"
                   min="1"
@@ -330,67 +347,67 @@ const UniversalEditModal = ({
                     const value = Math.max(1, Number(e.target.value) || 1);
                     handleEditChange(table.id, "table_type", value);
                   }}
-                  className={`w-full px-3 py-2 border-default rounded-lg focus:outline-none focus:ring-2 focus:ring-action-primary ${
-                    editFieldErrors?.table_type ? 'border-bulkActions-delete bg-red-50' : 'border-border-default'
+                  className={`w-full px-3 py-2 rounded-md border focus:outline-none focus:ring-2 focus:ring-blue-500 focus:border-transparent ${
+                    editFieldErrors?.table_type ? 'border-red-500 bg-red-50' : 'border-gray-300'
                   }`}
                 />
                 {editFieldErrors?.table_type && (
-                  <div className="text-action-danger text-xs mt-1 font-medium">{editFieldErrors.table_type}</div>
+                  <p className="text-red-600 text-xs mt-1">{editFieldErrors.table_type}</p>
                 )}
               </div>
 
               {/* Type */}
               <div>
-                <label className="block text-sm font-semibold mb-1.5 text-text-secondary">Type</label>
+                <label className="block text-sm font-medium mb-1 text-gray-700">Type</label>
                 <select
                   value={table.location_zone}
                   onChange={(e) => handleEditChange(table.id, "location_zone", e.target.value)}
-                  className={`w-full px-3 py-2 border rounded-lg focus:outline-none focus:ring-2 focus:ring-action-primary ${
-                    editFieldErrors?.location_zone ? 'border-bulkActions-delete bg-red-50' : 'border-border-default'
+                  className={`w-full px-3 py-2 rounded-md border focus:outline-none focus:ring-2 focus:ring-blue-500 focus:border-transparent ${
+                    editFieldErrors?.location_zone ? 'border-red-500 bg-red-50' : 'border-gray-300'
                   }`}
                 >
                   <option value="AC">AC</option>
                   <option value="Non-AC">Non-AC</option>
                 </select>
                 {editFieldErrors?.location_zone && (
-                  <div className="text-action-danger text-xs mt-1 font-medium">{editFieldErrors.location_zone}</div>
+                  <p className="text-red-600 text-xs mt-1">{editFieldErrors.location_zone}</p>
                 )}
               </div>
 
               {/* Status */}
               <div>
-                <label className="block text-sm font-semibold mb-1.5 text-text-secondary">Status</label>
+                <label className="block text-sm font-medium mb-1 text-gray-700">Status</label>
                 <select
                   value={table.status || ""}
                   onChange={(e) => handleEditChange(table.id, "status", e.target.value)}
-                  className={`w-full px-3 py-2 border rounded-lg focus:outline-none focus:ring-2 focus:ring-action-primary ${
-                    editFieldErrors?.status ? 'border-bulkActions-delete bg-red-50' : 'border-border-default'
+                  className={`w-full px-3 py-2 rounded-md border focus:outline-none focus:ring-2 focus:ring-blue-500 focus:border-transparent ${
+                    editFieldErrors?.status ? 'border-red-500 bg-red-50' : 'border-gray-300'
                   }`}
                 >
                   <option value="Vacant">Vacant</option>
                   <option value="Reserved">Reserved</option>
                 </select>
                 {editFieldErrors?.status && (
-                  <div className="text-action-danger text-xs mt-1 font-medium">{editFieldErrors.status}</div>
+                  <p className="text-red-600 text-xs mt-1">{editFieldErrors.status}</p>
                 )}
               </div>
             </div>
+          </div>
 
-            {/* Action Buttons */}
-            <div className="flex gap-2 mt-5">
-              <button
-                className="flex-1 bg-action-primary text-text-white py-2.5 rounded-lg hover:bg-green-600 transition-colors font-bold shadow-md flex items-center justify-center gap-2"
-                onClick={() => saveEdit(table)}
-              >
-                <FaCheck /> Save
-              </button>
-              <button
-                className="flex-1 bg-modalsUpdateBg-cancel text-text-white py-2.5 rounded-lg hover:bg-gray-300 transition-colors font-bold flex items-center justify-center gap-2"
-                onClick={handleClose}
-              >
-                <FaTimes /> Cancel
-              </button>
-            </div>
+          {/* Footer */}
+          <div className="px-6 py-4 border-t border-gray-200 bg-gray-50 flex gap-3 justify-end">
+            <button
+              className="px-6 py-2 rounded-md bg-white text-gray-700 border border-gray-300 hover:bg-gray-50 font-medium"
+              onClick={handleClose}
+            >
+              Cancel
+            </button>
+            <button
+              className="px-6 py-2 rounded-md bg-action-primary text-text-white hover:bg-blue-700 font-medium"
+              onClick={() => saveEdit(table)}
+            >
+              Save
+            </button>
           </div>
         </div>
       </div>

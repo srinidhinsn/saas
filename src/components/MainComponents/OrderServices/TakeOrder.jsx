@@ -682,20 +682,19 @@ const searchInputRef = useRef(null);
             </span>
           </button>
         )}
-
-        {showCart && (
-          <div className="fixed inset-0 z-50 flex justify-end bg-color-modalsbg">
-            <div className="w-full md:w-96 lg:w-[28rem] h-full overflow-y-auto bg-bg-primary">
+{showCart && (
+          <div className="fixed inset-0 z-50 flex justify-end bg-color-modalsbg animate-fade-in">
+            <div className="w-full md:w-96 lg:w-[28rem] h-full overflow-y-auto bg-bg-primary animate-slide-in-right">
               <div className="p-4 lg:p-6">
                 <div className="flex justify-between items-center mb-6">
                   <h2 className="text-xl lg:text-2xl font-bold text-text-primary">Your Order</h2>
-                  <button onClick={() => setShowCart(false)} className='text-text-secondary'>
+                  <button onClick={() => setShowCart(false)} className='text-text-secondary hover:text-text-primary transition-colors'>
                     <X size={24} />
                   </button>
                 </div>
 
                 {orderPlaced ? (
-                  <div className="text-center py-12">
+                  <div className="text-center py-12 animate-scale-in">
                     <div className="rounded-full w-20 h-20 flex items-center justify-center mx-auto mb-4 bg-action-success">
                       <Check size={40} className='text-bg-primary'/>
                     </div>
@@ -712,7 +711,7 @@ const searchInputRef = useRef(null);
                           <select
                             value={selectedTable}
                             onChange={(e) => setSelectedTable(e.target.value)}
-                            className="w-full px-4 py-2 rounded-lg focus:outline-none border-border-default bg-bg-primary text-text-primary">
+                            className="w-full px-4 py-2 rounded-lg focus:outline-none border-border-default bg-bg-primary text-text-primary transition-all">
                             <option value="">Choose a table</option>
                             {availableTables.map(table => (
                               <option key={table.id} value={table.id}>
@@ -726,7 +725,7 @@ const searchInputRef = useRef(null);
 
                     <div className="space-y-4 mb-6 max-h-[calc(100vh-400px)] overflow-y-auto">
                       {cart.map(item => (
-                        <div key={item.id} className="flex items-center space-x-3 p-3 lg:p-4 rounded-lg bg-bg-tertiary border-border-default">
+                        <div key={item.id} className="flex items-center space-x-3 p-3 lg:p-4 rounded-lg bg-bg-tertiary border-border-default animate-slide-up">
               <div className="w-16 h-16 rounded-md overflow-hidden flex-shrink-0">
   <ImagePreview
     clientId={clientId}
@@ -749,7 +748,7 @@ const searchInputRef = useRef(null);
                               {item.note && (
                                 <button
                                   onClick={() => openNoteEditor(item)}
-                                  title="Has note" className='text-action-primary'>
+                                  title="Has note" className='text-action-primary hover:scale-110 transition-transform'>
                                   <StickyNote size={16} />
                                 </button>
                               )}
@@ -758,7 +757,7 @@ const searchInputRef = useRef(null);
                             {!item.note && (
                               <button
                                 onClick={() => openNoteEditor(item)}
-                                className="text-xs mt-1 text-text-secondary">
+                                className="text-xs mt-1 text-text-secondary hover:text-action-primary transition-colors">
                                 + Add note
                               </button>
                             )}
@@ -766,20 +765,20 @@ const searchInputRef = useRef(null);
                           <div className="flex items-center space-x-2">
                             <button
                               onClick={() => updateQuantity(item.id, -1)}
-                              className="p-1 rounded bg-bg-primary border-border-default"
+                              className="p-1 rounded bg-bg-primary border-border-default hover:bg-bg-secondary transition-colors"
                             >
                               <Minus size={16} />
                             </button>
                             <span className="w-8 text-center font-semibold text-text-primary">{item.quantity}</span>
                             <button
                               onClick={() => updateQuantity(item.id, 1)}
-                              className="p-1 rounded bg-bg-primary border-border-default">
+                              className="p-1 rounded bg-bg-primary border-border-default hover:bg-bg-secondary transition-colors">
                               <Plus size={16} />
                             </button>
                           </div>
                           <button
                             onClick={() => removeFromCart(item.id)}
-                            title="Remove item" className='text-action-danger'>
+                            title="Remove item" className='text-action-danger hover:scale-110 transition-transform'>
                             <X size={20} />
                           </button>
                         </div>
@@ -796,16 +795,16 @@ const searchInputRef = useRef(null);
                     <button
                       onClick={handlePlaceOrder}
                       disabled={ !selectedTable || cart.length === 0 || isPlacingOrder}
-                      className={`w-full py-3 rounded-lg font-semibold transition-colors  
+                      className={`w-full py-3 rounded-lg font-semibold transition-all duration-300 transform hover:scale-[1.02] active:scale-[0.98]
                         border-default
                         ${selectedTable && cart.length>0 && !isPlacingOrder?'text-text-white':'text-text-primary'}
-                        ${selectedTable&& cart.length>0 && !isPlacingOrder ? 'bg-action-primary cursor-pointer':'bg-border-default cursor-not-allowed'}`}
+                        ${selectedTable&& cart.length>0 && !isPlacingOrder ? 'bg-action-primary cursor-pointer hover:shadow-lg':'bg-border-default cursor-not-allowed'}`}
                     >
                       {isPlacingOrder ? "Placing Order..." : "Place Order"}
                     </button>
 
                     {(!selectedTable) && cart.length > 0 && (
-                      <p className="text-sm text-center mt-2 text-action-danger">
+                      <p className="text-sm text-center mt-2 text-action-danger animate-slide-up">
                         Select a table
                       </p>
                     )}
@@ -815,6 +814,65 @@ const searchInputRef = useRef(null);
             </div>
           </div>
         )}
+
+{/* Add these CSS animations to your component or global styles */}
+<style>{`
+  @keyframes fadeIn {
+    from { 
+      opacity: 0; 
+    }
+    to { 
+      opacity: 1; 
+    }
+  }
+  
+  @keyframes slideInRight {
+    from { 
+      transform: translateX(100%); 
+    }
+    to { 
+      transform: translateX(0); 
+    }
+  }
+  
+  @keyframes slideUp {
+    from { 
+      opacity: 0;
+      transform: translateY(10px); 
+    }
+    to { 
+      opacity: 1;
+      transform: translateY(0); 
+    }
+  }
+  
+  @keyframes scaleIn {
+    from { 
+      opacity: 0;
+      transform: scale(0.9); 
+    }
+    to { 
+      opacity: 1;
+      transform: scale(1); 
+    }
+  }
+  
+  .animate-fade-in {
+    animation: fadeIn 0.3s ease-out;
+  }
+  
+  .animate-slide-in-right {
+    animation: slideInRight 0.3s ease-out;
+  }
+  
+  .animate-slide-up {
+    animation: slideUp 0.4s ease-out;
+  }
+  
+  .animate-scale-in {
+    animation: scaleIn 0.5s ease-out;
+  }
+`}</style>
       </div>
 
       <NoteModal
