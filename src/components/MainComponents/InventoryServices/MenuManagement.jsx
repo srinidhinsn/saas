@@ -602,7 +602,7 @@ console.log("Payload",payload)
 
       // Refresh items
       const itemRes = await axios.get(
-        `${import.meta.env.VITE_API_INVENTORY_SERVICE_URL}/${clientId}/menu/read`,
+        `${import.meta.env.VITE_API_INVENTORY_SERVICE_URL}/${clientId}/menu/read?realm=${realm}`,
         { headers: { Authorization: `Bearer ${token}` } }
       );
       setMenuItems(itemRes.data.data);
@@ -803,7 +803,7 @@ console.log("Payload",payload)
 
         // Step 3: Refresh items
         const itemRes = await axios.get(
-          `${import.meta.env.VITE_API_INVENTORY_SERVICE_URL}/${clientId}/menu/read`,
+          `${import.meta.env.VITE_API_INVENTORY_SERVICE_URL}/${clientId}/menu/read?realm=${realm}`,
           { headers: { Authorization: `Bearer ${token}` } }
         );
         setMenuItems(itemRes.data.data);
