@@ -15,7 +15,7 @@ const UserManagement = ({token,clientId}) => {
       <ToastContainer position="top-right" autoClose={3000} />
       
       {/* Navigation Header */}
-      <div className="bg-bg-primary shadow-card sticky top-0 z-40">
+      {/* <div className="bg-bg-primary shadow-card sticky top-0 z-40">
         <div className="max-w-7xl mx-auto px-6">
           <div className="flex  space-x-1 py-3">
             <button 
@@ -38,7 +38,7 @@ const UserManagement = ({token,clientId}) => {
             >
               Add User
             </button>
-            {/* <button 
+            <button 
               className={`px-8 py-2.5 font-medium transition-all ${
                 activeView === 'reset' 
                   ? 'bg-action-primary text-text-white rounded-lg' 
@@ -47,10 +47,10 @@ const UserManagement = ({token,clientId}) => {
               onClick={() => setActiveView('reset')}
             >
               Reset Password
-            </button> */}
+            </button>
           </div>
         </div>
-      </div>
+      </div> */}
 
       {/* Content */}
       <div className="max-w-7xl mx-auto px-6 py-6">
