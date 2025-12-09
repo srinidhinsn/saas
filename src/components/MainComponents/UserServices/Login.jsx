@@ -1,9 +1,9 @@
 import React, { useState } from 'react';
-import { User, Lock, AlertCircle } from 'lucide-react';
+import { User, Lock, AlertCircle, CheckCircle } from 'lucide-react';
 import { useNavigate, useParams } from 'react-router-dom';
 import { APP_ROOT } from '../../config/pathConfig';
-export default function LoginPage({  onLoginSuccess }) {
-  const {clientId}=useParams()
+export default function LoginPage({ onLoginSuccess }) {
+  const { clientId } = useParams()
   const [form, setForm] = useState({ username: '', password: '' });
   const [error, setError] = useState('');
   const [loading, setLoading] = useState(false);
@@ -17,6 +17,7 @@ export default function LoginPage({  onLoginSuccess }) {
   });
   const [forgotError, setForgotError] = useState('');
   const [forgotLoading, setForgotLoading] = useState(false);
+  const [showAnimation, setShowAnimation] = useState(false);
   const navigate = useNavigate();
   const handleChange = (e) => {
     const { name, value } = e.target;
@@ -51,14 +52,17 @@ export default function LoginPage({  onLoginSuccess }) {
       const data = await response.json();
       const token = data.data.access_token;
       const screen_id = data.screen_id || 'default_user';
-      
+
       console.log('Login successful', { token, screen_id });
-      
+
       // Call the onLoginSuccess callback to update parent state
       if (onLoginSuccess) {
         onLoginSuccess(token, screen_id);
+        setShowAnimation(true);
       }
-      navigate(`/${APP_ROOT}/${clientId}/home`, { replace: true });
+      setTimeout(() => {
+        navigate(`/${APP_ROOT}/${clientId}/home`, { replace: true });
+      }, 2000); // adjust timing for animation
     } catch (err) {
       console.error('Login failed:', err);
       setError(err.message || 'Login failed. Please try again.');
@@ -158,12 +162,68 @@ export default function LoginPage({  onLoginSuccess }) {
     }
   };
 
+  if (showAnimation) {
+    return (
+      <div className="fixed inset-0 flex items-center justify-center bg-bg-primary text-action-primary z-[9999] animate-fadeBg">
+
+        <div className="text-center animate-scaleFade">
+
+          <CheckCircle size={80} className="mx-auto text-action-primary animate-glowPulse" />
+
+          <h1 className="mt-6 text-5xl font-extrabold tracking-wide animate-slide">
+            CHARIOT
+          </h1>
+
+          <p className="mt-2 text-lg opacity-80 tracking-wide animate-textFade">
+            Welcome to Your Restaurant POS
+          </p>
+
+        </div>
+
+        <style>
+          {`
+          @keyframes fadeBg {
+            0% { opacity: 0; }
+            100% { opacity: 1; }
+          }
+
+          @keyframes scaleFade {
+            0% { transform: scale(0.6); opacity: 0; }
+            100% { transform: scale(1); opacity: 1; }
+          }
+
+          @keyframes glowPulse {
+            0% { filter: drop-shadow(0 0 3px #ff6a00); }
+            100% { filter: drop-shadow(0 0 20px #ff4500); }
+          }
+
+          @keyframes slide {
+            0% { transform: translateY(25px); opacity: 0; }
+            100% { transform: translateY(0); opacity: 1; }
+          }
+
+          @keyframes textFade {
+            0% { opacity: 0; }
+            100% { opacity: 0.9; }
+          }
+
+          .animate-fadeBg { animation: fadeBg .5s ease-out forwards; }
+          .animate-scaleFade { animation: scaleFade 1s cubic-bezier(0.3,1,0.3,1) forwards; }
+          .animate-glowPulse { animation: glowPulse 2s infinite alternate ease-in-out; }
+          .animate-slide { animation: slide 1.2s ease-out forwards; }
+          .animate-textFade { animation: textFade 1.6s ease-out forwards; }
+        `}
+        </style>
+      </div>
+    );
+  }
+
 
 
   return (
     <div className="min-h-screen flex items-center justify-center p-4" style={{ backgroundColor: '#f9fafb' }}>
       <div className="w-full max-w-md">
-   
+
 
         {/* Login Card */}
         <div className="bg-white rounded-xl shadow-md p-8 md:p-10">
@@ -172,7 +232,7 @@ export default function LoginPage({  onLoginSuccess }) {
             <div className="w-32 h-32 rounded-full flex items-center justify-center relative z-10 shadow-lg" style={{ backgroundColor: '#f97316' }}>
               <User size={48} className="text-white" strokeWidth={2} />
             </div>
-          
+
           </div>
 
           <h2 className="text-2xl font-semibold text-center mb-2" style={{ color: '#111827' }}>
@@ -331,7 +391,7 @@ export default function LoginPage({  onLoginSuccess }) {
 
       {/* Forgot Password Modal */}
       {showForgot && (
-        <div 
+        <div
           className="fixed inset-0 flex items-center justify-center z-50 p-4"
           style={{ backgroundColor: 'rgba(0,0,0,0.5)' }}
           onClick={() => {
@@ -341,7 +401,7 @@ export default function LoginPage({  onLoginSuccess }) {
             setForgotForm({ username: '', otp: '', new_password: '', confirm_password: '' });
           }}
         >
-          <div 
+          <div
             className="bg-white rounded-xl p-8 max-w-md w-full shadow-2xl"
             onClick={(e) => e.stopPropagation()}
           >
@@ -353,8 +413,8 @@ export default function LoginPage({  onLoginSuccess }) {
                 {forgotStep === 1 ? 'Forgot Password' : 'Reset Password'}
               </h3>
               <p className="text-sm" style={{ color: '#6b7280' }}>
-                {forgotStep === 1 
-                  ? 'Enter your username to receive an OTP' 
+                {forgotStep === 1
+                  ? 'Enter your username to receive an OTP'
                   : 'Enter the OTP and your new password'}
               </p>
             </div>

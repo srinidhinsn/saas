@@ -220,7 +220,7 @@ const MenuManagement = ({ clientId, token, realm }) => {
         updated_by: created_by,
         inventory_id:1
       };
-
+console.log("Payload",payload)
       await axios.post(
         `${import.meta.env.VITE_API_INVENTORY_SERVICE_URL}/${clientId}/menu/create`,
         payload,
@@ -594,7 +594,9 @@ const MenuManagement = ({ clientId, token, realm }) => {
             `${import.meta.env.VITE_API_INVENTORY_SERVICE_URL}/${clientId}/menu/update`,
             payload,
             { headers: { Authorization: `Bearer ${token}` } }
+            
           );
+          
         })
       );
 
@@ -650,6 +652,7 @@ const MenuManagement = ({ clientId, token, realm }) => {
           Name: item.name ?? "",
           Description: item.description ?? "",
           Category: catNameById(item.category_id) || item.category || "Unknown",
+          Image: item.image_id,
           Unit: item.unit ?? "",
           Unit_Price: typeof item.unit_price === "number" ? item.unit_price : (item.unit_price ? parseFloat(item.unit_price) : 0),
           Unit_CST: typeof item.unit_cst === "number" ? item.unit_cst : (item.unit_cst ? parseFloat(item.unit_cst) : 0),
@@ -672,7 +675,7 @@ const MenuManagement = ({ clientId, token, realm }) => {
       // Create worksheet and workbook
       const worksheet = XLSX.utils.json_to_sheet(exportData, {
         header: [
-          "ID","Inventory_Id", "Name", "Description", "Category", "Unit", "Unit_Price", "Unit_CST", "Unit_GST", "Total_Unit_Price", "Total_Price",
+          "ID","Inventory_Id", "Name", "Description", "Category","Image", "Unit", "Unit_Price", "Unit_CST", "Unit_GST", "Total_Unit_Price", "Total_Price",
           "CST", "GST", "Discount", "Availability","Serving_Quantity","Serving_Unit", "Realm", "Dietary", "Slug", "Line_Item_IDs"
         ]
       });
@@ -794,6 +797,7 @@ const MenuManagement = ({ clientId, token, realm }) => {
             newItem,
             { headers: { Authorization: `Bearer ${token}` } }
           );
+          
         }
 
 

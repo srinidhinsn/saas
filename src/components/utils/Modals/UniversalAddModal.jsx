@@ -252,6 +252,28 @@ const UniversalAddModal = ({
                   placeholder="kg, pcs, etc."
                 />
               </div>
+
+              <div>
+                <label className="block text-sm font-medium mb-2 text-text-primary">Serving Quantity</label>
+                <input
+                  type="number"
+                  value={newItem?.serving_quantity ?? ''}
+                  onChange={(e) => setNewItem(prev => ({ ...(prev || {}), serving_quantity: e.target.value }))}
+                  className="w-full px-4 py-2 rounded-lg bg-bg-tertiary border border-border-default text-text-primary focus:outline-none focus:ring-2 focus:ring-action-primary"
+                  placeholder="0"
+                />
+              </div>
+
+              <div>
+                <label className="block text-sm font-medium mb-2 text-text-primary">Serving Unit</label>
+                <input
+                  type="text"
+                  value={newItem?.serving_unit ?? ''}
+                  onChange={(e) => setNewItem(prev => ({ ...(prev || {}), serving_unit: e.target.value }))}
+                  className="w-full px-4 py-2 rounded-lg bg-bg-tertiary border border-border-default text-text-primary focus:outline-none focus:ring-2 focus:ring-action-primary"
+                  placeholder="kg, pcs, etc."
+                />
+              </div>
             </div>
 
             {/* Item Image Upload */}
