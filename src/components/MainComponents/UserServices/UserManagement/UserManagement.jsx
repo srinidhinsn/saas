@@ -53,7 +53,7 @@ const UserManagement = ({token,clientId}) => {
       </div> */}
 
       {/* Content */}
-      <div className="max-w-7xl mx-auto px-6 py-6">
+      <div className="max-w-7xl mx-auto p-4">
         {activeView === 'list' && <UsersList clientId={clientId} token={token} onAddNew={() => setActiveView('add')} />}
         {activeView === 'add' && <AddUserForm  clientId={clientId} token={token}  onCancel={() => setActiveView('list')} onSave={() => setActiveView('list')} />}
         {/* {activeView === 'reset' && <ResetPassword  clientId={clientId} token={token} />} */}
@@ -227,7 +227,7 @@ const UsersList = ({ onAddNew ,clientId,token}) => {
         </div>
 
         {/* Filter Buttons */}
-        <div className="flex items-center gap-2 mb-4">
+        {/* <div className="flex items-center gap-2 mb-4">
           <button
             onClick={() => {
               setFilterRole("all");
@@ -256,7 +256,7 @@ const UsersList = ({ onAddNew ,clientId,token}) => {
           >
             Admins ({users.filter((u) => u.role === "Admin").length})
           </button>
-        </div>
+        </div> */}
 
         {/* Table */}
         <div className="overflow-x-auto rounded-lg border-default border-border-default">
