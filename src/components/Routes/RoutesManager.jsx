@@ -11,6 +11,7 @@ import { jwtDecode } from "jwt-decode";
 import MenuManagement from '../MainComponents/InventoryServices/MenuManagement';
 import BillingPage from '../MainComponents/BillingServices/Billing';
 import UserManagement from '../MainComponents/UserServices/UserManagement/UserManagement';
+import UserProfile from '../MainComponents/UserServices/ProfileManagement/UserProfile';
 
 
 const RoutesManager = ({ token }) => {
@@ -34,6 +35,7 @@ const RoutesManager = ({ token }) => {
       <Route path="kds" element={<Kds/>}/>
       <Route path="documents" element={<Documents token={token} clientId={clientId} />}/>
       <Route path="details" element={<div className="p-8">Details Page (placeholder)</div>} />
+      <Route path='user-profile'  element={<UserProfile token={token} clientId={clientId}/>} />
 
       {/* catch-all for unknown client subpaths -> redirect to home */}
       <Route path="*" element={<Navigate to="home" replace />} />
