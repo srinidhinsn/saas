@@ -514,4 +514,155 @@ ALTER TABLE inventory ADD COLUMN serving_quantity double precision;
 ALTER TABLE inventory ADD COLUMN serving_unit text;
 
 
+CREATE TABLE billing_documents (
 
+    id BIGSERIAL PRIMARY KEY,
+
+    client_id TEXT,
+
+    document_type TEXT,
+
+    document_number TEXT,
+
+    document_date TIMESTAMP,
+
+    due_date TIMESTAMP,
+
+    reference_number TEXT,
+
+    order_id TEXT,
+
+    customer_id TEXT,
+
+    vendor_id TEXT,
+
+    currency TEXT,
+
+    status TEXT,
+
+    contact_email TEXT,
+
+    contact_phone TEXT,
+
+    terms TEXT,
+
+    notes TEXT,
+
+    subtotal DOUBLE PRECISION,
+
+    tax_amount DOUBLE PRECISION,
+
+    discount_amount DOUBLE PRECISION,
+
+    total_amount DOUBLE PRECISION,
+
+    linked_document_ids TEXT,
+
+    is_active BOOLEAN NOT NULL DEFAULT TRUE,
+
+    created_by TEXT,
+
+    updated_by TEXT,
+
+    created_at TIMESTAMP DEFAULT NOW(),
+
+    updated_at TIMESTAMP DEFAULT NOW(),
+
+    payment_status TEXT DEFAULT 'Pending',
+
+    payment_due_date TIMESTAMP,
+
+    payment_method JSONB,
+
+    payment_reference TEXT,
+
+    approval_status TEXT DEFAULT 'Pending',
+
+    approved_by TEXT,
+
+    approval_date TIMESTAMP,
+
+    gl_account_code TEXT,
+
+    tax_code TEXT,
+
+    accounting_period TEXT,
+
+    currency_conversion_rate DOUBLE PRECISION,
+
+    shipping_address TEXT,
+
+    shipping_method TEXT,
+
+    delivery_date TIMESTAMP,
+
+    tracking_number TEXT,
+
+    document_version INTEGER DEFAULT 1,
+
+    invoice_date TIMESTAMP,
+
+    note TEXT,
+
+    customer_terms TEXT
+
+);
+
+CREATE TABLE billing_document_items (
+
+    id BIGSERIAL PRIMARY KEY,
+
+    document_id BIGINT REFERENCES billing_documents(id) ON DELETE CASCADE,
+
+    item_ref_id TEXT,
+
+    description TEXT,
+
+    quantity DOUBLE PRECISION,
+
+    unit_price DOUBLE PRECISION,
+
+    discount DOUBLE PRECISION,
+
+    tax_rate DOUBLE PRECISION,
+
+    total DOUBLE PRECISION,
+
+    is_active BOOLEAN NOT NULL DEFAULT TRUE,
+
+    created_at TIMESTAMP DEFAULT NOW(),
+
+    updated_at TIMESTAMP DEFAULT NOW(),
+
+    unit_of_measure TEXT DEFAULT 'Unit',
+
+    item_category TEXT,
+
+    item_discount DOUBLE PRECISION DEFAULT 0.0,
+
+    item_tax_code TEXT DEFAULT 'Standard'
+
+);
+
+
+CREATE TABLE notifications (
+
+    id UUID PRIMARY KEY DEFAULT gen_random_uuid(),
+
+    client_id VARCHAR NOT NULL,
+
+    template_name VARCHAR,
+
+    template_body VARCHAR,
+
+    type VARCHAR,
+
+    realm VARCHAR,
+
+    is_read VARCHAR,
+
+    created_at TIMESTAMPTZ DEFAULT NOW(),
+
+    updated_at TIMESTAMPTZ DEFAULT NOW()
+
+);
