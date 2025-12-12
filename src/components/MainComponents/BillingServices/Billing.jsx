@@ -6,9 +6,7 @@ import jsPDF from "jspdf";
 import CustomerAutocomplete from './CustomerAutocomplete';
 
 
-export default function BillingPage() {
-  const { clientId } = useParams();
-  const token = localStorage.getItem("access_token");
+export default function BillingPage({clientId,token}) {
   const invoiceRef = useRef(null);
 
   const [orders, setOrders] = useState([]);
