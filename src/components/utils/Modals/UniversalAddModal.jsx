@@ -391,15 +391,52 @@ const UniversalAddModal = ({
 
                 <div>
                   <label className="block text-sm font-semibold mb-2 text-text-primary">No of Seating *</label>
+
+                  {/* Desktop */}
                   <input
                     type="number"
                     min="1"
                     value={row?.table_type ?? ''}
                     onChange={(e) => handleRangeChange(index, 'table_type', e.target.value)}
-                    className={`w-full px-3 py-2 border rounded-lg focus:outline-none focus:ring-2 focus:ring-action-primary ${fieldErrors?.[index]?.table_type ? 'border-bulkActions-delete bg-red-50' : 'border-border-default'
+                    className={`hidden md:block w-full px-3 py-2 border rounded-lg focus:outline-none focus:ring-2 focus:ring-action-primary ${fieldErrors?.[index]?.table_type ? 'border-bulkActions-delete bg-red-50' : 'border-border-default'
                       }`}
                     placeholder="4"
                   />
+
+                  {/* Mobile with +/- buttons */}
+                  <div className={`md:hidden flex items-center border rounded-lg overflow-hidden ${fieldErrors?.[index]?.table_type ? 'border-bulkActions-delete bg-red-50' : 'border-border-default'
+                    }`}>
+                    <button
+                      type="button"
+                      onClick={() => {
+                        const current = Number(row?.table_type) || 1;
+                        const value = Math.max(1, current - 1);
+                        handleRangeChange(index, 'table_type', value);
+                      }}
+                      className="px-3 py-2 text-text-primary hover:bg-bg-tertiary font-bold"
+                    >
+                      −
+                    </button>
+                    <input
+                      type="number"
+                      min="1"
+                      value={row?.table_type ?? ''}
+                      onChange={(e) => handleRangeChange(index, 'table_type', e.target.value)}
+                      placeholder="4"
+                      className="flex-1 text-center py-2 border-x border-border-default focus:outline-none bg-transparent"
+                    />
+                    <button
+                      type="button"
+                      onClick={() => {
+                        const current = Number(row?.table_type) || 0;
+                        handleRangeChange(index, 'table_type', current + 1);
+                      }}
+                      className="px-3 py-2 text-text-primary hover:bg-bg-tertiary font-bold"
+                    >
+                      +
+                    </button>
+                  </div>
+
                   {fieldErrors?.[index]?.table_type && (
                     <div className="text-action-danger text-xs mt-1 font-medium">Enter seating</div>
                   )}
