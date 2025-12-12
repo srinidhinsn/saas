@@ -14,7 +14,7 @@ const MenuManagement = ({ clientId, token, realm }) => {
   const [searchOpen, setSearchOpen] = useState(false);
   const [searchQuery, setSearchQuery] = useState('');
   const searchInputRef = useRef(null);
-
+  const [screenId, setScreenId]= useState();
   const [selectedCategory, setSelectedCategory] = useState('All Categories');
   const [categories, setCategories] = useState([]);
   const [menuItems, setMenuItems] = useState([]);
