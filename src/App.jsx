@@ -619,6 +619,7 @@ const App = () => {
     setToken(null);
     setIsAuthenticated(false);
     localStorage.removeItem('access_token');
+    localStorage.removeItem('delegated_token');
     localStorage.removeItem('screen_id');
   };
 
