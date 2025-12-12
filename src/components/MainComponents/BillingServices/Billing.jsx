@@ -34,7 +34,7 @@ export default function BillingPage() {
   const isMobile = window.innerWidth <= 768;
   const [paidInvoices, setPaidInvoices] = useState([]);
   const [customersList, setCustomersList] = useState([]);
-  
+
   const safeNum = (num) => (typeof num === "number" && !isNaN(num) ? num : 0);
 
   const updateBalance = (sumOfPayments) => {
@@ -115,13 +115,13 @@ export default function BillingPage() {
 
   const subtotal =
     selectedOrder?.items?.reduce((sum, item) => sum + safeNum(item.unit_price) * safeNum(item.quantity), 0) || 0;
-    const taxAmount = (taxPercent / 100) * subtotal;
+  const taxAmount = (taxPercent / 100) * subtotal;
 
-    const discountBase = subtotal + taxAmount;
-    const discountAmount = discountIsPercent ? (discount / 100) * discountBase : discount;
-    
-    const total = Number((discountBase - discountAmount).toFixed(2));
-    
+  const discountBase = subtotal + taxAmount;
+  const discountAmount = discountIsPercent ? (discount / 100) * discountBase : discount;
+
+  const total = Number((discountBase - discountAmount).toFixed(2));
+
 
   const sumSplits = (splits) => splits.reduce((sum, s) => sum + Number(s.amount), 0);
 
@@ -194,6 +194,7 @@ export default function BillingPage() {
 
   const handleSelectOrder = async (order) => {
     if (!order) return;
+
     const enrichedItems = (order.items || []).map((item) => {
       const inv = inventoryMap[item.item_id] || {};
       return {
@@ -214,6 +215,7 @@ export default function BillingPage() {
       contact_email: invoiceDraft?.contact_email || order.contact_email || "",
       contact_phone: invoiceDraft?.contact_phone || order.contact_phone || "",
     };
+
     setSelectedOrder(updatedOrder);
     setInvoiceDraftId(invoiceDraft?.id ?? null);
     setStatus(invoiceDraft?.status ?? "Draft");
@@ -225,6 +227,7 @@ export default function BillingPage() {
       0
     )).toFixed(2));
 
+    // Handle payment methods
     if (Array.isArray(invoiceDraft?.payment_method) && invoiceDraft.payment_method.length > 0) {
       if (invoiceDraft.payment_method.length === 1) {
         setSplitPaymentEnabled(false);
@@ -252,43 +255,35 @@ export default function BillingPage() {
       setBalanceAmount(0);
     }
 
-    loadGSTDiscountFromStorage(order.id);
-  };
+    // Load GST from invoice draft (from DB)
+    // Priority: tax_rate field first, then calculate from tax_amount, finally default to 18
+    if (invoiceDraft?.tax_rate !== undefined && invoiceDraft?.tax_rate !== null) {
+      setTaxPercent(Number(invoiceDraft.tax_rate));
+    } else if (invoiceDraft?.tax_amount && totalVal > 0) {
+      // Calculate percentage from tax_amount if tax_rate not available
+      const calculatedTaxPercent = (invoiceDraft.tax_amount / totalVal) * 100;
+      setTaxPercent(Number(calculatedTaxPercent.toFixed(2)));
+    } else {
+      setTaxPercent(18); // Default GST
+    }
 
-  const loadGSTDiscountFromStorage = (orderId) => {
-    try {
-      const key = `billing_${orderId}_gst_discount`;
-      const saved = localStorage.getItem(key);
-      if (saved) {
-        const parsed = JSON.parse(saved);
-        if (typeof parsed.taxPercent === "number") setTaxPercent(parsed.taxPercent);
-        if (typeof parsed.discount === "number") setDiscount(parsed.discount);
-        if (typeof parsed.discountIsPercent === "boolean")
-          setDiscountIsPercent(parsed.discountIsPercent);
-      } else {
-        setTaxPercent(18);
-        setDiscount(0);
-        setDiscountIsPercent(true);
-      }
-    } catch (e) {
-      setTaxPercent(18);
+    // Load discount from invoice draft (from DB)
+    if (invoiceDraft?.discount !== undefined && invoiceDraft?.discount !== null) {
+      setDiscount(Number(invoiceDraft.discount));
+      // Determine type: if has decimal (.0 format), it's percentage
+      const hasDecimal = (invoiceDraft.discount % 1 !== 0);
+      setDiscountIsPercent(hasDecimal);
+    } else if (invoiceDraft?.discount_amount !== undefined) {
+      setDiscount(Number(invoiceDraft.discount_amount));
+      setDiscountIsPercent(false); // discount_amount is typically fixed value
+    } else {
       setDiscount(0);
       setDiscountIsPercent(true);
     }
   };
 
-  // Save GST and Discount to localStorage whenever they change
-  useEffect(() => {
-    if (selectedOrder?.id) {
-      const key = `billing_${selectedOrder.id}_gst_discount`;
-      const dataToSave = {
-        taxPercent,
-        discount,
-        discountIsPercent
-      };
-      localStorage.setItem(key, JSON.stringify(dataToSave));
-    }
-  }, [taxPercent, discount, discountIsPercent, selectedOrder?.id]);
+
+
 
   const fetchInvoiceDraft = async (orderId) => {
     try {
@@ -354,7 +349,9 @@ export default function BillingPage() {
         reference_number: tablesMap[selectedOrder.table_id]?.name || `Table ${selectedOrder.table_id}`,
         subtotal: Number(subtotal.toFixed(2)),
         tax_amount: Number(taxAmount.toFixed(2)),
+        tax_rate: Number(taxPercent),
         discount_amount: Number(discountAmount.toFixed(2)),
+        discount: discountIsPercent ? Number(discount.toFixed(1)) : Number(discount),
         total_amount: Number(total.toFixed(2)),
         payment_status: paymentStatus,
         payment_method: paymentMethodArray,
@@ -462,23 +459,23 @@ export default function BillingPage() {
       // Header with gradient effect
       doc.setFillColor(102, 126, 234);
       doc.rect(0, 0, pageWidth, 120, 'F');
-      
+
       doc.setFont("helvetica", "bold");
       doc.setFontSize(26);
       doc.setTextColor(255, 255, 255);
       doc.text(clientId.toUpperCase(), 40, y);
-      
+
       doc.setFontSize(18);
       doc.text("INVOICE", 40, y + 30);
-      
+
       doc.setFontSize(11);
       doc.setFont("helvetica", "normal");
       doc.text(`Invoice No: ${currentInvoiceNumber}`, pageWidth - 40, y, { align: "right" });
       doc.text(`Date: ${new Date().toLocaleDateString()}`, pageWidth - 40, y + 20, { align: "right" });
       doc.text(`Time: ${new Date().toLocaleTimeString([], { hour: "2-digit", minute: "2-digit" })}`, pageWidth - 40, y + 35, { align: "right" });
-      
+
       y = 140;
-      
+
       doc.setTextColor(0, 0, 0);
       doc.setFont("helvetica", "bold");
       doc.setFontSize(10);
@@ -486,15 +483,15 @@ export default function BillingPage() {
       doc.setFont("helvetica", "normal");
       doc.setFontSize(9);
       doc.text(localStorage.getItem("restaurant_address") || "Address not available", 40, y + 15);
-      
+
       y += 50;
-      
+
       doc.setDrawColor(200, 200, 200);
       doc.setLineWidth(1);
       doc.line(40, y, pageWidth - 40, y);
-      
+
       y += 25;
-      
+
       doc.setFont("helvetica", "bold");
       doc.setFontSize(10);
       doc.text("BILL TO", 40, y);
@@ -503,19 +500,19 @@ export default function BillingPage() {
       doc.text(`Customer: ${selectedOrder.customer_id || "Walk-in Customer"}`, 40, y + 18);
       doc.text(`Phone: ${selectedOrder.contact_phone || "N/A"}`, 40, y + 32);
       doc.text(`Email: ${selectedOrder.contact_email || "N/A"}`, 40, y + 46);
-      
+
       doc.setFont("helvetica", "bold");
       doc.text("ORDER DETAILS", pageWidth - 180, y);
       doc.setFont("helvetica", "normal");
       doc.text(`Table: ${tablesMap[selectedOrder.table_id]?.name || "N/A"}`, pageWidth - 180, y + 18);
       doc.text(`Type: ${selectedOrder.mode || "Dine-In"}`, pageWidth - 180, y + 32);
       doc.text(`Order #${selectedOrder.id}`, pageWidth - 180, y + 46);
-      
+
       y += 70;
-      
+
       doc.setFillColor(248, 250, 252);
       doc.rect(40, y - 5, pageWidth - 80, 25, 'F');
-      
+
       doc.setFont("helvetica", "bold");
       doc.setFontSize(10);
       doc.setTextColor(30, 41, 59);
@@ -523,53 +520,53 @@ export default function BillingPage() {
       doc.text("QTY", pageWidth - 260, y + 10);
       doc.text("PRICE", pageWidth - 180, y + 10);
       doc.text("AMOUNT", pageWidth - 80, y + 10);
-      
+
       y += 30;
-      
+
       doc.setFont("helvetica", "normal");
       doc.setFontSize(9);
       doc.setTextColor(0, 0, 0);
-      
+
       selectedOrder.items.forEach((item, index) => {
         if (y > pageHeight - 150) {
           doc.addPage();
           y = 50;
         }
-        
+
         if (index % 2 === 0) {
           doc.setFillColor(249, 250, 251);
           doc.rect(40, y - 8, pageWidth - 80, 20, 'F');
         }
-        
+
         doc.text(item.name || "Unnamed", 45, y);
         doc.text(`${item.quantity || 0}`, pageWidth - 260, y);
         doc.text(`Rs.${(item.unit_price ?? 0).toFixed(2)}`, pageWidth - 180, y);
         doc.text(`Rs.${((item.unit_price ?? 0) * (item.quantity ?? 0)).toFixed(2)}`, pageWidth - 80, y);
         y += 20;
       });
-      
+
       y += 15;
-      
+
       doc.setDrawColor(200, 200, 200);
       doc.line(40, y, pageWidth - 40, y);
       y += 20;
-      
+
       doc.setFont("helvetica", "normal");
       doc.setFontSize(10);
       doc.text("Subtotal:", pageWidth - 200, y);
       doc.text(`Rs.${subtotal.toFixed(2)}`, pageWidth - 80, y, { align: "right" });
       y += 18;
-      
+
       doc.text("Discount:", pageWidth - 200, y);
       doc.setTextColor(239, 68, 68);
       doc.text(`-Rs.${discountAmount.toFixed(2)}`, pageWidth - 80, y, { align: "right" });
       y += 18;
-      
+
       doc.setTextColor(0, 0, 0);
       doc.text(`GST (${taxPercent}%):`, pageWidth - 200, y);
       doc.text(`Rs.${taxAmount.toFixed(2)}`, pageWidth - 80, y, { align: "right" });
       y += 25;
-      
+
       doc.setFillColor(239, 246, 255);
       doc.rect(pageWidth - 220, y - 12, 180, 30, 'F');
       doc.setFont("helvetica", "bold");
@@ -577,18 +574,18 @@ export default function BillingPage() {
       doc.setTextColor(59, 130, 246);
       doc.text("TOTAL:", pageWidth - 200, y);
       doc.text(`Rs.${total.toFixed(2)}`, pageWidth - 80, y, { align: "right" });
-      
+
       y += 40;
-      
+
       doc.setTextColor(0, 0, 0);
       doc.setFont("helvetica", "bold");
       doc.setFontSize(10);
       doc.text("PAYMENT INFORMATION", 40, y);
       y += 18;
-      
+
       doc.setFont("helvetica", "normal");
       doc.setFontSize(9);
-      
+
       if (splitPaymentEnabled && paymentSplits.length > 1) {
         paymentSplits.forEach((split, idx) => {
           doc.text(`${idx + 1}. ${split.method}:`, 45, y);
@@ -603,13 +600,13 @@ export default function BillingPage() {
         doc.text(`Amount Paid: ₹${Number(paymentAmount).toFixed(2)}`, 45, y);
         y += 15;
       }
-      
+
       doc.text(`Payment Status: ${paymentStatus}`, 45, y);
       y += 30;
-      
+
       doc.setDrawColor(200, 200, 200);
       doc.line(40, pageHeight - 80, pageWidth - 40, pageHeight - 80);
-      
+
       doc.setFont("helvetica", "italic");
       doc.setFontSize(10);
       doc.setTextColor(100, 116, 139);
@@ -666,7 +663,7 @@ export default function BillingPage() {
           <div className="text-xs">{new Date().toLocaleDateString()}</div>
         </div>
       </div>
-  
+
       {/* Customer & Order Info */}
       <div className="flex flex-col md:flex-row justify-between bg-bg-white p-4 border-b border-gray-200 gap-4">
         <div className="flex-1">
@@ -709,7 +706,7 @@ export default function BillingPage() {
             className="w-full border border-gray-300 rounded px-2 py-1"
           />
         </div>
-  
+
         <div className="flex-1">
           <h3 className="text-action-primary font-semibold mb-2">Order Info</h3>
           <p><span className="font-semibold">Table:</span> {tablesMap[selectedOrder.table_id]?.name || "N/A"}</p>
@@ -717,7 +714,7 @@ export default function BillingPage() {
           <p><span className="font-semibold">Order ID:</span> #{selectedOrder.id}</p>
         </div>
       </div>
-  
+
       {/* Items Table */}
       <div className="overflow-x-auto bg-bg-primary p-4 border-b border-gray-200">
         <table className="w-full text-sm">
@@ -757,7 +754,7 @@ export default function BillingPage() {
           </tbody>
         </table>
       </div>
-  
+
       {/* Controls */}
       <div className="bg-bg-primary p-4 flex flex-col md:flex-row gap-4 border-b border-gray-200">
         <div className="flex-1 grid grid-cols-3 gap-2">
@@ -793,7 +790,7 @@ export default function BillingPage() {
             </select>
           </div>
         </div>
-  
+
         {/* Payment Status */}
         <div className="flex-1">
           <span className="text-action-primary font-semibold mb-1 block">Payment Status</span>
@@ -802,11 +799,10 @@ export default function BillingPage() {
               <button
                 key={statusOption}
                 type="button"
-                className={`px-3 py-1 rounded-md font-semibold border ${
-                  paymentStatus === statusOption
-                    ? "bg-action-primary text-text-white border-action-primary"
-                    : "bg-bg-primary text-action-primary border-action-primary hover:bg-orange-100"
-                }`}
+                className={`px-3 py-1 rounded-md font-semibold border ${paymentStatus === statusOption
+                  ? "bg-action-primary text-text-white border-action-primary"
+                  : "bg-bg-primary text-action-primary border-action-primary hover:bg-orange-100"
+                  }`}
                 onClick={() => setPaymentStatus(statusOption)}
               >
                 {statusOption}
@@ -815,7 +811,7 @@ export default function BillingPage() {
           </div>
         </div>
       </div>
-  
+
       {/* Payment Methods */}
       <div className="bg-bg-primary p-4 flex flex-col gap-4">
         <div className="flex items-center gap-2">
@@ -835,7 +831,7 @@ export default function BillingPage() {
             Enable Split Payment
           </label>
         </div>
-  
+
         {splitPaymentEnabled ? (
           <div className="space-y-2">
             {paymentSplits.map((split, idx) => (
@@ -906,7 +902,7 @@ export default function BillingPage() {
           </div>
         )}
       </div>
-  
+
       {/* Action Buttons */}
       <div className="bg-bg-primary p-4 flex gap-4 justify-end border-t border-gray-200">
         <button
@@ -926,18 +922,18 @@ export default function BillingPage() {
       </div>
     </>
   );
-  
+
 
   return (
     <div className="min-h-screen bg-gray-50 p-4 md:p-6">
       <div className="max-w-7xl mx-auto bg-white shadow-lg rounded-lg overflow-hidden flex flex-col md:flex-row">
-  
+
         {/* Orders Sidebar */}
         <aside className="w-full md:w-80 border-r border-gray-200">
           <div className="bg-action-primary text-text-white p-4">
             <h2 className="text-lg font-semibold">📋 Today's Orders</h2>
           </div>
-  
+
           <div className="overflow-y-auto h-[calc(100vh-6rem)] p-2 space-y-2 bg-bg-primary">
             {loading && (
               <p className="text-gray-500 text-sm text-center mt-4">Loading orders...</p>
@@ -945,7 +941,7 @@ export default function BillingPage() {
             {!loading && orders.length === 0 && (
               <p className="text-gray-400 text-sm text-center mt-4">No served orders today</p>
             )}
-  
+
             {orders.map((order) => {
               const tableName = tablesMap[order.table_id]?.name || `Table ${order.table_id}`;
               const itemsWithPrice = (order.items || []).map((item) => ({
@@ -957,17 +953,16 @@ export default function BillingPage() {
                 0
               );
               const isSelected = selectedOrder?.id === order.id;
-  
+
               return (
                 <div
                   key={order.id}
                   tabIndex={0}
                   role="button"
-                  className={`p-3 rounded-lg cursor-pointer border transition-all ${
-                    isSelected
-                      ? "bg-orange-100 border-orange-400"
-                      : "bg-bg-primary border-gray-200 hover:bg-orange-50"
-                  }`}
+                  className={`p-3 rounded-lg cursor-pointer border transition-all ${isSelected
+                    ? "bg-orange-100 border-orange-400"
+                    : "bg-bg-primary border-gray-200 hover:bg-orange-50"
+                    }`}
                   onClick={() => handleSelectOrder(order)}
                   onKeyDown={(e) => {
                     if (e.key === "Enter" || e.key === " ") {
@@ -992,7 +987,7 @@ export default function BillingPage() {
             })}
           </div>
         </aside>
-  
+
         {/* Invoice Section */}
         <main className="flex-1 overflow-y-auto">
           {isMobile ? (
@@ -1023,7 +1018,7 @@ export default function BillingPage() {
       </div>
     </div>
   );
-  
+
 }
 
 

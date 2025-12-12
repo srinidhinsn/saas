@@ -6,7 +6,7 @@ const UniversalBulkUpdateModal = ({
   showModal,
   setShowModal,
   modalType, // 'menu' or 'table'
-  
+
   // Menu-specific props (Bulk Update)
   filteredItems,
   selectedRows,
@@ -17,7 +17,7 @@ const UniversalBulkUpdateModal = ({
   setBulkEditData,
   handleBulkUpdate,
   handleBulkDelete,
-  
+
   // Table-specific props (Bulk Update)
   tables,
   bulkUpdateSearch,
@@ -32,6 +32,7 @@ const UniversalBulkUpdateModal = ({
   saveBulkUpdate,
   getFilteredUpdateTables
 }) => {
+  
   // Menu: Toggle all selection
   const toggleSelectAll = () => {
     if (modalType === 'menu') {
@@ -103,18 +104,18 @@ const UniversalBulkUpdateModal = ({
     return (
       <div className="fixed inset-0 z-50 flex items-center justify-center p-4 bg-black bg-opacity-50">
         <div className="rounded-lg max-w-4xl w-full bg-white max-h-[90vh] flex flex-col shadow-xl">
-          
+
           {/* Header */}
           <div className="flex justify-between items-center px-6 py-4 border-b border-gray-200">
             <h2 className="text-xl font-semibold text-gray-900">Bulk Update & Delete</h2>
-            <button 
-              onClick={handleClose} 
+            <button
+              onClick={handleClose}
               className="w-8 h-8 rounded hover:bg-gray-100 flex items-center justify-center"
             >
               <X className="w-5 h-5 text-gray-500" />
             </button>
           </div>
-  
+
           {/* Action Bar */}
           <div className="flex justify-between items-center gap-4 px-6 py-3 border-b border-gray-200 bg-gray-50">
             <div className="flex items-center gap-4">
@@ -131,7 +132,7 @@ const UniversalBulkUpdateModal = ({
                 {selectedRows.length} item(s) selected
               </span>
             </div>
-  
+
             <div className="flex gap-3">
               <button
                 onClick={handleBulkUpdate}
@@ -151,7 +152,7 @@ const UniversalBulkUpdateModal = ({
               </button>
             </div>
           </div>
-  
+
           {/* Table Container */}
           <div className="flex-1 overflow-auto px-4 py-4">
             <div className="min-w-[800px]">
@@ -177,17 +178,16 @@ const UniversalBulkUpdateModal = ({
                   {filteredItems.map((item, index) => {
                     const isSelected = selectedRows.includes(item.id);
                     const editData = bulkEditData[item.id] || {};
-  
+
                     return (
-                      <tr 
-                        key={item.id} 
-                        className={`border-b border-gray-200 ${
-                          isSelected 
-                            ? 'bg-blue-50' 
-                            : index % 2 === 0 
-                              ? 'bg-white hover:bg-gray-50' 
-                              : 'bg-gray-50 hover:bg-gray-100'
-                        }`}
+                      <tr
+                        key={item.id}
+                        className={`border-b border-gray-200 ${isSelected
+                          ? 'bg-blue-50'
+                          : index % 2 === 0
+                            ? 'bg-white hover:bg-gray-50'
+                            : 'bg-gray-50 hover:bg-gray-100'
+                          }`}
                       >
                         <td className="px-4 py-3">
                           <input
@@ -275,7 +275,7 @@ const UniversalBulkUpdateModal = ({
                   })}
                 </tbody>
               </table>
-  
+
               {filteredItems.length === 0 && (
                 <div className="text-center py-16 mt-4">
                   <p className="text-gray-500 text-lg">No items to display</p>
@@ -284,7 +284,7 @@ const UniversalBulkUpdateModal = ({
               )}
             </div>
           </div>
-  
+
           {/* Footer */}
           <div className="px-6 py-4 border-t border-gray-200 bg-gray-50">
             <div className="flex justify-between items-center">
@@ -303,32 +303,60 @@ const UniversalBulkUpdateModal = ({
       </div>
     );
   }
-  
+
   // Render Table Bulk Update Modal
-  if (modalType === 'table') {
-    const filteredTables = getFilteredUpdateTables();
-    
-    return (
-      <div className="fixed inset-0 bg-black bg-opacity-50 z-50 flex items-center justify-center p-4">
-        <div className="bg-white rounded-lg w-full max-w-2xl shadow-xl max-h-[90vh] overflow-hidden flex flex-col">
-          
-          {/* Header */}
-          <div className="px-6 py-4 border-b border-gray-200 flex justify-between items-center">
-            <h2 className="text-xl font-semibold text-gray-900">Update Tables</h2>
-            <button 
-              onClick={handleClose} 
-              className="w-8 h-8 rounded hover:bg-gray-100 flex items-center justify-center"
-            >
-              <X className="w-5 h-5 text-gray-500" />
-            </button>
-          </div>
+// Render Table Bulk Update Modal
+if (modalType === 'table') {
+  const filteredTables = getFilteredUpdateTables();
   
-          {/* Global Update Section */}
-          <div className="px-6 py-4 bg-gray-50 border-b border-gray-200">
-            <h3 className="text-sm font-semibold text-gray-700 mb-3">Apply to All Selected</h3>
-            <div className="grid grid-cols-3 gap-4">
-              <div>
-                <label className="block text-xs font-medium mb-1 text-gray-600">Seating</label>
+  return (
+    <div className="fixed inset-0 bg-black bg-opacity-50 z-50 flex items-center justify-center p-4">
+      <div className="bg-bg-primary rounded-xl w-full max-w-3xl shadow-2xl h-[95vh] overflow-hidden flex flex-col border border-border-default">
+        
+        {/* Header */}
+        <div className="px-4 sm:px-6 py-3 border-b border-border-default flex justify-between items-center bg-bg-tertiary flex-shrink-0">
+          <h2 className="text-base sm:text-lg font-bold text-text-primary">Update Tables</h2>
+          <button 
+            onClick={handleClose} 
+            className="w-7 h-7 rounded-lg hover:bg-bg-secondary flex items-center justify-center transition-colors"
+          >
+            <X className="w-4 h-4 text-text-secondary" />
+          </button>
+        </div>
+
+        {/* Global Update Section */}
+        <div className="px-4 sm:px-6 py-3 bg-bg-tertiary border-b border-border-default flex-shrink-0">
+          <h3 className="text-xs font-bold text-text-primary mb-2">Apply to All Selected</h3>
+          <div className="grid grid-cols-1 sm:grid-cols-3 gap-2">
+            <div>
+              <label className="block text-xs font-semibold mb-1.5 text-text-secondary">Seating</label>
+              
+              {/* Desktop */}
+              <input
+                type="number"
+                min="1"
+                value={bulkUpdateGlobal.table_type}
+                onChange={e => {
+                  const value = e.target.value ? Math.max(1, Number(e.target.value)) : "";
+                  setBulkUpdateGlobal(prev => ({ ...prev, table_type: value }));
+                }}
+                placeholder="No change"
+                className="hidden sm:block w-full px-3 py-1.5 border border-border-default rounded-lg focus:outline-none focus:ring-2 focus:ring-action-primary focus:border-transparent text-sm bg-bg-primary text-text-primary"
+              />
+              
+              {/* Mobile with +/- buttons */}
+              <div className="sm:hidden flex items-center border border-border-default rounded-lg overflow-hidden bg-bg-primary">
+                <button
+                  type="button"
+                  onClick={() => {
+                    const current = Number(bulkUpdateGlobal.table_type) || 0;
+                    const value = current > 1 ? current - 1 : "";
+                    setBulkUpdateGlobal(prev => ({ ...prev, table_type: value }));
+                  }}
+                  className="px-3 py-1.5 text-text-primary hover:bg-bg-tertiary font-bold transition-colors"
+                >
+                  −
+                </button>
                 <input
                   type="number"
                   min="1"
@@ -337,101 +365,141 @@ const UniversalBulkUpdateModal = ({
                     const value = e.target.value ? Math.max(1, Number(e.target.value)) : "";
                     setBulkUpdateGlobal(prev => ({ ...prev, table_type: value }));
                   }}
-                  placeholder="No change"
-                  className="w-full px-3 py-2 border border-gray-300 rounded-md focus:outline-none focus:ring-2 focus:ring-blue-500 focus:border-transparent text-sm"
+                  placeholder="None"
+                  className="flex-1 text-center py-1.5 border-x border-border-default focus:outline-none text-sm bg-transparent text-text-primary"
                 />
-              </div>
-              <div>
-                <label className="block text-xs font-medium mb-1 text-gray-600">Status</label>
-                <select
-                  value={bulkUpdateGlobal.status}
-                  onChange={e => setBulkUpdateGlobal(prev => ({ ...prev, status: e.target.value }))}
-                  className="w-full px-3 py-2 border border-gray-300 rounded-md focus:outline-none focus:ring-2 focus:ring-blue-500 focus:border-transparent text-sm"
+                <button
+                  type="button"
+                  onClick={() => {
+                    const current = Number(bulkUpdateGlobal.table_type) || 0;
+                    setBulkUpdateGlobal(prev => ({ ...prev, table_type: current + 1 }));
+                  }}
+                  className="px-3 py-1.5 text-text-primary hover:bg-bg-tertiary font-bold transition-colors"
                 >
-                  <option value="">No change</option>
-                  <option value="Vacant">Vacant</option>
-                  <option value="Reserved">Reserved</option>
-                </select>
-              </div>
-              <div>
-                <label className="block text-xs font-medium mb-1 text-gray-600">Zone</label>
-                <select
-                  value={bulkUpdateGlobal.location_zone}
-                  onChange={e => setBulkUpdateGlobal(prev => ({ ...prev, location_zone: e.target.value }))}
-                  className="w-full px-3 py-2 border border-gray-300 rounded-md focus:outline-none focus:ring-2 focus:ring-blue-500 focus:border-transparent text-sm"
-                >
-                  <option value="">No change</option>
-                  <option value="AC">AC</option>
-                  <option value="Non-AC">Non-AC</option>
-                </select>
+                  +
+                </button>
               </div>
             </div>
+            
+            <div>
+              <label className="block text-xs font-semibold mb-1.5 text-text-secondary">Status</label>
+              <select
+                value={bulkUpdateGlobal.status}
+                onChange={e => setBulkUpdateGlobal(prev => ({ ...prev, status: e.target.value }))}
+                className="w-full px-3 py-1.5 border border-border-default rounded-lg focus:outline-none focus:ring-2 focus:ring-action-primary focus:border-transparent text-sm bg-bg-primary text-text-primary"
+              >
+                <option value="">No change</option>
+                <option value="Vacant">Vacant</option>
+                <option value="Reserved">Reserved</option>
+              </select>
+            </div>
+            
+            <div>
+              <label className="block text-xs font-semibold mb-1.5 text-text-secondary">Zone</label>
+              <select
+                value={bulkUpdateGlobal.location_zone}
+                onChange={e => setBulkUpdateGlobal(prev => ({ ...prev, location_zone: e.target.value }))}
+                className="w-full px-3 py-1.5 border border-border-default rounded-lg focus:outline-none focus:ring-2 focus:ring-action-primary focus:border-transparent text-sm bg-bg-primary text-text-primary"
+              >
+                <option value="">No change</option>
+                <option value="AC">AC</option>
+                <option value="Non-AC">Non-AC</option>
+              </select>
+            </div>
           </div>
-  
-          {/* Search Bar */}
-          <div className="px-6 py-4 border-b border-gray-200">
-            <div className="relative">
-              <Search className="absolute left-3 top-1/2 transform -translate-y-1/2 w-4 h-4 text-gray-400" />
+        </div>
+
+        {/* Search Bar */}
+        <div className="px-4 sm:px-6 py-2 border-b border-border-default bg-bg-primary flex-shrink-0">
+          <div className="relative">
+            <Search className="absolute left-3 top-1/2 transform -translate-y-1/2 w-4 h-4 text-text-secondary" />
+            <input
+              type="text"
+              placeholder="Search tables..."
+              value={bulkUpdateSearch}
+              onChange={e => setBulkUpdateSearch(e.target.value)}
+              className="w-full pl-10 pr-4 py-1.5 border border-border-default rounded-lg focus:outline-none focus:ring-2 focus:ring-action-primary focus:border-transparent text-sm bg-bg-primary text-text-primary"
+            />
+          </div>
+        </div>
+
+        {/* Select All */}
+        <div className="px-4 sm:px-6 py-2 bg-bg-tertiary border-b border-border-default flex-shrink-0">
+          <label className="flex items-center justify-between cursor-pointer">
+            <div className="flex items-center gap-2">
               <input
-                type="text"
-                placeholder="Search tables..."
-                value={bulkUpdateSearch}
-                onChange={e => setBulkUpdateSearch(e.target.value)}
-                className="w-full pl-10 pr-4 py-2 border border-gray-300 rounded-md focus:outline-none focus:ring-2 focus:ring-blue-500 focus:border-transparent text-sm"
+                type="checkbox"
+                checked={selectedUpdateTables.length === filteredTables.length && filteredTables.length > 0}
+                onChange={selectAllUpdateTables}
+                className="w-4 h-4 text-action-primary border-border-default rounded focus:ring-action-primary"
               />
+              <span className="text-sm font-semibold text-text-primary">Select All</span>
             </div>
-          </div>
-  
-          {/* Select All */}
-          <div className="px-6 py-3 bg-gray-50 border-b border-gray-200">
-            <label className="flex items-center justify-between cursor-pointer">
-              <div className="flex items-center gap-2">
-                <input
-                  type="checkbox"
-                  checked={selectedUpdateTables.length === filteredTables.length && filteredTables.length > 0}
-                  onChange={selectAllUpdateTables}
-                  className="w-4 h-4 text-blue-600 border-gray-300 rounded focus:ring-blue-500"
-                />
-                <span className="text-sm font-medium text-gray-700">Select All</span>
+            <span className="text-xs text-text-secondary">
+              {selectedUpdateTables.length} of {filteredTables.length} selected
+            </span>
+          </label>
+        </div>
+
+        {/* Table List */}
+        <div className="flex-1 overflow-y-auto px-4 sm:px-6 py-3">
+          <div className="space-y-2">
+            {filteredTables.length === 0 ? (
+              <div className="text-center py-12">
+                <Search className="w-12 h-12 text-text-secondary mx-auto mb-3 opacity-30" />
+                <p className="text-text-secondary">No tables found</p>
               </div>
-              <span className="text-sm text-gray-600">
-                {selectedUpdateTables.length} of {filteredTables.length} selected
-              </span>
-            </label>
-          </div>
-  
-          {/* Table List */}
-          <div className="flex-1 overflow-y-auto px-6 py-4">
-            <div className="space-y-3">
-              {filteredTables.length === 0 ? (
-                <div className="text-center py-12">
-                  <Search className="w-12 h-12 text-gray-300 mx-auto mb-3" />
-                  <p className="text-gray-500">No tables found</p>
-                </div>
-              ) : (
-                filteredTables.map(table => (
-                  <div 
-                    key={table.id} 
-                    className={`border rounded-lg p-4 ${
-                      selectedUpdateTables.includes(table.id) 
-                        ? 'border-blue-300 bg-blue-50' 
-                        : 'border-gray-200 bg-white'
-                    }`}
-                  >
-                    <div className="flex items-center gap-3 mb-3">
-                      <input
-                        type="checkbox"
-                        checked={selectedUpdateTables.includes(table.id)}
-                        onChange={() => toggleUpdateTableSelection(table.id)}
-                        className="w-4 h-4 text-blue-600 border-gray-300 rounded focus:ring-blue-500 cursor-pointer"
-                      />
-                      <span className="font-medium text-gray-900">{table.name}</span>
-                    </div>
-  
-                    {selectedUpdateTables.includes(table.id) ? (
-                      <div className="grid grid-cols-3 gap-3 pt-3 border-t border-gray-200">
-                        <div>
-                          <label className="block text-xs font-medium mb-1 text-gray-600">Seating</label>
+            ) : (
+              filteredTables.map(table => (
+                <div 
+                  key={table.id} 
+                  className={`border rounded-xl p-3 transition-all ${
+                    selectedUpdateTables.includes(table.id) 
+                      ? 'border-action-primary bg-action-primary/5 shadow-sm' 
+                      : 'border-border-default bg-bg-primary'
+                  }`}
+                >
+                  <div className="flex items-center gap-2 mb-2">
+                    <input
+                      type="checkbox"
+                      checked={selectedUpdateTables.includes(table.id)}
+                      onChange={() => toggleUpdateTableSelection(table.id)}
+                      className="w-4 h-4 text-action-primary border-border-default rounded focus:ring-action-primary cursor-pointer"
+                    />
+                    <span className="font-bold text-sm text-text-primary">{table.name}</span>
+                  </div>
+
+                  {selectedUpdateTables.includes(table.id) ? (
+                    <div className="grid grid-cols-1 sm:grid-cols-3 gap-2 pt-2 border-t border-border-default">
+                      <div>
+                        <label className="block text-xs font-semibold mb-1.5 text-text-secondary">Seating</label>
+                        
+                        {/* Desktop */}
+                        <input
+                          type="number"
+                          min="1"
+                          value={bulkUpdateData[table.id]?.table_type ?? table.table_type ?? ""}
+                          onChange={e => {
+                            const value = e.target.value ? Math.max(1, Number(e.target.value)) : "";
+                            handleBulkUpdateChange(table.id, "table_type", value);
+                          }}
+                          placeholder={bulkUpdateGlobal.table_type ? `Global: ${bulkUpdateGlobal.table_type}` : "Seating"}
+                          className="hidden sm:block w-full px-3 py-1.5 border border-border-default rounded-lg text-sm focus:outline-none focus:ring-2 focus:ring-action-primary focus:border-transparent bg-bg-primary text-text-primary"
+                        />
+                        
+                        {/* Mobile with +/- buttons */}
+                        <div className="sm:hidden flex items-center border border-border-default rounded-lg overflow-hidden bg-bg-primary">
+                          <button
+                            type="button"
+                            onClick={() => {
+                              const current = Number(bulkUpdateData[table.id]?.table_type ?? table.table_type) || 1;
+                              const value = Math.max(1, current - 1);
+                              handleBulkUpdateChange(table.id, "table_type", value);
+                            }}
+                            className="px-3 py-1.5 text-text-primary hover:bg-bg-tertiary font-bold transition-colors"
+                          >
+                            −
+                          </button>
                           <input
                             type="number"
                             min="1"
@@ -440,78 +508,91 @@ const UniversalBulkUpdateModal = ({
                               const value = e.target.value ? Math.max(1, Number(e.target.value)) : "";
                               handleBulkUpdateChange(table.id, "table_type", value);
                             }}
-                            placeholder={bulkUpdateGlobal.table_type ? `Global: ${bulkUpdateGlobal.table_type}` : "Seating"}
-                            className="w-full px-3 py-2 border border-gray-300 rounded-md text-sm focus:outline-none focus:ring-2 focus:ring-blue-500 focus:border-transparent"
+                            placeholder={bulkUpdateGlobal.table_type ? `${bulkUpdateGlobal.table_type}` : ""}
+                            className="flex-1 text-center py-1.5 border-x border-border-default focus:outline-none text-sm bg-transparent text-text-primary"
                           />
-                        </div>
-                        <div>
-                          <label className="block text-xs font-medium mb-1 text-gray-600">Status</label>
-                          <select
-                            value={bulkUpdateData[table.id]?.status ?? table.status}
-                            onChange={e => handleBulkUpdateChange(table.id, 'status', e.target.value)}
-                            className="w-full px-3 py-2 border border-gray-300 rounded-md text-sm focus:outline-none focus:ring-2 focus:ring-blue-500 focus:border-transparent"
+                          <button
+                            type="button"
+                            onClick={() => {
+                              const current = Number(bulkUpdateData[table.id]?.table_type ?? table.table_type) || 0;
+                              handleBulkUpdateChange(table.id, "table_type", current + 1);
+                            }}
+                            className="px-3 py-1.5 text-text-primary hover:bg-bg-tertiary font-bold transition-colors"
                           >
-                            <option value="Vacant">Vacant</option>
-                            <option value="Reserved">Reserved</option>
-                          </select>
-                        </div>
-                        <div>
-                          <label className="block text-xs font-medium mb-1 text-gray-600">Zone</label>
-                          <select
-                            value={bulkUpdateData[table.id]?.location_zone ?? table.location_zone}
-                            onChange={e => handleBulkUpdateChange(table.id, 'location_zone', e.target.value)}
-                            className="w-full px-3 py-2 border border-gray-300 rounded-md text-sm focus:outline-none focus:ring-2 focus:ring-blue-500 focus:border-transparent"
-                          >
-                            <option value="AC">AC</option>
-                            <option value="Non-AC">Non-AC</option>
-                          </select>
+                            +
+                          </button>
                         </div>
                       </div>
-                    ) : (
-                      <div className="pt-3 border-t border-gray-200">
-                        <div className="grid grid-cols-3 gap-2 text-sm">
-                          <div>
-                            <span className="text-gray-600">Seating:</span>
-                            <span className="ml-1 text-gray-900 font-medium">{table.table_type}</span>
-                          </div>
-                          <div>
-                            <span className="text-gray-600">Status:</span>
-                            <span className="ml-1 text-gray-900 font-medium">{table.status}</span>
-                          </div>
-                          <div>
-                            <span className="text-gray-600">Zone:</span>
-                            <span className="ml-1 text-gray-900 font-medium">{table.location_zone}</span>
-                          </div>
+                      
+                      <div>
+                        <label className="block text-xs font-semibold mb-1.5 text-text-secondary">Status</label>
+                        <select
+                          value={bulkUpdateData[table.id]?.status ?? table.status}
+                          onChange={e => handleBulkUpdateChange(table.id, 'status', e.target.value)}
+                          className="w-full px-3 py-1.5 border border-border-default rounded-lg text-sm focus:outline-none focus:ring-2 focus:ring-action-primary focus:border-transparent bg-bg-primary text-text-primary"
+                        >
+                          <option value="Vacant">Vacant</option>
+                          <option value="Reserved">Reserved</option>
+                        </select>
+                      </div>
+                      
+                      <div>
+                        <label className="block text-xs font-semibold mb-1.5 text-text-secondary">Zone</label>
+                        <select
+                          value={bulkUpdateData[table.id]?.location_zone ?? table.location_zone}
+                          onChange={e => handleBulkUpdateChange(table.id, 'location_zone', e.target.value)}
+                          className="w-full px-3 py-1.5 border border-border-default rounded-lg text-sm focus:outline-none focus:ring-2 focus:ring-action-primary focus:border-transparent bg-bg-primary text-text-primary"
+                        >
+                          <option value="AC">AC</option>
+                          <option value="Non-AC">Non-AC</option>
+                        </select>
+                      </div>
+                    </div>
+                  ) : (
+                    <div className="pt-2 border-t border-border-default">
+                      <div className="grid grid-cols-3 gap-2 text-xs">
+                        <div>
+                          <span className="text-text-secondary">Seating:</span>
+                          <span className="ml-1 text-text-primary font-semibold">{table.table_type}</span>
+                        </div>
+                        <div>
+                          <span className="text-text-secondary">Status:</span>
+                          <span className="ml-1 text-text-primary font-semibold">{table.status}</span>
+                        </div>
+                        <div>
+                          <span className="text-text-secondary">Zone:</span>
+                          <span className="ml-1 text-text-primary font-semibold">{table.location_zone}</span>
                         </div>
                       </div>
-                    )}
-                  </div>
-                ))
-              )}
-            </div>
-          </div>
-  
-          {/* Footer */}
-          <div className="px-6 py-4 bg-gray-50 border-t border-gray-200 flex gap-3 justify-end">
-            <button
-              className="px-6 py-2 rounded-md bg-white text-gray-700 border border-gray-300 hover:bg-gray-50 font-medium text-sm"
-              onClick={handleClose}
-            >
-              Cancel
-            </button>
-            <button
-              className="px-6 py-2 rounded-md bg-blue-600 text-white hover:bg-blue-700 font-medium text-sm disabled:bg-gray-300 disabled:cursor-not-allowed"
-              onClick={saveBulkUpdate}
-              disabled={selectedUpdateTables.length === 0}
-            >
-              Update ({selectedUpdateTables.length})
-            </button>
+                    </div>
+                  )}
+                </div>
+              ))
+            )}
           </div>
         </div>
+
+        {/* Footer */}
+        <div className="px-4 sm:px-6 py-3 bg-bg-tertiary border-t border-border-default flex flex-col sm:flex-row gap-2 justify-end flex-shrink-0">
+          <button
+            className="px-6 py-2 rounded-lg bg-bg-primary text-text-primary border border-border-default hover:bg-bg-secondary font-semibold text-sm transition-colors"
+            onClick={handleClose}
+          >
+            Cancel
+          </button>
+          <button
+            className="px-6 py-2 rounded-lg bg-action-primary text-text-white hover:bg-action-primary/90 font-semibold text-sm transition-colors disabled:bg-bg-secondary disabled:cursor-not-allowed shadow-lg"
+            onClick={saveBulkUpdate}
+            disabled={selectedUpdateTables.length === 0}
+          >
+            Update ({selectedUpdateTables.length})
+          </button>
+        </div>
       </div>
-    );
-  }
-  
+    </div>
+  );
+}
+
   return null;
 };
 

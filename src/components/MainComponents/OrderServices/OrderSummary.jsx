@@ -1217,7 +1217,7 @@ import axios from 'axios';
 import { toast } from "react-toastify";
 import { MdOutlineKeyboardDoubleArrowDown } from "react-icons/md";
 import Modal from "react-modal";
-import { X, Edit2, Trash2, Search, Filter } from 'lucide-react';
+import { X, Edit2, Trash2, Search, Filter, ShoppingBag, Clock } from 'lucide-react';
 
 Modal.setAppElement("#root");
 
@@ -1322,7 +1322,7 @@ const OrderSummaryVisible = ({ clientId, token }) => {
   const [pendingOrderId, setPendingOrderId] = useState(null);
   const [visibleOrderId, setVisibleOrderId] = useState(null);
   const [selectedCategory, setSelectedCategory] = useState(null);
-
+  const [activeTab, setActiveTab] = useState('items');
   const getOrderBgColor = (status) => {
     switch (status?.toLowerCase()) {
       case 'served':
@@ -2523,81 +2523,123 @@ const OrderSummaryVisible = ({ clientId, token }) => {
         </div>
       </div>
 
+
       {showOrderDetailModal && selectedOrder && (
         <div
-          className="fixed top-16 inset-0 z-40 flex items-center justify-center  p-2 sm:p-4 overflow-y-auto bg-color-smallModal"
-          onClick={() => setShowOrderDetailModal(false)}>
+          className="fixed inset-0 z-50 flex items-center justify-center p-4 bg-color-modalsbg backdrop-blur-sm"
+          onClick={() => { setShowOrderDetailModal(false); setActiveTab('items'); }}>
           <div
-            className={`rounded-xl w-full max-h-[80vh]  my-4 flex flex-col  bg-bg-primary shadow-card border-default border-border-default ${editOrderId ? 'max-w-4xl' : 'max-w-xl'}`}
+            className={`rounded-xl w-full max-h-[90vh] my-2 flex flex-col bg-bg-primary shadow-2xl border-default border-border-default transition-all duration-300 ${editOrderId ? 'max-w-3xl' : 'max-w-xl'}`}
             onClick={(e) => e.stopPropagation()}>
-            <div
-              className="flex px-3 sm:px-4 rounded-xl py-2.5 sm:py-3 border-b items-center justify-between flex-shrink-0 bg-gradient-to-r from-action-primary to-bg-primary border-default border-border-default"
-            >
-              <div className="flex-1 min-w-0 mr-2">
-                <h3
-                  className="text-base sm:text-lg font-bold truncate text-text-primary">
-                  {tablesMap[selectedOrder.table_id] || selectedOrder.table || selectedOrder.table_id}
-                </h3>
-                <div className="text-xs text-text-secondary">
-                  {selectedOrder.items.length} items • {new Date(selectedOrder.created_at).toLocaleDateString()}
-                </div>
-              </div>
 
-              <div className="flex items-center gap-2 flex-shrink-0">
-                <div className="text-right">
-                  <div className="text-xs text-text-secondary">Total</div>
-                  <div className="text-sm sm:text-base font-bold text-action-primary">
-                    ₹{selectedOrder.items.reduce((sum, item) => sum + ((inventoryMap[item.item_id]?.unit_price || item.unit_price || item.price || 0) * (item.quantity || 1)), 0).toFixed(2)}
+            {/* Header */}
+            <div className="relative px-4 sm:px-6 py-4 sm:py-5 border-b border-border-default bg-gradient-to-r from-action-primary/10 via-bg-tertiary to-action-primary/5">
+              <div className="flex items-start justify-between gap-4">
+                <div className="flex-1 min-w-0">
+                  <div className="flex items-center gap-3 mb-2">
+                    <div className="p-2 bg-action-primary/20 rounded-xl border border-action-primary/30">
+                      <ShoppingBag size={20} className="text-action-primary" />
+                    </div>
+                    <div className="flex-1 min-w-0">
+                      <h3 className="text-lg sm:text-xl font-bold text-text-primary truncate">
+                        {tablesMap[selectedOrder.table_id] || selectedOrder.table || selectedOrder.table_id}
+                      </h3>
+                      <div className="flex items-center gap-3 mt-1 text-xs sm:text-sm text-text-secondary flex-wrap">
+                        <span className="flex items-center gap-1">
+                          <ShoppingBag size={14} />
+                          {selectedOrder.items.length} items
+                        </span>
+                        <span className="hidden sm:inline">•</span>
+                        <span className="flex items-center gap-1">
+                          <Clock size={14} />
+                          {new Date(selectedOrder.created_at).toLocaleString()}
+                        </span>
+                      </div>
+                    </div>
                   </div>
                 </div>
 
-                <button
-                  className="p-1.5 rounded-lg transition-all duration-200 flex-shrink-0 text-text-secondary bg-transparent hover:bg-bg-tertiary border-default border-transparent"
-                  onClick={() => { setShowOrderDetailModal(false); setEditOrderId(null); }}
-                  aria-label="Close order details"
-                // onMouseEnter={e => e.currentTarget.style.backgroundColor = 'var(--color-bg-hover)'}
-                // onMouseLeave={e => e.currentTarget.style.backgroundColor = 'transparent'}
-                >
-                  <X size={18} />
-                </button>
+                <div className="flex items-center gap-3 flex-shrink-0">
+                  <div className="text-right bg-gradient-to-br from-action-primary/10 to-action-primary/5 px-3 sm:px-4 py-2 rounded-xl border border-action-primary/20 shadow-sm">
+                    <div className="text-[10px] sm:text-xs font-semibold text-text-secondary uppercase tracking-wide">Total</div>
+                    <div className="text-lg sm:text-2xl font-bold text-action-primary mt-0.5">
+                      ₹{selectedOrder.items.reduce((sum, item) => sum + ((inventoryMap[item.item_id]?.unit_price || item.unit_price || item.price || 0) * (item.quantity || 1)), 0).toFixed(2)}
+                    </div>
+                  </div>
+
+                  <button
+                    className="p-2 rounded-xl transition-all duration-200 text-text-secondary hover:text-text-primary hover:bg-bg-tertiary border border-transparent hover:border-border-default"
+                    onClick={() => { setShowOrderDetailModal(false); setEditOrderId(null); setActiveTab('items'); }}
+                    aria-label="Close">
+                    <X size={20} />
+                  </button>
+                </div>
               </div>
             </div>
 
-            <div className="flex-1 max-h-[calc(100vh-200px)] overflow-y-auto">
+            {/* Tab Navigation - Only show in edit mode on mobile/tablet */}
+            {editOrderId === selectedOrder.id && (
+              <div className="lg:hidden border-b border-border-default bg-bg-tertiary">
+                <div className="flex">
+                  <button
+                    className={`flex-1 py-3 px-4 text-sm font-semibold transition-all ${activeTab === 'items'
+                        ? 'text-action-primary border-b-2 border-action-primary bg-bg-primary'
+                        : 'text-text-secondary hover:text-text-primary hover:bg-bg-secondary/50'
+                      }`}
+                    onClick={() => setActiveTab('items')}>
+                    Order Items ({selectedOrder.items.length})
+                  </button>
+                  <button
+                    className={`flex-1 py-3 px-4 text-sm font-semibold transition-all ${activeTab === 'available'
+                        ? 'text-action-primary border-b-2 border-action-primary bg-bg-primary'
+                        : 'text-text-secondary hover:text-text-primary hover:bg-bg-secondary/50'
+                      }`}
+                    onClick={() => setActiveTab('available')}>
+                    Available Items
+                  </button>
+                </div>
+              </div>
+            )}
+
+            {/* Content */}
+            <div className="flex-1 overflow-hidden">
               <div className="flex flex-col lg:flex-row h-full">
+
+                {/* Available Items Panel */}
                 {editOrderId === selectedOrder.id && (
-                  <div className="w-full lg:w-1/2 border-border-default bg-bg-tertiary border-b lg:border-b-0 lg:border-r">
-                    <div className="p-3 sticky top-0 z-10 bg-bg-tertiary border-b-border-default border-default">
-                      <h4 className="font-bold text-sm mb-2 text-text-primary">Available Items</h4>
+                  <div className={`w-full lg:w-2/5 border-b lg:border-b-0 lg:border-r border-border-default bg-bg-tertiary ${activeTab === 'available' ? 'block' : 'hidden lg:block'
+                    }`}>
+                    <div className="p-4 bg-bg-primary border-b border-border-default sticky top-0 z-10">
+                      <h4 className="font-bold text-base mb-3 text-text-primary flex items-center gap-2">
+                        <Search size={18} className="text-action-primary" />
+                        Available Items
+                      </h4>
                       <div className="relative">
-                        <Search size={14} className="absolute left-2 top-[50%] text-text-secondary -translate-y-1/2" />
+                        <Search size={16} className="absolute left-3 top-1/2 -translate-y-1/2 text-text-secondary" />
                         <input
                           type="text"
-                          className="w-full pl-8 pr-2 py-1.5 text-xs rounded-lg transition-all border-default border-border-default bg-bg-primary text-text-primary"
+                          className="w-full pl-10 pr-4 py-2.5 text-sm rounded-xl border border-border-default bg-bg-primary text-text-primary placeholder-text-secondary focus:outline-none focus:ring-2 focus:ring-action-primary focus:border-transparent transition-all"
                           placeholder="Search items..."
                           value={itemSearchQuery}
                           onChange={(e) => setItemSearchQuery(e.target.value)} />
                       </div>
                     </div>
 
-                    <div className="p-3 space-y-1.5 max-h-[calc(100vh-320px)] overflow-y-auto">
+                    <div className="p-3 sm:p-4 space-y-2 max-h-[calc(90vh-320px)] overflow-y-auto custom-scrollbar">
                       {(itemSearchResults.length > 0 ? itemSearchResults : allInventoryItems).map(item => (
                         <div
                           key={item.id}
-                          className="flex items-center gap-2 p-2 bg-bg-primary border-default hover:shadow-border-hovering border-border-default rounded-lg cursor-pointer transition-all active:scale-95"
-                          onClick={() => handleItemSelection(selectedOrder.id, item)}
-                        // onMouseEnter={e => { e.currentTarget.style.borderColor = 'var(--color-action-primary)'; e.currentTarget.style.boxShadow = '0 4px 10px rgba(0,0,0,0.03)'; }}
-                        // onMouseLeave={e => { e.currentTarget.style.borderColor = 'var(--color-border-default)'; e.currentTarget.style.boxShadow = 'none'; }}
-                        >
+                          className="flex items-center gap-3 p-3 bg-bg-primary border border-border-default rounded-xl cursor-pointer transition-all hover:border-action-primary hover:shadow-lg hover:shadow-action-primary/10 active:scale-98"
+                          onClick={() => { handleItemSelection(selectedOrder.id, item); setActiveTab('items'); }}>
                           {item.image && (
-                            <img src={item.image} alt={item.name} className="w-9 h-9 object-cover rounded-lg flex-shrink-0" />
+                            <img src={item.image} alt={item.name} className="w-12 h-12 object-cover rounded-lg flex-shrink-0 border border-border-default" />
                           )}
                           <div className="flex-1 min-w-0">
-                            <div className="font-medium text-xs truncate text-text-primary">{item.name}</div>
-                            <div className="text-xs font-bold text-action-primary">₹{item.unit_price}</div>
+                            <div className="font-semibold text-sm text-text-primary truncate">{item.name}</div>
+                            <div className="text-sm font-bold text-action-primary mt-0.5">₹{item.unit_price}</div>
                           </div>
                           {item.line_item_id && item.line_item_id.length > 0 && (
-                            <span className="text-xs px-1.5 py-0.5 rounded-full font-medium flex-shrink-0 bg-action-primary text-text-white">
+                            <span className="text-xs px-2.5 py-1 rounded-full font-semibold bg-action-primary text-text-white shadow-sm">
                               +{item.line_item_id.length}
                             </span>
                           )}
@@ -2605,18 +2647,28 @@ const OrderSummaryVisible = ({ clientId, token }) => {
                       ))}
 
                       {itemSearchQuery && itemSearchResults.length === 0 && (
-                        <div className="text-center py-6 text-xs text-text-secondary">No items found</div>
+                        <div className="text-center py-12">
+                          <div className="text-text-secondary mb-2 opacity-40">
+                            <Search size={48} className="mx-auto" />
+                          </div>
+                          <p className="text-sm text-text-secondary">No items found</p>
+                        </div>
                       )}
                     </div>
                   </div>
                 )}
 
-                <div className={editOrderId === selectedOrder.id ? 'w-full lg:w-1/2' : 'w-full'}>
-                  <div className="p-3 sticky top-0 z-10 bg-bg-primary border-b-border-default">
-                    <h4 className="font-bold text-sm text-text-primary">Order Items</h4>
+                {/* Order Items Panel */}
+                <div className={`w-full ${editOrderId === selectedOrder.id ? 'lg:w-3/5' : ''} bg-bg-primary ${editOrderId === selectedOrder.id && activeTab === 'items' ? 'block' : editOrderId === selectedOrder.id ? 'hidden lg:block' : 'block'
+                  }`}>
+                  <div className="p-4 border-b border-border-default sticky top-0 z-10 bg-bg-primary">
+                    <h4 className="font-bold text-base text-text-primary flex items-center gap-2">
+                      <ShoppingBag size={18} className="text-action-primary" />
+                      Order Items
+                    </h4>
                   </div>
 
-                  <div className="p-3 space-y-1.5 overflow-y-auto max-h-[calc(100vh - 320px)]">
+                  <div className="p-3 sm:p-4 space-y-2 overflow-y-auto max-h-[calc(90vh-320px)] custom-scrollbar">
                     {selectedOrder.items.map((item, idx) => {
                       const prev = selectedOrder.items[idx - 1];
                       const showDivider = item._isBatchStart || (item.is_new_item && (!prev || (prev.batch_timestamp || null) !== (item.batch_timestamp || null)));
@@ -2624,73 +2676,62 @@ const OrderSummaryVisible = ({ clientId, token }) => {
                       return (
                         <div key={item.id || idx}>
                           {showDivider && (
-                            <div className="flex items-center my-2">
-                              <div className="flex-1 h-px bg-action-primary"></div>
-                              <span
-                                className="px-2 py-0.5 text-action-primary bg-bg-primary border-default border-border-default text-xs font-bold rounded-full mx-2"
-                              >
+                            <div className="flex items-center my-4">
+                              <div className="flex-1 h-px bg-gradient-to-r from-transparent via-action-primary to-transparent"></div>
+                              <span className="px-3 py-1.5 text-action-primary bg-action-primary/10 text-xs font-bold rounded-full mx-3 border border-action-primary/30 shadow-sm">
                                 New Items
                               </span>
-                              <div className="flex-1 h-px bg-action-primary"></div>
+                              <div className="flex-1 h-px bg-gradient-to-r from-transparent via-action-primary to-transparent"></div>
                             </div>
                           )}
 
-                          <div className="flex items-start gap-2 p-2 rounded-lg bg-bg-primary border-default border-border-default">
+                          <div className="flex items-center gap-3 p-3 sm:p-4 rounded-xl bg-bg-tertiary border border-border-default hover:border-border-default/60 transition-all">
                             <div className="flex-1 min-w-0">
-                              <div className="font-semibold text-xs text-text-primary">{item.item_name || item.item_id}</div>
+                              <div className="font-semibold text-sm text-text-primary mb-1.5">{item.item_name || item.item_id}</div>
                               <span
-                                className={`  ${item.status === 'pending'
-                                  ? 'bg-status-pending text-yellow-700'
-                                  : item.status === 'completed'
-                                    ? 'bg-status-served text-action-success'
-                                    : 'bg-bg-tertiary text-text-secondary'
-                                  } inline-block px-1.5 py-0.5 rounded-full text-xs font-medium mt-1`}
-                              // style={{
-                              //   backgroundColor: item.status === 'pending' ? 'var(--color-status-pending)' : item.status === 'completed' ? 'var(--color-status-served)' : 'var(--color-bg-tertiary)',
-                              //   color: item.status === 'pending' ? 'var(--color-action-warning)' : item.status === 'completed' ? 'var(--color-action-success)' : 'var(--color-text-secondary)'
-                              // }}
-                              >
+                                className={`inline-block px-2.5 py-1 rounded-full text-xs font-semibold ${item.status === 'pending'
+                                    ? 'bg-status-pending text-yellow-700'
+                                    : item.status === 'completed'
+                                      ? 'bg-status-served text-action-success'
+                                      : 'bg-bg-secondary text-text-secondary'
+                                  }`}>
                                 {item.status}
                               </span>
                             </div>
 
-                            <div className="flex flex-col items-end gap-1 flex-shrink-0">
+                            <div className="flex items-center gap-2 flex-shrink-0">
                               {editOrderId === selectedOrder.id ? (
                                 <>
-                                  <div className="flex items-center rounded-lg overflow-hidden border-default border-border-default bg-bg-primary">
+                                  <div className="flex items-center rounded-lg overflow-hidden border-2 border-border-default bg-bg-primary shadow-sm">
                                     <button
-                                      className="px-2 py-1 text-xs font-bold transition-colors text-text-primary"
-                                      onClick={() => updateItemQuantity(selectedOrder.id, item.id || item.frontend_unique_key, Math.max(1, (item.quantity || 1) - 1))}
-                                    >
+                                      className="px-3 py-2 text-sm font-bold text-text-primary hover:bg-bg-tertiary transition-colors active:scale-95"
+                                      onClick={() => updateItemQuantity(selectedOrder.id, item.id || item.frontend_unique_key, Math.max(1, (item.quantity || 1) - 1))}>
                                       −
                                     </button>
-                                    <div className="px-2 py-1 font-bold text-xs text-center border-l-border-default border-default border-r-border-default min-w-[28px]">
+                                    <div className="px-4 py-2 font-bold text-sm text-center border-x-2 border-border-default min-w-[45px] bg-bg-tertiary">
                                       {item.quantity}
                                     </div>
                                     <button
-                                      className="px-2 py-1 text-xs font-bold transition-colors text-text-primary"
+                                      className="px-3 py-2 text-sm font-bold text-text-primary hover:bg-bg-tertiary transition-colors active:scale-95"
                                       onClick={() => updateItemQuantity(selectedOrder.id, item.id || item.frontend_unique_key, (item.quantity || 1) + 1)}>
                                       +
                                     </button>
                                   </div>
 
                                   <button
-                                    className="p-1.5 rounded-lg transition-colors bg-bg-primary hover:bg-bg-secondary hover:text-text-white text-action-danger"
+                                    className="p-2.5 rounded-lg transition-all bg-red-50 hover:bg-red-100 text-action-danger border border-red-200 active:scale-95"
                                     onClick={() => { setDeleteTarget({ orderId: selectedOrder.id, itemBackendId: item.id }); setShowDeleteModals(true); }}
-                                    title="Delete item"
-                                  // onMouseEnter={e => e.currentTarget.style.backgroundColor = 'var(--color-bg-hover)'}
-                                  // onMouseLeave={e => e.currentTarget.style.backgroundColor = 'var(--color-bg-primary)'}
-                                  >
-                                    <Trash2 size={12} />
+                                    title="Delete item">
+                                    <Trash2 size={16} />
                                   </button>
                                 </>
                               ) : (
-                                <>
-                                  <span className="text-xs font-medium text-text-secondary">×{item.quantity}</span>
-                                  <span className="text-xs font-bold text-text-primary">
+                                <div className="text-right">
+                                  <span className="block text-xs font-medium text-text-secondary mb-1">×{item.quantity}</span>
+                                  <span className="block text-sm font-bold text-text-primary">
                                     ₹{((inventoryMap[item.item_id]?.unit_price || item.unit_price || item.price || 0) * item.quantity).toFixed(2)}
                                   </span>
-                                </>
+                                </div>
                               )}
                             </div>
                           </div>
@@ -2702,40 +2743,40 @@ const OrderSummaryVisible = ({ clientId, token }) => {
               </div>
             </div>
 
-            <div className="p-3 rounded-xl border-t-border-default border-default bg-bg-primary">
+            {/* Footer Actions */}
+            <div className="p-4 sm:p-5 border-t border-border-default bg-bg-tertiary">
               {editOrderId === selectedOrder.id ? (
-                <div className="flex flex-col sm:flex-row gap-2">
+                <div className="flex flex-col sm:flex-row gap-3">
                   <button
-                    className="flex-1 bg-bg-secondary text-text-white p-2 rounded-lg font-semibold text-xs sm:text-sm transition-colors"
-                    onClick={() => updateOrderItems(selectedOrder.id, selectedOrder.items)}>
+                    className="flex-1 bg-action-primary hover:bg-action-primary/90 text-text-white px-6 py-3 rounded-xl font-semibold text-sm transition-all shadow-lg hover:shadow-xl active:scale-98"
+                    onClick={() => { updateOrderItems(selectedOrder.id, selectedOrder.items); setActiveTab('items'); }}>
                     Save Changes
                   </button>
                   <button
-                    className="flex-1 rounded-lg bg-bg-tertiary text-text-primary p-2 border-default border-border-default font-semibold text-xs sm:text-sm transition-colors"
-                    onClick={() => { setEditOrderId(null); setCurrentBatchTimestamp(null); setItemSearchQuery(''); }}
-                  >
+                    className="flex-1 rounded-xl bg-bg-primary text-text-primary px-6 py-3 border-2 border-border-default hover:border-action-primary/30 font-semibold text-sm transition-all active:scale-98"
+                    onClick={() => { setEditOrderId(null); setCurrentBatchTimestamp(null); setItemSearchQuery(''); setActiveTab('items'); }}>
                     Cancel
                   </button>
                 </div>
               ) : (
-                <div className="space-y-2">
+                <div className="space-y-3">
                   <button
-                    className="w-full rounded-lg bg-action-primary text-text-white p-2 font-semibold text-xs sm:text-sm transition-colors flex items-center justify-center gap-2"
-                    onClick={() => { setEditOrderId(selectedOrder.id); }}>
-                    <Edit2 size={14} />
+                    className="w-full rounded-xl bg-action-primary hover:bg-action-primary/90 text-text-white px-6 py-3 font-semibold text-sm transition-all shadow-lg hover:shadow-xl flex items-center justify-center gap-2 active:scale-98"
+                    onClick={() => { setEditOrderId(selectedOrder.id); setActiveTab('items'); }}>
+                    <Edit2 size={16} />
                     Edit Order
                   </button>
 
-                  <div className="flex gap-2">
+                  <div className="flex gap-3">
                     <button
-                      className="flex-1 rounded-lg bg-action-success text-text-white p-2 font-semibold text-xs sm:text-sm transition-colors"
-                      onClick={() => { handleStatusChange(selectedOrder.id, 'served'); setShowOrderDetailModal(false); setEditOrderId(null); }}>
+                      className="flex-1 rounded-xl bg-action-success hover:bg-action-success/90 text-text-white px-6 py-3 font-semibold text-sm transition-all shadow-lg hover:shadow-xl active:scale-98"
+                      onClick={() => { handleStatusChange(selectedOrder.id, 'served'); setShowOrderDetailModal(false); setEditOrderId(null); setActiveTab('items'); }}>
                       Mark as Served
                     </button>
 
                     <button
-                      className="flex-1 bg-action-danger text-text-white p-2 rounded-lg font-semibold text-xs sm:text-sm transition-colors"
-                      onClick={() => { setOrderToDelete(selectedOrder.id); setShowDeleteModal(true); setShowOrderDetailModal(false); }}>
+                      className="flex-1 bg-action-danger hover:bg-action-danger/90 text-text-white px-6 py-3 rounded-xl font-semibold text-sm transition-all shadow-lg hover:shadow-xl active:scale-98"
+                      onClick={() => { setOrderToDelete(selectedOrder.id); setShowDeleteModal(true); setShowOrderDetailModal(false); setActiveTab('items'); }}>
                       Delete Order
                     </button>
                   </div>
@@ -2746,6 +2787,25 @@ const OrderSummaryVisible = ({ clientId, token }) => {
         </div>
       )}
 
+      <style>{`
+  .custom-scrollbar::-webkit-scrollbar {
+    width: 8px;
+  }
+  
+  .custom-scrollbar::-webkit-scrollbar-track {
+    background: var(--color-bg-tertiary);
+    border-radius: 10px;
+  }
+  
+  .custom-scrollbar::-webkit-scrollbar-thumb {
+    background: var(--color-border-default);
+    border-radius: 10px;
+  }
+  
+  .custom-scrollbar::-webkit-scrollbar-thumb:hover {
+    background: var(--color-action-primary);
+  }
+`}</style>
 
       <LineItemsModal
         isOpen={lineItemsModalOpen}
