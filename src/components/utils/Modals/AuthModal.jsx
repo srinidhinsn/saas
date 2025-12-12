@@ -10,28 +10,33 @@ export default function AuthModal({ open, onClose, onSuccess, clientId, requeste
 
   const handleSubmit = async (e) => {
     e.preventDefault();
-  
+
     const payload = {
-      admin_username: username || "",
-      admin_password: password || "",
-      requester_id: requesterId || ""
+      admin_username: username,
+      admin_password: password,
+      requester_id: requesterId,
     };
-    console.log("Sending payload to API:", JSON.stringify(payload, null, 2));
-  
+
+    console.log("Sending payload to API:", payload);
+
     try {
+      // FIXED: capture response object
       const res = await axios.post(
         `${import.meta.env.VITE_API_USER_SERVICE_URL}/${clientId}/users/delegate-access`,
         payload,
+        { params: { client_id: clientId } }
       );
-  
+
       const token = res.data.delegated_token;
       localStorage.setItem("delegate_token", token);
+
       onSuccess(token);
       onClose();
     } catch (err) {
       const detail = err.response?.data?.detail;
+
       if (Array.isArray(detail)) {
-        setError(detail.map(d => d.msg).join(", "));
+        setError(detail.map((d) => d.msg).join(", "));
       } else if (typeof detail === "string") {
         setError(detail);
       } else {
@@ -39,7 +44,6 @@ export default function AuthModal({ open, onClose, onSuccess, clientId, requeste
       }
     }
   };
-  
 
   return (
     <div className="modal-overlay">

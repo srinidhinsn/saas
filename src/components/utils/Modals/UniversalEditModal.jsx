@@ -8,7 +8,7 @@ const UniversalEditModal = ({
   showModal,
   setShowModal,
   modalType, // 'menu' or 'table'
-  
+
   // Menu-specific props
   editingItem,
   setEditingItem,
@@ -21,7 +21,7 @@ const UniversalEditModal = ({
   handleEditItem,
   clientId,
   token,
-  
+
   // Table-specific props
   editRowId,
   setEditRowId,
@@ -93,12 +93,12 @@ const UniversalEditModal = ({
     return (
       <div className="fixed inset-0 z-50 flex items-center justify-center p-4 bg-black bg-opacity-50">
         <div className="rounded-lg max-w-2xl w-full bg-white max-h-[90vh] overflow-hidden flex flex-col shadow-xl">
-          
+
           {/* Header */}
           <div className="px-6 py-4 border-b border-gray-200 flex justify-between items-center">
             <h2 className="text-xl font-semibold text-gray-900">Edit Menu Item</h2>
-            <button 
-              onClick={handleClose} 
+            <button
+              onClick={handleClose}
               className="w-8 h-8 rounded hover:bg-gray-100 flex items-center justify-center"
             >
               <X className="w-5 h-5 text-gray-500" />
@@ -244,9 +244,8 @@ const UniversalEditModal = ({
                 ) : null}
 
                 <div
-                  className={`relative border-2 border-dashed rounded-md p-6 transition-colors ${
-                    dragActive ? 'border-blue-500 bg-blue-50' : 'border-gray-300 bg-gray-50'
-                  }`}
+                  className={`relative border-2 border-dashed rounded-md p-6 transition-colors ${dragActive ? 'border-blue-500 bg-blue-50' : 'border-gray-300 bg-gray-50'
+                    }`}
                   onDragEnter={handleEditDrag}
                   onDragLeave={handleEditDrag}
                   onDragOver={handleEditDrag}
@@ -315,12 +314,12 @@ const UniversalEditModal = ({
     return (
       <div className="fixed inset-0 bg-black bg-opacity-50 z-50 flex items-center justify-center p-4">
         <div className="bg-white rounded-lg w-full max-w-md shadow-xl">
-          
+
           {/* Header */}
           <div className="px-6 py-4 border-b border-gray-200 flex justify-between items-center">
             <h2 className="text-xl font-semibold text-gray-900">Edit Table</h2>
-            <button 
-              className="w-8 h-8 rounded hover:bg-gray-100 flex items-center justify-center" 
+            <button
+              className="w-8 h-8 rounded hover:bg-gray-100 flex items-center justify-center"
               onClick={handleClose}
             >
               <X className="w-5 h-5 text-gray-500" />
@@ -337,8 +336,11 @@ const UniversalEditModal = ({
 
             <div className="space-y-4">
               {/* No of Seating */}
+              {/* No of Seating */}
               <div>
                 <label className="block text-sm font-medium mb-1 text-gray-700">No of Seating</label>
+
+                {/* Desktop: Regular input */}
                 <input
                   type="number"
                   min="1"
@@ -347,10 +349,45 @@ const UniversalEditModal = ({
                     const value = Math.max(1, Number(e.target.value) || 1);
                     handleEditChange(table.id, "table_type", value);
                   }}
-                  className={`w-full px-3 py-2 rounded-md border focus:outline-none focus:ring-2 focus:ring-blue-500 focus:border-transparent ${
-                    editFieldErrors?.table_type ? 'border-red-500 bg-red-50' : 'border-gray-300'
-                  }`}
+                  className={`hidden md:block w-full px-3 py-2 rounded-md border focus:outline-none focus:ring-2 focus:ring-blue-500 focus:border-transparent ${editFieldErrors?.table_type ? 'border-red-500 bg-red-50' : 'border-gray-300'
+                    }`}
                 />
+
+                {/* Mobile: Input with +/- buttons */}
+                <div className={`md:hidden flex items-center gap-2 border rounded-md ${editFieldErrors?.table_type ? 'border-red-500 bg-red-50' : 'border-gray-300'
+                  }`}>
+                  <button
+                    type="button"
+                    onClick={() => {
+                      const newValue = Math.max(1, (Number(table.table_type) || 1) - 1);
+                      handleEditChange(table.id, "table_type", newValue);
+                    }}
+                    className="px-4 py-2 text-lg font-bold text-gray-700 hover:bg-gray-100 transition-colors"
+                  >
+                    −
+                  </button>
+                  <input
+                    type="number"
+                    min="1"
+                    value={table.table_type}
+                    onChange={(e) => {
+                      const value = Math.max(1, Number(e.target.value) || 1);
+                      handleEditChange(table.id, "table_type", value);
+                    }}
+                    className="flex-1 text-center py-2 border-x border-gray-300 focus:outline-none bg-transparent font-bold"
+                  />
+                  <button
+                    type="button"
+                    onClick={() => {
+                      const newValue = (Number(table.table_type) || 1) + 1;
+                      handleEditChange(table.id, "table_type", newValue);
+                    }}
+                    className="px-4 py-2 text-lg font-bold text-gray-700 hover:bg-gray-100 transition-colors"
+                  >
+                    +
+                  </button>
+                </div>
+
                 {editFieldErrors?.table_type && (
                   <p className="text-red-600 text-xs mt-1">{editFieldErrors.table_type}</p>
                 )}
@@ -362,9 +399,8 @@ const UniversalEditModal = ({
                 <select
                   value={table.location_zone}
                   onChange={(e) => handleEditChange(table.id, "location_zone", e.target.value)}
-                  className={`w-full px-3 py-2 rounded-md border focus:outline-none focus:ring-2 focus:ring-blue-500 focus:border-transparent ${
-                    editFieldErrors?.location_zone ? 'border-red-500 bg-red-50' : 'border-gray-300'
-                  }`}
+                  className={`w-full px-3 py-2 rounded-md border focus:outline-none focus:ring-2 focus:ring-blue-500 focus:border-transparent ${editFieldErrors?.location_zone ? 'border-red-500 bg-red-50' : 'border-gray-300'
+                    }`}
                 >
                   <option value="AC">AC</option>
                   <option value="Non-AC">Non-AC</option>
@@ -380,9 +416,8 @@ const UniversalEditModal = ({
                 <select
                   value={table.status || ""}
                   onChange={(e) => handleEditChange(table.id, "status", e.target.value)}
-                  className={`w-full px-3 py-2 rounded-md border focus:outline-none focus:ring-2 focus:ring-blue-500 focus:border-transparent ${
-                    editFieldErrors?.status ? 'border-red-500 bg-red-50' : 'border-gray-300'
-                  }`}
+                  className={`w-full px-3 py-2 rounded-md border focus:outline-none focus:ring-2 focus:ring-blue-500 focus:border-transparent ${editFieldErrors?.status ? 'border-red-500 bg-red-50' : 'border-gray-300'
+                    }`}
                 >
                   <option value="Vacant">Vacant</option>
                   <option value="Reserved">Reserved</option>

@@ -858,7 +858,7 @@ const KitchenDisplay = () => {
                                                                 className="px-3 py-2 rounded-lg bg-action-primary text-text-white font-semibold hover:bg-orange-600"
                                                                 onClick={() => handleStatusChange(order.id, "pending")}
                                                             >
-                                                                New
+                                                                Pending
                                                             </button>
                                                         )}
                                                         {order.status === "pending" && (
@@ -884,7 +884,7 @@ const KitchenDisplay = () => {
                                                                     window.dispatchEvent(collectEvent);
                                                                 }}
                                                             >
-                                                                Order Ready!!!
+                                                               Ready To Serve !!!
                                                             </button>
                                                         )}
                                                     </div>

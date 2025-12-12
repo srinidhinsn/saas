@@ -9,8 +9,9 @@ import DashBoardPage from '../Constants/DashBoards/DashBoard';
 import MenuManagement from '../MainComponents/InventoryServices/MenuManagement';
 import BillingPage from '../MainComponents/BillingServices/Billing';
 import UserManagement from '../MainComponents/UserServices/UserManagement/UserManagement';
-import InventoryManager from '../MainComponents/InventoryServices/InventoryManagement';
-import { getValidToken } from '../utils/Interceptors/Api';
+import UserProfile from '../MainComponents/UserServices/ProfileManagement/UserProfile';
+import {getValidToken} from '../utils/Interceptors/Api'
+import InventoryManager from '../MainComponents/InventoryServices/InventoryManagement'
 
 const RoutesManager = () => {
   const { clientId } = useParams();
@@ -92,6 +93,7 @@ const RoutesManager = () => {
         element={<InventoryManager clientId={clientId} token={token} realm={realm} screenIds={screenIds} />}
       />
       <Route path="*" element={<Navigate to="home" replace />} />
+      <Route path='user-profile'  element={<UserProfile token={token} clientId={clientId}/>} />
     </Routes>
   );
 };

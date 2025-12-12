@@ -540,7 +540,7 @@ import {
 } from 'recharts';
 
 import { useNavigate, useParams } from 'react-router-dom';
-import axios from 'axios';import resolveConfig from "tailwindcss/resolveConfig";
+import axios from 'axios'; import resolveConfig from "tailwindcss/resolveConfig";
 import tailwindConfig from "../../../../tailwind.config";
 
 const fullConfig = resolveConfig(tailwindConfig);
@@ -664,17 +664,32 @@ const DashBoardPage = () => {
       if (!token || !clientId) return;
 
       try {
-        const res = await axios.get(`${import.meta.env.VITE_API_ORDER_SERVICE_URL}/${clientId}/dinein/table`, {
+        // Fetch orders for order counts
+        const ordersRes = await axios.get(`${import.meta.env.VITE_API_ORDER_SERVICE_URL}/${clientId}/dinein/table`, {
           headers: { Authorization: `Bearer ${token}` }
         });
 
-        const allOrders = res.data?.data || [];
+        // Fetch invoices for earnings
+        const billingRes = await axios.get(`${import.meta.env.VITE_API_BILLING_SERVICE_URL}/${clientId}/invoice/read_document`, {
+          headers: { Authorization: `Bearer ${token}` },
+          params: { client_id: clientId }
+        });
+
+        const allOrders = ordersRes.data?.data || [];
+        const allInvoices = billingRes.data?.data || [];
+
         const startDate = getStartDate(timeFilter);
         const filteredOrders = allOrders.filter(o => new Date(o.created_at) >= startDate);
+        const filteredInvoices = allInvoices.filter(inv => new Date(inv.document_date || inv.created_at) >= startDate);
+
+        // Calculate total earnings from invoices (only Paid/Issued invoices)
+        const earnings = filteredInvoices
+          .filter(inv => inv.payment_status?.toLowerCase() === "paid" || inv.status?.toLowerCase() === "issued")
+          .reduce((sum, inv) => sum + (parseFloat(inv.total_amount) || 0), 0);
 
         setTotalOrders(filteredOrders.length);
         setPendingOrders(filteredOrders.filter(o => o.status === "pending" || o.status === "preparing").length);
-        setTotalEarnings(Math.round(filteredOrders.reduce((sum, o) => sum + (parseFloat(o.total_price) || 0), 0)));
+        setTotalEarnings(Math.round(earnings)); // Now from billing service
         setTotalCustomers(filteredOrders.length);
         setNewOrders(filteredOrders.filter(o => o.status === "new").length);
         setPreparingOrders(filteredOrders.filter(o => o.status === "preparing").length);
@@ -862,7 +877,7 @@ const DashBoardPage = () => {
                   <XAxis dataKey="date" tick={{ fontSize: 12 }} tickLine={false} padding={{ left: 10, right: 10 }} />
                   <YAxis tick={{ fontSize: 12 }} tickLine={false} domain={["auto", "auto"]} allowDecimals={false} />
                   <Tooltip formatter={(value) => `₹${value}`} />
-                  <Bar dataKey="sales" fill={ACTION_PRIMARY} radius={[8,8,0,0]} />
+                  <Bar dataKey="sales" fill={ACTION_PRIMARY} radius={[8, 8, 0, 0]} />
                 </BarChart>
               </ResponsiveContainer>
             </div>
