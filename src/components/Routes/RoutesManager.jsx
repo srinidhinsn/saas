@@ -4,6 +4,7 @@ import {jwtDecode} from 'jwt-decode';
 import axios from 'axios';
 import TakeOrder from '../MainComponents/OrderServices/TakeOrder';
 import OrderSummary from '../MainComponents/OrderServices/OrderSummary';
+import Kds from '../MainComponents/OrderServices/Kds';
 import TableManagement from '../MainComponents/TableServices/TableManagement';
 import DashBoardPage from '../Constants/DashBoards/DashBoard';
 import MenuManagement from '../MainComponents/InventoryServices/MenuManagement';
@@ -76,6 +77,10 @@ const RoutesManager = () => {
         path="order"
         element={<TakeOrder clientId={clientId} token={token} realm={realm} screenIds={screenIds} />}
       />
+      <Route path="summary" element={<OrderSummary token={token} clientId={clientId} />} />
+
+      <Route path="kds" element={<Kds/>}/>
+
       <Route
         path="menu"
         element={<MenuManagement clientId={clientId} token={token} realm={realm} screenIds={screenIds} />}
