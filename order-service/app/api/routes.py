@@ -142,7 +142,10 @@ def update_order_status(
     if not order:
         raise HTTPException(status_code=404, detail=f"Order {body.order_id} not found")
 
-    order.status = body.status
+    if body.status is not None:
+        order.status = body.status
+    if body.invoice_status is not None:
+        order.invoice_status = body.invoice_status
     db.commit()
     db.refresh(order)
 
