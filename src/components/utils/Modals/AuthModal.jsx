@@ -24,7 +24,6 @@ export default function AuthModal({ open, onClose, onSuccess, clientId, requeste
       const res = await axios.post(
         `${import.meta.env.VITE_API_USER_SERVICE_URL}/${clientId}/users/delegate-access`,
         payload,
-        { params: { client_id: clientId } }
       );
 
       const token = res.data.delegated_token;

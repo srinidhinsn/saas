@@ -7,7 +7,7 @@ export default function StockRecipeManager(props) {
   const params = useParams();
   const clientId = props.clientId || params.clientId || params.client_id;
   const token = props.token || localStorage.getItem("access_token");
-  const realm=props.realm;
+  const realm = props.realm;
 
   const API_BASE_MENU = `${import.meta.env.VITE_API_INVENTORY_SERVICE_URL}/${clientId}/menu`;
   const API_BASE_INVENTORY = `${import.meta.env.VITE_API_INVENTORY_SERVICE_URL}/${clientId}/inventory`;
@@ -37,11 +37,9 @@ export default function StockRecipeManager(props) {
   // Filters & search
   const [query, setQuery] = useState("");
   const [categoryFilter, setCategoryFilter] = useState("All");
-  const [supplierFilter, setSupplierFilter] = useState("All"); // supplier optional
   const [showLowStockOnly, setShowLowStockOnly] = useState(false);
 
   // Suppliers & categories (fetched if available)
-  const [suppliers, setSuppliers] = useState([]);
   const [categories, setCategories] = useState([]);
 
   // Bulk import preview
@@ -71,16 +69,16 @@ export default function StockRecipeManager(props) {
       setLoading(true);
       const res = await axios.get(`${API_BASE_MENU}/read?client_id=${clientId}`, getAuthHeaders());
       const items = res.data?.data || [];
-  
+
       // Filter only items with realm = 'inventory'
       const inventoryItems = items.filter((s) => s.realm === "inventory");
-  
+
       setStocks(inventoryItems);
-  
+
       // derive categories from filtered items
       const cats = Array.from(new Set(inventoryItems.map((s) => (s.category || "").toString()).filter(Boolean)));
       setCategories(cats);
-  
+
     } catch (err) {
       console.error("fetchStocks:", err);
       showError("Failed to fetch stocks");
@@ -181,30 +179,49 @@ export default function StockRecipeManager(props) {
     }
   };
 
-  // ---- Filters / derived data ----
-  const enrichedStocks = useMemo(() => {
-    return stocks.map((s) => {
-      const availability = Number(s.availability || 0);
-      const lowThreshold = Number(s.low_threshold || 0);
+  const realTimeStocks = useMemo(() => {
+    return stocks.map((stock) => {
+      let consumption = 0;
+
+
+      recipe.forEach((r) => {
+        if (Number(r.stock_item_id) === Number(stock.id)) {
+          consumption += Number(r.quantity_required || 0);
+        }
+      });
+
+
+      const physical = Number(stock.availability || 0);
+      const effective = physical - consumption;
+      const threshold = Number(5 || 0);
+
+
+      let status = "HEALTHY";
+      if (effective <= 0) status = "OUT";
+      else if (effective <= threshold) status = "LOW";
+
+
       return {
-        ...s,
-        isLow: lowThreshold > 0 ? availability <= lowThreshold : false,
-        total_cost: (Number(s.unit_price || 0) * availability) || 0,
+        ...stock,
+        effective_availability: effective,
+        isLow: status !== "HEALTHY",
+        stock_status: status,
+        total_cost: effective * Number(stock.unit_price || 0),
       };
     });
-  }, [stocks]);
+  }, [stocks, recipe]);
+
 
   const filteredStocks = useMemo(() => {
-    let list = enrichedStocks.slice();
+    let list = realTimeStocks;
     if (query) {
       const q = query.toLowerCase();
-      list = list.filter((s) => `${s.name} ${s.description || ""} ${s.category || ""}`.toLowerCase().includes(q));
+      list = list.filter((s) => `${s.name} ${s.category}`.toLowerCase().includes(q));
     }
-    if (categoryFilter !== "All") list = list.filter((s) => (s.category || "") === categoryFilter);
-    if (supplierFilter !== "All") list = list.filter((s) => String(s.supplier_id || "") === String(supplierFilter));
+    if (categoryFilter !== "All") list = list.filter((s) => s.category === categoryFilter);
     if (showLowStockOnly) list = list.filter((s) => s.isLow);
     return list;
-  }, [enrichedStocks, query, categoryFilter, supplierFilter, showLowStockOnly]);
+  }, [realTimeStocks, query, categoryFilter, showLowStockOnly]);
 
   const pageCount = Math.max(1, Math.ceil(filteredStocks.length / PAGE_SIZE));
   const pageItems = filteredStocks.slice((page - 1) * PAGE_SIZE, page * PAGE_SIZE);
@@ -274,7 +291,7 @@ export default function StockRecipeManager(props) {
 
   const applyStockBulkImport = async () => {
     if (!bulkPreview.length) return showError("No rows to import");
-  
+
     try {
       // STEP 1 → Delete old records first
       await axios.delete(
@@ -288,7 +305,7 @@ export default function StockRecipeManager(props) {
           ...getAuthHeaders()
         }
       );
-  
+
       // STEP 2 → Import rows one-by-one
       for (const row of bulkPreview) {
         const payload = {
@@ -302,25 +319,25 @@ export default function StockRecipeManager(props) {
           realm: "inventory",
           recipe: row.recipe ? JSON.parse(row.recipe) : null
         };
-  
+
         await axios.post(`${API_BASE_MENU}/stock/create?client_id=${clientId}`, payload, getAuthHeaders());
       }
-  
+
       // UI cleanup
       setBulkPreview([]);
       setBulkName("");
       await fetchStocks();
-  
+
     } catch (err) {
       console.error("applyStockBulkImport:", err);
       showError("Bulk import failed");
     }
   };
-  
+
 
   const handleExportStockCSV = () => {
     if (!stocks.length) return showError("No stock data to export");
-    const headers = ["id", "name", "description", "category","realm", "availability", "unit", "unit_price"];
+    const headers = ["id", "name", "description", "category", "realm", "availability", "unit", "unit_price"];
     const lines = [headers.join(",")];
     stocks.forEach((s) => {
       const row = headers.map((h) => escapeForCSV(s[h] ?? ""));
@@ -446,8 +463,10 @@ export default function StockRecipeManager(props) {
           </div>
 
           <div className="flex items-center gap-3">
-            <label className="text-sm text-gray-600">Low stock</label>
-            <input type="checkbox" className="h-4 w-4" checked={showLowStockOnly} onChange={(e) => setShowLowStockOnly(e.target.checked)} />
+            <label className="flex items-center gap-2 text-sm">
+              <input type="checkbox" checked={showLowStockOnly} onChange={(e) => setShowLowStockOnly(e.target.checked)} />
+              Low stock only
+            </label>
             <div className="flex items-center gap-2">
               <label className="sr-only">Import Stocks CSV</label>
               <input
@@ -677,13 +696,6 @@ export default function StockRecipeManager(props) {
               <div className="text-sm text-gray-500">Total stock items</div>
               <div className="text-xl font-semibold text-gray-900">{stocks.length}</div>
               <div className="text-xs text-gray-400 mt-2">Last updated: {new Date().toLocaleString()}</div>
-            </div>
-
-            <div className="bg-white rounded-xl p-4 shadow-sm border border-gray-100">
-              <h3 className="text-sm text-gray-700 font-medium mb-2">Suppliers</h3>
-              <div className="max-h-40 overflow-auto space-y-2 text-sm">
-                {suppliers.length ? suppliers.map((s) => <div key={s.id} className="truncate">{s.name}</div>) : <div className="text-sm text-gray-400">No suppliers</div>}
-              </div>
             </div>
           </aside>
         </div>
