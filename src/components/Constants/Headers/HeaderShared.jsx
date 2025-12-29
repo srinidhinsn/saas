@@ -190,7 +190,6 @@ export const navMap = {
   kds: (clientId) => `/${APP_ROOT}/${clientId}/kds`,
   details: (clientId) => `/${APP_ROOT}/${clientId}/details`,
   documents: (clientId) => `/${APP_ROOT}/${clientId}/documents`,
-  documents: (clientId) => `/${APP_ROOT}/${clientId}/documents`,
   profile: (clientId) => `/${APP_ROOT}/${clientId}/user-profile`,
 };
 
