@@ -6,64 +6,49 @@ import "react-toastify/dist/ReactToastify.css";
 import { Search, Plus, Edit, Trash2, X, ChevronLeft, ChevronRight } from 'lucide-react';
 import axios from 'axios';
 
-// Main Component
-const UserManagement = ({token,clientId}) => {
+const UserManagement = ({ token, clientId }) => {
   const [activeView, setActiveView] = useState('list');
+  const [selectedUser, setSelectedUser] = useState(null);
 
   return (
     <div className="min-h-screen bg-bg-primary">
       <ToastContainer position="top-right" autoClose={3000} />
-      
-      {/* Navigation Header */}
-      {/* <div className="bg-bg-primary shadow-card sticky top-0 z-40">
-        <div className="max-w-7xl mx-auto px-6">
-          <div className="flex  space-x-1 py-3">
-            <button 
-              className={`px-8 py-2.5 font-medium transition-all ${
-                activeView === 'list' 
-                  ? 'bg-action-primary text-text-white rounded-lg' 
-                  : 'text-text-primary hover:text-text-secondary'
-              }`}
-              onClick={() => setActiveView('list')}
-            >
-              View Users
-            </button>
-            <button 
-              className={`px-8 py-2.5 font-medium transition-all ${
-                activeView === 'add' 
-                  ? 'bg-action-primary text-text-white rounded-lg' 
-                  : 'text-text-primary hover:text-text-secondary'
-              }`}
-              onClick={() => setActiveView('add')}
-            >
-              Add User
-            </button>
-            <button 
-              className={`px-8 py-2.5 font-medium transition-all ${
-                activeView === 'reset' 
-                  ? 'bg-action-primary text-text-white rounded-lg' 
-                  : 'text-text-primary hover:text-text-secondary'
-              }`}
-              onClick={() => setActiveView('reset')}
-            >
-              Reset Password
-            </button>
-          </div>
-        </div>
-      </div> */}
-
       {/* Content */}
       <div className="max-w-7xl mx-auto p-4">
-        {activeView === 'list' && <UsersList clientId={clientId} token={token} onAddNew={() => setActiveView('add')} />}
-        {activeView === 'add' && <AddUserForm  clientId={clientId} token={token}  onCancel={() => setActiveView('list')} onSave={() => setActiveView('list')} />}
-        {/* {activeView === 'reset' && <ResetPassword  clientId={clientId} token={token} />} */}
+        {activeView === 'list' && (
+          <UsersList
+            clientId={clientId}
+            token={token}
+            onAddNew={() => setActiveView('add')}
+            onEdit={(user) => {
+              setSelectedUser(user);
+              setActiveView('add');
+            }}
+          />
+        )}
+        {activeView === 'add' && (
+          <AddUserForm
+            isEdit={!!selectedUser}
+            editUser={selectedUser}
+            clientId={clientId}
+            token={token}
+            onCancel={() => {
+              setSelectedUser(null);
+              setActiveView('list');
+            }}
+            onSave={() => {
+              setSelectedUser(null);
+              setActiveView('list');
+            }}
+          />
+        )}
       </div>
     </div>
   );
 };
 
 // Users List Component
-const UsersList = ({ onAddNew ,clientId,token}) => {
+const UsersList = ({ onAddNew, clientId, token, onEdit }) => {
 
   const [users, setUsers] = useState([]);
   const [filterRole, setFilterRole] = useState("all");
@@ -122,20 +107,20 @@ const UsersList = ({ onAddNew ,clientId,token}) => {
 
   const filteredUsers = useMemo(() => {
     let filtered = users;
-    
+
     if (filterRole === "admin") {
       filtered = filtered.filter((u) => u.role === "admin");
     }
-    
+
     if (searchQuery.trim()) {
       const query = searchQuery.toLowerCase();
-      filtered = filtered.filter((u) => 
+      filtered = filtered.filter((u) =>
         u.username?.toLowerCase().includes(query) ||
         u.name?.toLowerCase().includes(query) ||
         u.email?.toLowerCase().includes(query)
       );
     }
-    
+
     return filtered;
   }, [users, filterRole, searchQuery]);
 
@@ -178,8 +163,8 @@ const UsersList = ({ onAddNew ,clientId,token}) => {
   };
 
   const toggleSelection = (userId) => {
-    setSelectionModel(prev => 
-      prev.includes(userId) 
+    setSelectionModel(prev =>
+      prev.includes(userId)
         ? prev.filter(id => id !== userId)
         : [...prev, userId]
     );
@@ -225,39 +210,6 @@ const UsersList = ({ onAddNew ,clientId,token}) => {
             className="w-full pl-12 pr-4 py-2.5 rounded-lg border border-border-default transition-colors text-text-primary placeholder-text-secondary"
           />
         </div>
-
-        {/* Filter Buttons */}
-        {/* <div className="flex items-center gap-2 mb-4">
-          <button
-            onClick={() => {
-              setFilterRole("all");
-              setSelectionModel([]);
-              setCurrentPage(1);
-            }}
-            className={`px-4 py-2 rounded-lg font-medium transition-colors ${
-              filterRole === "all"
-                ? "bg-action-danger text-text-white"
-                : "bg-bg-tertiary text-text-primary hover:bg-gray-200"
-            }`}
-          >
-            All Users ({users.length})
-          </button>
-          <button
-            onClick={() => {
-              setFilterRole("admin");
-              setSelectionModel([]);
-              setCurrentPage(1);
-            }}
-            className={`px-4 py-2 rounded-lg font-medium transition-colors ${
-              filterRole === "admin"
-                ? "bg-action-danger text-text-white"
-                : "bg-bg-tertiary text-text-primary hover:bg-gray-200"
-            }`}
-          >
-            Admins ({users.filter((u) => u.role === "Admin").length})
-          </button>
-        </div> */}
-
         {/* Table */}
         <div className="overflow-x-auto rounded-lg border-default border-border-default">
           <table className="w-full">
@@ -275,12 +227,16 @@ const UsersList = ({ onAddNew ,clientId,token}) => {
                 <th className="px-4 py-3 text-left text-xs font-semibold text-text-secondary uppercase tracking-wider">Email</th>
                 <th className="px-4 py-3 text-left text-xs font-semibold text-text-secondary uppercase tracking-wider">Phone</th>
                 <th className="px-4 py-3 text-left text-xs font-semibold text-text-secondary uppercase tracking-wider">Role</th>
+                <th className="px-4 py-3 text-xs font-semibold text-text-secondary uppercase">
+                  Actions
+                </th>
+
               </tr>
             </thead>
             <tbody className="divide-y divide-text-secondary bg-bg-primary">
               {paginatedUsers.map((user) => (
-                <tr 
-                  key={user.id} 
+                <tr
+                  key={user.id}
                   className="hover:bg-gray-50 transition-colors cursor-pointer"
                 >
                   <td className="px-4 py-3">
@@ -315,7 +271,19 @@ const UsersList = ({ onAddNew ,clientId,token}) => {
                       {user.role}
                     </span>
                   </td>
+
+                  <td className="px-4 py-3">
+                    <button
+                      onClick={() => onEdit(user)}
+                      className="text-action-primary hover:text-action-danger"
+                      title="Edit user"
+                    >
+                      <Edit size={16} />
+                    </button>
+                  </td>
+
                 </tr>
+
               ))}
             </tbody>
           </table>
@@ -340,11 +308,10 @@ const UsersList = ({ onAddNew ,clientId,token}) => {
                   <button
                     key={i + 1}
                     onClick={() => setCurrentPage(i + 1)}
-                    className={`px-3 py-1.5 rounded-lg font-medium transition-colors ${
-                      currentPage === i + 1
+                    className={`px-3 py-1.5 rounded-lg font-medium transition-colors ${currentPage === i + 1
                         ? "bg-action-primary text-text-white"
                         : "bg-bg-tertiary text-text-secondary hover:bg-text-secondary"
-                    }`}
+                      }`}
                   >
                     {i + 1}
                   </button>
@@ -370,80 +337,12 @@ const UsersList = ({ onAddNew ,clientId,token}) => {
           </div>
         )}
       </div>
-
-      {/* Role Change Section */}
-      {/* {selectionModel.length > 0 && (
-        <div className="bg-white rounded-lg shadow-sm p-4">
-          <div className="flex flex-col sm:flex-row gap-3 items-end">
-            <div className="flex-1 w-full">
-              <label className="block text-sm font-medium text-gray-700 mb-2">
-                Change Role for {selectionModel.length} selected user{selectionModel.length > 1 ? 's' : ''}
-              </label>
-              <select
-                value={changeRoleValue}
-                onChange={(e) => setChangeRoleValue(e.target.value)}
-                className="w-full px-4 py-2.5 rounded-lg border border-gray-200 bg-white text-gray-700 focus:border-purple-500 focus:outline-none transition-colors"
-              >
-                <option value="">Select New Role</option>
-                {roles.map((r) => (
-                  <option key={r.id} value={r.name}>
-                    {r.name}
-                  </option>
-                ))}
-              </select>
-            </div>
-            <button
-              onClick={() => {
-                if (!changeRoleValue) {
-                  toast.error("Please select a role");
-                  return;
-                }
-                setIsChangeRoleConfirmOpen(true);
-              }}
-              className="w-full sm:w-auto px-6 py-2.5 rounded-lg bg-purple-600 text-white font-medium hover:bg-purple-700 transition-colors"
-            >
-              Update Roles
-            </button>
-          </div>
-        </div>
-      )} */}
-
-      {/* Confirmation Modal */}
-      {/* {isChangeRoleConfirmOpen && (
-        <div className="fixed inset-0 z-50 flex items-center justify-center p-4 bg-black bg-opacity-50">
-          <div className="bg-white rounded-lg max-w-md w-full p-6 shadow-xl">
-            <div className="w-12 h-12 mx-auto mb-4 rounded-full bg-purple-100 flex items-center justify-center">
-              <FaUserShield className="text-2xl text-purple-600" />
-            </div>
-            <h3 className="text-xl font-semibold text-gray-800 mb-3 text-center">Confirm Role Change</h3>
-            <p className="text-gray-600 mb-6 text-center text-sm">
-              You are about to change the role of <strong className="text-purple-600">{selectionModel.length}</strong> user
-              {selectionModel.length > 1 ? "s" : ""} to <strong className="text-purple-600">{changeRoleValue}</strong>.
-              This action will update their permissions immediately.
-            </p>
-            <div className="flex gap-3">
-              <button
-                onClick={() => setIsChangeRoleConfirmOpen(false)}
-                className="flex-1 px-4 py-2.5 rounded-lg border border-gray-300 text-gray-700 font-medium hover:bg-gray-50 transition-colors"
-              >
-                Cancel
-              </button>
-              <button
-                onClick={confirmChangeRole}
-                className="flex-1 px-4 py-2.5 rounded-lg bg-purple-600 text-white font-medium hover:bg-purple-700 transition-colors"
-              >
-                Confirm
-              </button>
-            </div>
-          </div>
-        </div>
-      )} */}
     </div>
   );
 };
 
 // Add User Form Component
-const AddUserForm = ({ onCancel, onSave,clientId,token }) => {
+const AddUserForm = ({ onCancel, onSave, clientId, token, editUser = null, isEdit = false }) => {
   const [formData, setFormData] = useState({
     username: "",
     email: "",
@@ -457,6 +356,21 @@ const AddUserForm = ({ onCancel, onSave,clientId,token }) => {
 
   const [roles, setRoles] = useState([]);
   const [loading, setLoading] = useState(false);
+
+  useEffect(() => {
+    if (isEdit && editUser) {
+      setFormData({
+        username: editUser.username || "",
+        email: editUser.email || "",
+        firstName: editUser.first_name || "",
+        lastName: editUser.last_name || "",
+        dob: editUser.dob || "",
+        phone: editUser.phone || "",
+        password: "",
+        role: editUser.role || "",
+      });
+    }
+  }, [isEdit, editUser]);
 
   useEffect(() => {
     const fetchRoles = async () => {
@@ -497,16 +411,30 @@ const AddUserForm = ({ onCancel, onSave,clientId,token }) => {
     };
 
     try {
-      await axios.post(
-        `${import.meta.env.VITE_API_USER_SERVICE_URL}/${clientId}/users/add`,
-        payload,
-        { headers: { Authorization: `Bearer ${token}` } }
-      );
-      toast.success("User added successfully!");
+      const url = isEdit
+        ? `${import.meta.env.VITE_API_USER_SERVICE_URL}/${clientId}/users/person-details`
+        : `${import.meta.env.VITE_API_USER_SERVICE_URL}/${clientId}/users/add`;
+
+      const finalPayload = isEdit
+        ? {
+            user_id: editUser.id,
+            first_name: formData.firstName,
+            last_name: formData.lastName,
+            email: formData.email,
+            phone: formData.phone,
+            roles: [formData.role],
+          }
+        : payload;
+
+      await axios.post(url, finalPayload, {
+        headers: { Authorization: `Bearer ${token}` },
+      });
+
+      toast.success(isEdit ? "User updated successfully!" : "User added successfully!");
       if (onSave) onSave();
     } catch (error) {
-      console.error("Failed to add user:", error);
-      toast.error(error?.response?.data?.detail || "Failed to add user");
+      console.error(`Failed to ${isEdit ? 'update' : 'add'} user:`, error);
+      toast.error(error?.response?.data?.detail || `Failed to ${isEdit ? 'update' : 'add'} user`);
     } finally {
       setLoading(false);
     }
@@ -515,8 +443,12 @@ const AddUserForm = ({ onCancel, onSave,clientId,token }) => {
   return (
     <div className="bg-bg-primary rounded-lg shadow-card p-6">
       <div className="mb-6">
-        <h2 className="text-2xl font-semibold text-text-primary">Add New User</h2>
-        <p className="text-text-secondary text-sm mt-1">Create a new user account with role assignment</p>
+        <h2 className="text-2xl font-semibold text-text-primary">
+          {isEdit ? "Edit User" : "Add New User"}
+        </h2>
+        <p className="text-text-secondary text-sm mt-1">
+          {isEdit ? "Update user account details and role assignment" : "Create a new user account with role assignment"}
+        </p>
       </div>
 
       <form onSubmit={handleSubmit} className="space-y-4">
@@ -530,10 +462,13 @@ const AddUserForm = ({ onCancel, onSave,clientId,token }) => {
             <input
               name="username"
               type="text"
+              disabled={isEdit}
               value={formData.username}
               onChange={handleChange}
               required
-              className="w-full px-4 py-2.5 rounded-lg border border-border-default focus:border-action-success focus:outline-none transition-colors text-text-primary placeholder-text-secondary"
+              className={`w-full px-4 py-2.5 rounded-lg border border-border-default focus:border-action-success focus:outline-none transition-colors text-text-primary placeholder-text-secondary ${
+                isEdit ? 'bg-gray-100 cursor-not-allowed' : ''
+              }`}
               placeholder="Enter username"
             />
           </div>
@@ -618,22 +553,24 @@ const AddUserForm = ({ onCancel, onSave,clientId,token }) => {
             />
           </div>
 
-          {/* Password */}
-          <div>
-            <label className="flex items-center gap-2 text-sm font-medium text-text-primary mb-1.5">
-              <FaLock className="text-action-danger text-xs" />
-              Password <span className="text-action-danger">*</span>
-            </label>
-            <input
-              name="password"
-              type="password"
-              value={formData.password}
-              onChange={handleChange}
-              required
-              className="w-full px-4 py-2.5 rounded-lg border border-border-default focus:border-action-success focus:outline-none transition-colors text-text-primary placeholder-text-secondary"
-              placeholder="Enter password"
-            />
-          </div>
+          {/* Password - Only show for new users */}
+          {!isEdit && (
+            <div>
+              <label className="flex items-center gap-2 text-sm font-medium text-text-primary mb-1.5">
+                <FaLock className="text-action-danger text-xs" />
+                Password <span className="text-action-danger">*</span>
+              </label>
+              <input
+                name="password"
+                type="password"
+                value={formData.password}
+                onChange={handleChange}
+                required={!isEdit}
+                className="w-full px-4 py-2.5 rounded-lg border border-border-default focus:border-action-success focus:outline-none transition-colors text-text-primary placeholder-text-secondary"
+                placeholder="Enter password"
+              />
+            </div>
+          )}
 
           {/* Role */}
           <div>
@@ -672,7 +609,10 @@ const AddUserForm = ({ onCancel, onSave,clientId,token }) => {
             disabled={loading}
             className="flex-1 px-4 py-2.5 rounded-lg bg-action-primary text-text-white hover:bg-action-danger hover:text-text-primary transition-colors font-medium disabled:opacity-50 disabled:cursor-not-allowed"
           >
-            {loading ? "Adding User..." : "Add New User"}
+            {loading 
+              ? (isEdit ? "Updating User..." : "Adding User...") 
+              : (isEdit ? "Update User" : "Add New User")
+            }
           </button>
         </div>
       </form>
@@ -680,269 +620,5 @@ const AddUserForm = ({ onCancel, onSave,clientId,token }) => {
   );
 };
 
-// Reset Password Component
-const ResetPassword = ({clientId,token}) => {
-  const [form, setForm] = useState({
-    username: "",
-    otp: "",
-    old_password: "",
-    new_password: "",
-    confirm_password: "",
-  });
-
-  const [otpSent, setOtpSent] = useState(false);
-  const [loading, setLoading] = useState(false);
-  const [resetMethod, setResetMethod] = useState("otp");
-
-  const handleChange = (e) => {
-    setForm((prev) => ({ ...prev, [e.target.name]: e.target.value }));
-  };
-
-  const handleMethodChange = (e) => {
-    setResetMethod(e.target.value);
-    setForm((prev) => ({ ...prev, otp: "", old_password: "" }));
-    if (e.target.value === "old_password") setOtpSent(true);
-    else setOtpSent(false);
-  };
-
-  const handleSendOtp = async () => {
-    if (!form.username) {
-      toast.error("Enter username first");
-      return;
-    }
-    setLoading(true);
-    try {
-      const res = await axios.post(
-        `${import.meta.env.VITE_API_USER_SERVICE_URL}/${clientId}/users/reset-password`,
-        {
-          username: form.username,
-          otp: "",
-          old_password: "",
-          new_password: "",
-          confirm_password: "",
-        },
-        { headers: { Authorization: `Bearer ${token}` } }
-      );
-      toast.success(res.data.message || "OTP sent successfully");
-      setOtpSent(true);
-    } catch (err) {
-      const detail = err?.response?.data?.detail || "Failed to send OTP";
-      toast.error(detail);
-    } finally {
-      setLoading(false);
-    }
-  };
-
-  const handleResetPassword = async (e) => {
-    e.preventDefault();
-
-    if (!form.new_password || !form.confirm_password) {
-      toast.error("Enter new password and confirm password");
-      return;
-    }
-
-    if (form.new_password !== form.confirm_password) {
-      toast.error("Passwords do not match");
-      return;
-    }
-
-    if (resetMethod === "otp" && !form.otp) {
-      toast.error("Enter OTP");
-      return;
-    }
-
-    if (resetMethod === "old_password" && !form.old_password) {
-      toast.error("Enter old password");
-      return;
-    }
-
-    setLoading(true);
-
-    try {
-      const payload = {
-        username: form.username,
-        new_password: form.new_password,
-        confirm_password: form.confirm_password,
-        otp: resetMethod === "otp" ? form.otp : "",
-        old_password: resetMethod === "old_password" ? form.old_password : "",
-      };
-
-      const res = await axios.post(
-        `${import.meta.env.VITE_API_USER_SERVICE_URL}/${clientId}/users/reset-password`,
-        payload,
-        { headers: { Authorization: `Bearer ${token}` } }
-      );
-
-      toast.success(res.data.message || "Password reset successfully");
-      
-      // Reset form
-      setForm({
-        username: "",
-        otp: "",
-        old_password: "",
-        new_password: "",
-        confirm_password: "",
-      });
-      setOtpSent(false);
-    } catch (err) {
-      const detail = err?.response?.data?.detail || "Failed to reset password";
-      toast.error(detail);
-    } finally {
-      setLoading(false);
-    }
-  };
-
-  return (
-    <div className="max-w-2xl mx-auto">
-      <div className="bg-bg-primary rounded-lg shadow-card p-6">
-        {/* Header */}
-        <div className="text-center mb-6">
-          <div className="w-16 h-16 mx-auto mb-3 rounded-full bg-bg-tertiary flex items-center justify-center">
-            <FaLock className="text-action-primary text-2xl" />
-          </div>
-          <h2 className="text-2xl font-semibold text-text-primary">Reset Password</h2>
-          <p className="text-text-secondary text-sm mt-1">Choose your preferred method to reset password</p>
-        </div>
-
-        {/* Reset Method Selection */}
-        <div className="mb-4">
-          <label className="block text-sm font-medium text-text-primary mb-1.5">Reset Method</label>
-          <select
-            value={resetMethod}
-            onChange={handleMethodChange}
-            className="w-full px-4 py-2.5 rounded-lg border border-border-default bg-bg-tertiary text-text-primary focus:outline-none focus:border-action-success transition-colors"
-          >
-            <option value="otp">Reset via OTP</option>
-            <option value="old_password">Reset via Old Password</option>
-          </select>
-        </div>
-
-        {/* Form */}
-        <form onSubmit={handleResetPassword} className="space-y-4">
-          {/* Username */}
-          <div>
-            <label htmlFor="username" className="block text-sm font-medium text-text-primary mb-1.5">
-              Username <span className="text-action-danger">*</span>
-            </label>
-            <div className="relative">
-              <FaUser className="absolute left-4 top-1/2 transform -translate-y-1/2 text-text-secondary text-sm" />
-              <input
-                type="text"
-                name="username"
-                placeholder="Enter username"
-                value={form.username}
-                onChange={handleChange}
-                required
-                className="w-full pl-11 pr-4 py-2.5 rounded-lg border-default border-border-default bg-bg-tertiary text-text-primary focus:outline-none focus:border-action-success transition-colors"
-              />
-            </div>
-          </div>
-
-          {/* OTP Flow */}
-          {resetMethod === "otp" && (
-            <>
-              {!otpSent ? (
-                <button
-                  type="button"
-                  onClick={handleSendOtp}
-                  disabled={loading}
-                  className="w-full py-2.5 rounded-lg bg-action-primary text-white font-medium hover:bg-action-danger transition-colors disabled:opacity-50 disabled:cursor-not-allowed"
-                >
-                  {loading ? "Sending OTP..." : "Send OTP"}
-                </button>
-              ) : (
-                <div>
-                  <label className="block text-sm font-medium text-text-primary mb-1.5">
-                    OTP <span className="text-action-danger">*</span>
-                  </label>
-                  <div className="relative">
-                    <FaLock className="absolute left-4 top-1/2 transform -translate-y-1/2 text-text-secondary text-sm" />
-                    <input
-                      type="text"
-                      name="otp"
-                      placeholder="Enter OTP"
-                      value={form.otp}
-                      onChange={handleChange}
-                      className="w-full pl-11 pr-4 py-2.5 rounded-lg border border-border-default bg-bg-tertiary text-text-secondary focus:outline-none focus:border-action-success transition-colors"
-                    />
-                  </div>
-                </div>
-              )}
-            </>
-          )}
-
-          {/* Old Password Flow */}
-          {resetMethod === "old_password" && (
-            <div>
-              <label className="block text-sm font-medium text-text-primary mb-1.5">
-                Old Password <span className="text-action-danger">*</span>
-              </label>
-              <div className="relative">
-                <FaLock className="absolute left-4 top-1/2 transform -translate-y-1/2 text-text-secondary text-sm" />
-                <input
-                  type="password"
-                  name="old_password"
-                  placeholder="Enter old password"
-                  value={form.old_password}
-                  onChange={handleChange}
-                  className="w-full pl-11 pr-4 py-2.5 rounded-lg border-default border-border-default bg-bg-tertiary text-text-primary focus:outline-none focus:border-action-success transition-colors"
-                />
-              </div>
-            </div>
-          )}
-
-          {/* New Password */}
-          {(otpSent || resetMethod === "old_password") && (
-            <>
-              <div>
-                <label className="block text-sm font-medium text-text-primary mb-1.5">
-                  New Password <span className="text-action-danger">*</span>
-                </label>
-                <div className="relative">
-                  <FaLock className="absolute left-4 top-1/2 transform -translate-y-1/2 text-text-secondary text-sm" />
-                  <input
-                    type="password"
-                    name="new_password"
-                    placeholder="Enter new password"
-                    value={form.new_password}
-                    onChange={handleChange}
-                    required
-                    className="w-full pl-11 pr-4 py-2.5 rounded-lg border-default border-border-default bg-bg-tertiary text-text-primary focus:outline-none focus:border-action-success transition-colors"
-                  />
-                </div>
-              </div>
-
-              <div>
-                <label className="block text-sm font-medium text-text-primary mb-1.5">
-                  Confirm Password <span className="text-action-danger">*</span>
-                </label>
-                <div className="relative">
-                  <FaLock className="absolute left-4 top-1/2 transform -translate-y-1/2 text-text-secondary text-sm" />
-                  <input
-                    type="password"
-                    name="confirm_password"
-                    placeholder="Confirm new password"
-                    value={form.confirm_password}
-                    onChange={handleChange}
-                    required
-                    className="w-full pl-11 pr-4 py-2.5 rounded-lg border-default border-border-default bg-bg-tertiary text-text-primary focus:outline-none focus:border-action-success transition-colors"
-                  />
-                </div>
-              </div>
-
-              <button
-                type="submit"
-                disabled={loading}
-                className="w-full py-2.5 rounded-lg bg-action-primary text-text-white font-medium hover:bg-action-danger hover:text-text-primary transition-colors disabled:opacity-50 disabled:cursor-not-allowed"
-              >
-                {loading ? "Resetting Password..." : "Reset Password"}
-              </button>
-            </>
-          )}
-        </form>
-      </div>
-    </div>
-  );
-};
 
 export default UserManagement;
