@@ -6,6 +6,7 @@ import UniversalAddModal from "../../utils/Modals/UniversalAddModal";
 import UniversalEditModal from "../../utils/Modals/UniversalEditModal";
 import UniversalBulkUpdateModal from "../../utils/Modals/UniversalBulkUpdateModal";
 import UniversalBulkDeleteModal from "../../utils/Modals/UniversalBulkDeleteModal";
+import AccessGuard from "../../utils/Interceptors/ProtectedRoute";
 
 const statusConfig = {
     Vacant: { card: "bg-tableStatusBg-vacant border-tableStatusBorder-vacant", icon: <FaCheck className="text-action-success text-xl" />, label: "Available" },
@@ -13,7 +14,9 @@ const statusConfig = {
     Reserved: { card: "bg-tableStatusBg-reserved border-tableStatusBorder-reserved", icon: <FaClock className="text-action-primary text-xl" />, label: "Reserved" }
 };
 
-const TableManagement = ({ clientId, token }) => {
+const TableManagement = ({ clientId, token, screenIds,userId }) => {
+
+    console.log("requesterId",userId)
     const [searchTerm, setSearchTerm] = useState("");
     const [statusFilter, setStatusFilter] = useState("");
     const [tableRanges, setTableRanges] = useState([]);
@@ -28,6 +31,8 @@ const TableManagement = ({ clientId, token }) => {
     const [isGenerating, setIsGenerating] = useState(false);
     const [loading, setLoading] = useState(true);
     const generatingRef = useRef(false);
+
+    const [requiredScreenId, setRequiredScreenId] = useState(null);
 
     // Bulk Update States
     const [showBulkUpdate, setShowBulkUpdate] = useState(false);
@@ -55,15 +60,26 @@ const TableManagement = ({ clientId, token }) => {
         if (!clientId) return;
         setLoading(true);
         try {
-            const res = await axios.get(`${import.meta.env.VITE_API_TABLE_SERVICE_URL}/${clientId}/tables/read`, {
-                headers: { Authorization: `Bearer ${token}` }
-            });
+            const res = await axios.get(
+                `${import.meta.env.VITE_API_TABLE_SERVICE_URL}/${clientId}/tables/read`,
+                { headers: { Authorization: `Bearer ${token}` } }
+            );
+    
             const result = res.data;
+            setRequiredScreenId(result.screen_id);
+    
             if (result.screen_id === "default_tables") {
                 const tableList = Array.isArray(result?.data) ? result.data : [];
-                tableList.sort((a, b) => a.name.localeCompare(b.name, undefined, { numeric: true }));
-                setTables(tableList);
-                setOriginalTables(tableList);
+    
+                // Exclude takeaway table
+                const filteredTables = tableList
+                    .filter(table => table.name?.toLowerCase() !== "takeaway")
+                    .sort((a, b) =>
+                        a.name.localeCompare(b.name, undefined, { numeric: true })
+                    );
+    
+                setTables(filteredTables);
+                setOriginalTables(filteredTables);
             }
         } catch (error) {
             console.error("Error fetching tables:", error);
@@ -71,7 +87,7 @@ const TableManagement = ({ clientId, token }) => {
             setLoading(false);
         }
     };
-
+    
     const parseTableRange = (rangeStr) => {
         const parts = rangeStr.split(",");
         const tables = [];
@@ -456,6 +472,7 @@ const TableManagement = ({ clientId, token }) => {
     }
 
     return (
+        <AccessGuard screenIds={screenIds} requiredScreenId={requiredScreenId} clientId={clientId} requesterId={userId}>
         <div className="min-h-screen bg-bg-primary">
             <style>
                 {`
@@ -756,6 +773,7 @@ const TableManagement = ({ clientId, token }) => {
                 )}
             </main>
         </div>
+        </AccessGuard>
     );
 };
 
