@@ -60,16 +60,26 @@ const TableManagement = ({ clientId, token, screenIds,userId }) => {
         if (!clientId) return;
         setLoading(true);
         try {
-            const res = await axios.get(`${import.meta.env.VITE_API_TABLE_SERVICE_URL}/${clientId}/tables/read`, {
-                headers: { Authorization: `Bearer ${token}` }
-            });
+            const res = await axios.get(
+                `${import.meta.env.VITE_API_TABLE_SERVICE_URL}/${clientId}/tables/read`,
+                { headers: { Authorization: `Bearer ${token}` } }
+            );
+    
             const result = res.data;
             setRequiredScreenId(result.screen_id);
+    
             if (result.screen_id === "default_tables") {
                 const tableList = Array.isArray(result?.data) ? result.data : [];
-                tableList.sort((a, b) => a.name.localeCompare(b.name, undefined, { numeric: true }));
-                setTables(tableList);
-                setOriginalTables(tableList);
+    
+                // Exclude takeaway table
+                const filteredTables = tableList
+                    .filter(table => table.name?.toLowerCase() !== "takeaway")
+                    .sort((a, b) =>
+                        a.name.localeCompare(b.name, undefined, { numeric: true })
+                    );
+    
+                setTables(filteredTables);
+                setOriginalTables(filteredTables);
             }
         } catch (error) {
             console.error("Error fetching tables:", error);
@@ -77,7 +87,7 @@ const TableManagement = ({ clientId, token, screenIds,userId }) => {
             setLoading(false);
         }
     };
-
+    
     const parseTableRange = (rangeStr) => {
         const parts = rangeStr.split(",");
         const tables = [];
