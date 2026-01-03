@@ -205,42 +205,74 @@ async def reset_password(client_id: str, req_data: ResetpasswordRequest, context
     return ResponseModel( screen_id=context.screen_id,data={"message": "Password reset successfully"})
 
 # ================== PERSON DETAILS ==================
-@router.post("/person-details")
-async def update_person_details(client_id: str,person_req: PersonModel,context: SaasContext = Depends(verify_token),db: Session = Depends(get_db)):
-    try:
-        user_uuid = uuid.UUID(str(context.user_id))
-    except ValueError:
-        raise HTTPException(status_code=400, detail="Invalid user_id format in token")
 
-    user = db.query(User).filter(User.id == user_uuid,User.client_id == client_id).first()
-    if not user:
+@router.post("/person-details")
+async def update_person_details(request: Request,client_id: str,person_req: PersonModel,context: SaasContext = Depends(verify_token),db: Session = Depends(get_db)):
+    body = await request.json()
+
+    # If admin edit, user_id comes from body
+    target_user_id = body.get("user_id") or context.user_id
+    roles = body.get("roles")
+
+    try:
+        user_uuid = uuid.UUID(str(target_user_id))
+    except ValueError:
+        raise HTTPException(status_code=400, detail="Invalid user_id")
+
+    # Fetch user using entity and convert to model
+    user_entity = db.query(User).filter(
+        User.id == user_uuid,
+        User.client_id == client_id
+    ).first()
+
+    if not user_entity:
         raise HTTPException(status_code=404, detail="User not found")
 
-    person = db.query(Person).filter(Person.id == user_uuid).first()
-    action = "added"
+    user_model = User.copyToModel(user_entity)
 
-    if person:
-        person.first_name = person_req.first_name
-        person.last_name = person_req.last_name
-        person.dob = person_req.dob
-        person.email = person_req.email
-        person.phone = person_req.phone
-        db.commit()
-        db.refresh(person)
+    # Fetch person using entity and convert to model
+    person_entity = db.query(Person).filter(Person.id == user_uuid).first()
+    
+    if person_entity:
+        # Update existing person
+        person_model = Person.copyToModel(person_entity)
+        person_entity.first_name = person_req.first_name
+        person_entity.last_name = person_req.last_name
+        person_entity.dob = person_req.dob
+        person_entity.email = person_req.email
+        person_entity.phone = person_req.phone
         action = "updated"
     else:
-        person = Person(id=user.id,**person_req.dict(exclude_unset=True))
-        db.add(person)
-        db.commit()
-        db.refresh(person)
+        # Create new person
+        person_entity = Person(
+            id=user_model.id,
+            first_name=person_req.first_name,
+            last_name=person_req.last_name,
+            dob=person_req.dob,
+            email=person_req.email,
+            phone=person_req.phone
+        )
+        db.add(person_entity)
+        action = "added"
 
-    if person_req.email:
-        body = f"Dear {person_req.first_name}, your details have been {action} successfully."
-        otpEmailService(person_req.email, body)
+    # Role update
+    if roles is not None:
+        user_entity.roles = roles
 
-    return ResponseModel(screen_id=context.screen_id,
-        data={"message": f"Person details {action} successfully","person": PersonModel.from_orm(person)})\
-        
+    db.commit()
+    db.refresh(user_entity)
+
+    # Convert updated entity to model for response
+    updated_user_model = User.copyToModel(user_entity)
+
+    return ResponseModel(
+        screen_id=context.screen_id,
+        data={
+            "message": f"User details {action} successfully",
+            "user_id": str(updated_user_model.id)
+        }
+    )
+
 @router.get("/person-details")
 async def get_person_details(
     client_id: str,
