@@ -1217,7 +1217,7 @@ import axios from 'axios';
 import { toast } from "react-toastify";
 import { MdOutlineKeyboardDoubleArrowDown } from "react-icons/md";
 import Modal from "react-modal";
-import { X, Edit2, Trash2, Search, Filter, ShoppingBag, Clock } from 'lucide-react';
+import { X, Edit2, Trash2, Search, Filter, ShoppingBag, Clock, Users, Package, Truck } from 'lucide-react';
 
 Modal.setAppElement("#root");
 
@@ -1323,6 +1323,7 @@ const OrderSummaryVisible = ({ clientId, token }) => {
   const [visibleOrderId, setVisibleOrderId] = useState(null);
   const [selectedCategory, setSelectedCategory] = useState(null);
   const [activeTab, setActiveTab] = useState('items');
+  const [selectedOrderMode, setSelectedOrderMode] = useState('all'); // 'all', 'dinein', 'takeaway', 'delivery'
   const getOrderBgColor = (status) => {
     switch (status?.toLowerCase()) {
       case 'served':
@@ -2059,7 +2060,12 @@ const OrderSummaryVisible = ({ clientId, token }) => {
             deduped.push(it);
           }
 
-          return { ...order, items: deduped, has_new_items: batchItemsMap.size > 0 };
+          return {
+            ...order,
+            _derivedMode: deriveOrderMode(order),
+            items: deduped,
+            has_new_items: batchItemsMap.size > 0
+          };
         });
 
         setOrders(processed);
@@ -2403,11 +2409,21 @@ const OrderSummaryVisible = ({ clientId, token }) => {
     setVisibleOrderId(prev => (prev === orderId ? null : orderId));
   };
 
+  // First filter by date
   let filteredOrders = selectedDate ? orders.filter(order => {
     const orderDate = new Date(order.created_at).toLocaleDateString('en-CA');
     return orderDate === selectedDate;
   }) : orders;
 
+  // Filter by order mode
+  if (selectedOrderMode !== 'all') {
+    filteredOrders = filteredOrders.filter(order => {
+      return order._derivedMode === selectedOrderMode;
+    });
+  }
+
+
+  // Then filter by status
   switch (filterMode) {
     case 0:
       filteredOrders = [...filteredOrders].sort((a, b) => new Date(a.created_at) - new Date(b.created_at));
@@ -2428,6 +2444,11 @@ const OrderSummaryVisible = ({ clientId, token }) => {
       break;
   }
 
+  const deriveOrderMode = (order) => {
+    if (Number(order.table_id) === 500) return 'takeaway';
+    return 'dinein';
+  };
+
   return (
     <div className="min-h-screen bg-bg-primary">
       <div className="mx-auto px-4 py-2">
@@ -2436,19 +2457,68 @@ const OrderSummaryVisible = ({ clientId, token }) => {
           <p className="text-sm md:text-base" style={{ color: 'var(--color-text-secondary)' }}>Manage and track all active orders</p>
         </div> */}
 
-        <div className="rounded-lg p-2 mb-2 flex justify-end">
-          <div className="">
-            <div className="relative">
-              <Filter className="absolute left-3 top-1/2 text-text-secondary transform -translate-y-1/2" size={20} />
-              <select value={filterMode} onChange={(e) => setFilterMode(Number(e.target.value))} className="w-full pl-10 pr-4 py-2 rounded-lg" >
-                <option value={0}>Orders</option>
-                <option value={1}>New</option>
-                <option value={2}>New Orders</option>
-                <option value={3}>Preparing</option>
-                <option value={4}>Served</option>
-              </select>
+        <div className="rounded-lg p-2 mb-2">
+          {/* Order Mode Filter - Horizontal Tabs */}
+          <div className="mb-3 overflow-x-auto">
+            <div className="flex gap-2 min-w-max">
+              <button
+                onClick={() => setSelectedOrderMode('all')}
+                className={`flex items-center gap-2 px-4 py-2 rounded-lg font-medium text-sm transition-all ${selectedOrderMode === 'all'
+                  ? 'bg-action-primary text-text-white shadow-sm'
+                  : 'bg-bg-tertiary text-text-secondary hover:text-text-primary border border-border-default'
+                  }`}>
+                <Filter size={16} />
+                <span>All Orders</span>
+              </button>
+
+              <button
+                onClick={() => setSelectedOrderMode('dinein')}
+                className={`flex items-center gap-2 px-4 py-2 rounded-lg font-medium text-sm transition-all ${selectedOrderMode === 'dinein'
+                  ? 'bg-action-primary text-text-white shadow-sm'
+                  : 'bg-bg-tertiary text-text-secondary hover:text-text-primary border border-border-default'
+                  }`}>
+                <Users size={16} />
+                <span>Dine In</span>
+              </button>
+
+              <button
+                onClick={() => setSelectedOrderMode('takeaway')}
+                className={`flex items-center gap-2 px-4 py-2 rounded-lg font-medium text-sm transition-all ${selectedOrderMode === 'takeaway'
+                  ? 'bg-action-primary text-text-white shadow-sm'
+                  : 'bg-bg-tertiary text-text-secondary hover:text-text-primary border border-border-default'
+                  }`}>
+                <Package size={16} />
+                <span>Takeaway</span>
+              </button>
+
+              <button
+                onClick={() => setSelectedOrderMode('delivery')}
+                className={`flex items-center gap-2 px-4 py-2 rounded-lg font-medium text-sm transition-all ${selectedOrderMode === 'delivery'
+                  ? 'bg-action-primary text-text-white shadow-sm'
+                  : 'bg-bg-tertiary text-text-secondary hover:text-text-primary border border-border-default'
+                  }`}>
+                <Truck size={16} />
+                <span>Delivery</span>
+              </button>
+              <div className="flex justify-end">
+                <div className="relative w-full sm:w-auto">
+                  <Filter className="absolute left-3 top-1/2 text-text-secondary transform -translate-y-1/2" size={20} />
+                  <select
+                    value={filterMode}
+                    onChange={(e) => setFilterMode(Number(e.target.value))}
+                    className="w-full sm:w-auto pl-10 pr-4 py-2 rounded-lg bg-bg-primary border border-border-default text-text-primary">
+                    <option value={0}>All Status</option>
+                    <option value={2}>New Orders</option>
+                    <option value={3}>Preparing</option>
+                    <option value={4}>Served</option>
+                  </select>
+                </div>
+              </div>
             </div>
           </div>
+
+          {/* Status Filter Dropdown */}
+
         </div>
 
         <div className="grid grid-cols-1 sm:grid-cols-2 lg:grid-cols-3 gap-6">
@@ -2469,9 +2539,27 @@ const OrderSummaryVisible = ({ clientId, token }) => {
                 <div key={order.id} className="rounded-lg overflow-hidden self-start shadow-card" style={{ backgroundColor: order.status?.toLowerCase() === 'served' ? 'var(--color-bg-primary)' : 'var(--color-bg-primary)', border: `2px solid ${borderColor}` }}>
                   <div className="p-3 lg:p-6 border-b flex items-start justify-between bg-bg-tertiary border-border-default">
                     <div>
-                      <div className="flex items-center space-x-3 mb-2">
-                        <h3 className="text-sm font-bold text-text-primary">Table: {tablesMap[order.table_id] || order.table || order.table_id}</h3>
-                        <span className="px-2 py-1 rounded-full text-[12px] font-semibold bg-status-new text-action-primary">{order.status}</span>
+
+                      <div className="flex items-center flex-wrap gap-2 mb-2">
+                        <h3 className="text-sm font-bold text-text-primary">
+                          {order._derivedMode === 'takeaway'
+                            ? (order.customer_name || 'Take Away')
+                            : `Table: ${tablesMap[order.table_id] || order.table || order.table_id}`}
+                        </h3>
+
+                        <span className="px-2 py-1 rounded-full text-[12px] font-semibold bg-status-new text-action-primary">
+                          {order.status}
+                        </span>
+
+                        <span className="px-2 py-1 rounded-full text-[10px] font-semibold bg-bg-primary text-text-secondary border border-border-default flex items-center gap-1">
+                          {order._derivedMode === 'dinein' ? (
+                            <Users size={10} />
+                          ) : (
+                            <Package size={10} />
+                          )}
+                          {order._derivedMode === 'dinein' ? 'Dine In' : 'Takeaway'}
+                        </span>
+
                       </div>
                       <div className="flex flex-wrap gap-x-3 gap-y-2 text-sm text-text-secondary">
                         <span className="px-2 py-1 rounded bg-bg-tertiary border-default border-border-default">Order Id: #{order.id}</span>
@@ -2583,16 +2671,16 @@ const OrderSummaryVisible = ({ clientId, token }) => {
                 <div className="flex">
                   <button
                     className={`flex-1 py-3 px-4 text-sm font-semibold transition-all ${activeTab === 'items'
-                        ? 'text-action-primary border-b-2 border-action-primary bg-bg-primary'
-                        : 'text-text-secondary hover:text-text-primary hover:bg-bg-secondary/50'
+                      ? 'text-action-primary border-b-2 border-action-primary bg-bg-primary'
+                      : 'text-text-secondary hover:text-text-primary hover:bg-bg-secondary/50'
                       }`}
                     onClick={() => setActiveTab('items')}>
                     Order Items ({selectedOrder.items.length})
                   </button>
                   <button
                     className={`flex-1 py-3 px-4 text-sm font-semibold transition-all ${activeTab === 'available'
-                        ? 'text-action-primary border-b-2 border-action-primary bg-bg-primary'
-                        : 'text-text-secondary hover:text-text-primary hover:bg-bg-secondary/50'
+                      ? 'text-action-primary border-b-2 border-action-primary bg-bg-primary'
+                      : 'text-text-secondary hover:text-text-primary hover:bg-bg-secondary/50'
                       }`}
                     onClick={() => setActiveTab('available')}>
                     Available Items
@@ -2690,10 +2778,10 @@ const OrderSummaryVisible = ({ clientId, token }) => {
                               <div className="font-semibold text-sm text-text-primary mb-1.5">{item.item_name || item.item_id}</div>
                               <span
                                 className={`inline-block px-2.5 py-1 rounded-full text-xs font-semibold ${item.status === 'pending'
-                                    ? 'bg-status-pending text-yellow-700'
-                                    : item.status === 'completed'
-                                      ? 'bg-status-served text-action-success'
-                                      : 'bg-bg-secondary text-text-secondary'
+                                  ? 'bg-status-pending text-yellow-700'
+                                  : item.status === 'completed'
+                                    ? 'bg-status-served text-action-success'
+                                    : 'bg-bg-secondary text-text-secondary'
                                   }`}>
                                 {item.status}
                               </span>
