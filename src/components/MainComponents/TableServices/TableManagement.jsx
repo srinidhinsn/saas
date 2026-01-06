@@ -9,9 +9,9 @@ import UniversalBulkDeleteModal from "../../utils/Modals/UniversalBulkDeleteModa
 import AccessGuard from "../../utils/Interceptors/ProtectedRoute";
 
 const statusConfig = {
-    Vacant: { card: "bg-tableStatusBg-vacant border-tableStatusBorder-vacant", icon: <FaCheck className="text-action-success text-xl" />, label: "Available" },
-    Occupied: { card: "bg-tableStatusBg-occupied border-tableStatusBorder-occupied", icon: <FaUsers className="text-action-danger text-xl" />, label: "Occupied" },
-    Reserved: { card: "bg-tableStatusBg-reserved border-tableStatusBorder-reserved", icon: <FaClock className="text-action-primary text-xl" />, label: "Reserved" }
+    Vacant: { card: "border-tableStatusBorder-vacant", icon: <FaCheck className="text-action-success text-xl" />, label: "Available" },
+    Occupied: { card: "border-tableStatusBorder-occupied", icon: <FaUsers className="text-action-danger text-xl" />, label: "Occupied" },
+    Reserved: { card: "border-tableStatusBorder-reserved", icon: <FaClock className="text-action-primary text-xl" />, label: "Reserved" }
 };
 
 const TableManagement = ({ clientId, token, screenIds,userId }) => {
