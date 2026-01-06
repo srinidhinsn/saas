@@ -1323,7 +1323,8 @@ const OrderSummaryVisible = ({ clientId, token }) => {
   const [visibleOrderId, setVisibleOrderId] = useState(null);
   const [selectedCategory, setSelectedCategory] = useState(null);
   const [activeTab, setActiveTab] = useState('items');
-  const [selectedOrderMode, setSelectedOrderMode] = useState('all'); // 'all', 'dinein', 'takeaway', 'delivery'
+  const [selectedOrderModes, setSelectedOrderModes] = useState(['all']);
+  // possible values: 'dinein', 'takeaway', 'delivery'
   const getOrderBgColor = (status) => {
     switch (status?.toLowerCase()) {
       case 'served':
@@ -2415,12 +2416,34 @@ const OrderSummaryVisible = ({ clientId, token }) => {
     return orderDate === selectedDate;
   }) : orders;
 
-  // Filter by order mode
-  if (selectedOrderMode !== 'all') {
-    filteredOrders = filteredOrders.filter(order => {
-      return order._derivedMode === selectedOrderMode;
+  const toggleOrderMode = (mode) => {
+    setSelectedOrderModes(prev => {
+      // If "all" is clicked → reset everything
+      if (mode === 'all') return ['all'];
+
+      // Remove "all" when selecting specific modes
+      let updated = prev.filter(m => m !== 'all');
+
+      // Toggle logic
+      if (updated.includes(mode)) {
+        updated = updated.filter(m => m !== mode);
+      } else {
+        updated.push(mode);
+      }
+
+      // If nothing selected → fallback to all
+      return updated.length === 0 ? ['all'] : updated;
     });
+  };
+
+
+  // Filter by order mode
+  if (!selectedOrderModes.includes('all')) {
+    filteredOrders = filteredOrders.filter(order =>
+      selectedOrderModes.includes(order._derivedMode)
+    );
   }
+
 
 
   // Then filter by status
@@ -2462,44 +2485,52 @@ const OrderSummaryVisible = ({ clientId, token }) => {
           <div className="mb-3 overflow-x-auto">
             <div className="flex gap-2 min-w-max">
               <button
-                onClick={() => setSelectedOrderMode('all')}
-                className={`flex items-center gap-2 px-4 py-2 rounded-lg font-medium text-sm transition-all ${selectedOrderMode === 'all'
-                  ? 'bg-action-primary text-text-white shadow-sm'
-                  : 'bg-bg-tertiary text-text-secondary hover:text-text-primary border border-border-default'
-                  }`}>
+                onClick={() => toggleOrderMode('all')}
+                className={`flex items-center gap-2 px-4 py-2 rounded-lg font-medium text-sm transition-all ${selectedOrderModes.includes('all')
+                    ? 'bg-action-primary text-text-white shadow-sm'
+                    : 'bg-bg-tertiary text-text-secondary hover:text-text-primary border border-border-default'
+                  }`}
+              >
                 <Filter size={16} />
                 <span>All Orders</span>
               </button>
 
+
               <button
-                onClick={() => setSelectedOrderMode('dinein')}
-                className={`flex items-center gap-2 px-4 py-2 rounded-lg font-medium text-sm transition-all ${selectedOrderMode === 'dinein'
-                  ? 'bg-action-primary text-text-white shadow-sm'
-                  : 'bg-bg-tertiary text-text-secondary hover:text-text-primary border border-border-default'
-                  }`}>
+                onClick={() => toggleOrderMode('dinein')}
+                className={`flex items-center gap-2 px-4 py-2 rounded-lg font-medium text-sm transition-all ${selectedOrderModes.includes('dinein')
+                    ? 'bg-action-primary text-text-white shadow-sm'
+                    : 'bg-bg-tertiary text-text-secondary hover:text-text-primary border border-border-default'
+                  }`}
+              >
                 <Users size={16} />
                 <span>Dine In</span>
               </button>
 
+
               <button
-                onClick={() => setSelectedOrderMode('takeaway')}
-                className={`flex items-center gap-2 px-4 py-2 rounded-lg font-medium text-sm transition-all ${selectedOrderMode === 'takeaway'
-                  ? 'bg-action-primary text-text-white shadow-sm'
-                  : 'bg-bg-tertiary text-text-secondary hover:text-text-primary border border-border-default'
-                  }`}>
+                onClick={() => toggleOrderMode('takeaway')}
+                className={`flex items-center gap-2 px-4 py-2 rounded-lg font-medium text-sm transition-all ${selectedOrderModes.includes('takeaway')
+                    ? 'bg-action-primary text-text-white shadow-sm'
+                    : 'bg-bg-tertiary text-text-secondary hover:text-text-primary border border-border-default'
+                  }`}
+              >
                 <Package size={16} />
                 <span>Takeaway</span>
               </button>
 
+
               <button
-                onClick={() => setSelectedOrderMode('delivery')}
-                className={`flex items-center gap-2 px-4 py-2 rounded-lg font-medium text-sm transition-all ${selectedOrderMode === 'delivery'
-                  ? 'bg-action-primary text-text-white shadow-sm'
-                  : 'bg-bg-tertiary text-text-secondary hover:text-text-primary border border-border-default'
-                  }`}>
+                onClick={() => toggleOrderMode('delivery')}
+                className={`flex items-center gap-2 px-4 py-2 rounded-lg font-medium text-sm transition-all ${selectedOrderModes.includes('delivery')
+                    ? 'bg-action-primary text-text-white shadow-sm'
+                    : 'bg-bg-tertiary text-text-secondary hover:text-text-primary border border-border-default'
+                  }`}
+              >
                 <Truck size={16} />
                 <span>Delivery</span>
               </button>
+
               <div className="flex justify-end">
                 <div className="relative w-full sm:w-auto">
                   <Filter className="absolute left-3 top-1/2 text-text-secondary transform -translate-y-1/2" size={20} />
