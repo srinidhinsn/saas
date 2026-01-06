@@ -1,6 +1,7 @@
 version: "3.8"
 services:
   frontend-qa:
+    container_name: frontend-qa
     build: .
     ports:
       - "3000:80"
