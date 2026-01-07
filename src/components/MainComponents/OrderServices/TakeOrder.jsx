@@ -143,9 +143,9 @@ const TakeOrder = ({ clientId, token, onOrderUpdate, realm }) => {
           { headers: { Authorization: `Bearer ${token}` } }
         );
         const tableList = Array.isArray(tablesRes.data?.data)
-        ? tablesRes.data.data
+          ? tablesRes.data.data
             .filter(t =>
-              t.id !== 500 &&                            
+              t.id !== 500 &&
               !['takeaway', 'take away'].includes(
                 (t.name || '').toLowerCase().trim()
               )
@@ -154,8 +154,8 @@ const TakeOrder = ({ clientId, token, onOrderUpdate, realm }) => {
               ...t,
               table_number: t.name || t.table_number || "-",
             }))
-        : [];
-      
+          : [];
+
 
         // Find or identify Takeaway table
         let takeawayTable = tableList.find(t =>
@@ -268,13 +268,13 @@ const TakeOrder = ({ clientId, token, onOrderUpdate, realm }) => {
       .toLowerCase()
       .includes('ac')
   );
-  
+
   const nonAcTables = availableTables.filter(t =>
     !(t.table_type || t.location_zone || '')
       .toLowerCase()
       .includes('ac')
   );
-  
+
   const getFilteredItems = () => {
     const q = (searchQuery || '').trim().toLowerCase();
 
@@ -565,9 +565,16 @@ const TakeOrder = ({ clientId, token, onOrderUpdate, realm }) => {
     return () => window.removeEventListener('keydown', onKey);
   }, []);
   const handleClearCart = () => {
-    setCart([]);
-    setShowCart(false); // close order panel
+    if (cart.length === 0) return;
+    setShowClearConfirm(true);
   };
+  const confirmClearCart = () => {
+    setCart([]);
+    setSelectedTable('');
+    setShowCart(false);
+    setShowClearConfirm(false);
+  };
+
 
   // if (loading) {
   //   return (
@@ -932,7 +939,7 @@ const TakeOrder = ({ clientId, token, onOrderUpdate, realm }) => {
                             {/* ACTIONS */}
                             <div className="flex gap-2 mt-3">
                               <button
-                                onClick={() => setShowClearConfirm(true)}
+                                onClick={handleClearCart}
                                 className="flex-1 py-2 border rounded-lg text-sm hover:bg-gray-100"
                               >
                                 Clear
@@ -1147,6 +1154,35 @@ const TakeOrder = ({ clientId, token, onOrderUpdate, realm }) => {
           </div>
         </div>
       )}
+      {showClearConfirm && (
+        <div className="fixed inset-0 z-50 flex items-center justify-center bg-black/40">
+          <div className="bg-white rounded-lg p-6 w-80 shadow-xl animate-scale-in">
+            <h3 className="text-lg font-semibold mb-4 text-gray-800">
+              Clear all items?
+            </h3>
+            <p className="text-sm text-gray-600 mb-5">
+              This will remove all items from the order.
+            </p>
+
+            <div className="flex gap-3">
+              <button
+                onClick={() => setShowClearConfirm(false)}
+                className="flex-1 py-2 border rounded-lg hover:bg-gray-100"
+              >
+                Cancel
+              </button>
+
+              <button
+                onClick={confirmClearCart}
+                className="flex-1 py-2 bg-red-600 text-white rounded-lg hover:bg-red-700"
+              >
+                Clear
+              </button>
+            </div>
+          </div>
+        </div>
+      )}
+
       {/* Floating Cart Button */}
       {cart.length > 0 && !showCart && (
         <button
