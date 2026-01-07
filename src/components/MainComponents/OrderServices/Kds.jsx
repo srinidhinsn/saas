@@ -4,6 +4,8 @@ import { useParams } from "react-router-dom";
 import { toast } from "react-toastify";
 import "react-toastify/dist/ReactToastify.css";
 import { FaCheckCircle, FaClock, FaHourglassHalf } from "react-icons/fa";
+import { X, Edit2, Trash2, Search, Filter, ShoppingBag, Clock, Users, Package, Truck } from 'lucide-react';
+
 
 const KitchenDisplay = () => {
     const { clientId } = useParams();
@@ -14,6 +16,8 @@ const KitchenDisplay = () => {
     const [inventoryItems, setInventoryItems] = useState([]);
     const [inventoryMap, setInventoryMap] = useState({});
     const [loading, setLoading] = useState(true);
+    const [orderFilter, setOrderFilter] = useState("ALL");
+    // ALL | DINEIN | TAKEAWAY
 
     const [editOrderId, setEditOrderId] = useState(null);
     const [addingOrderId, setAddingOrderId] = useState(null);
@@ -464,6 +468,20 @@ const KitchenDisplay = () => {
         return "default";
     };
 
+    const filteredOrders = orders.filter(order => {
+        if (orderFilter === "ALL") return true;
+
+        // 🔑 YOUR RULE
+        const isTakeaway = Number(order.table_id) === 500;
+
+        if (orderFilter === "TAKEAWAY") return isTakeaway;
+        if (orderFilter === "DINEIN") return !isTakeaway;
+
+        return true;
+    });
+
+
+
     const handleStatusChange = async (orderId, newStatus) => {
         try {
             const orderIdInt = parseInt(orderId, 10);
@@ -701,10 +719,42 @@ const KitchenDisplay = () => {
 
         <>
             <div className="min-h-screen w-full bg-gray-50 text-gray-900">
-                <div className="mx-auto px-4 py-6 lg:py-8">
-                    <div className="text-center mb-6 lg:mb-8">
-                        <h1 className="text-3xl md:text-4xl lg:text-5xl font-serif italic mb-3 lg:mb-4" style={{ color: 'var(--color-text-primary)' }}>Kitchen Display System</h1>
+                <div className="mx-auto p-6 lg:py-8">
+                    <div className="mb-3 overflow-x-auto">
+                        <div className="flex gap-2 min-w-max">
+                            <button
+                                onClick={() => setOrderFilter("ALL")}
+                                className={`flex items-center gap-2 px-4 py-2 rounded-lg font-medium text-sm transition-all ${orderFilter === "ALL"
+                                    ? "bg-action-primary text-text-white shadow-sm"
+                                    : "bg-bg-tertiary text-text-secondary hover:text-text-primary border border-border-default"}`}
+                            >
+                                <Filter size={16} />
+                                All Orders
+                            </button>
+
+                            <button
+                                onClick={() => setOrderFilter("DINEIN")}
+                                className={`flex items-center gap-2 px-4 py-2 rounded-lg font-medium text-sm transition-all ${orderFilter === "DINEIN"
+                                    ? "bg-action-primary text-text-white shadow-sm"
+                                    : "bg-bg-tertiary text-text-secondary hover:text-text-primary border border-border-default"}`}
+                            >
+                                <Users size={16} />
+                                Dine-In
+                            </button>
+
+                            <button
+                                onClick={() => setOrderFilter("TAKEAWAY")}
+                                className={`flex items-center gap-2 px-4 py-2 rounded-lg font-medium text-sm transition-all ${orderFilter === "TAKEAWAY"
+                                    ? "bg-action-primary text-text-white shadow-sm"
+                                    : "bg-bg-tertiary text-text-secondary hover:text-text-primary border border-border-default"}`}
+                            >
+                                <Package size={16} />
+                                Takeaway
+                            </button>
+                        </div>
                     </div>
+
+
                     <div className="w-full">
                         {loading ? (
                             <div className="flex items-center justify-center py-12">
@@ -712,7 +762,7 @@ const KitchenDisplay = () => {
                             </div>
                         ) : (
                             <div className="grid grid-cols-1 sm:grid-cols-2 lg:grid-cols-3 xl:grid-cols-4 gap-5">
-                                {orders.map((order) => {
+                                {filteredOrders.map((order) => {
                                     const isEditing = editOrderId === order.id;
                                     const isAdding = addingOrderId === order.id;
                                     return (
@@ -884,7 +934,7 @@ const KitchenDisplay = () => {
                                                                     window.dispatchEvent(collectEvent);
                                                                 }}
                                                             >
-                                                               Ready To Serve !!!
+                                                                Ready To Serve !!!
                                                             </button>
                                                         )}
                                                     </div>
