@@ -34,12 +34,12 @@ const TreeNode = ({ category, isExpanded, onToggle, isSelected, onSelect, hasChi
           {category.name}
         </span>
 
-        {typeof category.count !== 'undefined' && (
-          <span
-            className="text-xs px-2 py-0.5 rounded-full text-text-primary bg-bg-tertiary">
-            {category.count}
+        {category.children && category.children.length > 0 && (
+          <span className="text-xs px-2 py-0.5 rounded-full font-semibold bg-bg-tertiary text-text-primary">
+            {category.children.length}
           </span>
         )}
+
       </div>
     </div>
   );
