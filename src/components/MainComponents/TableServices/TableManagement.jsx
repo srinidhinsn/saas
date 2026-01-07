@@ -14,9 +14,9 @@ const statusConfig = {
     Reserved: { card: "border-tableStatusBorder-reserved", icon: <FaClock className="text-action-primary text-xl" />, label: "Reserved" }
 };
 
-const TableManagement = ({ clientId, token, screenIds,userId }) => {
+const TableManagement = ({ clientId, token, screenIds, userId }) => {
 
-    console.log("requesterId",userId)
+    console.log("requesterId", userId)
     const [searchTerm, setSearchTerm] = useState("");
     const [statusFilter, setStatusFilter] = useState("");
     const [tableRanges, setTableRanges] = useState([]);
@@ -52,10 +52,35 @@ const TableManagement = ({ clientId, token, screenIds,userId }) => {
     const [showFirstDeleteConfirm, setShowFirstDeleteConfirm] = useState(false);
     const [showSecondDeleteConfirm, setShowSecondDeleteConfirm] = useState(false);
 
+    const [viewMode, setViewMode] = useState(false);
+    const [addItemsMode, setAddItemsMode] = useState(false);
     useEffect(() => {
         if (clientId) fetchTables();
     }, [clientId]);
+    // Add this new function after your state declarations
+    const getSortedTables = (tablesToSort) => {
+        const COLS_PER_ROW = 8;
+        const statusOrder = { Vacant: 1, Occupied: 2, Reserved: 3 };
 
+        // Group tables into rows of 8
+        const rows = [];
+        for (let i = 0; i < tablesToSort.length; i += COLS_PER_ROW) {
+            rows.push(tablesToSort.slice(i, i + COLS_PER_ROW));
+        }
+
+        // Sort within each row by status
+        const sortedRows = rows.map(row => {
+            return [...row].sort((a, b) => {
+                const statusDiff = statusOrder[a.status] - statusOrder[b.status];
+                if (statusDiff !== 0) return statusDiff;
+                // Secondary sort by name for tables with same status
+                return a.name.localeCompare(b.name, undefined, { numeric: true });
+            });
+        });
+
+        // Flatten back to single array
+        return sortedRows.flat();
+    };
     const fetchTables = async () => {
         if (!clientId) return;
         setLoading(true);
@@ -64,20 +89,24 @@ const TableManagement = ({ clientId, token, screenIds,userId }) => {
                 `${import.meta.env.VITE_API_TABLE_SERVICE_URL}/${clientId}/tables/read`,
                 { headers: { Authorization: `Bearer ${token}` } }
             );
-    
+
             const result = res.data;
             setRequiredScreenId(result.screen_id);
-    
+
             if (result.screen_id === "default_tables") {
                 const tableList = Array.isArray(result?.data) ? result.data : [];
-    
+
                 // Exclude takeaway table
                 const filteredTables = tableList
-                    .filter(table => table.name?.toLowerCase() !== "takeaway")
+                    .filter(table =>
+                        table.id !== 500 &&                           // ⬅️ hard exclude takeaway table
+                        table.name?.toLowerCase() !== "take away" && // ⬅️ extra safety
+                        table.name?.toLowerCase() !== "takeaway"
+                    )
                     .sort((a, b) =>
                         a.name.localeCompare(b.name, undefined, { numeric: true })
                     );
-    
+
                 setTables(filteredTables);
                 setOriginalTables(filteredTables);
             }
@@ -87,7 +116,7 @@ const TableManagement = ({ clientId, token, screenIds,userId }) => {
             setLoading(false);
         }
     };
-    
+
     const parseTableRange = (rangeStr) => {
         const parts = rangeStr.split(",");
         const tables = [];
@@ -454,11 +483,13 @@ const TableManagement = ({ clientId, token, screenIds,userId }) => {
         );
     };
 
-    const filteredTables = tables.filter(table => {
-        const matchesSearch = table.name.toLowerCase().includes(searchTerm.toLowerCase());
-        const matchesStatus = !statusFilter || table.status === statusFilter;
-        return matchesSearch && matchesStatus;
-    });
+    const filteredTables = getSortedTables(
+        tables.filter(table => {
+            const matchesSearch = table.name.toLowerCase().includes(searchTerm.toLowerCase());
+            const matchesStatus = !statusFilter || table.status === statusFilter;
+            return matchesSearch && matchesStatus;
+        })
+    );
 
     if (loading) {
         return (
@@ -473,9 +504,9 @@ const TableManagement = ({ clientId, token, screenIds,userId }) => {
 
     return (
         <AccessGuard screenIds={screenIds} requiredScreenId={requiredScreenId} clientId={clientId} requesterId={userId}>
-        <div className="min-h-screen bg-bg-primary">
-            <style>
-                {`
+            <div className="min-h-screen bg-bg-primary">
+                <style>
+                    {`
           @keyframes scale-in {
             from {
               opacity: 0;
@@ -490,167 +521,186 @@ const TableManagement = ({ clientId, token, screenIds,userId }) => {
             animation: scale-in 0.2s ease-out;
           }
         `}
-            </style>
-            <main className="mx-auto px-3 py-2">
-                {/* Controls */}
-                <div className="rounded-xl p-2 mb-4">
-                    <div className="flex flex-col lg:flex-row gap-3 lg:items-center lg:justify-between">
-                        <div className="flex flex-col sm:flex-row gap-2 flex-1">
-                            <div className="relative ">
-                                <FaSearch className="absolute left-3 top-1/2 transform -translate-y-1/2 text-text-secondary" />
-                                <input
-                                    type="text"
-                                    value={searchTerm}
-                                    onChange={e => setSearchTerm(e.target.value)}
-                                    placeholder="Search tables..."
-                                    className="w-full pl-10 pr-3 py-2 border-default border-border-default rounded-lg focus:outline-none  focus:border-action-primary bg-bg-primary text-text-primary"
-                                />
+                </style>
+                <main className="mx-auto px-3 py-2">
+                    {/* Controls */}
+                    <div className="rounded-xl p-2 mb-4">
+                        <div className="flex flex-col lg:flex-row gap-3 lg:items-center lg:justify-between">
+                            <div className="flex flex-col sm:flex-row gap-2 flex-1">
+                                <div className="relative ">
+                                    <FaSearch className="absolute left-3 top-1/2 transform -translate-y-1/2 text-text-secondary" />
+                                    <input
+                                        type="text"
+                                        value={searchTerm}
+                                        onChange={e => setSearchTerm(e.target.value)}
+                                        placeholder="Search tables..."
+                                        className="w-full pl-10 pr-3 py-2 border-default border-border-default rounded-lg focus:outline-none  focus:border-action-primary bg-bg-primary text-text-primary"
+                                    />
+                                </div>
+                                <select
+                                    value={statusFilter}
+                                    onChange={e => setStatusFilter(e.target.value)}
+                                    className="px-3 py-2 border-default border-border-default rounded-lg focus:outline-none focus:ring-2 focus:border-action-primary bg-bg-primary text-text-primary"
+                                >
+                                    <option value="">All Status</option>
+                                    <option value="Vacant">Available</option>
+                                    <option value="Occupied">Occupied</option>
+                                    <option value="Reserved">Reserved</option>
+                                </select>
                             </div>
-                            <select
-                                value={statusFilter}
-                                onChange={e => setStatusFilter(e.target.value)}
-                                className="px-3 py-2 border-default border-border-default rounded-lg focus:outline-none focus:ring-2 focus:border-action-primary bg-bg-primary text-text-primary"
-                            >
-                                <option value="">All Status</option>
-                                <option value="Vacant">Available</option>
-                                <option value="Occupied">Occupied</option>
-                                <option value="Reserved">Reserved</option>
-                            </select>
-                        </div>
 
-                        <div className="flex flex-wrap gap-2">
-                            <button
-                                className="flex items-center gap-2 px-4 py-2 bg-action-primary text-text-white rounded-lg hover:bg-bulkActionsHover-updateHover hover:text-text-primary transition-colors font-semibold text-sm shadow-md"
-                                onClick={openBulkUpdate}
-                            >
-                                <FaEdit /> <span>Bulk Update</span>
-                            </button>
-                            <button
-                                className="flex items-center gap-2 px-4 py-2 bg-bulkActions-delete text-text-white rounded-lg hover:bg-bulkActionsHover-deleteHover hover:text-text-primary transition-colors font-semibold text-sm shadow-md"
-                                onClick={openBulkDelete}
-                            >
-                                <FaTrash /> <span>Bulk Delete</span>
-                            </button>
-                            <button
-                                className="flex items-center gap-2 px-4 py-2 bg-bulkActions-adding text-text-white rounded-lg hover:bg-bulkActionsHover-addingHover hover:text-text-primary transition-colors font-semibold text-sm shadow-md"
-                                onClick={() => {
-                                    setShowAddTable(true);
-                                    setTableRanges([{
-                                        range: "", table_type: "", type: "", remark: "Vacant",
-                                        is_active: false, description: "", slug: "", section: "",
-                                        sort_order: "", qr_code_url: ""
-                                    }]);
-                                    setFieldErrors([{}]);
-                                }}
-                            >
-                                <FaPlus /> <span>Add Table</span>
-                            </button>
+                            <div className="flex flex-wrap gap-2">
+                                <button
+                                    className="flex items-center gap-2 px-4 py-2 bg-action-primary text-text-white rounded-lg hover:bg-bulkActionsHover-updateHover hover:text-text-primary transition-colors font-semibold text-sm shadow-md"
+                                    onClick={openBulkUpdate}
+                                >
+                                    <FaEdit /> <span>Bulk Update</span>
+                                </button>
+                                <button
+                                    className="flex items-center gap-2 px-4 py-2 bg-bulkActions-delete text-text-white rounded-lg hover:bg-bulkActionsHover-deleteHover hover:text-text-primary transition-colors font-semibold text-sm shadow-md"
+                                    onClick={openBulkDelete}
+                                >
+                                    <FaTrash /> <span>Bulk Delete</span>
+                                </button>
+                                <button
+                                    className="flex items-center gap-2 px-4 py-2 bg-bulkActions-adding text-text-white rounded-lg hover:bg-bulkActionsHover-addingHover hover:text-text-primary transition-colors font-semibold text-sm shadow-md"
+                                    onClick={() => {
+                                        setShowAddTable(true);
+                                        setTableRanges([{
+                                            range: "", table_type: "", type: "", remark: "Vacant",
+                                            is_active: false, description: "", slug: "", section: "",
+                                            sort_order: "", qr_code_url: ""
+                                        }]);
+                                        setFieldErrors([{}]);
+                                    }}
+                                >
+                                    <FaPlus /> <span>Add Table</span>
+                                </button>
+                            </div>
                         </div>
                     </div>
-                </div>
 
-                {/* Table Grid */}
-                <div className="grid grid-cols-2 sm:grid-cols-3 lg:grid-cols-4 xl:grid-cols-5 2xl:grid-cols-6 gap-2 sm:gap-3">
-                    {filteredTables.map(table => {
-                        const config = statusConfig[table.status] || statusConfig['Vacant'];
-                        return (
-                            <div key={table.id} className={`${config.card} rounded-button shadow-sm overflow-hidden border-2 transition-all duration-200 hover:shadow-lg hover:scale-105`}>
-                                <div className="p-3 border-b bg-bg-primary bg-opacity-50">
-                                    <div className="flex justify-between items-start mb-2">
-                                        <div className="flex-1">
-                                            <div className="text-lg font-bold text-text-primary mb-0.5">{table.name}</div>
-                                            <div className="text-xs text-text-secondary">Seating : <span className="font-semibold text-text-primary">{table.table_type}</span></div>
-                                            <div className="text-xs text-text-secondary">Zone : <span className="font-semibold text-text-primary">{table.location_zone}</span></div>
+                    {/* Table Grid */}
+                    <div className="grid grid-cols-2 sm:grid-cols-4 lg:grid-cols-6 xl:grid-cols-6 2xl:grid-cols-8 gap-2 sm:gap-3">
+                        {filteredTables.map(table => {
+                            const config = statusConfig[table.status] || statusConfig['Vacant'];
+                            return (
+                                <div key={table.id} className={`${config.card} rounded-button shadow-sm overflow-hidden border-2 transition-all duration-200 hover:shadow-lg hover:scale-105`}>
+                                    <div className="p-3 border-b bg-bg-primary bg-opacity-50">
+                                        <div className="flex justify-between items-start mb-2">
+                                            <div className="flex-1">
+                                                {/* Table Name */}
+                                                <div className="text-xl font-bold text-center text-text-primary mb-1">
+                                                    {table.name}
+                                                </div>
+
+                                                {/* Seating + Zone in one row */}
+                                                <div className="flex gap-2 text-[10px] justify-center align-center font-semibold text-text-secondary">
+                                                    <div>
+                                                        Seating :{" "}
+                                                        <span className="font-bold text-text-primary">
+                                                            {table.table_type}
+                                                        </span>
+                                                    </div>
+                                                    <div>
+                                                        Zone :{" "}
+                                                        <span className="font-bold text-text-primary">
+                                                            {table.location_zone}
+                                                        </span>
+                                                    </div>
+                                                </div>
+                                            </div>
+
+                                            {config.icon}
                                         </div>
-                                        {config.icon}
+
+                                        <div className="flex items-center justify-center">
+                                            <span className={`px-2 py-0.5 rounded-full text-[10px] font-bold ${table.status === 'Vacant' ? 'bg-tableStatusBg-vacant text-tableStatusText-vacant' :
+                                                table.status === 'Occupied' ? 'bg-tableStatusBg-occupied text-tableStatusText-occupied' :
+                                                    'bg-tableStatusBg-reserved text-tableStatusText-reserved'
+                                                }`}>
+                                                Status : {config.label}
+                                            </span>
+                                        </div>
                                     </div>
-                                    <div className="flex items-center justify-center">
-                                        <span className={`px-2.5 py-0.5 rounded-full text-xs font-bold ${table.status === 'Vacant' ? 'bg-tableStatusBg-vacant text-tableStatusText-vacant' :
-                                            table.status === 'Occupied' ? 'bg-tableStatusBg-occupied text-tableStatusText-occupied' :
-                                                'bg-tableStatusBg-reserved text-tableStatusText-reserved'
-                                            }`}>
-                                            Status : {config.label}
-                                        </span>
+
+                                    <div className="p-1 bg-bg-primary bg-opacity-50 flex gap-1.5">
+                                        <button
+                                            className="flex-1 flex items-center justify-center gap-1 text-[10px] bg-action-primary text-text-white py-1 rounded hover:bg-bulkActionsHover-updateHover hover:text-text-primary transition-colors font-semibold  shadow-sm"
+                                            onClick={() => setEditRowId(table.id)}
+                                        >
+                                            <FaEdit className="text-[10px]" /> Edit
+                                        </button>
+                                        <button
+                                            className="flex-1 flex items-center justify-center gap-1 bg-action-danger text-text-white py-1 rounded hover:bg-bulkActionsHover-deleteHover hover:text-text-primary transition-colors font-semibold text-[10px] shadow-sm"
+                                            onClick={() => { setDeleteTableId(table.id); setShowConfirmDelete(true); }}
+                                        >
+                                            <FaTrash className="text-[10px]" /> Delete
+                                        </button>
                                     </div>
                                 </div>
-
-                                <div className="p-2 bg-bg-primary bg-opacity-50 flex gap-1.5">
-                                    <button
-                                        className="flex-1 flex items-center justify-center gap-1 bg-action-primary text-text-white py-1.5 rounded hover:bg-bulkActionsHover-updateHover hover:text-text-primary transition-colors font-semibold text-xs shadow-sm"
-                                        onClick={() => setEditRowId(table.id)}
-                                    >
-                                        <FaEdit className="text-xs" /> Edit
-                                    </button>
-                                    <button
-                                        className="flex-1 flex items-center justify-center gap-1 bg-action-danger text-text-white py-1.5 rounded hover:bg-bulkActionsHover-deleteHover hover:text-text-primary transition-colors font-semibold text-xs shadow-sm"
-                                        onClick={() => { setDeleteTableId(table.id); setShowConfirmDelete(true); }}
-                                    >
-                                        <FaTrash className="text-xs" /> Delete
-                                    </button>
-                                </div>
-                            </div>
-                        );
-                    })}
-                </div>
-
-                {filteredTables.length === 0 && (
-                    <div className="bg-bg-primary rounded-xl shadow-sm p-12 text-center border border-border-default">
-                        <div className="text-text-secondary mb-3">
-                            <FaSearch className="text-5xl mx-auto" />
-                        </div>
-                        <p className="text-text-secondary text-lg font-medium">No tables found</p>
-                        <p className="text-text-secondary text-sm mt-1">Try adjusting your search or filter criteria</p>
+                            );
+                        })}
                     </div>
-                )}
 
-                <UniversalAddModal
-                    showModal={showAddTable}
-                    setShowModal={setShowAddTable}
-                    modalType="table"
+                    {filteredTables.length === 0 && (
+                        <div className="bg-bg-primary rounded-xl shadow-sm p-12 text-center border border-border-default">
+                            <div className="text-text-secondary mb-3">
+                                <FaSearch className="text-5xl mx-auto" />
+                            </div>
+                            <p className="text-text-secondary text-lg font-medium">No tables found</p>
+                            <p className="text-text-secondary text-sm mt-1">Try adjusting your search or filter criteria</p>
+                        </div>
+                    )}
 
-                    // Table-specific props
-                    tableRanges={tableRanges}
-                    setTableRanges={setTableRanges}
-                    fieldErrors={fieldErrors}
-                    setFieldErrors={setFieldErrors}
-                    isGenerating={isGenerating}
-                    generateTables={generateTables}
-                />
-                            <UniversalEditModal
-                    showModal={editRowId !== null}
-                    setShowModal={(show) => !show && setEditRowId(null)}
-                    modalType="table"
+                    <UniversalAddModal
+                        showModal={showAddTable}
+                        setShowModal={setShowAddTable}
+                        modalType="table"
 
-                    // Table-specific props
-                    editRowId={editRowId}
-                    setEditRowId={setEditRowId}
-                    tables={tables}
-                    handleEditChange={handleEditChange}
-                    saveEdit={saveEdit}
-                    editFieldErrors={editFieldErrors}
-                />
+                        // Table-specific props
+                        tableRanges={tableRanges}
+                        setTableRanges={setTableRanges}
+                        fieldErrors={fieldErrors}
+                        setFieldErrors={setFieldErrors}
+                        isGenerating={isGenerating}
+                        generateTables={generateTables}
+                    />
+                    <UniversalEditModal
+                        showModal={editRowId !== null}
+                        setShowModal={(show) => !show && setEditRowId(null)}
+                        modalType="table"
 
-                <UniversalBulkUpdateModal
-                    showModal={showBulkUpdate}
-                    setShowModal={setShowBulkUpdate}
-                    modalType="table"
+                        // Table-specific props
+                        editRowId={editRowId}
+                        setEditRowId={setEditRowId}
+                        tables={tables}
+                        handleEditChange={handleEditChange}
+                        saveEdit={saveEdit}
+                        editFieldErrors={editFieldErrors}
+                    />
 
-                    // Table-specific props
-                    tables={tables}
-                    bulkUpdateSearch={bulkUpdateSearch}
-                    setBulkUpdateSearch={setBulkUpdateSearch}
-                    selectedUpdateTables={selectedUpdateTables}
-                    setSelectedUpdateTables={setSelectedUpdateTables}
-                    bulkUpdateData={bulkUpdateData}
-                    setBulkUpdateData={setBulkUpdateData}
-                    bulkUpdateGlobal={bulkUpdateGlobal}
-                    setBulkUpdateGlobal={setBulkUpdateGlobal}
-                    handleBulkUpdateChange={handleBulkUpdateChange}
-                    saveBulkUpdate={saveBulkUpdate}
-                    getFilteredUpdateTables={getFilteredUpdateTables}
-                />
+                    <UniversalBulkUpdateModal
+                        showModal={showBulkUpdate}
+                        setShowModal={setShowBulkUpdate}
+                        modalType="table"
 
-                   <UniversalBulkDeleteModal
+                        // Table-specific props
+                        tables={tables}
+                        bulkUpdateSearch={bulkUpdateSearch}
+                        setBulkUpdateSearch={setBulkUpdateSearch}
+                        selectedUpdateTables={selectedUpdateTables}
+                        setSelectedUpdateTables={setSelectedUpdateTables}
+                        bulkUpdateData={bulkUpdateData}
+                        setBulkUpdateData={setBulkUpdateData}
+                        bulkUpdateGlobal={bulkUpdateGlobal}
+                        setBulkUpdateGlobal={setBulkUpdateGlobal}
+                        handleBulkUpdateChange={handleBulkUpdateChange}
+                        saveBulkUpdate={saveBulkUpdate}
+                        getFilteredUpdateTables={getFilteredUpdateTables}
+                    />
+
+                    <UniversalBulkDeleteModal
                         showModal={showBulkDelete}
                         setShowModal={setShowBulkDelete}
                         modalType="table"
@@ -667,114 +717,116 @@ const TableManagement = ({ clientId, token, screenIds,userId }) => {
                         getFilteredDeleteTables={getFilteredDeleteTables}
                     />
 
-                {/* First Delete Confirmation */}
-                {showFirstDeleteConfirm && (
-                    <div className="fixed inset-0 bg-color-modalsbg bg-opacity-50 z-50 flex items-center justify-center p-4">
-                        <div className="bg-bg-primary rounded-xl w-full max-w-md shadow-2xl border-2 border-border-default animate-scale-in">
-                            <div className="p-6 text-center">
-                                <h3 className="text-2xl font-bold text-text-primary mb-2">Confirm Deletion</h3>
-                                <p className="text-text-secondary mb-3">
-                                    Delete <strong className="text-action-danger text-xl">{selectedDeleteTables.length}</strong> table(s)?
-                                </p>
-                                <div className="flex flex-wrap gap-2 justify-center mb-5 max-h-32 overflow-y-auto p-2 bg-bg-tertiary rounded-lg">
-                                    {tables.filter(t => selectedDeleteTables.includes(t.id)).map(t => (
-                                        <span key={t.id} className="px-2.5 py-1 bg-tableStatusBg-occupied text-action-danger rounded-full text-sm font-bold border border-red-300">
-                                            {t.name}
-                                        </span>
-                                    ))}
-                                </div>
-                                <div className="flex gap-3">
-                                    <button
-                                        className="flex-1 bg-action-danger text-text-white py-2.5 rounded-lg hover:bg-action-primary transition-colors font-bold shadow-md"
-                                        onClick={() => {
-                                            setShowFirstDeleteConfirm(false);
-                                            setShowSecondDeleteConfirm(true);
-                                        }}
-                                    >
-                                        Continue
-                                    </button>
-                                    <button
-                                        className="flex-1 bg-modalsUpdateBg-cancel text-text-primary py-2.5 rounded-lg hover:bg-bg-tertiary transition-colors font-bold"
-                                        onClick={() => setShowFirstDeleteConfirm(false)}
-                                    >
-                                        Cancel
-                                    </button>
-                                </div>
-                            </div>
-                        </div>
-                    </div>
-                )}
-
-                {/* Second Delete Confirmation */}
-                {showSecondDeleteConfirm && (
-                    <div className="fixed inset-0 bg-color-modalsbg bg-opacity-70 z-50 flex items-center justify-center p-4">
-                        <div className="bg-bg-primary rounded-xl w-full max-w-md shadow-2xl border-default border-red-300 animate-scale-in">
-                            <div className="p-6 text-center">
-                                <h3 className="text-2xl font-bold text-action-danger mb-3">Final Confirmation</h3>
-                                <div className="bg-tableStatusBg-occupied border-2 border-red-300 rounded-lg p-3 mb-5">
-                                    <p className="text-gray-800 font-semibold text-base mb-1">
-                                        <span className="text-action-danger font-black text-lg">IRREVERSIBLE ACTION</span>
+                    {/* First Delete Confirmation */}
+                    {showFirstDeleteConfirm && (
+                        <div className="fixed inset-0 bg-color-modalsbg bg-opacity-50 z-50 flex items-center justify-center p-4">
+                            <div className="bg-bg-primary rounded-xl w-full max-w-md shadow-2xl border-2 border-border-default animate-scale-in">
+                                <div className="p-6 text-center">
+                                    <h3 className="text-2xl font-bold text-text-primary mb-2">Confirm Deletion</h3>
+                                    <p className="text-text-secondary mb-3">
+                                        Delete <strong className="text-action-danger text-xl">{selectedDeleteTables.length}</strong> table(s)?
                                     </p>
-                                    <p className="text-text-primary text-sm">
-                                        All selected tables will be permanently deleted
-                                    </p>
-                                </div>
-                                <div className="flex gap-3">
-                                    <button
-                                        className="flex-1 bg-action-danger text-text-white py-3 rounded-lg hover:bg-action-primary  transition-colors font-bold shadow-lg flex items-center justify-center gap-2"
-                                        onClick={confirmBulkDelete}
-                                    >
-                                        <FaTrash /> Confirm Delete
-                                    </button>
-                                    <button
-                                        className="flex-1 bg-modalsUpdateBg-cancel text-text-primary py-3 rounded-lg hover:bg-bg-tertiary transition-colors font-bold"
-                                        onClick={() => {
-                                            setShowSecondDeleteConfirm(false);
-                                            setShowFirstDeleteConfirm(false);
-                                        }}
-                                    >
-                                        Cancel
-                                    </button>
-                                </div>
-                            </div>
-                        </div>
-                    </div>
-                )}
-
-                {/* Single Delete Confirmation */}
-                {showConfirmDelete && (
-                    <div className="fixed inset-0 bg-color-modalsbg bg-opacity-50 z-50 flex items-center justify-center p-4">
-                        <div className="bg-bg-primary rounded-xl w-full max-w-sm shadow-2xl border border-border-default animate-scale-in">
-                            <div className="px-5 py-3 border-b rounded-xl flex justify-between items-center bg-gradient-to-r from-red-50 to-pink-50">
-                                <h2 className="text-lg font-bold text-action-danger flex items-center gap-2">
-                                    <FaTrash /> Delete Table
-                                </h2>
-                                <button onClick={() => setShowConfirmDelete(false)} className="text-text-primary hover:text-text-secondary transition-colors p-1 rounded-full">
-                                    <FaTimes size={20} />
-                                </button>
-                            </div>
-                            <div className="p-5">
-                                <div className="text-center">
-                                    {/* <div className="text-5xl mb-3">🗑️</div> */}
-                                    <p className="text-text-primary mb-3">
-                                        Delete table <strong className="text-action-danger text-lg">{tables.find(t => t.id === deleteTableId)?.name || "this table"}</strong>?
-                                    </p>
-                                    <p className="text-sm text-action-danger bg-red-200 p-2 rounded border border-red-300 mb-4">
-                                        This action cannot be undone
-                                    </p>
-                                    <div className="flex justify-center gap-3">
-                                        <button className="bg-action-danger text-text-white rounded-lg px-6 py-2 font-semibold hover:bg-action-primary transition-colors shadow-md" onClick={confirmDelete}>Delete</button>
-                                        <button className="bg-modalsUpdateBg-cancel text-text-primary rounded-lg px-6 py-2 font-semibold hover:bg-bg-tertiary transition-colors" onClick={() => setShowConfirmDelete(false)}>Cancel</button>
+                                    <div className="flex flex-wrap gap-2 justify-center mb-5 max-h-32 overflow-y-auto p-2 bg-bg-tertiary rounded-lg">
+                                        {tables.filter(t => selectedDeleteTables.includes(t.id)).map(t => (
+                                            <span key={t.id} className="px-2.5 py-1 bg-tableStatusBg-occupied text-action-danger rounded-full text-sm font-bold border border-red-300">
+                                                {t.name}
+                                            </span>
+                                        ))}
+                                    </div>
+                                    <div className="flex gap-3">
+                                        <button
+                                            className="flex-1 bg-action-danger text-text-white py-2.5 rounded-lg hover:bg-action-primary transition-colors font-bold shadow-md"
+                                            onClick={() => {
+                                                setShowFirstDeleteConfirm(false);
+                                                setShowSecondDeleteConfirm(true);
+                                            }}
+                                        >
+                                            Continue
+                                        </button>
+                                        <button
+                                            className="flex-1 bg-modalsUpdateBg-cancel text-text-primary py-2.5 rounded-lg hover:bg-bg-tertiary transition-colors font-bold"
+                                            onClick={() => setShowFirstDeleteConfirm(false)}
+                                        >
+                                            Cancel
+                                        </button>
                                     </div>
                                 </div>
                             </div>
                         </div>
-                    </div>
-                )}
-            </main>
-        </div>
+                    )}
+
+                    {/* Second Delete Confirmation */}
+                    {showSecondDeleteConfirm && (
+                        <div className="fixed inset-0 bg-color-modalsbg bg-opacity-70 z-50 flex items-center justify-center p-4">
+                            <div className="bg-bg-primary rounded-xl w-full max-w-md shadow-2xl border-default border-red-300 animate-scale-in">
+                                <div className="p-6 text-center">
+                                    <h3 className="text-2xl font-bold text-action-danger mb-3">Final Confirmation</h3>
+                                    <div className="bg-tableStatusBg-occupied border-2 border-red-300 rounded-lg p-3 mb-5">
+                                        <p className="text-gray-800 font-semibold text-base mb-1">
+                                            <span className="text-action-danger font-black text-lg">IRREVERSIBLE ACTION</span>
+                                        </p>
+                                        <p className="text-text-primary text-sm">
+                                            All selected tables will be permanently deleted
+                                        </p>
+                                    </div>
+                                    <div className="flex gap-3">
+                                        <button
+                                            className="flex-1 bg-action-danger text-text-white py-3 rounded-lg hover:bg-action-primary  transition-colors font-bold shadow-lg flex items-center justify-center gap-2"
+                                            onClick={confirmBulkDelete}
+                                        >
+                                            <FaTrash /> Confirm Delete
+                                        </button>
+                                        <button
+                                            className="flex-1 bg-modalsUpdateBg-cancel text-text-primary py-3 rounded-lg hover:bg-bg-tertiary transition-colors font-bold"
+                                            onClick={() => {
+                                                setShowSecondDeleteConfirm(false);
+                                                setShowFirstDeleteConfirm(false);
+                                            }}
+                                        >
+                                            Cancel
+                                        </button>
+                                    </div>
+                                </div>
+                            </div>
+                        </div>
+                    )}
+
+                    {/* Single Delete Confirmation */}
+                    {showConfirmDelete && (
+                        <div className="fixed inset-0 bg-color-modalsbg bg-opacity-50 z-50 flex items-center justify-center p-4">
+                            <div className="bg-bg-primary rounded-xl w-full max-w-sm shadow-2xl border border-border-default animate-scale-in">
+                                <div className="px-5 py-3 border-b rounded-xl flex justify-between items-center bg-gradient-to-r from-red-50 to-pink-50">
+                                    <h2 className="text-lg font-bold text-action-danger flex items-center gap-2">
+                                        <FaTrash /> Delete Table
+                                    </h2>
+                                    <button onClick={() => setShowConfirmDelete(false)} className="text-text-primary hover:text-text-secondary transition-colors p-1 rounded-full">
+                                        <FaTimes size={20} />
+                                    </button>
+                                </div>
+                                <div className="p-5">
+                                    <div className="text-center">
+                                        {/* <div className="text-5xl mb-3">🗑️</div> */}
+                                        <p className="text-text-primary mb-3">
+                                            Delete table <strong className="text-action-danger text-lg">{tables.find(t => t.id === deleteTableId)?.name || "this table"}</strong>?
+                                        </p>
+                                        <p className="text-sm text-action-danger bg-red-200 p-2 rounded border border-red-300 mb-4">
+                                            This action cannot be undone
+                                        </p>
+                                        <div className="flex justify-center gap-3">
+                                            <button className="bg-action-danger text-text-white rounded-lg px-6 py-2 font-semibold hover:bg-action-primary transition-colors shadow-md" onClick={confirmDelete}>Delete</button>
+                                            <button className="bg-modalsUpdateBg-cancel text-text-primary rounded-lg px-6 py-2 font-semibold hover:bg-bg-tertiary transition-colors" onClick={() => setShowConfirmDelete(false)}>Cancel</button>
+                                        </div>
+                                    </div>
+                                </div>
+                            </div>
+                        </div>
+                    )}
+                </main>
+            </div>
         </AccessGuard>
     );
 };
 
 export default TableManagement;
+
+// --------------------  Table management ============================ //
