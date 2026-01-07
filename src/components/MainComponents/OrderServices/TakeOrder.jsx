@@ -708,6 +708,14 @@ const TakeOrder = ({ clientId, token, onOrderUpdate, realm }) => {
                             {discountPercent}% OFF
                           </div>
                         )}
+                        {item.line_item_id &&
+                          Array.isArray(item.line_item_id) &&
+                          item.line_item_id.length > 0 && (
+                            <div className="absolute bottom-2 left-2 bg-orange-500 text-white text-xs font-semibold px-2 py-1 rounded-md z-10 shadow-md flex items-center gap-1">
+                              <Plus size={12} />
+                              <span>{item.line_item_id.length} add-ons</span>
+                            </div>
+                          )}
 
                         <ImagePreview
                           clientId={clientId}
