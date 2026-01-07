@@ -143,11 +143,19 @@ const TakeOrder = ({ clientId, token, onOrderUpdate, realm }) => {
           { headers: { Authorization: `Bearer ${token}` } }
         );
         const tableList = Array.isArray(tablesRes.data?.data)
-          ? tablesRes.data.data.map(t => ({
-            ...t,
-            table_number: t.name || t.table_number || "-",
-          }))
-          : [];
+        ? tablesRes.data.data
+            .filter(t =>
+              t.id !== 500 &&                            
+              !['takeaway', 'take away'].includes(
+                (t.name || '').toLowerCase().trim()
+              )
+            )
+            .map(t => ({
+              ...t,
+              table_number: t.name || t.table_number || "-",
+            }))
+        : [];
+      
 
         // Find or identify Takeaway table
         let takeawayTable = tableList.find(t =>
@@ -255,7 +263,18 @@ const TakeOrder = ({ clientId, token, onOrderUpdate, realm }) => {
   const availableTables = tables.filter(t =>
     ["vacant", "available"].includes(t.status?.trim().toLowerCase())
   );
-
+  const acTables = availableTables.filter(t =>
+    (t.table_type || t.location_zone || '')
+      .toLowerCase()
+      .includes('ac')
+  );
+  
+  const nonAcTables = availableTables.filter(t =>
+    !(t.table_type || t.location_zone || '')
+      .toLowerCase()
+      .includes('ac')
+  );
+  
   const getFilteredItems = () => {
     const q = (searchQuery || '').trim().toLowerCase();
 
