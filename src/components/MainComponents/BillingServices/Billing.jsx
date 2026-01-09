@@ -305,7 +305,6 @@ export default function BillingPage({clientId,token}) {
       return {};
     }
   };
-
   const saveInvoiceDraft = async () => {
     if (!selectedOrder) {
       toast.error("Select an order first");
@@ -391,7 +390,15 @@ export default function BillingPage({clientId,token}) {
         itemsPayload,
         { headers: { Authorization: `Bearer ${token}` } }
       );
-
+      await axios.post(
+        `${import.meta.env.VITE_API_ORDER_SERVICE_URL}/${clientId}/dinein/update`,
+        {
+          id: selectedOrder.id,
+          invoice_status: paymentStatus.toLowerCase(), // paid / unpaid / partial / due
+        },
+        { headers: { Authorization: `Bearer ${token}` } }
+      );
+      
       toast.success("Invoice draft saved!");
       return draftId;
     } catch (err) {
@@ -402,7 +409,6 @@ export default function BillingPage({clientId,token}) {
       setSaving(false);
     }
   };
-
   const printInvoice = async () => {
     if (!selectedOrder || !selectedOrder.items?.length) {
       toast.error("Select an order with items first");
