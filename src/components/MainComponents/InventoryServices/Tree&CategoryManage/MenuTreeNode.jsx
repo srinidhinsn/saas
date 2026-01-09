@@ -46,10 +46,9 @@ const MenuTreeNode = ({
         <span className={`flex-1 text-sm ${isSelected ? "text-text-white" : "text-text-primary"}`}>
           {category.name}
         </span>
-
-        {typeof category.count !== 'undefined' && (
-          <span className="text-xs px-2 py-0.5 rounded-full text-text-primary bg-bg-tertiary font-medium">
-            {category.count}
+        {category.children && category.children.length > 0 && (
+          <span className="text-xs px-2 py-0.5 rounded-full font-semibold bg-bg-tertiary text-text-primary">
+            {category.children.length}
           </span>
         )}
 

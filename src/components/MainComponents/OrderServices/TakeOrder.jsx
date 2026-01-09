@@ -105,6 +105,8 @@ const TakeOrder = ({ clientId, token, onOrderUpdate, realm }) => {
   const [orderMode, setOrderMode] = useState('dinein'); // 'dinein' or 'takeaway'
   const [takeawayTableId, setTakeawayTableId] = useState(null);
   const isPlacingRef = useRef(false);
+  const isMobile = window.matchMedia('(max-width: 1024px)').matches;
+  const [showClearConfirm, setShowClearConfirm] = useState(false);
 
   // Flatten category tree
   const flattenCategoryTree = (tree, level = 0, parentId = null) => {
@@ -298,6 +300,9 @@ const TakeOrder = ({ clientId, token, onOrderUpdate, realm }) => {
     } else {
       setCart([...cart, { ...item, quantity: 1, note: '' }]);
     }
+    if (!isMobile) {
+      setShowCart(true);
+    }
   };
 
   const handleAddMainItemWithLineItems = () => {
@@ -387,6 +392,14 @@ const TakeOrder = ({ clientId, token, onOrderUpdate, realm }) => {
     localStorage.setItem("order_id_counter", count);
     return `order_${count}`;
   };
+  // const handleClearCart = () => {
+  //   if (cart.length === 0) return;
+  //   const ok = window.confirm("Clear all items from the order?");
+  //   if (ok) {
+  //     setCart([]);
+  //     setSelectedTable('');
+  //   }
+  // };
 
   const generateNextInvoiceId = () => {
     let count = parseInt(localStorage.getItem("invoice_id_counter") || "0", 10);
@@ -446,7 +459,7 @@ const TakeOrder = ({ clientId, token, onOrderUpdate, realm }) => {
         cst: cstValue,
         discount: discountValue,
         total_price,
-        mode: orderMode === 'dinein' ? "Dine In" : "Takeaway",  
+        mode: orderMode === 'dinein' ? "Dine In" : "Takeaway",
         paymentMode: "Cash",
         dinein_order_id,
         invoice_id,
@@ -533,35 +546,39 @@ const TakeOrder = ({ clientId, token, onOrderUpdate, realm }) => {
     window.addEventListener('keydown', onKey);
     return () => window.removeEventListener('keydown', onKey);
   }, []);
+  const handleClearCart = () => {
+    setCart([]);
+    setShowCart(false); // close order panel
+  };
 
-  // if (loading) {
-  //   return (
-  //     <div className="min-h-screen flex items-center justify-center bg-bg-secondary">
-  //       <div className="text-center">
-  //         <div className="animate-spin rounded-full h-12 w-12 border-b-2 mx-auto mb-4 border-action-primary"></div>
-  //         <p className="text-text-secondary">Loading...</p>
-  //       </div>
-  //     </div>
-  //   );
-  // }
+  if (loading) {
+    return (
+      <div className="flex items-center h-[calc(100vh-6rem)] justify-center bg-bg-secondary">
+        <div className="text-center">
+          <div className="animate-spin rounded-full h-12 w-12 border-b-2 mx-auto mb-4 border-action-primary"></div>
+          <p className="text-text-secondary">Loading...</p>
+        </div>
+      </div>
+    );
+  }
 
   return (
-    <div className="min-h-screen bg-bg-primary p-0">
+    <div className="bg-bg-primary p-0 h-[calc(100vh-4rem)] overflow-hidden">
 
+      {/* Search Floating Button */}
       <div
-        className={`fixed top-[80px] right-5 z-50 flex items-center transition-all duration-300 ease-in-out ${searchOpen ? 'w-120' : 'w-22'}`}
-        aria-hidden={false}
+        className={`fixed top-[80px] right-5 z-10 flex items-center transition-all duration-300 ease-in-out ${searchOpen ? 'w-120' : 'w-22'
+          }`}
       >
         <div
-          className={`flex items-center gap-2 rounded-full shadow-lg overflow-hidden transition-colors duration-200 ${searchOpen ? 'bg-action-primary px-3 py-2' : 'bg-action-primary p-2'}`}
-          title={searchOpen ? 'Search items' : 'Open search'}
-          role="button"
-          aria-expanded={searchOpen}
+          className={`flex items-center gap-2 rounded-full shadow-lg overflow-hidden transition-colors duration-200 ${searchOpen ? 'bg-action-primary px-3 py-2' : 'bg-action-primary p-2'
+            }`}
         >
           <button
             onClick={() => setSearchOpen(s => !s)}
-            aria-label={searchOpen ? 'Close search' : 'Open search'}
-            className={`flex items-center justify-center border-none p-0 h-[25px] w-[25px] ${searchOpen ? 'text-text-primary' : 'text-text-white'}`}>
+            className={`h-[25px] w-[25px] flex items-center justify-center ${searchOpen ? 'text-text-primary' : 'text-text-white'
+              }`}
+          >
             <Search size={20} />
           </button>
 
@@ -570,89 +587,96 @@ const TakeOrder = ({ clientId, token, onOrderUpdate, realm }) => {
             value={searchQuery}
             onChange={(e) => setSearchQuery(e.target.value)}
             placeholder="Search items..."
-            className={`transition-all duration-200 bg-action-primary text-text-white outline-none text-sm ${searchOpen ? 'opacity-100 w-full' : 'opacity-0 w-0 pointer-events-none'}`}
-            onKeyDown={(e) => {
-              if (e.key === 'Enter') {
-                // optional: close on Enter or keep open — keeping open so user can refine
-              }
-            }}
+            className={`transition-all duration-200 bg-action-primary text-text-white outline-none text-sm ${searchOpen ? 'opacity-100 w-full' : 'opacity-0 w-0 pointer-events-none'
+              }`}
           />
+
           {searchOpen && (
             <button
               onClick={() => {
-                if (searchQuery.trim() !== "") {
-                  // First click → clear text
-                  setSearchQuery("");
-                  setTimeout(() => searchInputRef.current?.focus(), 50);
-                } else {
-                  // Second click → close search box
-                  setSearchOpen(false);
-                }
+                if (searchQuery) setSearchQuery('');
+                else setSearchOpen(false);
               }}
-              aria-label="Clear or close"
-              className="ml-1 text-xs px-2 py-1 rounded border-border-default bg-transparent text-text-secondary"
-              title={searchQuery.trim() === "" ? "Close" : "Clear search"}
+              className="ml-1 text-xs px-2 py-1 rounded border-border-default text-text-secondary"
             >
-              {searchQuery.trim() === "" ? "Close" : "Clear"}
+              {searchQuery ? 'Clear' : 'Close'}
             </button>
-
           )}
         </div>
       </div>
 
-      <div className="mx-auto px-4 py-2">
-        <div className="grid lg:grid-cols-4 gap-6 lg:gap-8">
-          {/* Sidebar */}
+      <div className="mx-auto px-2 py-2">
+        <div className="grid lg:grid-cols-4 gap-2">
+
+          {/* CATEGORY SIDEBAR */}
           <div className="lg:col-span-1">
-            <div className="lg:sticky lg:top-24">
+            <div className="
+    sticky top-24
+    h-[calc(100vh-4rem)]
+    overflow-y-auto
+    pr-1
+  ">
               <CategoryTree
                 categories={categories}
                 selectedCategory={selectedCategory}
                 onSelectCategory={setSelectedCategory}
-                defaultOpenAll={true}
+                defaultOpenAll
               />
             </div>
           </div>
 
-          {/* Main Content */}
-          <div className="lg:col-span-3">
-            <div className="mb-4">
-              <h2 className="text-xl lg:text-2xl font-semibold text-text-primary">
-                {selectedCategory}
-                <span className="text-sm ml-2 text-text-primary">
-                  ({filteredItems.length} items)
-                </span>
-              </h2>
-            </div>
 
-            {/* Items Grid */}
-            <div className="grid grid-cols-2 sm:grid-cols-2 lg:grid-cols-3 xl:grid-cols-4 2xl:grid-cols-5 gap-3 md:gap-4 lg:gap-5">
-              {filteredItems.map(item => {
-                const discountPercent = item.discount && item.unit_price && Number(item.discount) > 0
-                  ? ((Number(item.discount) * 100) / Number(item.unit_price)).toFixed(1).replace(/\.0$/, '')
-                  : null;
+          {/* MENU + ORDER PANEL */}
+          <div className="lg:col-span-3 grid grid-cols-[1fr_auto] gap-4">
 
-                return (
-                  <div key={item.id} className="min-w-0 bg-bg-primary rounded-xl shadow-sm overflow-hidden hover:shadow-lg transition-all duration-300 group relative"
+
+            {/* MENU */}
+            <div className={`transition-all duration-300
+    lg:max-h-[calc(100vh-4rem)] border-default border-border-default p-4 rounded-lg
+    lg:overflow-y-auto
+    ${!isMobile ? 'flex-1' : 'w-full'}`}>
+
+              <div className="mb-4">
+                <h2 className="text-xl lg:text-2xl font-semibold text-text-primary">
+                  {selectedCategory}
+                  <span className="text-sm ml-2">({filteredItems.length} items)</span>
+                </h2>
+              </div>
+
+              <div
+  className="
+    grid gap-4
+    [grid-template-columns:repeat(auto-fit,minmax(220px,1fr))]
+  "
+>
+
+
+                {filteredItems.map(item => {
+                  const discountPercent =
+                    item.discount &&
+                      item.unit_price &&
+                      Number(item.discount) > 0
+                      ? ((Number(item.discount) * 100) / Number(item.unit_price))
+                        .toFixed(1)
+                        .replace(/\.0$/, '')
+                      : null;
+
+                  return (
+                    <div
+                    key={item.id}
+                    className="
+                      flex gap-3
+                      bg-bg-primary
+                      border border-border-default
+                      rounded-xl
+                      p-2
+                      shadow-sm
+                      hover:shadow-md
+                      transition
+                    "
                   >
-                    <div className="relative h-36 sm:h-40 md:h-44 lg:h-48 overflow-hidden bg-gradient-to-br from-gray-100 to-gray-200">
-
-                      {/* Discount Badge */}
-                      {discountPercent && (
-                        <div className="absolute top-2 left-2 bg-action-danger text-text-white text-xs font-bold px-2 py-1 rounded-md z-10 shadow-md">
-                          {discountPercent}% OFF
-                        </div>
-                      )}
-
-                      {/* Add-ons Badge */}
-                      {item.line_item_id && Array.isArray(item.line_item_id) && item.line_item_id.length > 0 && (
-                        <div className="absolute bottom-2 left-2 bg-orange-500 text-white text-xs font-semibold px-2 py-1 rounded-md z-10 shadow-md flex items-center gap-1">
-                          <Plus size={12} />
-                          <span>{item.line_item_id.length} add-ons</span>
-                        </div>
-                      )}
-
-                      {/* Item Image */}
+                    {/* IMAGE */}
+                    <div className="w-14 h-14 rounded-lg overflow-hidden flex-shrink-0 bg-gray-100">
                       <ImagePreview
                         clientId={clientId}
                         imageId={item.image_id}
@@ -662,81 +686,311 @@ const TakeOrder = ({ clientId, token, onOrderUpdate, realm }) => {
                         urlBuilder={({ baseUrl, clientId, imageId }) =>
                           `${baseUrl}/${clientId}/document/download?doc_id=${imageId}`
                         }
-                        className="w-full h-full object-cover group-hover:scale-110 transition-transform duration-500"
+                        className="w-full h-full object-cover"
                       />
-
-
-
-                      {/* Add Button */}
-                      <button
-                        onClick={() => handleItemClick(item)}
-                        className="absolute bottom-2 right-2 bg-action-primary text-white p-2 sm:p-2.5 rounded-full hover:bg-orange-600 transition-all duration-300 shadow-lg hover:shadow-xl z-10 hover:scale-110 active:scale-95"
-                        aria-label="Add to order"
-                      >
-                        <Plus size={18} className="sm:w-5 sm:h-5" />
-                      </button>
                     </div>
-
-                    {/* Item Info */}
-                    <div className="p-2.5 sm:p-3">
-                      <h3 className="font-semibold text-sm sm:text-base line-clamp-2 mb-1 min-h-[2.5rem] sm:min-h-[3rem] text-text-primary">
-                        {item.name}
-                      </h3>
+                  
+                    {/* CONTENT */}
+                    <div className="flex-1 min-w-0 flex flex-col justify-between">
+                      <div>
+                        {/* NAME */}
+                        <h3 className="text-sm font-semibold text-text-primary leading-tight line-clamp-2">
+                          {item.name}
+                        </h3>
+                  
+                        {/* DESCRIPTION */}
+                        {item.description && (
+                          <p className="text-xs text-text-secondary mt-1 line-clamp-2">
+                            {item.description}
+                          </p>
+                        )}
+                  
+                        {/* KCAL */}
+                        {item.kcal && (
+                          <p className="text-xs text-text-secondary mt-1">
+                            {item.kcal} Kcal
+                          </p>
+                        )}
+                      </div>
+                  
+                      {/* PRICE + ACTION */}
                       <div className="flex items-center justify-between mt-2">
-                        <span className="text-action-primary font-bold text-base sm:text-lg">
-                          ₹{item.unit_price?.toFixed(2)}
-                        </span>
-                        <span className="text-xs text-text-secondary truncate max-w-[100px]">
-                          {item.category}
-                        </span>
+                        {/* PRICE */}
+                        <div>
+                          {item.discount ? (
+                            <>
+                              <span className="text-sm font-bold text-action-primary">
+                                ₹{(item.unit_price - item.discount).toFixed(0)}
+                              </span>
+                              <span className="ml-2 text-xs line-through text-text-secondary">
+                                ₹{item.unit_price}
+                              </span>
+                            </>
+                          ) : (
+                            <span className="text-sm font-bold text-action-primary">
+                              ₹{item.unit_price}
+                            </span>
+                          )}
+                        </div>
+                  
+                        {/* ADD BUTTON */}
+                        <button
+                          onClick={() => handleItemClick(item)}
+                          className="
+                            px-4 py-1.5
+                            text-sm font-semibold
+                            rounded-full
+                            bg-action-primary
+                            text-text-white
+                            hover:bg-action-primary/90
+                            transition
+                          "
+                        >
+                          Add +
+                        </button>
                       </div>
                     </div>
                   </div>
-                );
-              })}
+                  
+                  );
+                })}
+
+              </div>
             </div>
 
-            {/* Empty State */}
-            {filteredItems.length === 0 && (
-              <div className="text-center py-12 rounded-lg bg-bg-primary">
-                <p className="text-text-secondary text-base">No items found in this category</p>
-              </div>
-            )}
-          </div>
-        </div>
+            {/* ORDER PANEL (INLINE – DESKTOP ONLY) */}
+            {!isMobile && (
+              <>
+                <div
+                  className={`transition-all duration-300 ease-in-out overflow-hidden
+      ${showCart ? 'w-[20rem] opacity-100 z-20' : 'w-0 opacity-0'}`}
+                >
+                  <div
+                    className="bg-bg-primary border-l border-border-default shadow-sm
+        lg:sticky lg:top-24
+        lg:h-[calc(100vh-4rem)]
+        lg:flex lg:flex-col"
+                  >
+                    <div className="p-3 lg:p-4 flex flex-col h-full">
 
-        {cart.length > 0 && (
-          <button
-            onClick={() => setShowCart(true)}
-            className="fixed bottom-6 right-6 bg-action-primary  text-text-white lg:bottom-8 lg:right-8 p-4 rounded-full shadow-lg transition-all flex items-center space-x-2 z-40">
-            <ShoppingCart size={24} />
-            <span className="rounded-full w-6 h-6 flex items-center justify-center text-sm font-bold bg-bg-primary text-action-primary">
-              {cart.length}
-            </span>
-          </button>
-        )}
-        {showCart && (
-          <div className="fixed inset-0 z-50 flex justify-end bg-color-modalsbg animate-fade-in">
-            <div className="w-full md:w-96 lg:w-[28rem] h-full overflow-y-auto bg-bg-primary animate-slide-in-right">
-              <div className="p-4 lg:p-6">
-                <div className="flex justify-between items-center mb-6">
-                  <h2 className="text-xl lg:text-2xl font-bold text-text-primary">Your Order</h2>
-                  <button onClick={() => setShowCart(false)} className='text-text-secondary hover:text-text-primary transition-colors'>
-                    <X size={24} />
-                  </button>
+                      {/* Header */}
+                      <div className="flex justify-between items-center mb-3 p-2">
+                        <button
+                          onClick={() => setShowCart(false)}
+                          className="text-text-secondary hover:text-text-primary"
+                        >
+                          <X size={20} />
+                        </button>
+                        <h2 className="text-base font-bold text-text-primary">
+                          Your Order
+                        </h2>
+                      </div>
+
+                      {cart.length === 0 ? (
+                        <p className="text-text-secondary text-center text-sm">
+                          No items added
+                        </p>
+                      ) : (
+                        <>
+                          {/* Order Mode */}
+                          <div className="mb-3">
+                            <div className="flex gap-1 p-1 bg-bg-tertiary rounded-lg ">
+                              <button
+                                onClick={() => {
+                                  setOrderMode('dinein');
+                                  setSelectedTable('');
+                                }}
+                                className={`flex-1 px-3 py-1.5 text-sm rounded-md flex items-center justify-center gap-2 font-medium
+                    ${orderMode === 'dinein'
+                                    ? 'bg-action-primary text-text-white'
+                                    : 'text-text-secondary hover:text-text-primary'
+                                  }`}
+                              >
+                                <Users size={16} /> Dine In
+                              </button>
+
+                              <button
+                                onClick={() => {
+                                  setOrderMode('takeaway');
+                                  setSelectedTable('');
+                                }}
+                                className={`flex-1 px-3 py-1.5 text-sm rounded-md flex items-center justify-center gap-2 font-medium
+                    ${orderMode === 'takeaway'
+                                    ? 'bg-action-primary text-text-white'
+                                    : 'text-text-secondary hover:text-text-primary'
+                                  }`}
+                              >
+                                <Package size={16} /> Takeaway
+                              </button>
+                            </div>
+                          </div>
+
+                          {/* Table Select */}
+                          {orderMode === 'dinein' && (
+                            <div className="mb-3 p-3 rounded-lg bg-bg-tertiary">
+                              <label className="block text-xs font-semibold mb-1 text-text-primary">
+                                Select Table
+                              </label>
+                              <select
+                                value={selectedTable}
+                                onChange={(e) => setSelectedTable(e.target.value)}
+                                className="w-full px-3 py-1.5 text-sm rounded-md bg-bg-primary border-border-default"
+                              >
+                                <option value="">Choose a table</option>
+                                {availableTables.map(t => (
+                                  <option key={t.id} value={t.id}>
+                                    {t.table_number} - {t.location_zone}
+                                  </option>
+                                ))}
+                              </select>
+                            </div>
+                          )}
+
+                          {/* Cart Items */}
+                          <div className="space-y-1 overflow-y-auto flex-1 mb-3">
+                            {cart.map(item => (
+                              <div
+                                key={item.id}
+                                className="flex gap-2 p-2 rounded-lg bg-bg-tertiary border-border-default"
+                              >
+                                <div className="flex-1 min-w-0">
+                                  <h4 className="text-sm font-semibold truncate">
+                                    {item.name}
+                                  </h4>
+                                  <p className="text-xs text-action-primary">
+                                    ₹{(item.unit_price - item.discount).toFixed(2)} × {item.quantity}
+                                  </p>
+                                </div>
+
+                                <div className="flex items-center gap-1">
+                                  <button
+                                    onClick={() => updateQuantity(item.id, -1)}
+                                    className="p-1 bg-bg-primary rounded border-border-default"
+                                  >
+                                    <Minus size={14} />
+                                  </button>
+
+                                  <span className="px-2 text-sm font-semibold text-action-primary">
+                                    {item.quantity}
+                                  </span>
+
+                                  <button
+                                    onClick={() => updateQuantity(item.id, 1)}
+                                    className="p-1 bg-bg-primary rounded border-border-default"
+                                  >
+                                    <Plus size={14} />
+                                  </button>
+                                </div>
+
+                                <button
+                                  onClick={() => removeFromCart(item.id)}
+                                  className="text-action-danger"
+                                >
+                                  <X size={16} />
+                                </button>
+                              </div>
+                            ))}
+                          </div>
+
+                          {/* Total */}
+                          <div className="border-t pt-2 mb-2">
+                            <div className="flex justify-between font-semibold text-sm">
+                              <span>Total</span>
+                              <span className="text-action-primary">
+                                ₹{getTotalPrice()}
+                              </span>
+                            </div>
+                          </div>
+
+                          {/* Actions */}
+                          <div className="flex gap-2">
+                            <button
+                              onClick={() => setShowClearConfirm(true)}
+                              className="flex-1 py-2 text-sm border rounded-lg hover:bg-bg-tertiary"
+                            >
+                              Clear
+                            </button>
+
+                            <button
+                              onClick={handlePlaceOrder}
+                              disabled={
+                                (orderMode === 'dinein' && !selectedTable) ||
+                                cart.length === 0 ||
+                                isPlacingOrder
+                              }
+                              className={`flex-1 py-2 text-sm rounded-lg font-semibold
+                  ${!isPlacingOrder && cart.length > 0 && selectedTable
+                                  ? 'bg-action-primary text-text-white'
+                                  : 'bg-border-default cursor-not-allowed'
+                                }`}
+                            >
+                              {isPlacingOrder ? 'Placing...' : 'Place Order'}
+                            </button>
+                          </div>
+                        </>
+                      )}
+                    </div>
+                  </div>
                 </div>
 
-                {orderPlaced ? (
-                  <div className="text-center py-12 animate-scale-in">
-                    <div className="rounded-full w-20 h-20 flex items-center justify-center mx-auto mb-4 bg-action-success">
-                      <Check size={40} className='text-bg-primary' />
+                {/* CLEAR CONFIRM POPUP */}
+                {showClearConfirm && (
+                  <div className="fixed inset-0 z-50 bg-black/40 flex items-center justify-center">
+                    <div className="bg-bg-primary rounded-lg w-[300px] p-4 space-y-3">
+                      <h3 className="text-sm font-semibold">Clear Order?</h3>
+                      <p className="text-xs text-text-secondary">
+                        This will remove all items from the order.
+                      </p>
+                      <div className="flex justify-end gap-2">
+                        <button
+                          onClick={() => setShowClearConfirm(false)}
+                          className="px-3 py-1.5 text-sm border rounded"
+                        >
+                          Cancel
+                        </button>
+                        <button
+                          onClick={() => {
+                            handleClearCart();
+                            setShowClearConfirm(false);
+                          }}
+                          className="px-3 py-1.5 text-sm bg-red-600 text-white rounded"
+                        >
+                          Clear
+                        </button>
+                      </div>
                     </div>
-                    <h3 className="text-xl font-semibold mb-2 text-action-success">Order Placed!</h3>
-                    <p className='text-text-secondary'>Your order has been successfully placed.</p>
                   </div>
-                ) : (
-                  <>
-                    {/* Order Mode Toggle */}
+                )}
+              </>
+            )}
+
+
+          </div>
+        </div>
+      </div>
+      {isMobile && showCart && (
+        <div className="fixed inset-0 z-50 flex justify-end bg-color-modalsbg animate-fade-in">
+          <div className="w-full md:w-96 lg:w-[28rem] h-full overflow-y-auto bg-bg-primary animate-slide-in-right">
+            <div className="p-4 lg:p-6">
+              <div className="flex justify-between items-center mb-6">
+                <h2 className="text-xl lg:text-2xl font-bold text-text-primary">Your Order</h2>
+                <button onClick={() => setShowCart(false)} className='text-text-secondary hover:text-text-primary transition-colors'>
+                  <X size={24} />
+                </button>
+              </div>
+
+              {orderPlaced ? (
+                <div className="text-center py-12 animate-scale-in">
+                  <div className="rounded-full w-20 h-20 flex items-center justify-center mx-auto mb-4 bg-action-success">
+                    <Check size={40} className='text-bg-primary' />
+                  </div>
+                  <h3 className="text-xl font-semibold mb-2 text-action-success">Order Placed!</h3>
+                  <p className='text-text-secondary'>Your order has been successfully placed.</p>
+                </div>
+              ) : (
+                <>
+                  <div className="mb-6 p-4 rounded-lg bg-bg-tertiary border-border-default">
+                    {/* Order Mode Toggle (MOBILE) */}
                     <div className="mb-4">
                       <div className="flex gap-2 p-1 bg-bg-tertiary rounded-lg">
                         <button
@@ -745,248 +999,188 @@ const TakeOrder = ({ clientId, token, onOrderUpdate, realm }) => {
                             setSelectedTable('');
                           }}
                           className={`flex-1 px-4 py-2.5 rounded-md transition-all flex items-center justify-center gap-2 font-medium ${orderMode === 'dinein'
-                              ? 'bg-action-primary text-text-white shadow-sm'
-                              : 'text-text-secondary hover:text-text-primary'
-                            }`}>
+                            ? 'bg-action-primary text-text-white shadow-sm'
+                            : 'text-text-secondary'
+                            }`}
+                        >
                           <Users size={18} />
-                          <span>Dine In</span>
+                          Dine In
                         </button>
-                        
+
                         <button
                           onClick={() => {
                             setOrderMode('takeaway');
                             setSelectedTable('');
                           }}
                           className={`flex-1 px-4 py-2.5 rounded-md transition-all flex items-center justify-center gap-2 font-medium ${orderMode === 'takeaway'
-                              ? 'bg-action-primary text-text-white shadow-sm'
-                              : 'text-text-secondary hover:text-text-primary'
-                            }`}>
+                            ? 'bg-action-primary text-text-white shadow-sm'
+                            : 'text-text-secondary'
+                            }`}
+                        >
                           <Package size={18} />
-                          <span>Takeaway</span>
+                          Takeaway
                         </button>
                       </div>
                     </div>
 
-                    {/* Table Selection - Only for Dine In */}
                     {orderMode === 'dinein' && (
-                      <div className="mb-6 p-4 rounded-lg bg-bg-tertiary border-border-default">
-                        <div className="text-sm text-text-primary">
-                          <span className="font-semibold">Table:</span>
-                          <div className="mt-2">
-                            <label className="block text-sm font-semibold mb-2 text-text-primary">Select Table</label>
-                            <select
-                              value={selectedTable}
-                              onChange={(e) => setSelectedTable(e.target.value)}
-                              className="w-full px-4 py-2 rounded-lg focus:outline-none border-border-default bg-bg-primary text-text-primary transition-all">
-                              <option value="">Choose a table</option>
-                              {availableTables.map(table => (
-                                <option key={table.id} value={table.id}>
-                                  {table.table_number} - {table.location_zone}
-                                </option>
-                              ))}
-                            </select>
-                          </div>
-                        </div>
+                      <div className="text-sm text-text-primary">
+                        <label className="block text-sm font-semibold mb-2 text-text-primary">
+                          Select Table
+                        </label>
+                        <select
+                          value={selectedTable}
+                          onChange={(e) => setSelectedTable(e.target.value)}
+                          className="w-full px-4 py-2 rounded-lg border-border-default bg-bg-primary"
+                        >
+                          <option value="">Choose a table</option>
+                          {availableTables.map(table => (
+                            <option key={table.id} value={table.id}>
+                              {table.table_number} - {table.location_zone}
+                            </option>
+                          ))}
+                        </select>
                       </div>
                     )}
 
-                    {/* Takeaway Info */}
-                    {orderMode === 'takeaway' && (
-                      <div className="mb-6 p-4 rounded-lg bg-gradient-to-r from-orange-50 to-orange-100 border border-orange-200">
-                        <div className="flex items-center gap-3">
-                          <div className="p-2 bg-action-primary rounded-lg">
-                            <Package size={20} className="text-text-white" />
-                          </div>
-                          <div>
-                            <div className="text-sm text-text-secondary">Order Type</div>
-                            <div className="font-bold text-text-primary">Takeaway Order</div>
-                          </div>
+                  </div>
+
+                  <div className="space-y-4 mb-6 max-h-[calc(100vh-400px)] overflow-y-auto">
+                    {cart.map(item => (
+                      <div key={item.id} className="flex items-center space-x-3 p-3 lg:p-4 rounded-lg bg-bg-tertiary border-border-default animate-slide-up">
+                        <div className="w-16 h-16 rounded-md overflow-hidden flex-shrink-0">
+                          <ImagePreview
+                            clientId={clientId}
+                            imageId={item.image_id}
+                            token={token}
+                            alt={item.name}
+                            baseUrl={import.meta.env.VITE_API_DOCUMENT_SERVICE_URL}
+                            urlBuilder={({ baseUrl, clientId, imageId }) =>
+                              `${baseUrl}/${clientId}/document/download?doc_id=${imageId}`
+                            }
+                            className="w-full h-full object-cover"
+                          />
                         </div>
-                      </div>
-                    )}
-
-                    <div className="space-y-4 mb-6 max-h-[calc(100vh-400px)] overflow-y-auto">
-                      {cart.map(item => (
-                        <div key={item.id} className="flex items-center space-x-3 p-3 lg:p-4 rounded-lg bg-bg-tertiary border-border-default animate-slide-up">
-                          <div className="w-16 h-16 rounded-md overflow-hidden flex-shrink-0">
-                            <ImagePreview
-                              clientId={clientId}
-                              imageId={item.image_id}
-                              token={token}
-                              alt={item.name}
-                              baseUrl={import.meta.env.VITE_API_DOCUMENT_SERVICE_URL}
-                              urlBuilder={({ baseUrl, clientId, imageId }) =>
-                                `${baseUrl}/${clientId}/document/download?doc_id=${imageId}`
-                              }
-                              className="w-full h-full object-cover"
-                            />
-                          </div>
 
 
 
-                          <div className="flex-1 min-w-0">
-                            <h4 className="font-semibold text-sm lg:text-base truncate flex items-center gap-2 text-text-primary">
-                              {item.name}
-                              {item.note && (
-                                <button
-                                  onClick={() => openNoteEditor(item)}
-                                  title="Has note" className='text-action-primary hover:scale-110 transition-transform'>
-                                  <StickyNote size={16} />
-                                </button>
-                              )}
-                            </h4>
-                            <p className='text-action-primary font-bold'>Rs.{item.unit_price?.toFixed(2)}</p>
-                            {!item.note && (
+                        <div className="flex-1 min-w-0">
+                          <h4 className="font-semibold text-sm lg:text-base truncate flex items-center gap-2 text-text-primary">
+                            {item.name}
+                            {item.note && (
                               <button
                                 onClick={() => openNoteEditor(item)}
-                                className="text-xs mt-1 text-text-secondary hover:text-action-primary transition-colors">
-                                + Add note
+                                title="Has note" className='text-action-primary hover:scale-110 transition-transform'>
+                                <StickyNote size={16} />
                               </button>
                             )}
-                          </div>
-                          <div className="flex items-center space-x-2">
+                          </h4>
+                          <p className='text-action-primary font-bold'>Rs.{item.unit_price?.toFixed(2)}</p>
+                          {!item.note && (
                             <button
-                              onClick={() => updateQuantity(item.id, -1)}
-                              className="p-1 rounded bg-bg-primary border-border-default hover:bg-bg-secondary transition-colors"
-                            >
-                              <Minus size={16} />
+                              onClick={() => openNoteEditor(item)}
+                              className="text-xs mt-1 text-text-secondary hover:text-action-primary transition-colors">
+                              + Add note
                             </button>
-                            <span className="w-8 text-center font-semibold text-text-primary">{item.quantity}</span>
-                            <button
-                              onClick={() => updateQuantity(item.id, 1)}
-                              className="p-1 rounded bg-bg-primary border-border-default hover:bg-bg-secondary transition-colors">
-                              <Plus size={16} />
-                            </button>
-                          </div>
+                          )}
+                        </div>
+                        <div className="flex items-center space-x-2">
                           <button
-                            onClick={() => removeFromCart(item.id)}
-                            title="Remove item" className='text-action-danger hover:scale-110 transition-transform'>
-                            <X size={20} />
+                            onClick={() => updateQuantity(item.id, -1)}
+                            className="p-1 rounded bg-bg-primary border-border-default hover:bg-bg-secondary transition-colors"
+                          >
+                            <Minus size={16} />
+                          </button>
+                          <span className="w-8 text-center font-semibold text-text-primary">{item.quantity}</span>
+                          <button
+                            onClick={() => updateQuantity(item.id, 1)}
+                            className="p-1 rounded bg-bg-primary border-border-default hover:bg-bg-secondary transition-colors">
+                            <Plus size={16} />
                           </button>
                         </div>
-                      ))}
-                    </div>
-
-                    <div className="border-t pt-4 mb-6 border-border-default" >
-                      <div className="flex justify-between items-center text-xl font-bold">
-                        <span className='text-text-primary'>Total:</span>
-                        <span className='text-action-primary font-bold'>Rs.{getTotalPrice()}</span>
+                        <button
+                          onClick={() => removeFromCart(item.id)}
+                          title="Remove item" className='text-action-danger hover:scale-110 transition-transform'>
+                          <X size={20} />
+                        </button>
                       </div>
+                    ))}
+                  </div>
+
+                  <div className="border-t pt-4 mb-6 border-border-default" >
+                    <div className="flex justify-between items-center text-xl font-bold">
+                      <span className='text-text-primary'>Total:</span>
+                      <span className='text-action-primary font-bold'>Rs.{getTotalPrice()}</span>
                     </div>
+                  </div>
 
-                    <button
-                      onClick={handlePlaceOrder}
-                      disabled={
-                        (orderMode === 'dinein' && !selectedTable) ||
-                        (orderMode === 'takeaway' && !takeawayTableId) ||
-                        cart.length === 0 ||
-                        isPlacingOrder
+                  <button
+                    onClick={handlePlaceOrder}
+                    disabled={
+                      (orderMode === 'dinein' && !selectedTable) ||
+                      cart.length === 0 ||
+                      isPlacingOrder
+                    }
+                    className={`w-full py-3 rounded-lg font-semibold transition-all
+                      ${((orderMode === 'dinein' ? selectedTable : true) &&
+                        cart.length > 0 &&
+                        !isPlacingOrder)
+                        ? 'bg-action-primary text-text-white hover:shadow-lg'
+                        : 'bg-border-default text-text-primary cursor-not-allowed'
                       }
-                      className={`w-full py-3 rounded-lg font-semibold transition-all duration-300 transform hover:scale-[1.02] active:scale-[0.98]
-        border-default
-        ${(orderMode === 'dinein' ? selectedTable : takeawayTableId) && cart.length > 0 && !isPlacingOrder
-                          ? 'text-text-white bg-action-primary cursor-pointer hover:shadow-lg'
-                          : 'text-text-primary bg-border-default cursor-not-allowed'
-                        }`}>
-                      {isPlacingOrder ? "Placing Order..." : "Place Order"}
-                    </button>
+                    `}
+                  >
+                    {isPlacingOrder ? "Placing Order..." : "Place Order"}
+                  </button>
 
-                    {/* Updated Error Message */}
-                    {orderMode === 'dinein' && !selectedTable && cart.length > 0 && (
-                      <p className="text-sm text-center mt-2 text-action-danger animate-slide-up">
-                        Select a table
-                      </p>
-                    )}
-                    {orderMode === 'takeaway' && !takeawayTableId && cart.length > 0 && (
-                      <p className="text-sm text-center mt-2 text-action-danger animate-slide-up">
-                        Takeaway not available
-                      </p>
-                    )}
-                  </>
-                )}
-              </div>
+                  {orderMode === 'dinein' && !selectedTable && cart.length > 0 && (
+                    <p className="text-sm text-center mt-2 text-action-danger">
+                      Select a table
+                    </p>
+                  )}
+
+                </>
+              )}
             </div>
           </div>
-        )}
-
-        {/* Add these CSS animations to your component or global styles */}
-        <style>{`
-  @keyframes fadeIn {
-    from { 
-      opacity: 0; 
-    }
-    to { 
-      opacity: 1; 
-    }
-  }
-  
-  @keyframes slideInRight {
-    from { 
-      transform: translateX(100%); 
-    }
-    to { 
-      transform: translateX(0); 
-    }
-  }
-  
-  @keyframes slideUp {
-    from { 
-      opacity: 0;
-      transform: translateY(10px); 
-    }
-    to { 
-      opacity: 1;
-      transform: translateY(0); 
-    }
-  }
-  
-  @keyframes scaleIn {
-    from { 
-      opacity: 0;
-      transform: scale(0.9); 
-    }
-    to { 
-      opacity: 1;
-      transform: scale(1); 
-    }
-  }
-  
-  .animate-fade-in {
-    animation: fadeIn 0.3s ease-out;
-  }
-  
-  .animate-slide-in-right {
-    animation: slideInRight 0.3s ease-out;
-  }
-  
-  .animate-slide-up {
-    animation: slideUp 0.4s ease-out;
-  }
-  
-  .animate-scale-in {
-    animation: scaleIn 0.5s ease-out;
-  }
-`}</style>
-      </div>
-
-      <NoteModal
-        isOpen={noteModalOpen}
-        onClose={() => setNoteModalOpen(false)}
-        itemName={currentItemForNote?.name}
-        note={currentItemForNote?.note}
-        onSave={saveNoteToItem}
-      />
-
+        </div>
+      )}
+      {/* Floating Cart Button */}
+      {cart.length > 0 && !showCart && (
+        <button
+          onClick={() => setShowCart(true)}
+          className="fixed bottom-6 right-6 bg-action-primary text-white p-4 rounded-full shadow-lg z-40"
+        >
+          <ShoppingCart size={24} />
+        </button>
+      )}
+      {/* Line Items (Add-ons) Modal */}
       <LineItemsModal
         isOpen={lineItemsModalOpen}
-        onClose={() => setLineItemsModalOpen(false)}
+        onClose={() => {
+          setLineItemsModalOpen(false);
+          setSelectedMainItem(null);
+          setLineItemsDetails([]);
+        }}
         mainItem={selectedMainItem}
         lineItems={lineItemsDetails}
-        onAddWithLineItems={handleAddMainItemWithLineItems}
         onAddMainOnly={handleAddMainItemOnly}
+        onAddWithLineItems={handleAddMainItemWithLineItems}
       />
+
+      {/* Notes Modal */}
+      <NoteModal
+        isOpen={noteModalOpen}
+        onClose={() => {
+          setNoteModalOpen(false);
+          setCurrentItemForNote(null);
+        }}
+        itemName={currentItemForNote?.name}
+      />
+
     </div>
   );
+
 };
 
 export default TakeOrder;
