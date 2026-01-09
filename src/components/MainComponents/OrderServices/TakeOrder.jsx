@@ -751,6 +751,7 @@ const TakeOrder = ({ clientId, token, onOrderUpdate, realm }) => {
                           <Users size={18} />
                           <span>Dine In</span>
                         </button>
+                        
                         <button
                           onClick={() => {
                             setOrderMode('takeaway');

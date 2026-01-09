@@ -387,62 +387,88 @@ const KitchenDisplay = () => {
         }
     };
 
+
+
     const handleItemStatusChange = async (orderId, itemBackendId, newStatus) => {
         try {
             const orderIdInt = parseInt(orderId, 10);
-            // Get the order from state
             const order = orders.find(o => o.id === orderIdInt);
-            if (!order) {
-                toast.error("Order not found in state");
-                return;
-            }
+            if (!order) return;
 
-            // Modify only the item you care about
+            // 🔄 Update clicked item status
             const updatedItems = order.items.map(item =>
                 item.id === itemBackendId
                     ? { ...item, status: newStatus }
                     : item
             );
 
-            // Strip 'id' so backend doesn't try to insert into identity column
+            // ❗ Remove id before sending to backend
             const itemsForUpdate = updatedItems.map(({ id, ...rest }) => rest);
 
-            // Recalculate total price
+            // 💰 Recalculate total
             const totalPrice = updatedItems.reduce(
                 (sum, item) =>
                     sum + (inventoryMap[item.item_id]?.price || 0) * (item.quantity || 1),
                 0
             );
 
-            // Send full updated list without 'id'
+            // 🔄 Update items in backend
             await axios.post(
                 `${import.meta.env.VITE_API_ORDER_SERVICE_URL}/${clientId}/order_items/update?order_id=${orderIdInt}`,
                 itemsForUpdate,
                 { headers: { Authorization: `Bearer ${token}` } }
             );
 
-            // Update order total price in backend
+            // 🧠 DERIVE ORDER STATUS FROM ITEMS
+            const derivedStatus = deriveOrderStatusFromItems(updatedItems);
+
+            // 🔄 Update order status in backend
             await axios.post(
                 `${import.meta.env.VITE_API_ORDER_SERVICE_URL}/${clientId}/dinein/update`,
-                { id: orderIdInt, total_price: totalPrice },
+                {
+                    id: orderIdInt,
+                    status: derivedStatus,
+                    total_price: totalPrice,
+                },
                 { headers: { Authorization: `Bearer ${token}` } }
             );
 
-            // Update local state (with id still intact locally)
+            // 📣 DISPATCH EVENT ONLY WHEN ALL ITEMS ARE SERVED
+            if (derivedStatus === "ready" && order.status !== "ready") {
+                const collectEvent = new CustomEvent("orderCollect", {
+                    detail: {
+                        tableName:
+                            tablesMap[order.table_id] ||
+                            order.table_number ||
+                            "Unknown Table",
+                        orderId: order.id,
+                    },
+                });
+                window.dispatchEvent(collectEvent);
+            }
+
+            // 🪄 Update local state
             setOrders(prev =>
                 prev.map(o =>
                     o.id === orderId
-                        ? { ...o, items: updatedItems, total_price: totalPrice }
+                        ? {
+                            ...o,
+                            items: updatedItems,
+                            status: derivedStatus,
+                            total_price: totalPrice,
+                        }
                         : o
                 )
             );
 
-            toast.success("Item status updated");
         } catch (err) {
             console.error(err);
             toast.error("Failed to update item status");
         }
     };
+
+
+
     // Update item name locally
     const updateItemName = (orderId, itemId, newName) => {
         setOrders((prev) =>
@@ -482,80 +508,103 @@ const KitchenDisplay = () => {
 
 
 
-    const handleStatusChange = async (orderId, newStatus) => {
-        try {
-            const orderIdInt = parseInt(orderId, 10);
-            const order = orders.find(o => o.id === orderIdInt);
-            if (!order) return;
+    const deriveOrderStatusFromItems = (items) => {
+        if (!items || items.length === 0) return "new";
 
-            // Update all items if order status is "served"
-            const updatedItems =
-                newStatus === "served"
-                    ? order.items.map(item => ({ ...item, status: "served" }))
-                    : order.items;
-
-            const cleanedItems = updatedItems.map(item => ({
-                item_id: item.item_id,
-                item_name: item.item_name,
-                quantity: item.quantity,
-                status: item.status || "new",
-                note: item.note || "",
-                slug: item.slug || "",
-                price: item.price || inventoryMap[item.item_id]?.price || 0,
-                client_id: clientId,
-                order_id: orderId,
-            }));
-
-            const totalPrice = cleanedItems.reduce(
-                (sum, item) => sum + (item.price || 0) * (item.quantity || 1),
-                0
-            );
-
-            // Save updated items with their statuses
-            await axios.post(
-                `${import.meta.env.VITE_API_ORDER_SERVICE_URL}/${clientId}/order_items/update?order_id=${orderIdInt}`,
-                cleanedItems,
-                { headers: { Authorization: `Bearer ${token}` } }
-            );
-
-            // Update overall order status and total price
-            await axios.post(
-                `${import.meta.env.VITE_API_ORDER_SERVICE_URL}/${clientId}/dinein/update`,
-                { id: orderIdInt, status: newStatus, total_price: totalPrice },
-                { headers: { Authorization: `Bearer ${token}` } }
-            );
-
-            // ✅ If served, clear new items tracking
-            if (newStatus === "served") {
-                clearNewItemsStorage(orderId);
-            }
-
-            // Update local state accordingly
-            setOrders(prev =>
-                prev.map(o =>
-                    o.id === orderId
-                        ? {
-                            ...o,
-                            status: newStatus,
-                            items: updatedItems,
-                            total_price: totalPrice,
-                            has_new_items: newStatus === 'served' ? false : o.has_new_items,
-                            new_items_start_index: newStatus === 'served' ? null : o.new_items_start_index,
-                        }
-                        : o
-                )
-            );
-
-            // Exit edit/add modes if served
-            if (newStatus === "served") {
-                if (editOrderId === orderId) setEditOrderId(null);
-                if (addingOrderId === orderId) setAddingOrderId(null);
-            }
-        } catch (err) {
-            console.error(err);
-            toast.error("Failed to update order status");
+        if (items.some(i => i.status === "pending")) {
+            return "pending";
         }
+
+        if (items.some(i => i.status === "preparing")) {
+            return "preparing";
+        }
+
+        if (items.every(i => i.status === "served")) {
+            return "ready";
+        }
+
+        return "new";
     };
+
+
+
+    // const handleStatusChange = async (orderId, newStatus) => {
+    //     try {
+    //         const orderIdInt = parseInt(orderId, 10);
+    //         const order = orders.find(o => o.id === orderIdInt);
+    //         if (!order) return;
+
+    //         // Update all items if order status is "served"
+    //         const updatedItems =
+    //         newStatus === "served"
+    //             ? order.items.map(item => ({ ...item, status: "served" }))
+    //             : newStatus === "ready"
+    //             ? order.items.map(item => ({ ...item, status: "ready" }))
+    //             : order.items;
+
+
+    //         const cleanedItems = updatedItems.map(item => ({
+    //             item_id: item.item_id,
+    //             item_name: item.item_name,
+    //             quantity: item.quantity,
+    //             status: item.status || "new",
+    //             note: item.note || "",
+    //             slug: item.slug || "",
+    //             price: item.price || inventoryMap[item.item_id]?.price || 0,
+    //             client_id: clientId,
+    //             order_id: orderId,
+    //         }));
+
+    //         const totalPrice = cleanedItems.reduce(
+    //             (sum, item) => sum + (item.price || 0) * (item.quantity || 1),
+    //             0
+    //         );
+
+    //         // Save updated items with their statuses
+    //         await axios.post(
+    //             `${import.meta.env.VITE_API_ORDER_SERVICE_URL}/${clientId}/order_items/update?order_id=${orderIdInt}`,
+    //             cleanedItems,
+    //             { headers: { Authorization: `Bearer ${token}` } }
+    //         );
+
+    //         // Update overall order status and total price
+    //         await axios.post(
+    //             `${import.meta.env.VITE_API_ORDER_SERVICE_URL}/${clientId}/dinein/update`,
+    //             { id: orderIdInt, status: newStatus, total_price: totalPrice },
+    //             { headers: { Authorization: `Bearer ${token}` } }
+    //         );
+
+    //         // ✅ If served, clear new items tracking
+    //         if (newStatus === "served") {
+    //             clearNewItemsStorage(orderId);
+    //         }
+
+    //         // Update local state accordingly
+    //         setOrders(prev =>
+    //             prev.map(o =>
+    //                 o.id === orderId
+    //                     ? {
+    //                         ...o,
+    //                         status: newStatus,
+    //                         items: updatedItems,
+    //                         total_price: totalPrice,
+    //                         has_new_items: newStatus === 'served' ? false : o.has_new_items,
+    //                         new_items_start_index: newStatus === 'served' ? null : o.new_items_start_index,
+    //                     }
+    //                     : o
+    //             )
+    //         );
+
+    //         // Exit edit/add modes if served
+    //         if (newStatus === "served") {
+    //             if (editOrderId === orderId) setEditOrderId(null);
+    //             if (addingOrderId === orderId) setAddingOrderId(null);
+    //         }
+    //     } catch (err) {
+    //         console.error(err);
+    //         toast.error("Failed to update order status");
+    //     }
+    // };
 
     // Calculate elapsed time since item was created
     const calculateElapsedTime = (createdAt) => {
@@ -751,6 +800,16 @@ const KitchenDisplay = () => {
                                 <Package size={16} />
                                 Takeaway
                             </button>
+
+                            <button
+                                onClick={() => setOrderFilter("DELIVERY")}
+                                className={`flex items-center gap-2 px-4 py-2 rounded-lg font-medium text-sm transition-all ${orderFilter === "DELIVERY"
+                                    ? "bg-action-primary text-text-white shadow-sm"
+                                    : "bg-bg-tertiary text-text-secondary hover:text-text-primary border border-border-default"}`}
+                            >
+                                <Truck size={16} />
+                                DELIVERY
+                            </button>
                         </div>
                     </div>
 
@@ -776,12 +835,16 @@ const KitchenDisplay = () => {
                                         >
                                             {/* Card header */}
                                             <div className="flex items-center justify-between px-4 py-3 bg-action-primary text-text-white">
-                                                <div className="flex items-center gap-2">
+                                                <div className="flex items-center justify-between w-full">
                                                     <span className="text-sm md:text-base font-semibold">
                                                         {tablesMap[order.table_id] || order.table_number || order.customer_name || "N/A"}
                                                     </span>
-                                                    <span className="text-xs text-orange-100/80 ml-1">#{order.id}</span>
+
+                                                    <span className="text-xl font-semibold text-orange-100/80">
+                                                        #{order.id}
+                                                    </span>
                                                 </div>
+
 
                                                 <div className="flex items-center gap-2">
                                                     {/* commented actions preserved but hidden visually */}
@@ -800,23 +863,18 @@ const KitchenDisplay = () => {
 
                                                             {/* Item row */}
                                                             <div
-                                                                className={`
-                                    flex items-center w-full p-3 rounded-lg
-                                    ${item.is_new_item ? "bg-orange-50" : "bg-white"}
-                                    ${isEditing ? "cursor-pointer hover:shadow-sm" : "cursor-default"}
-                                  `}
-                                                            >
+                                                                className={` flex items-center w-full  rounded-lg ${item.is_new_item ? "bg-orange-50" : "bg-white"} ${isEditing ? "cursor-pointer hover:shadow-sm" : "cursor-default"}`}>
                                                                 {/* Item name / editable */}
                                                                 <div className="flex-1">
                                                                     {isEditing ? (
                                                                         <input
                                                                             value={item.item_name}
                                                                             onChange={(e) => updateItemName(order.id, item.item_id, e.target.value)}
-                                                                            className="w-full px-3 py-2 rounded-md border border-gray-300 focus:outline-none focus:ring-2 focus:ring-orange-500 bg-white text-gray-900"
+                                                                            className="w-full rounded-md border border-gray-300 focus:outline-none focus:ring-2 focus:ring-orange-500 bg-white text-gray-900"
                                                                         />
                                                                     ) : (
                                                                         <div className="flex items-center justify-between w-full">
-                                                                            <span className="font-medium text-sm">
+                                                                            <span className=" font-medium text-sm">
                                                                                 {`${item.quantity}x ${item.item_name || "Unnamed Item"}`}
                                                                             </span>
                                                                         </div>
@@ -831,7 +889,7 @@ const KitchenDisplay = () => {
                                                                         title="Pending"
                                                                         className="p-2 rounded-md hover:bg-gray-100"
                                                                     >
-                                                                        <FaClock
+                                                                        <FaClock size={20}
                                                                             className={item.status === "pending" ? "text-blue-600" : "text-gray-500"}
                                                                             title="Pending"
                                                                         />
@@ -843,7 +901,7 @@ const KitchenDisplay = () => {
                                                                         title="Preparing"
                                                                         className="p-2 rounded-md hover:bg-gray-100"
                                                                     >
-                                                                        <FaHourglassHalf
+                                                                        <FaHourglassHalf size={20}
                                                                             className={item.status === "preparing" ? "text-orange-500" : "text-gray-500"}
                                                                             title="Preparing"
                                                                         />
@@ -852,12 +910,12 @@ const KitchenDisplay = () => {
                                                                     <button
                                                                         type="button"
                                                                         onClick={() => handleItemStatusChange(order.id, item.id, "served")}
-                                                                        title="Served"
+                                                                        title="Ready"
                                                                         className="p-2 rounded-md hover:bg-gray-100"
                                                                     >
-                                                                        <FaCheckCircle
+                                                                        <FaCheckCircle size={20}
                                                                             className={item.status === "served" ? "text-green-500" : "text-gray-500"}
-                                                                            title="Served"
+                                                                            title="Ready"
                                                                         />
                                                                     </button>
                                                                 </div>
@@ -899,7 +957,15 @@ const KitchenDisplay = () => {
                                                 )}
                                             </div>
 
-                                            {/* Card footer (status action) */}
+                                            <button className={`text-l font-semibold uppercase px-3 py-2 rounded-lg
+    ${order.status === "pending" && "text-blue-600"}
+    ${order.status === "preparing" && "text-orange-600"}
+    ${order.status === "ready" && "text-green-600"}
+`}>
+                                                {order.status}
+                                            </button>
+
+                                            {/* Card footer (status action)
                                             {!isAdding && !isEditing && order.status !== "served" && (
                                                 <div className="px-4 py-3 border-t border-gray-100 bg-white">
                                                     <div className="flex items-center gap-3">
@@ -923,7 +989,7 @@ const KitchenDisplay = () => {
                                                             <button
                                                                 className="px-3 py-2 rounded-lg bg-green-50 text-green-700 font-semibold hover:bg-green-100"
                                                                 onClick={() => {
-                                                                    handleStatusChange(order.id, "preparing");
+                                                                    handleStatusChange(order.id, "ready");
 
                                                                     const collectEvent = new CustomEvent("orderCollect", {
                                                                         detail: {
@@ -939,7 +1005,7 @@ const KitchenDisplay = () => {
                                                         )}
                                                     </div>
                                                 </div>
-                                            )}
+                                            )} */}
                                         </div>
                                     );
                                 })}
