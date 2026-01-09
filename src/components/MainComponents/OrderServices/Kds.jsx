@@ -494,22 +494,32 @@ const KitchenDisplay = () => {
         return "default";
     };
 
-    const filteredOrders = orders.filter(order => {
-        if (orderFilter === "ALL") return true;
+    const statusPriority = {
+        pending: 1,
+        preparing: 2,
+        ready: 3,
+    };
 
-        // 🔑 YOUR RULE
-        const isTakeaway = Number(order.table_id) === 500;
+    const filteredOrders = orders
+        .filter(order => {
+            if (orderFilter === "ALL") return true;
 
-        if (orderFilter === "TAKEAWAY") return isTakeaway;
-        if (orderFilter === "DINEIN") return !isTakeaway;
+            const isTakeaway = Number(order.table_id) === 500;
 
-        return true;
-    });
+            if (orderFilter === "TAKEAWAY") return isTakeaway;
+            if (orderFilter === "DINEIN") return !isTakeaway;
+
+            return true;
+        })
+        .sort((a, b) => {
+            return (statusPriority[a.status] || 99) - (statusPriority[b.status] || 99);
+        });
+
 
 
 
     const deriveOrderStatusFromItems = (items) => {
-        if (!items || items.length === 0) return "new";
+        if (!items || items.length === 0) return "pending";
 
         if (items.some(i => i.status === "pending")) {
             return "pending";
@@ -828,11 +838,13 @@ const KitchenDisplay = () => {
                                         <div
                                             key={order.id}
                                             className={`
-                          rounded-xl shadow-md overflow-hidden border border-gray-200 bg-white
-                          transition-transform transform hover:-translate-y-0.5
-                          ${cardColors(order)}
-                        `}
+                                          rounded-xl shadow-md overflow-hidden border border-gray-200 bg-white
+                                          transition-transform transform hover:-translate-y-0.5
+                                          flex flex-col
+                                          ${cardColors(order)}
+                                        `}
                                         >
+
                                             {/* Card header */}
                                             <div className="flex items-center justify-between px-4 py-3 bg-action-primary text-text-white">
                                                 <div className="flex items-center justify-between w-full">
@@ -852,7 +864,7 @@ const KitchenDisplay = () => {
                                             </div>
 
                                             {/* Card body */}
-                                            <div className="bg-bg-primary px-4 py-4 space-y-3">
+                                            <div className="bg-bg-primary px-4 py-4 space-y-3 flex-1">
                                                 {order.items.map((item, idx) => {
                                                     const divider = order.batch_dividers?.find(d => d.index === idx);
 
@@ -875,7 +887,11 @@ const KitchenDisplay = () => {
                                                                     ) : (
                                                                         <div className="flex items-center justify-between w-full">
                                                                             <span className=" font-medium text-sm">
-                                                                                {`${item.quantity}x ${item.item_name || "Unnamed Item"}`}
+                                                                                <span className="font-medium text-sm">
+                                                                                    <span className="mr-2">{item.quantity}  x</span>
+                                                                                    <span>{item.item_name || "Unnamed Item"}</span>
+                                                                                </span>
+
                                                                             </span>
                                                                         </div>
                                                                     )}
@@ -957,13 +973,16 @@ const KitchenDisplay = () => {
                                                 )}
                                             </div>
 
-                                            <button className={`text-l font-semibold uppercase px-3 py-2 rounded-lg
-    ${order.status === "pending" && "text-blue-600"}
-    ${order.status === "preparing" && "text-orange-600"}
-    ${order.status === "ready" && "text-green-600"}
-`}>
-                                                {order.status}
-                                            </button>
+                                            <div className="px-4 py-3 border-t border-gray-100 bg-white">
+                                                <button className={`text-l font-semibold uppercase
+        ${order.status === "pending" && "text-blue-600"}
+        ${order.status === "preparing" && "text-orange-600"}
+        ${order.status === "ready" && "text-green-600"}
+    `}>
+                                                    {order.status}
+                                                </button>
+                                            </div>
+
 
                                             {/* Card footer (status action)
                                             {!isAdding && !isEditing && order.status !== "served" && (

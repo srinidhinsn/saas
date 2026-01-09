@@ -1210,6 +1210,98 @@
 
 
 
+{/* <div className="grid grid-cols-1 sm:grid-cols-2 lg:grid-cols-3 gap-6">
+          {filteredOrders.length === 0 ? (
+            <div className="rounded-lg p-8 lg:p-12 text-center col-span-full bg-bg-primary border-default border-border-default shadow-card">
+              <p className="text-text-secondary text-base">No orders found</p>
+            </div>
+          ) : (
+            filteredOrders.map(order => {
+              const borderColor =
+                order.status?.toLowerCase() === 'served' ? 'var(--color-status-served)' :
+                  order.status?.toLowerCase() === 'pending' ? 'var(--color-status-pending)' :
+                    order.status?.toLowerCase() === 'preparing' ? 'var(--color-status-preparing)' :
+                      order.status?.toLowerCase() === 'new' ? 'var(--color-status-new)' :
+                        'var(--color-border-default)';
+
+              return (
+                <div key={order.id} className="rounded-lg overflow-hidden self-start shadow-card" style={{ backgroundColor: order.status?.toLowerCase() === 'served' ? 'var(--color-bg-primary)' : 'var(--color-bg-primary)', border: `2px solid ${borderColor}` }}>
+                  <div className="p-3 lg:p-6 border-b flex items-start justify-between bg-bg-tertiary border-border-default">
+                    <div>
+
+                      <div className="flex items-center flex-wrap gap-2 mb-2">
+                        <h3 className="text-sm font-bold text-text-primary">
+                          {order._derivedMode === 'takeaway'
+                            ? (order.customer_name || 'Take Away')
+                            : `Table: ${tablesMap[order.table_id] || order.table || order.table_id}`}
+                        </h3>
+
+                        <span className="px-2 py-1 rounded-full text-[12px] font-semibold bg-status-new text-action-primary">
+                          {order.status}
+                        </span>
+
+                        <span className="px-2 py-1 rounded-full text-[10px] font-semibold bg-bg-primary text-text-secondary border border-border-default flex items-center gap-1">
+                          {order._derivedMode === 'dinein' ? (
+                            <Users size={10} />
+                          ) : (
+                            <Package size={10} />
+                          )}
+                          {order._derivedMode === 'dinein' ? 'Dine In' : 'Takeaway'}
+                        </span>
+
+                      </div>
+                      <div className="flex flex-wrap gap-x-3 gap-y-2 text-sm text-text-secondary">
+                        <span className="px-2 py-1 rounded bg-bg-tertiary border-default border-border-default">Order Id: #{order.id}</span>
+                        <span className="px-2 py-1 rounded bg-bg-tertiary border-default border-border-default">Time: {new Date(order.created_at).toLocaleTimeString()}</span>
+                      </div>
+                    </div>
+
+                    <div className="flex items-center space-x-2">
+                      <button onClick={(e) => { e.stopPropagation(); toggleVisibleItems(order.id); }} title="View items" className="p-2 rounded text-text-secondary">
+                        <MdOutlineKeyboardDoubleArrowDown size={20} />
+                      </button>
+                      <button onClick={() => { setSelectedOrder(order); setShowOrderDetailModal(true); }} className="px-4 py-2 rounded-lg bg-action-primary text-text-white">Manage</button>
+                      <button onClick={() => { setOrderToDelete(order.id); setShowDeleteModal(true); }} className="p-2 rounded-lg text-action-primary"><Trash2 size={18} /></button>
+                    </div>
+                  </div>
+
+                  {visibleOrderId === order.id && (
+                    <div className="p-4 lg:p-6 border-t">
+                      <div className="space-y-2 text-sm text-text-primary">
+                        {order.items.map((it, idx) => (
+                          <div key={idx}>
+                            {it._isBatchStart && (
+                              <div className="flex items-center my-3">
+                                <div className="flex-1 h-px bg-action-primary"></div>
+                                <span className="px-3 text-xs font-semibold text-action-primary bg-bg-primary rounded-badge">New Items</span>
+                                <div className="flex-1 h-px bg-action-primary"></div>
+                              </div>
+                            )}
+                            <div className="flex justify-between text-text-primary">
+                              <div>{it.item_name || it.name}</div>
+                              <div className="text-right">x{it.quantity} &nbsp; ₹{(inventoryMap[it.item_id]?.unit_price || it.unit_price || it.price || 0).toFixed(2)}</div>
+                            </div>
+                          </div>
+                        ))}
+                      </div>
+                    </div>
+                  )}
+
+                  <div className="p-4 lg:p-6 flex items-center justify-between border-t-border-default border-default">
+                    <div className="text-sm text-text-secondary">Total items: {order.items.length}</div>
+                    <div className="text-lg font-bold text-action-primary">
+                      Rs.{order.items.reduce((s, it) => s + ((inventoryMap[it.item_id]?.unit_price || it.unit_price || it.price || 0) * (it.quantity || 1)), 0).toFixed(2)}
+                    </div>
+                  </div>
+                </div>
+              );
+            })
+          )} */}
+
+
+
+
+
 
 
 import React, { useEffect, useState } from "react";
@@ -1333,8 +1425,6 @@ const OrderSummaryVisible = ({ clientId, token }) => {
         return 'bg-yellow-100';
       case 'preparing':
         return 'bg-blue-200';
-      case 'new':
-        return 'bg-orange-100';
       default:
         return 'bg-white';
     }
@@ -2455,12 +2545,15 @@ const OrderSummaryVisible = ({ clientId, token }) => {
       filteredOrders = [...filteredOrders].sort((a, b) => new Date(b.created_at) - new Date(a.created_at));
       break;
     case 2:
-      filteredOrders = filteredOrders.filter(o => o.status?.toLowerCase() === 'new');
+      filteredOrders = filteredOrders.filter(o => o.status?.toLowerCase() === 'pending');
       break;
     case 3:
       filteredOrders = filteredOrders.filter(o => o.status?.toLowerCase() === 'preparing');
       break;
     case 4:
+      filteredOrders = filteredOrders.filter(o => o.status?.toLowerCase() === 'ready');
+      break;
+    case 5:
       filteredOrders = filteredOrders.filter(o => o.status?.toLowerCase() === 'served');
       break;
     default:
@@ -2475,11 +2568,6 @@ const OrderSummaryVisible = ({ clientId, token }) => {
   return (
     <div className="min-h-screen bg-bg-primary">
       <div className="mx-auto px-4 py-2">
-        {/* <div className="text-center mb-6 lg:mb-8">
-          <h1 className="text-3xl md:text-4xl lg:text-5xl font-serif italic mb-3 lg:mb-4" style={{ color: 'var(--color-text-primary)' }}>Order Summary</h1>
-          <p className="text-sm md:text-base" style={{ color: 'var(--color-text-secondary)' }}>Manage and track all active orders</p>
-        </div> */}
-
         <div className="rounded-lg p-2 mb-2">
           {/* Order Mode Filter - Horizontal Tabs */}
           <div className="mb-3 overflow-x-auto">
@@ -2539,9 +2627,10 @@ const OrderSummaryVisible = ({ clientId, token }) => {
                     onChange={(e) => setFilterMode(Number(e.target.value))}
                     className="w-full sm:w-auto pl-10 pr-4 py-2 rounded-lg bg-bg-primary border border-border-default text-text-primary">
                     <option value={0}>All Status</option>
-                    <option value={2}>New Orders</option>
+                    <option value={2}>Pending</option>
                     <option value={3}>Preparing</option>
-                    <option value={4}>Served</option>
+                    <option value={4}>Ready</option>
+                    <option value={5}>Served</option>
                   </select>
                 </div>
               </div>
@@ -2552,156 +2641,76 @@ const OrderSummaryVisible = ({ clientId, token }) => {
 
         </div>
 
-        {/* <div className="grid grid-cols-1 sm:grid-cols-2 lg:grid-cols-3 gap-6">
+        <div className="grid grid-cols-1 sm:grid-cols-2 lg:grid-cols-4 gap-6">
           {filteredOrders.length === 0 ? (
             <div className="rounded-lg p-8 lg:p-12 text-center col-span-full bg-bg-primary border-default border-border-default shadow-card">
               <p className="text-text-secondary text-base">No orders found</p>
             </div>
           ) : (
             filteredOrders.map(order => {
-              const borderColor =
-                order.status?.toLowerCase() === 'served' ? 'var(--color-status-served)' :
-                  order.status?.toLowerCase() === 'pending' ? 'var(--color-status-pending)' :
-                    order.status?.toLowerCase() === 'preparing' ? 'var(--color-status-preparing)' :
-                      order.status?.toLowerCase() === 'new' ? 'var(--color-status-new)' :
-                        'var(--color-border-default)';
+              const status = order.status?.toLowerCase();
 
-              return (
-                <div key={order.id} className="rounded-lg overflow-hidden self-start shadow-card" style={{ backgroundColor: order.status?.toLowerCase() === 'served' ? 'var(--color-bg-primary)' : 'var(--color-bg-primary)', border: `2px solid ${borderColor}` }}>
-                  <div className="p-3 lg:p-6 border-b flex items-start justify-between bg-bg-tertiary border-border-default">
-                    <div>
+              const cardBg =
+                status === 'preparing'
+                  ? 'bg-yellow-50'
+                  : status === 'ready'
+                    ? 'bg-green-50'
+                    : status === 'served'
+                      ? 'bg-green-100'
+                      : '';
 
-                      <div className="flex items-center flex-wrap gap-2 mb-2">
-                        <h3 className="text-sm font-bold text-text-primary">
-                          {order._derivedMode === 'takeaway'
-                            ? (order.customer_name || 'Take Away')
-                            : `Table: ${tablesMap[order.table_id] || order.table || order.table_id}`}
-                        </h3>
-
-                        <span className="px-2 py-1 rounded-full text-[12px] font-semibold bg-status-new text-action-primary">
-                          {order.status}
-                        </span>
-
-                        <span className="px-2 py-1 rounded-full text-[10px] font-semibold bg-bg-primary text-text-secondary border border-border-default flex items-center gap-1">
-                          {order._derivedMode === 'dinein' ? (
-                            <Users size={10} />
-                          ) : (
-                            <Package size={10} />
-                          )}
-                          {order._derivedMode === 'dinein' ? 'Dine In' : 'Takeaway'}
-                        </span>
-
-                      </div>
-                      <div className="flex flex-wrap gap-x-3 gap-y-2 text-sm text-text-secondary">
-                        <span className="px-2 py-1 rounded bg-bg-tertiary border-default border-border-default">Order Id: #{order.id}</span>
-                        <span className="px-2 py-1 rounded bg-bg-tertiary border-default border-border-default">Time: {new Date(order.created_at).toLocaleTimeString()}</span>
-                      </div>
-                    </div>
-
-                    <div className="flex items-center space-x-2">
-                      <button onClick={(e) => { e.stopPropagation(); toggleVisibleItems(order.id); }} title="View items" className="p-2 rounded text-text-secondary">
-                        <MdOutlineKeyboardDoubleArrowDown size={20} />
-                      </button>
-                      <button onClick={() => { setSelectedOrder(order); setShowOrderDetailModal(true); }} className="px-4 py-2 rounded-lg bg-action-primary text-text-white">Manage</button>
-                      <button onClick={() => { setOrderToDelete(order.id); setShowDeleteModal(true); }} className="p-2 rounded-lg text-action-primary"><Trash2 size={18} /></button>
-                    </div>
-                  </div>
-
-                  {visibleOrderId === order.id && (
-                    <div className="p-4 lg:p-6 border-t">
-                      <div className="space-y-2 text-sm text-text-primary">
-                        {order.items.map((it, idx) => (
-                          <div key={idx}>
-                            {it._isBatchStart && (
-                              <div className="flex items-center my-3">
-                                <div className="flex-1 h-px bg-action-primary"></div>
-                                <span className="px-3 text-xs font-semibold text-action-primary bg-bg-primary rounded-badge">New Items</span>
-                                <div className="flex-1 h-px bg-action-primary"></div>
-                              </div>
-                            )}
-                            <div className="flex justify-between text-text-primary">
-                              <div>{it.item_name || it.name}</div>
-                              <div className="text-right">x{it.quantity} &nbsp; ₹{(inventoryMap[it.item_id]?.unit_price || it.unit_price || it.price || 0).toFixed(2)}</div>
-                            </div>
-                          </div>
-                        ))}
-                      </div>
-                    </div>
-                  )}
-
-                  <div className="p-4 lg:p-6 flex items-center justify-between border-t-border-default border-default">
-                    <div className="text-sm text-text-secondary">Total items: {order.items.length}</div>
-                    <div className="text-lg font-bold text-action-primary">
-                      Rs.{order.items.reduce((s, it) => s + ((inventoryMap[it.item_id]?.unit_price || it.unit_price || it.price || 0) * (it.quantity || 1)), 0).toFixed(2)}
-                    </div>
-                  </div>
-                </div>
-              );
-            })
-          )} */}
-
-        <div className="grid grid-cols-1 sm:grid-cols-2 lg:grid-cols-3 gap-6">
-          {filteredOrders.length === 0 ? (
-            <div className="rounded-lg p-8 lg:p-12 text-center col-span-full bg-bg-primary border-default border-border-default shadow-card">
-              <p className="text-text-secondary text-base">No orders found</p>
-            </div>
-          ) : (
-            filteredOrders.map(order => {
-              const borderColor =
-                order.status?.toLowerCase() === 'served'
-                  ? 'var(--color-status-served)'
-                  : order.status?.toLowerCase() === 'pending'
-                    ? 'var(--color-status-pending)'
-                    : order.status?.toLowerCase() === 'preparing'
-                      ? 'var(--color-status-preparing)'
-                      : order.status?.toLowerCase() === 'new'
-                        ? 'var(--color-status-new)'
-                        : 'var(--color-border-default)';
+              const statusBadge =
+                status === 'preparing'
+                  ? 'bg-yellow-400 text-yellow-900'
+                  : status === 'ready'
+                    ? 'bg-green-500 text-white'
+                    : status === 'served'
+                      ? 'bg-green-700 text-white'
+                      : 'bg-transparent text-text-primary';
 
               return (
                 <div
                   key={order.id}
-                  className="rounded-xl shadow-md overflow-hidden border border-gray-200 bg-white transition-transform transform hover:-translate-y-0.5"
-                  style={{ borderColor }}
+                  className={`rounded-xl shadow-md border border-gray-200 flex flex-col h-full ${cardBg}`}
                 >
-                  {/* HEADER */}
-                  <div className="flex items-center justify-between px-4 py-3  text-text-black">
-                    <div className="flex items-center flex-wrap gap-2 mb-2">
-                      <h3 className="text-sm font-bold text-text-primary">
+                  {/* HEADER — STICKY */}
+                  <div className="sticky top-0 z-10 bg-action-primary px-4 py-3 text-text-black">
+                    {/* Order Mode */}
+                    <span className="inline-flex items-center gap-1 px-2 py-1 rounded-full text-[10px] font-semibold bg-bg-primary text-text-secondary border border-border-default">
+                      {order._derivedMode === 'dinein' ? <Users size={10} /> : <Package size={10} />}
+                      {order._derivedMode === 'dinein' ? 'Dine In' : 'Takeaway'}
+                    </span>
+
+                    {/* Table / Customer + Status */}
+                    <div className="flex items-center justify-between mt-2">
+                      <h3 className="text-lg font-bold text-text-primary">
                         {order._derivedMode === 'takeaway'
-                          ? (order.customer_name || 'Take Away')
-                          : `Table: ${tablesMap[order.table_id] || order.table || order.table_id}`}
+                          ? order.customer_name || 'Take Away'
+                          : tablesMap[order.table_id] || order.table || order.table_id}
                       </h3>
 
-                      <span className="px-2 py-1 rounded-full text-[12px] font-semibold bg-status-new text-action-primary">
+                      <span
+                        className={`inline-flex items-center gap-1 px-2 py-1 rounded-full text-[12px] font-semibold ${statusBadge}`}
+                      >
+                        {(status === 'ready' || status === 'served') && '✔'}
                         {order.status}
                       </span>
-
-                      <span className="px-2 py-1 rounded-full text-[10px] font-semibold bg-bg-primary text-text-secondary border border-border-default flex items-center gap-1">
-                        {order._derivedMode === 'dinein' ? (
-                          <Users size={10} />
-                        ) : (
-                          <Package size={10} />
-                        )}
-                        {order._derivedMode === 'dinein' ? 'Dine In' : 'Takeaway'}
-                      </span>
-
-                    </div>
-
-                    <span className="text-lg font-semibold text-black-100/80">
+                      <div className="text-xl font-bold text-black-100/80 mt-1">
                       #{order.id}
-                    </span>
+                    </div>
+                    </div>
                   </div>
 
-                  {/* BODY */}
-                  <div className="bg-bg-primary px-4 py-4 space-y-3">
+                  {/* BODY — SCROLLABLE */}
+                  <div className="flex-1 overflow-y-auto bg-bg-primary px-4 py-4 space-y-3">
                     {order.items.map((it, idx) => (
                       <div
                         key={idx}
                         className="flex items-center justify-between bg-white rounded-lg px-3 py-2"
                       >
                         <span className="text-sm font-medium">
-                          {it.quantity}x {it.item_name || it.name}
+                          <span className="mr-2">{it.quantity} ×</span>
+                          {it.item_name || 'Unnamed Item'}
                         </span>
 
                         <span className="text-sm text-gray-600">
@@ -2716,8 +2725,8 @@ const OrderSummaryVisible = ({ clientId, token }) => {
                     ))}
                   </div>
 
-                  {/* ACTIONS — MOVED FROM MANAGE */}
-                  <div className="flex items-center justify-between px-4 py-3 border-t border-gray-200 bg-white">
+                  {/* ACTIONS — STICKY BOTTOM */}
+                  <div className="sticky bottom-0 bg-white border-t border-gray-200 px-4 py-3 flex items-center justify-between">
                     <button
                       onClick={() => {
                         setSelectedOrder(order);
@@ -2738,275 +2747,277 @@ const OrderSummaryVisible = ({ clientId, token }) => {
                     </button>
                   </div>
                 </div>
-              );
+        );
             })
           )}
-        </div>
       </div>
+    </div>
 
 
-      {showOrderDetailModal && selectedOrder && (
+      {
+    showOrderDetailModal && selectedOrder && (
+      <div
+        className="fixed inset-0 z-50 flex items-center justify-center p-4 bg-color-modalsbg backdrop-blur-sm"
+        onClick={() => { setShowOrderDetailModal(false); setActiveTab('items'); }}>
         <div
-          className="fixed inset-0 z-50 flex items-center justify-center p-4 bg-color-modalsbg backdrop-blur-sm"
-          onClick={() => { setShowOrderDetailModal(false); setActiveTab('items'); }}>
-          <div
-            className={`rounded-xl w-full max-h-[90vh] my-2 flex flex-col bg-bg-primary shadow-2xl border-default border-border-default transition-all duration-300 ${editOrderId ? 'max-w-3xl' : 'max-w-xl'}`}
-            onClick={(e) => e.stopPropagation()}>
+          className={`rounded-xl w-full max-h-[90vh] my-2 flex flex-col bg-bg-primary shadow-2xl border-default border-border-default transition-all duration-300 ${editOrderId ? 'max-w-3xl' : 'max-w-xl'}`}
+          onClick={(e) => e.stopPropagation()}>
 
-            {/* Header */}
-            <div className="relative px-4 sm:px-6 py-4 sm:py-5 border-b border-border-default bg-gradient-to-r from-action-primary/10 via-bg-tertiary to-action-primary/5">
-              <div className="flex items-start justify-between gap-4">
-                <div className="flex-1 min-w-0">
-                  <div className="flex items-center gap-3 mb-2">
-                    <div className="p-2 bg-action-primary/20 rounded-xl border border-action-primary/30">
-                      <ShoppingBag size={20} className="text-action-primary" />
-                    </div>
-                    <div className="flex-1 min-w-0">
-                      <h3 className="text-lg sm:text-xl font-bold text-text-primary truncate">
-                        {tablesMap[selectedOrder.table_id] || selectedOrder.table || selectedOrder.table_id}
-                      </h3>
-                      <div className="flex items-center gap-3 mt-1 text-xs sm:text-sm text-text-secondary flex-wrap">
-                        <span className="flex items-center gap-1">
-                          <ShoppingBag size={14} />
-                          {selectedOrder.items.length} items
-                        </span>
-                        <span className="hidden sm:inline">•</span>
-                        <span className="flex items-center gap-1">
-                          <Clock size={14} />
-                          {new Date(selectedOrder.created_at).toLocaleString()}
-                        </span>
-                      </div>
+          {/* Header */}
+          <div className="relative px-4 sm:px-6 py-4 sm:py-5 border-b border-border-default bg-gradient-to-r from-action-primary/10 via-bg-tertiary to-action-primary/5">
+            <div className="flex items-start justify-between gap-4">
+              <div className="flex-1 min-w-0">
+                <div className="flex items-center gap-3 mb-2">
+                  <div className="p-2 bg-action-primary/20 rounded-xl border border-action-primary/30">
+                    <ShoppingBag size={20} className="text-action-primary" />
+                  </div>
+                  <div className="flex-1 min-w-0">
+                    <h3 className="text-lg sm:text-xl font-bold text-text-primary truncate">
+                      {tablesMap[selectedOrder.table_id] || selectedOrder.table || selectedOrder.table_id}
+                    </h3>
+                    <div className="flex items-center gap-3 mt-1 text-xs sm:text-sm text-text-secondary flex-wrap">
+                      <span className="flex items-center gap-1">
+                        <ShoppingBag size={14} />
+                        {selectedOrder.items.length} items
+                      </span>
+                      <span className="hidden sm:inline">•</span>
+                      <span className="flex items-center gap-1">
+                        <Clock size={14} />
+                        {new Date(selectedOrder.created_at).toLocaleString()}
+                      </span>
                     </div>
                   </div>
                 </div>
+              </div>
 
-                <div className="flex items-center gap-3 flex-shrink-0">
-                  <div className="text-right bg-gradient-to-br from-action-primary/10 to-action-primary/5 px-3 sm:px-4 py-2 rounded-xl border border-action-primary/20 shadow-sm">
-                    <div className="text-[10px] sm:text-xs font-semibold text-text-secondary uppercase tracking-wide">Total</div>
-                    <div className="text-lg sm:text-2xl font-bold text-action-primary mt-0.5">
-                      ₹{selectedOrder.items.reduce((sum, item) => sum + ((inventoryMap[item.item_id]?.unit_price || item.unit_price || item.price || 0) * (item.quantity || 1)), 0).toFixed(2)}
+              <div className="flex items-center gap-3 flex-shrink-0">
+                <div className="text-right bg-gradient-to-br from-action-primary/10 to-action-primary/5 px-3 sm:px-4 py-2 rounded-xl border border-action-primary/20 shadow-sm">
+                  <div className="text-[10px] sm:text-xs font-semibold text-text-secondary uppercase tracking-wide">Total</div>
+                  <div className="text-lg sm:text-2xl font-bold text-action-primary mt-0.5">
+                    ₹{selectedOrder.items.reduce((sum, item) => sum + ((inventoryMap[item.item_id]?.unit_price || item.unit_price || item.price || 0) * (item.quantity || 1)), 0).toFixed(2)}
+                  </div>
+                </div>
+
+                <button
+                  className="p-2 rounded-xl transition-all duration-200 text-text-secondary hover:text-text-primary hover:bg-bg-tertiary border border-transparent hover:border-border-default"
+                  onClick={() => { setShowOrderDetailModal(false); setEditOrderId(null); setActiveTab('items'); }}
+                  aria-label="Close">
+                  <X size={20} />
+                </button>
+              </div>
+            </div>
+          </div>
+
+          {/* Tab Navigation - Only show in edit mode on mobile/tablet */}
+          {editOrderId === selectedOrder.id && (
+            <div className="lg:hidden border-b border-border-default bg-bg-tertiary">
+              <div className="flex">
+                <button
+                  className={`flex-1 py-3 px-4 text-sm font-semibold transition-all ${activeTab === 'items'
+                    ? 'text-action-primary border-b-2 border-action-primary bg-bg-primary'
+                    : 'text-text-secondary hover:text-text-primary hover:bg-bg-secondary/50'
+                    }`}
+                  onClick={() => setActiveTab('items')}>
+                  Order Items ({selectedOrder.items.length})
+                </button>
+                <button
+                  className={`flex-1 py-3 px-4 text-sm font-semibold transition-all ${activeTab === 'available'
+                    ? 'text-action-primary border-b-2 border-action-primary bg-bg-primary'
+                    : 'text-text-secondary hover:text-text-primary hover:bg-bg-secondary/50'
+                    }`}
+                  onClick={() => setActiveTab('available')}>
+                  Available Items
+                </button>
+              </div>
+            </div>
+          )}
+
+          {/* Content */}
+          <div className="flex-1 overflow-hidden">
+            <div className="flex flex-col lg:flex-row h-full">
+
+              {/* Available Items Panel */}
+              {editOrderId === selectedOrder.id && (
+                <div className={`w-full lg:w-2/5 border-b lg:border-b-0 lg:border-r border-border-default bg-bg-tertiary ${activeTab === 'available' ? 'block' : 'hidden lg:block'
+                  }`}>
+                  <div className="p-4 bg-bg-primary border-b border-border-default sticky top-0 z-10">
+                    <h4 className="font-bold text-base mb-3 text-text-primary flex items-center gap-2">
+                      <Search size={18} className="text-action-primary" />
+                      Available Items
+                    </h4>
+                    <div className="relative">
+                      <Search size={16} className="absolute left-3 top-1/2 -translate-y-1/2 text-text-secondary" />
+                      <input
+                        type="text"
+                        className="w-full pl-10 pr-4 py-2.5 text-sm rounded-xl border border-border-default bg-bg-primary text-text-primary placeholder-text-secondary focus:outline-none focus:ring-2 focus:ring-action-primary focus:border-transparent transition-all"
+                        placeholder="Search items..."
+                        value={itemSearchQuery}
+                        onChange={(e) => setItemSearchQuery(e.target.value)} />
                     </div>
                   </div>
 
-                  <button
-                    className="p-2 rounded-xl transition-all duration-200 text-text-secondary hover:text-text-primary hover:bg-bg-tertiary border border-transparent hover:border-border-default"
-                    onClick={() => { setShowOrderDetailModal(false); setEditOrderId(null); setActiveTab('items'); }}
-                    aria-label="Close">
-                    <X size={20} />
-                  </button>
+                  <div className="p-3 sm:p-4 space-y-2 max-h-[calc(90vh-320px)] overflow-y-auto custom-scrollbar">
+                    {(itemSearchResults.length > 0 ? itemSearchResults : allInventoryItems).map(item => (
+                      <div
+                        key={item.id}
+                        className="flex items-center gap-3 p-3 bg-bg-primary border border-border-default rounded-xl cursor-pointer transition-all hover:border-action-primary hover:shadow-lg hover:shadow-action-primary/10 active:scale-98"
+                        onClick={() => { handleItemSelection(selectedOrder.id, item); setActiveTab('items'); }}>
+                        {item.image && (
+                          <img src={item.image} alt={item.name} className="w-12 h-12 object-cover rounded-lg flex-shrink-0 border border-border-default" />
+                        )}
+                        <div className="flex-1 min-w-0">
+                          <div className="font-semibold text-sm text-text-primary truncate">{item.name}</div>
+                          <div className="text-sm font-bold text-action-primary mt-0.5">₹{item.unit_price}</div>
+                        </div>
+                        {item.line_item_id && item.line_item_id.length > 0 && (
+                          <span className="text-xs px-2.5 py-1 rounded-full font-semibold bg-action-primary text-text-white shadow-sm">
+                            +{item.line_item_id.length}
+                          </span>
+                        )}
+                      </div>
+                    ))}
+
+                    {itemSearchQuery && itemSearchResults.length === 0 && (
+                      <div className="text-center py-12">
+                        <div className="text-text-secondary mb-2 opacity-40">
+                          <Search size={48} className="mx-auto" />
+                        </div>
+                        <p className="text-sm text-text-secondary">No items found</p>
+                      </div>
+                    )}
+                  </div>
+                </div>
+              )}
+
+              {/* Order Items Panel */}
+              <div className={`w-full ${editOrderId === selectedOrder.id ? 'lg:w-3/5' : ''} bg-bg-primary ${editOrderId === selectedOrder.id && activeTab === 'items' ? 'block' : editOrderId === selectedOrder.id ? 'hidden lg:block' : 'block'
+                }`}>
+                <div className="p-4 border-b border-border-default sticky top-0 z-10 bg-bg-primary">
+                  <h4 className="font-bold text-base text-text-primary flex items-center gap-2">
+                    <ShoppingBag size={18} className="text-action-primary" />
+                    Order Items
+                  </h4>
+                </div>
+
+                <div className="p-3 sm:p-4 space-y-2 overflow-y-auto max-h-[calc(90vh-320px)] custom-scrollbar">
+                  {selectedOrder.items.map((item, idx) => {
+                    const prev = selectedOrder.items[idx - 1];
+                    const showDivider = item._isBatchStart || (item.is_new_item && (!prev || (prev.batch_timestamp || null) !== (item.batch_timestamp || null)));
+
+                    return (
+                      <div key={item.id || idx}>
+                        {showDivider && (
+                          <div className="flex items-center my-4">
+                            <div className="flex-1 h-px bg-gradient-to-r from-transparent via-action-primary to-transparent"></div>
+                            <span className="px-3 py-1.5 text-action-primary bg-action-primary/10 text-xs font-bold rounded-full mx-3 border border-action-primary/30 shadow-sm">
+                              New Items
+                            </span>
+                            <div className="flex-1 h-px bg-gradient-to-r from-transparent via-action-primary to-transparent"></div>
+                          </div>
+                        )}
+
+                        <div className="flex items-center gap-3 p-3 sm:p-4 rounded-xl bg-bg-tertiary border border-border-default hover:border-border-default/60 transition-all">
+                          <div className="flex-1 min-w-0">
+                            <div className="font-semibold text-sm text-text-primary mb-1.5">{item.item_name || item.item_id}</div>
+                            <span
+                              className={`inline-block px-2.5 py-1 rounded-full text-xs font-semibold ${item.status === 'pending'
+                                ? 'bg-status-pending text-yellow-700'
+                                : item.status === 'completed'
+                                  ? 'bg-status-served text-action-success'
+                                  : 'bg-bg-secondary text-text-secondary'
+                                }`}>
+                              {item.status}
+                            </span>
+                          </div>
+
+                          <div className="flex items-center gap-2 flex-shrink-0">
+                            {editOrderId === selectedOrder.id ? (
+                              <>
+                                <div className="flex items-center rounded-lg overflow-hidden border-2 border-border-default bg-bg-primary shadow-sm">
+                                  <button
+                                    className="px-3 py-2 text-sm font-bold text-text-primary hover:bg-bg-tertiary transition-colors active:scale-95"
+                                    onClick={() => updateItemQuantity(selectedOrder.id, item.id || item.frontend_unique_key, Math.max(1, (item.quantity || 1) - 1))}>
+                                    −
+                                  </button>
+                                  <div className="px-4 py-2 font-bold text-sm text-center border-x-2 border-border-default min-w-[45px] bg-bg-tertiary">
+                                    {item.quantity}
+                                  </div>
+                                  <button
+                                    className="px-3 py-2 text-sm font-bold text-text-primary hover:bg-bg-tertiary transition-colors active:scale-95"
+                                    onClick={() => updateItemQuantity(selectedOrder.id, item.id || item.frontend_unique_key, (item.quantity || 1) + 1)}>
+                                    +
+                                  </button>
+                                </div>
+
+                                <button
+                                  className="p-2.5 rounded-lg transition-all bg-red-50 hover:bg-red-100 text-action-danger border border-red-200 active:scale-95"
+                                  onClick={() => { setDeleteTarget({ orderId: selectedOrder.id, itemBackendId: item.id }); setShowDeleteModals(true); }}
+                                  title="Delete item">
+                                  <Trash2 size={16} />
+                                </button>
+                              </>
+                            ) : (
+                              <div className="text-right">
+                                <span className="block text-xs font-medium text-text-secondary mb-1">×{item.quantity}</span>
+                                <span className="block text-sm font-bold text-text-primary">
+                                  ₹{((inventoryMap[item.item_id]?.unit_price || item.unit_price || item.price || 0) * item.quantity).toFixed(2)}
+                                </span>
+                              </div>
+                            )}
+                          </div>
+                        </div>
+                      </div>
+                    );
+                  })}
                 </div>
               </div>
             </div>
+          </div>
 
-            {/* Tab Navigation - Only show in edit mode on mobile/tablet */}
-            {editOrderId === selectedOrder.id && (
-              <div className="lg:hidden border-b border-border-default bg-bg-tertiary">
-                <div className="flex">
+          {/* Footer Actions */}
+          <div className="p-4 sm:p-5 border-t border-border-default bg-bg-tertiary">
+            {editOrderId === selectedOrder.id ? (
+              <div className="flex flex-col sm:flex-row gap-3">
+                <button
+                  className="flex-1 bg-action-primary hover:bg-action-primary/90 text-text-white px-6 py-3 rounded-xl font-semibold text-sm transition-all shadow-lg hover:shadow-xl active:scale-98"
+                  onClick={() => { updateOrderItems(selectedOrder.id, selectedOrder.items); setActiveTab('items'); }}>
+                  Save Changes
+                </button>
+                <button
+                  className="flex-1 rounded-xl bg-bg-primary text-text-primary px-6 py-3 border-2 border-border-default hover:border-action-primary/30 font-semibold text-sm transition-all active:scale-98"
+                  onClick={() => { setEditOrderId(null); setCurrentBatchTimestamp(null); setItemSearchQuery(''); setActiveTab('items'); }}>
+                  Cancel
+                </button>
+              </div>
+            ) : (
+              <div className="space-y-3">
+                <button
+                  className="w-full rounded-xl bg-action-primary hover:bg-action-primary/90 text-text-white px-6 py-3 font-semibold text-sm transition-all shadow-lg hover:shadow-xl flex items-center justify-center gap-2 active:scale-98"
+                  onClick={() => { setEditOrderId(selectedOrder.id); setActiveTab('items'); }}>
+                  <Edit2 size={16} />
+                  Edit Order
+                </button>
+
+                <div className="flex gap-3">
                   <button
-                    className={`flex-1 py-3 px-4 text-sm font-semibold transition-all ${activeTab === 'items'
-                      ? 'text-action-primary border-b-2 border-action-primary bg-bg-primary'
-                      : 'text-text-secondary hover:text-text-primary hover:bg-bg-secondary/50'
-                      }`}
-                    onClick={() => setActiveTab('items')}>
-                    Order Items ({selectedOrder.items.length})
+                    className="flex-1 rounded-xl bg-action-success hover:bg-action-success/90 text-text-white px-6 py-3 font-semibold text-sm transition-all shadow-lg hover:shadow-xl active:scale-98"
+                    onClick={() => { handleStatusChange(selectedOrder.id, 'served'); setShowOrderDetailModal(false); setEditOrderId(null); setActiveTab('items'); }}>
+                    Mark as Served
                   </button>
+
                   <button
-                    className={`flex-1 py-3 px-4 text-sm font-semibold transition-all ${activeTab === 'available'
-                      ? 'text-action-primary border-b-2 border-action-primary bg-bg-primary'
-                      : 'text-text-secondary hover:text-text-primary hover:bg-bg-secondary/50'
-                      }`}
-                    onClick={() => setActiveTab('available')}>
-                    Available Items
+                    className="flex-1 bg-action-danger hover:bg-action-danger/90 text-text-white px-6 py-3 rounded-xl font-semibold text-sm transition-all shadow-lg hover:shadow-xl active:scale-98"
+                    onClick={() => { setOrderToDelete(selectedOrder.id); setShowDeleteModal(true); setShowOrderDetailModal(false); setActiveTab('items'); }}>
+                    Delete Order
                   </button>
                 </div>
               </div>
             )}
-
-            {/* Content */}
-            <div className="flex-1 overflow-hidden">
-              <div className="flex flex-col lg:flex-row h-full">
-
-                {/* Available Items Panel */}
-                {editOrderId === selectedOrder.id && (
-                  <div className={`w-full lg:w-2/5 border-b lg:border-b-0 lg:border-r border-border-default bg-bg-tertiary ${activeTab === 'available' ? 'block' : 'hidden lg:block'
-                    }`}>
-                    <div className="p-4 bg-bg-primary border-b border-border-default sticky top-0 z-10">
-                      <h4 className="font-bold text-base mb-3 text-text-primary flex items-center gap-2">
-                        <Search size={18} className="text-action-primary" />
-                        Available Items
-                      </h4>
-                      <div className="relative">
-                        <Search size={16} className="absolute left-3 top-1/2 -translate-y-1/2 text-text-secondary" />
-                        <input
-                          type="text"
-                          className="w-full pl-10 pr-4 py-2.5 text-sm rounded-xl border border-border-default bg-bg-primary text-text-primary placeholder-text-secondary focus:outline-none focus:ring-2 focus:ring-action-primary focus:border-transparent transition-all"
-                          placeholder="Search items..."
-                          value={itemSearchQuery}
-                          onChange={(e) => setItemSearchQuery(e.target.value)} />
-                      </div>
-                    </div>
-
-                    <div className="p-3 sm:p-4 space-y-2 max-h-[calc(90vh-320px)] overflow-y-auto custom-scrollbar">
-                      {(itemSearchResults.length > 0 ? itemSearchResults : allInventoryItems).map(item => (
-                        <div
-                          key={item.id}
-                          className="flex items-center gap-3 p-3 bg-bg-primary border border-border-default rounded-xl cursor-pointer transition-all hover:border-action-primary hover:shadow-lg hover:shadow-action-primary/10 active:scale-98"
-                          onClick={() => { handleItemSelection(selectedOrder.id, item); setActiveTab('items'); }}>
-                          {item.image && (
-                            <img src={item.image} alt={item.name} className="w-12 h-12 object-cover rounded-lg flex-shrink-0 border border-border-default" />
-                          )}
-                          <div className="flex-1 min-w-0">
-                            <div className="font-semibold text-sm text-text-primary truncate">{item.name}</div>
-                            <div className="text-sm font-bold text-action-primary mt-0.5">₹{item.unit_price}</div>
-                          </div>
-                          {item.line_item_id && item.line_item_id.length > 0 && (
-                            <span className="text-xs px-2.5 py-1 rounded-full font-semibold bg-action-primary text-text-white shadow-sm">
-                              +{item.line_item_id.length}
-                            </span>
-                          )}
-                        </div>
-                      ))}
-
-                      {itemSearchQuery && itemSearchResults.length === 0 && (
-                        <div className="text-center py-12">
-                          <div className="text-text-secondary mb-2 opacity-40">
-                            <Search size={48} className="mx-auto" />
-                          </div>
-                          <p className="text-sm text-text-secondary">No items found</p>
-                        </div>
-                      )}
-                    </div>
-                  </div>
-                )}
-
-                {/* Order Items Panel */}
-                <div className={`w-full ${editOrderId === selectedOrder.id ? 'lg:w-3/5' : ''} bg-bg-primary ${editOrderId === selectedOrder.id && activeTab === 'items' ? 'block' : editOrderId === selectedOrder.id ? 'hidden lg:block' : 'block'
-                  }`}>
-                  <div className="p-4 border-b border-border-default sticky top-0 z-10 bg-bg-primary">
-                    <h4 className="font-bold text-base text-text-primary flex items-center gap-2">
-                      <ShoppingBag size={18} className="text-action-primary" />
-                      Order Items
-                    </h4>
-                  </div>
-
-                  <div className="p-3 sm:p-4 space-y-2 overflow-y-auto max-h-[calc(90vh-320px)] custom-scrollbar">
-                    {selectedOrder.items.map((item, idx) => {
-                      const prev = selectedOrder.items[idx - 1];
-                      const showDivider = item._isBatchStart || (item.is_new_item && (!prev || (prev.batch_timestamp || null) !== (item.batch_timestamp || null)));
-
-                      return (
-                        <div key={item.id || idx}>
-                          {showDivider && (
-                            <div className="flex items-center my-4">
-                              <div className="flex-1 h-px bg-gradient-to-r from-transparent via-action-primary to-transparent"></div>
-                              <span className="px-3 py-1.5 text-action-primary bg-action-primary/10 text-xs font-bold rounded-full mx-3 border border-action-primary/30 shadow-sm">
-                                New Items
-                              </span>
-                              <div className="flex-1 h-px bg-gradient-to-r from-transparent via-action-primary to-transparent"></div>
-                            </div>
-                          )}
-
-                          <div className="flex items-center gap-3 p-3 sm:p-4 rounded-xl bg-bg-tertiary border border-border-default hover:border-border-default/60 transition-all">
-                            <div className="flex-1 min-w-0">
-                              <div className="font-semibold text-sm text-text-primary mb-1.5">{item.item_name || item.item_id}</div>
-                              <span
-                                className={`inline-block px-2.5 py-1 rounded-full text-xs font-semibold ${item.status === 'pending'
-                                  ? 'bg-status-pending text-yellow-700'
-                                  : item.status === 'completed'
-                                    ? 'bg-status-served text-action-success'
-                                    : 'bg-bg-secondary text-text-secondary'
-                                  }`}>
-                                {item.status}
-                              </span>
-                            </div>
-
-                            <div className="flex items-center gap-2 flex-shrink-0">
-                              {editOrderId === selectedOrder.id ? (
-                                <>
-                                  <div className="flex items-center rounded-lg overflow-hidden border-2 border-border-default bg-bg-primary shadow-sm">
-                                    <button
-                                      className="px-3 py-2 text-sm font-bold text-text-primary hover:bg-bg-tertiary transition-colors active:scale-95"
-                                      onClick={() => updateItemQuantity(selectedOrder.id, item.id || item.frontend_unique_key, Math.max(1, (item.quantity || 1) - 1))}>
-                                      −
-                                    </button>
-                                    <div className="px-4 py-2 font-bold text-sm text-center border-x-2 border-border-default min-w-[45px] bg-bg-tertiary">
-                                      {item.quantity}
-                                    </div>
-                                    <button
-                                      className="px-3 py-2 text-sm font-bold text-text-primary hover:bg-bg-tertiary transition-colors active:scale-95"
-                                      onClick={() => updateItemQuantity(selectedOrder.id, item.id || item.frontend_unique_key, (item.quantity || 1) + 1)}>
-                                      +
-                                    </button>
-                                  </div>
-
-                                  <button
-                                    className="p-2.5 rounded-lg transition-all bg-red-50 hover:bg-red-100 text-action-danger border border-red-200 active:scale-95"
-                                    onClick={() => { setDeleteTarget({ orderId: selectedOrder.id, itemBackendId: item.id }); setShowDeleteModals(true); }}
-                                    title="Delete item">
-                                    <Trash2 size={16} />
-                                  </button>
-                                </>
-                              ) : (
-                                <div className="text-right">
-                                  <span className="block text-xs font-medium text-text-secondary mb-1">×{item.quantity}</span>
-                                  <span className="block text-sm font-bold text-text-primary">
-                                    ₹{((inventoryMap[item.item_id]?.unit_price || item.unit_price || item.price || 0) * item.quantity).toFixed(2)}
-                                  </span>
-                                </div>
-                              )}
-                            </div>
-                          </div>
-                        </div>
-                      );
-                    })}
-                  </div>
-                </div>
-              </div>
-            </div>
-
-            {/* Footer Actions */}
-            <div className="p-4 sm:p-5 border-t border-border-default bg-bg-tertiary">
-              {editOrderId === selectedOrder.id ? (
-                <div className="flex flex-col sm:flex-row gap-3">
-                  <button
-                    className="flex-1 bg-action-primary hover:bg-action-primary/90 text-text-white px-6 py-3 rounded-xl font-semibold text-sm transition-all shadow-lg hover:shadow-xl active:scale-98"
-                    onClick={() => { updateOrderItems(selectedOrder.id, selectedOrder.items); setActiveTab('items'); }}>
-                    Save Changes
-                  </button>
-                  <button
-                    className="flex-1 rounded-xl bg-bg-primary text-text-primary px-6 py-3 border-2 border-border-default hover:border-action-primary/30 font-semibold text-sm transition-all active:scale-98"
-                    onClick={() => { setEditOrderId(null); setCurrentBatchTimestamp(null); setItemSearchQuery(''); setActiveTab('items'); }}>
-                    Cancel
-                  </button>
-                </div>
-              ) : (
-                <div className="space-y-3">
-                  <button
-                    className="w-full rounded-xl bg-action-primary hover:bg-action-primary/90 text-text-white px-6 py-3 font-semibold text-sm transition-all shadow-lg hover:shadow-xl flex items-center justify-center gap-2 active:scale-98"
-                    onClick={() => { setEditOrderId(selectedOrder.id); setActiveTab('items'); }}>
-                    <Edit2 size={16} />
-                    Edit Order
-                  </button>
-
-                  <div className="flex gap-3">
-                    <button
-                      className="flex-1 rounded-xl bg-action-success hover:bg-action-success/90 text-text-white px-6 py-3 font-semibold text-sm transition-all shadow-lg hover:shadow-xl active:scale-98"
-                      onClick={() => { handleStatusChange(selectedOrder.id, 'served'); setShowOrderDetailModal(false); setEditOrderId(null); setActiveTab('items'); }}>
-                      Mark as Served
-                    </button>
-
-                    <button
-                      className="flex-1 bg-action-danger hover:bg-action-danger/90 text-text-white px-6 py-3 rounded-xl font-semibold text-sm transition-all shadow-lg hover:shadow-xl active:scale-98"
-                      onClick={() => { setOrderToDelete(selectedOrder.id); setShowDeleteModal(true); setShowOrderDetailModal(false); setActiveTab('items'); }}>
-                      Delete Order
-                    </button>
-                  </div>
-                </div>
-              )}
-            </div>
           </div>
         </div>
-      )}
+      </div>
+    )
+  }
 
       <style>{`
   .custom-scrollbar::-webkit-scrollbar {
@@ -3052,7 +3063,7 @@ const OrderSummaryVisible = ({ clientId, token }) => {
         title="Delete Item"
         message="Are you sure you want to delete this item?"
       />
-    </div>
+    </div >
   );
 };
 
