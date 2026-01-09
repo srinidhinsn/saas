@@ -2487,8 +2487,8 @@ const OrderSummaryVisible = ({ clientId, token }) => {
               <button
                 onClick={() => toggleOrderMode('all')}
                 className={`flex items-center gap-2 px-4 py-2 rounded-lg font-medium text-sm transition-all ${selectedOrderModes.includes('all')
-                    ? 'bg-action-primary text-text-white shadow-sm'
-                    : 'bg-bg-tertiary text-text-secondary hover:text-text-primary border border-border-default'
+                  ? 'bg-action-primary text-text-white shadow-sm'
+                  : 'bg-bg-tertiary text-text-secondary hover:text-text-primary border border-border-default'
                   }`}
               >
                 <Filter size={16} />
@@ -2499,8 +2499,8 @@ const OrderSummaryVisible = ({ clientId, token }) => {
               <button
                 onClick={() => toggleOrderMode('dinein')}
                 className={`flex items-center gap-2 px-4 py-2 rounded-lg font-medium text-sm transition-all ${selectedOrderModes.includes('dinein')
-                    ? 'bg-action-primary text-text-white shadow-sm'
-                    : 'bg-bg-tertiary text-text-secondary hover:text-text-primary border border-border-default'
+                  ? 'bg-action-primary text-text-white shadow-sm'
+                  : 'bg-bg-tertiary text-text-secondary hover:text-text-primary border border-border-default'
                   }`}
               >
                 <Users size={16} />
@@ -2511,8 +2511,8 @@ const OrderSummaryVisible = ({ clientId, token }) => {
               <button
                 onClick={() => toggleOrderMode('takeaway')}
                 className={`flex items-center gap-2 px-4 py-2 rounded-lg font-medium text-sm transition-all ${selectedOrderModes.includes('takeaway')
-                    ? 'bg-action-primary text-text-white shadow-sm'
-                    : 'bg-bg-tertiary text-text-secondary hover:text-text-primary border border-border-default'
+                  ? 'bg-action-primary text-text-white shadow-sm'
+                  : 'bg-bg-tertiary text-text-secondary hover:text-text-primary border border-border-default'
                   }`}
               >
                 <Package size={16} />
@@ -2523,8 +2523,8 @@ const OrderSummaryVisible = ({ clientId, token }) => {
               <button
                 onClick={() => toggleOrderMode('delivery')}
                 className={`flex items-center gap-2 px-4 py-2 rounded-lg font-medium text-sm transition-all ${selectedOrderModes.includes('delivery')
-                    ? 'bg-action-primary text-text-white shadow-sm'
-                    : 'bg-bg-tertiary text-text-secondary hover:text-text-primary border border-border-default'
+                  ? 'bg-action-primary text-text-white shadow-sm'
+                  : 'bg-bg-tertiary text-text-secondary hover:text-text-primary border border-border-default'
                   }`}
               >
                 <Truck size={16} />
@@ -2552,7 +2552,7 @@ const OrderSummaryVisible = ({ clientId, token }) => {
 
         </div>
 
-        <div className="grid grid-cols-1 sm:grid-cols-2 lg:grid-cols-3 gap-6">
+        {/* <div className="grid grid-cols-1 sm:grid-cols-2 lg:grid-cols-3 gap-6">
           {filteredOrders.length === 0 ? (
             <div className="rounded-lg p-8 lg:p-12 text-center col-span-full bg-bg-primary border-default border-border-default shadow-card">
               <p className="text-text-secondary text-base">No orders found</p>
@@ -2634,6 +2634,108 @@ const OrderSummaryVisible = ({ clientId, token }) => {
                     <div className="text-lg font-bold text-action-primary">
                       Rs.{order.items.reduce((s, it) => s + ((inventoryMap[it.item_id]?.unit_price || it.unit_price || it.price || 0) * (it.quantity || 1)), 0).toFixed(2)}
                     </div>
+                  </div>
+                </div>
+              );
+            })
+          )} */}
+
+        <div className="grid grid-cols-1 sm:grid-cols-2 lg:grid-cols-3 gap-6">
+          {filteredOrders.length === 0 ? (
+            <div className="rounded-lg p-8 lg:p-12 text-center col-span-full bg-bg-primary border-default border-border-default shadow-card">
+              <p className="text-text-secondary text-base">No orders found</p>
+            </div>
+          ) : (
+            filteredOrders.map(order => {
+              const borderColor =
+                order.status?.toLowerCase() === 'served'
+                  ? 'var(--color-status-served)'
+                  : order.status?.toLowerCase() === 'pending'
+                    ? 'var(--color-status-pending)'
+                    : order.status?.toLowerCase() === 'preparing'
+                      ? 'var(--color-status-preparing)'
+                      : order.status?.toLowerCase() === 'new'
+                        ? 'var(--color-status-new)'
+                        : 'var(--color-border-default)';
+
+              return (
+                <div
+                  key={order.id}
+                  className="rounded-xl shadow-md overflow-hidden border border-gray-200 bg-white transition-transform transform hover:-translate-y-0.5"
+                  style={{ borderColor }}
+                >
+                  {/* HEADER */}
+                  <div className="flex items-center justify-between px-4 py-3  text-text-black">
+                    <div className="flex items-center flex-wrap gap-2 mb-2">
+                      <h3 className="text-sm font-bold text-text-primary">
+                        {order._derivedMode === 'takeaway'
+                          ? (order.customer_name || 'Take Away')
+                          : `Table: ${tablesMap[order.table_id] || order.table || order.table_id}`}
+                      </h3>
+
+                      <span className="px-2 py-1 rounded-full text-[12px] font-semibold bg-status-new text-action-primary">
+                        {order.status}
+                      </span>
+
+                      <span className="px-2 py-1 rounded-full text-[10px] font-semibold bg-bg-primary text-text-secondary border border-border-default flex items-center gap-1">
+                        {order._derivedMode === 'dinein' ? (
+                          <Users size={10} />
+                        ) : (
+                          <Package size={10} />
+                        )}
+                        {order._derivedMode === 'dinein' ? 'Dine In' : 'Takeaway'}
+                      </span>
+
+                    </div>
+
+                    <span className="text-lg font-semibold text-black-100/80">
+                      #{order.id}
+                    </span>
+                  </div>
+
+                  {/* BODY */}
+                  <div className="bg-bg-primary px-4 py-4 space-y-3">
+                    {order.items.map((it, idx) => (
+                      <div
+                        key={idx}
+                        className="flex items-center justify-between bg-white rounded-lg px-3 py-2"
+                      >
+                        <span className="text-sm font-medium">
+                          {it.quantity}x {it.item_name || it.name}
+                        </span>
+
+                        <span className="text-sm text-gray-600">
+                          ₹{(
+                            (inventoryMap[it.item_id]?.unit_price ||
+                              it.unit_price ||
+                              it.price ||
+                              0) * (it.quantity || 1)
+                          ).toFixed(2)}
+                        </span>
+                      </div>
+                    ))}
+                  </div>
+
+                  {/* ACTIONS — MOVED FROM MANAGE */}
+                  <div className="flex items-center justify-between px-4 py-3 border-t border-gray-200 bg-white">
+                    <button
+                      onClick={() => {
+                        setSelectedOrder(order);
+                        setEditOrderId(order.id);
+                        setShowOrderDetailModal(true);
+                        setActiveTab('items');
+                      }}
+                      className="px-4 py-2 rounded-lg bg-action-primary text-text-white text-sm font-semibold"
+                    >
+                      Edit Order
+                    </button>
+
+                    <button
+                      onClick={() => handleStatusChange(order.id, 'served')}
+                      className="px-4 py-2 rounded-lg bg-action-success text-text-white text-sm font-semibold"
+                    >
+                      Mark as Served
+                    </button>
                   </div>
                 </div>
               );
