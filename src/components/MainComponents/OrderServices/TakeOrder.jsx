@@ -5,6 +5,132 @@ import CategoryTree from '../InventoryServices/CategoryTree';
 import ImagePreview from '../../utils/ImagePreview';
 
 
+const TableReservation = ({
+  tables = [],
+  orderMode = "dinein",
+  onSelectTable,
+  onSelectTakeaway,
+  onSelectDineIn,
+}) => {
+  const uniqueZones = [...new Set(tables.map(t => t.location_zone))];
+
+  return (
+    <div
+      className="
+  p-4
+  bg-bg-primary
+  overflow-y-auto
+  h-[calc(100vh-4rem)]
+"
+    >
+      {/* 🔁 DINE-IN / TAKEAWAY TOGGLE */}
+      <div className="flex justify-center mb-2">
+        <div className="flex bg-bg-primary border-2 rounded-full border-action-primary p-1 shadow-sm">
+
+          {/* DINE IN */}
+          <button
+            onClick={onSelectDineIn}
+            className={`px-5 py-2 text-sm font-semibold rounded-full transition-all
+              ${orderMode === "dinein"
+                ? "bg-action-primary text-text-white shadow"
+                : "text-text-secondary hover:bg-gray-100"}
+            `}
+          >
+            Dine In
+          </button>
+
+          {/* TAKEAWAY */}
+          <button
+            onClick={onSelectTakeaway}
+            className={`px-5 py-2 text-sm font-semibold rounded-full transition-all flex items-center gap-1
+              ${orderMode === "takeaway"
+                ? "bg-orange-500 text-white shadow"
+                : "text-gray-600 hover:bg-gray-100"}
+            `}
+          >
+            <Package size={14} />
+            Takeaway
+          </button>
+
+        </div>
+      </div>
+
+      {/* 🪑 TABLE GRID – ONLY FOR DINE-IN */}
+      {orderMode === "dinein" && uniqueZones.map(zone => (
+        <div key={zone} className="mb-8">
+
+          {/* ZONE TITLE */}
+          <h3 className="text-lg font-semibold mb-3 text-gray-700">
+            {zone}
+          </h3>
+
+          {/* TABLE GRID */}
+          <div className="
+            grid gap-4
+            grid-cols-3
+            sm:grid-cols-4
+            md:grid-cols-5
+            lg:grid-cols-6
+            xl:grid-cols-12
+          ">
+            {tables
+              .filter(
+                t =>
+                  t.location_zone === zone &&
+                  ["vacant", "available"].includes(
+                    t.status?.toLowerCase()
+                  )
+              )
+              .map(table => (
+                <div
+                  key={table.id}
+                  onClick={() => onSelectTable(table)}
+                  className="
+                    aspect-square
+                    flex flex-col items-center justify-center
+                    rounded-xl
+                    border border-dashed border-gray-400
+                    bg-white
+                    cursor-pointer
+                    transition-all duration-200
+                    hover:shadow-lg
+                    hover:-translate-y-1
+                    hover:bg-green-50
+                  "
+                >
+                  {/* TABLE NUMBER */}
+                  <div className="text-lg font-bold text-gray-800">
+                    {table.table_number}
+                  </div>
+
+                  {/* STATUS */}
+                  <span className="
+                    mt-2
+                    px-3 py-0.5
+                    text-[11px] font-medium
+                    rounded-full
+                    bg-green-100 text-green-700
+                  ">
+                    {table.status}
+                  </span>
+                </div>
+              ))}
+          </div>
+        </div>
+      ))}
+
+      {/* TAKEAWAY INFO */}
+      {orderMode === "takeaway" && (
+        <div className="text-center mt-10 text-gray-500 text-sm">
+          Takeaway selected. Opening menu…
+        </div>
+      )}
+
+    </div>
+  );
+};
+
+
 
 
 const NoteModal = ({ isOpen, onClose, itemName }) => {
@@ -107,7 +233,8 @@ const TakeOrder = ({ clientId, token, onOrderUpdate, realm }) => {
   const isPlacingRef = useRef(false);
   const isMobile = window.matchMedia('(max-width: 1024px)').matches;
   const [showClearConfirm, setShowClearConfirm] = useState(false);
-
+  const [showOrderPage, setShowOrderPage] = useState(false);
+  const [currentView, setCurrentView] = useState('floor');
   // Flatten category tree
   const flattenCategoryTree = (tree, level = 0, parentId = null) => {
     let flatList = [];
@@ -127,6 +254,31 @@ const TakeOrder = ({ clientId, token, onOrderUpdate, realm }) => {
     });
     return flatList;
   };
+
+  useEffect(() => {
+    const onBackButton = (e) => {
+      // If user is on order view → go back to table view
+      if (currentView === 'order') {
+        e.preventDefault();
+
+        setCurrentView('floor');
+        setShowCart(false);
+
+        // push state again to block leaving page
+        window.history.pushState({ view: 'floor' }, '');
+      }
+    };
+
+    window.addEventListener('popstate', onBackButton);
+
+    return () => {
+      window.removeEventListener('popstate', onBackButton);
+    };
+  }, [currentView]);
+  useEffect(() => {
+    window.history.pushState({ view: 'floor' }, '');
+  }, []);
+
   useEffect(() => {
     const fetchData = async () => {
       if (!clientId || !token) {
@@ -143,11 +295,19 @@ const TakeOrder = ({ clientId, token, onOrderUpdate, realm }) => {
           { headers: { Authorization: `Bearer ${token}` } }
         );
         const tableList = Array.isArray(tablesRes.data?.data)
-          ? tablesRes.data.data.map(t => ({
-            ...t,
-            table_number: t.name || t.table_number || "-",
-          }))
+          ? tablesRes.data.data
+            .filter(t =>
+              t.id !== 500 &&
+              !['takeaway', 'take away'].includes(
+                (t.name || '').toLowerCase().trim()
+              )
+            )
+            .map(t => ({
+              ...t,
+              table_number: t.name || t.table_number || "-",
+            }))
           : [];
+
 
         // Find or identify Takeaway table
         let takeawayTable = tableList.find(t =>
@@ -254,6 +414,17 @@ const TakeOrder = ({ clientId, token, onOrderUpdate, realm }) => {
   }, [clientId, token, realm]);
   const availableTables = tables.filter(t =>
     ["vacant", "available"].includes(t.status?.trim().toLowerCase())
+  );
+  const acTables = availableTables.filter(t =>
+    (t.table_type || t.location_zone || '')
+      .toLowerCase()
+      .includes('ac')
+  );
+
+  const nonAcTables = availableTables.filter(t =>
+    !(t.table_type || t.location_zone || '')
+      .toLowerCase()
+      .includes('ac')
   );
 
   const getFilteredItems = () => {
@@ -512,13 +683,12 @@ const TakeOrder = ({ clientId, token, onOrderUpdate, realm }) => {
       }
       // For takeaway, skip table update entirely since it causes 403 error
 
-      setTimeout(() => {
-        setCart([]);
-        setSelectedTable('');
-        setOrderPlaced(false);
-        setShowCart(false);
-        onOrderUpdate?.(res.data);
-      }, 3000);
+      setCart([]);
+      setSelectedTable('');
+      setShowCart(false);
+      setOrderPlaced(false);
+      onOrderUpdate?.(res.data);
+
 
     } catch (err) {
       console.error("Order failed:", err);
@@ -529,6 +699,17 @@ const TakeOrder = ({ clientId, token, onOrderUpdate, realm }) => {
       setIsPlacingOrder(false);
     }
   };
+
+
+  const handleTableSelect = (table) => {
+    setSelectedTable(table.id.toString());
+    setCurrentView('order');
+
+    // 🔥 push fake state so back button stays inside this page
+    window.history.pushState({ view: 'order' }, '');
+  };
+
+
   useEffect(() => {
     if (searchOpen && searchInputRef.current) {
       // small timeout to ensure input is visible before focusing (nice in some browsers)
@@ -547,23 +728,52 @@ const TakeOrder = ({ clientId, token, onOrderUpdate, realm }) => {
     return () => window.removeEventListener('keydown', onKey);
   }, []);
   const handleClearCart = () => {
+    if (cart.length === 0) return;
+    setShowClearConfirm(true);
+  };
+  const confirmClearCart = () => {
     setCart([]);
-    setShowCart(false); // close order panel
+    setSelectedTable('');
+    setShowOrderPage(false);
+    setCurrentView('floor');
+    setShowCart(false);
+    setShowClearConfirm(false);
   };
 
-  if (loading) {
-    return (
-      <div className="flex items-center h-[calc(100vh-6rem)] justify-center bg-bg-secondary">
-        <div className="text-center">
-          <div className="animate-spin rounded-full h-12 w-12 border-b-2 mx-auto mb-4 border-action-primary"></div>
-          <p className="text-text-secondary">Loading...</p>
-        </div>
-      </div>
-    );
-  }
+  const handleTakeawaySelect = () => {
+    if (!takeawayTableId) {
+      alert("Takeaway table not configured");
+      return;
+    }
+
+    setOrderMode('takeaway');
+    setSelectedTable(takeawayTableId.toString());
+    setCurrentView('order');
+
+    // keep back-button behavior consistent
+    window.history.pushState({ view: 'order' }, '');
+  };
+
+
+  // if (loading) {
+  //   return (
+  //     <div className="flex items-center h-[calc(100vh-6rem)] justify-center bg-bg-secondary">
+  //       <div className="text-center">
+  //         <div className="animate-spin rounded-full h-12 w-12 border-b-2 mx-auto mb-4 border-action-primary"></div>
+  //         <p className="text-text-secondary">Loading...</p>
+  //       </div>
+  //     </div>
+  //   );
+  // }
 
   return (
-    <div className="bg-bg-primary p-0 h-[calc(100vh-4rem)] overflow-hidden">
+    <div className="bg-bg-primary p-0 overflow-y-auto lg:overflow-hidden">
+
+      <TableReservation
+        tables={tables}
+      />
+
+
 
       {/* Search Floating Button */}
       <div
@@ -606,16 +816,17 @@ const TakeOrder = ({ clientId, token, onOrderUpdate, realm }) => {
       </div>
 
       <div className="mx-auto px-2 py-2">
-        <div className="grid lg:grid-cols-4 gap-2">
+        <div className="grid lg:grid-cols-4 gap-1">
 
           {/* CATEGORY SIDEBAR */}
           <div className="lg:col-span-1">
             <div className="
-    sticky top-24
-    h-[calc(100vh-4rem)]
-    overflow-y-auto
-    pr-1
-  ">
+lg:sticky lg:top-24
+lg:h-[calc(100dvh-4rem)]
+lg:overflow-y-auto
+pr-1
+">
+
               <CategoryTree
                 categories={categories}
                 selectedCategory={selectedCategory}
@@ -627,14 +838,22 @@ const TakeOrder = ({ clientId, token, onOrderUpdate, realm }) => {
 
 
           {/* MENU + ORDER PANEL */}
-          <div className="lg:col-span-3 grid grid-cols-[1fr_auto] gap-4">
-
+          <div className="lg:col-span-3 flex gap-2">
 
             {/* MENU */}
-            <div className={`transition-all duration-300
-    lg:max-h-[calc(100vh-4rem)] border-default border-border-default p-4 rounded-lg
-    lg:overflow-y-auto
-    ${!isMobile ? 'flex-1' : 'w-full'}`}>
+            <div
+              className="
+transition-all duration-300
+border-default border-border-default p-4 rounded-lg
+flex-1
+overflow-y-auto
+h-[calc(100dvh-4rem)]
+lg:h-auto
+lg:max-h-[calc(100dvh-4rem)]
+"
+            >
+
+
 
               <div className="mb-4">
                 <h2 className="text-xl lg:text-2xl font-semibold text-text-primary">
@@ -644,28 +863,21 @@ const TakeOrder = ({ clientId, token, onOrderUpdate, realm }) => {
               </div>
 
               <div
-  className="
-    grid gap-4
-    [grid-template-columns:repeat(auto-fit,minmax(220px,1fr))]
-  "
->
-
-
+                className="grid gap-3 [grid-template-columns:repeat(auto-fit,minmax(240px,1fr))]">
                 {filteredItems.map(item => {
                   const discountPercent =
                     item.discount &&
                       item.unit_price &&
                       Number(item.discount) > 0
                       ? ((Number(item.discount) * 100) / Number(item.unit_price))
-                        .toFixed(1)
-                        .replace(/\.0$/, '')
+                        .toFixed(0)
                       : null;
 
                   return (
-                    <div
-                    key={item.id}
-                    className="
-                      flex gap-3
+                    <div onClick={() => handleItemClick(item)}
+                      key={item.id}
+                      className="
+                      flex gap-2 items-center
                       bg-bg-primary
                       border border-border-default
                       rounded-xl
@@ -674,56 +886,45 @@ const TakeOrder = ({ clientId, token, onOrderUpdate, realm }) => {
                       hover:shadow-md
                       transition
                     "
-                  >
-                    {/* IMAGE */}
-                    <div className="w-14 h-14 rounded-lg overflow-hidden flex-shrink-0 bg-gray-100">
-                      <ImagePreview
-                        clientId={clientId}
-                        imageId={item.image_id}
-                        token={token}
-                        alt={item.name}
-                        baseUrl={import.meta.env.VITE_API_DOCUMENT_SERVICE_URL}
-                        urlBuilder={({ baseUrl, clientId, imageId }) =>
-                          `${baseUrl}/${clientId}/document/download?doc_id=${imageId}`
-                        }
-                        className="w-full h-full object-cover"
-                      />
-                    </div>
-                  
-                    {/* CONTENT */}
-                    <div className="flex-1 min-w-0 flex flex-col justify-between">
-                      <div>
-                        {/* NAME */}
-                        <h3 className="text-sm font-semibold text-text-primary leading-tight line-clamp-2">
+                    >
+                      {/* IMAGE */}
+                      <div className="w-14 h-14 rounded-lg overflow-hidden shrink-0 bg-gray-100">
+                        <ImagePreview
+                          clientId={clientId}
+                          imageId={item.image_id}
+                          token={token}
+                          alt={item.name}
+                          baseUrl={import.meta.env.VITE_API_DOCUMENT_SERVICE_URL}
+                          urlBuilder={({ baseUrl, clientId, imageId }) =>
+                            `${baseUrl}/${clientId}/document/download?doc_id=${imageId}`
+                          }
+                          className="w-full h-full object-cover"
+                        />
+                      </div>
+
+                      {/* INFO */}
+                      <div className="flex-1 min-w-0">
+                        <h3 className="text-sm font-semibold text-text-primary line-clamp-2">
                           {item.name}
                         </h3>
-                  
-                        {/* DESCRIPTION */}
+
                         {item.description && (
-                          <p className="text-xs text-text-secondary mt-1 line-clamp-2">
+                          <p className="text-xs text-text-secondary line-clamp-1 mt-0.5">
                             {item.description}
                           </p>
                         )}
-                  
-                        {/* KCAL */}
-                        {item.kcal && (
-                          <p className="text-xs text-text-secondary mt-1">
-                            {item.kcal} Kcal
-                          </p>
-                        )}
-                      </div>
-                  
-                      {/* PRICE + ACTION */}
-                      <div className="flex items-center justify-between mt-2">
-                        {/* PRICE */}
-                        <div>
-                          {item.discount ? (
+
+                        <div className="flex items-center gap-2 mt-1">
+                          {discountPercent ? (
                             <>
                               <span className="text-sm font-bold text-action-primary">
                                 ₹{(item.unit_price - item.discount).toFixed(0)}
                               </span>
-                              <span className="ml-2 text-xs line-through text-text-secondary">
+                              <span className="text-xs line-through  text-text-secondary">
                                 ₹{item.unit_price}
+                              </span>
+                              <span className="text-xs text-action-danger font-semibold">
+                                {discountPercent}% OFF
                               </span>
                             </>
                           ) : (
@@ -732,33 +933,14 @@ const TakeOrder = ({ clientId, token, onOrderUpdate, realm }) => {
                             </span>
                           )}
                         </div>
-                  
-                        {/* ADD BUTTON */}
-                        <button
-                          onClick={() => handleItemClick(item)}
-                          className="
-                            px-4 py-1.5
-                            text-sm font-semibold
-                            rounded-full
-                            bg-action-primary
-                            text-text-white
-                            hover:bg-action-primary/90
-                            transition
-                          "
-                        >
-                          Add +
-                        </button>
                       </div>
                     </div>
-                  </div>
-                  
                   );
                 })}
 
               </div>
             </div>
 
-            {/* ORDER PANEL (INLINE – DESKTOP ONLY) */}
             {!isMobile && (
               <>
                 <div
@@ -964,10 +1146,11 @@ const TakeOrder = ({ clientId, token, onOrderUpdate, realm }) => {
               </>
             )}
 
-
           </div>
         </div>
       </div>
+
+
       {isMobile && showCart && (
         <div className="fixed inset-0 z-50 flex justify-end bg-color-modalsbg animate-fade-in">
           <div className="w-full md:w-96 lg:w-[28rem] h-full overflow-y-auto bg-bg-primary animate-slide-in-right">
@@ -1022,30 +1205,26 @@ const TakeOrder = ({ clientId, token, onOrderUpdate, realm }) => {
                         </button>
                       </div>
                     </div>
+                    {selectedTable && (
+                      <div className="mb-3 flex justify-between items-center">
+                        <span className="text-sm font-semibold text-text-primary">
+                          Table: {tables.find(t => t.id.toString() === selectedTable)?.table_number}
+                        </span>
 
-                    {orderMode === 'dinein' && (
-                      <div className="text-sm text-text-primary">
-                        <label className="block text-sm font-semibold mb-2 text-text-primary">
-                          Select Table
-                        </label>
-                        <select
-                          value={selectedTable}
-                          onChange={(e) => setSelectedTable(e.target.value)}
-                          className="w-full px-4 py-2 rounded-lg border-border-default bg-bg-primary"
+                        <button
+                          onClick={() => {
+                            setCurrentView('floor');
+                            setShowCart(false);
+                          }}
+                          className="text-xs text-action-danger"
                         >
-                          <option value="">Choose a table</option>
-                          {availableTables.map(table => (
-                            <option key={table.id} value={table.id}>
-                              {table.table_number} - {table.location_zone}
-                            </option>
-                          ))}
-                        </select>
+                          Change
+                        </button>
                       </div>
                     )}
-
                   </div>
 
-                  <div className="space-y-4 mb-6 max-h-[calc(100vh-400px)] overflow-y-auto">
+                  <div className="space-y-4 mb-6 max-h-[calc(100vh-4rem)] overflow-y-auto">
                     {cart.map(item => (
                       <div key={item.id} className="flex items-center space-x-3 p-3 lg:p-4 rounded-lg bg-bg-tertiary border-border-default animate-slide-up">
                         <div className="w-16 h-16 rounded-md overflow-hidden flex-shrink-0">
@@ -1145,6 +1324,35 @@ const TakeOrder = ({ clientId, token, onOrderUpdate, realm }) => {
           </div>
         </div>
       )}
+      {showClearConfirm && (
+        <div className="fixed inset-0 z-50 flex items-center justify-center bg-black/40">
+          <div className="bg-white rounded-lg p-6 w-80 shadow-xl animate-scale-in">
+            <h3 className="text-lg font-semibold mb-4 text-gray-800">
+              Clear all items?
+            </h3>
+            <p className="text-sm text-gray-600 mb-5">
+              This will remove all items from the order.
+            </p>
+
+            <div className="flex gap-3">
+              <button
+                onClick={() => setShowClearConfirm(false)}
+                className="flex-1 py-2 border rounded-lg hover:bg-gray-100"
+              >
+                Cancel
+              </button>
+
+              <button
+                onClick={confirmClearCart}
+                className="flex-1 py-2 bg-red-600 text-white rounded-lg hover:bg-red-700"
+              >
+                Clear
+              </button>
+            </div>
+          </div>
+        </div>
+      )}
+
       {/* Floating Cart Button */}
       {cart.length > 0 && !showCart && (
         <button
