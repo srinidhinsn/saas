@@ -617,7 +617,7 @@ const TableManagement = ({ clientId, token, screenIds, userId }) => {
     }
 
     return (
-        <AccessGuard screenIds={screenIds} requiredScreenId={requiredScreenId} clientId={clientId} requesterId={userId}>
+        // <AccessGuard screenIds={screenIds} requiredScreenId={requiredScreenId} clientId={clientId} requesterId={userId}>
             <div className="min-h-screen bg-bg-primary">
                 <style>
                     {`
@@ -945,7 +945,7 @@ const TableManagement = ({ clientId, token, screenIds, userId }) => {
                     )}
                 </main>
             </div>
-        </AccessGuard>
+        // </AccessGuard>
     );
 };
 

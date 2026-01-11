@@ -2871,8 +2871,8 @@ const OrderSummaryVisible = ({ clientId, token }) => {
                 <div className="flex">
                   <button
                     className={`flex-1 py-3 text-sm font-semibold ${activeTab === 'items'
-                      ? 'text-action-primary border-b-2 border-action-primary bg-bg-primary'
-                      : 'text-text-secondary'
+                        ? 'text-action-primary border-b-2 border-action-primary bg-bg-primary'
+                        : 'text-text-secondary'
                       }`}
                     onClick={() => setActiveTab('items')}
                   >
@@ -2880,8 +2880,8 @@ const OrderSummaryVisible = ({ clientId, token }) => {
                   </button>
                   <button
                     className={`flex-1 py-3 text-sm font-semibold ${activeTab === 'available'
-                      ? 'text-action-primary border-b-2 border-action-primary bg-bg-primary'
-                      : 'text-text-secondary'
+                        ? 'text-action-primary border-b-2 border-action-primary bg-bg-primary'
+                        : 'text-text-secondary'
                       }`}
                     onClick={() => setActiveTab('available')}
                   >

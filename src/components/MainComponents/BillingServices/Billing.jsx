@@ -1068,4 +1068,3 @@ export default function BillingPage({ clientId, token }) {
 
 }
 
-
