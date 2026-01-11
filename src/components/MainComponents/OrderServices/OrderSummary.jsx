@@ -1311,6 +1311,7 @@ import { MdOutlineKeyboardDoubleArrowDown } from "react-icons/md";
 import Modal from "react-modal";
 import { X, Edit2, Trash2, Search, Filter, ShoppingBag, Clock, Users, Package, Truck } from 'lucide-react';
 import { useNavigate } from "react-router-dom";
+import BillingPage from "../BillingServices/Billing";
 
 
 Modal.setAppElement("#root");
@@ -2321,8 +2322,8 @@ const OrderSummaryVisible = ({ clientId, token }) => {
         status: item.status || 'pending',
         note: item.note || '',
         slug: item.slug || '',
-        price: unitPrice,             
-        unit_price: unitPrice,       
+        price: unitPrice,
+        unit_price: unitPrice,
         line_total: unitPrice * (item.quantity || 1),
         client_id: clientId,
         order_id: orderId,
@@ -2582,6 +2583,18 @@ const OrderSummaryVisible = ({ clientId, token }) => {
     return 'dinein';
   };
 
+  const handleGenerateBill = (order) => {
+    navigate(`/saas/${clientId}/billing`, {
+      state: {
+        orderId: order.id,
+        tableId: order.table_id,
+        clientId
+      }
+    });
+  };
+  
+
+
 
   return (
     <div className="min-h-screen bg-bg-primary">
@@ -2593,44 +2606,41 @@ const OrderSummaryVisible = ({ clientId, token }) => {
               <button
                 onClick={() => toggleOrderMode('all')}
                 className={`flex items-center gap-2 px-4 py-2 rounded-lg font-medium text-sm transition-all ${selectedOrderModes.includes('all')
-                  ? 'bg-action-primary text-text-white shadow-sm'
-                  : 'bg-bg-tertiary text-text-secondary hover:text-text-primary border border-border-default'
+                    ? 'bg-action-primary text-text-white shadow-sm'
+                    : 'bg-bg-tertiary text-text-secondary hover:text-text-primary border border-border-default'
                   }`}
               >
                 <Filter size={16} />
                 <span>All Orders</span>
               </button>
 
-
               <button
                 onClick={() => toggleOrderMode('dinein')}
                 className={`flex items-center gap-2 px-4 py-2 rounded-lg font-medium text-sm transition-all ${selectedOrderModes.includes('dinein')
-                  ? 'bg-action-primary text-text-white shadow-sm'
-                  : 'bg-bg-tertiary text-text-secondary hover:text-text-primary border border-border-default'
+                    ? 'bg-action-primary text-text-white shadow-sm'
+                    : 'bg-bg-tertiary text-text-secondary hover:text-text-primary border border-border-default'
                   }`}
               >
                 <Users size={16} />
                 <span>Dine In</span>
               </button>
 
-
               <button
                 onClick={() => toggleOrderMode('takeaway')}
                 className={`flex items-center gap-2 px-4 py-2 rounded-lg font-medium text-sm transition-all ${selectedOrderModes.includes('takeaway')
-                  ? 'bg-action-primary text-text-white shadow-sm'
-                  : 'bg-bg-tertiary text-text-secondary hover:text-text-primary border border-border-default'
+                    ? 'bg-action-primary text-text-white shadow-sm'
+                    : 'bg-bg-tertiary text-text-secondary hover:text-text-primary border border-border-default'
                   }`}
               >
                 <Package size={16} />
                 <span>Takeaway</span>
               </button>
 
-
               <button
                 onClick={() => toggleOrderMode('delivery')}
                 className={`flex items-center gap-2 px-4 py-2 rounded-lg font-medium text-sm transition-all ${selectedOrderModes.includes('delivery')
-                  ? 'bg-action-primary text-text-white shadow-sm'
-                  : 'bg-bg-tertiary text-text-secondary hover:text-text-primary border border-border-default'
+                    ? 'bg-action-primary text-text-white shadow-sm'
+                    : 'bg-bg-tertiary text-text-secondary hover:text-text-primary border border-border-default'
                   }`}
               >
                 <Truck size={16} />
@@ -2639,11 +2649,15 @@ const OrderSummaryVisible = ({ clientId, token }) => {
 
               <div className="flex justify-end">
                 <div className="relative w-full sm:w-auto">
-                  <Filter className="absolute left-3 top-1/2 text-text-secondary transform -translate-y-1/2" size={20} />
+                  <Filter
+                    className="absolute left-3 top-1/2 text-text-secondary transform -translate-y-1/2"
+                    size={20}
+                  />
                   <select
                     value={filterMode}
                     onChange={(e) => setFilterMode(Number(e.target.value))}
-                    className="w-full sm:w-auto pl-10 pr-4 py-2 rounded-lg bg-bg-primary border border-border-default text-text-primary">
+                    className="w-full sm:w-auto pl-10 pr-4 py-2 rounded-lg bg-bg-primary border border-border-default text-text-primary"
+                  >
                     <option value={0}>All Status</option>
                     <option value={2}>Pending</option>
                     <option value={3}>Preparing</option>
@@ -2654,9 +2668,6 @@ const OrderSummaryVisible = ({ clientId, token }) => {
               </div>
             </div>
           </div>
-
-          {/* Status Filter Dropdown */}
-
         </div>
 
         <div className="grid grid-cols-1 sm:grid-cols-2 lg:grid-cols-4 gap-6">
@@ -2697,40 +2708,27 @@ const OrderSummaryVisible = ({ clientId, token }) => {
                 >
                   {/* HEADER */}
                   <div className="bg-action-primary px-4 py-3 text-text-black rounded-t-2xl">
-                    {/* Order Mode */}
                     <span className="inline-flex items-center gap-1 px-2 py-1 rounded-full text-[10px] font-semibold bg-bg-primary text-text-secondary border border-border-default">
-                      {order._derivedMode === 'dinein' ? (
-                        <Users size={10} />
-                      ) : (
-                        <Package size={10} />
-                      )}
+                      {order._derivedMode === 'dinein' ? <Users size={10} /> : <Package size={10} />}
                       {order._derivedMode === 'dinein' ? 'Dine In' : 'Takeaway'}
                     </span>
 
-                    {/* SINGLE LINE HEADER */}
                     <div className="flex items-center justify-between mt-2 gap-2">
-                      {/* Table / Customer */}
                       <h3 className="text-lg font-bold text-text-primary truncate">
                         {order._derivedMode === 'takeaway'
                           ? order.customer_name || 'Take Away'
-                          : tablesMap[order.table_id] ||
-                          order.table ||
-                          order.table_id}
+                          : tablesMap[order.table_id] || order.table || order.table_id}
                       </h3>
-                      {/* Status */}
-                      <span
-                        className={`inline-flex items-center px-3 py-1 rounded-full text-sm font-bold ${statusBadge}`}
-                      >
+
+                      <span className={`inline-flex items-center px-3 py-1 rounded-full text-sm font-bold ${statusBadge}`}>
                         {(status === 'ready' || status === 'served') && '✔'}
                         {order.status}
                       </span>
 
-                      {/* Order ID */}
                       <span className="text-lg font-bold text-text-primary">
                         #{order.id}
                       </span>
 
-                      {/* Delete */}
                       <button
                         onClick={() => {
                           setOrderToDelete(order.id);
@@ -2760,7 +2758,8 @@ const OrderSummaryVisible = ({ clientId, token }) => {
                             (inventoryMap[it.item_id]?.unit_price ||
                               it.unit_price ||
                               it.price ||
-                              0) * (it.quantity || 1)
+                              0) *
+                            (it.quantity || 1)
                           ).toFixed(2)}
                         </span>
                       </div>
@@ -2768,32 +2767,44 @@ const OrderSummaryVisible = ({ clientId, token }) => {
                   </div>
 
                   {/* ACTIONS */}
-                  <div className="sticky bottom-0 bg-white border-t border-gray-200 px-4 py-3 flex items-center gap-3">
-                    <button
-                      onClick={() => {
-                        setSelectedOrder(order);
-                        setEditOrderId(order.id);
-                        setShowOrderDetailModal(true);
-                        setActiveTab('items');
-                      }}
-                      className="flex-1 px-4 py-2 rounded-lg bg-action-primary text-text-white text-sm font-semibold"
-                    >
-                      Edit Order
-                    </button>
+                  <div className="sticky bottom-0 bg-white border-t border-gray-200 px-4 py-3 space-y-3">
+                    {/* Existing buttons */}
+                    <div className="flex items-center gap-3">
+                      <button
+                        onClick={() => {
+                          setSelectedOrder(order);
+                          setEditOrderId(order.id);
+                          setShowOrderDetailModal(true);
+                          setActiveTab('items');
+                        }}
+                        className="flex-1 px-4 py-2 rounded-lg bg-action-primary text-text-white text-sm font-semibold"
+                      >
+                        Edit Order
+                      </button>
 
-                    <button
-                      onClick={() => handleStatusChange(order.id, 'served')}
-                      className="flex-1 px-4 py-2 rounded-lg bg-action-success text-text-white text-sm font-semibold"
-                    >
-                      Mark as Served
-                    </button>
+                      <button
+                        onClick={() => handleStatusChange(order.id, 'served')}
+                        className="flex-1 px-4 py-2 rounded-lg bg-action-success text-text-white text-sm font-semibold"
+                      >
+                        Mark as Served
+                      </button>
+                    </div>
+
+                    {/* NEW: Generate Bill button */}
+                    {status === 'served' && (
+                      <button
+                        onClick={() => handleGenerateBill(order)}
+                        className="w-full px-4 py-3 rounded-xl bg-green-700 hover:bg-green-800 text-white text-sm font-semibold shadow-md transition-all"
+                      >
+                        Generate Bill
+                      </button>
+                    )}
                   </div>
                 </div>
               );
             })
           )}
         </div>
-
       </div>
 
       {
@@ -2871,8 +2882,8 @@ const OrderSummaryVisible = ({ clientId, token }) => {
                 <div className="flex">
                   <button
                     className={`flex-1 py-3 text-sm font-semibold ${activeTab === 'items'
-                        ? 'text-action-primary border-b-2 border-action-primary bg-bg-primary'
-                        : 'text-text-secondary'
+                      ? 'text-action-primary border-b-2 border-action-primary bg-bg-primary'
+                      : 'text-text-secondary'
                       }`}
                     onClick={() => setActiveTab('items')}
                   >
@@ -2880,8 +2891,8 @@ const OrderSummaryVisible = ({ clientId, token }) => {
                   </button>
                   <button
                     className={`flex-1 py-3 text-sm font-semibold ${activeTab === 'available'
-                        ? 'text-action-primary border-b-2 border-action-primary bg-bg-primary'
-                        : 'text-text-secondary'
+                      ? 'text-action-primary border-b-2 border-action-primary bg-bg-primary'
+                      : 'text-text-secondary'
                       }`}
                     onClick={() => setActiveTab('available')}
                   >
