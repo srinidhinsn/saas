@@ -145,7 +145,7 @@ def update_order_status(
     if body.status is not None:
         order.status = body.status
     if body.invoice_status is not None:
-        order.invoice_status = body.invoice_status
+        order.invoice_status = body.invoice_status    
     db.commit()
     db.refresh(order)
 
@@ -295,25 +295,68 @@ def update_order_status(
         data={"message": "Status updated", "new_status": order.status},
     )
 
-
-
-
-
 @router.post("/order_items/update")
-def update_order_items(client_id: str, order_id: Optional[int] = Query(None), body: Optional[List[OrderItemModel]] = None, context: SaasContext = Depends(verify_token), db: Session = Depends(get_db)):
-    if not order_id:
-        raise HTTPException(status_code=400, detail="Missing order_id")
-    try:
-        order_id=int(order_id)
-    except (ValueError,TypeError):
-        raise HTTPException(status_code=400,detail="Missing order_id")    
+def update_order_items(
+    client_id: str,
+    order_id: int = Query(...),
+    body: List[OrderItemModel] = None,
+    context: SaasContext = Depends(verify_token),
+    db: Session = Depends(get_db),
+):
+    new_items = []
 
-    db.query(Db_OrderItem_Entity).filter(Db_OrderItem_Entity.order_id == order_id).delete()
-    latest_order_item_list = Db_OrderItem_Entity.copyFromModels(body)
-    db.add_all(latest_order_item_list)
+    for item in body:
+        inventory_item = db.query(InventoryEntity).filter(
+            InventoryEntity.id == item.item_id,
+            InventoryEntity.client_id == client_id,
+            InventoryEntity.inventory_id == 1
+        ).first()
+
+        if inventory_item:
+            unit_price = Decimal(inventory_item.unit_price or 0)
+        else:
+            unit_price = Decimal(item.unit_price or item.price or 0)
+
+        quantity = Decimal(item.quantity or 1)
+        line_total = unit_price * quantity
+
+        db_item = Db_OrderItem_Entity(
+            order_id=order_id,
+            client_id=client_id,
+            item_id=item.item_id,
+            item_name=item.item_name,
+            slug=item.slug,
+            quantity=int(quantity),
+            unit_price=unit_price,
+            line_total=line_total,
+            status=item.status or OrderStatusEnum.pending,
+            frontend_unique_key=item.frontend_unique_key
+        )
+
+        new_items.append(db_item)
+
+    # SAFE delete AFTER validation
+    db.query(Db_OrderItem_Entity)\
+      .filter(Db_OrderItem_Entity.order_id == order_id)\
+      .delete()
+
+    db.add_all(new_items)
+
+    subtotal = sum(i.line_total for i in new_items)
+    db.query(Db_Order_Entity)\
+      .filter(Db_Order_Entity.id == order_id)\
+      .update({
+      "price": subtotal,
+      "total_price": subtotal   # later add tax/discount here
+  })
+
     db.commit()
-    response = ResponseModel(screen_id=context.screen_id, data={"message": "Order items updated successfully"})
-    return response
+
+    return ResponseModel(
+        screen_id=context.screen_id,
+        data={"message": "Order items updated successfully"}
+    )
+
 
 @router.post("/order_item/update")
 def update_order_item(client_id: str, order_id: Optional[int] = Query(None), order_item: Optional[OrderItemModel] = None, context: SaasContext = Depends(verify_token), db: Session = Depends(get_db)):
