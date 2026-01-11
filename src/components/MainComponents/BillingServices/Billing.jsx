@@ -6,7 +6,7 @@ import jsPDF from "jspdf";
 import CustomerAutocomplete from './CustomerAutocomplete';
 
 
-export default function BillingPage({clientId,token}) {
+export default function BillingPage({ clientId, token }) {
   const invoiceRef = useRef(null);
 
   const [orders, setOrders] = useState([]);
@@ -32,6 +32,7 @@ export default function BillingPage({clientId,token}) {
   const isMobile = window.innerWidth <= 768;
   const [paidInvoices, setPaidInvoices] = useState([]);
   const [customersList, setCustomersList] = useState([]);
+  const [gstManuallyEdited, setGstManuallyEdited] = useState(false);
 
   const safeNum = (num) => (typeof num === "number" && !isNaN(num) ? num : 0);
 
@@ -105,21 +106,36 @@ export default function BillingPage({clientId,token}) {
     }
   };
 
+
   useEffect(() => {
     if (clientId && token) {
       fetchUniqueCustomers();
     }
   }, [clientId, token]);
+  const orderSubtotal = Number(
+    (selectedOrder?.items || []).reduce(
+      (sum, item) =>
+        sum + (Number(item.unit_price) || 0) * (Number(item.quantity) || 0),
+      0
+    ).toFixed(2)
+  );
 
-  const subtotal =
-    selectedOrder?.items?.reduce((sum, item) => sum + safeNum(item.unit_price) * safeNum(item.quantity), 0) || 0;
-  const taxAmount = (taxPercent / 100) * subtotal;
+  const orderGST = Number(selectedOrder?.gst ?? 0);
+  const orderCST = Number(selectedOrder?.cst ?? 0);
+  const orderDiscount = Number(selectedOrder?.discount ?? 0);
+  const orderTotal = Number(selectedOrder?.total_price ?? 0);
 
-  const discountBase = subtotal + taxAmount;
-  const discountAmount = discountIsPercent ? (discount / 100) * discountBase : discount;
+  const calculatedDiscount = discountIsPercent
+    ? (orderSubtotal * discount) / 100
+    : discount;
 
-  const total = Number((discountBase - discountAmount).toFixed(2));
+  const calculatedGST = (orderSubtotal - calculatedDiscount) * (taxPercent / 100);
 
+  const calculatedTotal = Number(
+    (orderSubtotal - calculatedDiscount + calculatedGST).toFixed(2)
+  );
+  const total = calculatedTotal;
+  const orderTax = orderGST + orderCST;
 
   const sumSplits = (splits) => splits.reduce((sum, s) => sum + Number(s.amount), 0);
 
@@ -191,6 +207,8 @@ export default function BillingPage({clientId,token}) {
   };
 
   const handleSelectOrder = async (order) => {
+    setGstManuallyEdited(false);
+
     if (!order) return;
 
     const enrichedItems = (order.items || []).map((item) => {
@@ -220,10 +238,8 @@ export default function BillingPage({clientId,token}) {
     setDocumentNumber(invoiceDraft?.document_number ?? "");
     setPaymentStatus(invoiceDraft?.payment_status ?? "Pending");
 
-    const totalVal = Number((combinedItems.reduce(
-      (sum, i) => sum + (i.unit_price ?? 0) * (i.quantity ?? 1),
-      0
-    )).toFixed(2));
+    const totalVal = Number(order.total_price ?? 0);
+
 
     // Handle payment methods
     if (Array.isArray(invoiceDraft?.payment_method) && invoiceDraft.payment_method.length > 0) {
@@ -253,17 +269,14 @@ export default function BillingPage({clientId,token}) {
       setBalanceAmount(0);
     }
 
-    // Load GST from invoice draft (from DB)
-    // Priority: tax_rate field first, then calculate from tax_amount, finally default to 18
-    if (invoiceDraft?.tax_rate !== undefined && invoiceDraft?.tax_rate !== null) {
-      setTaxPercent(Number(invoiceDraft.tax_rate));
-    } else if (invoiceDraft?.tax_amount && totalVal > 0) {
-      // Calculate percentage from tax_amount if tax_rate not available
-      const calculatedTaxPercent = (invoiceDraft.tax_amount / totalVal) * 100;
-      setTaxPercent(Number(calculatedTaxPercent.toFixed(2)));
-    } else {
-      setTaxPercent(18); // Default GST
+    if (!gstManuallyEdited) {
+      if (invoiceDraft?.tax_rate !== undefined && invoiceDraft?.tax_rate !== null) {
+        setTaxPercent(Number(invoiceDraft.tax_rate));
+      } else {
+        setTaxPercent(18); // default GST
+      }
     }
+
 
     // Load discount from invoice draft (from DB)
     if (invoiceDraft?.discount !== undefined && invoiceDraft?.discount !== null) {
@@ -281,7 +294,32 @@ export default function BillingPage({clientId,token}) {
   };
 
 
+  useEffect(() => {
+    if (!selectedOrder) return;
 
+    // When total changes, resync payments
+    if (!splitPaymentEnabled) {
+      setPaymentSplits([{ method, amount: total }]);
+      setSinglePaymentAmount(total);
+      setBalanceAmount(0);
+    } else {
+      // Split payment → rebalance last row
+      let splits = [...paymentSplits];
+      if (splits.length > 0) {
+        const used = splits
+          .slice(0, splits.length - 1)
+          .reduce((sum, s) => sum + Number(s.amount || 0), 0);
+
+        splits[splits.length - 1].amount = Math.max(
+          Number((total - used).toFixed(2)),
+          0
+        );
+
+        setPaymentSplits(splits);
+        updateBalance(sumSplits(splits));
+      }
+    }
+  }, [total]);
 
   const fetchInvoiceDraft = async (orderId) => {
     try {
@@ -344,12 +382,12 @@ export default function BillingPage({clientId,token}) {
         document_date: new Date().toISOString(),
         order_id: selectedOrder.id.toString(),
         reference_number: tablesMap[selectedOrder.table_id]?.name || `Table ${selectedOrder.table_id}`,
-        subtotal: Number(subtotal.toFixed(2)),
-        tax_amount: Number(taxAmount.toFixed(2)),
-        tax_rate: Number(taxPercent),
-        discount_amount: Number(discountAmount.toFixed(2)),
-        discount: discountIsPercent ? Number(discount.toFixed(1)) : Number(discount),
-        total_amount: Number(total.toFixed(2)),
+        subtotal: orderSubtotal,
+        tax_amount: calculatedGST,
+        tax_rate: taxPercent,
+        discount_amount: calculatedDiscount,
+        discount: discountIsPercent ? discount : calculatedDiscount,
+        total_amount: calculatedTotal,
         payment_status: paymentStatus,
         payment_method: paymentMethodArray,
         single_payment_amount: splitPaymentEnabled ? null : Number(total.toFixed(2)),
@@ -398,7 +436,7 @@ export default function BillingPage({clientId,token}) {
         },
         { headers: { Authorization: `Bearer ${token}` } }
       );
-      
+
       toast.success("Invoice draft saved!");
       return draftId;
     } catch (err) {
@@ -558,17 +596,17 @@ export default function BillingPage({clientId,token}) {
       doc.setFont("helvetica", "normal");
       doc.setFontSize(10);
       doc.text("Subtotal:", pageWidth - 200, y);
-      doc.text(`Rs.${subtotal.toFixed(2)}`, pageWidth - 80, y, { align: "right" });
+      doc.text(`Rs.${orderSubtotal.toFixed(2)}`, pageWidth - 80, y, { align: "right" });
       y += 18;
 
       doc.text("Discount:", pageWidth - 200, y);
       doc.setTextColor(239, 68, 68);
-      doc.text(`-Rs.${discountAmount.toFixed(2)}`, pageWidth - 80, y, { align: "right" });
+      doc.text(`-Rs.${calculatedDiscount.toFixed(2)}`, pageWidth - 80, y, { align: "right" });
       y += 18;
 
       doc.setTextColor(0, 0, 0);
       doc.text(`GST (${taxPercent}%):`, pageWidth - 200, y);
-      doc.text(`Rs.${taxAmount.toFixed(2)}`, pageWidth - 80, y, { align: "right" });
+      doc.text(`Rs.${calculatedGST.toFixed(2)}`, pageWidth - 80, y, { align: "right" });
       y += 25;
 
       doc.setFillColor(239, 246, 255);
@@ -741,19 +779,23 @@ export default function BillingPage({clientId,token}) {
             ))}
             <tr className="font-semibold">
               <td colSpan={3} className="text-right p-2">Subtotal</td>
-              <td className="text-right p-2">₹{subtotal.toFixed(2)}</td>
+              <td className="text-right p-2">₹{orderSubtotal.toFixed(2)}
+              </td>
             </tr>
             <tr className="font-semibold">
               <td colSpan={3} className="text-right p-2">Discount</td>
-              <td className="text-right p-2">-₹{discountAmount.toFixed(2)}</td>
+              <td className="text-right p-2">-₹{calculatedDiscount.toFixed(2)}
+              </td>
             </tr>
             <tr className="font-semibold">
               <td colSpan={3} className="text-right p-2">GST ({taxPercent}%)</td>
-              <td className="text-right p-2">₹{taxAmount.toFixed(2)}</td>
+              <td className="text-right p-2">₹{calculatedGST.toFixed(2)}
+              </td>
             </tr>
             <tr className="font-bold text-lg bg-orange-50">
               <td colSpan={3} className="text-right p-2">TOTAL</td>
-              <td className="text-right p-2">₹{total.toFixed(2)}</td>
+              <td className="text-right p-2">₹{calculatedTotal.toFixed(2)}
+              </td>
             </tr>
           </tbody>
         </table>
@@ -769,7 +811,10 @@ export default function BillingPage({clientId,token}) {
               value={taxPercent}
               min="0"
               className="w-full border border-gray-300 rounded px-2 py-1"
-              onChange={(e) => setTaxPercent(Number(e.target.value))}
+              onChange={(e) => {
+                setTaxPercent(Number(e.target.value));
+                setGstManuallyEdited(true);
+              }}
             />
           </div>
           <div>
@@ -952,10 +997,8 @@ export default function BillingPage({clientId,token}) {
                 ...item,
                 unit_price: item.unit_price ?? item.price ?? inventoryMap[item.item_id]?.unit_price ?? 0,
               }));
-              const orderTotal = itemsWithPrice.reduce(
-                (sum, item) => sum + (item.unit_price * (item.quantity || 1)),
-                0
-              );
+              const orderTotal = Number(order.total_price ?? 0);
+
               const isSelected = selectedOrder?.id === order.id;
 
               return (
@@ -1024,5 +1067,4 @@ export default function BillingPage({clientId,token}) {
   );
 
 }
-
 
