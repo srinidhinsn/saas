@@ -3,6 +3,39 @@ import { ShoppingCart, Plus, Minus, X, Check, StickyNote, Search, Users, Package
 import axios from 'axios';
 import CategoryTree from '../InventoryServices/CategoryTree';
 import ImagePreview from '../../utils/ImagePreview';
+import { Eye, Lock } from 'lucide-react';
+import { TbExchange } from "react-icons/tb";
+const TABLE_STATUS_CONFIG = {
+  vacant: {
+    clickable: true,
+    bg: 'bg-green-50',
+    border: 'border-gray-500',
+    badge: 'bg-green-100 text-green-700',
+    icon: null,
+  },
+  available: {
+    clickable: true,
+    bg: 'bg-green-50',
+    border: 'border-green-500',
+    badge: 'bg-green-100 text-green-700',
+    icon: null,
+  },
+  occupied: {
+    clickable: false,
+    bg: 'bg-red-50',
+    border: 'border-red-400',
+    badge: 'bg-red-100 text-red-700',
+    icon: Eye,
+    viewable: true, // Add this flag
+  },
+  reserved: {
+    clickable: false,
+    bg: 'bg-yellow-50',
+    border: 'border-yellow-400',
+    badge: 'bg-yellow-100 text-yellow-700',
+    icon: Lock,
+  },
+};
 
 
 const TableReservation = ({
@@ -10,19 +43,53 @@ const TableReservation = ({
   orderMode = "dinein",
   onSelectTable,
   onSelectTakeaway,
-  onSelectDineIn,
+  onSelectDineIn, onViewOrder,
 }) => {
+  const [selectedSections, setSelectedSections] = useState([]);
+  const [selectedZones, setSelectedZones] = useState([]);
+  const toggleFilter = (value, list, setList) => {
+    setList(prev =>
+      prev.includes(value)
+        ? prev.filter(v => v !== value)
+        : [...prev, value]
+    );
+  };
+
   const uniqueZones = [...new Set(tables.map(t => t.location_zone))];
+
+  const getSectionsByZone = (zone) => {
+    return [...new Set(
+      filteredTables
+        .filter(t => t.location_zone === zone)
+        .map(t => t.section || 'Other')
+    )];
+  };
+
+  const filteredTables = tables.filter(t => {
+    if ((t.name || '').toLowerCase().includes('takeaway') || t.id === 500) {
+      return false;
+    }
+
+    const zoneMatch =
+      selectedZones.length === 0 || selectedZones.includes(t.location_zone);
+
+    const sectionMatch =
+      selectedSections.length === 0 || selectedSections.includes(t.section);
+
+    return zoneMatch && sectionMatch;
+  });
+  const visibleZones = [...new Set(filteredTables.map(t => t.location_zone))];
 
   return (
     <div
       className="
-  p-4
-  bg-bg-primary
-  overflow-y-auto
-  h-[calc(100vh-4rem)]
-"
+    p-4
+    bg-bg-primary
+    overflow-y-auto
+    h-[calc(100vh-4rem)]
+  "
     >
+
       {/* 🔁 DINE-IN / TAKEAWAY TOGGLE */}
       <div className="flex justify-center mb-2">
         <div className="flex bg-bg-primary border-2 rounded-full border-action-primary p-1 shadow-sm">
@@ -54,70 +121,158 @@ const TableReservation = ({
 
         </div>
       </div>
+      {/* 🔍 FILTER BAR */}
+      <div className="mb-3 sticky top-0 z-10 bg-bg-primary">
+        <div className="flex flex-wrap gap-2 p-2 rounded-xl border border-border-default bg-bg-tertiary">
+
+          {/* SECTION */}
+          {["AC", "Non-AC"].map(sec => (
+            <button
+              key={sec}
+              onClick={() => toggleFilter(sec, selectedSections, setSelectedSections)}
+              className={`px-3 py-1 rounded-full text-xs font-semibold transition
+          ${selectedSections.includes(sec)
+                  ? "bg-action-primary text-white"
+                  : "bg-white text-text-secondary hover:bg-gray-100"
+                }`}
+            >
+              {sec}
+            </button>
+          ))}
+
+          <div className="w-px bg-border-default mx-1" />
+
+          {/* ZONES */}
+          {["Ground Floor", "First Floor", "Second Floor", "Garden Area"].map(zone => (
+            <button
+              key={zone}
+              onClick={() => toggleFilter(zone, selectedZones, setSelectedZones)}
+              className={`px-3 py-1 rounded-full text-xs font-semibold transition
+          ${selectedZones.includes(zone)
+                  ? "bg-action-primary text-white"
+                  : "bg-white text-text-secondary hover:bg-gray-100"
+                }`}
+            >
+              {zone}
+            </button>
+          ))}
+
+          {(selectedSections.length > 0 || selectedZones.length > 0) && (
+            <button
+              onClick={() => {
+                setSelectedSections([]);
+                setSelectedZones([]);
+              }}
+              className="ml-auto text-xs text-action-danger font-semibold hover:underline"
+            >
+              Clear
+            </button>
+          )}
+        </div>
+      </div>
+
 
       {/* 🪑 TABLE GRID – ONLY FOR DINE-IN */}
-      {orderMode === "dinein" && uniqueZones.map(zone => (
-        <div key={zone} className="mb-8">
+      {orderMode === "dinein" && visibleZones.map(zone => {
 
-          {/* ZONE TITLE */}
-          <h3 className="text-lg font-semibold mb-3 text-gray-700">
-            {zone}
-          </h3>
+        const sections = getSectionsByZone(zone);
 
-          {/* TABLE GRID */}
-          <div className="
-            grid gap-4
-            grid-cols-3
-            sm:grid-cols-4
-            md:grid-cols-5
-            lg:grid-cols-6
-            xl:grid-cols-12
-          ">
-            {tables
-              .filter(
-                t =>
-                  t.location_zone === zone &&
-                  ["vacant", "available"].includes(
-                    t.status?.toLowerCase()
-                  )
-              )
-              .map(table => (
-                <div
-                  key={table.id}
-                  onClick={() => onSelectTable(table)}
-                  className="
-                    aspect-square
-                    flex flex-col items-center justify-center
-                    rounded-xl
-                    border border-dashed border-gray-400
-                    bg-white
-                    cursor-pointer
-                    transition-all duration-200
-                    hover:shadow-lg
-                    hover:-translate-y-1
-                    hover:bg-green-50
-                  "
-                >
-                  {/* TABLE NUMBER */}
-                  <div className="text-lg font-bold text-gray-800">
-                    {table.table_number}
-                  </div>
+        return (
+          <div key={zone} className="mb-10">
 
-                  {/* STATUS */}
-                  <span className="
-                    mt-2
-                    px-3 py-0.5
-                    text-[11px] font-medium
-                    rounded-full
-                    bg-green-100 text-green-700
-                  ">
-                    {table.status}
+            {/* 🟦 ZONE TITLE */}
+            <h3 className="text-xl font-bold mb-4 text-gray-800">
+              {zone}
+            </h3>
+
+            {/* 🔽 SECTION LOOP */}
+            {sections.map(section => (
+              <div key={section} className="mb-6">
+
+                {/* 🟨 SECTION TITLE */}
+                <div className="flex items-center gap-2 mb-3">
+                  <span className="text-sm font-semibold px-3 py-1 rounded-full bg-gray-200">
+                    {section}
                   </span>
                 </div>
-              ))}
+
+                {/* 🪑 TABLE GRID */}
+                <div
+                  className="
+    grid gap-4
+    grid-cols-2
+    sm:grid-cols-4
+    md:grid-cols-5
+    lg:grid-cols-6
+    xl:grid-cols-10
+  "
+                >
+                  {filteredTables
+                    .filter(t =>
+                      t.location_zone === zone &&
+                      t.section === section
+                    )
+                    .map(table => {
+                      const statusKey = table.status?.toLowerCase();
+                      const config =
+                        TABLE_STATUS_CONFIG[statusKey] || TABLE_STATUS_CONFIG.vacant;
+
+                      return (
+                        <div
+                          key={table.id}
+                          onClick={() => {
+                            if (config.clickable) {
+                              onSelectTable(table);
+                            } else if (statusKey === 'occupied' && onViewOrder) {
+                              onViewOrder(table);
+                            }
+                          }}
+                          className="
+            rounded-xl overflow-hidden
+            border shadow-sm
+            hover:shadow-md
+            transition
+            cursor-pointer
+            bg-white
+          "
+                        >
+                          {/* HEADER */}
+                          <div className="bg-action-primary text-white px-3 py-2 text-center">
+                            <span className="font-semibold text-sm">
+                              {table.table_number}
+                            </span>
+                          </div>
+
+                          {/* ICON */}
+                          <div className="h-20 flex items-center justify-center">
+                            {statusKey === 'vacant' && <span>-</span>}
+                            {statusKey === 'occupied' && <Eye size={28} />}
+                            {statusKey === 'reserved' && <Lock size={28} />}
+                          </div>
+
+                          {/* STATUS */}
+                          <div
+                            className={`py-2 text-center text-sm font-semibold border-t
+              ${statusKey === 'occupied'
+                                ? 'text-blue-600'
+                                : statusKey === 'reserved'
+                                  ? 'text-yellow-600'
+                                  : 'text-green-600'
+                              }`}
+                          >
+                            {table.status?.toUpperCase()}
+                          </div>
+                        </div>
+                      );
+                    })}
+                </div>
+
+              </div>
+            ))}
           </div>
-        </div>
-      ))}
+        );
+      })}
+
 
       {/* TAKEAWAY INFO */}
       {orderMode === "takeaway" && (
@@ -295,18 +450,12 @@ const TakeOrder = ({ clientId, token, onOrderUpdate, realm }) => {
           { headers: { Authorization: `Bearer ${token}` } }
         );
         const tableList = Array.isArray(tablesRes.data?.data)
-          ? tablesRes.data.data
-            .filter(t =>
-              t.id !== 500 &&
-              !['takeaway', 'take away'].includes(
-                (t.name || '').toLowerCase().trim()
-              )
-            )
-            .map(t => ({
-              ...t,
-              table_number: t.name || t.table_number || "-",
-            }))
+          ? tablesRes.data.data.map(t => ({
+            ...t,
+            table_number: t.name || t.table_number || "-",
+          }))
           : [];
+
 
 
         // Find or identify Takeaway table
@@ -588,10 +737,6 @@ const TakeOrder = ({ clientId, token, onOrderUpdate, realm }) => {
       return;
     }
 
-    if (orderMode === 'takeaway' && !takeawayTableId) {
-      alert("No takeaway table available. Please contact support.");
-      return;
-    }
 
     if (cart.length === 0) {
       alert("Please select at least one item before placing the order.");
@@ -615,12 +760,85 @@ const TakeOrder = ({ clientId, token, onOrderUpdate, realm }) => {
       const dinein_order_id = generateNextOrderId();
       const invoice_id = generateNextInvoiceId();
 
-      // Use appropriate table ID based on mode
-      const tableId = orderMode === 'dinein' ? selectedTable : 500;
+      const tableId = orderMode === 'dinein' ? Number(selectedTable) : 500;
+
       const selectedTableObj = orderMode === 'dinein'
         ? tables.find(t => t.id.toString() === selectedTable)
-        : tables.find(t => t.id === takeawayTableId);
+        : null; // Don't need table object for takeaway
 
+      // Check if table already has an active order
+      let existingOrderId = null;
+      try {
+        const ordersResponse = await axios.get(
+          `${import.meta.env.VITE_API_ORDER_SERVICE_URL}/${clientId}/dinein/table`,
+          { headers: { Authorization: `Bearer ${token}` } }
+        );
+
+        const allOrders = ordersResponse.data?.data || [];
+        const existingOrder = allOrders.find(order =>
+          order.id === tableId &&
+          order.status?.toLowerCase() !== 'served'
+        );
+
+        if (existingOrder) {
+          existingOrderId = existingOrder.id;
+        }
+      } catch (err) {
+        console.warn('Could not check for existing orders:', err);
+      }
+
+      // If existing order found, update it instead of creating new
+      if (existingOrderId) {
+        const itemsPayload = cart.map(item => ({
+          client_id: clientId,
+          item_id: Number(item.id),
+          quantity: Number(item.quantity),
+          status: "pending",
+          note: item.note || "",
+          item_name: item.name,
+          slug: item.slug || generateSlug(item.name),
+          unit_price: item.unit_price || 0,
+          line_total: (item.unit_price || 0) * (item.quantity || 0),
+          order_id: existingOrderId
+        }));
+
+        // Update existing order items
+        await axios.post(
+          `${import.meta.env.VITE_API_ORDER_SERVICE_URL}/${clientId}/order_items/update?order_id=${existingOrderId}`,
+          itemsPayload,
+          { headers: { Authorization: `Bearer ${token}` } }
+        );
+
+        // Update order total and other details
+        await axios.post(
+          `${import.meta.env.VITE_API_ORDER_SERVICE_URL}/${clientId}/dinein/update`,
+          {
+            id: existingOrderId,
+            total_price: total_price,
+            price: subtotal,
+            gst: gstValue,
+            cst: cstValue,
+            discount: discountValue
+          },
+          { headers: { Authorization: `Bearer ${token}` } }
+        );
+
+        setOrderPlaced(true);
+        setCart([]);
+        setSelectedTable('');
+        setShowCart(false);
+
+        setTimeout(() => {
+          setOrderPlaced(false);
+          setCurrentView('floor');
+        }, 1500);
+
+        onOrderUpdate?.({ success: true, orderId: existingOrderId, updated: true });
+
+        return; // Exit early - don't create new order
+      }
+
+      // No existing order - create new one
       const payload = {
         client_id: clientId,
         table_id: tableId,
@@ -686,9 +904,13 @@ const TakeOrder = ({ clientId, token, onOrderUpdate, realm }) => {
       setCart([]);
       setSelectedTable('');
       setShowCart(false);
-      setOrderPlaced(false);
-      onOrderUpdate?.(res.data);
 
+      setTimeout(() => {
+        setOrderPlaced(false);
+        setCurrentView('floor');
+      }, 1500);
+
+      onOrderUpdate?.(res.data);
 
     } catch (err) {
       console.error("Order failed:", err);
@@ -765,14 +987,96 @@ const TakeOrder = ({ clientId, token, onOrderUpdate, realm }) => {
   //     </div>
   //   );
   // }
+  const displayTableName =
+    orderMode === 'takeaway'
+      ? tables.find(t => t.id === 500)?.table_number || 'Takeaway'
+      : tables.find(t => t.id.toString() === selectedTable)?.table_number;
+  const handleViewOrder = async (table) => {
+    try {
+      setLoading(true);
 
+      // Fetch ALL orders (like OrderSummary does)
+      const response = await axios.get(
+        `${import.meta.env.VITE_API_ORDER_SERVICE_URL}/${clientId}/dinein/table`,
+        { headers: { Authorization: `Bearer ${token}` } }
+      );
+
+      const allOrders = response.data?.data || [];
+
+      // Find orders for this specific table
+      const tableOrders = allOrders.filter(order =>
+        order.table_id === table.id
+        &&
+        order.status?.toLowerCase() !== 'served'
+      );
+
+      if (tableOrders.length === 0) {
+        alert('No active orders found for this table');
+        setLoading(false);
+        return;
+      }
+
+      // Get the most recent active order
+      const activeOrder = tableOrders.sort((a, b) =>
+        new Date(b.created_at) - new Date(a.created_at)
+      )[0];
+
+      // Load order items into cart
+      if (activeOrder.items && activeOrder.items.length > 0) {
+        const cartItems = activeOrder.items.map(item => {
+          // Find matching menu item for additional details
+          const menuItem = menuItems.find(mi => mi.id === item.item_id);
+
+          return {
+            id: item.item_id,
+            name: item.item_name || menuItem?.name,
+            unit_price: item.unit_price || item.price,
+            quantity: item.quantity || 1,
+            note: item.note || '',
+            image_id: menuItem?.image_id,
+            discount: menuItem?.discount || 0,
+            slug: item.slug || menuItem?.slug,
+            category: menuItem?.category,
+          };
+        });
+
+        setCart(cartItems);
+        setSelectedTable(table.id.toString());
+        setOrderMode('dinein');
+        setCurrentView('order');
+
+        // Show cart (desktop auto-shows, mobile needs explicit show)
+        if (!isMobile) {
+          setShowCart(true);
+        } else {
+          setShowCart(true);
+        }
+
+        // Push state for back button
+        window.history.pushState({ view: 'order' }, '');
+      } else {
+        alert('Order found but has no items');
+      }
+    } catch (error) {
+      console.error('Error fetching order:', error);
+      const errorMessage = error.response?.data?.message || error.message || 'Unable to load order details';
+      alert(errorMessage);
+    } finally {
+      setLoading(false);
+    }
+  };
   return (
-    <div className="bg-bg-primary p-0 overflow-y-auto lg:overflow-hidden">
-
-      <TableReservation
-        tables={tables}
-      />
-
+    <div className="bg-bg-primary p-0 h-[calc(100vh-4rem)] overflow-hidden">
+      {currentView === 'floor' && (
+        <TableReservation
+          tables={tables}
+          onSelectTable={handleTableSelect}
+          onSelectTakeaway={handleTakeawaySelect}
+          onSelectDineIn={() => setOrderMode('dinein')}
+          onViewOrder={handleViewOrder}
+          orderMode={orderMode}
+        />
+      )}
 
 
       {/* Search Floating Button */}
@@ -814,342 +1118,359 @@ const TakeOrder = ({ clientId, token, onOrderUpdate, realm }) => {
           )}
         </div>
       </div>
+      {currentView === 'order' && (
+        <div className="mx-auto px-2 py-2">
+          <div className="grid lg:grid-cols-4 gap-1">
 
-      <div className="mx-auto px-2 py-2">
-        <div className="grid lg:grid-cols-4 gap-1">
-
-          {/* CATEGORY SIDEBAR */}
-          <div className="lg:col-span-1">
-            <div className="
+            {/* CATEGORY SIDEBAR */}
+            <div className="lg:col-span-1">
+              <div className="
 lg:sticky lg:top-24
 lg:h-[calc(100dvh-4rem)]
 lg:overflow-y-auto
 pr-1
 ">
 
-              <CategoryTree
-                categories={categories}
-                selectedCategory={selectedCategory}
-                onSelectCategory={setSelectedCategory}
-                defaultOpenAll
-              />
-            </div>
-          </div>
-
-
-          {/* MENU + ORDER PANEL */}
-          <div className="lg:col-span-3 flex gap-2">
-
-            {/* MENU */}
-            <div
-              className="
-transition-all duration-300
-border-default border-border-default p-4 rounded-lg
-flex-1
-overflow-y-auto
-h-[calc(100dvh-4rem)]
-lg:h-auto
-lg:max-h-[calc(100dvh-4rem)]
-"
-            >
-
-
-
-              <div className="mb-4">
-                <h2 className="text-xl lg:text-2xl font-semibold text-text-primary">
-                  {selectedCategory}
-                  <span className="text-sm ml-2">({filteredItems.length} items)</span>
-                </h2>
+                <CategoryTree
+                  categories={categories}
+                  selectedCategory={selectedCategory}
+                  onSelectCategory={setSelectedCategory}
+                  defaultOpenAll
+                />
               </div>
+            </div>
 
+
+            {/* MENU + ORDER PANEL */}
+            <div className="lg:col-span-3 flex gap-2">
+
+              {/* MENU */}
               <div
-                className="grid gap-3 [grid-template-columns:repeat(auto-fit,minmax(240px,1fr))]">
-                {filteredItems.map(item => {
-                  const discountPercent =
-                    item.discount &&
-                      item.unit_price &&
-                      Number(item.discount) > 0
-                      ? ((Number(item.discount) * 100) / Number(item.unit_price))
-                        .toFixed(0)
-                      : null;
+                className="
+            transition-all duration-300
+            border-default border-border-default p-4 rounded-lg
+            flex-1
+            overflow-y-auto
+            h-[calc(100dvh-4rem)]
+            lg:h-auto
+            lg:max-h-[calc(100dvh-4rem)]
+            "
+              >
 
-                  return (
-                    <div onClick={() => handleItemClick(item)}
-                      key={item.id}
-                      className="
+
+
+                <div className="mb-4">
+                  <h2 className="text-xl lg:text-2xl font-semibold text-text-primary">
+                    {selectedCategory}
+                    <span className="text-sm ml-2">({filteredItems.length} items)</span>
+                  </h2>
+                </div>
+                <div
+                  className="grid gap-3 [grid-template-columns:repeat(auto-fit,minmax(240px,1fr))]">
+                  {filteredItems.map(item => {
+                    const discountPercent =
+                      item.discount &&
+                        item.unit_price &&
+                        Number(item.discount) > 0
+                        ? ((Number(item.discount) * 100) / Number(item.unit_price))
+                          .toFixed(0)
+                        : null;
+
+                    return (
+                      <div onClick={() => handleItemClick(item)}
+                        key={item.id}
+                        className="
                       flex gap-2 items-center
                       bg-bg-primary
                       border border-border-default
                       rounded-xl
-                      p-2
+                      p-1
                       shadow-sm
                       hover:shadow-md
                       transition
                     "
-                    >
-                      {/* IMAGE */}
-                      <div className="w-14 h-14 rounded-lg overflow-hidden shrink-0 bg-gray-100">
-                        <ImagePreview
-                          clientId={clientId}
-                          imageId={item.image_id}
-                          token={token}
-                          alt={item.name}
-                          baseUrl={import.meta.env.VITE_API_DOCUMENT_SERVICE_URL}
-                          urlBuilder={({ baseUrl, clientId, imageId }) =>
-                            `${baseUrl}/${clientId}/document/download?doc_id=${imageId}`
-                          }
-                          className="w-full h-full object-cover"
-                        />
-                      </div>
+                      >
+                        {/* IMAGE */}
+                        <div className="w-14 h-16 rounded-lg overflow-hidden shrink-0 bg-gray-100">
+                          <ImagePreview
+                            clientId={clientId}
+                            imageId={item.image_id}
+                            token={token}
+                            alt={item.name}
+                            baseUrl={import.meta.env.VITE_API_DOCUMENT_SERVICE_URL}
+                            urlBuilder={({ baseUrl, clientId, imageId }) =>
+                              `${baseUrl}/${clientId}/document/download?doc_id=${imageId}`
+                            }
+                            className="w-full h-full object-cover"
+                          />
+                        </div>
 
-                      {/* INFO */}
-                      <div className="flex-1 min-w-0">
-                        <h3 className="text-sm font-semibold text-text-primary line-clamp-2">
-                          {item.name}
-                        </h3>
+                        {/* INFO */}
+                        <div className="flex-1 min-w-0">
+                          <h3 className="text-sm font-semibold text-text-primary line-clamp-2">
+                            {item.name}
+                          </h3>
 
-                        {item.description && (
-                          <p className="text-xs text-text-secondary line-clamp-1 mt-0.5">
-                            {item.description}
-                          </p>
-                        )}
+                          {item.description && (
+                            <p className="text-xs text-text-secondary line-clamp-1 mt-0.5">
+                              {item.description}
+                            </p>
+                          )}
 
-                        <div className="flex items-center gap-2 mt-1">
-                          {discountPercent ? (
-                            <>
+                          <div className="flex items-center gap-2 mt-1">
+                            {discountPercent ? (
+                              <>
+                                <span className="text-sm font-bold text-action-primary">
+                                  ₹{(item.unit_price - item.discount).toFixed(0)}
+                                </span>
+                                <span className="text-xs line-through  text-text-secondary">
+                                  ₹{item.unit_price}
+                                </span>
+                                <span className="text-xs text-action-danger font-semibold">
+                                  {discountPercent}% OFF
+                                </span>
+                              </>
+                            ) : (
                               <span className="text-sm font-bold text-action-primary">
-                                ₹{(item.unit_price - item.discount).toFixed(0)}
-                              </span>
-                              <span className="text-xs line-through  text-text-secondary">
                                 ₹{item.unit_price}
                               </span>
-                              <span className="text-xs text-action-danger font-semibold">
-                                {discountPercent}% OFF
-                              </span>
-                            </>
+                            )}
+                          </div>
+                        </div>
+                      </div>
+                    );
+                  })}
+                </div>
+
+              </div>
+
+              {/* ORDER PANEL (INLINE – DESKTOP ONLY) */}
+              {!isMobile && (
+                <>
+                  {/* CART SIDEBAR */}
+                  <div
+                    className={`transition-all duration-300 ease-in-out
+            ${showCart ? 'w-[22rem] opacity-100 z-30' : 'w-0 opacity-0'}`}
+                  >
+                    {/* ✅ OUTER BORDER WRAPPER */}
+                    <div className="h-full border border-gray-300 rounded-xl bg-white">
+
+                      {/* INNER STICKY CONTAINER */}
+                      <div
+                        className="shadow-xl rounded-xl
+               lg:sticky lg:top-10
+               lg:h-[calc(100dvh-4rem)]
+               flex flex-col"
+                      >
+                        <div className="flex flex-col h-full p-4">
+
+                          {/* HEADER */}
+                          <div className="pb-3 border-b space-y-2">
+
+                            {/* Top row */}
+                            <div className="flex items-center justify-between">
+                              <button
+                                onClick={() => setShowCart(false)}
+                                className="p-1 rounded hover:bg-gray-100"
+                              >
+                                <X size={18} />
+                              </button>
+
+                              <h2 className="text-lg font-semibold text-gray-800">
+                                Your Order
+                              </h2>
+                            </div>
+
+                            {/* Single info row */}
+                            {cart.length > 0 && (
+                              <div className="flex items-center justify-between text-sm bg-gray-50 px-3 py-2 rounded-lg">
+
+                                {/* LEFT : TABLE + CHANGE */}
+                                <div className="flex items-center gap-2">
+                                  {orderMode === 'dinein' && selectedTable && (
+
+                                    <>
+                                      <span className="font-semibold text-[18px] text-gray-700">
+                                        {tables.find(t => t.id.toString() === selectedTable)?.table_number}
+                                      </span>
+
+                                      <button
+                                        onClick={() => {
+                                          setOrderMode('dinein');
+                                          setSelectedTable('');
+                                          setCurrentView('floor');
+                                          setShowCart(false);
+                                        }}
+                                        className="text-sm text-red-600 hover:underline"
+                                      > <TbExchange />
+                                      </button>
+                                    </>
+                                  )}
+                                </div>
+
+                                {/* RIGHT : TOTAL PRICE */}
+                                <span className="text-base font-bold text-red-600">
+                                  ₹{getTotalPrice()}
+                                </span>
+                              </div>
+                            )}
+                          </div>
+
+
+
+
+                          {/* EMPTY STATE */}
+                          {cart.length === 0 ? (
+                            <div className="flex-1 flex items-center justify-center text-sm text-gray-400">
+                              No items added
+                            </div>
                           ) : (
-                            <span className="text-sm font-bold text-action-primary">
-                              ₹{item.unit_price}
-                            </span>
+                            <>
+                              {/* ORDER MODE */}
+                              <div className="mt-3">
+                                <div className="flex bg-gray-100 rounded-lg p-1">
+                                  <button
+                                    onClick={() => {
+                                      setOrderMode('dinein');
+                                    }}
+
+                                    className={`flex-1 py-2 rounded-md text-sm font-medium flex items-center justify-center gap-2
+                             ${orderMode === 'dinein'
+                                        ? 'bg-red-600 text-white shadow'
+                                        : 'text-gray-600 hover:text-gray-800'
+                                      }`}
+                                  >
+                                    <Users size={16} />
+                                    Dine In
+                                  </button>
+
+                                  <button
+                                    onClick={() => {
+                                      setOrderMode('takeaway');
+                                      setSelectedTable(takeawayTableId?.toString());
+
+                                    }}
+
+                                    className={`flex-1 py-2 rounded-md text-sm font-medium flex items-center justify-center gap-2
+                             ${orderMode === 'takeaway'
+                                        ? 'bg-red-600 text-white shadow'
+                                        : 'text-gray-600 hover:text-gray-800'
+                                      }`}
+                                  >
+                                    <Package size={16} />
+                                    Takeaway
+                                  </button>
+                                </div>
+                              </div>
+
+                              {/* TABLE SELECT */}
+
+
+                              {/* CART ITEMS */}
+                              <div className="flex-1 overflow-y-auto mt-4 space-y-2">
+                                {cart.map(item => (
+                                  <div
+                                    key={item.id}
+                                    className="flex items-center gap-2 p-3 rounded-xl border bg-white shadow-sm hover:shadow transition
+"
+                                  >
+
+                                    {/* IMAGE + INFO */}
+                                    <div className="flex items-center gap-3 flex-1 min-w-0">
+                                      <div className="w-12 h-12 rounded-lg overflow-hidden border bg-white shrink-0">
+                                        <ImagePreview
+                                          clientId={clientId}
+                                          imageId={item.image_id}
+                                          token={token}
+                                          alt={item.name}
+                                          baseUrl={import.meta.env.VITE_API_DOCUMENT_SERVICE_URL}
+                                          urlBuilder={({ baseUrl, clientId, imageId }) =>
+                                            `${baseUrl}/${clientId}/document/download?doc_id=${imageId}`
+                                          }
+                                          className="w-full h-full object-cover"
+                                        />
+                                      </div>
+
+                                      <div className="min-w-0">
+                                        <h4 className="text-sm font-semibold truncate text-gray-800">
+                                          {item.name}
+                                        </h4>
+                                        <p className="text-xs text-red-600">
+                                          ₹{(item.unit_price - (item.discount || 0)).toFixed(2)}
+                                        </p>
+                                      </div>
+                                    </div>
+
+                                    {/* QUANTITY */}
+                                    <div className="flex items-center gap-1">
+                                      <button
+                                        onClick={() => updateQuantity(item.id, -1)}
+                                        className="w-7 h-7 flex items-center justify-center border rounded hover:bg-gray-100"
+                                      >
+                                        <Minus size={14} />
+                                      </button>
+
+                                      <span className="w-6 text-center text-sm font-semibold">
+                                        {item.quantity}
+                                      </span>
+
+                                      <button
+                                        onClick={() => updateQuantity(item.id, 1)}
+                                        className="w-7 h-7 flex items-center justify-center border rounded hover:bg-gray-100"
+                                      >
+                                        <Plus size={14} />
+                                      </button>
+                                    </div>
+
+                                    {/* REMOVE */}
+                                    <button
+                                      onClick={() => removeFromCart(item.id)}
+                                      className="text-red-500 hover:text-red-700"
+                                    >
+                                      <X size={16} />
+                                    </button>
+                                  </div>
+                                ))}
+                              </div>
+                              {/* ACTIONS */}
+                              <div className="flex gap-2 mt-3">
+                                <button
+                                  onClick={handleClearCart}
+                                  className="flex-1 py-2 border rounded-lg text-sm hover:bg-gray-100"
+                                >
+                                  Clear
+                                </button>
+
+                                <button
+                                  onClick={handlePlaceOrder}
+                                  disabled={
+                                    (orderMode === 'dinein' && !selectedTable) ||
+                                    cart.length === 0 ||
+                                    isPlacingOrder
+                                  }
+                                  className={`flex-1 py-2 rounded-lg text-sm font-semibold
+                           ${!isPlacingOrder &&
+                                      cart.length > 0 &&
+                                      (orderMode === 'takeaway' || selectedTable)
+                                      ? 'bg-red-600 text-white hover:bg-red-700'
+                                      : 'bg-gray-300 cursor-not-allowed'
+                                    }`}
+                                >
+                                  {isPlacingOrder ? 'Placing...' : 'Place Order'}
+                                </button>
+                              </div>
+                            </>
                           )}
                         </div>
                       </div>
                     </div>
-                  );
-                })}
-
-              </div>
+                  </div>
+                </>
+              )}
             </div>
-
-            {!isMobile && (
-              <>
-                <div
-                  className={`transition-all duration-300 ease-in-out overflow-hidden
-      ${showCart ? 'w-[20rem] opacity-100 z-20' : 'w-0 opacity-0'}`}
-                >
-                  <div
-                    className="bg-bg-primary border-l border-border-default shadow-sm
-        lg:sticky lg:top-24
-        lg:h-[calc(100vh-4rem)]
-        lg:flex lg:flex-col"
-                  >
-                    <div className="p-3 lg:p-4 flex flex-col h-full">
-
-                      {/* Header */}
-                      <div className="flex justify-between items-center mb-3 p-2">
-                        <button
-                          onClick={() => setShowCart(false)}
-                          className="text-text-secondary hover:text-text-primary"
-                        >
-                          <X size={20} />
-                        </button>
-                        <h2 className="text-base font-bold text-text-primary">
-                          Your Order
-                        </h2>
-                      </div>
-
-                      {cart.length === 0 ? (
-                        <p className="text-text-secondary text-center text-sm">
-                          No items added
-                        </p>
-                      ) : (
-                        <>
-                          {/* Order Mode */}
-                          <div className="mb-3">
-                            <div className="flex gap-1 p-1 bg-bg-tertiary rounded-lg ">
-                              <button
-                                onClick={() => {
-                                  setOrderMode('dinein');
-                                  setSelectedTable('');
-                                }}
-                                className={`flex-1 px-3 py-1.5 text-sm rounded-md flex items-center justify-center gap-2 font-medium
-                    ${orderMode === 'dinein'
-                                    ? 'bg-action-primary text-text-white'
-                                    : 'text-text-secondary hover:text-text-primary'
-                                  }`}
-                              >
-                                <Users size={16} /> Dine In
-                              </button>
-
-                              <button
-                                onClick={() => {
-                                  setOrderMode('takeaway');
-                                  setSelectedTable('');
-                                }}
-                                className={`flex-1 px-3 py-1.5 text-sm rounded-md flex items-center justify-center gap-2 font-medium
-                    ${orderMode === 'takeaway'
-                                    ? 'bg-action-primary text-text-white'
-                                    : 'text-text-secondary hover:text-text-primary'
-                                  }`}
-                              >
-                                <Package size={16} /> Takeaway
-                              </button>
-                            </div>
-                          </div>
-
-                          {/* Table Select */}
-                          {orderMode === 'dinein' && (
-                            <div className="mb-3 p-3 rounded-lg bg-bg-tertiary">
-                              <label className="block text-xs font-semibold mb-1 text-text-primary">
-                                Select Table
-                              </label>
-                              <select
-                                value={selectedTable}
-                                onChange={(e) => setSelectedTable(e.target.value)}
-                                className="w-full px-3 py-1.5 text-sm rounded-md bg-bg-primary border-border-default"
-                              >
-                                <option value="">Choose a table</option>
-                                {availableTables.map(t => (
-                                  <option key={t.id} value={t.id}>
-                                    {t.table_number} - {t.location_zone}
-                                  </option>
-                                ))}
-                              </select>
-                            </div>
-                          )}
-
-                          {/* Cart Items */}
-                          <div className="space-y-1 overflow-y-auto flex-1 mb-3">
-                            {cart.map(item => (
-                              <div
-                                key={item.id}
-                                className="flex gap-2 p-2 rounded-lg bg-bg-tertiary border-border-default"
-                              >
-                                <div className="flex-1 min-w-0">
-                                  <h4 className="text-sm font-semibold truncate">
-                                    {item.name}
-                                  </h4>
-                                  <p className="text-xs text-action-primary">
-                                    ₹{(item.unit_price - item.discount).toFixed(2)} × {item.quantity}
-                                  </p>
-                                </div>
-
-                                <div className="flex items-center gap-1">
-                                  <button
-                                    onClick={() => updateQuantity(item.id, -1)}
-                                    className="p-1 bg-bg-primary rounded border-border-default"
-                                  >
-                                    <Minus size={14} />
-                                  </button>
-
-                                  <span className="px-2 text-sm font-semibold text-action-primary">
-                                    {item.quantity}
-                                  </span>
-
-                                  <button
-                                    onClick={() => updateQuantity(item.id, 1)}
-                                    className="p-1 bg-bg-primary rounded border-border-default"
-                                  >
-                                    <Plus size={14} />
-                                  </button>
-                                </div>
-
-                                <button
-                                  onClick={() => removeFromCart(item.id)}
-                                  className="text-action-danger"
-                                >
-                                  <X size={16} />
-                                </button>
-                              </div>
-                            ))}
-                          </div>
-
-                          {/* Total */}
-                          <div className="border-t pt-2 mb-2">
-                            <div className="flex justify-between font-semibold text-sm">
-                              <span>Total</span>
-                              <span className="text-action-primary">
-                                ₹{getTotalPrice()}
-                              </span>
-                            </div>
-                          </div>
-
-                          {/* Actions */}
-                          <div className="flex gap-2">
-                            <button
-                              onClick={() => setShowClearConfirm(true)}
-                              className="flex-1 py-2 text-sm border rounded-lg hover:bg-bg-tertiary"
-                            >
-                              Clear
-                            </button>
-
-                            <button
-                              onClick={handlePlaceOrder}
-                              disabled={
-                                (orderMode === 'dinein' && !selectedTable) ||
-                                cart.length === 0 ||
-                                isPlacingOrder
-                              }
-                              className={`flex-1 py-2 text-sm rounded-lg font-semibold
-                  ${!isPlacingOrder && cart.length > 0 && selectedTable
-                                  ? 'bg-action-primary text-text-white'
-                                  : 'bg-border-default cursor-not-allowed'
-                                }`}
-                            >
-                              {isPlacingOrder ? 'Placing...' : 'Place Order'}
-                            </button>
-                          </div>
-                        </>
-                      )}
-                    </div>
-                  </div>
-                </div>
-
-                {/* CLEAR CONFIRM POPUP */}
-                {showClearConfirm && (
-                  <div className="fixed inset-0 z-50 bg-black/40 flex items-center justify-center">
-                    <div className="bg-bg-primary rounded-lg w-[300px] p-4 space-y-3">
-                      <h3 className="text-sm font-semibold">Clear Order?</h3>
-                      <p className="text-xs text-text-secondary">
-                        This will remove all items from the order.
-                      </p>
-                      <div className="flex justify-end gap-2">
-                        <button
-                          onClick={() => setShowClearConfirm(false)}
-                          className="px-3 py-1.5 text-sm border rounded"
-                        >
-                          Cancel
-                        </button>
-                        <button
-                          onClick={() => {
-                            handleClearCart();
-                            setShowClearConfirm(false);
-                          }}
-                          className="px-3 py-1.5 text-sm bg-red-600 text-white rounded"
-                        >
-                          Clear
-                        </button>
-                      </div>
-                    </div>
-                  </div>
-                )}
-              </>
-            )}
-
           </div>
         </div>
-      </div>
-
+      )}
 
       {isMobile && showCart && (
         <div className="fixed inset-0 z-50 flex justify-end bg-color-modalsbg animate-fade-in">
@@ -1179,7 +1500,6 @@ lg:max-h-[calc(100dvh-4rem)]
                         <button
                           onClick={() => {
                             setOrderMode('dinein');
-                            setSelectedTable('');
                           }}
                           className={`flex-1 px-4 py-2.5 rounded-md transition-all flex items-center justify-center gap-2 font-medium ${orderMode === 'dinein'
                             ? 'bg-action-primary text-text-white shadow-sm'
@@ -1193,7 +1513,8 @@ lg:max-h-[calc(100dvh-4rem)]
                         <button
                           onClick={() => {
                             setOrderMode('takeaway');
-                            setSelectedTable('');
+                            setSelectedTable(takeawayTableId?.toString());
+
                           }}
                           className={`flex-1 px-4 py-2.5 rounded-md transition-all flex items-center justify-center gap-2 font-medium ${orderMode === 'takeaway'
                             ? 'bg-action-primary text-text-white shadow-sm'
@@ -1207,9 +1528,10 @@ lg:max-h-[calc(100dvh-4rem)]
                     </div>
                     {selectedTable && (
                       <div className="mb-3 flex justify-between items-center">
-                        <span className="text-sm font-semibold text-text-primary">
-                          Table: {tables.find(t => t.id.toString() === selectedTable)?.table_number}
+                        <span className="font-semibold text-gray-800">
+                          {displayTableName}
                         </span>
+
 
                         <button
                           onClick={() => {

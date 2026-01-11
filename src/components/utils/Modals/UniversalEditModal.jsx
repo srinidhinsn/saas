@@ -393,22 +393,44 @@ const UniversalEditModal = ({
                 )}
               </div>
 
-              {/* Type */}
+              {/* SECTION (AC / Non-AC) */}
               <div>
-                <label className="block text-sm font-medium mb-1 text-gray-700">Type</label>
+                <label className="block text-sm font-medium mb-1 text-gray-700">
+                  Section
+                </label>
                 <select
-                  value={table.location_zone}
-                  onChange={(e) => handleEditChange(table.id, "location_zone", e.target.value)}
-                  className={`w-full px-3 py-2 rounded-md border focus:outline-none focus:ring-2 focus:ring-blue-500 focus:border-transparent ${editFieldErrors?.location_zone ? 'border-red-500 bg-red-50' : 'border-gray-300'
-                    }`}
+                  value={table.section || ""}
+                  onChange={(e) =>
+                    handleEditChange(table.id, "section", e.target.value)
+                  }
+                  className="w-full px-3 py-2 rounded-md border border-gray-300 focus:ring-2 focus:ring-blue-500"
                 >
+                  <option value="">Select</option>
                   <option value="AC">AC</option>
                   <option value="Non-AC">Non-AC</option>
                 </select>
-                {editFieldErrors?.location_zone && (
-                  <p className="text-red-600 text-xs mt-1">{editFieldErrors.location_zone}</p>
-                )}
               </div>
+
+              {/* ZONE */}
+              <div>
+                <label className="block text-sm font-medium mb-1 text-gray-700">
+                  Zone
+                </label>
+                <select
+                  value={table.location_zone || ""}
+                  onChange={(e) =>
+                    handleEditChange(table.id, "location_zone", e.target.value)
+                  }
+                  className="w-full px-3 py-2 rounded-md border border-gray-300 focus:ring-2 focus:ring-blue-500"
+                >
+                  <option value="">Select</option>
+                  <option value="Garden Area">Garden Area</option>
+                  <option value="Ground Floor">Ground Floor</option>
+                  <option value="First Floor">First Floor</option>
+                  <option value="Second Floor">Second Floor</option>
+                </select>
+              </div>
+
 
               {/* Status */}
               <div>

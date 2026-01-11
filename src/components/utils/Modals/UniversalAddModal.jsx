@@ -118,6 +118,7 @@ const UniversalAddModal = ({
     setTableRanges(updated);
   };
 
+
   const handleClose = () => {
     setShowModal(false);
     if (modalType === 'menu') {
@@ -441,23 +442,46 @@ const UniversalAddModal = ({
                     <div className="text-action-danger text-xs mt-1 font-medium">Enter seating</div>
                   )}
                 </div>
-
                 <div>
-                  <label className="block text-sm font-semibold mb-2 text-text-secondary">Type *</label>
+                  <label className="block text-sm font-semibold mb-2">Section *</label>
                   <select
-                    value={row?.type ?? ''}
-                    onChange={(e) => handleRangeChange(index, 'type', e.target.value)}
-                    className={`w-full px-3 py-2 border-default border-border-default rounded-lg focus:outline-none focus:ring-2 focus:ring-action-primary ${fieldErrors?.[index]?.type ? 'border-bulkActions-delete bg-red-50' : 'border-border-default'
-                      }`}
+                    value={row?.section ?? ""}
+                    onChange={(e) => handleRangeChange(index, "section", e.target.value)}
+                    className="w-full px-3 py-2 border rounded-lg"
                   >
                     <option value="">Select</option>
                     <option value="AC">AC</option>
                     <option value="Non-AC">Non-AC</option>
                   </select>
-                  {fieldErrors?.[index]?.type && (
-                    <div className="text-action-danger text-xs mt-1 font-medium">Select type</div>
-                  )}
+                  {fieldErrors?.[index]?.section && (
+  <div className="text-action-danger text-xs mt-1 font-medium">
+    Select section
+  </div>
+)}
+
                 </div>
+
+                <div>
+                  <label className="block text-sm font-semibold mb-2">Zone *</label>
+                  <select
+                    value={row?.location_zone ?? ""}
+                    onChange={(e) => handleRangeChange(index, "location_zone", e.target.value)}
+                    className="w-full px-3 py-2 border rounded-lg"
+                  >
+                    <option value="">Select</option>
+                    <option value="Ground Floor">Ground Floor</option>
+                    <option value="First Floor">First Floor</option>
+                    <option value="Second Floor">Second Floor</option>
+                    <option value="Garden Area">Garden</option>
+                  </select>
+                  {fieldErrors?.[index]?.location_zone && (
+  <div className="text-action-danger text-xs mt-1 font-medium">
+    Select zone
+  </div>
+)}
+
+                </div>
+
 
                 <div>
                   <label className="block text-sm font-semibold mb-2 text-text-secondary">Remark</label>
