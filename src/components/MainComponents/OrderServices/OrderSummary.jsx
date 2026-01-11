@@ -2305,20 +2305,30 @@ const OrderSummaryVisible = ({ clientId, token }) => {
     }
 
     const itemsToSave = updatedItemsWithStatuses.filter(item => typeof item.id === 'number' || item.is_new_item);
-    const cleanedItems = itemsToSave.map(item => ({
-      item_id: item.item_id || item.inventory_id,
-      item_name: item.name || item.item_name,
-      quantity: item.quantity || 1,
-      status: item.status || 'pending',
-      note: item.note || '',
-      slug: item.slug || '',
-      price: item.unit_price || item.price || inventoryMap[item.item_id || item.inventory_id]?.unit_price || 0,
-      unit_price: item.unit_price || item.price || inventoryMap[item.item_id || item.inventory_id]?.unit_price || 0,
-      line_total: (item.unit_price || item.price || 0) * (item.quantity || 1),
-      client_id: clientId,
-      order_id: orderId,
-      frontend_unique_key: item.frontend_unique_key || null
-    }));
+    const cleanedItems = itemsToSave.map(item => {
+      const inventoryItem = inventoryMap[item.item_id || item.inventory_id];
+
+      const unitPrice =
+        item.unit_price ??
+        item.price ??
+        inventoryItem?.unit_price ??
+        0;
+
+      return {
+        item_id: item.item_id || item.inventory_id,
+        item_name: item.item_name || item.name,
+        quantity: item.quantity || 1,
+        status: item.status || 'pending',
+        note: item.note || '',
+        slug: item.slug || '',
+        price: unitPrice,             
+        unit_price: unitPrice,       
+        line_total: unitPrice * (item.quantity || 1),
+        client_id: clientId,
+        order_id: orderId,
+        frontend_unique_key: item.frontend_unique_key || null
+      };
+    });
 
     const totalPrice = cleanedItems.reduce((s, i) => s + i.price * i.quantity, 0);
 
