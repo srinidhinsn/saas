@@ -19,6 +19,7 @@ class Inventory(BaseModel):
     serving_unit: Optional[str] = None
     availability: Optional[float] = None
     unit: Optional[str] = None
+    code: Optional[str] = None
     image_id: Optional[str] = None
     unit_price: Optional[float] = None
     unit_cst: Optional[float] = None
