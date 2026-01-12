@@ -94,10 +94,10 @@ import axios from 'axios';
 import { v4 as uuidv4 } from 'uuid';
 import { jwtDecode } from 'jwt-decode';
 
-const CategoryTree = ({ 
-  categories = [], 
-  selectedCategory, 
-  onSelectCategory, 
+const CategoryTree = ({
+  categories = [],
+  selectedCategory,
+  onSelectCategory,
   defaultOpenCategoryName = 'Dietery',
   clientId,
   token,
@@ -105,12 +105,12 @@ const CategoryTree = ({
 }) => {
   const [expandedCategories, setExpandedCategories] = useState(['All Categories']);
   const [parentMap, setParentMap] = useState({});
-  
+
   // Modal states
   const [showAddModal, setShowAddModal] = useState(false);
   const [showEditModal, setShowEditModal] = useState(false);
   const [showDeleteModal, setShowDeleteModal] = useState(false);
-  
+
   // Form states
   const [newCategoryName, setNewCategoryName] = useState("");
   const [newCategoryDescription, setNewCategoryDescription] = useState("");
@@ -215,7 +215,7 @@ const CategoryTree = ({
   const generateSlugFromParents = (categoryId, currentName, overrideParentMap = null) => {
     const path = [];
     const categoryMap = {};
-    
+
     const buildMap = (cats) => {
       for (const cat of cats) {
         categoryMap[cat.id] = cat;
@@ -319,7 +319,7 @@ const CategoryTree = ({
 
       closeAddModal();
       alert("✅ New category added successfully!");
-      
+
       if (onCategoriesUpdate) onCategoriesUpdate();
     } catch (err) {
       console.error("❌ Error adding category:", err.response?.data || err);
@@ -398,7 +398,7 @@ const CategoryTree = ({
       setEditNewSubcategoryName("");
       closeEditModal();
       alert("✅ Category updated successfully!");
-      
+
       if (onCategoriesUpdate) onCategoriesUpdate();
     } catch (err) {
       console.error("Error editing category:", err.response?.data || err);
@@ -423,7 +423,7 @@ const CategoryTree = ({
 
       closeDeleteModal();
       alert("✅ Category deleted successfully!");
-      
+
       if (onCategoriesUpdate) onCategoriesUpdate();
     } catch (err) {
       console.error("Delete error:", err.response?.data || err);
@@ -480,69 +480,61 @@ const CategoryTree = ({
       );
     });
   };
-// Flatten all categories recursively for mobile view
-const flattenAllCategories = (cats) => {
-  let flat = [];
-  const traverse = (items) => {
-    items.forEach(cat => {
-      // Only include categories with items (count > 0)
-      if (cat.count > 0) {
-        flat.push(cat);
-      }
-      if (cat.children && cat.children.length > 0) {
-        traverse(cat.children);
-      }
+  // Flatten all categories recursively for mobile view
+  const flattenAllCategories = (cats) => {
+    let flat = [];
+    const traverse = (items) => {
+      items.forEach(cat => {
+        // Only include categories with items (count > 0)
+        if (cat.count > 0) {
+          flat.push(cat);
+        }
+        if (cat.children && cat.children.length > 0) {
+          traverse(cat.children);
+        }
+      });
+    };
+    traverse(cats);
+    return flat;
+  };
+
+  const renderMobileCategories = (items) => {
+    const flatCategories = flattenAllCategories(items);
+
+    return flatCategories.map((category) => {
+      const isSelected = selectedCategory === category.name;
+
+      return (
+        <button
+          key={category.id || category.name}
+          onClick={() => onSelectCategory(category.name)}
+          className={`flex items-center gap-2 px-4 py-2 rounded-full whitespace-nowrap font-semibold text-sm transition-all shadow-sm flex-shrink-0 ${isSelected
+              ? 'bg-action-primary text-white shadow-md'
+              : 'bg-bg-primary text-text-primary border-2 border-border-default hover:border-action-primary hover:bg-bg-tertiary'
+            }`}
+        >
+          <span>{category.name}</span>
+          {typeof category.count !== 'undefined' && (
+            <span className={`text-xs px-2 py-0.5 rounded-full font-bold ${isSelected
+                ? 'bg-white text-action-primary'
+                : 'bg-bg-tertiary text-text-secondary'
+              }`}>
+              {category.count}
+            </span>
+          )}
+        </button>
+      );
     });
   };
-  traverse(cats);
-  return flat;
-};
-
-const renderMobileCategories = (items) => {
-  const flatCategories = flattenAllCategories(items);
-  
-  return flatCategories.map((category) => {
-    const isSelected = selectedCategory === category.name;
-    
-    return (
-      <button
-        key={category.id || category.name}
-        onClick={() => onSelectCategory(category.name)}
-        className={`flex items-center gap-2 px-4 py-2 rounded-full whitespace-nowrap font-semibold text-sm transition-all shadow-sm flex-shrink-0 ${
-          isSelected 
-            ? 'bg-action-primary text-white shadow-md' 
-            : 'bg-bg-primary text-text-primary border-2 border-border-default hover:border-action-primary hover:bg-bg-tertiary'
-        }`}
-      >
-        <span>{category.name}</span>
-        {typeof category.count !== 'undefined' && (
-          <span className={`text-xs px-2 py-0.5 rounded-full font-bold ${
-            isSelected 
-              ? 'bg-white text-action-primary' 
-              : 'bg-bg-tertiary text-text-secondary'
-          }`}>
-            {category.count}
-          </span>
-        )}
-      </button>
-    );
-  });
-};
   return (
     <>
       {/* Desktop: Tree View */}
       <div className="hidden lg:block rounded-lg p-4 bg-bg-primary shadow-md border border-border-default">
         <div className="flex items-center justify-between mb-3 px-3">
           <h3 className="text-lg font-semibold text-text-primary">
-            Categories
+          All  Categories
           </h3>
-          <button
-            onClick={() => setShowAddModal(true)}
-            className="p-1.5 rounded-lg bg-action-primary text-text-white hover:opacity-90 transition-opacity"
-            title="Add new category"
-          >
-            <Plus size={18} />
-          </button>
+  
         </div>
         <div className="space-y-1">
           {categories && categories.length > 0 ? (
@@ -554,52 +546,52 @@ const renderMobileCategories = (items) => {
           )}
         </div>
       </div>
-     {/* Mobile: Horizontal Scrollable List */}
-<div className="lg:hidden mb-4">
-  <div className="flex items-center justify-between mb-3 px-2">
-    <h3 className="text-base font-semibold text-text-primary">
-      Categories
-    </h3>
-    <button
-      onClick={() => setShowAddModal(true)}
-      className="p-1.5 rounded-lg bg-action-primary text-text-white hover:opacity-90 transition-opacity shadow-md flex-shrink-0"
-      title="Add new category"
-    >
-      <Plus size={16} />
-    </button>
-  </div>
-  
-  <div 
-    className="overflow-x-auto max-w-[350px] overflow-y-hidden scrollbar-hide px-2 touch-pan-x"
-    style={{ 
-      WebkitOverflowScrolling: 'touch',
-      scrollbarWidth: 'none',
-      msOverflowStyle: 'none'
-    }}
-  >
-    <div className="flex gap-2 pb-2 w-max">
-      {categories && categories.length > 0 ? (
-        renderMobileCategories(categories)
-      ) : (
-        <div className="text-text-secondary text-sm py-2">
-          No categories
+      {/* Mobile: Horizontal Scrollable List */}
+      <div className="lg:hidden mb-4">
+        <div className="flex items-center justify-between mb-3 px-2">
+          <h3 className="text-base font-semibold text-text-primary">
+            Categories
+          </h3>
+          <button
+            onClick={() => setShowAddModal(true)}
+            className="p-1.5 rounded-lg bg-action-primary text-text-white hover:opacity-90 transition-opacity shadow-md flex-shrink-0"
+            title="Add new category"
+          >
+            <Plus size={16} />
+          </button>
         </div>
-      )}
-    </div>
-  </div>
-</div>
-  
+
+        <div
+          className="overflow-x-auto max-w-[350px] overflow-y-hidden scrollbar-hide px-2 touch-pan-x"
+          style={{
+            WebkitOverflowScrolling: 'touch',
+            scrollbarWidth: 'none',
+            msOverflowStyle: 'none'
+          }}
+        >
+          <div className="flex gap-2 pb-2 w-max">
+            {categories && categories.length > 0 ? (
+              renderMobileCategories(categories)
+            ) : (
+              <div className="text-text-secondary text-sm py-2">
+                No categories
+              </div>
+            )}
+          </div>
+        </div>
+      </div>
+
       {/* Modals remain the same */}
       {showAddModal && createPortal(
         <div className="fixed inset-0 z-[9999] flex items-center justify-center p-4 bg-black bg-opacity-50">
           <div className="rounded-lg max-w-md w-full p-6 bg-bg-primary shadow-xl">
             <div className="flex justify-between items-center mb-4">
               <h3 className="text-xl font-semibold text-text-primary">Add New Category</h3>
-              <button onClick={closeAddModal} className="text-text-secondary hover:text-text-primary">
-                <X size={24} />
+              <button onClick={closeAddModal} className="p-1.5 rounded-lg bg-action-primary text-text-white hover:opacity-90 transition-opacity">
+                <X className="h-5 w-5" />
               </button>
             </div>
-  
+
             <div className="space-y-4">
               <div>
                 <label className="block text-sm font-medium mb-2 text-text-primary">
@@ -614,7 +606,7 @@ const renderMobileCategories = (items) => {
                   autoFocus
                 />
               </div>
-  
+
               <div>
                 <label className="block text-sm font-medium mb-2 text-text-primary">
                   Description (optional)
@@ -627,7 +619,7 @@ const renderMobileCategories = (items) => {
                   rows="3"
                 />
               </div>
-  
+
               <div className="flex gap-3 pt-4">
                 <button
                   onClick={closeAddModal}
@@ -647,17 +639,17 @@ const renderMobileCategories = (items) => {
         </div>,
         document.body
       )}
-  
+
       {showEditModal && editingCategory && createPortal(
         <div className="fixed inset-0 z-[9999] flex items-center justify-center p-4 bg-black bg-opacity-50">
           <div className="rounded-lg max-w-md w-full p-6 bg-bg-primary shadow-xl">
             <div className="flex justify-between items-center mb-4">
               <h3 className="text-xl font-semibold text-text-primary">Edit Category</h3>
-              <button onClick={closeEditModal} className="text-text-secondary hover:text-text-primary">
-                <X size={24} />
+              <button onClick={closeEditModal}  className="p-1.5 rounded-lg bg-action-primary text-text-white hover:opacity-90 transition-opacity">
+                <X className="h-5 w-5" />
               </button>
             </div>
-  
+
             <div className="space-y-4">
               <div>
                 <label className="block text-sm font-medium mb-2 text-text-primary">
@@ -671,7 +663,7 @@ const renderMobileCategories = (items) => {
                   className="w-full px-4 py-2 rounded-lg bg-bg-tertiary border border-border-default text-text-primary focus:outline-none focus:ring-2 focus:ring-action-primary"
                 />
               </div>
-  
+
               <div>
                 <label className="block text-sm font-medium mb-2 text-text-primary">
                   Description
@@ -684,7 +676,7 @@ const renderMobileCategories = (items) => {
                   rows="3"
                 />
               </div>
-  
+
               <div>
                 <label className="block text-sm font-medium mb-2 text-text-primary">
                   Add New Subcategory (optional)
@@ -697,7 +689,7 @@ const renderMobileCategories = (items) => {
                   className="w-full px-4 py-2 rounded-lg bg-bg-tertiary border border-border-default text-text-primary focus:outline-none focus:ring-2 focus:ring-action-primary"
                 />
               </div>
-  
+
               <div className="flex gap-3 pt-4">
                 <button
                   onClick={closeEditModal}
@@ -717,16 +709,16 @@ const renderMobileCategories = (items) => {
         </div>,
         document.body
       )}
-  
+
       {showDeleteModal && deleteTarget && createPortal(
         <div className="fixed inset-0 z-[9999] flex items-center justify-center p-4 bg-black bg-opacity-50">
           <div className="rounded-lg max-w-md w-full p-6 bg-bg-primary shadow-xl">
             <h3 className="text-xl font-semibold mb-4 text-text-primary">Confirm Delete</h3>
             <p className="mb-6 text-text-secondary">
-              Are you sure you want to delete <strong className="text-text-primary">{deleteTarget?.name}</strong>? 
+              Are you sure you want to delete <strong className="text-text-primary">{deleteTarget?.name}</strong>?
               This action cannot be undone.
             </p>
-  
+
             <div className="flex gap-3">
               <button
                 onClick={closeDeleteModal}
