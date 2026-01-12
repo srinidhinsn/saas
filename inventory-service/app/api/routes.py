@@ -40,10 +40,7 @@ def read_inventory(
 
 @router.post("/create", response_model=ResponseModel[Inventory])
 def create_inventory(item: Inventory, client_id: str, context: SaasContext = Depends(verify_token), db: Session = Depends(get_db)):
-    payload = item.dict(exclude_unset=True)
-    payload.setdefault("inventory_id", 1)
-    payload.setdefault("client_id", context.client_id)
-    db_item = InventoryEntity(**payload)
+    db_item = InventoryEntity(**item.dict())
     db.add(db_item)
     db.commit()
     db.refresh(db_item)
