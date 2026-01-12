@@ -842,7 +842,7 @@ const TakeOrder = ({ clientId, token, onOrderUpdate, realm }) => {
       const payload = {
         client_id: clientId,
         table_id: tableId,
-        status: "new",
+        status: "pending",
         price: subtotal,
         gst: gstValue,
         cst: cstValue,

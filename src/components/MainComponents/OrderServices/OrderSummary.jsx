@@ -2592,7 +2592,7 @@ const OrderSummaryVisible = ({ clientId, token }) => {
       }
     });
   };
-  
+
 
 
 
@@ -2606,8 +2606,8 @@ const OrderSummaryVisible = ({ clientId, token }) => {
               <button
                 onClick={() => toggleOrderMode('all')}
                 className={`flex items-center gap-2 px-4 py-2 rounded-lg font-medium text-sm transition-all ${selectedOrderModes.includes('all')
-                    ? 'bg-action-primary text-text-white shadow-sm'
-                    : 'bg-bg-tertiary text-text-secondary hover:text-text-primary border border-border-default'
+                  ? 'bg-action-primary text-text-white shadow-sm'
+                  : 'bg-bg-tertiary text-text-secondary hover:text-text-primary border border-border-default'
                   }`}
               >
                 <Filter size={16} />
@@ -2617,8 +2617,8 @@ const OrderSummaryVisible = ({ clientId, token }) => {
               <button
                 onClick={() => toggleOrderMode('dinein')}
                 className={`flex items-center gap-2 px-4 py-2 rounded-lg font-medium text-sm transition-all ${selectedOrderModes.includes('dinein')
-                    ? 'bg-action-primary text-text-white shadow-sm'
-                    : 'bg-bg-tertiary text-text-secondary hover:text-text-primary border border-border-default'
+                  ? 'bg-action-primary text-text-white shadow-sm'
+                  : 'bg-bg-tertiary text-text-secondary hover:text-text-primary border border-border-default'
                   }`}
               >
                 <Users size={16} />
@@ -2628,8 +2628,8 @@ const OrderSummaryVisible = ({ clientId, token }) => {
               <button
                 onClick={() => toggleOrderMode('takeaway')}
                 className={`flex items-center gap-2 px-4 py-2 rounded-lg font-medium text-sm transition-all ${selectedOrderModes.includes('takeaway')
-                    ? 'bg-action-primary text-text-white shadow-sm'
-                    : 'bg-bg-tertiary text-text-secondary hover:text-text-primary border border-border-default'
+                  ? 'bg-action-primary text-text-white shadow-sm'
+                  : 'bg-bg-tertiary text-text-secondary hover:text-text-primary border border-border-default'
                   }`}
               >
                 <Package size={16} />
@@ -2639,8 +2639,8 @@ const OrderSummaryVisible = ({ clientId, token }) => {
               <button
                 onClick={() => toggleOrderMode('delivery')}
                 className={`flex items-center gap-2 px-4 py-2 rounded-lg font-medium text-sm transition-all ${selectedOrderModes.includes('delivery')
-                    ? 'bg-action-primary text-text-white shadow-sm'
-                    : 'bg-bg-tertiary text-text-secondary hover:text-text-primary border border-border-default'
+                  ? 'bg-action-primary text-text-white shadow-sm'
+                  : 'bg-bg-tertiary text-text-secondary hover:text-text-primary border border-border-default'
                   }`}
               >
                 <Truck size={16} />
@@ -2783,11 +2783,17 @@ const OrderSummaryVisible = ({ clientId, token }) => {
                       </button>
 
                       <button
-                        onClick={() => handleStatusChange(order.id, 'served')}
-                        className="flex-1 px-4 py-2 rounded-lg bg-action-success text-text-white text-sm font-semibold"
+                        onClick={() => status === 'ready' && handleStatusChange(order.id, 'served')}
+                        disabled={status !== 'ready'}
+                        className={`flex-1 px-4 py-2 rounded-lg text-sm font-semibold transition-all
+    ${status === 'ready'
+                            ? 'bg-action-success text-text-white hover:opacity-90'
+                            : 'bg-gray-300 text-gray-500 cursor-not-allowed'
+                          }`}
                       >
                         Mark as Served
                       </button>
+
                     </div>
 
                     {/* NEW: Generate Bill button */}

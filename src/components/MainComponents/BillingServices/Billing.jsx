@@ -427,16 +427,16 @@ export default function BillingPage({ clientId, token }) {
         `${import.meta.env.VITE_API_ORDER_SERVICE_URL}/${clientId}/dinein/update`,
         {
           id: selectedOrder.id,
-          status: "served", // Keep the order status as served
-          invoice_status: paymentStatus.toLowerCase(), // paid / unpaid / partial / due
+          status: "served",
+          invoice_status: paymentStatus.toLowerCase(),
         },
         { headers: { Authorization: `Bearer ${token}` } }
       );
 
       toast.success("Invoice draft saved!");
-      setTimeout(() => {
-        navigate(`/saas/${clientId}/orders`); // Adjust path to your orders page
-      }, 1000);
+      // setTimeout(() => {
+      //   navigate(`/saas/${clientId}/orders`);
+      // }, 1000);
       
       return draftId;
       } catch (err) {
@@ -689,29 +689,29 @@ export default function BillingPage({ clientId, token }) {
   }, [clientId, token, selectedOrder]);
 
   const renderInvoiceContent = () => (
-    <div className="flex flex-col h-full bg-white">
+    <div className="flex flex-col h-full bg-bg-primary">
       
       {/* Header with Order Info */}
-      <div className="bg-gradient-to-r from-indigo-600 via-purple-600 to-pink-600 px-4 py-3 shadow-lg flex-shrink-0">
+      <div className="bg-action-primary px-4 py-3 shadow-lg flex-shrink-0">
         <div className="flex justify-between items-center">
           <div className="flex items-center gap-3">
-            <div className="w-10 h-10 bg-white/20 backdrop-blur-md rounded-xl flex items-center justify-center text-white font-bold text-lg shadow-md border border-white/30">
+            <div className="w-10 h-10 bg-white/20 backdrop-blur-md rounded-xl flex items-center justify-center text-text-white font-bold text-lg shadow-md border border-white/30">
               {clientId.charAt(0).toUpperCase()}
             </div>
             <div>
-              <h1 className="text-xl font-bold text-white">{clientId.toUpperCase()}</h1>
-              <p className="text-white/80 text-xs">Invoice #{documentNumber || "Draft"}</p>
+              <h1 className="text-xl font-bold text-text-white">{clientId.toUpperCase()}</h1>
+              <p className="text-text-white/80 text-xs">Invoice #{documentNumber || "Draft"}</p>
             </div>
           </div>
           
           <div className="flex items-center gap-6">
             <div className="text-right">
-              <div className="text-xs text-white/80">Table: {tablesMap[selectedOrder.table_id]?.name}</div>
-              <div className="text-xs text-white/80">Order #{selectedOrder.id} • {selectedOrder.mode}</div>
+              <div className="text-xs text-text-white/80">Table: {tablesMap[selectedOrder.table_id]?.name}</div>
+              <div className="text-xs text-text-white/80">Order #{selectedOrder.id} • {selectedOrder.mode}</div>
             </div>
-            <div className="text-right text-white">
+            <div className="text-right text-text-white">
               <div className="text-xs font-medium">{new Date().toLocaleDateString()}</div>
-              <div className="text-xs text-white/80">{new Date().toLocaleTimeString([], { hour: "2-digit", minute: "2-digit" })}</div>
+              <div className="text-xs text-text-white/80">{new Date().toLocaleTimeString([], { hour: "2-digit", minute: "2-digit" })}</div>
             </div>
           </div>
         </div>
@@ -723,16 +723,16 @@ export default function BillingPage({ clientId, token }) {
 
           {/* LEFT - Items */}
           <div className="lg:col-span-7">
-            <div className="bg-white rounded-xl shadow-md border border-gray-200">
+            <div className="bg-bg-primary rounded-xl shadow-md border border-gray-200">
               <div className="px-4 py-2 bg-gray-50 border-b border-gray-200 rounded-t-xl">
-                <h2 className="text-sm font-bold text-gray-900">Order Items</h2>
+                <h2 className="text-sm font-bold text-text-black">Order Items</h2>
               </div>
 
               <div className="p-3 space-y-2 max-h-80 overflow-y-auto">
                 {selectedOrder.items.map((item, idx) => (
-                  <div key={idx} className="flex justify-between items-start py-2 px-3 rounded-lg border border-gray-100 hover:border-indigo-200 hover:bg-indigo-50/50 transition-all">
+                  <div key={idx} className="flex justify-between items-start py-2 px-3 rounded-lg border border-gray-100 hover:border-action-primary hover:bg-indigo-50/50 transition-all">
                     <div className="flex-1">
-                      <div className="font-semibold text-gray-900 text-sm">{item.name}</div>
+                      <div className="font-semibold text-text-black text-sm">{item.name}</div>
                       <div className="text-xs text-gray-500 mt-1 flex items-center gap-2">
                         <span className="inline-flex items-center px-2 py-0.5 rounded-md bg-gray-100 text-gray-700 font-medium">
                           {item.quantity}x
@@ -740,7 +740,7 @@ export default function BillingPage({ clientId, token }) {
                         <span>@ ₹{item.unit_price?.toFixed(2)}</span>
                       </div>
                     </div>
-                    <div className="font-bold text-gray-900">
+                    <div className="font-bold text-text-black">
                       ₹{((item.unit_price || 0) * (item.quantity || 0)).toFixed(2)}
                     </div>
                   </div>
@@ -763,8 +763,8 @@ export default function BillingPage({ clientId, token }) {
                     <span className="font-semibold">₹{calculatedGST.toFixed(2)}</span>
                   </div>
                   <div className="pt-2 border-t border-gray-300 flex justify-between items-center">
-                    <span className="text-base font-bold text-gray-900">TOTAL</span>
-                    <span className="text-lg font-bold bg-gradient-to-r from-indigo-600 to-purple-600 bg-clip-text text-transparent">
+                    <span className="text-base font-bold text-text-black">TOTAL</span>
+                    <span className="text-lg font-bold text-action-primary">
                       ₹{calculatedTotal.toFixed(2)}
                     </span>
                   </div>
@@ -777,9 +777,9 @@ export default function BillingPage({ clientId, token }) {
           <div className="lg:col-span-5 space-y-4">
 
             {/* Customer Details */}
-            <div className="bg-white rounded-xl shadow-md border border-gray-200">
+            <div className="bg-bg-primary rounded-xl shadow-md border border-gray-200">
               <div className="px-4 py-2 bg-gray-50 border-b border-gray-200 rounded-t-xl">
-                <h3 className="text-sm font-bold text-gray-900">👤 Customer</h3>
+                <h3 className="text-sm font-bold text-text-black">👤 Customer</h3>
               </div>
               <div className="p-3 space-y-2">
                 <CustomerAutocomplete
@@ -797,13 +797,13 @@ export default function BillingPage({ clientId, token }) {
                   placeholder="Walk-in / Customer ID"
                 />
                 <input
-                  className="w-full border border-gray-300 rounded-lg px-3 py-2 text-sm focus:ring-2 focus:ring-indigo-500 focus:border-indigo-500 transition-all"
+                  className="w-full border border-gray-300 rounded-lg px-3 py-2 text-sm focus:ring-2 focus:ring-action-primary focus:border-action-primary transition-all"
                   placeholder="📞 Phone"
                   value={selectedOrder.contact_phone || ""}
                   onChange={(e) => setSelectedOrder((p) => ({ ...p, contact_phone: e.target.value }))}
                 />
                 <input
-                  className="w-full border border-gray-300 rounded-lg px-3 py-2 text-sm focus:ring-2 focus:ring-indigo-500 focus:border-indigo-500 transition-all"
+                  className="w-full border border-gray-300 rounded-lg px-3 py-2 text-sm focus:ring-2 focus:ring-action-primary focus:border-action-primary transition-all"
                   placeholder="📧 Email"
                   value={selectedOrder.contact_email || ""}
                   onChange={(e) => setSelectedOrder((p) => ({ ...p, contact_email: e.target.value }))}
@@ -812,9 +812,9 @@ export default function BillingPage({ clientId, token }) {
             </div>
 
             {/* Tax & Discount */}
-            <div className="bg-white rounded-xl shadow-md border border-gray-200">
+            <div className="bg-bg-primary rounded-xl shadow-md border border-gray-200">
               <div className="px-4 py-2 bg-gray-50 border-b border-gray-200 rounded-t-xl">
-                <h3 className="text-sm font-bold text-gray-900">⚙️ Tax & Discount</h3>
+                <h3 className="text-sm font-bold text-text-black">⚙️ Tax & Discount</h3>
               </div>
               <div className="p-3 space-y-3">
                 <div className="grid grid-cols-3 gap-2">
@@ -824,7 +824,7 @@ export default function BillingPage({ clientId, token }) {
                       type="number"
                       value={taxPercent}
                       min="0"
-                      className="w-full border border-gray-300 rounded-lg px-2 py-1.5 text-sm focus:ring-2 focus:ring-indigo-500"
+                      className="w-full border border-gray-300 rounded-lg px-2 py-1.5 text-sm focus:ring-2 focus:ring-action-primary"
                       onChange={(e) => {
                         setTaxPercent(Number(e.target.value));
                         setGstManuallyEdited(true);
@@ -837,7 +837,7 @@ export default function BillingPage({ clientId, token }) {
                       type="number"
                       value={discount}
                       min="0"
-                      className="w-full border border-gray-300 rounded-lg px-2 py-1.5 text-sm focus:ring-2 focus:ring-indigo-500"
+                      className="w-full border border-gray-300 rounded-lg px-2 py-1.5 text-sm focus:ring-2 focus:ring-action-primary"
                       onChange={(e) => setDiscount(Number(e.target.value))}
                     />
                   </div>
@@ -846,7 +846,7 @@ export default function BillingPage({ clientId, token }) {
                     <select
                       value={discountIsPercent ? "percent" : "fixed"}
                       onChange={(e) => setDiscountIsPercent(e.target.value === "percent")}
-                      className="w-full border border-gray-300 rounded-lg px-2 py-1.5 text-sm focus:ring-2 focus:ring-indigo-500 bg-white"
+                      className="w-full border border-gray-300 rounded-lg px-2 py-1.5 text-sm focus:ring-2 focus:ring-action-primary bg-bg-primary"
                     >
                       <option value="percent">%</option>
                       <option value="fixed">₹</option>
@@ -864,7 +864,7 @@ export default function BillingPage({ clientId, token }) {
                         type="button"
                         className={`px-3 py-1.5 rounded-lg text-xs font-semibold transition-all ${
                           paymentStatus === statusOption
-                            ? "bg-gradient-to-r from-indigo-600 to-purple-600 text-white shadow-md"
+                            ? "bg-action-primary text-text-white shadow-md"
                             : "bg-gray-100 text-gray-700 hover:bg-gray-200"
                         }`}
                         onClick={() => setPaymentStatus(statusOption)}
@@ -878,13 +878,13 @@ export default function BillingPage({ clientId, token }) {
             </div>
 
             {/* Payment Method */}
-            <div className="bg-white rounded-xl shadow-md border border-gray-200">
+            <div className="bg-bg-primary rounded-xl shadow-md border border-gray-200">
               <div className="px-4 py-2 bg-gray-50 border-b border-gray-200 rounded-t-xl flex items-center justify-between">
-                <h3 className="text-sm font-bold text-gray-900">💳 Payment</h3>
+                <h3 className="text-sm font-bold text-text-black">💳 Payment</h3>
                 <label className="flex items-center gap-2 cursor-pointer">
                   <input
                     type="checkbox"
-                    className="w-4 h-4 accent-indigo-600 rounded"
+                    className="w-4 h-4 accent-action-primary rounded"
                     checked={splitPaymentEnabled}
                     onChange={() => {
                       const newSplitEnabled = !splitPaymentEnabled;
@@ -909,7 +909,7 @@ export default function BillingPage({ clientId, token }) {
                             newSplits[idx].method = e.target.value;
                             setPaymentSplits(newSplits);
                           }}
-                          className="flex-1 border border-gray-300 rounded-lg px-2 py-1.5 text-sm focus:ring-2 focus:ring-indigo-500 bg-white"
+                          className="flex-1 border border-gray-300 rounded-lg px-2 py-1.5 text-sm focus:ring-2 focus:ring-action-primary bg-bg-primary"
                         >
                           <option>Cash</option>
                           <option>UPI</option>
@@ -923,7 +923,7 @@ export default function BillingPage({ clientId, token }) {
                           value={split.amount}
                           onChange={(e) => updateSplitAmount(idx, e.target.value)}
                           onBlur={() => onSplitAmountBlur()}
-                          className="w-24 border border-gray-300 rounded-lg px-2 py-1.5 text-sm focus:ring-2 focus:ring-indigo-500"
+                          className="w-24 border border-gray-300 rounded-lg px-2 py-1.5 text-sm focus:ring-2 focus:ring-action-primary"
                         />
                         <button
                           type="button"
@@ -938,7 +938,7 @@ export default function BillingPage({ clientId, token }) {
                     <button
                       type="button"
                       onClick={addSplitRow}
-                      className="w-full bg-gradient-to-r from-indigo-600 to-purple-600 hover:from-indigo-700 hover:to-purple-700 text-white px-3 py-2 rounded-lg text-sm font-semibold transition-all"
+                      className="w-full bg-action-primary hover:bg-action-primary/90 text-text-white px-3 py-2 rounded-lg text-sm font-semibold transition-all"
                     >
                       + Add Payment
                     </button>
@@ -951,7 +951,7 @@ export default function BillingPage({ clientId, token }) {
                         setMethod(e.target.value);
                         setPaymentSplits([{ method: e.target.value, amount: total }]);
                       }}
-                      className="flex-1 border border-gray-300 rounded-lg px-3 py-2 text-sm focus:ring-2 focus:ring-indigo-500 bg-white"
+                      className="flex-1 border border-gray-300 rounded-lg px-3 py-2 text-sm focus:ring-2 focus:ring-action-primary bg-bg-primary"
                     >
                       <option>Cash</option>
                       <option>UPI</option>
@@ -974,13 +974,13 @@ export default function BillingPage({ clientId, token }) {
               <button
                 onClick={saveInvoiceDraft}
                 disabled={saving}
-                className="flex-1 bg-gradient-to-r from-green-600 to-emerald-600 hover:from-green-700 hover:to-emerald-700 text-white px-4 py-2.5 rounded-xl font-bold shadow-lg transition-all disabled:opacity-50"
+                className="flex-1 bg-action-primary hover:bg-action-primary/90 text-text-white px-4 py-2.5 rounded-xl font-bold shadow-lg transition-all disabled:opacity-50"
               >
                 {saving ? "Saving..." : "💾 Save"}
               </button>
               <button
                 onClick={printInvoice}
-                className="flex-1 bg-white border-2 border-gray-300 hover:border-indigo-400 hover:bg-indigo-50 text-gray-700 px-4 py-2.5 rounded-xl font-bold transition-all shadow-md"
+                className="flex-1 bg-bg-primary border-2 border-action-primary hover:border-action-primary hover:bg-indigo-50 text-gray-700 px-4 py-2.5 rounded-xl font-bold transition-all shadow-md"
               >
                 📄 Print
               </button>
@@ -997,20 +997,20 @@ export default function BillingPage({ clientId, token }) {
       <div className="max-w-7xl mx-auto">
         
         {/* Header */}
-        <div className="bg-gradient-to-r from-indigo-600 via-purple-600 to-pink-600 rounded-2xl shadow-xl px-6 py-4 mb-4">
+        <div className="bg-action-primary rounded-2xl shadow-xl px-6 py-4 mb-4">
           <div className="flex items-center justify-between">
             <div className="flex items-center gap-3">
-              <div className="w-12 h-12 bg-white/20 backdrop-blur-md rounded-xl flex items-center justify-center text-white font-bold text-xl shadow-md border border-white/30">
+              <div className="w-12 h-12 bg-white/20 backdrop-blur-md rounded-xl flex items-center justify-center text-text-white font-bold text-xl shadow-md border border-white/30">
                 {clientId.charAt(0).toUpperCase()}
               </div>
               <div>
-                <h1 className="text-2xl font-bold text-white">{clientId.toUpperCase()}</h1>
-                <p className="text-white/80 text-sm">Today's Orders</p>
+                <h1 className="text-2xl font-bold text-text-white">{clientId.toUpperCase()}</h1>
+                <p className="text-text-white/80 text-sm">Today's Orders</p>
               </div>
             </div>
-            <div className="text-white text-right">
+            <div className="text-text-white text-right">
               <div className="text-sm font-medium">{new Date().toLocaleDateString()}</div>
-              <div className="text-xs text-white/80">{orders.length} served orders</div>
+              <div className="text-xs text-text-white/80">{orders.length} served orders</div>
             </div>
           </div>
         </div>
@@ -1022,9 +1022,9 @@ export default function BillingPage({ clientId, token }) {
             <p className="text-gray-500 text-sm mt-4">Loading orders...</p>
           </div>
         ) : orders.length === 0 ? (
-          <div className="flex flex-col items-center justify-center py-20 text-center bg-white rounded-2xl shadow-lg">
+          <div className="flex flex-col items-center justify-center py-20 text-center bg-bg-primary rounded-2xl shadow-lg">
             <div className="text-7xl mb-4">📭</div>
-            <p className="text-xl font-bold text-gray-900 mb-2">No Orders Yet</p>
+            <p className="text-xl font-bold text-text-black mb-2">No Orders Yet</p>
             <p className="text-gray-500">No served orders for today</p>
           </div>
         ) : (
@@ -1037,15 +1037,15 @@ export default function BillingPage({ clientId, token }) {
                 <div
                   key={order.id}
                   onClick={() => handleSelectOrder(order)}
-                  className="bg-white rounded-xl shadow-md hover:shadow-xl border-2 border-gray-200 hover:border-indigo-400 p-4 cursor-pointer transition-all duration-200 hover:scale-105"
+                  className="bg-bg-primary rounded-xl shadow-md hover:shadow-xl border-2 border-gray-200 hover:border-action-primary p-4 cursor-pointer transition-all duration-200 hover:scale-105"
                 >
                   <div className="flex justify-between items-start mb-3">
                     <div>
-                      <h3 className="text-lg font-bold text-gray-900">{tableName}</h3>
+                      <h3 className="text-lg font-bold text-text-black">{tableName}</h3>
                       <p className="text-xs text-gray-500">Order #{order.id}</p>
                     </div>
                     <div className="text-right">
-                      <div className="text-lg font-bold text-indigo-600">₹{orderTotal.toFixed(2)}</div>
+                      <div className="text-lg font-bold text-action-primary">₹{orderTotal.toFixed(2)}</div>
                       <div className="text-xs text-gray-500">
                         {new Date(order.created_at).toLocaleTimeString([], { hour: "2-digit", minute: "2-digit" })}
                       </div>
@@ -1066,9 +1066,9 @@ export default function BillingPage({ clientId, token }) {
         {/* Invoice Modal */}
         {invoiceModalOpen && selectedOrder && (
           <div className="fixed inset-0 bg-black/60 backdrop-blur-sm flex items-center justify-center z-50 p-4">
-            <div className="bg-white rounded-2xl shadow-2xl w-full max-w-7xl h-[90vh] flex flex-col relative">
+            <div className="bg-bg-primary rounded-2xl shadow-2xl w-full max-w-7xl h-[90vh] flex flex-col relative">
               <button
-                className="absolute top-4 right-4 z-10 text-gray-500 hover:text-gray-700 hover:bg-gray-100 text-2xl font-bold w-10 h-10 rounded-full flex items-center justify-center transition-all shadow-md bg-white"
+                className="absolute top-4 right-4 z-10 text-gray-500 hover:text-gray-700 hover:bg-gray-100 text-2xl font-bold w-10 h-10 rounded-full flex items-center justify-center transition-all shadow-md bg-bg-primary"
                 onClick={() => setInvoiceModalOpen(false)}
               >
                 ×
