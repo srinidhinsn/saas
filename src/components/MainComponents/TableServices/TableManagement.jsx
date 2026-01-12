@@ -55,11 +55,33 @@ const TableManagement = ({ clientId, token, screenIds, userId }) => {
 
     const [viewMode, setViewMode] = useState(false);
     const [addItemsMode, setAddItemsMode] = useState(false);
+    const getColumnsByScreen = () => {
+        const width = window.innerWidth;
+      
+        if (width >= 1536) return 8; // 2xl
+        if (width >= 1280) return 6; // xl
+        if (width >= 1024) return 6; // lg
+        if (width >= 640) return 4;  // sm
+        return 2;                    // mobile
+      };
     useEffect(() => {
         if (clientId) fetchTables();
     }, [clientId]);
-    const getSortedTables = (tablesToSort) => {
-        const COLS_PER_ROW = 8;
+    const [colsPerRow, setColsPerRow] = useState(getColumnsByScreen());
+
+    useEffect(() => {
+      const onResize = () => {
+        setColsPerRow(getColumnsByScreen());
+      };
+    
+      window.addEventListener("resize", onResize);
+      return () => window.removeEventListener("resize", onResize);
+    }, []);
+    
+  
+      
+      const getSortedTables = (tablesToSort, COLS_PER_ROW) => {
+
 
         const occupied = tablesToSort
             .filter(t => t.status === 'Occupied')
@@ -370,6 +392,7 @@ const TableManagement = ({ clientId, token, screenIds, userId }) => {
         const hasChanged = (
             original?.table_type?.toString() !== table.table_type?.toString() ||
             original?.location_zone !== table.location_zone ||
+            original?.section !== table.section ||
             (original?.status || "") !== (table.status || "")
         );
 
@@ -504,12 +527,19 @@ const TableManagement = ({ clientId, token, screenIds, userId }) => {
                 } else if (bulkUpdateGlobal.location_zone) {
                     finalZone = bulkUpdateGlobal.location_zone;
                 }
+                let finalSection = table.section;
+                if (tableUpdates.section && tableUpdates.section !== table.section) {
+                    finalSection = tableUpdates.section;
+                } else if (bulkUpdateGlobal.section) {
+                    finalSection = bulkUpdateGlobal.section;
+                }
 
                 const updatedFields = {
                     ...table,
                     table_type: finalTableType.toString(),
                     status: finalStatus,
                     location_zone: finalZone,
+                    section: finalSection,
                 };
 
                 await axios.post(
@@ -602,7 +632,7 @@ const TableManagement = ({ clientId, token, screenIds, userId }) => {
             const matchesSearch = table.name.toLowerCase().includes(searchTerm.toLowerCase());
             const matchesStatus = !statusFilter || table.status === statusFilter;
             return matchesSearch && matchesStatus;
-        })
+        }), colsPerRow
     );
 
     if (loading) {
@@ -617,7 +647,7 @@ const TableManagement = ({ clientId, token, screenIds, userId }) => {
     }
 
     return (
-        // <AccessGuard screenIds={screenIds} requiredScreenId={requiredScreenId} clientId={clientId} requesterId={userId}>
+        <AccessGuard screenIds={screenIds} requiredScreenId={requiredScreenId} clientId={clientId} requesterId={userId}>
             <div className="min-h-screen bg-bg-primary">
                 <style>
                     {`
@@ -726,8 +756,8 @@ const TableManagement = ({ clientId, token, screenIds, userId }) => {
                                         <div className="flex gap-3 items-center text-xs font-semibold">
                                             <span>{table.section}</span>
                                             <span>
-                                                {table.status === "Vacant" }
-                                                {table.status === "Occupied" }
+                                                {table.status === "Vacant"}
+                                                {table.status === "Occupied"}
                                                 {table.status === "Reserved"}
                                             </span>
                                         </div>
@@ -945,7 +975,7 @@ const TableManagement = ({ clientId, token, screenIds, userId }) => {
                     )}
                 </main>
             </div>
-        // </AccessGuard>
+        </AccessGuard>
     );
 };
 
