@@ -69,7 +69,9 @@ const TableReservation = ({
     if ((t.name || '').toLowerCase().includes('takeaway') || t.id === 500) {
       return false;
     }
-
+    if (t.status?.toLowerCase() !== 'vacant') {
+      return false;
+    }
     const zoneMatch =
       selectedZones.length === 0 || selectedZones.includes(t.location_zone);
 
@@ -602,27 +604,37 @@ const TakeOrder = ({ clientId, token, onOrderUpdate, realm }) => {
 
   const getFilteredItems = () => {
     const q = (searchQuery || '').trim().toLowerCase();
-
+  
     let items = menuItems;
+  
+    // 📂 CATEGORY FILTER
     if (selectedCategory && selectedCategory !== 'All Categories') {
       const allowedCategories = getCategoryAndChildrenNames(
         categories,
         selectedCategory
       );
-
+  
       items = items.filter(item =>
         allowedCategories.includes(item.category)
       );
     }
-
-
-    if (q.length === 0) return items;
-
-    return items.filter(item =>
-      (item.name || '').toLowerCase().includes(q) ||
-      (item.category || '').toLowerCase().includes(q)
-    );
+  
+    // 🔍 SEARCH (Name + Code + Category)
+    if (!q) return items;
+  
+    return items.filter(item => {
+      const name = (item.name || '').toLowerCase();
+      const category = (item.category || '').toLowerCase();
+      const code = String(item.code || '').toLowerCase();
+  
+      return (
+        name.includes(q) ||
+        category.includes(q) ||
+        code.includes(q)
+      );
+    });
   };
+  
 
 
   const filteredItems = getFilteredItems();
