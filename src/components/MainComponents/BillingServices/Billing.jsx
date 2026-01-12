@@ -1,6 +1,6 @@
 import React, { useEffect, useState, useRef } from "react";
 import axios from "axios";
-import { useParams } from "react-router-dom";
+import { useNavigate } from "react-router-dom";
 import { toast } from "react-toastify";
 import jsPDF from "jspdf";
 import CustomerAutocomplete from './CustomerAutocomplete';
@@ -8,6 +8,7 @@ import CustomerAutocomplete from './CustomerAutocomplete';
 
 export default function BillingPage({ clientId, token }) {
   const invoiceRef = useRef(null);
+  const navigate = useNavigate();
 
   const [orders, setOrders] = useState([]);
   const [tablesMap, setTablesMap] = useState({});
@@ -29,7 +30,6 @@ export default function BillingPage({ clientId, token }) {
   const [loading, setLoading] = useState(true);
   const [invoiceModalOpen, setInvoiceModalOpen] = useState(false);
   const [status, setStatus] = useState("Draft");
-  const isMobile = window.innerWidth <= 768;
   const [paidInvoices, setPaidInvoices] = useState([]);
   const [customersList, setCustomersList] = useState([]);
   const [gstManuallyEdited, setGstManuallyEdited] = useState(false);
@@ -112,6 +112,7 @@ export default function BillingPage({ clientId, token }) {
       fetchUniqueCustomers();
     }
   }, [clientId, token]);
+  
   const orderSubtotal = Number(
     (selectedOrder?.items || []).reduce(
       (sum, item) =>
@@ -237,11 +238,10 @@ export default function BillingPage({ clientId, token }) {
     setStatus(invoiceDraft?.status ?? "Draft");
     setDocumentNumber(invoiceDraft?.document_number ?? "");
     setPaymentStatus(invoiceDraft?.payment_status ?? "Pending");
+    setInvoiceModalOpen(true);
 
     const totalVal = Number(order.total_price ?? 0);
 
-
-    // Handle payment methods
     if (Array.isArray(invoiceDraft?.payment_method) && invoiceDraft.payment_method.length > 0) {
       if (invoiceDraft.payment_method.length === 1) {
         setSplitPaymentEnabled(false);
@@ -273,37 +273,31 @@ export default function BillingPage({ clientId, token }) {
       if (invoiceDraft?.tax_rate !== undefined && invoiceDraft?.tax_rate !== null) {
         setTaxPercent(Number(invoiceDraft.tax_rate));
       } else {
-        setTaxPercent(18); // default GST
+        setTaxPercent(18);
       }
     }
 
-
-    // Load discount from invoice draft (from DB)
     if (invoiceDraft?.discount !== undefined && invoiceDraft?.discount !== null) {
       setDiscount(Number(invoiceDraft.discount));
-      // Determine type: if has decimal (.0 format), it's percentage
       const hasDecimal = (invoiceDraft.discount % 1 !== 0);
       setDiscountIsPercent(hasDecimal);
     } else if (invoiceDraft?.discount_amount !== undefined) {
       setDiscount(Number(invoiceDraft.discount_amount));
-      setDiscountIsPercent(false); // discount_amount is typically fixed value
+      setDiscountIsPercent(false);
     } else {
       setDiscount(0);
       setDiscountIsPercent(true);
     }
   };
 
-
   useEffect(() => {
     if (!selectedOrder) return;
 
-    // When total changes, resync payments
     if (!splitPaymentEnabled) {
       setPaymentSplits([{ method, amount: total }]);
       setSinglePaymentAmount(total);
       setBalanceAmount(0);
     } else {
-      // Split payment → rebalance last row
       let splits = [...paymentSplits];
       if (splits.length > 0) {
         const used = splits
@@ -343,6 +337,7 @@ export default function BillingPage({ clientId, token }) {
       return {};
     }
   };
+
   const saveInvoiceDraft = async () => {
     if (!selectedOrder) {
       toast.error("Select an order first");
@@ -432,14 +427,19 @@ export default function BillingPage({ clientId, token }) {
         `${import.meta.env.VITE_API_ORDER_SERVICE_URL}/${clientId}/dinein/update`,
         {
           id: selectedOrder.id,
-          invoice_status: paymentStatus.toLowerCase(), // paid / unpaid / partial / due
+          status: "served",
+          invoice_status: paymentStatus.toLowerCase(),
         },
         { headers: { Authorization: `Bearer ${token}` } }
       );
 
       toast.success("Invoice draft saved!");
+      // setTimeout(() => {
+      //   navigate(`/saas/${clientId}/orders`);
+      // }, 1000);
+      
       return draftId;
-    } catch (err) {
+      } catch (err) {
       console.error(err);
       toast.error("Failed to save invoice draft");
       throw err;
@@ -447,6 +447,7 @@ export default function BillingPage({ clientId, token }) {
       setSaving(false);
     }
   };
+
   const printInvoice = async () => {
     if (!selectedOrder || !selectedOrder.items?.length) {
       toast.error("Select an order with items first");
@@ -498,7 +499,6 @@ export default function BillingPage({ clientId, token }) {
       const pageHeight = doc.internal.pageSize.height;
       let y = 50;
 
-      // Header with gradient effect
       doc.setFillColor(102, 126, 234);
       doc.rect(0, 0, pageWidth, 120, 'F');
 
@@ -688,383 +688,396 @@ export default function BillingPage({ clientId, token }) {
     fetchPaidInvoices();
   }, [clientId, token, selectedOrder]);
 
-  useEffect(() => {
-    if (selectedOrder && isMobile) setInvoiceModalOpen(true);
-  }, [selectedOrder, isMobile]);
-
   const renderInvoiceContent = () => (
-    <>
-      {/* Header */}
-      <div className="flex justify-between bg-action-primary text-text-white p-4 rounded-t-lg">
-        <div>
-          <h1 className="text-2xl font-bold">{clientId.toUpperCase()}</h1>
-          <h2 className="text-lg font-semibold">INVOICE</h2>
-        </div>
-        <div className="text-right">
-          <div className="text-sm">#{documentNumber || "Draft"}</div>
-          <div className="text-xs">{new Date().toLocaleDateString()}</div>
-        </div>
-      </div>
-
-      {/* Customer & Order Info */}
-      <div className="flex flex-col md:flex-row justify-between bg-bg-white p-4 border-b border-gray-200 gap-4">
-        <div className="flex-1">
-          <h3 className="text-action-primary font-semibold mb-2">Bill To</h3>
-          <div className="mb-2">
-            <CustomerAutocomplete
-              value={selectedOrder.customer_id || ""}
-              onChange={(newValue) =>
-                setSelectedOrder((prev) => ({ ...prev, customer_id: newValue }))
-              }
-              onSelectCustomer={(customer) => {
-                setSelectedOrder((prev) => ({
-                  ...prev,
-                  customer_id: customer.customer_id,
-                  contact_email: customer.contact_email || prev.contact_email || "",
-                  contact_phone: customer.contact_phone || prev.contact_phone || "",
-                }));
-                toast.success("Customer details loaded");
-              }}
-              customers={customersList}
-              placeholder="Enter customer ID"
-            />
+    <div className="flex flex-col h-full bg-bg-primary">
+      
+      {/* Header with Order Info */}
+      <div className="bg-action-primary px-4 py-3 shadow-lg flex-shrink-0">
+        <div className="flex justify-between items-center">
+          <div className="flex items-center gap-3">
+            <div className="w-10 h-10 bg-white/20 backdrop-blur-md rounded-xl flex items-center justify-center text-text-white font-bold text-lg shadow-md border border-white/30">
+              {clientId.charAt(0).toUpperCase()}
+            </div>
+            <div>
+              <h1 className="text-xl font-bold text-text-white">{clientId.toUpperCase()}</h1>
+              <p className="text-text-white/80 text-xs">Invoice #{documentNumber || "Draft"}</p>
+            </div>
           </div>
-          <input
-            type="email"
-            value={selectedOrder.contact_email || ""}
-            onChange={(e) =>
-              setSelectedOrder((prev) => ({ ...prev, contact_email: e.target.value }))
-            }
-            placeholder="Email"
-            className="w-full border border-gray-300 rounded px-2 py-1 mb-2"
-          />
-          <input
-            type="text"
-            value={selectedOrder.contact_phone || ""}
-            onChange={(e) =>
-              setSelectedOrder((prev) => ({ ...prev, contact_phone: e.target.value }))
-            }
-            placeholder="Phone"
-            className="w-full border border-gray-300 rounded px-2 py-1"
-          />
-        </div>
-
-        <div className="flex-1">
-          <h3 className="text-action-primary font-semibold mb-2">Order Info</h3>
-          <p><span className="font-semibold">Table:</span> {tablesMap[selectedOrder.table_id]?.name || "N/A"}</p>
-          <p><span className="font-semibold">Type:</span> {selectedOrder.mode || "Dine-In"}</p>
-          <p><span className="font-semibold">Order ID:</span> #{selectedOrder.id}</p>
-        </div>
-      </div>
-
-      {/* Items Table */}
-      <div className="overflow-x-auto bg-bg-primary p-4 border-b border-gray-200">
-        <table className="w-full text-sm">
-          <thead className="bg-orange-100 text-action-primary font-semibold">
-            <tr>
-              <th className="p-2 text-left">Item</th>
-              <th className="p-2 text-right">Qty</th>
-              <th className="p-2 text-right">Price</th>
-              <th className="p-2 text-right">Amount</th>
-            </tr>
-          </thead>
-          <tbody>
-            {selectedOrder.items.map((item, idx) => (
-              <tr key={idx} className="border-b hover:bg-orange-50">
-                <td className="p-2">{item.name}</td>
-                <td className="p-2 text-right">{item.quantity ?? 0}</td>
-                <td className="p-2 text-right">₹{(item.unit_price ?? 0).toFixed(2)}</td>
-                <td className="p-2 text-right">₹{((item.unit_price ?? 0) * (item.quantity ?? 0)).toFixed(2)}</td>
-              </tr>
-            ))}
-            <tr className="font-semibold">
-              <td colSpan={3} className="text-right p-2">Subtotal</td>
-              <td className="text-right p-2">₹{orderSubtotal.toFixed(2)}
-              </td>
-            </tr>
-            <tr className="font-semibold">
-              <td colSpan={3} className="text-right p-2">Discount</td>
-              <td className="text-right p-2">-₹{calculatedDiscount.toFixed(2)}
-              </td>
-            </tr>
-            <tr className="font-semibold">
-              <td colSpan={3} className="text-right p-2">GST ({taxPercent}%)</td>
-              <td className="text-right p-2">₹{calculatedGST.toFixed(2)}
-              </td>
-            </tr>
-            <tr className="font-bold text-lg bg-orange-50">
-              <td colSpan={3} className="text-right p-2">TOTAL</td>
-              <td className="text-right p-2">₹{calculatedTotal.toFixed(2)}
-              </td>
-            </tr>
-          </tbody>
-        </table>
-      </div>
-
-      {/* Controls */}
-      <div className="bg-bg-primary p-4 flex flex-col md:flex-row gap-4 border-b border-gray-200">
-        <div className="flex-1 grid grid-cols-3 gap-2">
-          <div>
-            <label className="text-action-primary font-semibold">GST (%)</label>
-            <input
-              type="number"
-              value={taxPercent}
-              min="0"
-              className="w-full border border-gray-300 rounded px-2 py-1"
-              onChange={(e) => {
-                setTaxPercent(Number(e.target.value));
-                setGstManuallyEdited(true);
-              }}
-            />
-          </div>
-          <div>
-            <label className="text-action-primary font-semibold">Discount</label>
-            <input
-              type="number"
-              value={discount}
-              min="0"
-              className="w-full border border-gray-300 rounded px-2 py-1"
-              onChange={(e) => setDiscount(Number(e.target.value))}
-            />
-          </div>
-          <div>
-            <label className="text-action-primary font-semibold">Type</label>
-            <select
-              value={discountIsPercent ? "percent" : "fixed"}
-              onChange={(e) => setDiscountIsPercent(e.target.value === "percent")}
-              className="w-full border border-gray-300 rounded px-2 py-1"
-            >
-              <option value="percent">Percentage (%)</option>
-              <option value="fixed">Fixed Amount</option>
-            </select>
-          </div>
-        </div>
-
-        {/* Payment Status */}
-        <div className="flex-1">
-          <span className="text-action-primary font-semibold mb-1 block">Payment Status</span>
-          <div className="flex gap-2 flex-wrap">
-            {["Pending", "Paid", "Partial", "Due"].map((statusOption) => (
-              <button
-                key={statusOption}
-                type="button"
-                className={`px-3 py-1 rounded-md font-semibold border ${paymentStatus === statusOption
-                  ? "bg-action-primary text-text-white border-action-primary"
-                  : "bg-bg-primary text-action-primary border-action-primary hover:bg-orange-100"
-                  }`}
-                onClick={() => setPaymentStatus(statusOption)}
-              >
-                {statusOption}
-              </button>
-            ))}
+          
+          <div className="flex items-center gap-6">
+            <div className="text-right">
+              <div className="text-xs text-text-white/80">Table: {tablesMap[selectedOrder.table_id]?.name}</div>
+              <div className="text-xs text-text-white/80">Order #{selectedOrder.id} • {selectedOrder.mode}</div>
+            </div>
+            <div className="text-right text-text-white">
+              <div className="text-xs font-medium">{new Date().toLocaleDateString()}</div>
+              <div className="text-xs text-text-white/80">{new Date().toLocaleTimeString([], { hour: "2-digit", minute: "2-digit" })}</div>
+            </div>
           </div>
         </div>
       </div>
 
-      {/* Payment Methods */}
-      <div className="bg-bg-primary p-4 flex flex-col gap-4">
-        <div className="flex items-center gap-2">
-          <input
-            type="checkbox"
-            id="split-payment-toggle"
-            className="accent-orange-500"
-            checked={splitPaymentEnabled}
-            onChange={() => {
-              const newSplitEnabled = !splitPaymentEnabled;
-              setSplitPaymentEnabled(newSplitEnabled);
-              if (newSplitEnabled) setPaymentSplits([{ method: "Cash", amount: total }]);
-              else setPaymentSplits([{ method, amount: total }]);
-            }}
-          />
-          <label htmlFor="split-payment-toggle" className="font-semibold text-action-primary">
-            Enable Split Payment
-          </label>
-        </div>
+      {/* Scrollable Content */}
+      <div className="flex-1 overflow-y-auto p-4">
+        <div className="grid grid-cols-1 lg:grid-cols-12 gap-4">
 
-        {splitPaymentEnabled ? (
-          <div className="space-y-2">
-            {paymentSplits.map((split, idx) => (
-              <div key={idx} className="flex gap-2 items-center">
-                <select
-                  value={split.method}
-                  onChange={(e) => {
-                    const newSplits = [...paymentSplits];
-                    newSplits[idx].method = e.target.value;
-                    setPaymentSplits(newSplits);
-                  }}
-                  className="border border-gray-300 rounded px-2 py-1"
-                >
-                  <option>Cash</option>
-                  <option>UPI</option>
-                  <option>Card</option>
-                  <option>Due</option>
-                </select>
-                <input
-                  type="number"
-                  step="0.01"
-                  min="0"
-                  value={split.amount}
-                  onChange={(e) => updateSplitAmount(idx, e.target.value)}
-                  onBlur={() => onSplitAmountBlur()}
-                  className="border border-gray-300 rounded px-2 py-1 w-24"
-                  placeholder="Amount"
-                />
-                <button
-                  type="button"
-                  onClick={() => removeSplitRow(idx)}
-                  className="text-action-primary font-bold px-2 py-1 rounded hover:bg-red-50"
-                  disabled={paymentSplits.length === 1}
-                >
-                  ×
-                </button>
+          {/* LEFT - Items */}
+          <div className="lg:col-span-7">
+            <div className="bg-bg-primary rounded-xl shadow-md border border-gray-200">
+              <div className="px-4 py-2 bg-gray-50 border-b border-gray-200 rounded-t-xl">
+                <h2 className="text-sm font-bold text-text-black">Order Items</h2>
               </div>
-            ))}
-            <button
-              type="button"
-              onClick={addSplitRow}
-              className="bg-action-primary text-text-white px-3 py-1 rounded hover:bg-action-primary"
-            >
-              + Add Payment Method
-            </button>
-          </div>
-        ) : (
-          <div className="flex gap-4">
-            <select
-              value={method}
-              onChange={(e) => {
-                setMethod(e.target.value);
-                setPaymentSplits([{ method: e.target.value, amount: total }]);
-              }}
-              className="border border-gray-300 rounded px-2 py-1"
-            >
-              <option>Cash</option>
-              <option>UPI</option>
-              <option>Card</option>
-              <option>Due</option>
-            </select>
-            <input
-              type="number"
-              value={total}
-              readOnly
-              className="border border-gray-300 rounded px-2 py-1 bg-gray-50 w-32 cursor-not-allowed"
-            />
-          </div>
-        )}
-      </div>
 
-      {/* Action Buttons */}
-      <div className="bg-bg-primary p-4 flex gap-4 justify-end border-t border-gray-200">
-        <button
-          onClick={saveInvoiceDraft}
-          disabled={saving}
-          className="bg-action-primary text-text-white px-4 py-2 rounded hover:bg-action-primary"
-        >
-          {saving ? "Saving..." : "💾 Save Bill"}
-        </button>
-        <button
-          onClick={printInvoice}
-          disabled={!selectedOrder || !selectedOrder.items?.length}
-          className="bg-bg-primary text-action-primary border border-action-primary px-4 py-2 rounded hover:bg-orange-50"
-        >
-          📄 Download PDF
-        </button>
+              <div className="p-3 space-y-2 max-h-80 overflow-y-auto">
+                {selectedOrder.items.map((item, idx) => (
+                  <div key={idx} className="flex justify-between items-start py-2 px-3 rounded-lg border border-gray-100 hover:border-action-primary hover:bg-indigo-50/50 transition-all">
+                    <div className="flex-1">
+                      <div className="font-semibold text-text-black text-sm">{item.name}</div>
+                      <div className="text-xs text-gray-500 mt-1 flex items-center gap-2">
+                        <span className="inline-flex items-center px-2 py-0.5 rounded-md bg-gray-100 text-gray-700 font-medium">
+                          {item.quantity}x
+                        </span>
+                        <span>@ ₹{item.unit_price?.toFixed(2)}</span>
+                      </div>
+                    </div>
+                    <div className="font-bold text-text-black">
+                      ₹{((item.unit_price || 0) * (item.quantity || 0)).toFixed(2)}
+                    </div>
+                  </div>
+                ))}
+              </div>
+
+              {/* Totals */}
+              <div className="border-t border-gray-200 bg-gray-50 px-4 py-3 rounded-b-xl">
+                <div className="space-y-2 text-sm">
+                  <div className="flex justify-between text-gray-600">
+                    <span>Subtotal</span>
+                    <span className="font-semibold">₹{orderSubtotal.toFixed(2)}</span>
+                  </div>
+                  <div className="flex justify-between text-red-600">
+                    <span>Discount</span>
+                    <span className="font-semibold">-₹{calculatedDiscount.toFixed(2)}</span>
+                  </div>
+                  <div className="flex justify-between text-gray-600">
+                    <span>GST ({taxPercent}%)</span>
+                    <span className="font-semibold">₹{calculatedGST.toFixed(2)}</span>
+                  </div>
+                  <div className="pt-2 border-t border-gray-300 flex justify-between items-center">
+                    <span className="text-base font-bold text-text-black">TOTAL</span>
+                    <span className="text-lg font-bold text-action-primary">
+                      ₹{calculatedTotal.toFixed(2)}
+                    </span>
+                  </div>
+                </div>
+              </div>
+            </div>
+          </div>
+
+          {/* RIGHT - Customer & Payment */}
+          <div className="lg:col-span-5 space-y-4">
+
+            {/* Customer Details */}
+            <div className="bg-bg-primary rounded-xl shadow-md border border-gray-200">
+              <div className="px-4 py-2 bg-gray-50 border-b border-gray-200 rounded-t-xl">
+                <h3 className="text-sm font-bold text-text-black">👤 Customer</h3>
+              </div>
+              <div className="p-3 space-y-2">
+                <CustomerAutocomplete
+                  value={selectedOrder.customer_id || ""}
+                  onChange={(val) => setSelectedOrder((p) => ({ ...p, customer_id: val }))}
+                  onSelectCustomer={(c) => {
+                    setSelectedOrder((p) => ({
+                      ...p,
+                      customer_id: c.customer_id,
+                      contact_email: c.contact_email || "",
+                      contact_phone: c.contact_phone || "",
+                    }));
+                  }}
+                  customers={customersList}
+                  placeholder="Walk-in / Customer ID"
+                />
+                <input
+                  className="w-full border border-gray-300 rounded-lg px-3 py-2 text-sm focus:ring-2 focus:ring-action-primary focus:border-action-primary transition-all"
+                  placeholder="📞 Phone"
+                  value={selectedOrder.contact_phone || ""}
+                  onChange={(e) => setSelectedOrder((p) => ({ ...p, contact_phone: e.target.value }))}
+                />
+                <input
+                  className="w-full border border-gray-300 rounded-lg px-3 py-2 text-sm focus:ring-2 focus:ring-action-primary focus:border-action-primary transition-all"
+                  placeholder="📧 Email"
+                  value={selectedOrder.contact_email || ""}
+                  onChange={(e) => setSelectedOrder((p) => ({ ...p, contact_email: e.target.value }))}
+                />
+              </div>
+            </div>
+
+            {/* Tax & Discount */}
+            <div className="bg-bg-primary rounded-xl shadow-md border border-gray-200">
+              <div className="px-4 py-2 bg-gray-50 border-b border-gray-200 rounded-t-xl">
+                <h3 className="text-sm font-bold text-text-black">⚙️ Tax & Discount</h3>
+              </div>
+              <div className="p-3 space-y-3">
+                <div className="grid grid-cols-3 gap-2">
+                  <div>
+                    <label className="text-xs font-semibold text-gray-700 mb-1 block">GST (%)</label>
+                    <input
+                      type="number"
+                      value={taxPercent}
+                      min="0"
+                      className="w-full border border-gray-300 rounded-lg px-2 py-1.5 text-sm focus:ring-2 focus:ring-action-primary"
+                      onChange={(e) => {
+                        setTaxPercent(Number(e.target.value));
+                        setGstManuallyEdited(true);
+                      }}
+                    />
+                  </div>
+                  <div>
+                    <label className="text-xs font-semibold text-gray-700 mb-1 block">Discount</label>
+                    <input
+                      type="number"
+                      value={discount}
+                      min="0"
+                      className="w-full border border-gray-300 rounded-lg px-2 py-1.5 text-sm focus:ring-2 focus:ring-action-primary"
+                      onChange={(e) => setDiscount(Number(e.target.value))}
+                    />
+                  </div>
+                  <div>
+                    <label className="text-xs font-semibold text-gray-700 mb-1 block">Type</label>
+                    <select
+                      value={discountIsPercent ? "percent" : "fixed"}
+                      onChange={(e) => setDiscountIsPercent(e.target.value === "percent")}
+                      className="w-full border border-gray-300 rounded-lg px-2 py-1.5 text-sm focus:ring-2 focus:ring-action-primary bg-bg-primary"
+                    >
+                      <option value="percent">%</option>
+                      <option value="fixed">₹</option>
+                    </select>
+                  </div>
+                </div>
+
+                {/* Payment Status */}
+                <div>
+                  <label className="text-xs font-semibold text-gray-700 mb-1.5 block">Payment Status</label>
+                  <div className="flex gap-2 flex-wrap">
+                    {["Pending", "Paid", "Partial", "Due"].map((statusOption) => (
+                      <button
+                        key={statusOption}
+                        type="button"
+                        className={`px-3 py-1.5 rounded-lg text-xs font-semibold transition-all ${
+                          paymentStatus === statusOption
+                            ? "bg-action-primary text-text-white shadow-md"
+                            : "bg-gray-100 text-gray-700 hover:bg-gray-200"
+                        }`}
+                        onClick={() => setPaymentStatus(statusOption)}
+                      >
+                        {statusOption}
+                      </button>
+                    ))}
+                  </div>
+                </div>
+              </div>
+            </div>
+
+            {/* Payment Method */}
+            <div className="bg-bg-primary rounded-xl shadow-md border border-gray-200">
+              <div className="px-4 py-2 bg-gray-50 border-b border-gray-200 rounded-t-xl flex items-center justify-between">
+                <h3 className="text-sm font-bold text-text-black">💳 Payment</h3>
+                <label className="flex items-center gap-2 cursor-pointer">
+                  <input
+                    type="checkbox"
+                    className="w-4 h-4 accent-action-primary rounded"
+                    checked={splitPaymentEnabled}
+                    onChange={() => {
+                      const newSplitEnabled = !splitPaymentEnabled;
+                      setSplitPaymentEnabled(newSplitEnabled);
+                      if (newSplitEnabled) setPaymentSplits([{ method: "Cash", amount: total }]);
+                      else setPaymentSplits([{ method, amount: total }]);
+                    }}
+                  />
+                  <span className="text-xs font-medium text-gray-600">Split</span>
+                </label>
+              </div>
+
+              <div className="p-3">
+                {splitPaymentEnabled ? (
+                  <div className="space-y-2">
+                    {paymentSplits.map((split, idx) => (
+                      <div key={idx} className="flex gap-2 items-center p-2 rounded-lg bg-gray-50 border border-gray-200">
+                        <select
+                          value={split.method}
+                          onChange={(e) => {
+                            const newSplits = [...paymentSplits];
+                            newSplits[idx].method = e.target.value;
+                            setPaymentSplits(newSplits);
+                          }}
+                          className="flex-1 border border-gray-300 rounded-lg px-2 py-1.5 text-sm focus:ring-2 focus:ring-action-primary bg-bg-primary"
+                        >
+                          <option>Cash</option>
+                          <option>UPI</option>
+                          <option>Card</option>
+                          <option>Due</option>
+                        </select>
+                        <input
+                          type="number"
+                          step="0.01"
+                          min="0"
+                          value={split.amount}
+                          onChange={(e) => updateSplitAmount(idx, e.target.value)}
+                          onBlur={() => onSplitAmountBlur()}
+                          className="w-24 border border-gray-300 rounded-lg px-2 py-1.5 text-sm focus:ring-2 focus:ring-action-primary"
+                        />
+                        <button
+                          type="button"
+                          onClick={() => removeSplitRow(idx)}
+                          className="text-red-600 hover:bg-red-50 font-bold px-2 py-1 rounded-lg"
+                          disabled={paymentSplits.length === 1}
+                        >
+                          ×
+                        </button>
+                      </div>
+                    ))}
+                    <button
+                      type="button"
+                      onClick={addSplitRow}
+                      className="w-full bg-action-primary hover:bg-action-primary/90 text-text-white px-3 py-2 rounded-lg text-sm font-semibold transition-all"
+                    >
+                      + Add Payment
+                    </button>
+                  </div>
+                ) : (
+                  <div className="flex gap-2">
+                    <select
+                      value={method}
+                      onChange={(e) => {
+                        setMethod(e.target.value);
+                        setPaymentSplits([{ method: e.target.value, amount: total }]);
+                      }}
+                      className="flex-1 border border-gray-300 rounded-lg px-3 py-2 text-sm focus:ring-2 focus:ring-action-primary bg-bg-primary"
+                    >
+                      <option>Cash</option>
+                      <option>UPI</option>
+                      <option>Card</option>
+                      <option>Due</option>
+                    </select>
+                    <input
+                      type="number"
+                      value={total}
+                      readOnly
+                      className="w-28 border border-gray-300 rounded-lg px-3 py-2 bg-gray-50 text-sm font-semibold text-right"
+                    />
+                  </div>
+                )}
+              </div>
+            </div>
+
+            {/* Action Buttons */}
+            <div className="flex gap-3">
+              <button
+                onClick={saveInvoiceDraft}
+                disabled={saving}
+                className="flex-1 bg-action-primary hover:bg-action-primary/90 text-text-white px-4 py-2.5 rounded-xl font-bold shadow-lg transition-all disabled:opacity-50"
+              >
+                {saving ? "Saving..." : "💾 Save"}
+              </button>
+              <button
+                onClick={printInvoice}
+                className="flex-1 bg-bg-primary border-2 border-action-primary hover:border-action-primary hover:bg-indigo-50 text-gray-700 px-4 py-2.5 rounded-xl font-bold transition-all shadow-md"
+              >
+                📄 Print
+              </button>
+            </div>
+
+          </div>
+        </div>
       </div>
-    </>
+    </div>
   );
 
-
   return (
-    <div className="min-h-screen bg-gray-50 p-4 md:p-6">
-      <div className="max-w-7xl mx-auto bg-white shadow-lg rounded-lg overflow-hidden flex flex-col md:flex-row">
-
-        {/* Orders Sidebar */}
-        <aside className="w-full md:w-80 border-r border-gray-200">
-          <div className="bg-action-primary text-text-white p-4">
-            <h2 className="text-lg font-semibold">📋 Today's Orders</h2>
+    <div className="min-h-screen bg-gradient-to-br from-slate-100 via-gray-50 to-slate-100 p-4">
+      <div className="max-w-7xl mx-auto">
+        
+        {/* Header */}
+        <div className="bg-action-primary rounded-2xl shadow-xl px-6 py-4 mb-4">
+          <div className="flex items-center justify-between">
+            <div className="flex items-center gap-3">
+              <div className="w-12 h-12 bg-white/20 backdrop-blur-md rounded-xl flex items-center justify-center text-text-white font-bold text-xl shadow-md border border-white/30">
+                {clientId.charAt(0).toUpperCase()}
+              </div>
+              <div>
+                <h1 className="text-2xl font-bold text-text-white">{clientId.toUpperCase()}</h1>
+                <p className="text-text-white/80 text-sm">Today's Orders</p>
+              </div>
+            </div>
+            <div className="text-text-white text-right">
+              <div className="text-sm font-medium">{new Date().toLocaleDateString()}</div>
+              <div className="text-xs text-text-white/80">{orders.length} served orders</div>
+            </div>
           </div>
+        </div>
 
-          <div className="overflow-y-auto h-[calc(100vh-6rem)] p-2 space-y-2 bg-bg-primary">
-            {loading && (
-              <p className="text-gray-500 text-sm text-center mt-4">Loading orders...</p>
-            )}
-            {!loading && orders.length === 0 && (
-              <p className="text-gray-400 text-sm text-center mt-4">No served orders today</p>
-            )}
-
+        {/* Orders Grid */}
+        {loading ? (
+          <div className="flex flex-col items-center justify-center py-20">
+            <div className="w-16 h-16 border-4 border-indigo-200 border-t-indigo-600 rounded-full animate-spin"></div>
+            <p className="text-gray-500 text-sm mt-4">Loading orders...</p>
+          </div>
+        ) : orders.length === 0 ? (
+          <div className="flex flex-col items-center justify-center py-20 text-center bg-bg-primary rounded-2xl shadow-lg">
+            <div className="text-7xl mb-4">📭</div>
+            <p className="text-xl font-bold text-text-black mb-2">No Orders Yet</p>
+            <p className="text-gray-500">No served orders for today</p>
+          </div>
+        ) : (
+          <div className="grid grid-cols-1 sm:grid-cols-2 lg:grid-cols-3 xl:grid-cols-4 gap-4">
             {orders.map((order) => {
               const tableName = tablesMap[order.table_id]?.name || `Table ${order.table_id}`;
-              const itemsWithPrice = (order.items || []).map((item) => ({
-                ...item,
-                unit_price: item.unit_price ?? item.price ?? inventoryMap[item.item_id]?.unit_price ?? 0,
-              }));
               const orderTotal = Number(order.total_price ?? 0);
-
-              const isSelected = selectedOrder?.id === order.id;
 
               return (
                 <div
                   key={order.id}
-                  tabIndex={0}
-                  role="button"
-                  className={`p-3 rounded-lg cursor-pointer border transition-all ${isSelected
-                    ? "bg-orange-100 border-orange-400"
-                    : "bg-bg-primary border-gray-200 hover:bg-orange-50"
-                    }`}
                   onClick={() => handleSelectOrder(order)}
-                  onKeyDown={(e) => {
-                    if (e.key === "Enter" || e.key === " ") {
-                      e.preventDefault();
-                      handleSelectOrder(order);
-                    }
-                  }}
-                  aria-pressed={isSelected}
+                  className="bg-bg-primary rounded-xl shadow-md hover:shadow-xl border-2 border-gray-200 hover:border-action-primary p-4 cursor-pointer transition-all duration-200 hover:scale-105"
                 >
-                  <div className="flex justify-between items-center mb-1">
-                    <h4 className="font-semibold text-action-primary">{tableName}</h4>
-                    <div className="font-semibold text-gray-700">₹{orderTotal.toFixed(2)}</div>
+                  <div className="flex justify-between items-start mb-3">
+                    <div>
+                      <h3 className="text-lg font-bold text-text-black">{tableName}</h3>
+                      <p className="text-xs text-gray-500">Order #{order.id}</p>
+                    </div>
+                    <div className="text-right">
+                      <div className="text-lg font-bold text-action-primary">₹{orderTotal.toFixed(2)}</div>
+                      <div className="text-xs text-gray-500">
+                        {new Date(order.created_at).toLocaleTimeString([], { hour: "2-digit", minute: "2-digit" })}
+                      </div>
+                    </div>
                   </div>
-                  <div className="flex justify-between items-center text-sm text-gray-500">
-                    <span>Order #{order.id}</span>
-                    <time dateTime={order.created_at}>
-                      {new Date(order.created_at).toLocaleTimeString([], { hour: "2-digit", minute: "2-digit" })}
-                    </time>
+                  <div className="flex items-center justify-between pt-3 border-t border-gray-100">
+                    <span className="inline-flex items-center px-3 py-1 rounded-full text-xs font-medium bg-purple-100 text-purple-700">
+                      {order.mode || "Dine-In"}
+                    </span>
+                    <span className="text-gray-400 text-xs">{order.items?.length || 0} items</span>
                   </div>
                 </div>
               );
             })}
           </div>
-        </aside>
+        )}
 
-        {/* Invoice Section */}
-        <main className="flex-1 overflow-y-auto">
-          {isMobile ? (
-            <>
-              {invoiceModalOpen && selectedOrder && (
-                <div className="fixed inset-0 bg-black bg-opacity-30 flex justify-center items-start pt-20 z-50">
-                  <div className="bg-bg-primary rounded-lg shadow-lg w-full max-w-3xl p-6 relative">
-                    <button
-                      className="absolute top-3 right-3 text-gray-500 hover:text-gray-700 text-2xl font-bold"
-                      type="button"
-                      onClick={() => setInvoiceModalOpen(false)}
-                    >
-                      ×
-                    </button>
-                    {renderInvoiceContent()}
-                  </div>
-                </div>
-              )}
-            </>
-          ) : selectedOrder ? (
-            <section className="bg-white p-6 rounded-lg shadow">{renderInvoiceContent()}</section>
-          ) : (
-            <section className="flex justify-center items-center h-full text-gray-400 text-center">
-              <p className="text-lg">📋 Select an order to view invoice details</p>
-            </section>
-          )}
-        </main>
+        {/* Invoice Modal */}
+        {invoiceModalOpen && selectedOrder && (
+          <div className="fixed inset-0 bg-black/60 backdrop-blur-sm flex items-center justify-center z-50 p-4">
+            <div className="bg-bg-primary rounded-2xl shadow-2xl w-full max-w-7xl h-[90vh] flex flex-col relative">
+              <button
+                className="absolute top-4 right-4 z-10 text-gray-500 hover:text-gray-700 hover:bg-gray-100 text-2xl font-bold w-10 h-10 rounded-full flex items-center justify-center transition-all shadow-md bg-bg-primary"
+                onClick={() => setInvoiceModalOpen(false)}
+              >
+                ×
+              </button>
+              {renderInvoiceContent()}
+            </div>
+          </div>
+        )}
       </div>
     </div>
   );
-
 }
-

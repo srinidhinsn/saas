@@ -533,7 +533,7 @@ const KitchenDisplay = () => {
             return "ready";
         }
 
-        return "new";
+        return "pending";
     };
 
 

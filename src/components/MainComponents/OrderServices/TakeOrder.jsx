@@ -867,7 +867,7 @@ const TakeOrder = ({ clientId, token, onOrderUpdate, realm }) => {
             gst,
             cst,
             total_price: total,
-            status: "new",
+            status: "pending",
             items: cart.map(i => ({
               item_id: i.id,
               item_name: i.name,
