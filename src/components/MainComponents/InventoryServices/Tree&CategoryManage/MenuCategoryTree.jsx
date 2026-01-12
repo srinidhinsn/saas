@@ -364,34 +364,65 @@ const MenuCategoryTree = ({
     setShowDeleteModal(true);
   };
 
-  const renderTree = (items, level = 0) => {
-    return items.map((category) => {
-      const isExpanded = expandedCategories.includes(category.name);
-      const isSelected = selectedCategory === category.name;
-      const hasChildren = category.children && category.children.length > 0;
-
+  const renderTree = (items, level = 0) =>
+    items.map((category, index) => {
+      const hasChildren = category.children?.length > 0;
+  
       return (
-        <div key={category.id || category.name} className="px-1">
+        <div key={category.id}>
           <MenuTreeNode
             category={category}
-            isExpanded={isExpanded}
-            onToggle={() => toggleCategory(category.name)}
-            isSelected={isSelected}
-            onSelect={() => onSelectCategory(category.name)}
-            hasChildren={hasChildren}
             level={level}
+            hasChildren={hasChildren}
+            isExpanded={expandedCategories.includes(category.name)}
+            isLast={index === items.length - 1}
+            isSelected={selectedCategory === category.name}
+            onSelect={() => onSelectCategory(category.name)}
+            onToggle={() => toggleCategory(category.name)}
             onEdit={handleEdit}
             onDelete={handleDelete}
           />
-          {hasChildren && isExpanded && (
-            <div className="mt-1 ml-3">
+  
+          {hasChildren && expandedCategories.includes(category.name) && (
+            <div>
               {renderTree(category.children, level + 1)}
             </div>
           )}
         </div>
       );
     });
-  };
+  
+  
+
+  // const renderTree = (items, level = 0) => {
+  //   return items.map((category) => {
+  //     const isExpanded = expandedCategories.includes(category.name);
+  //     const isSelected = selectedCategory === category.name;
+  //     const hasChildren = category.children && category.children.length > 0;
+
+  //     return (
+  //       <div key={category.id || category.name} className="px-1">
+  //         <MenuTreeNode
+  //           category={category}
+  //           isExpanded={isExpanded}
+  //           onToggle={() => toggleCategory(category.name)}
+  //           isSelected={isSelected}
+  //           onSelect={() => onSelectCategory(category.name)}
+  //           hasChildren={hasChildren}
+  //           level={level}
+  //           onEdit={handleEdit}
+  //           onDelete={handleDelete}
+  //         />
+  //         {hasChildren && isExpanded && (
+  //          <div className="mt-1 ml-4 space-y-1">
+
+  //             {renderTree(category.children, level + 1)}
+  //           </div>
+  //         )}
+  //       </div>
+  //     );
+  //   });
+  // };
 // Flatten all categories recursively for mobile view
 const flattenAllCategories = (cats) => {
   let flat = [];
@@ -427,7 +458,7 @@ const renderMobileCategories = (items) => {
           className={`flex items-center gap-2 px-4 py-2 rounded-full whitespace-nowrap font-semibold text-sm transition-all shadow-sm ${
             isSelected 
               ? 'bg-action-primary text-white shadow-md' 
-              : 'bg-bg-primary text-text-primary border-2 border-border-default hover:border-action-primary hover:bg-bg-tertiary'
+              : 'bg-bg-primary text-text-primary border-2 border-border-default hover:border-action-primary '
           }`}
         >
           <span>{category.name}</span>
@@ -474,7 +505,8 @@ const renderMobileCategories = (items) => {
   return (
     <>
       {/* Desktop: Tree View */}
-      <div className="hidden lg:block rounded-lg p-4 bg-bg-primary shadow-md border border-border-default">
+      <div className="hidden lg:block rounded-xl p-3 bg-bg-primary border border-white/5">
+
         <div className="flex items-center justify-between mb-3 px-3">
           <h3 className="text-lg font-semibold text-text-primary">
             Categories
