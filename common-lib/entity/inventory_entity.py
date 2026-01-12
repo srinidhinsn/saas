@@ -21,7 +21,6 @@ class InventoryEntity(Base):
     availability = Column(Numeric(18,6), default=0)
     unit = Column(Text, nullable=True)
     code = Column(Text, nullable=True, index=True)
-    dietary_type = Column(Text, nullable=True)
     image_id = Column(Text, nullable=True)
     unit_price = Column(Float, nullable=True)
     unit_cst = Column(Float, nullable=True)
