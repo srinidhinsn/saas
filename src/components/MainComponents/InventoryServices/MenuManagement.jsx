@@ -7,6 +7,7 @@ import MenuImagePreview from './Tree&CategoryManage/MenuImagePreview';
 import UniversalAddModal from '../../utils/Modals/UniversalAddModal';
 import UniversalEditModal from '../../utils/Modals/UniversalEditModal';
 import UniversalBulkUpdateModal from '../../utils/Modals/UniversalBulkUpdateModal';
+import { jwtDecode } from "jwt-decode";
 
 
 // Main Menu Management Component
@@ -14,11 +15,12 @@ const MenuManagement = ({ clientId, token, realm }) => {
   const [searchOpen, setSearchOpen] = useState(false);
   const [searchQuery, setSearchQuery] = useState('');
   const searchInputRef = useRef(null);
-  const [screenId, setScreenId]= useState();
+  const [screenId, setScreenId] = useState();
   const [selectedCategory, setSelectedCategory] = useState('All Categories');
   const [categories, setCategories] = useState([]);
   const [menuItems, setMenuItems] = useState([]);
   const [loading, setLoading] = useState(true);
+  const [dietaryFilter, setDietaryFilter] = useState("All");
 
   // Modal states
   const [showAddModal, setShowAddModal] = useState(false);
@@ -43,6 +45,8 @@ const MenuManagement = ({ clientId, token, realm }) => {
     discount: '',
     availability: '',
     unit: '',
+    code: ' ',
+    dietary_type: '',
     serving_quantity: "",
     serving_unit: "",
     line_item_id: []
@@ -75,6 +79,19 @@ const MenuManagement = ({ clientId, token, realm }) => {
     };
     recurse(tree);
     return flat;
+  };
+  const getDietaryDotColor = (type) => {
+    switch ((type || "").toLowerCase()) {
+      case "veg":
+        return "bg-green-700";
+      case "non-veg":
+      case "non veg":
+        return "bg-action-primary";
+      case "egg":
+        return "bg-yellow-600";
+      default:
+        return "bg-gray-300";
+    }
   };
 
   // returns array of category names from root -> the given categoryId (works with UUID or cat_... ids)
@@ -150,27 +167,17 @@ const MenuManagement = ({ clientId, token, realm }) => {
 
   // Helper function to get category ID from name
   const getCategoryIdByName = (categoryName) => {
-    if (!categoryName || categoryName === 'All Categories' || categoryName === 'All') return '';
-    // search tree style first
-    const findInTree = (nodes) => {
-      for (const n of nodes || []) {
-        if (!n) continue;
-        if ((n.name || '').toLowerCase() === (categoryName || '').toLowerCase()) return n.id;
-        const children = n.subCategories || n.children;
-        if (children && children.length) {
-          const found = findInTree(children);
-          if (found) return found;
-        }
-      }
-      return null;
-    };
-    const byTree = findInTree(categories);
-    if (byTree) return byTree;
-    // fallback: search flattened list (if you've stored flattened categories elsewhere)
-    const flat = Array.isArray(categories) ? categories : [];
-    const matched = flat.find(c => c && (c.name || '').toLowerCase() === (categoryName || '').toLowerCase());
-    return matched ? matched.id : null;
+    if (!categoryName || categoryName === 'All Categories' || categoryName === 'All') return null;
+
+    const name = categoryName.trim().toLowerCase();
+
+    const match = categoriesFlat.find(
+      c => c.name.toLowerCase() === name
+    );
+
+    return match ? match.id : null;
   };
+
 
 
   // Updated handleAddItem function
@@ -218,9 +225,9 @@ const MenuManagement = ({ clientId, token, realm }) => {
         availability: parseInt(newItem.availability) || 0,
         created_by,
         updated_by: created_by,
-        inventory_id:1
+        inventory_id: 1
       };
-console.log("Payload",payload)
+      console.log("Payload", payload)
       await axios.post(
         `${import.meta.env.VITE_API_INVENTORY_SERVICE_URL}/${clientId}/menu/create`,
         payload,
@@ -255,25 +262,33 @@ console.log("Payload",payload)
       if (editItemImage) {
         imageId = await uploadImageToDocumentService(editItemImage);
       }
-      const categoryId = editingItem.category_id || (typeof selectedCategory === 'object' ? selectedCategory.id : getCategoryIdByName(selectedCategory));
-      const finalCategoryId = categoryId || (editingItem.parent_id ? editingItem.parent_id : null); // fallback if you want
 
-      // Build readable slug from names (not raw id)
+      const categoryId =
+        editingItem.category_id ||
+        (typeof selectedCategory === 'object'
+          ? selectedCategory.id
+          : getCategoryIdByName(selectedCategory));
+
+      const finalCategoryId = categoryId || null;
       const slug = generateSlug(finalCategoryId, editingItem.name);
 
-
-      const updated_by = currentUserId || localStorage.getItem('user_id') || 'system';
+      const updated_by =
+        currentUserId || localStorage.getItem('user_id') || 'system';
 
       const payload = {
         ...editingItem,
+        dietary_type: normalizeDietary(editingItem.dietary_type),
+        code: editingItem.code ? String(editingItem.code).trim() : null,
         client_id: clientId,
-        category_id: finalCategoryId, // unchanged (UUID)
+        category_id: finalCategoryId,
         image_id: imageId,
         realm: editingItem.realm || realm || '',
         slug,
+
         unit_price: parseFloat(editingItem.unit_price) || 0,
         discount: parseFloat(editingItem.discount) || 0,
         availability: parseInt(editingItem.availability) || 0,
+
         updated_by
       };
 
@@ -285,7 +300,6 @@ console.log("Payload",payload)
 
       await fetchData({ silent: true });
 
-
       setShowEditModal(false);
       setEditingItem(null);
       setEditItemImage(null);
@@ -295,6 +309,18 @@ console.log("Payload",payload)
       alert('Failed to update item');
     }
   };
+  const normalizeDietary = (value) => {
+    if (!value) return "";
+
+    const v = value.toString().toLowerCase().replace(/[-_\s]/g, "");
+
+    if (v === "veg") return "Veg";
+    if (v === "nonveg") return "Non-Veg";
+    if (v === "egg") return "Egg";
+
+    return "";
+  };
+
 
   const fetchData = useCallback(async (options = { silent: false }) => {
     const { silent = false } = options;
@@ -405,17 +431,35 @@ console.log("Payload",payload)
     const q = (searchQuery || '').trim().toLowerCase();
 
     let items = menuItems;
+
+    // 🔍 Search
+    if (q.length > 0) {
+      items = items.filter(item => {
+        const name = (item.name || '').toLowerCase();
+        const category = (item.category || '').toLowerCase();
+        const code = String(item.code || '').toLowerCase();
+        return name.includes(q) || category.includes(q) || code.includes(q);
+      });
+    }
+
+    // 📂 Category
     if (selectedCategory && selectedCategory !== 'All Categories') {
       items = items.filter(item => item.category === selectedCategory);
     }
 
-    if (q.length === 0) return items;
+    // 🟢🔴🟡 Dietary Filter
+    if (dietaryFilter !== "All") {
+      items = items.filter(
+        item =>
+          normalizeDietary(item.dietary_type) === dietaryFilter
 
-    return items.filter(item =>
-      (item.name || '').toLowerCase().includes(q) ||
-      (item.category || '').toLowerCase().includes(q)
-    );
+      );
+    }
+
+    return items;
   };
+
+
   // Add these functions after your existing handleDrag, handleDrop, etc.
   const handleEditDrag = (e) => {
     e.preventDefault();
@@ -587,16 +631,21 @@ console.log("Payload",payload)
           const payload = {
             ...originalItem,
             ...editedData,
+            dietary_type:
+              editedData.dietary_type !== undefined
+                ? normalizeDietary(editedData.dietary_type)
+                : normalizeDietary(originalItem.dietary_type),
             client_id: clientId
           };
+
 
           return axios.post(
             `${import.meta.env.VITE_API_INVENTORY_SERVICE_URL}/${clientId}/menu/update`,
             payload,
             { headers: { Authorization: `Bearer ${token}` } }
-            
+
           );
-          
+
         })
       );
 
@@ -653,6 +702,8 @@ console.log("Payload",payload)
           Description: item.description ?? "",
           Category: catNameById(item.category_id) || item.category || "Unknown",
           Image: item.image_id,
+          Code: item.code ?? "",
+          Dietary_type: item.dietary_type ?? "",
           Unit: item.unit ?? "",
           Unit_Price: typeof item.unit_price === "number" ? item.unit_price : (item.unit_price ? parseFloat(item.unit_price) : 0),
           Unit_CST: typeof item.unit_cst === "number" ? item.unit_cst : (item.unit_cst ? parseFloat(item.unit_cst) : 0),
@@ -675,8 +726,8 @@ console.log("Payload",payload)
       // Create worksheet and workbook
       const worksheet = XLSX.utils.json_to_sheet(exportData, {
         header: [
-          "ID","Inventory_Id", "Name", "Description", "Category","Image", "Unit", "Unit_Price", "Unit_CST", "Unit_GST", "Total_Unit_Price", "Total_Price",
-          "CST", "GST", "Discount", "Availability","Serving_Quantity","Serving_Unit", "Realm", "Dietary", "Slug", "Line_Item_IDs"
+          "ID", "Inventory_Id", "Name", "Description", "Category", "Image", "Unit", "Unit_Price", "Unit_CST", "Unit_GST", "Total_Unit_Price", "Total_Price",
+          "CST", "GST", "Discount", "Availability", "Serving_Quantity", "Serving_Unit", "Realm", "Dietary", "Slug", "Line_Item_IDs"
         ]
       });
 
@@ -693,139 +744,169 @@ console.log("Payload",payload)
   };
 
   const handleImportFromExcel = (e) => {
+    if (!categoriesFlat.length) {
+      alert("Categories not loaded yet. Please wait 2 seconds and try again.");
+      e.target.value = "";
+      return;
+    }
+
     const file = e.target.files[0];
     if (!file) return;
 
-    let created_by = "unknown", updated_by = "unknown";
+    let created_by = "system";
+    let updated_by = "system";
+
     try {
-        const decoded = jwtDecode(token);
-        created_by = decoded.user_id || "unknown";
-        updated_by = decoded.user_id || "unknown";
-    } catch { }
+      const decoded = jwtDecode(token);
+      created_by = decoded?.user_id || created_by;
+      updated_by = decoded?.user_id || updated_by;
+    } catch {
+      console.warn("JWT decode failed, using system user");
+    }
 
     const reader = new FileReader();
+
     reader.onload = async (evt) => {
       try {
-        const data = evt.target.result;
-        const workbook = XLSX.read(data, { type: "binary" });
+        const workbook = XLSX.read(evt.target.result, { type: "binary" });
         const sheetName = workbook.SheetNames[0];
         const worksheet = workbook.Sheets[sheetName];
-        const parsedData = XLSX.utils.sheet_to_json(worksheet);
+        const parsedData = XLSX.utils.sheet_to_json(worksheet, { defval: "" });
 
-        // Ask user if they want to replace all existing items
+        if (!parsedData.length) {
+          alert("Excel file is empty");
+          return;
+        }
+
+        // 🔍 VALIDATE BEFORE DELETE
+        const validationErrors = [];
+        parsedData.forEach((row, index) => {
+          if (!row.Name) {
+            validationErrors.push(`Row ${index + 2}: Name missing`);
+          }
+          if (!getCategoryIdByName(row.Category)) {
+            validationErrors.push(`Row ${index + 2}: Invalid category "${row.Category}"`);
+          }
+        });
+
+        if (validationErrors.length) {
+          alert(
+            `❌ Import blocked due to errors:\n\n${validationErrors
+              .slice(0, 5)
+              .join("\n")}${validationErrors.length > 5 ? "\n..." : ""}`
+          );
+          return;
+        }
+
         const confirmReplace = window.confirm(
-          `This will DELETE all ${menuItems.length} existing menu items and import ${parsedData.length} new items from the Excel file.\n\nDo you want to continue?`
+          `This will DELETE all ${menuItems.length} existing menu items and import ${parsedData.length} new items.\n\nContinue?`
         );
 
         if (!confirmReplace) {
-          e.target.value = ''; // Reset file input
+          e.target.value = "";
           return;
         }
+
+        // 🧹 DELETE OLD ITEMS
+        await Promise.all(
+          menuItems.map(item =>
+            axios.post(
+              `${import.meta.env.VITE_API_INVENTORY_SERVICE_URL}/${clientId}/menu/delete`,
+              { id: item.id },
+              { headers: { Authorization: `Bearer ${token}` } }
+            )
+          )
+        );
 
         let successCount = 0;
         let failCount = 0;
         const errors = [];
 
-
-
-        // Step 1: Delete all existing items
-        try {
-          await Promise.all(
-            menuItems.map(item =>
-              axios.post(
-                `${import.meta.env.VITE_API_INVENTORY_SERVICE_URL}/${clientId}/menu/delete`,
-                { id: item.id },
-                { headers: { Authorization: `Bearer ${token}` } }
-              )
-            )
-          );
-          console.log(`Deleted ${menuItems.length} existing items`);
-        } catch (deleteErr) {
-          console.error('Error deleting existing items:', deleteErr);
-          alert('Failed to delete existing items. Import cancelled.');
-          e.target.value = '';
-          return;
-        }
-
-        // Step 2: Import new items from Excel
-        for (const row of parsedData) {
-
-          // Try converting "Recipe" column into JSON
-          let recipeData = null;
-          if (row.Recipe) {
-            try {
-              recipeData = JSON.parse(row.Recipe);
-            } catch (err) {
-              console.warn("⚠ Invalid Recipe JSON format in Excel, storing as null:", row.Recipe);
-              recipeData = null;
+        // 📥 IMPORT NEW ITEMS
+        for (const [index, row] of parsedData.entries()) {
+          try {
+            let recipe = null;
+            if (row.Recipe) {
+              try {
+                recipe = JSON.parse(row.Recipe);
+              } catch {
+                recipe = null;
+              }
             }
+
+            const categoryId = getCategoryIdByName(row.Category);
+            if (!categoryId) throw new Error("Invalid category");
+
+            const payload = {
+              client_id: clientId,
+              inventory_id: row.Inventory_Id || null,
+              name: row.Name,
+              description: row.Description || "",
+              category_id: categoryId,
+              realm: row.Realm || realm || "",
+              code: row.Code || "",
+              dietary_type: normalizeDietary(row.Dietary || row.dietary_type || ""),
+              availability: Number(row.Availability || 0),
+              serving_quantity: row.Serving_Quantity || null,
+              serving_unit: row.Serving_Unit || null,
+              unit: row.Unit || "",
+              image_id: row.Image || null,
+              unit_price: Number(row.Unit_Price || 0),
+              unit_cst: Number(row.Unit_CST || 0),
+              unit_gst: Number(row.Unit_GST || 0),
+              unit_total_price: Number(row.Total_Unit_Price || 0),
+              cst: Number(row.CST || 0),
+              gst: Number(row.GST || 0),
+              discount: Number(row.Discount || 0),
+              total_price: Number(row.Total_Price || 0),
+              slug: row.Slug || "",
+              line_item_id: row.Line_Item_IDs
+                ? row.Line_Item_IDs.split(",").map(v => Number(v.trim())).filter(Boolean)
+                : [],
+              recipe,
+              created_by,
+              updated_by
+            };
+
+            await axios.post(
+              `${import.meta.env.VITE_API_INVENTORY_SERVICE_URL}/${clientId}/menu/create`,
+              payload,
+              { headers: { Authorization: `Bearer ${token}` } }
+            );
+
+            successCount++;
+          } catch (err) {
+            failCount++;
+            errors.push(`Row ${index + 2}: ${err.message}`);
           }
-
-          const newItem = {
-            client_id: clientId,
-            inventory_id: row.Inventory_Id,
-            name: row.Name || "",
-            description: row.Description || "",
-            category_id: getCategoryIdByName(row.Category),
-            realm: row.Realm || "",
-            availability: parseInt(row.Availability || 0),
-            serving_quantity: row.Serving_Quantity,
-            serving_unit:row.Serving_Unit,
-            unit: row.Unit || "",
-            image_id: row.Image,
-            unit_price: parseFloat(row.Unit_Price || 0),
-            unit_cst: parseFloat(row.Unit_CST || 0),
-            unit_gst: parseFloat(row.Unit_GST || 0),
-            unit_total_price: parseFloat(row.Total_Unit_Price || 0),
-            price: parseFloat(row.Price || 0),
-            cst: parseFloat(row.CST || 0),
-            gst: parseFloat(row.GST || 0),
-            discount: parseFloat(row.Discount || 0),
-            total_price: parseFloat(row.Total_Price || 0),
-            slug: row.Slug || "",
-            dietary_type: row.Dietary || "",
-            line_item_id: row.Line_Item_IDs
-              ? row.Line_Item_IDs.split(",").map(id => parseInt(id.trim()))
-              : [],
-            recipe: recipeData,  // ⬅ NEW: store JSONB back into DB
-            created_by,
-            updated_by
-          };
-
-          await axios.post(
-            `${import.meta.env.VITE_API_INVENTORY_SERVICE_URL}/${clientId}/menu/create`,
-            newItem,
-            { headers: { Authorization: `Bearer ${token}` } }
-          );
-          
         }
 
-
-        // Step 3: Refresh items
+        // 🔄 REFRESH
         const itemRes = await axios.get(
           `${import.meta.env.VITE_API_INVENTORY_SERVICE_URL}/${clientId}/menu/read?realm=${realm}`,
           { headers: { Authorization: `Bearer ${token}` } }
         );
         setMenuItems(itemRes.data.data);
 
-        // Step 4: Show detailed results
-        if (failCount > 0) {
-          alert(`Import completed with errors:\n✓ Success: ${successCount}\n✗ Failed: ${failCount}\n\nErrors:\n${errors.slice(0, 5).join('\n')}${errors.length > 5 ? `\n... and ${errors.length - 5} more` : ''}`);
-        } else {
-          alert(`✅ Import successful!\n\nDeleted: ${menuItems.length} old items\nImported: ${successCount} new items`);
-        }
+        // 📊 RESULT
+        alert(
+          `✅ Import completed\n\n` +
+          `✔ Success: ${successCount}\n` +
+          `✖ Failed: ${failCount}` +
+          (errors.length ? `\n\nErrors:\n${errors.slice(0, 5).join("\n")}` : "")
+        );
 
-        // Reset file input
-        e.target.value = '';
+        e.target.value = "";
       } catch (err) {
-        console.error('Import Error:', err);
-        alert(`Import failed: ${err.message}\n\nPlease check the console for details.`);
-        e.target.value = '';
+        console.error("Import Error:", err);
+        alert("Import failed. Check console.");
+        e.target.value = "";
       }
     };
 
     reader.readAsBinaryString(file);
   };
+
 
   const toggleSelectAll = () => {
     if (!selectAllChecked) {
@@ -867,94 +948,16 @@ console.log("Payload",payload)
 
   return (
     <div className="min-h-screen bg-bg-primary">
-      {/* Search Bar */}
-      <div className={`fixed top-36 right-5  z-50 flex items-center transition-all duration-300 ease-in-out ${searchOpen ? 'w-80' : 'w-12'}`}>
-        <div className={`flex items-center gap-2 rounded-full shadow-lg overflow-hidden transition-colors duration-200 ${searchOpen ? 'bg-action-primary px-3 py-2' : 'bg-action-primary p-2'}`}>
-          <button
-            onClick={() => setSearchOpen(s => !s)}
-            className={`flex items-center justify-center border-none p-0 h-6 w-6 ${searchOpen ? 'text-text-primary' : 'text-text-white'}`}
-          >
-            <Search size={20} />
-          </button>
 
-          <input
-            ref={searchInputRef}
-            value={searchQuery}
-            onChange={(e) => setSearchQuery(e.target.value)}
-            placeholder="Search items..."
-            className={`transition-all duration-200 bg-action-primary text-text-white outline-none text-sm ${searchOpen ? 'opacity-100 w-full' : 'opacity-0 w-0 pointer-events-none'}`}
-          />
-
-          {searchOpen && (
-            <button
-              onClick={() => {
-                if (searchQuery.trim() !== "") {
-                  setSearchQuery("");
-                  setTimeout(() => searchInputRef.current?.focus(), 50);
-                } else {
-                  setSearchOpen(false);
-                }
-              }}
-              className="ml-1 text-xs px-2 py-1 rounded border-border-default bg-transparent text-text-secondary"
-            >
-              {searchQuery.trim() === "" ? "Close" : "Clear"}
-            </button>
-          )}
-        </div>
-      </div>
 
       <div className="mx-auto px-4 py-2">
         {/* Action Buttons */}
-        <div className="flex flex-wrap justify-end gap-2 sm:gap-3 mb-4 sm:mb-6 px-2 sm:px-0">
-          <button
-            onClick={() => setShowAddModal(true)}
-            className="flex items-center justify-center gap-2 sm:px-4 px-2.5 py-2 sm:py-2.5 rounded-lg bg-action-primary text-text-white hover:opacity-90 transition-all shadow-md hover:shadow-lg font-semibold text-xs sm:text-sm"
-            title="Add Item"
-          >
-            <Plus size={18} className="sm:w-5 sm:h-5" />
-            <span className="hidden sm:inline">Add Item</span>
-          </button>
 
-          <button
-            onClick={() => setShowBulkModal(true)}
-            className="flex items-center justify-center gap-2 sm:px-4 px-2.5 py-2 sm:py-2.5 rounded-lg bg-bg-tertiary text-text-primary border-2 border-border-default hover:bg-bg-secondary hover:border-action-primary transition-all shadow-sm hover:shadow-md font-semibold text-xs sm:text-sm"
-            title="Bulk Update"
-          >
-            <Edit size={18} className="sm:w-5 sm:h-5" />
-            <span className="hidden sm:inline">Bulk Update</span>
-          </button>
 
-          <button
-            onClick={handleExportToExcel}
-            className="flex items-center justify-center gap-2 sm:px-4 px-2.5 py-2 sm:py-2.5 rounded-lg bg-bg-tertiary text-text-primary border-2 border-border-default hover:bg-bg-secondary hover:border-action-primary transition-all shadow-sm hover:shadow-md font-semibold text-xs sm:text-sm"
-            title="Export to Excel"
-          >
-            <Download size={18} className="sm:w-5 sm:h-5" />
-            <span className="hidden sm:inline">Export</span>
-          </button>
-
-          <button
-            onClick={() => document.getElementById('excelInput').click()}
-            className="flex items-center justify-center gap-2 sm:px-4 px-2.5 py-2 sm:py-2.5 rounded-lg bg-bg-tertiary text-text-primary border-2 border-border-default hover:bg-bg-secondary hover:border-action-primary transition-all shadow-sm hover:shadow-md font-semibold text-xs sm:text-sm"
-            title="Import from Excel"
-          >
-            <Upload size={18} className="sm:w-5 sm:h-5" />
-            <span className="hidden sm:inline">Import</span>
-          </button>
-
-          <input
-            type="file"
-            id="excelInput"
-            accept=".xlsx, .xls"
-            className="hidden"
-            onChange={handleImportFromExcel}
-          />
-        </div>
-
-        <div className="grid lg:grid-cols-4 gap-6 lg:gap-8">
+        <div className="grid lg:grid-cols-4 gap-2">
           {/* Sidebar */}
           <div className="lg:col-span-1">
-            <div className="lg:sticky lg:top-24">
+            <div className="lg:sticky lg:top-20">
               <MenuCategoryTree
                 categories={categories}
                 selectedCategory={selectedCategory}
@@ -971,18 +974,139 @@ console.log("Payload",payload)
           </div>
 
           {/* Main Content */}
-          <div className="lg:col-span-3">
-            <div className="mb-4">
-              <h2 className="text-xl lg:text-2xl font-semibold text-text-primary">
-                {selectedCategory}
-                <span className="text-sm ml-2 text-text-primary">
-                  ({filteredItems.length} items)
-                </span>
-              </h2>
+          <div className="lg:col-span-3 border-default border-border-default p-3 rounded-lg">
+            <div className="mb-4 grid gap-3 grid-cols-1 md:grid-cols-2 lg:grid-cols-3">
+
+
+              <div className="lg:col-span-1 space-y-2">
+                {/* Category title */}
+                <h2 className="text-xl lg:text-2xl font-semibold text-text-primary">
+                  {selectedCategory}
+                  <span className="text-sm ml-2 text-text-primary">
+                    ({filteredItems.length} items)
+                  </span>
+                </h2>
+              </div>
+
+
+
+              <div className="lg:col-span-1">
+                <div className="relative w-full">
+                  <Search
+                    size={16}
+                    className="absolute left-3 top-1/2 -translate-y-1/2 text-text-secondary"
+                  />
+                  <input
+                    ref={searchInputRef}
+                    type="text"
+                    value={searchQuery}
+                    onChange={(e) => setSearchQuery(e.target.value)}
+                    placeholder="Search items..."
+                    className="
+      w-full
+      h-9
+      pl-10 pr-3
+      rounded-lg
+      bg-bg-tertiary
+      border border-border-default
+      focus:ring-2 focus:ring-action-primary
+    "
+                  />
+                </div>
+
+              </div>
+
+              <div className="
+  flex flex-wrap
+  items-center justify-end
+  gap-2
+  md:justify-start
+  lg:justify-end
+">
+
+
+                <button
+                  onClick={() => setShowAddModal(true)}
+                  className="
+    h-9 px-3
+    flex items-center gap-2
+    rounded-lg
+    bg-action-primary
+    text-white
+    text-sm font-semibold
+    shadow-sm
+    hover:opacity-90
+  "
+                >
+                  <Plus size={14} />
+                  <span>Add</span>
+                </button>
+
+
+                <button
+                  onClick={() => setShowBulkModal(true)}
+                  className="
+    h-9 px-3
+    flex items-center gap-2
+    rounded-lg
+    bg-bg-tertiary
+    border border-border-default
+    text-sm font-semibold
+    hover:border-action-primary
+    hover:bg-bg-secondary
+  "
+                >
+                  <Edit size={14} />
+                  <span className="hidden sm:inline">Bulk</span>
+                </button>
+                <button
+                  onClick={handleExportToExcel}
+                  className="
+    h-9 px-3
+    flex items-center gap-2
+    rounded-lg
+    bg-bg-tertiary
+    border border-border-default
+    text-sm font-semibold
+    hover:border-action-primary
+    hover:bg-bg-secondary
+  "
+                >
+                  <Download size={14} />
+                  <span className="hidden sm:inline">Export</span>
+                </button>
+
+
+                <button
+                  onClick={() => document.getElementById('excelInput').click()}
+                  className="
+    h-9 px-3
+    flex items-center gap-2
+    rounded-lg
+    bg-bg-tertiary
+    border border-border-default
+    text-sm font-semibold
+    hover:border-action-primary
+    hover:bg-bg-secondary
+  "
+                >
+                  <Upload size={14} />
+                  <span className="hidden sm:inline">Import</span>
+                </button>
+
+
+                <input
+                  type="file"
+                  id="excelInput"
+                  accept=".xlsx, .xls"
+                  className="hidden"
+                  onChange={handleImportFromExcel}
+                />
+              </div>
             </div>
 
             {/* Items Grid */}
-            <div className="grid grid-cols-2 sm:grid-cols-2 lg:grid-cols-3 xl:grid-cols-4 2xl:grid-cols-5 gap-3 md:gap-4 lg:gap-5">
+            <div className="grid grid-cols-3 sm:grid-cols-4 lg:grid-cols-4 xl:grid-cols-5 2xl:grid-cols-6 gap-3 md:gap-4 lg:gap-5">
               {filteredItems.map(item => {
                 const discountPercent = item.discount && item.unit_price && Number(item.discount) > 0
                   ? ((Number(item.discount) * 100) / Number(item.unit_price)).toFixed(1).replace(/\.0$/, '')
@@ -990,7 +1114,7 @@ console.log("Payload",payload)
 
                 return (
                   <div key={item.id} className="bg-bg-primary rounded-xl shadow-sm overflow-hidden hover:shadow-lg transition-all duration-300 group relative">
-                    <div className="relative h-36 sm:h-40 md:h-44 lg:h-48 overflow-hidden bg-gradient-to-br from-gray-100 to-gray-200">
+                    <div className="relative h-20 sm:h-20 md:h-24 lg:h-28 overflow-hidden bg-gradient-to-br from-gray-100 to-gray-200">
                       {discountPercent && (
                         <div className="absolute top-2 left-2 bg-action-danger text-text-white text-xs font-bold px-2 py-1 rounded-md z-10 shadow-md">
                           {discountPercent}% OFF
@@ -998,8 +1122,8 @@ console.log("Payload",payload)
                       )}
 
                       {item.line_item_id && Array.isArray(item.line_item_id) && item.line_item_id.length > 0 && (
-                        <div className="absolute bottom-2 left-2 bg-orange-500 text-white text-xs font-semibold px-2 py-1 rounded-md z-10 shadow-md flex items-center gap-1">
-                          <Plus size={12} />
+                        <div className="absolute bottom-2 left-2 bg-orange-500 text-white text-[8px] p-1 rounded-md z-10 shadow-md flex items-center gap-1">
+                          <Plus size={10} />
                           <span>{item.line_item_id.length} add-ons</span>
                         </div>
                       )}
@@ -1019,38 +1143,55 @@ console.log("Payload",payload)
                       <div className="absolute top-2 right-2 flex gap-2">
                         <button
                           onClick={() => {
-                            setEditingItem(item);
+                            setEditingItem({
+                              ...item,
+                              dietary_type: normalizeDietary(item.dietary_type)
+                            });
                             setShowEditModal(true);
                           }}
-                          className="bg-action-primary text-text-white p-2 rounded-full hover:bg-orange-600 transition-all duration-300 shadow-lg hover:shadow-xl z-10 hover:scale-110 active:scale-95"
+
+                          className="bg-action-primary text-text-white p-1 rounded-full hover:bg-orange-600 transition-all duration-300 shadow-lg hover:shadow-xl z-10 hover:scale-110 active:scale-95"
                           aria-label="Edit item"
                         >
-                          <Edit size={16} />
+                          <Edit size={12} />
                         </button>
                         <button
                           onClick={() => {
                             setDeleteTarget(item);
                             setShowDeleteModal(true);
                           }}
-                          className="bg-action-danger text-text-white p-2 rounded-full hover:bg-red-600 transition-all duration-300 shadow-lg hover:shadow-xl z-10 hover:scale-110 active:scale-95"
+                          className="bg-action-danger text-text-white p-1  rounded-full hover:bg-red-600 transition-all duration-300 shadow-lg hover:shadow-xl z-10 hover:scale-110 active:scale-95"
                           aria-label="Delete item"
                         >
-                          <Trash2 size={16} />
+                          <Trash2 size={12} />
                         </button>
                       </div>
                     </div>
+                    <span
+                      className={`w-2.5 h-2.5 rounded-full ${getDietaryDotColor(normalizeDietary(item.dietary_type))}`}
+                      title={item.dietary_type || "Unknown"}
+                    />
+                    <div className="p-1">
+                      <div className="flex items-center gap-2">
+                        <h3 className="font-semibold text-[12px] line-clamp-2 min-h-[1.2rem] text-text-primary">
+                          {item.name}
+                        </h3>
+                      </div>
 
-                    <div className="p-2.5 sm:p-3">
-                      <h3 className="font-semibold text-sm sm:text-base line-clamp-2 mb-1 min-h-[2.5rem] sm:min-h-[3rem] text-text-primary">
-                        {item.name}
-                      </h3>
-                      <div className="flex items-center justify-between mt-2">
-                        <span className="text-action-primary font-bold text-base sm:text-lg">
-                          ₹{item.unit_price?.toFixed(2)}
-                        </span>
+                      <div className="flex items-center justify-between">
+                        <p className="text-action-primary font-bold text-base sm:text-md">
+                          ₹{(item.unit_price - (item.discount || 0)).toFixed(2)}
+                        </p>
+                        {discountPercent && (
+                          <span className="text-xs text-text-secondary line-through">
+                            ₹{item.unit_price?.toFixed(2)}
+                          </span>
+                        )}
+
+                        {/* 
                         <span className="text-xs text-text-secondary truncate max-w-[100px]">
                           {item.category}
-                        </span>
+                        </span> */}
                       </div>
                     </div>
                   </div>

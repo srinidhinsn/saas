@@ -30,7 +30,7 @@
 
   /* Scrollbar styles */
   ::-webkit-scrollbar {
-    width: 2px;
+    width: 1px;
     height: 8px;
   }
 
@@ -53,3 +53,19 @@
     background: rgb(242, 60, 0);
     color: white;
   }
+
+  /* Hide scrollbar but keep functionality */
+.scrollbar-hide {
+  -ms-overflow-style: none;
+  scrollbar-width: none;
+}
+
+.scrollbar-hide::-webkit-scrollbar {
+  display: none;
+}
+
+/* Smooth scroll for mobile categories */
+.overflow-x-scroll {
+  scroll-behavior: smooth;
+  -webkit-overflow-scrolling: touch;
+}
