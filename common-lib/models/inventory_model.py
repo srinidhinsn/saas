@@ -20,7 +20,6 @@ class Inventory(BaseModel):
     availability: Optional[float] = None
     unit: Optional[str] = None
     code: Optional[str] = None
-    dietary_type: Optional[str]
     image_id: Optional[str] = None
     unit_price: Optional[float] = None
     unit_cst: Optional[float] = None
