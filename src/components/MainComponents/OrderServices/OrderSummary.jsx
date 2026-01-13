@@ -2714,7 +2714,7 @@ const OrderSummaryVisible = ({ clientId, token }) => {
                     </span>
 
                     <div className="flex items-center justify-between mt-2 gap-2">
-                      <h3 className="text-lg font-bold text-text-primary truncate">
+                      <h3 className="text-lg font-bold text-text-white truncate">
                         {order._derivedMode === 'takeaway'
                           ? order.customer_name || 'Take Away'
                           : tablesMap[order.table_id] || order.table || order.table_id}
@@ -2725,7 +2725,7 @@ const OrderSummaryVisible = ({ clientId, token }) => {
                         {order.status}
                       </span>
 
-                      <span className="text-lg font-bold text-text-primary">
+                      <span className="text-lg font-bold text-text-white">
                         #{order.id}
                       </span>
 
