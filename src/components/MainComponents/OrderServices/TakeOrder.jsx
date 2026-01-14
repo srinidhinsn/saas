@@ -1257,7 +1257,7 @@
 //                       {/* INNER STICKY CONTAINER */}
 //                       <div
 //                         className="shadow-xl rounded-xl
-             
+
 //                lg:h-[calc(98dvh-4rem)]
 //                flex flex-col"
 //                       >
@@ -1845,9 +1845,7 @@ const TableReservation = ({
                 className={`px-3 py-1 rounded-full text-xs font-semibold transition
         ${selectedSections.includes(sec)
                     ? "bg-action-primary text-white"
-                    : "bg-white text-text-secondary hover:bg-gray-100"}
-      `}
-              >
+                    : "bg-white text-text-secondary hover:bg-gray-100"}`}>
                 {sec}
               </button>
             ))}
@@ -2326,29 +2324,29 @@ const TakeOrder = ({ clientId, token, onOrderUpdate, realm }) => {
 
   const getFilteredItems = () => {
     const q = (searchQuery || '').trim().toLowerCase();
-  
+
     let items = menuItems;
-  
+
     // 📂 CATEGORY FILTER
     if (selectedCategory && selectedCategory !== 'All Categories') {
       const allowedCategories = getCategoryAndChildrenNames(
         categories,
         selectedCategory
       );
-  
+
       items = items.filter(item =>
         allowedCategories.includes(item.category)
       );
     }
-  
+
     // 🔍 SEARCH (Name + Code + Category)
     if (!q) return items;
-  
+
     return items.filter(item => {
       const name = (item.name || '').toLowerCase();
       const category = (item.category || '').toLowerCase();
       const code = String(item.code || '').toLowerCase();
-  
+
       return (
         name.includes(q) ||
         category.includes(q) ||
@@ -2356,7 +2354,7 @@ const TakeOrder = ({ clientId, token, onOrderUpdate, realm }) => {
       );
     });
   };
-  
+
 
 
   const filteredItems = getFilteredItems();
@@ -2376,17 +2374,17 @@ const TakeOrder = ({ clientId, token, onOrderUpdate, realm }) => {
   };
   const addToCart = (item) => {
     setHasNewItems(true);
-  
+
     const timestamp = Date.now() + Math.random();
     const uniqueKey = `${item.id}_${timestamp}`;
-  
+
     let batchTimestamp = currentBatchTimestamp;
-  
+
     // 🆕 Create new batch if not exists
     if (!batchTimestamp) {
       batchTimestamp = Date.now();
       setCurrentBatchTimestamp(batchTimestamp);
-  
+
       if (activeOrderId) {
         localStorage.setItem(
           `order_${activeOrderId}_batch_${batchTimestamp}`,
@@ -2397,9 +2395,9 @@ const TakeOrder = ({ clientId, token, onOrderUpdate, realm }) => {
         );
       }
     }
-  
+
     const existingItem = cart.find(i => i.id === item.id);
-  
+
     if (existingItem) {
       setCart(cart.map(i =>
         i.id === item.id
@@ -2421,9 +2419,9 @@ const TakeOrder = ({ clientId, token, onOrderUpdate, realm }) => {
         batch_timestamp: batchTimestamp,     // ✅ IMPORTANT
         is_new_item: !!activeOrderId,         // only for occupied table
       };
-  
+
       setCart(prev => [...prev, cartItem]);
-  
+
       // 💾 SAVE TO LOCALSTORAGE (FOR KDS)
       if (activeOrderId) {
         localStorage.setItem(
@@ -2438,10 +2436,10 @@ const TakeOrder = ({ clientId, token, onOrderUpdate, realm }) => {
         );
       }
     }
-  
+
     if (!isMobile) setShowCart(true);
   };
-  
+
 
 
   const handleAddMainItemWithLineItems = () => {
@@ -2618,7 +2616,7 @@ const TakeOrder = ({ clientId, token, onOrderUpdate, realm }) => {
             line_total: i.unit_price * i.quantity,
             status: "pending",
             note: i.note || "",
-            frontend_unique_key: i.frontend_unique_key || null, 
+            frontend_unique_key: i.frontend_unique_key || null,
           })),
           { headers }
         );
