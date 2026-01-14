@@ -994,7 +994,7 @@ export default function BillingPage({ clientId, token }) {
 
   return (
     <div className="min-h-screen bg-gradient-to-br from-slate-100 via-gray-50 to-slate-100 p-4">
-      <div className="max-w-7xl mx-auto">
+      <div className="max-w-8xl mx-auto">
         
         {/* Header */}
         <div className="bg-action-primary rounded-2xl shadow-xl px-6 py-4 mb-4">

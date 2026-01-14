@@ -2708,36 +2708,40 @@ const OrderSummaryVisible = ({ clientId, token }) => {
                 >
                   {/* HEADER */}
                   <div className="bg-action-primary px-4 py-3 text-text-black rounded-t-2xl">
-                    <span className="inline-flex items-center gap-1 px-2 py-1 rounded-full text-[10px] font-semibold bg-bg-primary text-text-secondary border border-border-default">
-                      {order._derivedMode === 'dinein' ? <Users size={10} /> : <Package size={10} />}
-                      {order._derivedMode === 'dinein' ? 'Dine In' : 'Takeaway'}
-                    </span>
-
-                    <div className="flex items-center justify-between mt-2 gap-2">
-                      <h3 className="text-lg font-bold text-text-primary truncate">
-                        {order._derivedMode === 'takeaway'
-                          ? order.customer_name || 'Take Away'
-                          : tablesMap[order.table_id] || order.table || order.table_id}
-                      </h3>
-
-                      <span className={`inline-flex items-center px-3 py-1 rounded-full text-sm font-bold ${statusBadge}`}>
-                        {(status === 'ready' || status === 'served') && '✔'}
-                        {order.status}
+                    <div className="flex justify-between">
+                      <span className="inline-flex items-center gap-1 px-2 py-1 rounded-full text-[10px] font-semibold bg-bg-primary text-text-secondary border border-border-default">
+                        {order._derivedMode === 'dinein' ? <Users size={10} /> : <Package size={10} />}
+                        {order._derivedMode === 'dinein' ? 'Dine In' : 'Takeaway'}
                       </span>
 
-                      <span className="text-lg font-bold text-text-primary">
-                        #{order.id}
-                      </span>
 
                       <button
                         onClick={() => {
                           setOrderToDelete(order.id);
                           setShowDeleteModal(true);
                         }}
-                        className="p-2 rounded-lg hover:bg-black/10"
+                        className="text-text-white p-2 rounded-lg hover:bg-black/10"
                       >
                         <Trash2 size={18} />
                       </button>
+                    </div>
+
+                    <div className="flex items-center justify-between mt-2 gap-2">
+                      <h3 className="text-lg font-bold text-text-white truncate">
+                        {order._derivedMode === 'takeaway'
+                          ? order.customer_name || 'Take Away'
+                          : tablesMap[order.table_id] || order.table || order.table_id}
+                      </h3>
+
+                      <span className={`inline-flex items-center px-3 py-1 rounded-full text-xl font-bold ${statusBadge}`}>
+                        {(status === 'ready' || status === 'served') && '✔'}
+                        {order.status}
+                      </span>
+
+                      <span className="text-lg font-bold text-text-white">
+                        #{order.id}
+                      </span>
+
                     </div>
                   </div>
 

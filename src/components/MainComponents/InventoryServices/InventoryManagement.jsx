@@ -1,4 +1,3 @@
-// src/pages/StockRecipeManager.jsx
 import React, { useEffect, useMemo, useState } from "react";
 import axios from "axios";
 import { useParams } from "react-router-dom";
@@ -51,9 +50,9 @@ export default function StockRecipeManager({ clientId: propClientId, token: prop
     unit: "",
   });
 
-  // Pagination
-  const PAGE_SIZE = 12;
-  const [currentPage, setCurrentPage] = useState(1);
+  // Menu Availability
+  const [menuAvailabilityList, setMenuAvailabilityList] = useState([]);
+  const [menuSearchQuery, setMenuSearchQuery] = useState("");
 
   // Enhanced stock with real-time calculations
   const enhancedStocks = useMemo(() => {
@@ -101,12 +100,15 @@ export default function StockRecipeManager({ clientId: propClientId, token: prop
     return result;
   }, [enhancedStocks, searchQuery, categoryFilter, lowStockOnly]);
 
-  const paginatedStocks = useMemo(() => {
-    const start = (currentPage - 1) * PAGE_SIZE;
-    return filteredStocks.slice(start, start + PAGE_SIZE);
-  }, [filteredStocks, currentPage]);
+  // Filtered menu items for availability tab
+  const filteredMenuItems = useMemo(() => {
+    if (!menuSearchQuery) return menuAvailabilityList;
 
-  const totalPages = Math.max(1, Math.ceil(filteredStocks.length / PAGE_SIZE));
+    const q = menuSearchQuery.toLowerCase();
+    return menuAvailabilityList.filter((item) =>
+      `${item.name} ${item.description || ""} ${item.category || ""}`.toLowerCase().includes(q)
+    );
+  }, [menuAvailabilityList, menuSearchQuery]);
 
   // Data fetching
   useEffect(() => {
@@ -119,8 +121,13 @@ export default function StockRecipeManager({ clientId: propClientId, token: prop
     };
 
     loadData();
-    // eslint-disable-next-line react-hooks/exhaustive-deps
   }, [clientId]);
+
+  useEffect(() => {
+    if (activeTab === "menu-availability") {
+      fetchMenuAvailability();
+    }
+  }, [activeTab]);
 
   const fetchStocks = async () => {
     try {
@@ -149,6 +156,22 @@ export default function StockRecipeManager({ clientId: propClientId, token: prop
       setMenuItems(res.data?.data || []);
     } catch (err) {
       console.error("fetchMenuItems failed:", err);
+    }
+  };
+
+  const fetchMenuAvailability = async () => {
+    try {
+      setLoading(true);
+      const res = await axios.get(
+        `${API_CONFIG.baseMenu(clientId)}/read?realm=${realm}`,
+        getAuthHeaders(token)
+      );
+      setMenuAvailabilityList(res.data?.data || []);
+    } catch (err) {
+      console.error("fetchMenuAvailability failed:", err);
+      setError("Failed to load menu items");
+    } finally {
+      setLoading(false);
     }
   };
 
@@ -305,125 +328,100 @@ export default function StockRecipeManager({ clientId: propClientId, token: prop
     }
   };
 
-  // ──────────────────────────────────────────────────────────────
-  // UI Rendering
-  // ──────────────────────────────────────────────────────────────
+  // Menu Availability operations
+  const updateMenuAvailability = async (menuId, newAvailability, newUnit) => {
+    try {
+      await axios.post(
+        `${API_CONFIG.baseMenu(clientId)}/update`,
+        {
+          id: menuId,
+          availability: newAvailability,
+          unit: newUnit,
+        },
+        getAuthHeaders(token)
+      );
+
+      setMenuAvailabilityList((prev) =>
+        prev.map((item) =>
+          item.id === menuId ? { ...item, availability: newAvailability, unit: newUnit } : item
+        )
+      );
+
+      setMenuItems((prev) =>
+        prev.map((item) =>
+          item.id === menuId ? { ...item, availability: newAvailability, unit: newUnit } : item
+        )
+      );
+    } catch (err) {
+      console.error("updateMenuAvailability failed:", err);
+      setError("Failed to update menu availability");
+    }
+  };
 
   return (
     <div className="min-h-screen bg-gray-50/50 py-6 px-4 sm:px-6 lg:px-8">
-      <div className="max-w-7xl mx-auto">
-
-        {/* Header + Tabs */}
+      <div className="max-w-8xl mx-auto">
         <div className="flex flex-col sm:flex-row sm:items-center sm:justify-between gap-4 mb-8">
           <div>
-            <h1 className="text-2xl sm:text-3xl font-bold text-gray-900">
-              Inventory & Recipe
+            <h1 className="text-3xl sm:text-4xl font-bold text-gray-900">
+              Inventory & Recipe Management
             </h1>
-            <p className="mt-1 text-sm text-gray-600">
-              Manage stock items and link ingredients to menu items
+            <p className="mt-2 text-base text-gray-600">
+              Manage stock items, recipes, and menu availability
             </p>
           </div>
 
-          <div className="inline-flex rounded-lg border border-gray-200 bg-white p-1 shadow-sm">
+          <div className="flex gap-3">
             <button
-              className={`px-5 py-2 text-sm font-medium rounded-md transition-colors ${
-                activeTab === "stock"
-                  ? "bg-indigo-600 text-white shadow-sm"
-                  : "text-gray-700 hover:bg-gray-50"
+             className={`flex items-center gap-2 px-4 py-2 rounded-lg font-medium text-sm transition-all ${activeTab === "stock"
+              ? 'bg-action-primary text-text-white shadow-sm'
+              : 'bg-bg-tertiary text-text-secondary hover:text-text-primary border border-border-default'
               }`}
               onClick={() => setActiveTab("stock")}
             >
               Stock
             </button>
             <button
-              className={`px-5 py-2 text-sm font-medium rounded-md transition-colors ${
-                activeTab === "recipe"
-                  ? "bg-indigo-600 text-white shadow-sm"
-                  : "text-gray-700 hover:bg-gray-50"
+             className={`flex items-center gap-2 px-4 py-2 rounded-lg font-medium text-sm transition-all ${activeTab === "recipe"
+              ? 'bg-action-primary text-text-white shadow-sm'
+              : 'bg-bg-tertiary text-text-secondary hover:text-text-primary border border-border-default'
               }`}
               onClick={() => setActiveTab("recipe")}
             >
               Recipe
             </button>
+            <button
+             className={`flex items-center gap-2 px-4 py-2 rounded-lg font-medium text-sm transition-all ${activeTab === "menu-availability"
+              ? 'bg-action-primary text-text-white shadow-sm'
+              : 'bg-bg-tertiary text-text-secondary hover:text-text-primary border border-border-default'
+              }`}
+              onClick={() => setActiveTab("menu-availability")}
+            >
+              Menu Availability
+            </button>
           </div>
         </div>
 
         {error && (
-          <div className="mb-6 p-4 bg-red-50 border border-red-200 text-red-700 rounded-xl">
-            {error}
-          </div>
-        )}
-
-        {/* Filters Bar */}
-        {activeTab === "stock" && (
-          <div className="bg-bg-primary rounded-xl shadow border border-gray-100 p-4 mb-6">
-            <div className="flex flex-col sm:flex-row sm:items-end gap-4 flex-wrap">
-              <div className="flex-1 min-w-[240px]">
-                <label className="block text-sm font-medium text-gray-700 mb-1">
-                  Search
-                </label>
-                <input
-                  type="text"
-                  placeholder="Name, category, description..."
-                  className="w-full px-4 py-2 border border-gray-300 rounded-lg focus:ring-2 focus:ring-indigo-500 focus:border-indigo-500"
-                  value={searchQuery}
-                  onChange={(e) => {
-                    setSearchQuery(e.target.value);
-                    setCurrentPage(1);
-                  }}
-                />
-              </div>
-
-              <div className="min-w-[180px]">
-                <label className="block text-sm font-medium text-gray-700 mb-1">
-                  Category
-                </label>
-                <select
-                  className="w-full px-4 py-2 border border-gray-300 rounded-lg focus:ring-indigo-500 focus:border-indigo-500"
-                  value={categoryFilter}
-                  onChange={(e) => {
-                    setCategoryFilter(e.target.value);
-                    setCurrentPage(1);
-                  }}
-                >
-                  <option value="All">All Categories</option>
-                  {categories.map((cat) => (
-                    <option key={cat} value={cat}>
-                      {cat}
-                    </option>
-                  ))}
-                </select>
-              </div>
-
-              <div className="flex items-center gap-6 pt-4 sm:pt-0">
-                <label className="flex items-center gap-2 cursor-pointer">
-                  <input
-                    type="checkbox"
-                    checked={lowStockOnly}
-                    onChange={(e) => {
-                      setLowStockOnly(e.target.checked);
-                      setCurrentPage(1);
-                    }}
-                    className="h-4 w-4 text-indigo-600 focus:ring-indigo-500 border-gray-300 rounded"
-                  />
-                  <span className="text-sm text-gray-700">Low stock only</span>
-                </label>
-              </div>
-            </div>
+          <div className="mb-6 p-4 bg-red-50 border border-red-200 text-red-700 rounded-xl flex items-center justify-between text-base">
+            <span>{error}</span>
+            <button
+              onClick={() => setError("")}
+              className="text-action-primary  hover:text-action-primary font-medium text-2xl"
+            >
+              ×
+            </button>
           </div>
         )}
 
         <div className="grid lg:grid-cols-12 gap-6">
-          {/* Main Content */}
-          <main className="lg:col-span-8 space-y-6">
+          <main className="lg:col-span-9 space-y-6">
             {activeTab === "stock" && (
               <StockTab
-                stocks={paginatedStocks}
+                stocks={filteredStocks}
                 loading={loading}
-                totalItems={filteredStocks.length}
-                currentPage={currentPage}
-                totalPages={totalPages}
-                onPageChange={setCurrentPage}
+                searchQuery={searchQuery}
+                onSearchChange={setSearchQuery}
                 onAddNew={() => openStockModal()}
                 onEdit={openStockModal}
                 onDelete={deleteStock}
@@ -444,54 +442,70 @@ export default function StockRecipeManager({ clientId: propClientId, token: prop
                 onDeleteIngredient={deleteIngredient}
               />
             )}
+
+            {activeTab === "menu-availability" && (
+              <MenuAvailabilityTab
+                menuItems={filteredMenuItems}
+                loading={loading}
+                menuSearchQuery={menuSearchQuery}
+                onSearchChange={setMenuSearchQuery}
+                onUpdateAvailability={updateMenuAvailability}
+              />
+            )}
           </main>
 
-          {/* Sidebar */}
-          <aside className="lg:col-span-4 space-y-6">
-            <div className="bg-bg-primary rounded-xl border border-gray-100 shadow p-5">
-              <h3 className="font-medium text-gray-800 mb-4">Quick Actions</h3>
-              <div className="space-y-3">
-                <button
-                  onClick={() => {
-                    setActiveTab("stock");
-                    openStockModal();
-                  }}
-                  className="w-full py-2.5 px-4 bg-indigo-600 hover:bg-indigo-700 text-white rounded-lg transition-colors"
-                >
-                  + New Stock Item
-                </button>
-                <button
-                  onClick={() => setActiveTab("recipe")}
-                  className="w-full py-2.5 px-4 border border-gray-300 hover:bg-gray-50 text-gray-700 rounded-lg transition-colors"
-                >
-                  Manage Recipes
-                </button>
-                <button
-                  onClick={() => {
-                    fetchStocks();
-                    fetchMenuItems();
-                  }}
-                  className="w-full py-2.5 px-4 border border-gray-300 hover:bg-gray-50 text-gray-700 rounded-lg transition-colors"
-                >
-                  Refresh All Data
-                </button>
-              </div>
-            </div>
+          <aside className="lg:col-span-3 space-y-6">
+            {activeTab === "stock" && (
+              <div className="bg-bg-primary rounded-xl border border-gray-100 shadow p-6">
+                <h3 className="text-lg font-semibold text-gray-800 mb-4">Filters</h3>
+                <div className="space-y-4">
+                  <div>
+                    {/* <label className="block text-base font-medium text-gray-700 mb-2">Category</label> */}
+                    <select
+                      className="w-full px-4 py-3 text-base border border-gray-300 rounded-lg focus:ring-indigo-500 focus:border-indigo-500"
+                      value={categoryFilter}
+                      onChange={(e) => setCategoryFilter(e.target.value)}
+                    >
+                      <option value="All">All Categories</option>
+                      {categories.map((cat) => (
+                        <option key={cat} value={cat}>{cat}</option>
+                      ))}
+                    </select>
+                  </div>
 
-            <div className="bg-bg-primary rounded-xl border border-gray-100 shadow p-5">
-              <h3 className="font-medium text-gray-800 mb-3">Stock Overview</h3>
-              <div className="space-y-3 text-sm">
+                  <div className="pt-2">
+                    <label className="flex items-center gap-3 cursor-pointer">
+                      <input
+                        type="checkbox"
+                        checked={lowStockOnly}
+                        onChange={(e) => setLowStockOnly(e.target.checked)}
+                        className="h-5 w-5 text-action-primary  focus:ring-action-primary border-gray-300 rounded"
+                      />
+                      <span className="text-base text-gray-700 font-medium">Low stock only</span>
+                    </label>
+                  </div>
+                </div>
+              </div>
+            )}
+
+            <div className="bg-bg-primary rounded-xl border border-gray-100 shadow p-6">
+              <h3 className="text-lg font-semibold text-gray-800 mb-4">Overview</h3>
+              <div className="space-y-4 text-base">
                 <div className="flex justify-between">
-                  <span className="text-gray-600">Total items</span>
-                  <span className="font-medium">{stocks.length}</span>
+                  <span className="text-gray-600">Stock items</span>
+                  <span className="font-semibold text-gray-900">{stocks.length}</span>
                 </div>
                 <div className="flex justify-between">
                   <span className="text-gray-600">Low stock</span>
-                  <span className="font-medium text-amber-600">
+                  <span className="font-semibold text-amber-600">
                     {enhancedStocks.filter((s) => s.isLow).length}
                   </span>
                 </div>
-                <div className="text-xs text-gray-500 pt-2">
+                <div className="flex justify-between">
+                  <span className="text-gray-600">Menu items</span>
+                  <span className="font-semibold text-gray-900">{menuItems.length}</span>
+                </div>
+                <div className="text-sm text-gray-500 pt-3 border-t border-gray-100">
                   Last refresh: {new Date().toLocaleTimeString()}
                 </div>
               </div>
@@ -500,7 +514,6 @@ export default function StockRecipeManager({ clientId: propClientId, token: prop
         </div>
       </div>
 
-      {/* Stock Modal */}
       {isStockModalOpen && (
         <StockModal
           isOpen={isStockModalOpen}
@@ -527,151 +540,85 @@ export default function StockRecipeManager({ clientId: propClientId, token: prop
   );
 }
 
-// ──────────────────────────────────────────────────────────────
-// Component Helpers (extracted for better readability)
-// ──────────────────────────────────────────────────────────────
-
 function StockTab({
   stocks,
   loading,
-  totalItems,
-  currentPage,
-  totalPages,
-  onPageChange,
+  searchQuery,
+  onSearchChange,
   onAddNew,
   onEdit,
   onDelete,
 }) {
   return (
     <div className="bg-bg-primary rounded-xl shadow border border-gray-100 overflow-hidden">
-      <div className="p-5 border-b border-gray-100 flex items-center justify-between">
-        <h2 className="text-lg font-semibold text-gray-900">Stock Items</h2>
-        <div className="flex gap-3">
-          <button
-            onClick={onAddNew}
-            className="px-4 py-2 bg-indigo-600 hover:bg-indigo-700 text-white rounded-lg text-sm font-medium transition-colors"
-          >
-            + Add Stock
-          </button>
-          <button
-            onClick={() => window.location.reload()}
-            className="px-4 py-2 border border-gray-300 hover:bg-gray-50 rounded-lg text-sm transition-colors"
-          >
-            Refresh
-          </button>
+      <div className="bg-action-primary p-6 border-b border-gray-100 flex items-center justify-between">
+        <div className="flex-1 max-w-md">
+          <input
+            type="text"
+            placeholder="Search by name, category, description..."
+            className="w-full px-4 py-3 text-base border border-gray-300 rounded-lg focus:ring-2 focus:ring-action-primary focus:border-action-primary"
+            value={searchQuery}
+            onChange={(e) => onSearchChange(e.target.value)}
+          />
         </div>
+        <button
+          onClick={onAddNew}
+          className="ml-4 px-6 py-3 bg-action-primary border border-black-600 hover:bg-action-primary  text-text-white rounded-lg text-base font-semibold transition-colors"
+        >
+          + Add Stock
+        </button>
       </div>
 
-      <div className="overflow-x-auto">
+      <div className="overflow-auto max-h-[600px]">
         <table className="min-w-full divide-y divide-gray-200">
-          <thead className="bg-gray-50">
+          <thead className="bg-gray-50 sticky top-0">
             <tr>
-              <th className="px-6 py-3 text-left text-xs font-medium text-gray-500 uppercase tracking-wider">
-                Item
-              </th>
-              <th className="px-6 py-3 text-left text-xs font-medium text-gray-500 uppercase tracking-wider">
-                Category
-              </th>
-              <th className="px-6 py-3 text-left text-xs font-medium text-gray-500 uppercase tracking-wider">
-                Availability
-              </th>
-              <th className="px-6 py-3 text-left text-xs font-medium text-gray-500 uppercase tracking-wider">
-                Unit
-              </th>
-              <th className="px-6 py-3 text-left text-xs font-medium text-gray-500 uppercase tracking-wider">
-                Price
-              </th>
-              <th className="px-6 py-3 text-right text-xs font-medium text-gray-500 uppercase tracking-wider">
-                Actions
-              </th>
+              <th className="px-6 py-4 text-left text-sm font-semibold text-gray-600 uppercase tracking-wider">Item</th>
+              <th className="px-6 py-4 text-left text-sm font-semibold text-gray-600 uppercase tracking-wider">Category</th>
+              <th className="px-6 py-4 text-left text-sm font-semibold text-gray-600 uppercase tracking-wider">Availability</th>
+              <th className="px-6 py-4 text-left text-sm font-semibold text-gray-600 uppercase tracking-wider">Unit</th>
+              <th className="px-6 py-4 text-left text-sm font-semibold text-gray-600 uppercase tracking-wider">Price</th>
+              <th className="px-6 py-4 text-right text-sm font-semibold text-gray-600 uppercase tracking-wider">Actions</th>
             </tr>
           </thead>
           <tbody className="bg-bg-primary divide-y divide-gray-200">
             {loading ? (
               <tr>
-                <td colSpan={6} className="px-6 py-12 text-center text-gray-500">
-                  Loading...
-                </td>
+                <td colSpan={6} className="px-6 py-12 text-center text-gray-500 text-base">Loading...</td>
               </tr>
             ) : stocks.length === 0 ? (
               <tr>
-                <td colSpan={6} className="px-6 py-12 text-center text-gray-500">
-                  No stock items found
-                </td>
+                <td colSpan={6} className="px-6 py-12 text-center text-gray-500 text-base">No stock items found</td>
               </tr>
             ) : (
               stocks.map((item) => (
                 <tr key={item.id} className="hover:bg-gray-50 transition-colors">
                   <td className="px-6 py-4 whitespace-nowrap">
-                    <div className="font-medium text-gray-900">{item.name}</div>
+                    <div className="font-semibold text-gray-900 text-base">{item.name}</div>
                     <div className="text-sm text-gray-500">{item.description || "—"}</div>
                   </td>
-                  <td className="px-6 py-4 whitespace-nowrap text-sm text-gray-600">
-                    {item.category || "—"}
-                  </td>
+                  <td className="px-6 py-4 whitespace-nowrap text-base text-gray-600">{item.category || "—"}</td>
                   <td className="px-6 py-4 whitespace-nowrap">
-                    <span
-                      className={`inline-flex px-2.5 py-1 text-xs font-medium rounded-full ${
-                        item.status === "out"
-                          ? "bg-red-100 text-red-800"
-                          : item.status === "low"
-                          ? "bg-amber-100 text-amber-800"
-                          : "bg-green-100 text-green-800"
-                      }`}
-                    >
+                    <span className={`inline-flex px-3 py-1.5 text-sm font-semibold rounded-full ${item.status === "out" ? "bg-red-100 text-red-800" :
+                        item.status === "low" ? "bg-amber-100 text-amber-800" :
+                          "bg-green-100 text-green-800"
+                      }`}>
                       {item.effectiveAvailability}
                     </span>
                   </td>
-                  <td className="px-6 py-4 whitespace-nowrap text-sm text-gray-600">
-                    {item.unit || "—"}
-                  </td>
-                  <td className="px-6 py-4 whitespace-nowrap text-sm text-gray-700">
+                  <td className="px-6 py-4 whitespace-nowrap text-base text-gray-600">{item.unit || "—"}</td>
+                  <td className="px-6 py-4 whitespace-nowrap text-base font-medium text-gray-700">
                     ₹{(Number(item.unit_price) || 0).toFixed(2)}
                   </td>
-                  <td className="px-6 py-4 whitespace-nowrap text-right text-sm font-medium">
-                    <button
-                      onClick={() => onEdit(item)}
-                      className="text-indigo-600 hover:text-indigo-900 mr-3"
-                    >
-                      Edit
-                    </button>
-                    <button
-                      onClick={() => onDelete(item.id)}
-                      className="text-action-primary hover:text-red-900"
-                    >
-                      Delete
-                    </button>
+                  <td className="px-6 py-4 whitespace-nowrap text-right text-base font-medium">
+                    <button onClick={() => onEdit(item)} className="text-action-primary hover:text-action-primary  mr-4">Edit</button>
+                    <button onClick={() => onDelete(item.id)} className="text-action-primary hover:text-action-primary">Delete</button>
                   </td>
                 </tr>
               ))
             )}
           </tbody>
         </table>
-      </div>
-
-      <div className="px-6 py-4 flex items-center justify-between border-t border-gray-100 bg-gray-50">
-        <div className="text-sm text-gray-600">
-          Showing {totalItems} item{totalItems !== 1 ? "s" : ""}
-        </div>
-        <div className="flex items-center gap-3">
-          <button
-            onClick={() => onPageChange((p) => Math.max(1, p - 1))}
-            disabled={currentPage === 1}
-            className="px-3 py-1 border rounded-md text-sm disabled:opacity-40 disabled:cursor-not-allowed"
-          >
-            Prev
-          </button>
-          <span className="text-sm text-gray-700">
-            {currentPage} / {totalPages}
-          </span>
-          <button
-            onClick={() => onPageChange((p) => Math.min(totalPages, p + 1))}
-            disabled={currentPage === totalPages}
-            className="px-3 py-1 border rounded-md text-sm disabled:opacity-40 disabled:cursor-not-allowed"
-          >
-            Next
-          </button>
-        </div>
       </div>
     </div>
   );
@@ -690,32 +637,25 @@ function RecipeTab({
   onDeleteIngredient,
 }) {
   return (
-    <div className="bg-bg-primary rounded-xl shadow border border-gray-100 p-6">
-      <h2 className="text-lg font-semibold text-gray-900 mb-5">Recipe Builder</h2>
+    <div className="bg-bg-primary rounded-xl shadow border border-gray-100">
 
-      <div className="grid md:grid-cols-2 lg:grid-cols-3 gap-4 mb-6">
+      <div className="bg-action-primary p-3 grid md:grid-cols-2 lg:grid-cols-3 rounded-xl gap-4 mb-2">
         <div className="lg:col-span-2">
-          <label className="block text-sm font-medium text-gray-700 mb-1">
-            Menu Item
-          </label>
+          <label className="block text-sm font-medium text-text-white mb-1">Menu Item</label>
           <select
-            className="w-full px-4 py-2 border border-gray-300 rounded-lg focus:ring-indigo-500 focus:border-indigo-500"
+            className="w-full px-4 py-2 border rounded-lg focus:ring-indigo-500 focus:border-indigo-500"
             value={selectedMenuId || ""}
             onChange={(e) => onSelectMenu(e.target.value)}
           >
             <option value="">— Select menu item —</option>
             {menuItems.map((item) => (
-              <option key={item.id} value={item.id}>
-                {item.name}
-              </option>
+              <option key={item.id} value={item.id}>{item.name}</option>
             ))}
           </select>
         </div>
 
         <div>
-          <label className="block text-sm font-medium text-gray-700 mb-1">
-            Ingredients
-          </label>
+          <label className="block text-sm font-medium text-text-white mb-1">Ingredients</label>
           <div className="px-4 py-2 bg-gray-50 border border-gray-200 rounded-lg text-lg font-medium text-gray-900">
             {recipe.length}
           </div>
@@ -728,26 +668,16 @@ function RecipeTab({
             <table className="min-w-full divide-y divide-gray-200">
               <thead className="bg-gray-50">
                 <tr>
-                  <th className="px-6 py-3 text-left text-xs font-medium text-gray-500 uppercase tracking-wider">
-                    Ingredient
-                  </th>
-                  <th className="px-6 py-3 text-left text-xs font-medium text-gray-500 uppercase tracking-wider">
-                    Qty
-                  </th>
-                  <th className="px-6 py-3 text-left text-xs font-medium text-gray-500 uppercase tracking-wider">
-                    Unit
-                  </th>
-                  <th className="px-6 py-3 text-right text-xs font-medium text-gray-500 uppercase tracking-wider">
-                    Actions
-                  </th>
+                  <th className="px-6 py-3 text-left text-xs font-medium text-gray-500 uppercase tracking-wider">Ingredient</th>
+                  <th className="px-6 py-3 text-left text-xs font-medium text-gray-500 uppercase tracking-wider">Qty</th>
+                  <th className="px-6 py-3 text-left text-xs font-medium text-gray-500 uppercase tracking-wider">Unit</th>
+                  <th className="px-6 py-3 text-right text-xs font-medium text-gray-500 uppercase tracking-wider">Actions</th>
                 </tr>
               </thead>
               <tbody className="bg-bg-primary divide-y divide-gray-200">
                 {recipe.length === 0 ? (
                   <tr>
-                    <td colSpan={4} className="px-6 py-12 text-center text-gray-500">
-                      No ingredients added yet
-                    </td>
+                    <td colSpan={4} className="px-6 py-12 text-center text-gray-500">No ingredients added yet</td>
                   </tr>
                 ) : (
                   recipe.map((ing, index) => {
@@ -778,7 +708,7 @@ function RecipeTab({
                         <td className="px-6 py-4 text-right">
                           <button
                             onClick={() => onDeleteIngredient(index)}
-                            className="text-action-primary hover:text-red-800 text-sm font-medium"
+                            className="text-action-primary hover:text-action-primary text-sm font-medium"
                           >
                             Remove
                           </button>
@@ -791,23 +721,18 @@ function RecipeTab({
             </table>
           </div>
 
-          {/* Add new ingredient form */}
           <div className="bg-gray-50 p-5 rounded-xl border border-gray-100">
             <h4 className="text-base font-medium text-gray-800 mb-4">Add Ingredient</h4>
             <div className="grid md:grid-cols-4 gap-4 items-end">
               <div>
                 <select
                   value={newIngredient.stock_item_id}
-                  onChange={(e) =>
-                    setNewIngredient((prev) => ({ ...prev, stock_item_id: e.target.value }))
-                  }
+                  onChange={(e) => setNewIngredient((prev) => ({ ...prev, stock_item_id: e.target.value }))}
                   className="w-full px-4 py-2 border border-gray-300 rounded-lg focus:ring-indigo-500 focus:border-indigo-500"
                 >
                   <option value="">Select ingredient</option>
                   {stocks.map((s) => (
-                    <option key={s.id} value={s.id}>
-                      {s.name}
-                    </option>
+                    <option key={s.id} value={s.id}>{s.name}</option>
                   ))}
                 </select>
               </div>
@@ -819,9 +744,7 @@ function RecipeTab({
                   min="0"
                   placeholder="Quantity"
                   value={newIngredient.quantity_required}
-                  onChange={(e) =>
-                    setNewIngredient((prev) => ({ ...prev, quantity_required: e.target.value }))
-                  }
+                  onChange={(e) => setNewIngredient((prev) => ({ ...prev, quantity_required: e.target.value }))}
                   className="w-full px-4 py-2 border border-gray-300 rounded-lg focus:ring-indigo-500 focus:border-indigo-500"
                 />
               </div>
@@ -830,9 +753,7 @@ function RecipeTab({
                 <input
                   placeholder="Unit (g/ml/pcs)"
                   value={newIngredient.unit}
-                  onChange={(e) =>
-                    setNewIngredient((prev) => ({ ...prev, unit: e.target.value }))
-                  }
+                  onChange={(e) => setNewIngredient((prev) => ({ ...prev, unit: e.target.value }))}
                   className="w-full px-4 py-2 border border-gray-300 rounded-lg focus:ring-indigo-500 focus:border-indigo-500"
                 />
               </div>
@@ -840,14 +761,12 @@ function RecipeTab({
               <div className="flex gap-3">
                 <button
                   onClick={onAddIngredient}
-                  className="flex-1 py-2 px-4 bg-indigo-600 hover:bg-indigo-700 text-text-white rounded-lg transition-colors"
+                  className="flex-1 py-2 px-4 bg-action-primary hover:bg-action-primary text-text-white rounded-lg transition-colors"
                 >
                   Add
                 </button>
                 <button
-                  onClick={() =>
-                    setNewIngredient({ stock_item_id: "", quantity_required: "", unit: "" })
-                  }
+                  onClick={() => setNewIngredient({ stock_item_id: "", quantity_required: "", unit: "" })}
                   className="flex-1 py-2 px-4 border border-gray-300 hover:bg-gray-50 rounded-lg transition-colors"
                 >
                   Clear
@@ -865,13 +784,150 @@ function RecipeTab({
   );
 }
 
+function MenuAvailabilityTab({ menuItems, loading, onUpdateAvailability }) {
+  const [editingItem, setEditingItem] = useState(null);
+  const [editForm, setEditForm] = useState({ availability: "", unit: "" });
+
+  const handleEdit = (item) => {
+    setEditingItem(item.id);
+    setEditForm({
+      availability: item.availability || "",
+      unit: item.unit || "",
+    });
+  };
+
+  const handleSave = async (itemId) => {
+    await onUpdateAvailability(itemId, editForm.availability, editForm.unit);
+    setEditingItem(null);
+    setEditForm({ availability: "", unit: "" });
+  };
+
+  const handleCancel = () => {
+    setEditingItem(null);
+    setEditForm({ availability: "", unit: "" });
+  };
+
+  return (
+    <div className="bg-bg-primary rounded-xl shadow border border-gray-100 overflow-hidden">
+      <div className="bg-action-primary p-5 border-b border-gray-100">
+        <h2 className="text-lg font-semibold text-text-white">Menu Availability</h2>
+        <p className="text-sm text-text-white mt-1">Manage availability and units for menu items</p>
+      </div>
+
+      {loading ? (
+        <div className="px-6 py-12 text-center text-gray-500">Loading menu items...</div>
+      ) : menuItems.length === 0 ? (
+        <div className="px-6 py-12 text-center text-gray-500">No menu items found</div>
+      ) : (
+        <div className="overflow-x-auto">
+          <table className="min-w-full divide-y divide-gray-200">
+            <thead className="bg-gray-50">
+              <tr>
+                <th className="px-6 py-3 text-left text-xs font-medium text-gray-500 uppercase tracking-wider">
+                  Menu Item
+                </th>
+                <th className="px-6 py-3 text-left text-xs font-medium text-gray-500 uppercase tracking-wider">
+                  Category
+                </th>
+                <th className="px-6 py-3 text-left text-xs font-medium text-gray-500 uppercase tracking-wider">
+                  Availability
+                </th>
+                <th className="px-6 py-3 text-left text-xs font-medium text-gray-500 uppercase tracking-wider">
+                  Unit
+                </th>
+                <th className="px-6 py-3 text-right text-xs font-medium text-gray-500 uppercase tracking-wider">
+                  Actions
+                </th>
+              </tr>
+            </thead>
+            <tbody className="bg-bg-primary divide-y divide-gray-200">
+              {menuItems.map((item) => (
+                <tr key={item.id} className="hover:bg-gray-50 transition-colors">
+                  <td className="px-6 py-4 whitespace-nowrap">
+                    <div className="font-medium text-gray-900">{item.name}</div>
+                    {item.description && (
+                      <div className="text-sm text-gray-500">{item.description}</div>
+                    )}
+                  </td>
+                  <td className="px-6 py-4 whitespace-nowrap text-sm text-gray-600">
+                    {item.category || "—"}
+                  </td>
+                  <td className="px-6 py-4 whitespace-nowrap">
+                    {editingItem === item.id ? (
+                      <input
+                        type="number"
+                        step="0.01"
+                        min="0"
+                        value={editForm.availability}
+                        onChange={(e) =>
+                          setEditForm((prev) => ({ ...prev, availability: e.target.value }))
+                        }
+                        className="w-24 px-3 py-2 border border-gray-300 rounded-lg focus:ring-2 focus:ring-indigo-500 focus:border-indigo-500"
+                        placeholder="0"
+                      />
+                    ) : (
+                      <span className="text-sm text-gray-900">
+                        {item.availability || "—"}
+                      </span>
+                    )}
+                  </td>
+                  <td className="px-6 py-4 whitespace-nowrap">
+                    {editingItem === item.id ? (
+                      <input
+                        type="text"
+                        value={editForm.unit}
+                        onChange={(e) =>
+                          setEditForm((prev) => ({ ...prev, unit: e.target.value }))
+                        }
+                        className="w-24 px-3 py-2 border border-gray-300 rounded-lg focus:ring-2 focus:ring-indigo-500 focus:border-indigo-500"
+                        placeholder="kg, pcs"
+                      />
+                    ) : (
+                      <span className="text-sm text-gray-900">{item.unit || "—"}</span>
+                    )}
+                  </td>
+                  <td className="px-6 py-4 whitespace-nowrap text-right text-sm font-medium">
+                    {editingItem === item.id ? (
+                      <div className="flex justify-end gap-2">
+                        <button
+                          onClick={() => handleSave(item.id)}
+                          className="px-3 py-1 bg-indigo-600 hover:bg-indigo-700 text-white rounded-md transition-colors"
+                        >
+                          Save
+                        </button>
+                        <button
+                          onClick={handleCancel}
+                          className="px-3 py-1 border border-gray-300 hover:bg-gray-50 text-gray-700 rounded-md transition-colors"
+                        >
+                          Cancel
+                        </button>
+                      </div>
+                    ) : (
+                      <button
+                        onClick={() => handleEdit(item)}
+                        className="text-indigo-600 hover:text-indigo-900"
+                      >
+                        Edit
+                      </button>
+                    )}
+                  </td>
+                </tr>
+              ))}
+            </tbody>
+          </table>
+        </div>
+      )}
+    </div>
+  );
+}
+
 function StockModal({ isOpen, isEditing, form, categories, onChange, onSave, onClose }) {
   if (!isOpen) return null;
 
   return (
     <div className="fixed inset-0 z-50 flex items-center justify-center p-4">
       <div className="absolute inset-0 bg-black/40" onClick={onClose} />
-      <div className="relative bg-bg-white rounded-2xl shadow-2xl max-w-lg w-full p-6">
+      <div className="relative bg-bg-primary rounded-2xl shadow-2xl max-w-lg w-full p-6">
         <h3 className="text-xl font-semibold text-gray-900 mb-6">
           {isEditing ? "Edit Stock Item" : "New Stock Item"}
         </h3>
@@ -957,7 +1013,7 @@ function StockModal({ isOpen, isEditing, form, categories, onChange, onSave, onC
           </button>
           <button
             onClick={onSave}
-            className="px-6 py-2.5 bg-indigo-600 hover:bg-indigo-700 text-text-white rounded-lg transition-colors"
+            className="px-6 py-2.5 bg-action-primary text-text-white rounded-lg transition-colors"
           >
             {isEditing ? "Update" : "Create"}
           </button>
