@@ -11,4 +11,4 @@ app.get('*', (req, res) => {
   res.sendFile(path.join(__dirname, 'dist', 'index.html'))
 })
 
-app.listen(8080, () => console.log('App running on port 8080'))
+app.listen(8007, () => console.log('App running on port 8007'))
