@@ -2,7 +2,7 @@
 FROM node:20-alpine AS build
 
 # Set working directory
-WORKDIR /app
+WORKDIR /
 
 # Copy package.json and install dependencies
 COPY package.json package-lock.json ./
