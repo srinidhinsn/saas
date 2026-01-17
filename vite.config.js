@@ -6,6 +6,11 @@ export default defineConfig({
   base: '/',
   plugins: [react()],
   server: {
+    host: '0.0.0.0',       // allow external connections
+    port: 8007,            // your chosen port
+    allowedHosts: [
+      'saas.networkspecialist.in'
+    ],
     watch: {
       ignored: ['**/.env', '**/vite.config.js']
     }
