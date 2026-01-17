@@ -1,3 +1,4 @@
+
 import React, { useEffect, useState, useRef } from "react";
 import { FaEdit, FaTrash, FaCheck, FaTimes, FaSearch, FaUsers, FaClock, FaPlus } from "react-icons/fa";
 import axios from 'axios';
@@ -9,14 +10,14 @@ import UniversalBulkDeleteModal from "../../utils/Modals/UniversalBulkDeleteModa
 import AccessGuard from "../../utils/Interceptors/ProtectedRoute";
 
 const statusConfig = {
-    Vacant: { card: "bg-tableStatusBg-vacant border-tableStatusBorder-vacant", icon: <FaCheck className="text-action-success text-xl" />, label: "Available" },
-    Occupied: { card: "bg-tableStatusBg-occupied border-tableStatusBorder-occupied", icon: <FaUsers className="text-action-danger text-xl" />, label: "Occupied" },
-    Reserved: { card: "bg-tableStatusBg-reserved border-tableStatusBorder-reserved", icon: <FaClock className="text-action-primary text-xl" />, label: "Reserved" }
+    Vacant: { card: "border-tableStatusBorder-vacant", icon: <FaCheck className="text-action-success text-xl" />, label: "Available" },
+    Occupied: { card: "border-tableStatusBorder-occupied", icon: <FaUsers className="text-action-danger text-xl" />, label: "Occupied" },
+    Reserved: { card: "border-tableStatusBorder-reserved", icon: <FaClock className="text-action-primary text-xl" />, label: "Reserved" }
 };
 
-const TableManagement = ({ clientId, token, screenIds,userId }) => {
+const TableManagement = ({ clientId, token, screenIds, userId }) => {
 
-    console.log("requesterId",userId)
+    console.log("requesterId", userId)
     const [searchTerm, setSearchTerm] = useState("");
     const [statusFilter, setStatusFilter] = useState("");
     const [tableRanges, setTableRanges] = useState([]);
@@ -52,9 +53,74 @@ const TableManagement = ({ clientId, token, screenIds,userId }) => {
     const [showFirstDeleteConfirm, setShowFirstDeleteConfirm] = useState(false);
     const [showSecondDeleteConfirm, setShowSecondDeleteConfirm] = useState(false);
 
+    const [viewMode, setViewMode] = useState(false);
+    const [addItemsMode, setAddItemsMode] = useState(false);
     useEffect(() => {
         if (clientId) fetchTables();
     }, [clientId]);
+   const getSortedTables = (tablesToSort) => {
+    const COLS_PER_ROW = 8;
+
+    const occupied = tablesToSort
+        .filter(t => t.status === 'Occupied')
+        .sort((a, b) => a.name.localeCompare(b.name, undefined, { numeric: true }));
+
+    const reserved = tablesToSort
+        .filter(t => t.status === 'Reserved')
+        .sort((a, b) => a.name.localeCompare(b.name, undefined, { numeric: true }));
+
+    const vacant = tablesToSort
+        .filter(t => t.status === 'Vacant')
+        .sort((a, b) => a.name.localeCompare(b.name, undefined, { numeric: true }));
+
+    const totalTables = tablesToSort.length;
+    const totalRows = Math.ceil(totalTables / COLS_PER_ROW);
+
+    const grid = Array.from({ length: totalRows }, () =>
+        Array(COLS_PER_ROW).fill(null)
+    );
+
+    let filledCount = 0;
+
+    const canFill = (row, col) =>
+        row * COLS_PER_ROW + col < totalTables;
+
+    /* ---------------- RESERVED (right-most, top-down) ---------------- */
+    let resIndex = 0;
+    for (let col = COLS_PER_ROW - 1; col >= 0 && resIndex < reserved.length; col--) {
+        for (let row = 0; row < totalRows && resIndex < reserved.length; row++) {
+            if (!grid[row][col] && canFill(row, col)) {
+                grid[row][col] = reserved[resIndex++];
+                filledCount++;
+            }
+        }
+    }
+
+    /* ---------------- OCCUPIED (below reserved, right-side) ---------------- */
+    let occIndex = 0;
+    for (let col = COLS_PER_ROW - 1; col >= 0 && occIndex < occupied.length; col--) {
+        for (let row = 0; row < totalRows && occIndex < occupied.length; row++) {
+            if (!grid[row][col] && canFill(row, col)) {
+                grid[row][col] = occupied[occIndex++];
+                filledCount++;
+            }
+        }
+    }
+
+    /* ---------------- VACANT (everything else) ---------------- */
+    let vacIndex = 0;
+    for (let row = 0; row < totalRows && vacIndex < vacant.length; row++) {
+        for (let col = 0; col < COLS_PER_ROW && vacIndex < vacant.length; col++) {
+            if (!grid[row][col] && canFill(row, col)) {
+                grid[row][col] = vacant[vacIndex++];
+                filledCount++;
+            }
+        }
+    }
+
+    return grid.flat().filter(Boolean);
+};
+
 
     const fetchTables = async () => {
         if (!clientId) return;
@@ -64,20 +130,24 @@ const TableManagement = ({ clientId, token, screenIds,userId }) => {
                 `${import.meta.env.VITE_API_TABLE_SERVICE_URL}/${clientId}/tables/read`,
                 { headers: { Authorization: `Bearer ${token}` } }
             );
-    
+
             const result = res.data;
             setRequiredScreenId(result.screen_id);
-    
+
             if (result.screen_id === "default_tables") {
                 const tableList = Array.isArray(result?.data) ? result.data : [];
-    
+
                 // Exclude takeaway table
                 const filteredTables = tableList
-                    .filter(table => table.name?.toLowerCase() !== "takeaway")
+                    .filter(table =>
+                        table.id !== 500 &&                           // ⬅️ hard exclude takeaway table
+                        table.name?.toLowerCase() !== "take away" && // ⬅️ extra safety
+                        table.name?.toLowerCase() !== "takeaway"
+                    )
                     .sort((a, b) =>
                         a.name.localeCompare(b.name, undefined, { numeric: true })
                     );
-    
+
                 setTables(filteredTables);
                 setOriginalTables(filteredTables);
             }
@@ -87,35 +157,93 @@ const TableManagement = ({ clientId, token, screenIds,userId }) => {
             setLoading(false);
         }
     };
-    
+    const normalizeTableRangeStrict = (rangeStr) => {
+        const raw = rangeStr.trim().toUpperCase();
+
+        // Reject any unpadded numbers like B1, A3
+        if (/\b[A-Z]+\d\b/.test(raw)) {
+            throw new Error("Table numbers must be 2 digits. Use B01 instead of B1");
+        }
+
+        // Reject mixed digit width ranges like A01:A3
+        const parts = raw.split(",");
+        for (const part of parts) {
+            if (part.includes(":")) {
+                const [start, end] = part.split(":");
+
+                const startDigits = start.match(/\d+$/)?.[0]?.length;
+                const endDigits = end.match(/\d+$/)?.[0]?.length;
+
+                if (startDigits !== endDigits) {
+                    throw new Error("Mixed numbering not allowed. Use A01:A03");
+                }
+            }
+        }
+
+        return raw;
+    };
+
+    const validateTableRangeStrict = (rangeStr, existingTables) => {
+        let normalized;
+
+        try {
+            normalized = normalizeTableRangeStrict(rangeStr);
+        } catch (e) {
+            return e.message;
+        }
+
+        const validPattern =
+            /^[A-Z]{1,3}\d{2}(?::[A-Z]{1,3}\d{2})?(,\s*[A-Z]{1,3}\d{2}(?::[A-Z]{1,3}\d{2})?)*$/;
+
+        if (!validPattern.test(normalized)) {
+            return "Invalid format. Use A01 or A01:A10 or A01,B02";
+        }
+
+        const generated = parseTableRange(normalized);
+
+        // Duplicate check
+        const duplicates = generated.filter((v, i, a) => a.indexOf(v) !== i);
+        if (duplicates.length > 0) {
+            return `Duplicate table(s): ${duplicates.join(", ")}`;
+        }
+
+        // Existing table conflict
+        const existingNames = existingTables.map(t => t.name.toUpperCase());
+        const conflicts = generated.filter(t => existingNames.includes(t));
+        if (conflicts.length > 0) {
+            return `Table already exists: ${conflicts.join(", ")}`;
+        }
+
+        return null;
+    };
+
+
+
     const parseTableRange = (rangeStr) => {
         const parts = rangeStr.split(",");
         const tables = [];
+
         for (let part of parts) {
             part = part.trim();
-            if (!part) continue;
+
             if (part.includes(":")) {
-                const [startStr, endStr] = part.split(":");
-                const prefixStart = startStr.match(/[A-Za-z]+/);
-                const startNum = startStr.match(/\d+/);
-                const endNum = endStr.match(/\d+/);
-                if (!prefixStart || !startNum || !endNum) continue;
-                const prefix = prefixStart[0].toUpperCase();
-                const start = parseInt(startNum[0]);
-                const end = parseInt(endNum[0]);
-                for (let i = start; i <= end; i++) {
+                const [start, end] = part.split(":");
+
+                const prefix = start.match(/^[A-Z]+/)[0];
+                const startNum = parseInt(start.match(/\d{2}$/)[0], 10);
+                const endNum = parseInt(end.match(/\d{2}$/)[0], 10);
+
+                for (let i = startNum; i <= endNum; i++) {
                     tables.push(`${prefix}${i.toString().padStart(2, "0")}`);
                 }
             } else {
-                const prefix = part.match(/[A-Za-z]+/);
-                const num = part.match(/\d+/);
-                if (!prefix || !num) continue;
-                const formatted = `${prefix[0].toUpperCase()}${parseInt(num[0]).toString().padStart(2, "0")}`;
-                tables.push(formatted);
+                tables.push(part);
             }
         }
+
         return tables;
     };
+
 
     const generateTables = async () => {
         if (generatingRef.current) return;
@@ -142,7 +270,15 @@ const TableManagement = ({ clientId, token, screenIds,userId }) => {
 
             const payload = [];
             for (let row of validRows) {
-                const tableNumbers = parseTableRange(row.range);
+                const error = validateTableRangeStrict(row.range, originalTables);
+                if (error) {
+                    toast.error(error);
+                    return; // ⛔ STOP ENTIRE CREATION
+                }
+
+                const normalized = normalizeTableRangeStrict(row.range);
+                const tableNumbers = parseTableRange(normalized);
+
                 tableNumbers.forEach(num => {
                     payload.push({
                         client_id: clientId,
@@ -155,10 +291,11 @@ const TableManagement = ({ clientId, token, screenIds,userId }) => {
                         sort_order: row.sort_order ? parseInt(row.sort_order) : null,
                         is_active: row.is_active || false,
                         qr_code_url: row.qr_code_url || "",
-                        slug: `${clientId}-${(row.slug || num).toLowerCase().replace(/[^a-z0-9-]/g, '')}`
+                        slug: `${clientId}-${num.toLowerCase()}`
                     });
                 });
             }
+
 
             for (let data of payload) {
                 try {
@@ -454,11 +591,13 @@ const TableManagement = ({ clientId, token, screenIds,userId }) => {
         );
     };
 
-    const filteredTables = tables.filter(table => {
-        const matchesSearch = table.name.toLowerCase().includes(searchTerm.toLowerCase());
-        const matchesStatus = !statusFilter || table.status === statusFilter;
-        return matchesSearch && matchesStatus;
-    });
+    const filteredTables = getSortedTables(
+        tables.filter(table => {
+            const matchesSearch = table.name.toLowerCase().includes(searchTerm.toLowerCase());
+            const matchesStatus = !statusFilter || table.status === statusFilter;
+            return matchesSearch && matchesStatus;
+        })
+    );
 
     if (loading) {
         return (
@@ -473,9 +612,9 @@ const TableManagement = ({ clientId, token, screenIds,userId }) => {
 
     return (
         <AccessGuard screenIds={screenIds} requiredScreenId={requiredScreenId} clientId={clientId} requesterId={userId}>
-        <div className="min-h-screen bg-bg-primary">
-            <style>
-                {`
+            <div className="min-h-screen bg-bg-primary">
+                <style>
+                    {`
           @keyframes scale-in {
             from {
               opacity: 0;
@@ -490,167 +629,186 @@ const TableManagement = ({ clientId, token, screenIds,userId }) => {
             animation: scale-in 0.2s ease-out;
           }
         `}
-            </style>
-            <main className="mx-auto px-3 py-2">
-                {/* Controls */}
-                <div className="rounded-xl p-2 mb-4">
-                    <div className="flex flex-col lg:flex-row gap-3 lg:items-center lg:justify-between">
-                        <div className="flex flex-col sm:flex-row gap-2 flex-1">
-                            <div className="relative ">
-                                <FaSearch className="absolute left-3 top-1/2 transform -translate-y-1/2 text-text-secondary" />
-                                <input
-                                    type="text"
-                                    value={searchTerm}
-                                    onChange={e => setSearchTerm(e.target.value)}
-                                    placeholder="Search tables..."
-                                    className="w-full pl-10 pr-3 py-2 border-default border-border-default rounded-lg focus:outline-none  focus:border-action-primary bg-bg-primary text-text-primary"
-                                />
+                </style>
+                <main className="mx-auto px-3 py-2">
+                    {/* Controls */}
+                    <div className="rounded-xl p-2 mb-4">
+                        <div className="flex flex-col lg:flex-row gap-3 lg:items-center lg:justify-between">
+                            <div className="flex flex-col sm:flex-row gap-2 flex-1">
+                                <div className="relative ">
+                                    <FaSearch className="absolute left-3 top-1/2 transform -translate-y-1/2 text-text-secondary" />
+                                    <input
+                                        type="text"
+                                        value={searchTerm}
+                                        onChange={e => setSearchTerm(e.target.value)}
+                                        placeholder="Search tables..."
+                                        className="w-full pl-10 pr-3 py-2 border-default border-border-default rounded-lg focus:outline-none  focus:border-action-primary bg-bg-primary text-text-primary"
+                                    />
+                                </div>
+                                <select
+                                    value={statusFilter}
+                                    onChange={e => setStatusFilter(e.target.value)}
+                                    className="px-3 py-2 border-default border-border-default rounded-lg focus:outline-none focus:ring-2 focus:border-action-primary bg-bg-primary text-text-primary"
+                                >
+                                    <option value="">All Status</option>
+                                    <option value="Vacant">Available</option>
+                                    <option value="Occupied">Occupied</option>
+                                    <option value="Reserved">Reserved</option>
+                                </select>
                             </div>
-                            <select
-                                value={statusFilter}
-                                onChange={e => setStatusFilter(e.target.value)}
-                                className="px-3 py-2 border-default border-border-default rounded-lg focus:outline-none focus:ring-2 focus:border-action-primary bg-bg-primary text-text-primary"
-                            >
-                                <option value="">All Status</option>
-                                <option value="Vacant">Available</option>
-                                <option value="Occupied">Occupied</option>
-                                <option value="Reserved">Reserved</option>
-                            </select>
-                        </div>
 
-                        <div className="flex flex-wrap gap-2">
-                            <button
-                                className="flex items-center gap-2 px-4 py-2 bg-action-primary text-text-white rounded-lg hover:bg-bulkActionsHover-updateHover hover:text-text-primary transition-colors font-semibold text-sm shadow-md"
-                                onClick={openBulkUpdate}
-                            >
-                                <FaEdit /> <span>Bulk Update</span>
-                            </button>
-                            <button
-                                className="flex items-center gap-2 px-4 py-2 bg-bulkActions-delete text-text-white rounded-lg hover:bg-bulkActionsHover-deleteHover hover:text-text-primary transition-colors font-semibold text-sm shadow-md"
-                                onClick={openBulkDelete}
-                            >
-                                <FaTrash /> <span>Bulk Delete</span>
-                            </button>
-                            <button
-                                className="flex items-center gap-2 px-4 py-2 bg-bulkActions-adding text-text-white rounded-lg hover:bg-bulkActionsHover-addingHover hover:text-text-primary transition-colors font-semibold text-sm shadow-md"
-                                onClick={() => {
-                                    setShowAddTable(true);
-                                    setTableRanges([{
-                                        range: "", table_type: "", type: "", remark: "Vacant",
-                                        is_active: false, description: "", slug: "", section: "",
-                                        sort_order: "", qr_code_url: ""
-                                    }]);
-                                    setFieldErrors([{}]);
-                                }}
-                            >
-                                <FaPlus /> <span>Add Table</span>
-                            </button>
+                            <div className="flex flex-wrap gap-2">
+                                <button
+                                    className="flex items-center gap-2 px-4 py-2 bg-action-primary text-text-white rounded-lg hover:bg-bulkActionsHover-updateHover hover:text-text-primary transition-colors font-semibold text-sm shadow-md"
+                                    onClick={openBulkUpdate}
+                                >
+                                    <FaEdit /> <span>Bulk Update</span>
+                                </button>
+                                <button
+                                    className="flex items-center gap-2 px-4 py-2 bg-bulkActions-delete text-text-white rounded-lg hover:bg-bulkActionsHover-deleteHover hover:text-text-primary transition-colors font-semibold text-sm shadow-md"
+                                    onClick={openBulkDelete}
+                                >
+                                    <FaTrash /> <span>Bulk Delete</span>
+                                </button>
+                                <button
+                                    className="flex items-center gap-2 px-4 py-2 bg-bulkActions-adding text-text-white rounded-lg hover:bg-bulkActionsHover-addingHover hover:text-text-primary transition-colors font-semibold text-sm shadow-md"
+                                    onClick={() => {
+                                        setShowAddTable(true);
+                                        setTableRanges([{
+                                            range: "", table_type: "", type: "", remark: "Vacant",
+                                            is_active: false, description: "", slug: "", section: "",
+                                            sort_order: "", qr_code_url: ""
+                                        }]);
+                                        setFieldErrors([{}]);
+                                    }}
+                                >
+                                    <FaPlus /> <span>Add Table</span>
+                                </button>
+                            </div>
                         </div>
                     </div>
-                </div>
 
-                {/* Table Grid */}
-                <div className="grid grid-cols-2 sm:grid-cols-3 lg:grid-cols-4 xl:grid-cols-5 2xl:grid-cols-6 gap-2 sm:gap-3">
-                    {filteredTables.map(table => {
-                        const config = statusConfig[table.status] || statusConfig['Vacant'];
-                        return (
-                            <div key={table.id} className={`${config.card} rounded-button shadow-sm overflow-hidden border-2 transition-all duration-200 hover:shadow-lg hover:scale-105`}>
-                                <div className="p-3 border-b bg-bg-primary bg-opacity-50">
-                                    <div className="flex justify-between items-start mb-2">
-                                        <div className="flex-1">
-                                            <div className="text-lg font-bold text-text-primary mb-0.5">{table.name}</div>
-                                            <div className="text-xs text-text-secondary">Seating : <span className="font-semibold text-text-primary">{table.table_type}</span></div>
-                                            <div className="text-xs text-text-secondary">Zone : <span className="font-semibold text-text-primary">{table.location_zone}</span></div>
+                    {/* Table Grid */}
+                    <div className="grid grid-cols-2 sm:grid-cols-4 lg:grid-cols-6 xl:grid-cols-6 2xl:grid-cols-8 gap-2 sm:gap-3">
+                        {filteredTables.map(table => {
+                            const config = statusConfig[table.status] || statusConfig['Vacant'];
+                            return (
+                                <div key={table.id} className={`${config.card} rounded-button shadow-sm overflow-hidden border-2 transition-all duration-200 hover:shadow-lg hover:scale-105`}>
+                                    <div className="p-3 border-b bg-bg-primary bg-opacity-50">
+                                        <div className="flex justify-between items-start mb-2">
+                                            <div className="flex-1">
+                                                {/* Table Name */}
+                                                <div className="text-xl font-bold text-center text-text-primary mb-1">
+                                                    {table.name}
+                                                </div>
+
+                                                {/* Seating + Zone in one row */}
+                                                <div className="flex gap-2 text-[10px] justify-center align-center font-semibold text-text-secondary">
+                                                    <div>
+                                                        Seating :{" "}
+                                                        <span className="font-bold text-text-primary">
+                                                            {table.table_type}
+                                                        </span>
+                                                    </div>
+                                                    <div>
+                                                        Zone :{" "}
+                                                        <span className="font-bold text-text-primary">
+                                                            {table.location_zone}
+                                                        </span>
+                                                    </div>
+                                                </div>
+                                            </div>
+
+                                            {config.icon}
                                         </div>
-                                        {config.icon}
+
+                                        <div className="flex items-center justify-center">
+                                            <span className={`px-2 py-0.5 rounded-full text-[10px] font-bold ${table.status === 'Vacant' ? 'bg-tableStatusBg-vacant text-tableStatusText-vacant' :
+                                                table.status === 'Occupied' ? 'bg-tableStatusBg-occupied text-tableStatusText-occupied' :
+                                                    'bg-tableStatusBg-reserved text-tableStatusText-reserved'
+                                                }`}>
+                                                Status : {config.label}
+                                            </span>
+                                        </div>
                                     </div>
-                                    <div className="flex items-center justify-center">
-                                        <span className={`px-2.5 py-0.5 rounded-full text-xs font-bold ${table.status === 'Vacant' ? 'bg-tableStatusBg-vacant text-tableStatusText-vacant' :
-                                            table.status === 'Occupied' ? 'bg-tableStatusBg-occupied text-tableStatusText-occupied' :
-                                                'bg-tableStatusBg-reserved text-tableStatusText-reserved'
-                                            }`}>
-                                            Status : {config.label}
-                                        </span>
+
+                                    <div className="p-1 bg-bg-primary bg-opacity-50 flex gap-1.5">
+                                        <button
+                                            className="flex-1 flex items-center justify-center gap-1 text-[10px] bg-action-primary text-text-white py-1 rounded hover:bg-bulkActionsHover-updateHover hover:text-text-primary transition-colors font-semibold  shadow-sm"
+                                            onClick={() => setEditRowId(table.id)}
+                                        >
+                                            <FaEdit className="text-[10px]" /> Edit
+                                        </button>
+                                        <button
+                                            className="flex-1 flex items-center justify-center gap-1 bg-action-danger text-text-white py-1 rounded hover:bg-bulkActionsHover-deleteHover hover:text-text-primary transition-colors font-semibold text-[10px] shadow-sm"
+                                            onClick={() => { setDeleteTableId(table.id); setShowConfirmDelete(true); }}
+                                        >
+                                            <FaTrash className="text-[10px]" /> Delete
+                                        </button>
                                     </div>
                                 </div>
-
-                                <div className="p-2 bg-bg-primary bg-opacity-50 flex gap-1.5">
-                                    <button
-                                        className="flex-1 flex items-center justify-center gap-1 bg-action-primary text-text-white py-1.5 rounded hover:bg-bulkActionsHover-updateHover hover:text-text-primary transition-colors font-semibold text-xs shadow-sm"
-                                        onClick={() => setEditRowId(table.id)}
-                                    >
-                                        <FaEdit className="text-xs" /> Edit
-                                    </button>
-                                    <button
-                                        className="flex-1 flex items-center justify-center gap-1 bg-action-danger text-text-white py-1.5 rounded hover:bg-bulkActionsHover-deleteHover hover:text-text-primary transition-colors font-semibold text-xs shadow-sm"
-                                        onClick={() => { setDeleteTableId(table.id); setShowConfirmDelete(true); }}
-                                    >
-                                        <FaTrash className="text-xs" /> Delete
-                                    </button>
-                                </div>
-                            </div>
-                        );
-                    })}
-                </div>
-
-                {filteredTables.length === 0 && (
-                    <div className="bg-bg-primary rounded-xl shadow-sm p-12 text-center border border-border-default">
-                        <div className="text-text-secondary mb-3">
-                            <FaSearch className="text-5xl mx-auto" />
-                        </div>
-                        <p className="text-text-secondary text-lg font-medium">No tables found</p>
-                        <p className="text-text-secondary text-sm mt-1">Try adjusting your search or filter criteria</p>
+                            );
+                        })}
                     </div>
-                )}
 
-                <UniversalAddModal
-                    showModal={showAddTable}
-                    setShowModal={setShowAddTable}
-                    modalType="table"
+                    {filteredTables.length === 0 && (
+                        <div className="bg-bg-primary rounded-xl shadow-sm p-12 text-center border border-border-default">
+                            <div className="text-text-secondary mb-3">
+                                <FaSearch className="text-5xl mx-auto" />
+                            </div>
+                            <p className="text-text-secondary text-lg font-medium">No tables found</p>
+                            <p className="text-text-secondary text-sm mt-1">Try adjusting your search or filter criteria</p>
+                        </div>
+                    )}
 
-                    // Table-specific props
-                    tableRanges={tableRanges}
-                    setTableRanges={setTableRanges}
-                    fieldErrors={fieldErrors}
-                    setFieldErrors={setFieldErrors}
-                    isGenerating={isGenerating}
-                    generateTables={generateTables}
-                />
-                            <UniversalEditModal
-                    showModal={editRowId !== null}
-                    setShowModal={(show) => !show && setEditRowId(null)}
-                    modalType="table"
+                    <UniversalAddModal
+                        showModal={showAddTable}
+                        setShowModal={setShowAddTable}
+                        modalType="table"
 
-                    // Table-specific props
-                    editRowId={editRowId}
-                    setEditRowId={setEditRowId}
-                    tables={tables}
-                    handleEditChange={handleEditChange}
-                    saveEdit={saveEdit}
-                    editFieldErrors={editFieldErrors}
-                />
+                        // Table-specific props
+                        tableRanges={tableRanges}
+                        setTableRanges={setTableRanges}
+                        fieldErrors={fieldErrors}
+                        setFieldErrors={setFieldErrors}
+                        isGenerating={isGenerating}
+                        generateTables={generateTables}
+                    />
+                    <UniversalEditModal
+                        showModal={editRowId !== null}
+                        setShowModal={(show) => !show && setEditRowId(null)}
+                        modalType="table"
 
-                <UniversalBulkUpdateModal
-                    showModal={showBulkUpdate}
-                    setShowModal={setShowBulkUpdate}
-                    modalType="table"
+                        // Table-specific props
+                        editRowId={editRowId}
+                        setEditRowId={setEditRowId}
+                        tables={tables}
+                        handleEditChange={handleEditChange}
+                        saveEdit={saveEdit}
+                        editFieldErrors={editFieldErrors}
+                    />
 
-                    // Table-specific props
-                    tables={tables}
-                    bulkUpdateSearch={bulkUpdateSearch}
-                    setBulkUpdateSearch={setBulkUpdateSearch}
-                    selectedUpdateTables={selectedUpdateTables}
-                    setSelectedUpdateTables={setSelectedUpdateTables}
-                    bulkUpdateData={bulkUpdateData}
-                    setBulkUpdateData={setBulkUpdateData}
-                    bulkUpdateGlobal={bulkUpdateGlobal}
-                    setBulkUpdateGlobal={setBulkUpdateGlobal}
-                    handleBulkUpdateChange={handleBulkUpdateChange}
-                    saveBulkUpdate={saveBulkUpdate}
-                    getFilteredUpdateTables={getFilteredUpdateTables}
-                />
+                    <UniversalBulkUpdateModal
+                        showModal={showBulkUpdate}
+                        setShowModal={setShowBulkUpdate}
+                        modalType="table"
 
-                   <UniversalBulkDeleteModal
+                        // Table-specific props
+                        tables={tables}
+                        bulkUpdateSearch={bulkUpdateSearch}
+                        setBulkUpdateSearch={setBulkUpdateSearch}
+                        selectedUpdateTables={selectedUpdateTables}
+                        setSelectedUpdateTables={setSelectedUpdateTables}
+                        bulkUpdateData={bulkUpdateData}
+                        setBulkUpdateData={setBulkUpdateData}
+                        bulkUpdateGlobal={bulkUpdateGlobal}
+                        setBulkUpdateGlobal={setBulkUpdateGlobal}
+                        handleBulkUpdateChange={handleBulkUpdateChange}
+                        saveBulkUpdate={saveBulkUpdate}
+                        getFilteredUpdateTables={getFilteredUpdateTables}
+                    />
+
+                    <UniversalBulkDeleteModal
                         showModal={showBulkDelete}
                         setShowModal={setShowBulkDelete}
                         modalType="table"
@@ -667,112 +825,112 @@ const TableManagement = ({ clientId, token, screenIds,userId }) => {
                         getFilteredDeleteTables={getFilteredDeleteTables}
                     />
 
-                {/* First Delete Confirmation */}
-                {showFirstDeleteConfirm && (
-                    <div className="fixed inset-0 bg-color-modalsbg bg-opacity-50 z-50 flex items-center justify-center p-4">
-                        <div className="bg-bg-primary rounded-xl w-full max-w-md shadow-2xl border-2 border-border-default animate-scale-in">
-                            <div className="p-6 text-center">
-                                <h3 className="text-2xl font-bold text-text-primary mb-2">Confirm Deletion</h3>
-                                <p className="text-text-secondary mb-3">
-                                    Delete <strong className="text-action-danger text-xl">{selectedDeleteTables.length}</strong> table(s)?
-                                </p>
-                                <div className="flex flex-wrap gap-2 justify-center mb-5 max-h-32 overflow-y-auto p-2 bg-bg-tertiary rounded-lg">
-                                    {tables.filter(t => selectedDeleteTables.includes(t.id)).map(t => (
-                                        <span key={t.id} className="px-2.5 py-1 bg-tableStatusBg-occupied text-action-danger rounded-full text-sm font-bold border border-red-300">
-                                            {t.name}
-                                        </span>
-                                    ))}
-                                </div>
-                                <div className="flex gap-3">
-                                    <button
-                                        className="flex-1 bg-action-danger text-text-white py-2.5 rounded-lg hover:bg-action-primary transition-colors font-bold shadow-md"
-                                        onClick={() => {
-                                            setShowFirstDeleteConfirm(false);
-                                            setShowSecondDeleteConfirm(true);
-                                        }}
-                                    >
-                                        Continue
-                                    </button>
-                                    <button
-                                        className="flex-1 bg-modalsUpdateBg-cancel text-text-primary py-2.5 rounded-lg hover:bg-bg-tertiary transition-colors font-bold"
-                                        onClick={() => setShowFirstDeleteConfirm(false)}
-                                    >
-                                        Cancel
-                                    </button>
-                                </div>
-                            </div>
-                        </div>
-                    </div>
-                )}
-
-                {/* Second Delete Confirmation */}
-                {showSecondDeleteConfirm && (
-                    <div className="fixed inset-0 bg-color-modalsbg bg-opacity-70 z-50 flex items-center justify-center p-4">
-                        <div className="bg-bg-primary rounded-xl w-full max-w-md shadow-2xl border-default border-red-300 animate-scale-in">
-                            <div className="p-6 text-center">
-                                <h3 className="text-2xl font-bold text-action-danger mb-3">Final Confirmation</h3>
-                                <div className="bg-tableStatusBg-occupied border-2 border-red-300 rounded-lg p-3 mb-5">
-                                    <p className="text-gray-800 font-semibold text-base mb-1">
-                                        <span className="text-action-danger font-black text-lg">IRREVERSIBLE ACTION</span>
+                    {/* First Delete Confirmation */}
+                    {showFirstDeleteConfirm && (
+                        <div className="fixed inset-0 bg-color-modalsbg bg-opacity-50 z-50 flex items-center justify-center p-4">
+                            <div className="bg-bg-primary rounded-xl w-full max-w-md shadow-2xl border-2 border-border-default animate-scale-in">
+                                <div className="p-6 text-center">
+                                    <h3 className="text-2xl font-bold text-text-primary mb-2">Confirm Deletion</h3>
+                                    <p className="text-text-secondary mb-3">
+                                        Delete <strong className="text-action-danger text-xl">{selectedDeleteTables.length}</strong> table(s)?
                                     </p>
-                                    <p className="text-text-primary text-sm">
-                                        All selected tables will be permanently deleted
-                                    </p>
-                                </div>
-                                <div className="flex gap-3">
-                                    <button
-                                        className="flex-1 bg-action-danger text-text-white py-3 rounded-lg hover:bg-action-primary  transition-colors font-bold shadow-lg flex items-center justify-center gap-2"
-                                        onClick={confirmBulkDelete}
-                                    >
-                                        <FaTrash /> Confirm Delete
-                                    </button>
-                                    <button
-                                        className="flex-1 bg-modalsUpdateBg-cancel text-text-primary py-3 rounded-lg hover:bg-bg-tertiary transition-colors font-bold"
-                                        onClick={() => {
-                                            setShowSecondDeleteConfirm(false);
-                                            setShowFirstDeleteConfirm(false);
-                                        }}
-                                    >
-                                        Cancel
-                                    </button>
-                                </div>
-                            </div>
-                        </div>
-                    </div>
-                )}
-
-                {/* Single Delete Confirmation */}
-                {showConfirmDelete && (
-                    <div className="fixed inset-0 bg-color-modalsbg bg-opacity-50 z-50 flex items-center justify-center p-4">
-                        <div className="bg-bg-primary rounded-xl w-full max-w-sm shadow-2xl border border-border-default animate-scale-in">
-                            <div className="px-5 py-3 border-b rounded-xl flex justify-between items-center bg-gradient-to-r from-red-50 to-pink-50">
-                                <h2 className="text-lg font-bold text-action-danger flex items-center gap-2">
-                                    <FaTrash /> Delete Table
-                                </h2>
-                                <button onClick={() => setShowConfirmDelete(false)} className="text-text-primary hover:text-text-secondary transition-colors p-1 rounded-full">
-                                    <FaTimes size={20} />
-                                </button>
-                            </div>
-                            <div className="p-5">
-                                <div className="text-center">
-                                    {/* <div className="text-5xl mb-3">🗑️</div> */}
-                                    <p className="text-text-primary mb-3">
-                                        Delete table <strong className="text-action-danger text-lg">{tables.find(t => t.id === deleteTableId)?.name || "this table"}</strong>?
-                                    </p>
-                                    <p className="text-sm text-action-danger bg-red-200 p-2 rounded border border-red-300 mb-4">
-                                        This action cannot be undone
-                                    </p>
-                                    <div className="flex justify-center gap-3">
-                                        <button className="bg-action-danger text-text-white rounded-lg px-6 py-2 font-semibold hover:bg-action-primary transition-colors shadow-md" onClick={confirmDelete}>Delete</button>
-                                        <button className="bg-modalsUpdateBg-cancel text-text-primary rounded-lg px-6 py-2 font-semibold hover:bg-bg-tertiary transition-colors" onClick={() => setShowConfirmDelete(false)}>Cancel</button>
+                                    <div className="flex flex-wrap gap-2 justify-center mb-5 max-h-32 overflow-y-auto p-2 bg-bg-tertiary rounded-lg">
+                                        {tables.filter(t => selectedDeleteTables.includes(t.id)).map(t => (
+                                            <span key={t.id} className="px-2.5 py-1 bg-tableStatusBg-occupied text-action-danger rounded-full text-sm font-bold border border-red-300">
+                                                {t.name}
+                                            </span>
+                                        ))}
+                                    </div>
+                                    <div className="flex gap-3">
+                                        <button
+                                            className="flex-1 bg-action-danger text-text-white py-2.5 rounded-lg hover:bg-action-primary transition-colors font-bold shadow-md"
+                                            onClick={() => {
+                                                setShowFirstDeleteConfirm(false);
+                                                setShowSecondDeleteConfirm(true);
+                                            }}
+                                        >
+                                            Continue
+                                        </button>
+                                        <button
+                                            className="flex-1 bg-modalsUpdateBg-cancel text-text-primary py-2.5 rounded-lg hover:bg-bg-tertiary transition-colors font-bold"
+                                            onClick={() => setShowFirstDeleteConfirm(false)}
+                                        >
+                                            Cancel
+                                        </button>
                                     </div>
                                 </div>
                             </div>
                         </div>
-                    </div>
-                )}
-            </main>
-        </div>
+                    )}
+
+                    {/* Second Delete Confirmation */}
+                    {showSecondDeleteConfirm && (
+                        <div className="fixed inset-0 bg-color-modalsbg bg-opacity-70 z-50 flex items-center justify-center p-4">
+                            <div className="bg-bg-primary rounded-xl w-full max-w-md shadow-2xl border-default border-red-300 animate-scale-in">
+                                <div className="p-6 text-center">
+                                    <h3 className="text-2xl font-bold text-action-danger mb-3">Final Confirmation</h3>
+                                    <div className="bg-tableStatusBg-occupied border-2 border-red-300 rounded-lg p-3 mb-5">
+                                        <p className="text-gray-800 font-semibold text-base mb-1">
+                                            <span className="text-action-danger font-black text-lg">IRREVERSIBLE ACTION</span>
+                                        </p>
+                                        <p className="text-text-primary text-sm">
+                                            All selected tables will be permanently deleted
+                                        </p>
+                                    </div>
+                                    <div className="flex gap-3">
+                                        <button
+                                            className="flex-1 bg-action-danger text-text-white py-3 rounded-lg hover:bg-action-primary  transition-colors font-bold shadow-lg flex items-center justify-center gap-2"
+                                            onClick={confirmBulkDelete}
+                                        >
+                                            <FaTrash /> Confirm Delete
+                                        </button>
+                                        <button
+                                            className="flex-1 bg-modalsUpdateBg-cancel text-text-primary py-3 rounded-lg hover:bg-bg-tertiary transition-colors font-bold"
+                                            onClick={() => {
+                                                setShowSecondDeleteConfirm(false);
+                                                setShowFirstDeleteConfirm(false);
+                                            }}
+                                        >
+                                            Cancel
+                                        </button>
+                                    </div>
+                                </div>
+                            </div>
+                        </div>
+                    )}
+
+                    {/* Single Delete Confirmation */}
+                    {showConfirmDelete && (
+                        <div className="fixed inset-0 bg-color-modalsbg bg-opacity-50 z-50 flex items-center justify-center p-4">
+                            <div className="bg-bg-primary rounded-xl w-full max-w-sm shadow-2xl border border-border-default animate-scale-in">
+                                <div className="px-5 py-3 border-b rounded-xl flex justify-between items-center bg-gradient-to-r from-red-50 to-pink-50">
+                                    <h2 className="text-lg font-bold text-action-danger flex items-center gap-2">
+                                        <FaTrash /> Delete Table
+                                    </h2>
+                                    <button onClick={() => setShowConfirmDelete(false)} className="text-text-primary hover:text-text-secondary transition-colors p-1 rounded-full">
+                                        <FaTimes size={20} />
+                                    </button>
+                                </div>
+                                <div className="p-5">
+                                    <div className="text-center">
+                                        {/* <div className="text-5xl mb-3">🗑️</div> */}
+                                        <p className="text-text-primary mb-3">
+                                            Delete table <strong className="text-action-danger text-lg">{tables.find(t => t.id === deleteTableId)?.name || "this table"}</strong>?
+                                        </p>
+                                        <p className="text-sm text-action-danger bg-red-200 p-2 rounded border border-red-300 mb-4">
+                                            This action cannot be undone
+                                        </p>
+                                        <div className="flex justify-center gap-3">
+                                            <button className="bg-action-danger text-text-white rounded-lg px-6 py-2 font-semibold hover:bg-action-primary transition-colors shadow-md" onClick={confirmDelete}>Delete</button>
+                                            <button className="bg-modalsUpdateBg-cancel text-text-primary rounded-lg px-6 py-2 font-semibold hover:bg-bg-tertiary transition-colors" onClick={() => setShowConfirmDelete(false)}>Cancel</button>
+                                        </div>
+                                    </div>
+                                </div>
+                            </div>
+                        </div>
+                    )}
+                </main>
+            </div>
         </AccessGuard>
     );
 };
