@@ -13,3 +13,4 @@ COPY . .
 
 # Build the React app
 RUN npm run build
+RUN npm run dev -- --host 0.0.0.0 --port 8007
