@@ -3,19 +3,27 @@ from fastapi import FastAPI, Depends, Request, Header, HTTPException
 from sqlalchemy.orm import Session
 from api import routes
 import logging
+import os
 import logging.config
 import time
 from config.settings import LOGGING_CONFIG
 from fastapi.middleware.cors import CORSMiddleware
+from dotenv import load_dotenv
+
+load_dotenv()
 
 app = FastAPI()
 logging.config.dictConfig(LOGGING_CONFIG)
 logger = logging.getLogger(__name__)
 
+origins = os.getenv("ALLOWED_ORIGINS", "")
+ALLOWED_ORIGINS = [origin.strip() for origin in origins.split(",") if origin]
+
+
 app.include_router(routes.router, prefix="/saas/{client_id}/users")
 app.add_middleware(
     CORSMiddleware,
-    allow_origins=["*"],
+    allow_origins=ALLOWED_ORIGINS,
     allow_credentials=True,
     allow_methods=["*"],
     allow_headers=["*"],
