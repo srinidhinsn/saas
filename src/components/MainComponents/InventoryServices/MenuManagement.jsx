@@ -66,7 +66,7 @@ const MenuManagement = ({ clientId, token, realm }) => {
       console.warn("JWT decode failed");
     }
   }, [token]);
-  
+
   // Robust flatten for your current category-tree shape (handles `children` or `subCategories`)
   const flattenCategoriesGeneric = (tree) => {
     const flat = [];
@@ -200,157 +200,157 @@ const MenuManagement = ({ clientId, token, realm }) => {
   //   return `${normalizedName}_${dd}_${mm}`;
   // };
 
-// Updated handleAddItem - explicitly removes dietary_type
-const handleAddItem = async () => {
-  try {
-    let imageId = null;
+  // Updated handleAddItem - explicitly removes dietary_type
+  const handleAddItem = async () => {
+    try {
+      let imageId = null;
 
-    if (newItemImage) {
-      imageId = await uploadImageToDocumentService(newItemImage);
-    }
-
-    const categoryIdFromNewItem = newItem?.category_id || null;
-    const categoryIdFromSelected = (typeof selectedCategory === 'object' && selectedCategory?.id)
-      ? selectedCategory.id
-      : getCategoryIdByName(selectedCategory);
-
-    const resolvedCategoryId = categoryIdFromNewItem || categoryIdFromSelected || null;
-    const finalCategoryId = resolvedCategoryId;
-
-    if (!finalCategoryId) {
-      alert("Please select a valid category");
-      return;
-    }
-
-    const slug = generateSlug(finalCategoryId, newItem.name);
-    const created_by = currentUserId || localStorage.getItem('user_id') || 'system';
-
-    // ✅ EXPLICITLY remove dietary_type and any other unwanted fields
-    const { dietary_type, ...cleanNewItem } = newItem;
-
-    const payload = {
-      ...cleanNewItem,
-      client_id: clientId,
-      category_id: finalCategoryId,
-      image_id: imageId,
-      realm: realm || newItem.realm || '',
-      slug,
-      unit_price: parseFloat(newItem.unit_price) || 0,
-      discount: parseFloat(newItem.discount) || 0,
-      code: newItem.code ? String(newItem.code).trim() : null, // ✅ Convert to string
-      serving_quantity: newItem.serving_quantity ? parseFloat(newItem.serving_quantity) : null, // ✅ Convert to number or null
-      serving_unit: newItem.serving_unit || null,
-      created_by,
-      updated_by: created_by,
-      inventory_id: 1
-    };
-
-    console.log("Payload before sending:", payload);
-
-    await axios.post(
-      `${import.meta.env.VITE_API_INVENTORY_SERVICE_URL}/${clientId}/menu/create`,
-      payload,
-      {
-        headers: {
-          Authorization: `Bearer ${token}`,
-          "Content-Type": "application/json"
-        }
+      if (newItemImage) {
+        imageId = await uploadImageToDocumentService(newItemImage);
       }
-    );
 
-    await fetchData({ silent: true });
-
-    setShowAddModal(false);
-    setNewItem({
-      name: '',
-      description: '',
-      category_id: '',
-      unit_price: '',
-      discount: '',
-      code: '',
-      unit: '',
-      line_item_id: []
-    });
-    setNewItemImage(null);
-    setNewItemImageUrl('');
-  } catch (error) {
-    console.error('Error adding item:', error);
-    console.error('Full error response:', error.response);
-    console.error('Error data:', JSON.stringify(error.response?.data, null, 2));
-    
-    // Show detailed error message
-    let errorMsg = 'Failed to add item\n\n';
-    if (error.response?.data?.detail) {
-      if (Array.isArray(error.response.data.detail)) {
-        errorMsg += error.response.data.detail.map(err => 
-          `Field: ${err.loc?.join('.')}\nError: ${err.msg}`
-        ).join('\n\n');
-      } else {
-        errorMsg += error.response.data.detail;
-      }
-    } else {
-      errorMsg += error.message;
-    }
-    
-    alert(errorMsg);
-  }
-};
-const handleEditItem = async () => {
-  try {
-    let imageId = editingItem.image_id;
-
-    if (editItemImage) {
-      imageId = await uploadImageToDocumentService(editItemImage);
-    }
-
-    const categoryId =
-      editingItem.category_id ||
-      (typeof selectedCategory === 'object'
+      const categoryIdFromNewItem = newItem?.category_id || null;
+      const categoryIdFromSelected = (typeof selectedCategory === 'object' && selectedCategory?.id)
         ? selectedCategory.id
-        : getCategoryIdByName(selectedCategory));
+        : getCategoryIdByName(selectedCategory);
 
-    const finalCategoryId = categoryId || null;
-    const slug = generateSlug(finalCategoryId, editingItem.name);
-    const updated_by = currentUserId || localStorage.getItem('user_id') || 'system';
+      const resolvedCategoryId = categoryIdFromNewItem || categoryIdFromSelected || null;
+      const finalCategoryId = resolvedCategoryId;
 
-    // ✅ EXPLICITLY remove dietary_type
-    const { dietary_type, ...cleanEditingItem } = editingItem;
+      if (!finalCategoryId) {
+        alert("Please select a valid category");
+        return;
+      }
 
-    const payload = {
-      ...cleanEditingItem,
-      code: editingItem.code ? String(editingItem.code).trim() : null,
-      client_id: clientId,
-      category_id: finalCategoryId,
-      image_id: imageId,
-      realm: editingItem.realm || realm || '',
-      slug,
-      unit_price: parseFloat(editingItem.unit_price) || 0,
-      discount: parseFloat(editingItem.discount) || 0,
-      serving_quantity: editingItem.serving_quantity ? parseFloat(editingItem.serving_quantity) : null, // ✅ Add this
-      serving_unit: editingItem.serving_unit || null, // ✅ Add this
-      updated_by
-    };
+      const slug = generateSlug(finalCategoryId, newItem.name);
+      const created_by = currentUserId || localStorage.getItem('user_id') || 'system';
 
-    console.log("Edit payload:", payload);
+      // ✅ EXPLICITLY remove dietary_type and any other unwanted fields
+      const { dietary_type, ...cleanNewItem } = newItem;
 
-    await axios.post(
-      `${import.meta.env.VITE_API_INVENTORY_SERVICE_URL}/${clientId}/menu/update`,
-      payload,
-      { headers: { Authorization: `Bearer ${token}` } }
-    );
+      const payload = {
+        ...cleanNewItem,
+        client_id: clientId,
+        category_id: finalCategoryId,
+        image_id: imageId,
+        realm: realm || newItem.realm || '',
+        slug,
+        unit_price: parseFloat(newItem.unit_price) || 0,
+        discount: parseFloat(newItem.discount) || 0,
+        code: newItem.code ? String(newItem.code).trim() : null, // ✅ Convert to string
+        serving_quantity: newItem.serving_quantity ? parseFloat(newItem.serving_quantity) : null, // ✅ Convert to number or null
+        serving_unit: newItem.serving_unit || null,
+        created_by,
+        updated_by: created_by,
+        inventory_id: 1
+      };
 
-    await fetchData({ silent: true });
+      console.log("Payload before sending:", payload);
 
-    setShowEditModal(false);
-    setEditingItem(null);
-    setEditItemImage(null);
-    setEditItemImageUrl('');
-  } catch (error) {
-    console.error('Error updating item:', error);
-    console.error('Error response:', error.response?.data);
-    alert('Failed to update item: ' + (error.response?.data?.detail || error.message));
-  }
-};
+      await axios.post(
+        `${import.meta.env.VITE_API_INVENTORY_SERVICE_URL}/${clientId}/menu/create`,
+        payload,
+        {
+          headers: {
+            Authorization: `Bearer ${token}`,
+            "Content-Type": "application/json"
+          }
+        }
+      );
+
+      await fetchData({ silent: true });
+
+      setShowAddModal(false);
+      setNewItem({
+        name: '',
+        description: '',
+        category_id: '',
+        unit_price: '',
+        discount: '',
+        code: '',
+        unit: '',
+        line_item_id: []
+      });
+      setNewItemImage(null);
+      setNewItemImageUrl('');
+    } catch (error) {
+      console.error('Error adding item:', error);
+      console.error('Full error response:', error.response);
+      console.error('Error data:', JSON.stringify(error.response?.data, null, 2));
+
+      // Show detailed error message
+      let errorMsg = 'Failed to add item\n\n';
+      if (error.response?.data?.detail) {
+        if (Array.isArray(error.response.data.detail)) {
+          errorMsg += error.response.data.detail.map(err =>
+            `Field: ${err.loc?.join('.')}\nError: ${err.msg}`
+          ).join('\n\n');
+        } else {
+          errorMsg += error.response.data.detail;
+        }
+      } else {
+        errorMsg += error.message;
+      }
+
+      alert(errorMsg);
+    }
+  };
+  const handleEditItem = async () => {
+    try {
+      let imageId = editingItem.image_id;
+
+      if (editItemImage) {
+        imageId = await uploadImageToDocumentService(editItemImage);
+      }
+
+      const categoryId =
+        editingItem.category_id ||
+        (typeof selectedCategory === 'object'
+          ? selectedCategory.id
+          : getCategoryIdByName(selectedCategory));
+
+      const finalCategoryId = categoryId || null;
+      const slug = generateSlug(finalCategoryId, editingItem.name);
+      const updated_by = currentUserId || localStorage.getItem('user_id') || 'system';
+
+      // ✅ EXPLICITLY remove dietary_type
+      const { dietary_type, ...cleanEditingItem } = editingItem;
+
+      const payload = {
+        ...cleanEditingItem,
+        code: editingItem.code ? String(editingItem.code).trim() : null,
+        client_id: clientId,
+        category_id: finalCategoryId,
+        image_id: imageId,
+        realm: editingItem.realm || realm || '',
+        slug,
+        unit_price: parseFloat(editingItem.unit_price) || 0,
+        discount: parseFloat(editingItem.discount) || 0,
+        serving_quantity: editingItem.serving_quantity ? parseFloat(editingItem.serving_quantity) : null, // ✅ Add this
+        serving_unit: editingItem.serving_unit || null, // ✅ Add this
+        updated_by
+      };
+
+      console.log("Edit payload:", payload);
+
+      await axios.post(
+        `${import.meta.env.VITE_API_INVENTORY_SERVICE_URL}/${clientId}/menu/update`,
+        payload,
+        { headers: { Authorization: `Bearer ${token}` } }
+      );
+
+      await fetchData({ silent: true });
+
+      setShowEditModal(false);
+      setEditingItem(null);
+      setEditItemImage(null);
+      setEditItemImageUrl('');
+    } catch (error) {
+      console.error('Error updating item:', error);
+      console.error('Error response:', error.response?.data);
+      alert('Failed to update item: ' + (error.response?.data?.detail || error.message));
+    }
+  };
 
   const normalizeDietary = (value) => {
     if (!value) return "";
@@ -700,23 +700,23 @@ const handleEditItem = async () => {
       alert('No items selected');
       return;
     }
-  
+
     try {
       await Promise.all(
         selectedRows.map(id => {
           const editedData = bulkEditData[id] || {};
           const originalItem = menuItems.find(item => item.id === id);
-          
+
           // ✅ Remove dietary_type from both
           const { dietary_type: editedDietary, ...cleanEditedData } = editedData;
           const { dietary_type: originalDietary, ...cleanOriginalItem } = originalItem;
-  
+
           const payload = {
             ...cleanOriginalItem,
             ...cleanEditedData,
             client_id: clientId
           };
-  
+
           return axios.post(
             `${import.meta.env.VITE_API_INVENTORY_SERVICE_URL}/${clientId}/menu/update`,
             payload,
@@ -724,14 +724,14 @@ const handleEditItem = async () => {
           );
         })
       );
-  
+
       // Refresh items
       const itemRes = await axios.get(
         `${import.meta.env.VITE_API_INVENTORY_SERVICE_URL}/${clientId}/menu/read?realm=${realm}`,
         { headers: { Authorization: `Bearer ${token}` } }
       );
       setMenuItems(itemRes.data.data);
-  
+
       setShowBulkModal(false);
       setSelectedRows([]);
       setBulkEditData({});
@@ -1021,7 +1021,7 @@ const handleEditItem = async () => {
   // }
 
   return (
-    <div className="h-screen bg-bg-primary overflow-x-hidden">
+    <div className="h-[90vh] bg-bg-primary overflow-x-hidden">
 
 
 
@@ -1033,7 +1033,7 @@ const handleEditItem = async () => {
 
           {/* Sidebar */}
           <div className="lg:col-span-1">
-            <div className="lg:sticky lg:top-0">
+            <div className="lg:sticky lg:top-2">
               <MenuCategoryTree
                 categories={categories}
                 selectedCategory={selectedCategory}
@@ -1050,9 +1050,9 @@ const handleEditItem = async () => {
           </div>
 
           {/* Main Content */}
-          <div className="lg:col-span-3 border-default border-border-default p-3 rounded-lg overflow-x-hidden">
+          <div className="lg:col-span-3 border-default border-border-default p-3 rounded-lg h-[88.5vh] flex flex-col">
 
-            <div className="mb-4 grid gap-3 grid-cols-1 md:grid-cols-2 lg:grid-cols-3">
+            <div className="mb-4 grid gap-3 grid-cols-1 md:grid-cols-2 lg:grid-cols-3 flex-shrink-0">
 
 
               <div className="lg:col-span-1 space-y-2">
@@ -1233,100 +1233,103 @@ const handleEditItem = async () => {
             </div>
 
             {/* Items Grid */}
-            <div className="grid grid-cols-3 sm:grid-cols-4 lg:grid-cols-4 xl:grid-cols-5 2xl:grid-cols-6 gap-1 md:gap-2 lg:gap-2">
-              {filteredItems.map(item => {
-                const discountPercent = item.discount && item.unit_price && Number(item.discount) > 0
-                  ? ((Number(item.discount) * 100) / Number(item.unit_price)).toFixed(1).replace(/\.0$/, '')
-                  : null;
+            <div className="flex-1 overflow-y-auto">
+              <div className="grid grid-cols-3 sm:grid-cols-4 lg:grid-cols-4 xl:grid-cols-5 2xl:grid-cols-6 gap-1 md:gap-2 lg:gap-2">
+                {filteredItems.map(item => {
+                  const discountPercent = item.discount && item.unit_price && Number(item.discount) > 0
+                    ? ((Number(item.discount) * 100) / Number(item.unit_price)).toFixed(1).replace(/\.0$/, '')
+                    : null;
 
-                return (
-                  <div key={item.id} className="bg-bg-primary border-4 md:border-6 lg:border-8  border-border-default rounded-md overflow-hidden shadow-lg transition-all duration-300 group relative">
-                    <div className="relative h-20 border-2 md:border-3 rounded-lg lg:border-4 border-white  sm:h-20 md:h-24 lg:h-28 overflow-hidden bg-gradient-to-br from-gray-100 to-gray-200">
-                      {discountPercent && (
-                        <div className="absolute top-2 left-2 bg-action-danger text-text-white text-[8px] font-bold p-1 rounded-md z-10 shadow-md">
-                          {discountPercent}% OFF
+                  return (
+                    <div key={item.id} className="bg-bg-primary border-4 md:border-6 lg:border-8  border-border-default rounded-md overflow-hidden shadow-lg transition-all duration-300 group relative">
+                      <div className="relative h-20 border-2 md:border-3 rounded-lg lg:border-4 border-white  sm:h-20 md:h-24 lg:h-28 overflow-hidden bg-gradient-to-br from-gray-100 to-gray-200">
+                        {discountPercent && (
+                          <div className="absolute top-2 left-2 bg-action-danger text-text-white text-[8px] font-bold p-1 rounded-md z-10 shadow-md">
+                            {discountPercent}% OFF
+                          </div>
+                        )}
+
+                        {item.line_item_id && Array.isArray(item.line_item_id) && item.line_item_id.length > 0 && (
+                          <div className="absolute bottom-2 left-2 bg-orange-500 text-white text-[7px] p-1 rounded-md z-10 shadow-md flex items-center gap-1">
+                            <Plus size={10} />
+                            <span>{item.line_item_id.length} add-ons</span>
+                          </div>
+                        )}
+
+                        <MenuImagePreview
+                          clientId={clientId}
+                          imageId={item.image_id}
+                          token={token}
+                          alt={item.name}
+                          baseUrl={import.meta.env.VITE_API_DOCUMENT_SERVICE_URL}
+                          urlBuilder={({ baseUrl, clientId, imageId }) =>
+                            `${baseUrl}/${clientId}/document/download?doc_id=${imageId}`
+                          }
+                          className="w-full h-full object-cover group-hover:scale-110 transition-transform duration-500"
+                        />
+
+                        <div className="absolute top-2 right-2 flex gap-2">
+                          <button
+                            onClick={() => {
+                              setEditingItem({
+                                ...item,
+                              });
+                              setShowEditModal(true);
+                            }}
+
+                            className="bg-action-primary text-text-white p-1 rounded-full hover:bg-orange-600 transition-all duration-300 shadow-lg hover:shadow-xl z-10 hover:scale-110 active:scale-95"
+                            aria-label="Edit item"
+                          >
+                            <Edit size={10} />
+                          </button>
+                          <button
+                            onClick={() => {
+                              setDeleteTarget(item);
+                              setShowDeleteModal(true);
+                            }}
+                            className="bg-action-danger text-text-white p-1  rounded-full hover:bg-red-600 transition-all duration-300 shadow-lg hover:shadow-xl z-10 hover:scale-110 active:scale-95"
+                            aria-label="Delete item"
+                          >
+                            <Trash2 size={10} />
+                          </button>
                         </div>
-                      )}
-
-                      {item.line_item_id && Array.isArray(item.line_item_id) && item.line_item_id.length > 0 && (
-                        <div className="absolute bottom-2 left-2 bg-orange-500 text-white text-[7px] p-1 rounded-md z-10 shadow-md flex items-center gap-1">
-                          <Plus size={10} />
-                          <span>{item.line_item_id.length} add-ons</span>
+                      </div>
+                      <hr className='border-b-default border-border-default mx-1' />
+                      <div className="p-2">
+                        <div className="flex items-center justify-center gap-2">
+                          <h3 className="font-semibold text-[8px] xl:text-[14px] sm:text-[7px] md:text-[12px] line-clamp-2 min-h-[1.2rem] text-text-primary">
+                            {item.name}
+                          </h3>
                         </div>
-                      )}
 
-                      <MenuImagePreview
-                        clientId={clientId}
-                        imageId={item.image_id}
-                        token={token}
-                        alt={item.name}
-                        baseUrl={import.meta.env.VITE_API_DOCUMENT_SERVICE_URL}
-                        urlBuilder={({ baseUrl, clientId, imageId }) =>
-                          `${baseUrl}/${clientId}/document/download?doc_id=${imageId}`
-                        }
-                        className="w-full h-full object-cover group-hover:scale-110 transition-transform duration-500"
-                      />
-
-                      <div className="absolute top-2 right-2 flex gap-2">
-                        <button
-                          onClick={() => {
-                            setEditingItem({
-                              ...item,
-                            });
-                            setShowEditModal(true);
-                          }}
-
-                          className="bg-action-primary text-text-white p-1 rounded-full hover:bg-orange-600 transition-all duration-300 shadow-lg hover:shadow-xl z-10 hover:scale-110 active:scale-95"
-                          aria-label="Edit item"
-                        >
-                          <Edit size={10} />
-                        </button>
-                        <button
-                          onClick={() => {
-                            setDeleteTarget(item);
-                            setShowDeleteModal(true);
-                          }}
-                          className="bg-action-danger text-text-white p-1  rounded-full hover:bg-red-600 transition-all duration-300 shadow-lg hover:shadow-xl z-10 hover:scale-110 active:scale-95"
-                          aria-label="Delete item"
-                        >
-                          <Trash2 size={10} />
-                        </button>
-                      </div>
-                    </div>
-                    <hr className='border-b-default border-border-default mx-1' />
-                    <div className="p-2">
-                      <div className="flex items-center justify-center gap-2">
-                        <h3 className="font-semibold text-[8px] xl:text-[14px] sm:text-[7px] md:text-[5px] line-clamp-2 min-h-[1.2rem] text-text-primary">
-                          {item.name}
-                        </h3>
-                      </div>
-
-                      <div className="flex items-center justify-center">
-                        <p className="text-action-primary font-bold text-base sm:text-md">
-                          ₹{(item.unit_price - (item.discount || 0)).toFixed(2)}
-                        </p>
-                        {/* {discountPercent && (
+                        <div className="flex items-center justify-center">
+                          <p className="text-action-primary font-bold text-base sm:text-md">
+                            ₹{(item.unit_price - (item.discount || 0)).toFixed(2)}
+                          </p>
+                          {/* {discountPercent && (
                           <span className="text-xs text-text-secondary line-through">
                             ₹{item.unit_price?.toFixed(2)}
                           </span>
                         )} */}
 
-                        {/* 
+                          {/* 
                         <span className="text-xs text-text-secondary truncate max-w-[100px]">
                           {item.category}
                         </span> */}
+                        </div>
                       </div>
                     </div>
-                  </div>
-                );
-              })}
-            </div>
-
-            {filteredItems.length === 0 && (
+                  );
+                })}
+              </div>
+              {filteredItems.length === 0 && (
               <div className="text-center py-12 rounded-lg bg-bg-primary">
                 <p className="text-text-secondary text-base">No items found in this category</p>
               </div>
             )}
+            </div>
+
+         
           </div>
         </div>
       </div>

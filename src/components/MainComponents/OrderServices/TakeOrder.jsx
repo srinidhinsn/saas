@@ -1729,23 +1729,23 @@ import { TbExchange } from "react-icons/tb";
 const TABLE_STATUS_CONFIG = {
   vacant: {
     clickable: true,
-    bg: 'bg-green-50',
-    border: 'border-gray-500',
-    badge: 'bg-green-100 text-green-700',
+    bg: 'bg-action-success',
+    border: 'border-border-default',
+    badge: 'bg-green-100 text-action-success',
     icon: null,
   },
   available: {
     clickable: true,
-    bg: 'bg-green-50',
-    border: 'border-green-500',
+    bg: 'bg-action-success',
+    border: 'border-border-default',
     badge: 'bg-green-100 text-green-700',
     icon: null,
   },
   occupied: {
     clickable: false,
-    bg: 'bg-red-50',
-    border: 'border-red-400',
-    badge: 'bg-red-100 text-red-700',
+    bg: 'bg-action-primary',
+    border: 'border-action-primary',
+    badge: 'bg-red-100 text-action-primary',
     icon: Eye,
     viewable: true, // Add this flag
   },
@@ -2118,7 +2118,7 @@ const TakeOrder = ({ clientId, token, onOrderUpdate, realm }) => {
   const [activeOrderId, setActiveOrderId] = useState(null);
   const [hasNewItems, setHasNewItems] = useState(false);
   const [currentBatchTimestamp, setCurrentBatchTimestamp] = useState(null);
-
+  const [isOrderFormOpen, setIsOrderFormOpen] = useState(false);
   // Flatten category tree
   const flattenCategoryTree = (tree, level = 0, parentId = null) => {
     let flatList = [];
@@ -2138,7 +2138,9 @@ const TakeOrder = ({ clientId, token, onOrderUpdate, realm }) => {
     });
     return flatList;
   };
-
+  useEffect(() => {
+    setIsOrderFormOpen(showCart);
+  }, [showCart]);
   useEffect(() => {
     const onBackButton = (e) => {
       // If user is on order view → go back to table view
@@ -2894,7 +2896,7 @@ pr-1
               <div
                 className="
             transition-all duration-300
-            border-default border-border-default p-4 rounded-lg
+            border-default border-border-default p-2 rounded-lg
             flex-1
             overflow-y-auto
             h-[calc(98dvh-4rem)]
@@ -2936,9 +2938,8 @@ pr-1
 
                 </div>
 
-                <div
-                  className="grid gap-3 grid-cols-2 md:grid-cols-4 lg:grid-cols-4">
-                  {filteredItems.map(item => {
+                <div className={`grid gap-2 grid-cols-2 md:grid-cols-4 ${isOrderFormOpen ? 'lg:grid-cols-3' : 'lg:grid-cols-4'}`}>
+                {filteredItems.map(item => {
                     const discountPercent =
                       item.discount &&
                         item.unit_price &&
@@ -2953,7 +2954,7 @@ pr-1
                         className="
                       flex gap-2 items-center
                       bg-bg-primary
-                      border border-border-default
+                      border-default border-border-default
                       rounded-xl
                       p-1
                       shadow-sm
@@ -3107,7 +3108,7 @@ pr-1
 
                                     className={`flex-1 py-2 rounded-md text-sm font-medium flex items-center justify-center gap-2
                              ${orderMode === 'dinein'
-                                        ? 'bg-red-600 text-white shadow'
+                                        ? 'bg-action-primary text-text-white shadow'
                                         : 'text-gray-600 hover:text-gray-800'
                                       }`}
                                   >
@@ -3124,7 +3125,7 @@ pr-1
 
                                     className={`flex-1 py-2 rounded-md text-sm font-medium flex items-center justify-center gap-2
                              ${orderMode === 'takeaway'
-                                        ? 'bg-red-600 text-white shadow'
+                                        ? 'bg-action-primary text-white shadow'
                                         : 'text-gray-600 hover:text-gray-800'
                                       }`}
                                   >
@@ -3166,7 +3167,7 @@ pr-1
                                         <h4 className="text-sm font-semibold truncate text-gray-800">
                                           {item.name}
                                         </h4>
-                                        <p className="text-xs text-red-600">
+                                        <p className="text-xs font-bold text-action-primary">
                                           ₹{(item.unit_price - (item.discount || 0)).toFixed(2)}
                                         </p>
                                       </div>
@@ -3196,7 +3197,7 @@ pr-1
                                     {/* REMOVE */}
                                     <button
                                       onClick={() => removeFromCart(item.id)}
-                                      className="text-red-500 hover:text-red-700"
+                                      className="text-action-primary hover:text-red-700"
                                     >
                                       <X size={16} />
                                     </button>
@@ -3213,7 +3214,7 @@ pr-1
                            ${!isPlacingOrder &&
                                       cart.length > 0 &&
                                       (orderMode === 'takeaway' || selectedTable)
-                                      ? 'bg-red-600 text-white hover:bg-red-700'
+                                      ? 'bg-action-primary text-text-white hover:bg-action-danger'
                                       : 'bg-gray-300 cursor-not-allowed'
                                     }`}
                                   disabled={!canPlaceOrder || isPlacingOrder}
@@ -3430,7 +3431,7 @@ pr-1
 
               <button
                 onClick={confirmClearCart}
-                className="flex-1 py-2 bg-red-600 text-white rounded-lg hover:bg-red-700"
+                className="flex-1 py-2 bg-action-primary text-white rounded-lg hover:bg-action-danger"
               >
                 Clear
               </button>
