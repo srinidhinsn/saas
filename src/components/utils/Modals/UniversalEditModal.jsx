@@ -98,10 +98,8 @@ const UniversalEditModal = ({
           <div className="px-6 py-4 border-b border-gray-200 flex justify-between items-center">
             <h2 className="text-xl font-semibold text-gray-900">Edit Menu Item</h2>
             <button
-              onClick={handleClose}
-              className="w-8 h-8 rounded hover:bg-gray-100 flex items-center justify-center"
-            >
-              <X className="w-5 h-5 text-gray-500" />
+              onClick={handleClose} className="p-1.5 rounded-lg bg-action-primary text-text-white hover:opacity-90 transition-opacity   ">
+              <X className="w-5 h-5" />
             </button>
           </div>
 
@@ -142,6 +140,7 @@ const UniversalEditModal = ({
                 />
               </div>
 
+
               {/* Description */}
               <div>
                 <label className="block text-sm font-medium mb-1 text-gray-700">Description</label>
@@ -181,16 +180,26 @@ const UniversalEditModal = ({
 
               {/* Availability & Unit */}
               <div className="grid grid-cols-2 gap-4">
+                {/* Code */}
                 <div>
-                  <label className="block text-sm font-medium mb-1 text-gray-700">Availability</label>
+                  <label className="block text-sm font-medium mb-1 text-gray-700">
+                    Code <span className="text-red-600">*</span>
+                  </label>
                   <input
-                    type="number"
-                    value={editingItem.availability}
-                    onChange={(e) => setEditingItem({ ...editingItem, availability: e.target.value })}
-                    className="w-full px-3 py-2 rounded-md border border-gray-300 text-gray-900 focus:outline-none focus:ring-2 focus:ring-blue-500 focus:border-transparent"
+                    type="text"
+                    value={editingItem.code ?? ''}
+                    onChange={(e) =>
+                      setEditingItem({
+                        ...editingItem,
+                        code: e.target.value
+                      })
+                    }
+                    className="w-full px-3 py-2 rounded-md border border-gray-300 text-gray-900
+      focus:outline-none focus:ring-2 focus:ring-action-primary"
+                    placeholder="Item Code"
+                    required
                   />
                 </div>
-
                 <div>
                   <label className="block text-sm font-medium mb-1 text-gray-700">Unit</label>
                   <input
@@ -319,10 +328,10 @@ const UniversalEditModal = ({
           <div className="px-6 py-4 border-b border-gray-200 flex justify-between items-center">
             <h2 className="text-xl font-semibold text-gray-900">Edit Table</h2>
             <button
-              className="w-8 h-8 rounded hover:bg-gray-100 flex items-center justify-center"
+              className="p-1.5 rounded-lg bg-action-primary text-text-white hover:opacity-90 transition-opacity"
               onClick={handleClose}
             >
-              <X className="w-5 h-5 text-gray-500" />
+              <X className="w-5 h-5" />
             </button>
           </div>
 

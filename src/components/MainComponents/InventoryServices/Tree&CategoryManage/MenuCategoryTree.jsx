@@ -6,6 +6,8 @@ import axios from 'axios';
 import { v4 as uuidv4 } from 'uuid';
 import { jwtDecode } from 'jwt-decode';
 
+
+
 const MenuCategoryTree = ({ 
   categories = [], 
   selectedCategory, 
@@ -32,7 +34,6 @@ const MenuCategoryTree = ({
   const [editNewSubcategoryName, setEditNewSubcategoryName] = useState("");
   const [deleteTarget, setDeleteTarget] = useState(null);
 
-  // Stabilize handlers with useCallback
   const handleNewCategoryNameChange = useCallback((e) => {
     setNewCategoryName(e.target.value);
   }, []);
@@ -160,14 +161,22 @@ const MenuCategoryTree = ({
 
     return "_" + path.join(" _");
   };
-
+  const generateCategoryIdFromName = (name) => {
+    const now = new Date();
+    const day = String(now.getDate()).padStart(2, "0");
+    const month = String(now.getMonth() + 1).padStart(2, "0");
+    const minutes = String(now.getMinutes()).padStart(2, "0");
+  
+    return `${name.trim().replace(/\s+/g, "_")}_${day}_${month}_${minutes}`;
+  };
   const handleAddCategory = async () => {
     if (!newCategoryName.trim()) {
       alert("Category name is required");
       return;
     }
 
-    const newId = uuidv4();
+    
+    const newId = generateCategoryIdFromName(newCategoryName);
     let createdBy = "null";
     let updatedBy = "null";
 
@@ -255,7 +264,7 @@ const MenuCategoryTree = ({
     }
 
     if (editNewSubcategoryName.trim()) {
-      const newSubId = uuidv4();
+      const newSubId = generateCategoryIdFromName(editNewSubcategoryName);
       const tempParentMap = { [newSubId]: editingCategory.id };
 
       const newSubPayload = {
@@ -357,7 +366,7 @@ const MenuCategoryTree = ({
 
   const handleDelete = (category) => {
     if (category.id === 'all' || category.id === 'dietery' || category.name === 'All Categories') {
-      alert("Cannot edit 'All Categories'");
+      alert("Cannot delete 'All Categories'");
       return;
     }
     setDeleteTarget(category);
@@ -367,217 +376,213 @@ const MenuCategoryTree = ({
   const renderTree = (items, level = 0) =>
     items.map((category, index) => {
       const hasChildren = category.children?.length > 0;
-  
+      const isExpanded = expandedCategories.includes(category.name);
+      
+      // Add subcategory count (only if has subcategories)
+      const categoryWithCount = {
+        ...category,
+        count: hasChildren ? category.children.length : 0
+      };
+
       return (
-        <div key={category.id}>
+        <div key={category.id} className="space-y-1">
           <MenuTreeNode
-            category={category}
+            category={categoryWithCount}
             level={level}
             hasChildren={hasChildren}
-            isExpanded={expandedCategories.includes(category.name)}
             isLast={index === items.length - 1}
+            isExpanded={isExpanded}
             isSelected={selectedCategory === category.name}
             onSelect={() => onSelectCategory(category.name)}
             onToggle={() => toggleCategory(category.name)}
             onEdit={handleEdit}
             onDelete={handleDelete}
           />
-  
-          {hasChildren && expandedCategories.includes(category.name) && (
-            <div>
+
+          {hasChildren && isExpanded && (
+            <div className="mt-1">
               {renderTree(category.children, level + 1)}
             </div>
           )}
         </div>
       );
     });
-  
-  
 
-  // const renderTree = (items, level = 0) => {
-  //   return items.map((category) => {
-  //     const isExpanded = expandedCategories.includes(category.name);
-  //     const isSelected = selectedCategory === category.name;
-  //     const hasChildren = category.children && category.children.length > 0;
+  const flattenAllCategories = (cats) => {
+    let flat = [];
+    const traverse = (items) => {
+      items.forEach(cat => {
+        const hasChildren = cat.children && cat.children.length > 0;
+        flat.push({
+          ...cat,
+          count: hasChildren ? cat.children.length : 0,
+          showCount: hasChildren
+        });
+        if (hasChildren) {
+          traverse(cat.children);
+        }
+      });
+    };
+    traverse(cats);
+    return flat;
+  };
 
-  //     return (
-  //       <div key={category.id || category.name} className="px-1">
-  //         <MenuTreeNode
-  //           category={category}
-  //           isExpanded={isExpanded}
-  //           onToggle={() => toggleCategory(category.name)}
-  //           isSelected={isSelected}
-  //           onSelect={() => onSelectCategory(category.name)}
-  //           hasChildren={hasChildren}
-  //           level={level}
-  //           onEdit={handleEdit}
-  //           onDelete={handleDelete}
-  //         />
-  //         {hasChildren && isExpanded && (
-  //          <div className="mt-1 ml-4 space-y-1">
+  const renderMobileCategories = (items) => {
+    const flatCategories = flattenAllCategories(items);
+    
+    return flatCategories.map((category) => {
+      const isSelected = selectedCategory === category.name;
+      const canEdit = category.id !== 'dietery' && category.name !== 'All Categories';
+      
+      return (
+        <div
+          key={category.id || category.name}
+          className="relative flex-shrink-0"
+        >
+          <button
+            onClick={() => onSelectCategory(category.name)}
+            className={`
+              flex items-center justify-between gap-2
+              px-3 py-2
+              rounded-full
+              font-semibold text-sm
+              transition-all shadow-sm
+              whitespace-nowrap
+            
+              flex-shrink-0
+              w-[140px]
+              h-9
+            
+              ${
+                isSelected
+                  ? 'bg-action-primary text-white shadow-md'
+                  : 'bg-bg-primary text-text-primary border-2 border-border-default hover:border-action-primary'
+              }
+            `}
+            
+          >
+      <span className="truncate"> {category.name} </span>
 
-  //             {renderTree(category.children, level + 1)}
-  //           </div>
-  //         )}
-  //       </div>
-  //     );
-  //   });
-  // };
-// Flatten all categories recursively for mobile view
-const flattenAllCategories = (cats) => {
-  let flat = [];
-  const traverse = (items) => {
-    items.forEach(cat => {
-      // Only include categories with items (count > 0)
-      if (cat.count > 0) {
-        flat.push(cat);
-      }
-      if (cat.children && cat.children.length > 0) {
-        traverse(cat.children);
-      }
+
+            {category.showCount && (
+              <span className={`text-xs px-2 py-0.5 rounded-full font-bold 
+                ${isSelected ? 'bg-white text-action-primary' : 'bg-bg-tertiary text-text-secondary'}`}>
+                      {category.count}
+              </span> 
+            )}
+          </button>
+          
+          {canEdit && (
+            <div className="absolute -top-1 -right-1 flex gap-1 z-10">
+              <button
+                onClick={(e) => {
+                  e.stopPropagation();
+                  handleEdit(category);
+                }}
+                className="w-6 h-6 rounded-full bg-action-primary text-white shadow-lg flex items-center justify-center hover:scale-110 transition-transform"
+                aria-label="Edit category"
+              >
+                <Edit size={12} />
+              </button>
+              <button
+                onClick={(e) => {
+                  e.stopPropagation();
+                  handleDelete(category);
+                }}
+                className="w-6 h-6 rounded-full bg-action-danger text-white shadow-lg flex items-center justify-center hover:scale-110 transition-transform"
+                aria-label="Delete category"
+              >
+                <Trash2 size={12} />
+              </button>
+            </div>
+          )}
+        </div>
+      );
     });
   };
-  traverse(cats);
-  return flat;
-};
 
-const renderMobileCategories = (items) => {
-  const flatCategories = flattenAllCategories(items);
-  
-  return flatCategories.map((category) => {
-    const isSelected = selectedCategory === category.name;
-    const canEdit = category.id !== 'dietery' && category.name !== 'All Categories';
-    
-    return (
-      <div
-        key={category.id || category.name}
-        className="relative flex-shrink-0"
-      >
-        <button
-          onClick={() => onSelectCategory(category.name)}
-          className={`flex items-center gap-2 px-4 py-2 rounded-full whitespace-nowrap font-semibold text-sm transition-all shadow-sm ${
-            isSelected 
-              ? 'bg-action-primary text-white shadow-md' 
-              : 'bg-bg-primary text-text-primary border-2 border-border-default hover:border-action-primary '
-          }`}
-        >
-          <span>{category.name}</span>
-          {typeof category.count !== 'undefined' && (
-            <span className={`text-xs px-2 py-0.5 rounded-full font-bold ${
-              isSelected 
-                ? 'bg-white text-action-primary' 
-                : 'bg-bg-tertiary text-text-secondary'
-            }`}>
-              {category.count}
-            </span>
-          )}
-        </button>
-        
-        {/* Edit/Delete buttons for mobile - Only show for editable categories */}
-        {canEdit && (
-          <div className="absolute -top-1 -right-1 flex gap-1 z-10">
-            <button
-              onClick={(e) => {
-                e.stopPropagation();
-                handleEdit(category);
-              }}
-              className="w-6 h-6 rounded-full bg-action-primary text-white shadow-lg flex items-center justify-center hover:scale-110 transition-transform"
-              aria-label="Edit category"
-            >
-              <Edit size={12} />
-            </button>
-            <button
-              onClick={(e) => {
-                e.stopPropagation();
-                handleDelete(category);
-              }}
-              className="w-6 h-6 rounded-full bg-action-danger text-white shadow-lg flex items-center justify-center hover:scale-110 transition-transform"
-              aria-label="Delete category"
-            >
-              <Trash2 size={12} />
-            </button>
-          </div>
-        )}
-      </div>
-    );
-  });
-};
   return (
     <>
       {/* Desktop: Tree View */}
-      <div className="hidden lg:block rounded-xl p-3 bg-bg-primary border border-white/5">
-
-        <div className="flex items-center justify-between mb-3 px-3">
-          <h3 className="text-lg font-semibold text-text-primary">
+      <div className="hidden lg:block rounded-xl p-4 bg-bg-primary border border-border-default shadow-sm">
+        <div className="flex items-center justify-between mb-4 pb-3 border-b border-border-default">
+          <h3 className="text-lg font-bold text-text-primary">
             Categories
           </h3>
           <button
             onClick={() => setShowAddModal(true)}
-            className="p-1.5 rounded-lg bg-action-primary text-text-white hover:opacity-90 transition-opacity"
+            className="p-2 rounded-lg bg-action-primary text-white hover:opacity-90 transition-opacity shadow-sm"
             title="Add new category"
           >
             <Plus size={18} />
           </button>
         </div>
-        <div className="space-y-1">
+        <div className="space-y-1.5">
           {categories && categories.length > 0 ? (
             renderTree(categories)
           ) : (
-            <div className="px-3 py-4 text-text-secondary">
-              No categories
+            <div className="px-3 py-8 text-center text-text-secondary text-sm">
+              No categories available
             </div>
           )}
         </div>
       </div>
-     {/* Mobile: Horizontal Scrollable List */}
-<div className="lg:hidden mb-4">
-  <div className="flex items-center justify-between mb-3 px-2">
-    <h3 className="text-base font-semibold text-text-primary">
-      Categories
-    </h3>
-    <button
-      onClick={() => setShowAddModal(true)}
-      className="p-1.5 rounded-lg bg-action-primary text-text-white hover:opacity-90 transition-opacity shadow-md flex-shrink-0"
-      title="Add new category"
-    >
-      <Plus size={16} />
-    </button>
-  </div>
-  
-  <div 
-    className="overflow-x-auto max-w-[350px] overflow-y-hidden scrollbar-hide px-2 touch-pan-x"
-    style={{ 
-      WebkitOverflowScrolling: 'touch',
-      scrollbarWidth: 'none',
-      msOverflowStyle: 'none'
-    }}
-  >
-    <div className="flex gap-2 pb-2 w-max">
-      {categories && categories.length > 0 ? (
-        renderMobileCategories(categories)
-      ) : (
-        <div className="text-text-secondary text-sm py-2">
-          No categories
+
+      {/* Mobile: Horizontal Scrollable List */}
+      <div className="lg:hidden mb-4">
+        <div className="flex items-center justify-between mb-3 px-2">
+          <h3 className="text-base font-semibold text-text-primary">
+            Categories
+          </h3>
+          <button
+            onClick={() => setShowAddModal(true)}
+            className="p-1.5 rounded-lg bg-action-primary text-white hover:opacity-90 transition-opacity shadow-md flex-shrink-0"
+            title="Add new category"
+          >
+            <Plus size={16} />
+          </button>
         </div>
-      )}
-    </div>
-  </div>
-</div>
-  
-      {/* Modals remain the same */}
+        
+        <div
+  className="
+    relative
+    overflow-x-auto
+    overflow-y-hidden
+    scrollbar-hide
+    px-2
+  "
+>
+<div
+    className="
+      flex gap-2 pb-2
+      min-w-full
+    "
+  >
+            {categories && categories.length > 0 ? (
+              renderMobileCategories(categories)
+            ) : (
+              <div className="text-text-secondary text-sm py-2">
+                No categories
+              </div>
+            )}
+          </div>
+        </div>
+      </div>
+
+      {/* Add Modal */}
       {showAddModal && createPortal(
         <div className="fixed inset-0 z-[9999] flex items-center justify-center p-4 bg-black bg-opacity-50">
-          <div className="rounded-lg max-w-md w-full p-6 bg-bg-primary shadow-xl">
-            <div className="flex justify-between items-center mb-4">
-              <h3 className="text-xl font-semibold text-text-primary">Add New Category</h3>
-              <button onClick={closeAddModal} className="text-text-secondary hover:text-text-primary">
+          <div className="rounded-xl max-w-md w-full p-6 bg-bg-primary shadow-2xl border border-border-default">
+            <div className="flex justify-between items-center mb-6">
+              <h3 className="text-xl font-bold text-text-primary">Add New Category</h3>
+              <button onClick={closeAddModal} className="text-text-secondary hover:text-text-primary transition-colors">
                 <X size={24} />
               </button>
             </div>
-  
+
             <div className="space-y-4">
               <div>
-                <label className="block text-sm font-medium mb-2 text-text-primary">
+                <label className="block text-sm font-semibold mb-2 text-text-primary">
                   Category Name *
                 </label>
                 <input
@@ -585,34 +590,34 @@ const renderMobileCategories = (items) => {
                   value={newCategoryName}
                   onChange={handleNewCategoryNameChange}
                   placeholder="Enter category name"
-                  className="w-full px-4 py-2 rounded-lg bg-bg-tertiary border border-border-default text-text-primary focus:outline-none focus:ring-2 focus:ring-action-primary"
+                  className="w-full px-4 py-2.5 rounded-lg bg-bg-tertiary border border-border-default text-text-primary focus:outline-none focus:ring-2 focus:ring-action-primary"
                   autoFocus
                 />
               </div>
-  
+
               <div>
-                <label className="block text-sm font-medium mb-2 text-text-primary">
+                <label className="block text-sm font-semibold mb-2 text-text-primary">
                   Description (optional)
                 </label>
                 <textarea
                   value={newCategoryDescription}
                   onChange={handleNewCategoryDescriptionChange}
                   placeholder="Enter description"
-                  className="w-full px-4 py-2 rounded-lg bg-bg-tertiary border border-border-default text-text-primary focus:outline-none focus:ring-2 focus:ring-action-primary"
+                  className="w-full px-4 py-2.5 rounded-lg bg-bg-tertiary border border-border-default text-text-primary focus:outline-none focus:ring-2 focus:ring-action-primary resize-none"
                   rows="3"
                 />
               </div>
-  
+
               <div className="flex gap-3 pt-4">
                 <button
                   onClick={closeAddModal}
-                  className="flex-1 px-4 py-2 rounded-lg bg-bg-tertiary text-text-primary border border-border-default hover:bg-bg-secondary transition-colors"
+                  className="flex-1 px-4 py-2.5 rounded-lg bg-bg-tertiary text-text-primary border border-border-default hover:bg-bg-secondary transition-colors font-medium"
                 >
                   Cancel
                 </button>
                 <button
                   onClick={handleAddCategory}
-                  className="flex-1 px-4 py-2 rounded-lg bg-action-primary text-white hover:opacity-90 transition-opacity"
+                  className="flex-1 px-4 py-2.5 rounded-lg bg-action-primary text-white hover:opacity-90 transition-opacity font-semibold shadow-md"
                 >
                   Add Category
                 </button>
@@ -622,20 +627,21 @@ const renderMobileCategories = (items) => {
         </div>,
         document.body
       )}
-  
+
+      {/* Edit Modal */}
       {showEditModal && editingCategory && createPortal(
         <div className="fixed inset-0 z-[9999] flex items-center justify-center p-4 bg-black bg-opacity-50">
-          <div className="rounded-lg max-w-md w-full p-6 bg-bg-primary shadow-xl">
-            <div className="flex justify-between items-center mb-4">
-              <h3 className="text-xl font-semibold text-text-primary">Edit Category</h3>
-              <button onClick={closeEditModal} className="text-text-secondary hover:text-text-primary">
+          <div className="rounded-xl max-w-md w-full p-6 bg-bg-primary shadow-2xl border border-border-default">
+            <div className="flex justify-between items-center mb-6">
+              <h3 className="text-xl font-bold text-text-primary">Edit Category</h3>
+              <button onClick={closeEditModal} className="text-text-secondary hover:text-text-primary transition-colors">
                 <X size={24} />
               </button>
             </div>
-  
+
             <div className="space-y-4">
               <div>
-                <label className="block text-sm font-medium mb-2 text-text-primary">
+                <label className="block text-sm font-semibold mb-2 text-text-primary">
                   Category Name *
                 </label>
                 <input
@@ -643,25 +649,25 @@ const renderMobileCategories = (items) => {
                   value={editName}
                   onChange={handleEditNameChange}
                   placeholder="Enter category name"
-                  className="w-full px-4 py-2 rounded-lg bg-bg-tertiary border border-border-default text-text-primary focus:outline-none focus:ring-2 focus:ring-action-primary"
+                  className="w-full px-4 py-2.5 rounded-lg bg-bg-tertiary border border-border-default text-text-primary focus:outline-none focus:ring-2 focus:ring-action-primary"
                 />
               </div>
-  
+
               <div>
-                <label className="block text-sm font-medium mb-2 text-text-primary">
+                <label className="block text-sm font-semibold mb-2 text-text-primary">
                   Description
                 </label>
                 <textarea
                   value={editDescription}
                   onChange={handleEditDescriptionChange}
                   placeholder="Enter description"
-                  className="w-full px-4 py-2 rounded-lg bg-bg-tertiary border border-border-default text-text-primary focus:outline-none focus:ring-2 focus:ring-action-primary"
+                  className="w-full px-4 py-2.5 rounded-lg bg-bg-tertiary border border-border-default text-text-primary focus:outline-none focus:ring-2 focus:ring-action-primary resize-none"
                   rows="3"
                 />
               </div>
-  
+
               <div>
-                <label className="block text-sm font-medium mb-2 text-text-primary">
+                <label className="block text-sm font-semibold mb-2 text-text-primary">
                   Add New Subcategory (optional)
                 </label>
                 <input
@@ -669,20 +675,20 @@ const renderMobileCategories = (items) => {
                   value={editNewSubcategoryName}
                   onChange={handleEditNewSubcategoryNameChange}
                   placeholder="New subcategory name"
-                  className="w-full px-4 py-2 rounded-lg bg-bg-tertiary border border-border-default text-text-primary focus:outline-none focus:ring-2 focus:ring-action-primary"
+                  className="w-full px-4 py-2.5 rounded-lg bg-bg-tertiary border border-border-default text-text-primary focus:outline-none focus:ring-2 focus:ring-action-primary"
                 />
               </div>
-  
+
               <div className="flex gap-3 pt-4">
                 <button
                   onClick={closeEditModal}
-                  className="flex-1 px-4 py-2 rounded-lg bg-bg-tertiary text-text-primary border border-border-default hover:bg-bg-secondary transition-colors"
+                  className="flex-1 px-4 py-2.5 rounded-lg bg-bg-tertiary text-text-primary border border-border-default hover:bg-bg-secondary transition-colors font-medium"
                 >
                   Cancel
                 </button>
                 <button
                   onClick={handleEditCategory}
-                  className="flex-1 px-4 py-2 rounded-lg bg-action-primary text-white hover:opacity-90 transition-opacity"
+                  className="flex-1 px-4 py-2.5 rounded-lg bg-action-primary text-white hover:opacity-90 transition-opacity font-semibold shadow-md"
                 >
                   Save Changes
                 </button>
@@ -692,26 +698,27 @@ const renderMobileCategories = (items) => {
         </div>,
         document.body
       )}
-  
+
+      {/* Delete Modal */}
       {showDeleteModal && deleteTarget && createPortal(
         <div className="fixed inset-0 z-[9999] flex items-center justify-center p-4 bg-black bg-opacity-50">
-          <div className="rounded-lg max-w-md w-full p-6 bg-bg-primary shadow-xl">
-            <h3 className="text-xl font-semibold mb-4 text-text-primary">Confirm Delete</h3>
+          <div className="rounded-xl max-w-md w-full p-6 bg-bg-primary shadow-2xl border border-border-default">
+            <h3 className="text-xl font-bold mb-4 text-text-primary">Confirm Delete</h3>
             <p className="mb-6 text-text-secondary">
               Are you sure you want to delete <strong className="text-text-primary">{deleteTarget?.name}</strong>? 
               This action cannot be undone.
             </p>
-  
+
             <div className="flex gap-3">
               <button
                 onClick={closeDeleteModal}
-                className="flex-1 px-4 py-2 rounded-lg bg-bg-tertiary text-text-primary border border-border-default hover:bg-bg-secondary transition-colors"
+                className="flex-1 px-4 py-2.5 rounded-lg bg-bg-tertiary text-text-primary border border-border-default hover:bg-bg-secondary transition-colors font-medium"
               >
                 Cancel
               </button>
               <button
                 onClick={handleDeleteCategory}
-                className="flex-1 px-4 py-2 rounded-lg bg-action-danger text-white hover:opacity-90 transition-opacity"
+                className="flex-1 px-4 py-2.5 rounded-lg bg-action-danger text-white hover:opacity-90 transition-opacity font-semibold shadow-md"
               >
                 Delete
               </button>

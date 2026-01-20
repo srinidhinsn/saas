@@ -43,10 +43,8 @@ const MenuManagement = ({ clientId, token, realm }) => {
     category_id: '',
     unit_price: '',
     discount: '',
-    availability: '',
+    code: '',
     unit: '',
-    code: ' ',
-    dietary_type: '',
     serving_quantity: "",
     serving_unit: "",
     line_item_id: []
@@ -60,7 +58,15 @@ const MenuManagement = ({ clientId, token, realm }) => {
   const [bulkEditData, setBulkEditData] = useState({});
   // realm + user metadata
   const [currentUserId, setCurrentUserId] = useState(null);
-
+  useEffect(() => {
+    try {
+      const decoded = jwtDecode(token);
+      setCurrentUserId(decoded?.user_id || null);
+    } catch {
+      console.warn("JWT decode failed");
+    }
+  }, [token]);
+  
   // Robust flatten for your current category-tree shape (handles `children` or `subCategories`)
   const flattenCategoriesGeneric = (tree) => {
     const flat = [];
@@ -140,7 +146,7 @@ const MenuManagement = ({ clientId, token, realm }) => {
     if (itemPart) parts.push(itemPart);
 
     // join with single underscore, no leading underscore
-    return parts.filter(Boolean).join(' _'); // e.g. Dietery_Non_Veg_Gravies_Mutton_Gravy
+    return parts.filter(Boolean).join('_'); // e.g. Dietery_Non_Veg_Gravies_Mutton_Gravy
   };
 
 
@@ -179,136 +185,173 @@ const MenuManagement = ({ clientId, token, realm }) => {
   };
 
 
+  // const generateCategoryIdFromName = (name) => {
+  //   if (!name) return null;
 
-  // Updated handleAddItem function
-  const handleAddItem = async () => {
-    try {
-      let imageId = null;
+  //   const now = new Date();
+  //   const dd = String(now.getDate()).padStart(2, "0");
+  //   const mm = String(now.getMonth() + 1).padStart(2, "0");
 
-      if (newItemImage) {
-        imageId = await uploadImageToDocumentService(newItemImage);
+  //   const normalizedName = name
+  //     .trim()
+  //     .replace(/\s+/g, "_")
+  //     .replace(/[^a-zA-Z0-9_]/g, "");
+
+  //   return `${normalizedName}_${dd}_${mm}`;
+  // };
+
+// Updated handleAddItem - explicitly removes dietary_type
+const handleAddItem = async () => {
+  try {
+    let imageId = null;
+
+    if (newItemImage) {
+      imageId = await uploadImageToDocumentService(newItemImage);
+    }
+
+    const categoryIdFromNewItem = newItem?.category_id || null;
+    const categoryIdFromSelected = (typeof selectedCategory === 'object' && selectedCategory?.id)
+      ? selectedCategory.id
+      : getCategoryIdByName(selectedCategory);
+
+    const resolvedCategoryId = categoryIdFromNewItem || categoryIdFromSelected || null;
+    const finalCategoryId = resolvedCategoryId;
+
+    if (!finalCategoryId) {
+      alert("Please select a valid category");
+      return;
+    }
+
+    const slug = generateSlug(finalCategoryId, newItem.name);
+    const created_by = currentUserId || localStorage.getItem('user_id') || 'system';
+
+    // ✅ EXPLICITLY remove dietary_type and any other unwanted fields
+    const { dietary_type, ...cleanNewItem } = newItem;
+
+    const payload = {
+      ...cleanNewItem,
+      client_id: clientId,
+      category_id: finalCategoryId,
+      image_id: imageId,
+      realm: realm || newItem.realm || '',
+      slug,
+      unit_price: parseFloat(newItem.unit_price) || 0,
+      discount: parseFloat(newItem.discount) || 0,
+      code: newItem.code ? String(newItem.code).trim() : null, // ✅ Convert to string
+      serving_quantity: newItem.serving_quantity ? parseFloat(newItem.serving_quantity) : null, // ✅ Convert to number or null
+      serving_unit: newItem.serving_unit || null,
+      created_by,
+      updated_by: created_by,
+      inventory_id: 1
+    };
+
+    console.log("Payload before sending:", payload);
+
+    await axios.post(
+      `${import.meta.env.VITE_API_INVENTORY_SERVICE_URL}/${clientId}/menu/create`,
+      payload,
+      {
+        headers: {
+          Authorization: `Bearer ${token}`,
+          "Content-Type": "application/json"
+        }
       }
+    );
 
-      // Prefer category from newItem (modal) first, then from selectedCategory,
-      // and only as a last resort generate an id (legacy behavior).
-      const categoryIdFromNewItem = newItem?.category_id || null;
-      const categoryIdFromSelected = (typeof selectedCategory === 'object' && selectedCategory?.id)
+    await fetchData({ silent: true });
+
+    setShowAddModal(false);
+    setNewItem({
+      name: '',
+      description: '',
+      category_id: '',
+      unit_price: '',
+      discount: '',
+      code: '',
+      unit: '',
+      line_item_id: []
+    });
+    setNewItemImage(null);
+    setNewItemImageUrl('');
+  } catch (error) {
+    console.error('Error adding item:', error);
+    console.error('Full error response:', error.response);
+    console.error('Error data:', JSON.stringify(error.response?.data, null, 2));
+    
+    // Show detailed error message
+    let errorMsg = 'Failed to add item\n\n';
+    if (error.response?.data?.detail) {
+      if (Array.isArray(error.response.data.detail)) {
+        errorMsg += error.response.data.detail.map(err => 
+          `Field: ${err.loc?.join('.')}\nError: ${err.msg}`
+        ).join('\n\n');
+      } else {
+        errorMsg += error.response.data.detail;
+      }
+    } else {
+      errorMsg += error.message;
+    }
+    
+    alert(errorMsg);
+  }
+};
+const handleEditItem = async () => {
+  try {
+    let imageId = editingItem.image_id;
+
+    if (editItemImage) {
+      imageId = await uploadImageToDocumentService(editItemImage);
+    }
+
+    const categoryId =
+      editingItem.category_id ||
+      (typeof selectedCategory === 'object'
         ? selectedCategory.id
-        : getCategoryIdByName(selectedCategory);
+        : getCategoryIdByName(selectedCategory));
 
-      const resolvedCategoryId = categoryIdFromNewItem || categoryIdFromSelected || null;
+    const finalCategoryId = categoryId || null;
+    const slug = generateSlug(finalCategoryId, editingItem.name);
+    const updated_by = currentUserId || localStorage.getItem('user_id') || 'system';
 
-      const generateCategoryId = (parentId = null) => {
-        const timestamp = Date.now();
-        return parentId ? `subcat_${timestamp}` : `cat_${timestamp}`;
-      };
+    // ✅ EXPLICITLY remove dietary_type
+    const { dietary_type, ...cleanEditingItem } = editingItem;
 
-      const finalCategoryId = resolvedCategoryId
-        ? resolvedCategoryId
-        : generateCategoryId(typeof selectedCategory === 'object' ? selectedCategory.id : null);
+    const payload = {
+      ...cleanEditingItem,
+      code: editingItem.code ? String(editingItem.code).trim() : null,
+      client_id: clientId,
+      category_id: finalCategoryId,
+      image_id: imageId,
+      realm: editingItem.realm || realm || '',
+      slug,
+      unit_price: parseFloat(editingItem.unit_price) || 0,
+      discount: parseFloat(editingItem.discount) || 0,
+      serving_quantity: editingItem.serving_quantity ? parseFloat(editingItem.serving_quantity) : null, // ✅ Add this
+      serving_unit: editingItem.serving_unit || null, // ✅ Add this
+      updated_by
+    };
 
-      // Build slug using category name path (not the raw id)
-      const slug = generateSlug(finalCategoryId, newItem.name);
+    console.log("Edit payload:", payload);
 
-      // who created this?
-      const created_by = currentUserId || localStorage.getItem('user_id') || 'system';
+    await axios.post(
+      `${import.meta.env.VITE_API_INVENTORY_SERVICE_URL}/${clientId}/menu/update`,
+      payload,
+      { headers: { Authorization: `Bearer ${token}` } }
+    );
 
-      const payload = {
-        ...newItem,
-        client_id: clientId,
-        category_id: finalCategoryId,
-        image_id: imageId,
-        realm: realm || newItem.realm || '',
-        slug,
-        unit_price: parseFloat(newItem.unit_price) || 0,
-        discount: parseFloat(newItem.discount) || 0,
-        availability: parseInt(newItem.availability) || 0,
-        created_by,
-        updated_by: created_by,
-        inventory_id: 1
-      };
-      console.log("Payload", payload)
-      await axios.post(
-        `${import.meta.env.VITE_API_INVENTORY_SERVICE_URL}/${clientId}/menu/create`,
-        payload,
-        { headers: { Authorization: `Bearer ${token}` } }
-      );
+    await fetchData({ silent: true });
 
-      await fetchData({ silent: true });
+    setShowEditModal(false);
+    setEditingItem(null);
+    setEditItemImage(null);
+    setEditItemImageUrl('');
+  } catch (error) {
+    console.error('Error updating item:', error);
+    console.error('Error response:', error.response?.data);
+    alert('Failed to update item: ' + (error.response?.data?.detail || error.message));
+  }
+};
 
-      setShowAddModal(false);
-      setNewItem({
-        name: '',
-        description: '',
-        category_id: '',
-        unit_price: '',
-        discount: '',
-        availability: '',
-        unit: '',
-        line_item_id: []
-      });
-      setNewItemImage(null);
-      setNewItemImageUrl('');
-    } catch (error) {
-      console.error('Error adding item:', error);
-      alert('Failed to add item');
-    }
-  };
-
-  const handleEditItem = async () => {
-    try {
-      let imageId = editingItem.image_id;
-
-      if (editItemImage) {
-        imageId = await uploadImageToDocumentService(editItemImage);
-      }
-
-      const categoryId =
-        editingItem.category_id ||
-        (typeof selectedCategory === 'object'
-          ? selectedCategory.id
-          : getCategoryIdByName(selectedCategory));
-
-      const finalCategoryId = categoryId || null;
-      const slug = generateSlug(finalCategoryId, editingItem.name);
-
-      const updated_by =
-        currentUserId || localStorage.getItem('user_id') || 'system';
-
-      const payload = {
-        ...editingItem,
-        dietary_type: normalizeDietary(editingItem.dietary_type),
-        code: editingItem.code ? String(editingItem.code).trim() : null,
-        client_id: clientId,
-        category_id: finalCategoryId,
-        image_id: imageId,
-        realm: editingItem.realm || realm || '',
-        slug,
-
-        unit_price: parseFloat(editingItem.unit_price) || 0,
-        discount: parseFloat(editingItem.discount) || 0,
-        availability: parseInt(editingItem.availability) || 0,
-
-        updated_by
-      };
-
-      await axios.post(
-        `${import.meta.env.VITE_API_INVENTORY_SERVICE_URL}/${clientId}/menu/update`,
-        payload,
-        { headers: { Authorization: `Bearer ${token}` } }
-      );
-
-      await fetchData({ silent: true });
-
-      setShowEditModal(false);
-      setEditingItem(null);
-      setEditItemImage(null);
-      setEditItemImageUrl('');
-    } catch (error) {
-      console.error('Error updating item:', error);
-      alert('Failed to update item');
-    }
-  };
   const normalizeDietary = (value) => {
     if (!value) return "";
 
@@ -379,16 +422,19 @@ const MenuManagement = ({ clientId, token, realm }) => {
         }).length;
       };
 
+      // NEW VERSION - counts subcategories instead
       const buildCategoryTree = (flatCats) => {
         const categoryMap = new Map();
+
+        // First pass: create all category objects
         flatCats.forEach(cat => {
           categoryMap.set(cat.id, {
             ...cat,
-            count: getCategoryCount(cat.name),
             children: []
           });
         });
 
+        // Second pass: build tree structure
         const tree = [];
         categoryMap.forEach(cat => {
           if (cat.parentId && categoryMap.has(cat.parentId)) {
@@ -396,6 +442,11 @@ const MenuManagement = ({ clientId, token, realm }) => {
           } else {
             tree.push(cat);
           }
+        });
+
+        // Third pass: add subcategory counts
+        categoryMap.forEach(cat => {
+          cat.count = cat.children.length;
         });
 
         return tree;
@@ -406,7 +457,7 @@ const MenuManagement = ({ clientId, token, realm }) => {
           return {
             ...cat,
             name: 'All Categories',
-            count: enrichedItems.length  // Total count of all items
+            count: cat.children.length  // NEW: Subcategories count
           };
         }
         return cat;
@@ -426,7 +477,37 @@ const MenuManagement = ({ clientId, token, realm }) => {
 
     fetchData();
   }, [fetchData]);
+  // Add this function in MenuManagement.jsx after your other helper functions
+  const getAllDescendantCategories = (categoryName, categoryTree) => {
+    const descendants = [categoryName];
 
+    const findCategory = (cats, name) => {
+      for (const cat of cats) {
+        if (cat.name === name) return cat;
+        if (cat.children) {
+          const found = findCategory(cat.children, name);
+          if (found) return found;
+        }
+      }
+      return null;
+    };
+
+    const collectDescendants = (cat) => {
+      if (cat.children && cat.children.length > 0) {
+        cat.children.forEach(child => {
+          descendants.push(child.name);
+          collectDescendants(child);
+        });
+      }
+    };
+
+    const category = findCategory(categoryTree, categoryName);
+    if (category) {
+      collectDescendants(category);
+    }
+
+    return descendants;
+  };
   const getFilteredItems = () => {
     const q = (searchQuery || '').trim().toLowerCase();
 
@@ -442,19 +523,17 @@ const MenuManagement = ({ clientId, token, realm }) => {
       });
     }
 
-    // 📂 Category
+    // 📂 Category - hierarchical filtering
     if (selectedCategory && selectedCategory !== 'All Categories') {
-      items = items.filter(item => item.category === selectedCategory);
-    }
+      // Get all descendant categories
+      const allowedCategories = getAllDescendantCategories(selectedCategory, categories);
 
-    // 🟢🔴🟡 Dietary Filter
-    if (dietaryFilter !== "All") {
-      items = items.filter(
-        item =>
-          normalizeDietary(item.dietary_type) === dietaryFilter
-
+      items = items.filter(item =>
+        allowedCategories.includes(item.category)
       );
     }
+
+
 
     return items;
   };
@@ -616,46 +695,43 @@ const MenuManagement = ({ clientId, token, realm }) => {
     }
   };
 
-  // Bulk Update
   const handleBulkUpdate = async () => {
     if (selectedRows.length === 0) {
       alert('No items selected');
       return;
     }
-
+  
     try {
       await Promise.all(
         selectedRows.map(id => {
           const editedData = bulkEditData[id] || {};
           const originalItem = menuItems.find(item => item.id === id);
+          
+          // ✅ Remove dietary_type from both
+          const { dietary_type: editedDietary, ...cleanEditedData } = editedData;
+          const { dietary_type: originalDietary, ...cleanOriginalItem } = originalItem;
+  
           const payload = {
-            ...originalItem,
-            ...editedData,
-            dietary_type:
-              editedData.dietary_type !== undefined
-                ? normalizeDietary(editedData.dietary_type)
-                : normalizeDietary(originalItem.dietary_type),
+            ...cleanOriginalItem,
+            ...cleanEditedData,
             client_id: clientId
           };
-
-
+  
           return axios.post(
             `${import.meta.env.VITE_API_INVENTORY_SERVICE_URL}/${clientId}/menu/update`,
             payload,
             { headers: { Authorization: `Bearer ${token}` } }
-
           );
-
         })
       );
-
+  
       // Refresh items
       const itemRes = await axios.get(
         `${import.meta.env.VITE_API_INVENTORY_SERVICE_URL}/${clientId}/menu/read?realm=${realm}`,
         { headers: { Authorization: `Bearer ${token}` } }
       );
       setMenuItems(itemRes.data.data);
-
+  
       setShowBulkModal(false);
       setSelectedRows([]);
       setBulkEditData({});
@@ -702,8 +778,6 @@ const MenuManagement = ({ clientId, token, realm }) => {
           Description: item.description ?? "",
           Category: catNameById(item.category_id) || item.category || "Unknown",
           Image: item.image_id,
-          Code: item.code ?? "",
-          Dietary_type: item.dietary_type ?? "",
           Unit: item.unit ?? "",
           Unit_Price: typeof item.unit_price === "number" ? item.unit_price : (item.unit_price ? parseFloat(item.unit_price) : 0),
           Unit_CST: typeof item.unit_cst === "number" ? item.unit_cst : (item.unit_cst ? parseFloat(item.unit_cst) : 0),
@@ -713,7 +787,7 @@ const MenuManagement = ({ clientId, token, realm }) => {
           CST: typeof item.cst === "number" ? item.cst : (item.cst ? parseFloat(item.cst) : 0),
           GST: typeof item.gst === "number" ? item.gst : (item.gst ? parseFloat(item.gst) : 0),
           Discount: typeof item.discount === "number" ? item.discount : (item.discount ? parseFloat(item.discount) : 0),
-          Availability: typeof item.availability === "number" ? item.availability : (item.availability ? parseInt(item.availability) : 0),
+          Code: typeof item.code === "number" ? item.code : (item.code ? parseInt(item.code) : 0),
           Serving_Quantity: item.serving_quantity,
           Serving_Unit: item.serving_unit,
           Realm: item.realm ?? realm ?? "",
@@ -727,7 +801,7 @@ const MenuManagement = ({ clientId, token, realm }) => {
       const worksheet = XLSX.utils.json_to_sheet(exportData, {
         header: [
           "ID", "Inventory_Id", "Name", "Description", "Category", "Image", "Unit", "Unit_Price", "Unit_CST", "Unit_GST", "Total_Unit_Price", "Total_Price",
-          "CST", "GST", "Discount", "Availability", "Serving_Quantity", "Serving_Unit", "Realm", "Dietary", "Slug", "Line_Item_IDs"
+          "CST", "GST", "Discount", "Code", "Serving_Quantity", "Serving_Unit", "Realm", "Dietary", "Slug", "Line_Item_IDs"
         ]
       });
 
@@ -835,6 +909,8 @@ const MenuManagement = ({ clientId, token, realm }) => {
             }
 
             const categoryId = getCategoryIdByName(row.Category);
+
+
             if (!categoryId) throw new Error("Invalid category");
 
             const payload = {
@@ -845,8 +921,6 @@ const MenuManagement = ({ clientId, token, realm }) => {
               category_id: categoryId,
               realm: row.Realm || realm || "",
               code: row.Code || "",
-              dietary_type: normalizeDietary(row.Dietary || row.dietary_type || ""),
-              availability: Number(row.Availability || 0),
               serving_quantity: row.Serving_Quantity || null,
               serving_unit: row.Serving_Unit || null,
               unit: row.Unit || "",
@@ -947,17 +1021,19 @@ const MenuManagement = ({ clientId, token, realm }) => {
   // }
 
   return (
-    <div className="min-h-screen bg-bg-primary">
+    <div className="h-screen bg-bg-primary overflow-x-hidden">
 
 
-      <div className="mx-auto px-4 py-2">
+
+      <div className="mx-auto p-2">
         {/* Action Buttons */}
 
 
-        <div className="grid lg:grid-cols-4 gap-2">
+        <div className="lg:grid lg:grid-cols-4 gap-2">
+
           {/* Sidebar */}
           <div className="lg:col-span-1">
-            <div className="lg:sticky lg:top-20">
+            <div className="lg:sticky lg:top-0">
               <MenuCategoryTree
                 categories={categories}
                 selectedCategory={selectedCategory}
@@ -974,12 +1050,12 @@ const MenuManagement = ({ clientId, token, realm }) => {
           </div>
 
           {/* Main Content */}
-          <div className="lg:col-span-3 border-default border-border-default p-3 rounded-lg">
+          <div className="lg:col-span-3 border-default border-border-default p-3 rounded-lg overflow-x-hidden">
+
             <div className="mb-4 grid gap-3 grid-cols-1 md:grid-cols-2 lg:grid-cols-3">
 
 
               <div className="lg:col-span-1 space-y-2">
-                {/* Category title */}
                 <h2 className="text-xl lg:text-2xl font-semibold text-text-primary">
                   {selectedCategory}
                   <span className="text-sm ml-2 text-text-primary">
@@ -991,30 +1067,46 @@ const MenuManagement = ({ clientId, token, realm }) => {
 
 
               <div className="lg:col-span-1">
-                <div className="relative w-full">
+                <div className="
+    relative w-full
+    group
+  ">
                   <Search
                     size={16}
-                    className="absolute left-3 top-1/2 -translate-y-1/2 text-text-secondary"
+                    className="
+        absolute left-3 top-1/2 -translate-y-1/2
+        text-text-secondary
+        transition-colors
+        group-focus-within:text-action-primary
+      "
                   />
+
                   <input
                     ref={searchInputRef}
                     type="text"
                     value={searchQuery}
                     onChange={(e) => setSearchQuery(e.target.value)}
-                    placeholder="Search items..."
+                    placeholder="Search items, category or code…"
                     className="
-      w-full
-      h-9
-      pl-10 pr-3
-      rounded-lg
-      bg-bg-tertiary
-      border border-border-default
-      focus:ring-2 focus:ring-action-primary
-    "
+        w-full h-9
+        pl-10 pr-3
+        rounded-lg
+        bg-bg-tertiary
+        border border-border-default
+        text-sm text-text-primary
+        placeholder:text-text-secondary
+
+        transition-all duration-200
+        focus:outline-none
+        focus:ring-2 focus:ring-action-primary/30
+        focus:border-action-primary
+
+        hover:border-action-primary/50
+      "
                   />
                 </div>
-
               </div>
+
 
               <div className="
   flex flex-wrap
@@ -1039,7 +1131,7 @@ const MenuManagement = ({ clientId, token, realm }) => {
   "
                 >
                   <Plus size={14} />
-                  <span>Add</span>
+                  <span>Add Item</span>
                 </button>
 
 
@@ -1057,42 +1149,77 @@ const MenuManagement = ({ clientId, token, realm }) => {
   "
                 >
                   <Edit size={14} />
-                  <span className="hidden sm:inline">Bulk</span>
+                  <span className="hidden sm:inline">Bulk Update</span>
                 </button>
-                <button
-                  onClick={handleExportToExcel}
-                  className="
-    h-9 px-3
-    flex items-center gap-2
-    rounded-lg
-    bg-bg-tertiary
-    border border-border-default
-    text-sm font-semibold
-    hover:border-action-primary
-    hover:bg-bg-secondary
-  "
-                >
-                  <Download size={14} />
-                  <span className="hidden sm:inline">Export</span>
-                </button>
+                <div className="relative group">
+                  {/* Main Dropdown Button */}
+                  <button
+                    className="
+      h-9 px-3
+      flex items-center gap-2
+      rounded-lg
+      bg-bg-tertiary
+      border border-border-default
+      text-sm font-semibold
+      hover:border-action-primary
+      hover:bg-bg-secondary
+    "
+                  >
+                    <Download size={14} />
+                    {/* <span className="hidden sm:inline"></span> */}
+                    {/* <svg
+                      className="w-4 h-4"
+                      fill="none"
+                      stroke="currentColor"
+                      strokeWidth="2"
+                      viewBox="0 0 24 24"
+                    >
+                      <path d="M19 9l-7 7-7-7" />
+                    </svg> */}
+                  </button>
 
+                  {/* Dropdown Menu */}
+                  <div
+                    className="
+      absolute right-0 mt-1 w-36
+      bg-bg-primary
+      border border-border-default
+      rounded-lg
+      shadow-lg
+      opacity-0 invisible
+      group-hover:opacity-100 group-hover:visible
+      transition-all duration-200
+      z-50
+    "
+                  >
+                    <button
+                      onClick={() => document.getElementById('excelInput').click()}
+                      className="
+        w-full px-4 py-2
+        flex items-center gap-2
+        text-sm
+        hover:bg-bg-secondary
+      "
+                    >
+                      <Upload size={14} />
+                      Import
+                    </button>
 
-                <button
-                  onClick={() => document.getElementById('excelInput').click()}
-                  className="
-    h-9 px-3
-    flex items-center gap-2
-    rounded-lg
-    bg-bg-tertiary
-    border border-border-default
-    text-sm font-semibold
-    hover:border-action-primary
-    hover:bg-bg-secondary
-  "
-                >
-                  <Upload size={14} />
-                  <span className="hidden sm:inline">Import</span>
-                </button>
+                    <button
+                      onClick={handleExportToExcel}
+                      className="
+        w-full px-4 py-2
+        flex items-center gap-2
+        text-sm
+        hover:bg-bg-secondary
+      "
+                    >
+                      <Download size={14} />
+                      Export
+                    </button>
+                  </div>
+                </div>
+
 
 
                 <input
@@ -1106,23 +1233,23 @@ const MenuManagement = ({ clientId, token, realm }) => {
             </div>
 
             {/* Items Grid */}
-            <div className="grid grid-cols-3 sm:grid-cols-4 lg:grid-cols-4 xl:grid-cols-5 2xl:grid-cols-6 gap-3 md:gap-4 lg:gap-5">
+            <div className="grid grid-cols-3 sm:grid-cols-4 lg:grid-cols-4 xl:grid-cols-5 2xl:grid-cols-6 gap-1 md:gap-2 lg:gap-2">
               {filteredItems.map(item => {
                 const discountPercent = item.discount && item.unit_price && Number(item.discount) > 0
                   ? ((Number(item.discount) * 100) / Number(item.unit_price)).toFixed(1).replace(/\.0$/, '')
                   : null;
 
                 return (
-                  <div key={item.id} className="bg-bg-primary rounded-xl shadow-sm overflow-hidden hover:shadow-lg transition-all duration-300 group relative">
-                    <div className="relative h-20 sm:h-20 md:h-24 lg:h-28 overflow-hidden bg-gradient-to-br from-gray-100 to-gray-200">
+                  <div key={item.id} className="bg-bg-primary border-4 md:border-6 lg:border-8  border-border-default rounded-md overflow-hidden shadow-lg transition-all duration-300 group relative">
+                    <div className="relative h-20 border-2 md:border-3 rounded-lg lg:border-4 border-white  sm:h-20 md:h-24 lg:h-28 overflow-hidden bg-gradient-to-br from-gray-100 to-gray-200">
                       {discountPercent && (
-                        <div className="absolute top-2 left-2 bg-action-danger text-text-white text-xs font-bold px-2 py-1 rounded-md z-10 shadow-md">
+                        <div className="absolute top-2 left-2 bg-action-danger text-text-white text-[8px] font-bold p-1 rounded-md z-10 shadow-md">
                           {discountPercent}% OFF
                         </div>
                       )}
 
                       {item.line_item_id && Array.isArray(item.line_item_id) && item.line_item_id.length > 0 && (
-                        <div className="absolute bottom-2 left-2 bg-orange-500 text-white text-[8px] p-1 rounded-md z-10 shadow-md flex items-center gap-1">
+                        <div className="absolute bottom-2 left-2 bg-orange-500 text-white text-[7px] p-1 rounded-md z-10 shadow-md flex items-center gap-1">
                           <Plus size={10} />
                           <span>{item.line_item_id.length} add-ons</span>
                         </div>
@@ -1145,7 +1272,6 @@ const MenuManagement = ({ clientId, token, realm }) => {
                           onClick={() => {
                             setEditingItem({
                               ...item,
-                              dietary_type: normalizeDietary(item.dietary_type)
                             });
                             setShowEditModal(true);
                           }}
@@ -1153,7 +1279,7 @@ const MenuManagement = ({ clientId, token, realm }) => {
                           className="bg-action-primary text-text-white p-1 rounded-full hover:bg-orange-600 transition-all duration-300 shadow-lg hover:shadow-xl z-10 hover:scale-110 active:scale-95"
                           aria-label="Edit item"
                         >
-                          <Edit size={12} />
+                          <Edit size={10} />
                         </button>
                         <button
                           onClick={() => {
@@ -1163,30 +1289,27 @@ const MenuManagement = ({ clientId, token, realm }) => {
                           className="bg-action-danger text-text-white p-1  rounded-full hover:bg-red-600 transition-all duration-300 shadow-lg hover:shadow-xl z-10 hover:scale-110 active:scale-95"
                           aria-label="Delete item"
                         >
-                          <Trash2 size={12} />
+                          <Trash2 size={10} />
                         </button>
                       </div>
                     </div>
-                    <span
-                      className={`w-2.5 h-2.5 rounded-full ${getDietaryDotColor(normalizeDietary(item.dietary_type))}`}
-                      title={item.dietary_type || "Unknown"}
-                    />
-                    <div className="p-1">
-                      <div className="flex items-center gap-2">
-                        <h3 className="font-semibold text-[12px] line-clamp-2 min-h-[1.2rem] text-text-primary">
+                    <hr className='border-b-default border-border-default mx-1' />
+                    <div className="p-2">
+                      <div className="flex items-center justify-center gap-2">
+                        <h3 className="font-semibold text-[8px] xl:text-[14px] sm:text-[7px] md:text-[5px] line-clamp-2 min-h-[1.2rem] text-text-primary">
                           {item.name}
                         </h3>
                       </div>
 
-                      <div className="flex items-center justify-between">
+                      <div className="flex items-center justify-center">
                         <p className="text-action-primary font-bold text-base sm:text-md">
                           ₹{(item.unit_price - (item.discount || 0)).toFixed(2)}
                         </p>
-                        {discountPercent && (
+                        {/* {discountPercent && (
                           <span className="text-xs text-text-secondary line-through">
                             ₹{item.unit_price?.toFixed(2)}
                           </span>
-                        )}
+                        )} */}
 
                         {/* 
                         <span className="text-xs text-text-secondary truncate max-w-[100px]">

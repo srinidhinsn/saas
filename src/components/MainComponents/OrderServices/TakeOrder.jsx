@@ -2903,7 +2903,7 @@ pr-1
             "
               >
 
-                <div className="mb-4 flex items-center justify-between gap-3">
+                <div className="mb-2 flex items-center justify-between lg:flex-row flex-col gap-2">
 
                   {/* LEFT : CATEGORY NAME */}
                   <h2 className="text-xl lg:text-2xl font-semibold text-text-primary truncate">
@@ -2937,7 +2937,7 @@ pr-1
                 </div>
 
                 <div
-                  className="grid gap-3 [grid-template-columns:repeat(auto-fit,minmax(240px,1fr))]">
+                  className="grid gap-3 grid-cols-2 md:grid-cols-4 lg:grid-cols-4">
                   {filteredItems.map(item => {
                     const discountPercent =
                       item.discount &&

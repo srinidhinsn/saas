@@ -116,9 +116,10 @@ const UniversalBulkUpdateModal = ({
             <h2 className="text-xl font-semibold text-gray-900">Bulk Update & Delete</h2>
             <button
               onClick={handleClose}
-              className="w-8 h-8 rounded hover:bg-gray-100 flex items-center justify-center"
+              className="p-1.5 rounded-lg bg-action-primary text-text-white hover:opacity-90 transition-opacity   "
+
             >
-              <X className="w-5 h-5 text-gray-500" />
+              <X className="w-5 h-5" />
             </button>
           </div>
 
@@ -177,7 +178,9 @@ const UniversalBulkUpdateModal = ({
                     <th className="px-4 py-3 text-left text-sm font-semibold text-gray-700 bg-gray-50">Description</th>
                     <th className="px-4 py-3 text-left text-sm font-semibold text-gray-700 bg-gray-50">Price</th>
                     <th className="px-4 py-3 text-left text-sm font-semibold text-gray-700 bg-gray-50">Discount</th>
-                    <th className="px-4 py-3 text-left text-sm font-semibold text-gray-700 bg-gray-50">Availability</th>
+                    <th className="px-4 py-3 text-left text-sm font-semibold text-gray-700 bg-gray-50">
+                      Code
+                    </th>
                   </tr>
                 </thead>
                 <tbody>
@@ -266,16 +269,26 @@ const UniversalBulkUpdateModal = ({
                         <td className="px-4 py-3">
                           {isSelected ? (
                             <input
-                              type="number"
-                              value={editData.availability !== undefined ? editData.availability : item.availability}
-                              onChange={(e) => updateBulkEditData(item.id, 'availability', e.target.value)}
-                              className="w-full px-3 py-2 rounded-md border border-gray-300 text-sm focus:outline-none focus:ring-2 focus:ring-blue-500 focus:border-transparent"
-                              placeholder="0"
+                              type="text"
+                              value={
+                                editData.code !== undefined
+                                  ? editData.code
+                                  : item.code ?? ''
+                              }
+                              onChange={(e) =>
+                                updateBulkEditData(item.id, 'code', e.target.value)
+                              }
+                              className="w-full px-3 py-2 rounded-md border border-gray-300 text-sm
+        focus:outline-none focus:ring-2 focus:ring-action-primary"
+                              placeholder="Code"
                             />
                           ) : (
-                            <span className="text-sm text-gray-900">{item.availability || 0}</span>
+                            <span className="text-sm text-gray-900">
+                              {item.code ?? '-'}
+                            </span>
                           )}
                         </td>
+
                       </tr>
                     );
                   })}
@@ -321,19 +334,20 @@ const UniversalBulkUpdateModal = ({
 
           {/* Header */}
           <div className="px-4 sm:px-6 py-3 border-b border-border-default flex justify-between items-center bg-bg-tertiary flex-shrink-0">
-            <h2 className="text-base sm:text-lg font-bold text-text-primary">Update Tables</h2>
+            <h2 className="text-base sm:text-lg font-bold text-text-primary">Update Tables
+              <span className='text-sm'>(Apply to All Selected)</span>
+            </h2>
             <button
               onClick={handleClose}
-              className="w-7 h-7 rounded-lg hover:bg-bg-secondary flex items-center justify-center transition-colors"
+              className="p-1.5 rounded-lg bg-action-primary text-text-white hover:opacity-90 transition-opacity   "
             >
-              <X className="w-4 h-4 text-text-secondary" />
+              <X className="w-4 h-4 " />
             </button>
           </div>
 
           {/* Global Update Section */}
           <div className="px-4 sm:px-6 py-3 bg-bg-tertiary border-b border-border-default flex-shrink-0">
-            <h3 className="text-xs font-bold text-text-primary mb-2">Apply to All Selected</h3>
-            <div className="grid grid-cols-1 sm:grid-cols-3 gap-2">
+            <div className="grid grid-cols-1 sm:grid-cols-4 gap-2">
               <div>
                 <label className="block text-xs font-semibold mb-1.5 text-text-secondary">Seating</label>
 
@@ -614,7 +628,7 @@ const UniversalBulkUpdateModal = ({
                             <span className="text-text-secondary">Status:</span>
                             <span className="ml-1 text-text-primary font-semibold">{table.status}</span>
                           </div>
-                           <div>
+                          <div>
                             <span className="text-text-secondary">Section:</span>
                             <span className="ml-1 text-text-primary font-semibold">{table.section}</span>
                           </div>
