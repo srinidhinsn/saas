@@ -1,5 +1,3 @@
-
-// MenuCategoryTree.jsx - Updated with Drag & Drop
 import { useState, useEffect, useCallback } from "react";
 import { createPortal } from "react-dom";
 import MenuTreeNode from "./MenuTreeNode";
@@ -17,8 +15,7 @@ const MenuCategoryTree = ({
   onCategoriesUpdate
 }) => {
   const [expandedCategories, setExpandedCategories] = useState(['All Categories']);
-  const [parentMap, setParentMap] = useState({});
-  
+
   // Drag & Drop states
   const [draggedItem, setDraggedItem] = useState(null);
   const [dragOverItem, setDragOverItem] = useState(null);
@@ -60,6 +57,21 @@ const MenuCategoryTree = ({
         .replace(/^_|_$/g, "")         // ✅ no leading/trailing _
       + "_" + timestamp                // ✅ uniqueness
     );
+  };
+  const buildLocalParentMap = (cats) => {
+    const map = {};
+    const traverse = (nodes, parentId = null) => {
+      nodes.forEach(n => {
+        if (parentId && n.id !== "all") {
+          map[n.id] = parentId;
+        }
+        if (n.children?.length) {
+          traverse(n.children, n.id);
+        }
+      });
+    };
+    traverse(cats);
+    return map;
   };
   
   // Drag & Drop Handlers
@@ -142,67 +154,7 @@ const MenuCategoryTree = ({
     };
     return checkChildren(targetCat);
   };
-  const handleCategoryReorder = async (draggedCat, targetCat, position) => {
-    const draggedParentId = parentMap[draggedCat.id];
-    const targetParentId =
-      position === "inside"
-        ? targetCat.id
-        : parentMap[targetCat.id];
-  
-    if (!draggedParentId || !targetParentId) return;
-  
-    // ✅ BUILD FROM UI TREE (SOURCE OF TRUTH)
-    const getChildrenIds = (parentId) => {
-      const findNode = (nodes) => {
-        for (const n of nodes) {
-          if (n.id === parentId) return n;
-          if (n.children) {
-            const found = findNode(n.children);
-            if (found) return found;
-          }
-        }
-        return null;
-      };
-  
-      const node = findNode(categories);
-      return node?.children?.map(c => c.id) || [];
-    };
-  
-    let oldSubs = getChildrenIds(draggedParentId);
-    let newSubs = getChildrenIds(targetParentId);
-  
-    // ❌ remove dragged from old parent
-    oldSubs = oldSubs.filter(id => id !== draggedCat.id);
-  
-    // ➕ insert into new parent
-    if (position === "inside") {
-      if (!newSubs.includes(draggedCat.id)) {
-        newSubs.push(draggedCat.id);
-      }
-    } else {
-      const idx = newSubs.indexOf(targetCat.id);
-      const insertAt = position === "above" ? idx : idx + 1;
-  
-      newSubs = newSubs.filter(id => id !== draggedCat.id);
-      newSubs.splice(insertAt, 0, draggedCat.id);
-    }
-  
-    // 🔒 NEVER EMPTY DIETERY
-    if (draggedParentId === "dietery" && oldSubs.length === 0) {
-      console.warn("Blocked empty overwrite for Dietery");
-      return;
-    }
-  
-    // ✅ UPDATE SOURCE PARENT
-    await updateCategorySubcategories(draggedParentId, oldSubs);
-  
-    // ✅ UPDATE TARGET PARENT (ONLY IF DIFFERENT)
-    if (draggedParentId !== targetParentId) {
-      await updateCategorySubcategories(targetParentId, newSubs);
-    }
-  
-    onCategoriesUpdate?.();
-  };
+
   
   
   
@@ -225,26 +177,21 @@ const MenuCategoryTree = ({
   
 
   const updateCategorySubcategories = async (categoryId, subcategoryIds) => {
-    if (categoryId === "dietery" && subcategoryIds.length === 0) {
-      console.warn("Blocked empty overwrite for Dietery");
-      return;
-    }
+    if (categoryId === "dietery" && subcategoryIds.length === 0) return;
   
     const category = await fetchCategoryById(categoryId);
-  
-    const payload = {
-      id: categoryId,
-      client_id: clientId,
-      name: category.name,
-      description: category.description || "",
-      sub_categories: [...new Set(subcategoryIds)], // ✅ FULL LIST
-      slug: category.slug,
-      overwrite_subcategories: true,
-    };
+    if (!category) return;
   
     await axios.post(
       `${import.meta.env.VITE_API_INVENTORY_SERVICE_URL}/${clientId}/menu/update_category`,
-      payload,
+      {
+        id: categoryId,
+        client_id: clientId,
+        name: category.name,
+        description: category.description || "",
+        sub_categories: [...new Set(subcategoryIds)],
+        overwrite_subcategories: true, // ✅ ONLY THIS
+      },
       {
         headers: {
           Authorization: `Bearer ${token}`,
@@ -254,75 +201,96 @@ const MenuCategoryTree = ({
     );
   };
   
-  const regenerateSlugForCategory = async (categoryId, newParentId) => {
+  const updateSlugsRecursively = async (categoryId) => {
+    const slug = generateHierarchicalSlug(categoryId, categories);
+
     const category = await fetchCategoryById(categoryId);
-  
-    const newSlug = generateSlugFromParents(
-      categoryId,
-      category.name,
-      { [categoryId]: newParentId }
-    );
-  
-    const payload = {
-      id: categoryId,
-      client_id: clientId,
-      name: category.name,
-      description: category.description || "",
-      slug: newSlug,
-  
-      // ❌ DO NOT TOUCH SUBCATEGORIES HERE
-      overwrite_subcategories: false,
-    };
+    if (!category) return;
   
     await axios.post(
       `${import.meta.env.VITE_API_INVENTORY_SERVICE_URL}/${clientId}/menu/update_category`,
-      payload,
       {
-        headers: {
-          Authorization: `Bearer ${token}`,
-          "Content-Type": "application/json",
-        },
-      }
+        id: categoryId,
+        client_id: clientId,
+        name: category.name,
+        description: category.description || "",
+        slug,
+        overwrite_subcategories: false,
+      },
+      { headers: { Authorization: `Bearer ${token}` } }
     );
+  
+    const findNode = (nodes) => {
+      for (const n of nodes) {
+        if (n.id === categoryId) return n;
+        if (n.children) {
+          const found = findNode(n.children);
+          if (found) return found;
+        }
+      }
+      return null;
+    };
+  
+    const node = findNode(categories);
+    for (const child of node?.children || []) {
+      await updateSlugsRecursively(child.id);
+    }
   };
   
-
-  // Helper functions (keep your existing ones)
-  const generateSlugFromParents = (categoryId, currentName, overrideParentMap = null) => {
-    const path = [];
-    const categoryMap = {};
-    
-    const buildMap = (cats) => {
-      for (const cat of cats) {
-        categoryMap[cat.id] = cat;
-        if (cat.children) buildMap(cat.children);
+  const findParentIdFromTree = (nodes, childId, parentId = null) => {
+    for (const node of nodes) {
+      if (node.id === childId) return parentId;
+      if (node.children?.length) {
+        const found = findParentIdFromTree(node.children, childId, node.id);
+        if (found) return found;
       }
-    };
-    buildMap(categories);
-
-    const mapToUse = { ...parentMap, ...(overrideParentMap || {}) };
-    let currentId = categoryId;
-    const ancestors = [];
-
-    while (mapToUse[currentId]) {
-      const parentId = mapToUse[currentId];
-      ancestors.unshift(parentId);
-      currentId = parentId;
     }
-
-    ancestors.forEach(id => {
-      const cat = categoryMap[id];
-      if (cat && cat.id !== 'all') path.push(cat.name.trim().replace(/\s+/g, " "));
-    });
-
-    if (currentName) {
-      path.push(currentName.trim().replace(/\s+/g, " "));
+    return null;
+  };
+  
+  const handleCategoryReorder = async (draggedCat, targetCat, position) => {
+    const draggedParentId = findParentIdFromTree(categories, draggedCat.id);
+    const targetParentId =
+      position === "inside"
+        ? targetCat.id
+        : findParentIdFromTree(categories, targetCat.id);
+  
+    if (!draggedParentId || !targetParentId) return;
+  
+    const getChildrenIds = (parentId) => {
+      const findNode = (nodes) => {
+        for (const n of nodes) {
+          if (n.id === parentId) return n;
+          if (n.children) {
+            const found = findNode(n.children);
+            if (found) return found;
+          }
+        }
+        return null;
+      };
+      return findNode(categories)?.children?.map(c => c.id) || [];
+    };
+  
+    let oldSubs = getChildrenIds(draggedParentId).filter(id => id !== draggedCat.id);
+    let newSubs = getChildrenIds(targetParentId).filter(id => id !== draggedCat.id);
+  
+    if (position === "inside") {
+      newSubs.push(draggedCat.id);
     } else {
-      const cat = categoryMap[categoryId];
-      if (cat) path.push(cat.name.trim().replace(/\s+/g, " "));
+      const idx = newSubs.indexOf(targetCat.id);
+      newSubs.splice(position === "above" ? idx : idx + 1, 0, draggedCat.id);
+    }
+  
+    // update backend
+    await updateCategorySubcategories(draggedParentId, oldSubs);
+  
+    if (draggedParentId !== targetParentId) {
+      await updateCategorySubcategories(targetParentId, newSubs);
     }
 
-    return "_" + path.join(" _");
+
+    // refresh UI tree
+    onCategoriesUpdate?.();
   };
 
   // const generateCategoryIdFromName = (name) => {
@@ -361,23 +329,65 @@ const MenuCategoryTree = ({
     } else {
       setExpandedCategories(['All Categories']);
     }
-    buildParentMapFromCategories(categories);
   }, [categories, defaultOpenCategoryName]);
-
-  const buildParentMapFromCategories = (cats) => {
-    const tempMap = {};
-    const traverse = (items, parentId = null) => {
-      items.forEach(cat => {
-        if (parentId && cat.id !== 'all') tempMap[cat.id] = parentId;
-        if (cat.children && cat.children.length > 0) {
-          traverse(cat.children, cat.id);
+  useEffect(() => {
+    if (!categories || categories.length === 0) return;
+  
+    const regenerate = async () => {
+      for (const root of categories) {
+        if (root.id !== "all") {
+          await updateSlugsRecursively(root.id);
         }
+      }
+    };
+  
+    regenerate();
+  }, [categories]);
+  
+  const normalizeSlugPart = (name) => {
+    return name
+      ?.trim()
+      .replace(/\s+/g, "_")
+      .replace(/[^a-zA-Z0-9_]/g, "");
+  };
+  
+  const generateHierarchicalSlug = (categoryId, categories) => {
+    const categoryMap = {};
+    const parentMap = buildLocalParentMap(categories);
+  
+    const buildMap = (nodes) => {
+      nodes.forEach(cat => {
+        categoryMap[cat.id] = cat;
+        if (cat.children?.length) buildMap(cat.children);
       });
     };
-    traverse(cats);
-    setParentMap(tempMap);
+    buildMap(categories);
+  
+    const path = [];
+    let currentId = categoryId;
+    const visited = new Set();
+  
+    while (currentId && !visited.has(currentId)) {
+      visited.add(currentId);
+      const cat = categoryMap[currentId];
+      if (!cat) break;
+  
+      path.unshift(
+        cat.name
+          .trim()
+          .replace(/\s+/g, "_")
+          .replace(/[^a-zA-Z0-9_]/g, "")
+      );
+  
+      currentId = parentMap[currentId];
+    }
+  
+    return "_" + path.join("_");
   };
+  
+  
 
+    
   const toggleCategory = (categoryName) => {
     setExpandedCategories(prev =>
       prev.includes(categoryName)
@@ -450,22 +460,15 @@ const MenuCategoryTree = ({
       return;
     }
   
-    let createdBy = null;
-    let updatedBy = null;
-  
+    let userId = "system";
     try {
-      const decoded = jwtDecode(token);
-      createdBy = String(decoded.user_id);
-      updatedBy = String(decoded.user_id);
-    } catch (err) {
-      console.error("Token decode failed:", err);
-    }
+      userId = jwtDecode(token)?.user_id || userId;
+    } catch {}
   
-    // ✅ FRONTEND GENERATED ID (ONLY ONCE)
     const newId = generateCategoryIdFromName(newCategoryName);
   
     try {
-      // 1️⃣ CREATE CATEGORY
+      // create category
       await axios.post(
         `${import.meta.env.VITE_API_INVENTORY_SERVICE_URL}/${clientId}/menu/create_category`,
         {
@@ -474,67 +477,51 @@ const MenuCategoryTree = ({
           name: newCategoryName.trim(),
           description: newCategoryDescription.trim(),
           sub_categories: [],
-          created_by: createdBy,
-          updated_by: updatedBy,
+          created_by: userId,
+          updated_by: userId,
         },
         { headers: { Authorization: `Bearer ${token}` } }
       );
   
-      // 2️⃣ GET EXISTING DIETERY SUBS FROM UI TREE (SAFE)
-      const dieteryNode = categories.find(cat => cat.id === "dietery");
-      const existingSubs = dieteryNode?.children?.map(child => child.id) || [];
-  
-      // 3️⃣ UPDATE DIETERY WITH FULL LIST
-      const updatePayload = {
-        id: "dietery",
-        client_id: clientId,
-        name: "Dietery",
-        description: "",
-        sub_categories: [...new Set([...existingSubs, newId])],
-        slug: "_Dietery",
-        overwrite_subcategories: true,
-      };
+      // attach to dietery
+      const dieteryNode = categories.find(c => c.id === "dietery");
+      const subs = dieteryNode?.children?.map(c => c.id) || [];
   
       await axios.post(
         `${import.meta.env.VITE_API_INVENTORY_SERVICE_URL}/${clientId}/menu/update_category`,
-        updatePayload,
         {
-          headers: {
-            Authorization: `Bearer ${token}`,
-            "Content-Type": "application/json",
-          },
-        }
+          id: "dietery",
+          client_id: clientId,
+          name: "Dietery",
+          description: "",
+          sub_categories: [...subs, newId],
+          slug: "_Dietery",
+          overwrite_subcategories: true,
+        },
+        { headers: { Authorization: `Bearer ${token}` } }
       );
   
+  
       closeAddModal();
-      alert("✅ New category added successfully!");
       onCategoriesUpdate?.();
     } catch (err) {
-      console.error("❌ Error adding category:", err.response?.data || err);
+      console.error(err);
       alert("Failed to add category");
     }
   };
   
+  
   const handleEditCategory = async () => {
     if (!editingCategory) return;
   
-    let createdBy = null;
-    let updatedBy = null;
+    let userId = "system";
+    try {
+      userId = jwtDecode(token)?.user_id || userId;
+    } catch {}
   
     try {
-      const decoded = jwtDecode(token);
-      createdBy = String(decoded.user_id);
-      updatedBy = String(decoded.user_id);
-    } catch (err) {
-      console.error("Token decode failed:", err);
-    }
+      let finalSubs = editingCategory.children?.map(c => c.id) || [];
   
-    try {
-      // ✅ SOURCE OF TRUTH = UI TREE, NOT BACKEND
-      let finalSubcategories =
-        editingCategory.children?.map(child => child.id) || [];
-  
-      // ➕ CREATE NEW SUBCATEGORY
       if (editNewSubcategoryName.trim()) {
         const newSubId = generateCategoryIdFromName(editNewSubcategoryName);
   
@@ -546,50 +533,35 @@ const MenuCategoryTree = ({
             name: editNewSubcategoryName.trim(),
             description: "",
             sub_categories: [],
-            created_by: createdBy,
-            updated_by: updatedBy,
+            created_by: userId,
+            updated_by: userId,
           },
           { headers: { Authorization: `Bearer ${token}` } }
         );
   
-        // ✅ APPEND LOCALLY
-        finalSubcategories.push(newSubId);
+        finalSubs.push(newSubId);
       }
-  
-      const slug = generateSlugFromParents(
-        editingCategory.id,
-        editName.trim()
-      );
-  
-      // 🔥 FULL OVERWRITE WITH COMPLETE LIST
-      const payload = {
-        id: editingCategory.id,
-        client_id: clientId,
-        name: editName.trim(),
-        description: editDescription.trim(),
-        sub_categories: finalSubcategories,
-        slug,
-        overwrite_subcategories: true,
-      };
   
       await axios.post(
         `${import.meta.env.VITE_API_INVENTORY_SERVICE_URL}/${clientId}/menu/update_category`,
-        payload,
         {
-          headers: {
-            Authorization: `Bearer ${token}`,
-            "Content-Type": "application/json",
-          },
-        }
+          id: editingCategory.id,
+          client_id: clientId,
+          name: editName.trim(),
+          description: editDescription.trim(),
+          sub_categories: finalSubs,
+          overwrite_subcategories: true,
+        },
+        { headers: { Authorization: `Bearer ${token}` } }
       );
   
-      setEditNewSubcategoryName("");
-      closeEditModal();
-      alert("✅ Category updated successfully!");
+      // regenerate slugs
+      await updateSlugsRecursively(editingCategory.id);
   
+      closeEditModal();
       onCategoriesUpdate?.();
     } catch (err) {
-      console.error("Error editing category:", err.response?.data || err);
+      console.error(err);
       alert("Failed to update category");
     }
   };
@@ -667,8 +639,8 @@ const MenuCategoryTree = ({
               h-9
               ${
                 isSelected
-                  ? 'bg-action-primary text-white shadow-md'
-                  : 'bg-bg-primary text-text-primary border-2 border-border-default hover:border-action-primary'
+                  ? 'bg-action-primary text-text-white shadow-md'
+                  : 'bg-bg-primary  border-2 border-border-default hover:border-action-primary'
               }
             `}
           >
