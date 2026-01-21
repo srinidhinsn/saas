@@ -1,5 +1,5 @@
 import React, { useState, useEffect, useRef, useCallback } from 'react';
-import { Plus, Minus, X, Search, Edit, Trash2, Upload, Download } from 'lucide-react';
+import { Plus, Minus, X, Search, Edit, Trash2, Upload, Download, CloudUpload } from 'lucide-react';
 import axios from 'axios';
 import * as XLSX from 'xlsx';
 import MenuCategoryTree from './Tree&CategoryManage/MenuCategoryTree';
@@ -1107,65 +1107,35 @@ const MenuManagement = ({ clientId, token, realm }) => {
                 </div>
               </div>
 
+              {/* Buttons Container (Add Item,Bulk Update and Import Export) start >>>>>> */}
+              <div className="flex flex-wrap  items-center justify-end gap-2 md:justify-start lg:justify-end">
 
-              <div className="
-  flex flex-wrap
-  items-center justify-end
-  gap-2
-  md:justify-start
-  lg:justify-end
-">
+                <button onClick={() => setShowAddModal(true)}
+                  className="h-9 px-3  flex items-center gap-2 rounded-lg bg-action-primary text-white text-sm 
+                                   font-semibold shadow-sm hover:opacity-90">
 
-
-                <button
-                  onClick={() => setShowAddModal(true)}
-                  className="
-    h-9 px-3
-    flex items-center gap-2
-    rounded-lg
-    bg-action-primary
-    text-white
-    text-sm font-semibold
-    shadow-sm
-    hover:opacity-90
-  "
-                >
                   <Plus size={14} />
+
                   <span>Add Item</span>
+
                 </button>
 
+                <button onClick={() => setShowBulkModal(true)}
+                  className="h-9 px-3 flex items-center gap-2 rounded-lg bg-bg-tertiary border border-border-default
+                                   text-sm font-semibold hover:border-action-primary hover:bg-bg-secondary">
 
-                <button
-                  onClick={() => setShowBulkModal(true)}
-                  className="
-    h-9 px-3
-    flex items-center gap-2
-    rounded-lg
-    bg-bg-tertiary
-    border border-border-default
-    text-sm font-semibold
-    hover:border-action-primary
-    hover:bg-bg-secondary
-  "
-                >
                   <Edit size={14} />
+
                   <span className="hidden sm:inline">Bulk Update</span>
+
                 </button>
+
                 <div className="relative group">
                   {/* Main Dropdown Button */}
-                  <button
-                    className="
-      h-9 px-3
-      flex items-center gap-2
-      rounded-lg
-      bg-bg-tertiary
-      border border-border-default
-      text-sm font-semibold
-      hover:border-action-primary
-      hover:bg-bg-secondary
-    "
-                  >
-                    <Download size={14} />
+                  <button className=" h-9 px-3 flex items-center gap-2 rounded-lg bg-bg-tertiary border border-border-default 
+                                      text-sm font-semibold hover:border-action-primary hover:bg-bg-secondary">
+
+                    <CloudUpload size={14} />
                     {/* <span className="hidden sm:inline"></span> */}
                     {/* <svg
                       className="w-4 h-4"
@@ -1179,161 +1149,163 @@ const MenuManagement = ({ clientId, token, realm }) => {
                   </button>
 
                   {/* Dropdown Menu */}
-                  <div
-                    className="
-      absolute right-0 mt-1 w-36
-      bg-bg-primary
-      border border-border-default
-      rounded-lg
-      shadow-lg
-      opacity-0 invisible
-      group-hover:opacity-100 group-hover:visible
-      transition-all duration-200
-      z-50
-    "
-                  >
-                    <button
-                      onClick={() => document.getElementById('excelInput').click()}
-                      className="
-        w-full px-4 py-2
-        flex items-center gap-2
-        text-sm
-        hover:bg-bg-secondary
-      "
-                    >
+                  <div className="absolute right-0 mt-1 w-36 bg-bg-primary border border-border-default rounded-lg shadow-lg
+                                   opacity-0 invisible group-hover:opacity-100 group-hover:visible transition-all duration-200 z-50">
+
+                    <button onClick={() => document.getElementById('excelInput').click()}
+                      className="w-full px-4 py-2 flex items-center gap-2 text-sm  hover:bg-bg-secondary">
+
                       <Upload size={14} />
+
                       Import
                     </button>
 
-                    <button
-                      onClick={handleExportToExcel}
-                      className="
-        w-full px-4 py-2
-        flex items-center gap-2
-        text-sm
-        hover:bg-bg-secondary
-      "
-                    >
+                    <button onClick={handleExportToExcel}
+                      className=" w-full px-4 py-2 flex items-center gap-2 text-sm hover:bg-bg-secondary">
+
                       <Download size={14} />
+
                       Export
                     </button>
+
                   </div>
                 </div>
 
+                <input type="file" id="excelInput" accept=".xlsx, .xls" className="hidden" onChange={handleImportFromExcel} />
 
-
-                <input
-                  type="file"
-                  id="excelInput"
-                  accept=".xlsx, .xls"
-                  className="hidden"
-                  onChange={handleImportFromExcel}
-                />
               </div>
+              {/* Buttons Container (Add Item,Bulk Update and Import Export) end <<<<<<<<< */}
             </div>
 
-            {/* Items Grid */}
+            {/* Items Grid start >>>>>>>>>>>>>>>>>>>>>>>>>>>>>>>>>>>>>>>>>>*/}
             <div className="flex-1 overflow-y-auto">
-              <div className="grid grid-cols-3 sm:grid-cols-4 lg:grid-cols-4 xl:grid-cols-5 2xl:grid-cols-6 gap-1 md:gap-2 lg:gap-2">
-                {filteredItems.map(item => {
+
+              <div className="grid gap-2 grid-cols-2 md:grid-cols-4 lg:grid-cols-4">
+
+                {filteredItems.map((item) => {
                   const discountPercent = item.discount && item.unit_price && Number(item.discount) > 0
-                    ? ((Number(item.discount) * 100) / Number(item.unit_price)).toFixed(1).replace(/\.0$/, '')
-                    : null;
+                    ? ((Number(item.discount) * 100) / Number(item.unit_price)).toFixed(0) : null;
 
                   return (
-                    <div key={item.id} className="bg-bg-primary border-4 md:border-6 lg:border-8  border-border-default rounded-md overflow-hidden shadow-lg transition-all duration-300 group relative">
-                      <div className="relative h-20 border-2 md:border-3 rounded-lg lg:border-4 border-white  sm:h-20 md:h-24 lg:h-28 overflow-hidden bg-gradient-to-br from-gray-100 to-gray-200">
+                    <div key={item.id}
+                      className="relative flex gap-2 items-center bg-bg-primary border border-border-default rounded-xl p-1.5
+                                    shadow-sm hover:shadow-md transition group overflow-hidden">
+                      {/* POP OVERLAY – hides content */}
+                      <div className="absolute inset-0 bg-black/40 backdrop-blur-[2px] opacity-0 pointer-events-none z-10
+                                      group-hover:animate-overlayFade"/>
+
+                      {item.line_item_id?.length > 0 && (
+                        <div className="absolute top-1/2 right-0 -translate-y-1/2 translate-x-full
+                                     group-hover:translate-x-[-0.75rem]  opacity-0  group-hover:opacity-100 
+                                     transition-all duration-300 ease-out bg-orange-500 text-white
+                                     text-[10px] px-2 py-1 rounded-md flex items-center gap-1 z-10 pointer-events-none">
+
+                          <Plus size={10} />
+
+                          {item.line_item_id.length} Add-ons
+
+                        </div>
+                      )}
+
+                      {/* IMAGE */}
+                      <div className="relative w-14 h-16 rounded-lg overflow-hidden shrink-0 bg-gray-100">
                         {discountPercent && (
-                          <div className="absolute top-2 left-2 bg-action-danger text-text-white text-[8px] font-bold p-1 rounded-md z-10 shadow-md">
+                          <div className="absolute top-1 left-1 bg-action-danger text-white text-[10px] px-1 rounded z-10">
                             {discountPercent}% OFF
                           </div>
                         )}
 
-                        {item.line_item_id && Array.isArray(item.line_item_id) && item.line_item_id.length > 0 && (
-                          <div className="absolute bottom-2 left-2 bg-orange-500 text-white text-[7px] p-1 rounded-md z-10 shadow-md flex items-center gap-1">
-                            <Plus size={10} />
-                            <span>{item.line_item_id.length} add-ons</span>
-                          </div>
+
+                        <MenuImagePreview clientId={clientId} imageId={item.image_id} token={token} alt={item.name}
+                          baseUrl={import.meta.env.VITE_API_DOCUMENT_SERVICE_URL} className="w-full h-full object-cover"
+                          urlBuilder={({ baseUrl, clientId, imageId }) =>
+                            `${baseUrl}/${clientId}/document/download?doc_id=${imageId}`} />
+                      </div>
+
+                      {/* INFO */}
+                      <div className="flex-1 min-w-0 cursor-pointer" onClick={() => handleItemClick(item)}>
+
+                        <h3 className="text-md font-semibold text-text-primary">
+                          {item.name}
+                        </h3>
+
+                        {item.description && (
+                          <p className="text-xs text-text-secondary line-clamp-1">
+                            {item.description}
+                          </p>
                         )}
 
-                        <MenuImagePreview
-                          clientId={clientId}
-                          imageId={item.image_id}
-                          token={token}
-                          alt={item.name}
-                          baseUrl={import.meta.env.VITE_API_DOCUMENT_SERVICE_URL}
-                          urlBuilder={({ baseUrl, clientId, imageId }) =>
-                            `${baseUrl}/${clientId}/document/download?doc_id=${imageId}`
-                          }
-                          className="w-full h-full object-cover group-hover:scale-110 transition-transform duration-500"
-                        />
-
-                        <div className="absolute top-2 right-2 flex gap-2">
-                          <button
-                            onClick={() => {
-                              setEditingItem({
-                                ...item,
-                              });
-                              setShowEditModal(true);
-                            }}
-
-                            className="bg-action-primary text-text-white p-1 rounded-full hover:bg-orange-600 transition-all duration-300 shadow-lg hover:shadow-xl z-10 hover:scale-110 active:scale-95"
-                            aria-label="Edit item"
-                          >
-                            <Edit size={10} />
-                          </button>
-                          <button
-                            onClick={() => {
-                              setDeleteTarget(item);
-                              setShowDeleteModal(true);
-                            }}
-                            className="bg-action-danger text-text-white p-1  rounded-full hover:bg-red-600 transition-all duration-300 shadow-lg hover:shadow-xl z-10 hover:scale-110 active:scale-95"
-                            aria-label="Delete item"
-                          >
-                            <Trash2 size={10} />
-                          </button>
+                        <div className="flex items-center gap-2 mt-1">
+                          {discountPercent ? (
+                            <>
+                              <span className="text-sm font-bold text-action-primary">
+                                ₹{(item.unit_price - item.discount).toFixed(0)}
+                              </span>
+                              <span className="text-xs line-through text-text-secondary">
+                                ₹{item.unit_price}
+                              </span>
+                            </>
+                          ) : (
+                            <span className="text-sm font-bold text-action-primary">
+                              ₹{item.unit_price}
+                            </span>
+                          )}
                         </div>
                       </div>
-                      <hr className='border-b-default border-border-default mx-1' />
-                      <div className="p-2">
-                        <div className="flex items-center justify-center gap-2">
-                          <h3 className="font-semibold text-[8px] xl:text-[14px] sm:text-[7px] md:text-[12px] line-clamp-2 min-h-[1.2rem] text-text-primary">
-                            {item.name}
-                          </h3>
-                        </div>
 
-                        <div className="flex items-center justify-center">
-                          <p className="text-action-primary font-bold text-base sm:text-md">
-                            ₹{(item.unit_price - (item.discount || 0)).toFixed(2)}
-                          </p>
-                          {/* {discountPercent && (
-                          <span className="text-xs text-text-secondary line-through">
-                            ₹{item.unit_price?.toFixed(2)}
-                          </span>
-                        )} */}
+                      {/* ACTION BUTTONS */}  {/* opacity-0 group-hover:opacity-100 */}
+                      <div className="absolute top-1 right-1 flex gap-1 opacity-0 group-hover:opacity-100 transition-opacity
+                       duration-200 z-20">
 
-                          {/* 
-                        <span className="text-xs text-text-secondary truncate max-w-[100px]">
-                          {item.category}
-                        </span> */}
-                        </div>
+                        <button className="bg-action-primary text-white p-1 rounded-full hover:scale-110"
+                          onClick={(e) => { e.stopPropagation(); setEditingItem(item); setShowEditModal(true); }}>
+                          <Edit size={10} />
+                        </button>
+
+                        <button className="bg-action-danger text-white p-1 rounded-full hover:scale-110"
+                          onClick={(e) => { e.stopPropagation(); setDeleteTarget(item); setShowDeleteModal(true); }} >
+                          <Trash2 size={10} />
+                        </button>
+
                       </div>
                     </div>
                   );
                 })}
               </div>
-              {filteredItems.length === 0 && (
-              <div className="text-center py-12 rounded-lg bg-bg-primary">
-                <p className="text-text-secondary text-base">No items found in this category</p>
-              </div>
-            )}
             </div>
-
-         
+            {/*Items Grid end <<<<<<<<<<<<<<<<<<<<<<<<<<<<<<<<<<<<<<<<<<<<<*/}
           </div>
         </div>
       </div>
 
+
+      {/* Delete Modal start >>>>>> */}
+      {showDeleteModal && deleteTarget && (
+        <div className="fixed inset-0 z-50 flex items-center justify-center p-4 bg-color-modalsbg">
+          <div className="rounded-lg max-w-md w-full p-6 bg-bg-primary">
+            <h3 className="text-xl font-semibold mb-4 text-text-primary">Confirm Delete</h3>
+            <p className="mb-6 text-text-secondary">
+              Are you sure you want to delete <strong className="text-text-primary">{deleteTarget.name}</strong>? This action cannot be undone.
+            </p>
+
+            <div className="flex gap-3">
+              <button
+                onClick={() => setShowDeleteModal(false)}
+                className="flex-1 px-4 py-2 rounded-lg bg-bg-tertiary text-text-primary border border-border-default hover:bg-bg-secondary transition-colors"
+              >
+                Cancel
+              </button>
+              <button
+                onClick={handleDeleteItem}
+                className="flex-1 px-4 py-2 rounded-lg bg-action-danger text-text-white hover:opacity-90 transition-opacity"
+              >
+                Delete
+              </button>
+            </div>
+          </div>
+        </div>
+      )}
+      {/* Delete Modal end <<<<<<<< */}
       <UniversalAddModal
         showModal={showAddModal}
         setShowModal={setShowAddModal}
@@ -1371,32 +1343,8 @@ const MenuManagement = ({ clientId, token, realm }) => {
         clientId={clientId}
         token={token}
       />
-      {/* Delete Modal */}
-      {showDeleteModal && deleteTarget && (
-        <div className="fixed inset-0 z-50 flex items-center justify-center p-4 bg-color-modalsbg">
-          <div className="rounded-lg max-w-md w-full p-6 bg-bg-primary">
-            <h3 className="text-xl font-semibold mb-4 text-text-primary">Confirm Delete</h3>
-            <p className="mb-6 text-text-secondary">
-              Are you sure you want to delete <strong className="text-text-primary">{deleteTarget.name}</strong>? This action cannot be undone.
-            </p>
 
-            <div className="flex gap-3">
-              <button
-                onClick={() => setShowDeleteModal(false)}
-                className="flex-1 px-4 py-2 rounded-lg bg-bg-tertiary text-text-primary border border-border-default hover:bg-bg-secondary transition-colors"
-              >
-                Cancel
-              </button>
-              <button
-                onClick={handleDeleteItem}
-                className="flex-1 px-4 py-2 rounded-lg bg-action-danger text-text-white hover:opacity-90 transition-opacity"
-              >
-                Delete
-              </button>
-            </div>
-          </div>
-        </div>
-      )}
+
 
       <UniversalBulkUpdateModal
         showModal={showBulkModal}
