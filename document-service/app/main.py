@@ -5,14 +5,20 @@ from api.routes import router as table_router
 import logging
 import logging.config
 import time
+import os
 from config.settings import LOGGING_CONFIG
+from dotenv import load_dotenv
+
+load_dotenv()
 
 app = FastAPI()
 
+origins = os.getenv("ALLOWED_ORIGINS", "")
+ALLOWED_ORIGINS = [origin.strip() for origin in origins.split(",") if origin]
 
 app.add_middleware(
     CORSMiddleware,
-    allow_origins=["*"],
+    allow_origins=ALLOWED_ORIGINS,
     allow_headers=["*"],
     allow_methods=["*"],
     allow_credentials=True

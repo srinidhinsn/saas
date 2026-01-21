@@ -5,17 +5,25 @@ from api import routes
 import logging
 import logging.config
 import time
+import os
 from config.settings import LOGGING_CONFIG
-
+from dotenv import load_dotenv
 from fastapi.middleware.cors import CORSMiddleware
 
+load_dotenv()
 
 app = FastAPI()
+
+origins = os.getenv("ALLOWED_ORIGINS", "")
+ALLOWED_ORIGINS = [origin.strip() for origin in origins.split(",") if origin]
+
 logging.config.dictConfig(LOGGING_CONFIG)
 logger = logging.getLogger(__name__)
+
 app.include_router(routes.router, prefix="/saas/{client_id}")
 app.add_middleware(
-    CORSMiddleware, allow_origins=["*"],
+    CORSMiddleware,
+    allow_origins=ALLOWED_ORIGINS,
     allow_credentials=True,
     allow_methods=["*"],
     allow_headers=["*"]
