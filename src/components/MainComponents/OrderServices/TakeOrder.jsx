@@ -2373,7 +2373,19 @@ const TakeOrder = ({ clientId, token, onOrderUpdate, realm }) => {
     } else {
       addToCart(item);
     }
+  }; const clearDraftForOrder = (orderId) => {
+    if (!orderId) return;
+
+    Object.keys(localStorage).forEach(key => {
+      if (
+        key.startsWith(`order_${orderId}_new_item_`) ||
+        key.startsWith(`order_${orderId}_batch_`)
+      ) {
+        localStorage.removeItem(key);
+      }
+    });
   };
+
   const addToCart = (item) => {
     setHasNewItems(true);
 
@@ -2423,20 +2435,19 @@ const TakeOrder = ({ clientId, token, onOrderUpdate, realm }) => {
       };
 
       setCart(prev => [...prev, cartItem]);
+   // 💾 SAVE TO LOCALSTORAGE (FOR KDS)
+   if (activeOrderId) {
+    localStorage.setItem(
+      `order_${activeOrderId}_new_item_${uniqueKey}`,
+      JSON.stringify({
+        unique_key: uniqueKey,
+        added_at: timestamp,
+        batch_timestamp: batchTimestamp,
+        quantity: 1,
+      })
+    );
+  }
 
-      // 💾 SAVE TO LOCALSTORAGE (FOR KDS)
-      if (activeOrderId) {
-        localStorage.setItem(
-          `order_${activeOrderId}_new_item_${uniqueKey}`,
-          JSON.stringify({
-            item_id: item.id,
-            unique_key: uniqueKey,
-            added_at: timestamp,
-            batch_timestamp: batchTimestamp,
-            quantity: 1,
-          })
-        );
-      }
     }
 
     if (!isMobile) setShowCart(true);
@@ -2939,7 +2950,7 @@ pr-1
                 </div>
 
                 <div className={`grid gap-2 grid-cols-2 md:grid-cols-4 ${isOrderFormOpen ? 'lg:grid-cols-3' : 'lg:grid-cols-4'}`}>
-                {filteredItems.map(item => {
+                  {filteredItems.map(item => {
                     const discountPercent =
                       item.discount &&
                         item.unit_price &&
@@ -3042,7 +3053,17 @@ pr-1
                             {/* Top row */}
                             <div className="flex items-center justify-between">
                               <button
-                                onClick={() => setShowCart(false)}
+                                onClick={() => {
+                                  if (activeOrderId && hasNewItems) {
+                                    clearDraftForOrder(activeOrderId);
+                                  }
+                                  setActiveOrderId(null);
+                                  setCurrentBatchTimestamp(null);
+                                  setHasNewItems(false);
+                                  setShowCart(false);
+                                  setCurrentView('floor');
+                                }}
+
                                 className="p-1.5 rounded-lg bg-action-primary text-text-white hover:opacity-90 transition-opacity   "
                               >
                                 <X className='h-5 w-5' />
@@ -3070,8 +3091,15 @@ pr-1
                                         onClick={() => {
                                           setOrderMode('dinein');
                                           setSelectedTable('');
-                                          setCurrentView('floor');
+                                          if (activeOrderId && hasNewItems) {
+                                            clearDraftForOrder(activeOrderId);
+                                          }
+                                          setActiveOrderId(null);
+                                          setCurrentBatchTimestamp(null);
+                                          setHasNewItems(false);
                                           setShowCart(false);
+                                          setCurrentView('floor');
+
                                         }}
                                         className="text-sm text-red-600 hover:underline"
                                       > Transfer
