@@ -282,7 +282,7 @@ const MenuManagement = ({ clientId, token, realm }) => {
       // ✅ EXPLICITLY remove dietary_type
       const { dietary_type, ...cleanEditingItem } = editingItem;
 
-      const payload = {
+      const payload = {id: Number(editingItem.id),
         ...cleanEditingItem,
         code: editingItem.code ? String(editingItem.code).trim() : null,
         client_id: clientId,
@@ -741,7 +741,7 @@ const MenuManagement = ({ clientId, token, realm }) => {
           CST: typeof item.cst === "number" ? item.cst : (item.cst ? parseFloat(item.cst) : 0),
           GST: typeof item.gst === "number" ? item.gst : (item.gst ? parseFloat(item.gst) : 0),
           Discount: typeof item.discount === "number" ? item.discount : (item.discount ? parseFloat(item.discount) : 0),
-          Code: typeof item.code === "number" ? item.code : (item.code ? parseInt(item.code) : 0),
+          Code: item.code != null ? String(item.code) : "",
           Serving_Quantity: item.serving_quantity,
           Serving_Unit: item.serving_unit,
           Realm: item.realm ?? realm ?? "",
