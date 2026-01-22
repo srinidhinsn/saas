@@ -55,71 +55,93 @@ const TableManagement = ({ clientId, token, screenIds, userId }) => {
 
     const [viewMode, setViewMode] = useState(false);
     const [addItemsMode, setAddItemsMode] = useState(false);
+    const getColumnsByScreen = () => {
+        const width = window.innerWidth;
+      
+        if (width >= 1536) return 8; // 2xl
+        if (width >= 1280) return 6; // xl
+        if (width >= 1024) return 6; // lg
+        if (width >= 640) return 4;  // sm
+        return 2;                    // mobile
+      };
     useEffect(() => {
         if (clientId) fetchTables();
     }, [clientId]);
-   const getSortedTables = (tablesToSort) => {
-    const COLS_PER_ROW = 8;
+    const [colsPerRow, setColsPerRow] = useState(getColumnsByScreen());
 
-    const occupied = tablesToSort
-        .filter(t => t.status === 'Occupied')
-        .sort((a, b) => a.name.localeCompare(b.name, undefined, { numeric: true }));
+    useEffect(() => {
+      const onResize = () => {
+        setColsPerRow(getColumnsByScreen());
+      };
+    
+      window.addEventListener("resize", onResize);
+      return () => window.removeEventListener("resize", onResize);
+    }, []);
+    
+  
+      
+      const getSortedTables = (tablesToSort, COLS_PER_ROW) => {
 
-    const reserved = tablesToSort
-        .filter(t => t.status === 'Reserved')
-        .sort((a, b) => a.name.localeCompare(b.name, undefined, { numeric: true }));
 
-    const vacant = tablesToSort
-        .filter(t => t.status === 'Vacant')
-        .sort((a, b) => a.name.localeCompare(b.name, undefined, { numeric: true }));
+        const occupied = tablesToSort
+            .filter(t => t.status === 'Occupied')
+            .sort((a, b) => a.name.localeCompare(b.name, undefined, { numeric: true }));
 
-    const totalTables = tablesToSort.length;
-    const totalRows = Math.ceil(totalTables / COLS_PER_ROW);
+        const reserved = tablesToSort
+            .filter(t => t.status === 'Reserved')
+            .sort((a, b) => a.name.localeCompare(b.name, undefined, { numeric: true }));
 
-    const grid = Array.from({ length: totalRows }, () =>
-        Array(COLS_PER_ROW).fill(null)
-    );
+        const vacant = tablesToSort
+            .filter(t => t.status === 'Vacant')
+            .sort((a, b) => a.name.localeCompare(b.name, undefined, { numeric: true }));
 
-    let filledCount = 0;
+        const totalTables = tablesToSort.length;
+        const totalRows = Math.ceil(totalTables / COLS_PER_ROW);
 
-    const canFill = (row, col) =>
-        row * COLS_PER_ROW + col < totalTables;
+        const grid = Array.from({ length: totalRows }, () =>
+            Array(COLS_PER_ROW).fill(null)
+        );
 
-    /* ---------------- RESERVED (right-most, top-down) ---------------- */
-    let resIndex = 0;
-    for (let col = COLS_PER_ROW - 1; col >= 0 && resIndex < reserved.length; col--) {
-        for (let row = 0; row < totalRows && resIndex < reserved.length; row++) {
-            if (!grid[row][col] && canFill(row, col)) {
-                grid[row][col] = reserved[resIndex++];
-                filledCount++;
+        let filledCount = 0;
+
+        const canFill = (row, col) =>
+            row * COLS_PER_ROW + col < totalTables;
+
+        /* ---------------- RESERVED (right-most, top-down) ---------------- */
+        let resIndex = 0;
+        for (let col = COLS_PER_ROW - 1; col >= 0 && resIndex < reserved.length; col--) {
+            for (let row = 0; row < totalRows && resIndex < reserved.length; row++) {
+                if (!grid[row][col] && canFill(row, col)) {
+                    grid[row][col] = reserved[resIndex++];
+                    filledCount++;
+                }
             }
         }
-    }
 
-    /* ---------------- OCCUPIED (below reserved, right-side) ---------------- */
-    let occIndex = 0;
-    for (let col = COLS_PER_ROW - 1; col >= 0 && occIndex < occupied.length; col--) {
-        for (let row = 0; row < totalRows && occIndex < occupied.length; row++) {
-            if (!grid[row][col] && canFill(row, col)) {
-                grid[row][col] = occupied[occIndex++];
-                filledCount++;
+        /* ---------------- OCCUPIED (below reserved, right-side) ---------------- */
+        let occIndex = 0;
+        for (let col = COLS_PER_ROW - 1; col >= 0 && occIndex < occupied.length; col--) {
+            for (let row = 0; row < totalRows && occIndex < occupied.length; row++) {
+                if (!grid[row][col] && canFill(row, col)) {
+                    grid[row][col] = occupied[occIndex++];
+                    filledCount++;
+                }
             }
         }
-    }
 
-    /* ---------------- VACANT (everything else) ---------------- */
-    let vacIndex = 0;
-    for (let row = 0; row < totalRows && vacIndex < vacant.length; row++) {
-        for (let col = 0; col < COLS_PER_ROW && vacIndex < vacant.length; col++) {
-            if (!grid[row][col] && canFill(row, col)) {
-                grid[row][col] = vacant[vacIndex++];
-                filledCount++;
+        /* ---------------- VACANT (everything else) ---------------- */
+        let vacIndex = 0;
+        for (let row = 0; row < totalRows && vacIndex < vacant.length; row++) {
+            for (let col = 0; col < COLS_PER_ROW && vacIndex < vacant.length; col++) {
+                if (!grid[row][col] && canFill(row, col)) {
+                    grid[row][col] = vacant[vacIndex++];
+                    filledCount++;
+                }
             }
         }
-    }
 
-    return grid.flat().filter(Boolean);
-};
+        return grid.flat().filter(Boolean);
+    };
 
 
     const fetchTables = async () => {
@@ -254,15 +276,19 @@ const TableManagement = ({ clientId, token, screenIds, userId }) => {
             const newErrors = tableRanges.map(row => ({
                 range: !row.range,
                 table_type: !row.table_type,
-                type: !row.type
+                section: !row.section,
+                location_zone: !row.location_zone
             }));
+
             setFieldErrors(newErrors);
 
             const validRows = tableRanges.filter((row, index) =>
                 !newErrors[index].range &&
                 !newErrors[index].table_type &&
-                !newErrors[index].type
+                !newErrors[index].section &&
+                !newErrors[index].location_zone
             );
+
             if (validRows.length === 0) {
                 toast.error('Fill the fields')
                 return;
@@ -285,14 +311,15 @@ const TableManagement = ({ clientId, token, screenIds, userId }) => {
                         name: num,
                         table_type: row.table_type.toString(),
                         status: row.remark || "Vacant",
-                        location_zone: row.type,
+                        section: row.section,
+                        location_zone: row.location_zone,
                         description: row.description || "",
-                        section: row.section || "",
                         sort_order: row.sort_order ? parseInt(row.sort_order) : null,
                         is_active: row.is_active || false,
                         qr_code_url: row.qr_code_url || "",
                         slug: `${clientId}-${num.toLowerCase()}`
                     });
+
                 });
             }
 
@@ -346,9 +373,10 @@ const TableManagement = ({ clientId, token, screenIds, userId }) => {
         if (!table.table_type || table.table_type.toString().trim() === '') {
             errors.table_type = 'Required';
         }
-        if (!table.location_zone || table.location_zone.trim() === '') {
-            errors.location_zone = 'Required';
+        if (!table.section || table.section.trim() === '') {
+            errors.section = 'Required';
         }
+
         if (!table.status || table.status.trim() === '') {
             errors.status = 'Required';
         }
@@ -364,6 +392,7 @@ const TableManagement = ({ clientId, token, screenIds, userId }) => {
         const hasChanged = (
             original?.table_type?.toString() !== table.table_type?.toString() ||
             original?.location_zone !== table.location_zone ||
+            original?.section !== table.section ||
             (original?.status || "") !== (table.status || "")
         );
 
@@ -498,12 +527,19 @@ const TableManagement = ({ clientId, token, screenIds, userId }) => {
                 } else if (bulkUpdateGlobal.location_zone) {
                     finalZone = bulkUpdateGlobal.location_zone;
                 }
+                let finalSection = table.section;
+                if (tableUpdates.section && tableUpdates.section !== table.section) {
+                    finalSection = tableUpdates.section;
+                } else if (bulkUpdateGlobal.section) {
+                    finalSection = bulkUpdateGlobal.section;
+                }
 
                 const updatedFields = {
                     ...table,
                     table_type: finalTableType.toString(),
                     status: finalStatus,
                     location_zone: finalZone,
+                    section: finalSection,
                 };
 
                 await axios.post(
@@ -596,7 +632,7 @@ const TableManagement = ({ clientId, token, screenIds, userId }) => {
             const matchesSearch = table.name.toLowerCase().includes(searchTerm.toLowerCase());
             const matchesStatus = !statusFilter || table.status === statusFilter;
             return matchesSearch && matchesStatus;
-        })
+        }), colsPerRow
     );
 
     if (loading) {
@@ -675,10 +711,18 @@ const TableManagement = ({ clientId, token, screenIds, userId }) => {
                                     onClick={() => {
                                         setShowAddTable(true);
                                         setTableRanges([{
-                                            range: "", table_type: "", type: "", remark: "Vacant",
-                                            is_active: false, description: "", slug: "", section: "",
-                                            sort_order: "", qr_code_url: ""
+                                            range: "",
+                                            table_type: "",
+                                            section: "",
+                                            location_zone: "",
+                                            remark: "Vacant",
+                                            is_active: false,
+                                            description: "",
+                                            slug: "",
+                                            sort_order: "",
+                                            qr_code_url: ""
                                         }]);
+
                                         setFieldErrors([{}]);
                                     }}
                                 >
@@ -693,60 +737,60 @@ const TableManagement = ({ clientId, token, screenIds, userId }) => {
                         {filteredTables.map(table => {
                             const config = statusConfig[table.status] || statusConfig['Vacant'];
                             return (
-                                <div key={table.id} className={`${config.card} rounded-button shadow-sm overflow-hidden border-2 transition-all duration-200 hover:shadow-lg hover:scale-105`}>
-                                    <div className="p-3 border-b bg-bg-primary bg-opacity-50">
-                                        <div className="flex justify-between items-start mb-2">
-                                            <div className="flex-1">
-                                                {/* Table Name */}
-                                                <div className="text-xl font-bold text-center text-text-primary mb-1">
-                                                    {table.name}
-                                                </div>
+                                <div
+                                    key={table.id}
+                                    className={`border-2 rounded-lg overflow-hidden shadow-sm hover:shadow-md transition
+    ${table.status === "Vacant" ? "border-border-default" :
+                                            table.status === "Occupied" ? "border-red-400" :
+                                                "border-blue-400"}`}
+                                >
 
-                                                {/* Seating + Zone in one row */}
-                                                <div className="flex gap-2 text-[10px] justify-center align-center font-semibold text-text-secondary">
-                                                    <div>
-                                                        Seating :{" "}
-                                                        <span className="font-bold text-text-primary">
-                                                            {table.table_type}
-                                                        </span>
-                                                    </div>
-                                                    <div>
-                                                        Zone :{" "}
-                                                        <span className="font-bold text-text-primary">
-                                                            {table.location_zone}
-                                                        </span>
-                                                    </div>
-                                                </div>
-                                            </div>
+                                    {/* HEADER */}
+                                    <div className={`flex justify-between items-center px-3 py-2 text-sm font-bold
+    ${table.status === "Vacant" ? "bg-action-primary text-white" :
+                                            table.status === "Occupied" ? "bg-action-primary text-white" :
+                                                "bg-action-primary text-white"}`}>
 
-                                            {config.icon}
-                                        </div>
+                                        <span>{table.name}</span>
 
-                                        <div className="flex items-center justify-center">
-                                            <span className={`px-2 py-0.5 rounded-full text-[10px] font-bold ${table.status === 'Vacant' ? 'bg-tableStatusBg-vacant text-tableStatusText-vacant' :
-                                                table.status === 'Occupied' ? 'bg-tableStatusBg-occupied text-tableStatusText-occupied' :
-                                                    'bg-tableStatusBg-reserved text-tableStatusText-reserved'
-                                                }`}>
-                                                Status : {config.label}
+                                        <div className="flex gap-3 items-center text-xs font-semibold">
+                                            <span>{table.section}</span>
+                                            <span>
+                                                {table.status === "Vacant"}
+                                                {table.status === "Occupied"}
+                                                {table.status === "Reserved"}
                                             </span>
                                         </div>
                                     </div>
 
-                                    <div className="p-1 bg-bg-primary bg-opacity-50 flex gap-1.5">
+                                    {/* BODY */}
+                                    <div className="px-3 py-3 text-sm text-text-primary">
+                                        <div className="font-medium">{table.location_zone}</div>
+                                        <div className="text-xs text-text-secondary mt-1">
+                                            Seats: <span className="font-bold">{table.table_type}</span>
+                                        </div>
+                                    </div>
+
+                                    {/* FOOTER */}
+                                    <div className="grid grid-cols-2 border-t text-xs font-semibold">
                                         <button
-                                            className="flex-1 flex items-center justify-center gap-1 text-[10px] bg-action-primary text-text-white py-1 rounded hover:bg-bulkActionsHover-updateHover hover:text-text-primary transition-colors font-semibold  shadow-sm"
                                             onClick={() => setEditRowId(table.id)}
+                                            className="py-2 hover:bg-bg-tertiary transition"
                                         >
-                                            <FaEdit className="text-[10px]" /> Edit
+                                            EDIT
                                         </button>
                                         <button
-                                            className="flex-1 flex items-center justify-center gap-1 bg-action-danger text-text-white py-1 rounded hover:bg-bulkActionsHover-deleteHover hover:text-text-primary transition-colors font-semibold text-[10px] shadow-sm"
-                                            onClick={() => { setDeleteTableId(table.id); setShowConfirmDelete(true); }}
+                                            onClick={() => {
+                                                setDeleteTableId(table.id);
+                                                setShowConfirmDelete(true);
+                                            }}
+                                            className="py-2 text-action-danger hover:bg-red-50 transition border-l"
                                         >
-                                            <FaTrash className="text-[10px]" /> Delete
+                                            DELETE
                                         </button>
                                     </div>
                                 </div>
+
                             );
                         })}
                     </div>

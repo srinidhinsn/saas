@@ -118,6 +118,7 @@ const UniversalAddModal = ({
     setTableRanges(updated);
   };
 
+
   const handleClose = () => {
     setShowModal(false);
     if (modalType === 'menu') {
@@ -127,7 +128,7 @@ const UniversalAddModal = ({
         category_id: '',
         unit_price: '',
         discount: '',
-        availability: '',
+        code: '',
         unit: '',
         line_item_id: []
       });
@@ -147,8 +148,8 @@ const UniversalAddModal = ({
         <div className="rounded-lg max-w-2xl w-full p-6 bg-bg-primary max-h-[90vh] overflow-y-auto">
           <div className="flex justify-between items-center mb-4">
             <h3 className="text-xl font-semibold text-text-primary">Add New Menu Item</h3>
-            <button onClick={handleClose} className="text-text-secondary hover:text-text-primary">
-              <X size={24} />
+            <button onClick={handleClose} className="p-1.5 rounded-lg bg-action-primary text-text-white hover:opacity-90 transition-opacity">
+              <X className='h-5 w-5' />
             </button>
           </div>
 
@@ -232,11 +233,11 @@ const UniversalAddModal = ({
             {/* Availability & Unit */}
             <div className="grid grid-cols-2 gap-4">
               <div>
-                <label className="block text-sm font-medium mb-2 text-text-primary">Availability</label>
+                <label className="block text-sm font-medium mb-2 text-text-primary">Code *</label>
                 <input
-                  type="number"
-                  value={newItem?.availability ?? ''}
-                  onChange={(e) => setNewItem(prev => ({ ...(prev || {}), availability: e.target.value }))}
+                  type="text"
+                  value={newItem?.code ?? ''}
+                  onChange={(e) => setNewItem(prev => ({ ...(prev || {}), code: e.target.value }))}
                   className="w-full px-4 py-2 rounded-lg bg-bg-tertiary border border-border-default text-text-primary focus:outline-none focus:ring-2 focus:ring-action-primary"
                   placeholder="0"
                 />
@@ -364,8 +365,9 @@ const UniversalAddModal = ({
         <div className="bg-bg-primary rounded-xl w-full max-w-xl shadow-2xl border border-border-default my-8">
           <div className="sticky top-0 bg-bg-primary px-4 py-2 border-b-border-default flex justify-between items-center z-10 rounded-t-xl">
             <h3 className="text-xl font-bold text-text-primary">Add Tables</h3>
-            <button onClick={handleClose} className="text-text-secondary hover:text-text-primary transition-colors p-1">
-              <FaTimes size={24} />
+            <button onClick={handleClose}       className="p-1.5 rounded-lg bg-action-primary text-text-white hover:opacity-90 transition-opacity   "
+                           >
+              <X size={24} />
             </button>
           </div>
 
@@ -376,7 +378,36 @@ const UniversalAddModal = ({
                 key={index}
               >
                 <div>
-                  <label className="block text-sm font-semibold mb-2 text-text-primary">Table Range *</label>
+                  <label className="flex items-center gap-2 text-sm font-semibold mb-2 text-text-primary">
+                    Table Range *
+
+                    <div className="relative group cursor-pointer">
+                      {/* Info Icon */}
+                      <span className="w-5 h-5 flex items-center justify-center rounded-full bg-blue-100 text-action-primary text-xs font-bold">
+                        i
+                      </span>
+
+                      {/* Tooltip */}
+                      <div className="
+      absolute left-1/2 -translate-x-1/2 top-7
+      hidden group-hover:block
+      w-60 p-3
+      bg-white border border-blue-200
+      rounded-lg shadow-lg z-50
+      text-xs text-gray-700
+    ">
+                        <div className="font-bold mb-1 text-text-primary">
+                          Table Range Examples
+                        </div>
+                        <div className="space-y-1">
+                          <div><strong>Single Table:</strong> S1</div>
+                          <div><strong>Single Range:</strong> S01:S10</div>
+                          <div><strong>Multiple Ranges:</strong> A01:A10,B01:B05</div>
+                        </div>
+                      </div>
+                    </div>
+                  </label>
+
                   <input
                     value={row?.range ?? ''}
                     onChange={(e) => handleRangeChange(index, 'range', e.target.value)}
@@ -390,7 +421,7 @@ const UniversalAddModal = ({
                 </div>
 
                 <div>
-                  <label className="block text-sm font-semibold mb-2 text-text-primary">No of Seating *</label>
+                  <label className="block text-sm font-semibold mb-2 text-text-primary">Seats *</label>
 
                   {/* Desktop */}
                   <input
@@ -441,26 +472,49 @@ const UniversalAddModal = ({
                     <div className="text-action-danger text-xs mt-1 font-medium">Enter seating</div>
                   )}
                 </div>
-
                 <div>
-                  <label className="block text-sm font-semibold mb-2 text-text-secondary">Type *</label>
+                  <label className="block text-sm font-semibold mb-2">Section *</label>
                   <select
-                    value={row?.type ?? ''}
-                    onChange={(e) => handleRangeChange(index, 'type', e.target.value)}
-                    className={`w-full px-3 py-2 border-default border-border-default rounded-lg focus:outline-none focus:ring-2 focus:ring-action-primary ${fieldErrors?.[index]?.type ? 'border-bulkActions-delete bg-red-50' : 'border-border-default'
-                      }`}
+                    value={row?.section ?? ""}
+                    onChange={(e) => handleRangeChange(index, "section", e.target.value)}
+                    className="w-full px-3 py-2 border rounded-lg"
                   >
                     <option value="">Select</option>
                     <option value="AC">AC</option>
                     <option value="Non-AC">Non-AC</option>
                   </select>
-                  {fieldErrors?.[index]?.type && (
-                    <div className="text-action-danger text-xs mt-1 font-medium">Select type</div>
+                  {fieldErrors?.[index]?.section && (
+                    <div className="text-action-danger text-xs mt-1 font-medium">
+                      Select section
+                    </div>
                   )}
+
                 </div>
 
                 <div>
-                  <label className="block text-sm font-semibold mb-2 text-text-secondary">Remark</label>
+                  <label className="block text-sm font-semibold mb-2">Zone *</label>
+                  <select
+                    value={row?.location_zone ?? ""}
+                    onChange={(e) => handleRangeChange(index, "location_zone", e.target.value)}
+                    className="w-full px-3 py-2 border rounded-lg"
+                  >
+                    <option value="">Select</option>
+                    <option value="Ground Floor">Ground Floor</option>
+                    <option value="First Floor">First Floor</option>
+                    <option value="Second Floor">Second Floor</option>
+                    <option value="Garden Area">Garden</option>
+                  </select>
+                  {fieldErrors?.[index]?.location_zone && (
+                    <div className="text-action-danger text-xs mt-1 font-medium">
+                      Select zone
+                    </div>
+                  )}
+
+                </div>
+
+
+                <div>
+                  <label className="block text-sm font-semibold mb-2 text-text-primary">Remark</label>
                   <select
                     value={row?.remark ?? 'Vacant'}
                     onChange={(e) => handleRangeChange(index, 'remark', e.target.value)}
@@ -473,22 +527,7 @@ const UniversalAddModal = ({
               </div>
             ))}
 
-            <div className="bg-gradient-to-r from-blue-50 to-cyan-50 border-2 border-blue-200 rounded-lg p-5 mb-6">
-              <div className="flex items-start gap-3">
-                <div className="text-tableStatusText-vacant mt-1">
-                  <svg className="w-6 h-6" fill="currentColor" viewBox="0 0 20 20">
-                    <path fillRule="evenodd" d="M18 10a8 8 0 11-16 0 8 8 0 0116 0zm-7-4a1 1 0 11-2 0 1 1 0 012 0zM9 9a1 1 0 000 2v3a1 1 0 001 1h1a1 1 0 100-2v-3a1 1 0 00-1-1H9z" clipRule="evenodd" />
-                  </svg>
-                </div>
-                <div>
-                  <div className="text-sm font-bold text-text-primary mb-2">Table Range Examples:</div>
-                  <div className="text-sm text-gray-700 space-y-1">
-                    <div><strong>Single Table:</strong> S1</div>
-                    <div><strong>Single & Multi Range:</strong> T01:T10 & A01:A10,B01:B05</div>
-                  </div>
-                </div>
-              </div>
-            </div>
+
 
             <button
               className="w-full bg-action-primary text-text-white py-2 rounded-lg hover:bg-bulkActionsHover-addingHover hover:text-text-primary transition-colors font-bold text-lg shadow-lg disabled:bg-gray-300 disabled:cursor-not-allowed"

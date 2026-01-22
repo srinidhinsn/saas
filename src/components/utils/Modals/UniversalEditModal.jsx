@@ -98,10 +98,8 @@ const UniversalEditModal = ({
           <div className="px-6 py-4 border-b border-gray-200 flex justify-between items-center">
             <h2 className="text-xl font-semibold text-gray-900">Edit Menu Item</h2>
             <button
-              onClick={handleClose}
-              className="w-8 h-8 rounded hover:bg-gray-100 flex items-center justify-center"
-            >
-              <X className="w-5 h-5 text-gray-500" />
+              onClick={handleClose} className="p-1.5 rounded-lg bg-action-primary text-text-white hover:opacity-90 transition-opacity   ">
+              <X className="w-5 h-5" />
             </button>
           </div>
 
@@ -142,6 +140,7 @@ const UniversalEditModal = ({
                 />
               </div>
 
+
               {/* Description */}
               <div>
                 <label className="block text-sm font-medium mb-1 text-gray-700">Description</label>
@@ -181,16 +180,26 @@ const UniversalEditModal = ({
 
               {/* Availability & Unit */}
               <div className="grid grid-cols-2 gap-4">
+                {/* Code */}
                 <div>
-                  <label className="block text-sm font-medium mb-1 text-gray-700">Availability</label>
+                  <label className="block text-sm font-medium mb-1 text-gray-700">
+                    Code <span className="text-red-600">*</span>
+                  </label>
                   <input
-                    type="number"
-                    value={editingItem.availability}
-                    onChange={(e) => setEditingItem({ ...editingItem, availability: e.target.value })}
-                    className="w-full px-3 py-2 rounded-md border border-gray-300 text-gray-900 focus:outline-none focus:ring-2 focus:ring-blue-500 focus:border-transparent"
+                    type="text"
+                    value={editingItem.code ?? ''}
+                    onChange={(e) =>
+                      setEditingItem({
+                        ...editingItem,
+                        code: e.target.value
+                      })
+                    }
+                    className="w-full px-3 py-2 rounded-md border border-gray-300 text-gray-900
+      focus:outline-none focus:ring-2 focus:ring-action-primary"
+                    placeholder="Item Code"
+                    required
                   />
                 </div>
-
                 <div>
                   <label className="block text-sm font-medium mb-1 text-gray-700">Unit</label>
                   <input
@@ -319,10 +328,10 @@ const UniversalEditModal = ({
           <div className="px-6 py-4 border-b border-gray-200 flex justify-between items-center">
             <h2 className="text-xl font-semibold text-gray-900">Edit Table</h2>
             <button
-              className="w-8 h-8 rounded hover:bg-gray-100 flex items-center justify-center"
+              className="p-1.5 rounded-lg bg-action-primary text-text-white hover:opacity-90 transition-opacity"
               onClick={handleClose}
             >
-              <X className="w-5 h-5 text-gray-500" />
+              <X className="w-5 h-5" />
             </button>
           </div>
 
@@ -393,22 +402,44 @@ const UniversalEditModal = ({
                 )}
               </div>
 
-              {/* Type */}
+              {/* SECTION (AC / Non-AC) */}
               <div>
-                <label className="block text-sm font-medium mb-1 text-gray-700">Type</label>
+                <label className="block text-sm font-medium mb-1 text-gray-700">
+                  Section
+                </label>
                 <select
-                  value={table.location_zone}
-                  onChange={(e) => handleEditChange(table.id, "location_zone", e.target.value)}
-                  className={`w-full px-3 py-2 rounded-md border focus:outline-none focus:ring-2 focus:ring-blue-500 focus:border-transparent ${editFieldErrors?.location_zone ? 'border-red-500 bg-red-50' : 'border-gray-300'
-                    }`}
+                  value={table.section || ""}
+                  onChange={(e) =>
+                    handleEditChange(table.id, "section", e.target.value)
+                  }
+                  className="w-full px-3 py-2 rounded-md border border-gray-300 focus:ring-2 focus:ring-blue-500"
                 >
+                  <option value="">Select</option>
                   <option value="AC">AC</option>
                   <option value="Non-AC">Non-AC</option>
                 </select>
-                {editFieldErrors?.location_zone && (
-                  <p className="text-red-600 text-xs mt-1">{editFieldErrors.location_zone}</p>
-                )}
               </div>
+
+              {/* ZONE */}
+              <div>
+                <label className="block text-sm font-medium mb-1 text-gray-700">
+                  Zone
+                </label>
+                <select
+                  value={table.location_zone || ""}
+                  onChange={(e) =>
+                    handleEditChange(table.id, "location_zone", e.target.value)
+                  }
+                  className="w-full px-3 py-2 rounded-md border border-gray-300 focus:ring-2 focus:ring-blue-500"
+                >
+                  <option value="">Select</option>
+                  <option value="Garden Area">Garden Area</option>
+                  <option value="Ground Floor">Ground Floor</option>
+                  <option value="First Floor">First Floor</option>
+                  <option value="Second Floor">Second Floor</option>
+                </select>
+              </div>
+
 
               {/* Status */}
               <div>
