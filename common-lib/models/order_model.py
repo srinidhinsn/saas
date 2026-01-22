@@ -8,6 +8,7 @@ class OrderStatusEnum(str, Enum):
     new = "new"
     pending = "pending"
     preparing = "preparing"
+    ready = "ready"
     served = "served"
     cancelled = "cancelled"
 
