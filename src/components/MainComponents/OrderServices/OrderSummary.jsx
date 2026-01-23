@@ -1,4 +1,3 @@
-
 import React, { useEffect, useState } from "react";
 import axios from 'axios';
 import { toast } from "react-toastify";
@@ -1174,7 +1173,9 @@ const OrderSummaryVisible = ({ clientId, token }) => {
       const processedOrder = { ...updatedOrderFromBackend, items: dedupedNewAll, has_new_items: dedupedNewAll.length > oldItems.length };
       setOrders(prev => prev.map(o => o.id === orderId ? processedOrder : o));
       if (selectedOrder?.id === orderId) setSelectedOrder(processedOrder);
-
+      clearNewItemsStorage(orderId);
+      setCurrentBatchTimestamp(null);
+      
     } catch (err) {
       console.error('Save error', err);
       toast.error('Failed to update items or total.');

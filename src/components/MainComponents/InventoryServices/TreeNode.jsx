@@ -1,46 +1,61 @@
-import React, { useState } from 'react';
-import { ChevronDown, ChevronRight } from 'lucide-react';
+import { ChevronDown, ChevronRight } from "lucide-react";
 
-const TreeNode = ({ category, isExpanded, onToggle, isSelected, onSelect, hasChildren, level = 0 }) => {
-  const [hover, setHover] = useState(false);
-
-
+const TreeNode = ({
+  category,
+  level = 0,
+  hasChildren,
+  isExpanded,
+  isSelected,
+  onToggle,
+  onSelect,
+}) => {
   return (
-    <div className="select-none">
-      <div
-        role="button"
-        tabIndex={0}
-        onClick={onSelect}
-        onKeyDown={(e) => { if (e.key === 'Enter') onSelect(); }}
-        onMouseEnter={() => setHover(true)}
-        onMouseLeave={() => setHover(false)}
-        className={`flex items-center space-x-2 px-3 py-2 rounded-lg cursor-pointer transition-all  text-text-primary 
-       ${isSelected ? "bg-action-primary" : "bg-bg-primary"}`}
-
-      >
+    <div
+      role="button"
+      tabIndex={0}
+      onClick={onSelect}
+      onKeyDown={(e) => e.key === "Enter" && onSelect()}
+      className={`
+        flex items-center justify-between gap-2 px-3 py-2.5 rounded-lg cursor-pointer
+        transition-all border m-0.5
+        ${isSelected
+          ? "bg-action-primary text-white shadow-md"
+          : "bg-bg-primary hover:bg-bg-tertiary border-border-default"}
+      `}
+      style={{ marginLeft: level * 16 }}
+    >
+      <div className="flex items-center gap-2 flex-1 min-w-0">
         {hasChildren ? (
           <button
-            onClick={(e) => { e.stopPropagation(); onToggle(); }}
-            className="focus:outline-none"
-            aria-label={isExpanded ? 'Collapse' : 'Expand'}
+            onClick={(e) => {
+              e.stopPropagation();
+              onToggle();
+            }}
+            className={isSelected ? "text-white" : "text-text-secondary"}
           >
-            {isExpanded ? <ChevronDown size={18} /> : <ChevronRight size={18} />}
+            {isExpanded ? <ChevronDown size={16} /> : <ChevronRight size={16} />}
           </button>
         ) : (
-          <span className="w-[18px]" />
+          <span className="w-4" />
         )}
 
-        <span className={`flex-1 text-sm ${isSelected ? "text-text-white" : "text-text-primary"}`}>
+        <span className="text-sm font-medium truncate">
           {category.name}
         </span>
-
-        {category.children && category.children.length > 0 && (
-          <span className="text-xs px-2 py-0.5 rounded-full font-semibold bg-bg-tertiary text-text-primary">
-            {category.children.length}
-          </span>
-        )}
-
       </div>
+
+      {hasChildren && (
+        <span
+          className={`
+            text-xs px-2 py-0.5 rounded-full font-semibold
+            ${isSelected
+              ? "bg-white text-action-primary"
+              : "bg-bg-tertiary text-text-secondary"}
+          `}
+        >
+          {category.children.length}
+        </span>
+      )}
     </div>
   );
 };
