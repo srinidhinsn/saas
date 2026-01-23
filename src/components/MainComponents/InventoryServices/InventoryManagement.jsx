@@ -112,7 +112,7 @@ export default function StockRecipeManager({ clientId: propClientId, token: prop
 
   // Data fetching
   useEffect(() => {
-    if (!clientId) return;
+    if (!clientId || !realm) return;
 
     const loadData = async () => {
       setLoading(true);
@@ -121,13 +121,16 @@ export default function StockRecipeManager({ clientId: propClientId, token: prop
     };
 
     loadData();
-  }, [clientId]);
+  }, [clientId, realm]);
+
 
   useEffect(() => {
     if (activeTab === "menu-availability") {
       fetchMenuAvailability();
     }
   }, [activeTab]);
+
+
 
   const fetchStocks = async () => {
     try {
@@ -363,42 +366,40 @@ export default function StockRecipeManager({ clientId: propClientId, token: prop
       <div className="max-w-8xl mx-auto">
         <div className="flex flex-col sm:flex-row sm:items-center sm:justify-between gap-4 mb-8">
           <div>
-            <h1 className="text-3xl sm:text-4xl font-bold text-gray-900">
-              Inventory & Recipe Management
-            </h1>
-            <p className="mt-2 text-base text-gray-600">
+            <p className="text-3xl font-bold xl mt-2 text-base text-gray-600">
               Manage stock items, recipes, and menu availability
             </p>
           </div>
 
           <div className="flex gap-3">
             <button
-             className={`flex items-center gap-2 px-4 py-2 rounded-lg font-medium text-sm transition-all ${activeTab === "stock"
-              ? 'bg-action-primary text-text-white shadow-sm'
-              : 'bg-bg-tertiary text-text-secondary hover:text-text-primary border border-border-default'
-              }`}
+              className={`flex items-center gap-2 px-4 py-2 rounded-lg font-medium text-sm transition-all ${activeTab === "menu-availability"
+                ? 'bg-action-primary text-text-white shadow-sm'
+                : 'bg-bg-tertiary text-text-secondary hover:text-text-primary border border-border-default'
+                }`}
+              onClick={() => setActiveTab("menu-availability")}
+            >
+              Menu
+            </button>
+            <button
+              className={`flex items-center gap-2 px-4 py-2 rounded-lg font-medium text-sm transition-all ${activeTab === "stock"
+                ? 'bg-action-primary text-text-white shadow-sm'
+                : 'bg-bg-tertiary text-text-secondary hover:text-text-primary border border-border-default'
+                }`}
               onClick={() => setActiveTab("stock")}
             >
               Stock
             </button>
             <button
-             className={`flex items-center gap-2 px-4 py-2 rounded-lg font-medium text-sm transition-all ${activeTab === "recipe"
-              ? 'bg-action-primary text-text-white shadow-sm'
-              : 'bg-bg-tertiary text-text-secondary hover:text-text-primary border border-border-default'
-              }`}
+              className={`flex items-center gap-2 px-4 py-2 rounded-lg font-medium text-sm transition-all ${activeTab === "recipe"
+                ? 'bg-action-primary text-text-white shadow-sm'
+                : 'bg-bg-tertiary text-text-secondary hover:text-text-primary border border-border-default'
+                }`}
               onClick={() => setActiveTab("recipe")}
             >
               Recipe
             </button>
-            <button
-             className={`flex items-center gap-2 px-4 py-2 rounded-lg font-medium text-sm transition-all ${activeTab === "menu-availability"
-              ? 'bg-action-primary text-text-white shadow-sm'
-              : 'bg-bg-tertiary text-text-secondary hover:text-text-primary border border-border-default'
-              }`}
-              onClick={() => setActiveTab("menu-availability")}
-            >
-              Menu Availability
-            </button>
+
           </div>
         </div>
 
@@ -595,13 +596,12 @@ function StockTab({
                 <tr key={item.id} className="hover:bg-gray-50 transition-colors">
                   <td className="px-6 py-4 whitespace-nowrap">
                     <div className="font-semibold text-gray-900 text-base">{item.name}</div>
-                    <div className="text-sm text-gray-500">{item.description || "—"}</div>
                   </td>
                   <td className="px-6 py-4 whitespace-nowrap text-base text-gray-600">{item.category || "—"}</td>
                   <td className="px-6 py-4 whitespace-nowrap">
                     <span className={`inline-flex px-3 py-1.5 text-sm font-semibold rounded-full ${item.status === "out" ? "bg-red-100 text-red-800" :
-                        item.status === "low" ? "bg-amber-100 text-amber-800" :
-                          "bg-green-100 text-green-800"
+                      item.status === "low" ? "bg-amber-100 text-amber-800" :
+                        "bg-green-100 text-green-800"
                       }`}>
                       {item.effectiveAvailability}
                     </span>
@@ -610,10 +610,28 @@ function StockTab({
                   <td className="px-6 py-4 whitespace-nowrap text-base font-medium text-gray-700">
                     ₹{(Number(item.unit_price) || 0).toFixed(2)}
                   </td>
-                  <td className="px-6 py-4 whitespace-nowrap text-right text-base font-medium">
-                    <button onClick={() => onEdit(item)} className="text-action-primary hover:text-action-primary  mr-4">Edit</button>
-                    <button onClick={() => onDelete(item.id)} className="text-action-primary hover:text-action-primary">Delete</button>
+                  {/* <td className="flex  px-6 py-4 whitespace-nowrap text-right text-base font-medium">
+                    <button onClick={() => onEdit(item)} className="text-action-primary hover:text-action-primary  mr-4 border flex items-center gap-2 px-4 py-2 rounded-lg font-medium text-sm transition-all">Edit</button>
+                    <button onClick={() => onDelete(item.id)} className="text-action-primary hover:text-action-primary border flex items-center gap-2 px-4 py-2 rounded-lg font-medium text-sm transition-all">Delete</button>
+                  </td> */}
+
+                  <td className="px-6 py-4 whitespace-nowrap text-right">
+                    <div className="flex justify-end gap-4">
+                      <button
+                        onClick={() => onEdit(item)}
+                        className="text-action-primary hover:text-action-primary  mr-4 border  gap-2 px-4 py-2 rounded-lg font-medium text-sm transition-all"
+                      >
+                        Edit
+                      </button>
+                      <button
+                        onClick={() => onDelete(item.id)}
+                        className="text-action-primary hover:text-action-primary  border  gap-2 px-4 py-2 rounded-lg font-medium text-sm transition-all"
+                      >
+                        Delete
+                      </button>
+                    </div>
                   </td>
+
                 </tr>
               ))
             )}
@@ -905,7 +923,7 @@ function MenuAvailabilityTab({ menuItems, loading, onUpdateAvailability }) {
                     ) : (
                       <button
                         onClick={() => handleEdit(item)}
-                        className="text-indigo-600 hover:text-indigo-900"
+                        className="text-action-primary hover:text-action-primary  mr-4 border  gap-2 px-4 py-2 rounded-lg font-medium text-sm transition-all"
                       >
                         Edit
                       </button>
