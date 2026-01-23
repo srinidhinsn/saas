@@ -67,38 +67,6 @@ const MenuManagement = ({ clientId, token, realm }) => {
     }
   }, [token]);
 
-  // Robust flatten for your current category-tree shape (handles `children` or `subCategories`)
-  const flattenCategoriesGeneric = (tree) => {
-    const flat = [];
-    const recurse = (nodes, parentId = null) => {
-      (nodes || []).forEach(node => {
-        if (!node) return;
-        // unify fields (some components use subCategories, some use children)
-        const children = node.subCategories || node.children || [];
-        flat.push({
-          id: node.id,
-          name: (node.name || '').trim(),
-          parent_id: node.parentId ?? node.parent_id ?? parentId ?? null
-        });
-        if (children && children.length) recurse(children, node.id);
-      });
-    };
-    recurse(tree);
-    return flat;
-  };
-  const getDietaryDotColor = (type) => {
-    switch ((type || "").toLowerCase()) {
-      case "veg":
-        return "bg-green-700";
-      case "non-veg":
-      case "non veg":
-        return "bg-action-primary";
-      case "egg":
-        return "bg-yellow-600";
-      default:
-        return "bg-gray-300";
-    }
-  };
 
   // returns array of category names from root -> the given categoryId (works with UUID or cat_... ids)
   const buildCategoryPath = (categoryId) => {
@@ -149,7 +117,10 @@ const MenuManagement = ({ clientId, token, realm }) => {
     return parts.filter(Boolean).join('_'); // e.g. Dietery_Non_Veg_Gravies_Mutton_Gravy
   };
 
-
+  const handleItemClick = (item) => {
+    setEditingItem(item);
+    setShowEditModal(true);
+  };
 
   const flattenCategoryTree = (tree, level = 0, parentId = null) => {
     let flatList = [];
@@ -169,7 +140,6 @@ const MenuManagement = ({ clientId, token, realm }) => {
     });
     return flatList;
   };
-  // Add this helper function after your state declarations and before fetchData
 
   // Helper function to get category ID from name
   const getCategoryIdByName = (categoryName) => {
@@ -182,6 +152,13 @@ const MenuManagement = ({ clientId, token, realm }) => {
     );
 
     return match ? match.id : null;
+  };
+
+  const getSelectedCategoryName = () => {
+    if (!selectedCategory) return null;
+    if (typeof selectedCategory === 'string') return selectedCategory;
+    if (typeof selectedCategory === 'object') return selectedCategory.name;
+    return null;
   };
 
 
@@ -294,7 +271,8 @@ const MenuManagement = ({ clientId, token, realm }) => {
 
       alert(errorMsg);
     }
-  };
+  }
+
   const handleEditItem = async () => {
     try {
       let imageId = editingItem.image_id;
@@ -317,6 +295,7 @@ const MenuManagement = ({ clientId, token, realm }) => {
       const { dietary_type, ...cleanEditingItem } = editingItem;
 
       const payload = {
+        id: Number(editingItem.id),
         ...cleanEditingItem,
         code: editingItem.code ? String(editingItem.code).trim() : null,
         client_id: clientId,
@@ -351,19 +330,6 @@ const MenuManagement = ({ clientId, token, realm }) => {
       alert('Failed to update item: ' + (error.response?.data?.detail || error.message));
     }
   };
-
-  const normalizeDietary = (value) => {
-    if (!value) return "";
-
-    const v = value.toString().toLowerCase().replace(/[-_\s]/g, "");
-
-    if (v === "veg") return "Veg";
-    if (v === "nonveg") return "Non-Veg";
-    if (v === "egg") return "Egg";
-
-    return "";
-  };
-
 
   const fetchData = useCallback(async (options = { silent: false }) => {
     const { silent = false } = options;
@@ -409,9 +375,10 @@ const MenuManagement = ({ clientId, token, realm }) => {
         const cat = flatCategories.find(c => c.id === item.category_id);
         return {
           ...item,
-          category: cat ? cat.name : "Uncategorized"
+          category: cat?.name ?? "Uncategorized"
         };
       });
+
 
       setMenuItems(enrichedItems);
 
@@ -466,17 +433,16 @@ const MenuManagement = ({ clientId, token, realm }) => {
       setCategories(categoryTree);
 
     } catch (error) {
-      console.error('Error fetching data:', error);
+      console.error('Error fetching data:', error); console.error('Error details:', error.response?.data);
     } finally {
       if (!silent) setLoading(false);
     }
-  }, [clientId, token]);
+  }, [clientId, token, realm]);
 
   useEffect(() => {
-
-
     fetchData();
   }, [fetchData]);
+
   // Add this function in MenuManagement.jsx after your other helper functions
   const getAllDescendantCategories = (categoryName, categoryTree) => {
     const descendants = [categoryName];
@@ -508,57 +474,58 @@ const MenuManagement = ({ clientId, token, realm }) => {
 
     return descendants;
   };
-  const getFilteredItems = () => {
-    const q = (searchQuery || '').trim().toLowerCase();
 
+  const getFilteredItems = () => {
+    if (!menuItems.length) {
+      return [];
+    }
+
+    const q = (searchQuery || '').trim().toLowerCase();
     let items = menuItems;
 
-    // 🔍 Search
+    // Search filter
     if (q.length > 0) {
       items = items.filter(item => {
         const name = (item.name || '').toLowerCase();
         const category = (item.category || '').toLowerCase();
         const code = String(item.code || '').toLowerCase();
-        return name.includes(q) || category.includes(q) || code.includes(q);
+        return (
+          name.includes(q) ||
+          category.includes(q) ||
+          code.includes(q)
+        );
       });
+      console.log('After search filter:', items.length);
     }
 
-    // 📂 Category - hierarchical filtering
-    if (selectedCategory && selectedCategory !== 'All Categories') {
-      // Get all descendant categories
-      const allowedCategories = getAllDescendantCategories(selectedCategory, categories);
+    const selectedCategoryName = getSelectedCategoryName();
+
+    // Skip filtering for All Categories
+    if (!selectedCategoryName || selectedCategoryName === 'All Categories') {
+      return items;
+    }
+
+    // ✅ ADDED: Only filter if categories are loaded
+    if (categories.length > 0 && categoriesFlat.length > 0) {
+      const allowedCategories = getAllDescendantCategories(
+        selectedCategoryName,
+        categories
+      );
+
+      console.log('allowedCategories:', allowedCategories);
+      console.log('Sample item categories:', items.slice(0, 3).map(i => i.category));
 
       items = items.filter(item =>
         allowedCategories.includes(item.category)
       );
+
+      console.log('After category filter:', items.length);
     }
 
-
-
+    console.log('🏁 Final items count:', items.length);
     return items;
   };
 
-
-  // Add these functions after your existing handleDrag, handleDrop, etc.
-  const handleEditDrag = (e) => {
-    e.preventDefault();
-    e.stopPropagation();
-    if (e.type === "dragenter" || e.type === "dragover") {
-      setDragActive(true);
-    } else if (e.type === "dragleave") {
-      setDragActive(false);
-    }
-  };
-
-  const handleEditDrop = (e) => {
-    e.preventDefault();
-    e.stopPropagation();
-    setDragActive(false);
-
-    if (e.dataTransfer.files && e.dataTransfer.files[0]) {
-      handleEditImageFile(e.dataTransfer.files[0]);
-    }
-  };
 
   const handleEditImageFile = (file) => {
     if (file && file.type.startsWith('image/')) {
@@ -579,7 +546,9 @@ const MenuManagement = ({ clientId, token, realm }) => {
       alert('Failed to load image from URL');
     }
   };
+
   const filteredItems = getFilteredItems();
+
   const uploadImageToDocumentService = async (imageFile) => {
     try {
       const formData = new FormData();
@@ -607,25 +576,6 @@ const MenuManagement = ({ clientId, token, realm }) => {
     }
   };
 
-  const handleDrag = (e) => {
-    e.preventDefault();
-    e.stopPropagation();
-    if (e.type === "dragenter" || e.type === "dragover") {
-      setDragActive(true);
-    } else if (e.type === "dragleave") {
-      setDragActive(false);
-    }
-  };
-
-  const handleDrop = (e) => {
-    e.preventDefault();
-    e.stopPropagation();
-    setDragActive(false);
-
-    if (e.dataTransfer.files && e.dataTransfer.files[0]) {
-      handleImageFile(e.dataTransfer.files[0]);
-    }
-  };
 
   const handleImageFile = (file) => {
     if (file && file.type.startsWith('image/')) {
@@ -787,7 +737,7 @@ const MenuManagement = ({ clientId, token, realm }) => {
           CST: typeof item.cst === "number" ? item.cst : (item.cst ? parseFloat(item.cst) : 0),
           GST: typeof item.gst === "number" ? item.gst : (item.gst ? parseFloat(item.gst) : 0),
           Discount: typeof item.discount === "number" ? item.discount : (item.discount ? parseFloat(item.discount) : 0),
-          Code: typeof item.code === "number" ? item.code : (item.code ? parseInt(item.code) : 0),
+          Code: item.code != null ? String(item.code) : "",
           Serving_Quantity: item.serving_quantity,
           Serving_Unit: item.serving_unit,
           Realm: item.realm ?? realm ?? "",
@@ -910,7 +860,6 @@ const MenuManagement = ({ clientId, token, realm }) => {
 
             const categoryId = getCategoryIdByName(row.Category);
 
-
             if (!categoryId) throw new Error("Invalid category");
 
             const payload = {
@@ -955,12 +904,22 @@ const MenuManagement = ({ clientId, token, realm }) => {
           }
         }
 
-        // 🔄 REFRESH
+        // 🔄 REFRESH - FIXED VERSION
         const itemRes = await axios.get(
           `${import.meta.env.VITE_API_INVENTORY_SERVICE_URL}/${clientId}/menu/read?realm=${realm}`,
           { headers: { Authorization: `Bearer ${token}` } }
         );
-        setMenuItems(itemRes.data.data);
+
+        // ✅ ENRICH items with category names (same as fetchData)
+        const enrichedItems = (itemRes.data.data || []).map(item => {
+          const cat = categoriesFlat.find(c => c.id === item.category_id);
+          return {
+            ...item,
+            category: cat?.name ?? "Uncategorized"
+          };
+        });
+
+        setMenuItems(enrichedItems);
 
         // 📊 RESULT
         alert(
@@ -1019,18 +978,10 @@ const MenuManagement = ({ clientId, token, realm }) => {
   //     </div>
   //   );
   // }
-
   return (
     <div className="h-[90vh] bg-bg-primary overflow-x-hidden">
-
-
-
       <div className="mx-auto p-2">
-        {/* Action Buttons */}
-
-
         <div className="lg:grid lg:grid-cols-4 gap-2">
-
           {/* Sidebar */}
           <div className="lg:col-span-1">
             <div className="lg:sticky lg:top-2">
@@ -1051,65 +1002,36 @@ const MenuManagement = ({ clientId, token, realm }) => {
 
           {/* Main Content */}
           <div className="lg:col-span-3 border-default border-border-default p-3 rounded-lg h-[88.5vh] flex flex-col">
-
             <div className="mb-4 grid gap-3 grid-cols-1 md:grid-cols-2 lg:grid-cols-3 flex-shrink-0">
-
-
               <div className="lg:col-span-1 space-y-2">
                 <h2 className="text-xl lg:text-2xl font-semibold text-text-primary">
-                  {selectedCategory}
+                  {getSelectedCategoryName() || 'All Categories'}
                   <span className="text-sm ml-2 text-text-primary">
                     ({filteredItems.length} items)
                   </span>
                 </h2>
               </div>
 
-
-
+              {/* Search Field start >>>>>>>>>>>>>>>>>>>>>>>>>>>> */}
               <div className="lg:col-span-1">
-                <div className="
-    relative w-full
-    group
-  ">
-                  <Search
-                    size={16}
-                    className="
-        absolute left-3 top-1/2 -translate-y-1/2
-        text-text-secondary
-        transition-colors
-        group-focus-within:text-action-primary
-      "
-                  />
+                <div className="relative w-full group">
+                  <Search size={16} className="absolute left-3 top-1/2 -translate-y-1/2 text-text-secondary transition-colors
+                                             group-focus-within:text-action-primary"/>
 
-                  <input
-                    ref={searchInputRef}
-                    type="text"
-                    value={searchQuery}
-                    onChange={(e) => setSearchQuery(e.target.value)}
+                  <input ref={searchInputRef} type="text" value={searchQuery} onChange={(e) => setSearchQuery(e.target.value)}
                     placeholder="Search items, category or code…"
-                    className="
-        w-full h-9
-        pl-10 pr-3
-        rounded-lg
-        bg-bg-tertiary
-        border border-border-default
-        text-sm text-text-primary
-        placeholder:text-text-secondary
-
-        transition-all duration-200
-        focus:outline-none
-        focus:ring-2 focus:ring-action-primary/30
-        focus:border-action-primary
-
-        hover:border-action-primary/50
-      "
-                  />
+                    className="w-full h-9 pl-10 pr-3 rounded-lg bg-bg-tertiary border border-border-default
+                                  text-sm text-text-primary placeholder:text-text-secondary transition-all duration-200
+                                  focus:outline-none focus:ring-2 focus:ring-action-primary/30 focus:border-action-primary
+                                hover:border-action-primary/50"/>
                 </div>
               </div>
+              {/* Search Field end <<<<<<<<<<<<<<<<<<<<<<<<<<<<<<< */}
 
               {/* Buttons Container (Add Item,Bulk Update and Import Export) start >>>>>> */}
               <div className="flex flex-wrap  items-center justify-end gap-2 md:justify-start lg:justify-end">
 
+                {/* Add Item Button */}
                 <button onClick={() => setShowAddModal(true)}
                   className="h-9 px-3  flex items-center gap-2 rounded-lg bg-action-primary text-white text-sm 
                                    font-semibold shadow-sm hover:opacity-90">
@@ -1120,6 +1042,7 @@ const MenuManagement = ({ clientId, token, realm }) => {
 
                 </button>
 
+                {/* Bulk Update Button */}
                 <button onClick={() => setShowBulkModal(true)}
                   className="h-9 px-3 flex items-center gap-2 rounded-lg bg-bg-tertiary border border-border-default
                                    text-sm font-semibold hover:border-action-primary hover:bg-bg-secondary">
@@ -1130,6 +1053,7 @@ const MenuManagement = ({ clientId, token, realm }) => {
 
                 </button>
 
+                {/* Import Export Dropdown */}
                 <div className="relative group">
                   {/* Main Dropdown Button */}
                   <button className=" h-9 px-3 flex items-center gap-2 rounded-lg bg-bg-tertiary border border-border-default 
@@ -1179,8 +1103,7 @@ const MenuManagement = ({ clientId, token, realm }) => {
 
             {/* Items Grid start >>>>>>>>>>>>>>>>>>>>>>>>>>>>>>>>>>>>>>>>>>*/}
             <div className="flex-1 overflow-y-auto">
-
-              <div className="grid gap-2 grid-cols-2 md:grid-cols-4 lg:grid-cols-4">
+              <div className="grid gap-2 grid-cols-2 md:grid-cols-3 lg:grid-cols-3 xl:grid-cols-4">
 
                 {filteredItems.map((item) => {
                   const discountPercent = item.discount && item.unit_price && Number(item.discount) > 0
@@ -1188,12 +1111,18 @@ const MenuManagement = ({ clientId, token, realm }) => {
 
                   return (
                     <div key={item.id}
-                      className="relative flex gap-2 items-center bg-bg-primary border border-border-default rounded-xl p-1.5
+                      className="relative flex gap-2 items-center bg-bg-primary border border-border-default rounded-xl p-1
                                     shadow-sm hover:shadow-md transition group overflow-hidden">
                       {/* POP OVERLAY – hides content */}
                       <div className="absolute inset-0 bg-black/40 backdrop-blur-[2px] opacity-0 pointer-events-none z-10
                                       group-hover:animate-overlayFade"/>
-
+                      {item.line_item_id && Array.isArray(item.line_item_id) && item.line_item_id.length > 0 && (
+                        <div className="absolute bottom-2 right-2 bg-orange-500 text-white text-[7px] p-1 rounded-md z-10 shadow-md flex items-center gap-1">
+                          <Plus size={10} />
+                          <span>{item.line_item_id.length} add-ons</span>
+                        </div>
+                      )}
+                      {/* 
                       {item.line_item_id?.length > 0 && (
                         <div className="absolute top-1/2 right-0 -translate-y-1/2 translate-x-full
                                      group-hover:translate-x-[-0.75rem]  opacity-0  group-hover:opacity-100 
@@ -1205,12 +1134,12 @@ const MenuManagement = ({ clientId, token, realm }) => {
                           {item.line_item_id.length} Add-ons
 
                         </div>
-                      )}
+                      )} */}
 
                       {/* IMAGE */}
-                      <div className="relative w-14 h-16 rounded-lg overflow-hidden shrink-0 bg-gray-100">
+                      <div className="relative w-10 h-12 md:h-16 md:w-14  rounded-lg overflow-hidden shrink-0 bg-gray-100">
                         {discountPercent && (
-                          <div className="absolute top-1 left-1 bg-action-danger text-white text-[10px] px-1 rounded z-10">
+                          <div className="absolute top-1 left-1 bg-action-danger text-white text-[7px] md:text-[10px] px-1 rounded z-10">
                             {discountPercent}% OFF
                           </div>
                         )}
@@ -1225,12 +1154,13 @@ const MenuManagement = ({ clientId, token, realm }) => {
                       {/* INFO */}
                       <div className="flex-1 min-w-0 cursor-pointer" onClick={() => handleItemClick(item)}>
 
-                        <h3 className="text-md font-semibold text-text-primary">
+                        <h3 className="text-[10px] md:text-[16px] font-semibold text-text-primary">
                           {item.name}
                         </h3>
 
+
                         {item.description && (
-                          <p className="text-xs text-text-secondary line-clamp-1">
+                          <p className="text-[8px] md:text-[13px] text-text-secondary line-clamp-1">
                             {item.description}
                           </p>
                         )}
