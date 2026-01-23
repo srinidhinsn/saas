@@ -1,3 +1,4 @@
+
 import React, { useEffect, useState } from "react";
 import axios from 'axios';
 import { toast } from "react-toastify";
@@ -717,8 +718,12 @@ const OrderSummaryVisible = ({ clientId, token }) => {
         const processed = allOrders.map(order => {
           if (order.status === 'served') {
             clearNewItemsStorage(order.id);
-            return order;
+            return {
+              ...order,
+              _fixedOrderMode: order._fixedOrderMode ?? getInitialOrderMode(order)
+            };
           }
+          
 
           // read normalized storage items for this order
           const rawNewItems = getNewItemsFromStorage(order.id) || [];
@@ -855,10 +860,11 @@ const OrderSummaryVisible = ({ clientId, token }) => {
 
           return {
             ...order,
-            _derivedMode: deriveOrderMode(order),
+            _fixedOrderMode: order._fixedOrderMode ?? getInitialOrderMode(order),
             items: deduped,
             has_new_items: batchItemsMap.size > 0
           };
+          
         });
 
         setOrders(processed);
@@ -1242,11 +1248,16 @@ const OrderSummaryVisible = ({ clientId, token }) => {
   // Filter by order mode
   if (!selectedOrderModes.includes('all')) {
     filteredOrders = filteredOrders.filter(order =>
-      selectedOrderModes.includes(order._derivedMode)
+      selectedOrderModes.includes(order._fixedOrderMode)
     );
   }
 
-
+  const getInitialOrderMode = (order) => {
+    // takeaway is ONLY when table_id === 500 at creation
+    if (Number(order.table_id) === 500) return 'takeaway';
+    return 'dinein';
+  };
+  
 
   // Then filter by status
   switch (filterMode) {
@@ -1272,10 +1283,7 @@ const OrderSummaryVisible = ({ clientId, token }) => {
       break;
   }
 
-  const deriveOrderMode = (order) => {
-    if (Number(order.table_id) === 500) return 'takeaway';
-    return 'dinein';
-  };
+
 
   const handleGenerateBill = (order) => {
     navigate(`/saas/${clientId}/billing`, {
@@ -1404,8 +1412,8 @@ const OrderSummaryVisible = ({ clientId, token }) => {
                   <div className="bg-action-primary px-4 py-3 text-text-black rounded-t-2xl">
                     <div className="flex justify-between">
                       <span className="inline-flex items-center gap-1 px-2 py-1 rounded-full text-[10px] font-semibold bg-bg-primary text-text-secondary border border-border-default">
-                        {order._derivedMode === 'dinein' ? <Users size={10} /> : <Package size={10} />}
-                        {order._derivedMode === 'dinein' ? 'Dine In' : 'Takeaway'}
+                        {order._fixedOrderMode=== 'dinein' ? <Users size={10} /> : <Package size={10} />}
+                        {order._fixedOrderMode=== 'dinein' ? 'Dine In' : 'Takeaway'}
                       </span>
 
 
@@ -1422,7 +1430,7 @@ const OrderSummaryVisible = ({ clientId, token }) => {
 
                     <div className="flex items-center justify-between mt-2 gap-2">
                       <h3 className="text-lg font-bold text-text-white truncate">
-                        {order._derivedMode === 'takeaway'
+                        {order._fixedOrderMode  === 'takeaway'
                           ? order.customer_name || 'Take Away'
                           : tablesMap[order.table_id] || order.table || order.table_id}
                       </h3>
