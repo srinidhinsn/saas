@@ -4,7 +4,7 @@ import axios from 'axios';
 import CategoryTree from '../InventoryServices/CategoryTree';
 import ImagePreview from '../../utils/ImagePreview';
 import { Eye, Lock } from 'lucide-react';
-import { TbExchange } from "react-icons/tb";
+
 const TABLE_STATUS_CONFIG = {
   vacant: {
     clickable: true,
@@ -178,7 +178,7 @@ const TableReservation = ({
                   </span>
                 </div>
 
-                <div className="grid gap-4 grid-cols-2 sm:grid-cols-4 md:grid-cols-5 lg:grid-cols-6 xl:grid-cols-10">
+                <div className="grid gap-6 grid-cols-2 sm:grid-cols-4 md:grid-cols-5 lg:grid-cols-6 xl:grid-cols-5">
                   {filteredTables
                     .filter(t => t.location_zone === zone && t.section === section)
                     .map(table => {
@@ -199,17 +199,17 @@ const TableReservation = ({
                           className="rounded-xl overflow-hidden border shadow-sm hover:shadow-md transition cursor-pointer bg-white"
                         >
                           {/* ===== HEADER ===== */}
-                          <div className="px-3 py-2 bg-action-primary text-white">
-                            <div className="flex items-center justify-between">
+                          <div className="flex justify-between px-3 py-2 bg-action-primary text-white">
+                            
                               {/* TABLE NUMBER */}
-                              <span className="font-bold text-sm tracking-wide">
+                              <span className="font-bold text-xl tracking-wide">
                                 {table.table_number}
                               </span>
 
                               {/* ORDER STATUS */}
                               {statusKey === 'occupied' && orderInfo && (
                                 <span
-                                  className={`text-[10px] px-2 py-0.5 rounded-full font-semibold
+                                  className={`text-xl px-2 py-0.5 rounded-full font-semibold
                                   ${orderInfo.status === 'pending' ? 'bg-orange-100 text-orange-700' :
                                       orderInfo.status === 'preparing' ? 'bg-blue-100 text-blue-700' :
                                         'bg-green-100 text-green-700'}
@@ -218,12 +218,12 @@ const TableReservation = ({
                                   {orderInfo.status?.toUpperCase()}
                                 </span>
                               )}
-                            </div>
+                           
 
                             {/* ORDER ID */}
                             {statusKey === 'occupied' && orderInfo && (
-                              <div className="text-[11px] opacity-90 mt-1">
-                                Order #{orderInfo.id}
+                              <div className="text-xl opacity-90 mt-1">
+                                #{orderInfo.id}
                               </div>
                             )}
                           </div>
@@ -236,23 +236,6 @@ const TableReservation = ({
                             {statusKey === 'occupied' && <Eye size={28} className="text-blue-600" />}
                             {statusKey === 'reserved' && <Lock size={28} className="text-yellow-600" />}
                           </div>
-
-                          {/* ORDER MODE
-                            {statusKey === 'occupied' && orderInfo && (
-                              <div className="flex justify-center text-xs text-gray-700 mb-2 gap-1 items-center">
-                                {orderInfo.order_mode === 'takeaway' ? (
-                                  <>
-                                    <Package size={12} />
-                                    Takeaway
-                                  </>
-                                ) : (
-                                  <>
-                                    <Users size={12} />
-                                    Dine In
-                                  </>
-                                )}
-                              </div>
-                            )} */}
 
                           {/* ===== FOOTER (TABLE STATUS – UNCHANGED COLORS) ===== */}
                           <div
@@ -1190,6 +1173,42 @@ const TakeOrder = ({ clientId, token, onOrderUpdate, realm }) => {
     orderMode === 'takeaway'
       ? tables.find(t => t.id === 500)?.table_number || 'Takeaway'
       : tables.find(t => t.id.toString() === selectedTable)?.table_number;
+
+
+  // const handleStatusChange = async (orderId, newStatus) => {
+  //   const order = orders.find(o => o.id === orderId);
+  //   if (!order || order.status === 'served') return;
+  //   const tableObj = tables.find(t => t.id === order.table_id);
+  //   try {
+  //     await axios.post(`${import.meta.env.VITE_API_ORDER_SERVICE_URL}/${clientId}/dinein/update`, { id: orderId, client_id: clientId, status: newStatus }, { headers: { Authorization: `Bearer ${token}` } });
+  //     if (tableObj) {
+  //       await axios.post(`${import.meta.env.VITE_API_TABLE_SERVICE_URL}/${clientId}/tables/update`, {
+  //         id: order.table_id,
+  //         client_id: clientId,
+  //         name: tableObj.name,
+  //         table_type: tableObj.table_type,
+  //         status: 'Vacant',
+  //         location_zone: tableObj.location_zone
+  //       }, { headers: { Authorization: `Bearer ${token}` } });
+  //     }
+  //     toast.success('Order status updated');
+  //     setOrders(prev => prev.map(o => o.id === orderId ? {
+  //       ...o,
+  //       status: newStatus,
+  //       has_new_items: newStatus === 'served' ? false : o.has_new_items
+  //     } : o));
+  //     if (selectedOrder?.id === orderId) {
+  //       setSelectedOrder(prev => ({
+  //         ...prev,
+  //         status: newStatus,
+  //         has_new_items: newStatus === 'served' ? false : prev.has_new_items
+  //       }));
+  //     }
+  //     if (newStatus === 'served') setEditOrderId(null);
+  //   } catch (err) {
+  //     toast.error('❌ Failed to update order status.');
+  //   }
+  // };
 
   // ============ JSX RETURN ============
   return (
