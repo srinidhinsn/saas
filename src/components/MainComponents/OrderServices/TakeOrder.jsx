@@ -40,7 +40,6 @@ const TABLE_STATUS_CONFIG = {
 
 
 
-
 const TableReservation = ({
   tables = [],
   orderMode = "dinein",
@@ -516,12 +515,8 @@ const TakeOrder = ({ clientId, token, onOrderUpdate, realm }) => {
 
       tableList.forEach(table => {
         if (table.status?.toLowerCase() === 'occupied') {
-          // ✅ KEEP served orders — only ignore cancelled ones
           const tableOrder = allOrders
-            .filter(o =>
-              o.table_id === table.id &&
-              o.status?.toLowerCase() !== 'cancelled'
-            )
+            .filter(o => o.table_id === table.id && o.status?.toLowerCase() !== 'served')
             .sort((a, b) => new Date(b.created_at) - new Date(a.created_at))[0];
 
           if (tableOrder) {
@@ -540,7 +535,6 @@ const TakeOrder = ({ clientId, token, onOrderUpdate, realm }) => {
       console.error("Failed to fetch table orders:", err);
     }
   };
-
 
   useEffect(() => {
     setIsOrderFormOpen(showCart);
@@ -832,7 +826,6 @@ const TakeOrder = ({ clientId, token, onOrderUpdate, realm }) => {
 
   const clearDraftForOrder = (orderId) => {
     if (!orderId) return;
-
     Object.keys(localStorage).forEach(key => {
       if (
         key.startsWith(`order_${orderId}_new_item_`) ||
