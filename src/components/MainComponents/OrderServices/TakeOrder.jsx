@@ -3,7 +3,8 @@ import { ShoppingCart, Plus, Minus, X, Check, StickyNote, Search, Users, Package
 import axios from 'axios';
 import CategoryTree from '../InventoryServices/CategoryTree';
 import ImagePreview from '../../utils/ImagePreview';
-import { Eye, Lock } from 'lucide-react';
+import { Eye, Lock, Printer } from 'lucide-react';
+import { useNavigate } from 'react-router-dom';
 
 const TABLE_STATUS_CONFIG = {
   vacant: {
@@ -39,6 +40,7 @@ const TABLE_STATUS_CONFIG = {
 
 
 
+
 const TableReservation = ({
   tables = [],
   orderMode = "dinein",
@@ -47,6 +49,8 @@ const TableReservation = ({
   onSelectDineIn,
   onViewOrder,
   tableOrders = {},
+  // handleStatusChange
+  onPrintBill
 }) => {
   const [selectedSections, setSelectedSections] = useState([]);
   const [selectedZones, setSelectedZones] = useState([]);
@@ -189,18 +193,21 @@ const TableReservation = ({
                       return (
                         <div
                           key={table.id}
-                          onClick={() => {
-                            if (config.clickable) {
-                              onSelectTable(table);
-                            } else if (statusKey === 'occupied' && onViewOrder) {
-                              onViewOrder(table);
-                            }
-                          }}
-                          className="rounded-xl overflow-hidden border shadow-sm hover:shadow-md transition cursor-pointer bg-white"
+                          className="rounded-xl overflow-hidden border shadow-sm hover:shadow-md transition bg-white"
                         >
                           {/* ===== HEADER ===== */}
-                          <div className="flex justify-between px-3 py-2 bg-action-primary text-white">
-                            
+                          <div
+                            onClick={() => {
+                              if (config.clickable) {
+                                onSelectTable(table);
+                              } else if (statusKey === 'occupied' && onViewOrder) {
+                                onViewOrder(table);
+                              }
+                            }}
+                            className={`${config.clickable || statusKey === 'occupied' ? 'cursor-pointer' : ''}`}
+                          >
+                            <div className="flex justify-between px-3 py-2 bg-action-primary text-white">
+
                               {/* TABLE NUMBER */}
                               <span className="font-bold text-xl tracking-wide">
                                 {table.table_number}
@@ -210,42 +217,89 @@ const TableReservation = ({
                               {statusKey === 'occupied' && orderInfo && (
                                 <span
                                   className={`text-xl px-2 py-0.5 rounded-full font-semibold
-                                  ${orderInfo.status === 'pending' ? 'bg-orange-100 text-orange-700' :
+                                    ${orderInfo.status === 'pending' ? 'bg-orange-100 text-orange-700' :
                                       orderInfo.status === 'preparing' ? 'bg-blue-100 text-blue-700' :
                                         'bg-green-100 text-green-700'}
-                                `}
+                                  `}
                                 >
                                   {orderInfo.status?.toUpperCase()}
                                 </span>
                               )}
-                           
 
-                            {/* ORDER ID */}
-                            {statusKey === 'occupied' && orderInfo && (
-                              <div className="text-xl opacity-90 mt-1">
-                                #{orderInfo.id}
-                              </div>
-                            )}
+
+                              {/* ORDER ID */}
+                              {statusKey === 'occupied' && orderInfo && (
+                                <div className="text-xl opacity-90 mt-1">
+                                  #{orderInfo.id}
+                                </div>
+                              )}
+                            </div>
+
+                            {/* ===== BODY ===== */}
+                            {/* {statusKey === 'occupied' && orderInfo && (
+                                orderInfo.status?.toLowerCase() === 'served' ? (
+                                  <Printer
+                                    size={28}
+                                    className="text-green-600 cursor-pointer"
+                                    onClick={(e) => {
+                                      e.stopPropagation();
+                                      navigate(`/billing/${orderInfo.id}`);
+                                    }}
+                                  />
+                                ) : (
+                                  <Eye size={28} className="text-blue-600" />
+                                )
+                              )} */}
+                            {/* ICON */}
+                            <div className=" flex  justify-between p-6 ">
+                              {statusKey === 'vacant' && <span className="text-2xl">-</span>}
+                              {statusKey === 'occupied' && <Eye size={28} className="text-blue-600" />}
+                              {/* MARK AS SERVED BUTTON - FIXED */}
+                              {statusKey === 'occupied' && orderInfo && (
+                                <button
+                                  onClick={(e) => {
+                                    e.stopPropagation();
+                                    if (onPrintBill) {
+                                      onPrintBill(orderInfo.id, table.id);
+                                    }
+                                  }}
+                                  className='text-yellow-600'
+                                >
+                                  <Printer size={16} />
+                                </button>
+                              )}
+                              {statusKey === 'reserved' && <Lock size={28} className="text-yellow-600" />}
+                            </div>
+
+                            <div
+                              className={`py-2 text-center text-xs font-semibold border-t rounded
+                                ${statusKey === 'occupied' ? 'text-blue-600 bg-blue-50' :
+                                  statusKey === 'reserved' ? 'text-yellow-600 bg-yellow-50' :
+                                    'text-green-600 bg-green-50'}`}
+                            >
+                              {table.status?.toUpperCase()}
+                            </div>
                           </div>
 
-                          {/* ===== BODY ===== */}
-
-                          {/* ICON */}
-                          <div className="h-16 flex items-center justify-center ">
-                            {statusKey === 'vacant' && <span className="text-2xl">-</span>}
-                            {statusKey === 'occupied' && <Eye size={28} className="text-blue-600" />}
-                            {statusKey === 'reserved' && <Lock size={28} className="text-yellow-600" />}
-                          </div>
-
-                          {/* ===== FOOTER (TABLE STATUS – UNCHANGED COLORS) ===== */}
-                          <div
-                            className={`py-2 text-center text-xs font-semibold border-t rounded
-                              ${statusKey === 'occupied' ? 'text-blue-600 bg-blue-50' :
-                                statusKey === 'reserved' ? 'text-yellow-600 bg-yellow-50' :
-                                  'text-green-600 bg-green-50'}`}
-                          >
-                            {table.status?.toUpperCase()}
-                          </div>
+                          {/* MARK AS SERVED BUTTON - FIXED */}
+                          {/* {statusKey === 'occupied' && orderInfo && (
+                            <button
+                              onClick={async (e) => {
+                                e.stopPropagation();
+                                if (orderInfo.status === 'ready' && handleStatusChange) {
+                                  await handleStatusChange(orderInfo.id, 'served');
+                                }
+                              }}
+                              disabled={orderInfo.status !== 'ready'}
+                              className={`flex-1 px-4 py-2 rounded-lg text-sm font-semibold transition-all w-full
+                                ${orderInfo.status === 'ready'
+                                  ? 'bg-action-success text-text-white hover:opacity-90'
+                                  : 'bg-gray-300 text-gray-500 cursor-not-allowed'
+                                }`}
+                            >
+                              Mark as Served
+                            </button>
+                          )} */}
 
                         </div>
 
@@ -257,7 +311,6 @@ const TableReservation = ({
           </div>
         );
       })}
-
 
       {/* TAKEAWAY INFO */}
       {orderMode === "takeaway" && (
@@ -382,6 +435,7 @@ const TakeOrder = ({ clientId, token, onOrderUpdate, realm }) => {
   const [isOrderFormOpen, setIsOrderFormOpen] = useState(false);
   const [tableOrders, setTableOrders] = useState({});
 
+  const navigate = useNavigate();
   // ============ UTILITY FUNCTIONS ============
   const flattenCategoryTree = (tree, level = 0, parentId = null) => {
     let flatList = [];
@@ -462,8 +516,12 @@ const TakeOrder = ({ clientId, token, onOrderUpdate, realm }) => {
 
       tableList.forEach(table => {
         if (table.status?.toLowerCase() === 'occupied') {
+          // ✅ KEEP served orders — only ignore cancelled ones
           const tableOrder = allOrders
-            .filter(o => o.table_id === table.id && o.status?.toLowerCase() !== 'served')
+            .filter(o =>
+              o.table_id === table.id &&
+              o.status?.toLowerCase() !== 'cancelled'
+            )
             .sort((a, b) => new Date(b.created_at) - new Date(a.created_at))[0];
 
           if (tableOrder) {
@@ -482,6 +540,7 @@ const TakeOrder = ({ clientId, token, onOrderUpdate, realm }) => {
       console.error("Failed to fetch table orders:", err);
     }
   };
+
 
   useEffect(() => {
     setIsOrderFormOpen(showCart);
@@ -773,7 +832,7 @@ const TakeOrder = ({ clientId, token, onOrderUpdate, realm }) => {
 
   const clearDraftForOrder = (orderId) => {
     if (!orderId) return;
-  
+
     Object.keys(localStorage).forEach(key => {
       if (
         key.startsWith(`order_${orderId}_new_item_`) ||
@@ -1210,6 +1269,52 @@ const TakeOrder = ({ clientId, token, onOrderUpdate, realm }) => {
   //   }
   // };
 
+
+  // const handleStatusChange = async (orderId, newStatus) => {
+  //   try {
+  //     // Find the table that has this order
+  //     const tableId = Object.keys(tableOrders).find(
+  //       key => tableOrders[key].id === orderId
+  //     );
+
+  //     if (!tableId) {
+  //       console.error('Order not found in tableOrders');
+  //       alert('Order not found');
+  //       return;
+  //     }
+
+  //     // ✅ ONLY update order status
+  //     await axios.post(
+  //       `${import.meta.env.VITE_API_ORDER_SERVICE_URL}/${clientId}/dinein/update`,
+  //       {
+  //         id: orderId,
+  //         client_id: clientId,
+  //         status: newStatus
+  //       },
+  //       { headers: { Authorization: `Bearer ${token}` } }
+  //     );
+
+  //     // 🔁 Refresh data so UI updates
+  //     await fetchTables();
+
+  //     console.log('✅ Order status updated to:', newStatus);
+
+  //   } catch (err) {
+  //     console.error('❌ Failed to update order status:', err);
+  //     alert('Failed to update order status. Please try again.');
+  //   }
+  // };
+
+
+  
+
+// Add this handler function
+const handlePrintBill = (orderId, tableId) => {
+  // Navigate to billing page with the order ID
+  navigate(`/saas/${clientId}/billing?orderId=${orderId}`);
+};
+
+
   // ============ JSX RETURN ============
   return (
     <div className="bg-bg-primary p-0 h-[calc(100vh-4rem)] overflow-x-hidden overflow-y-auto">
@@ -1222,6 +1327,8 @@ const TakeOrder = ({ clientId, token, onOrderUpdate, realm }) => {
           onViewOrder={handleViewOrder}
           orderMode={orderMode}
           tableOrders={tableOrders}
+        // handleStatusChange={handleStatusChange}
+        onPrintBill={handlePrintBill}
         />
       )}
 

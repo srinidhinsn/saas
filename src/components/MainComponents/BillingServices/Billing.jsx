@@ -50,10 +50,10 @@ export default function BillingPage({ clientId, token }) {
           axios.get(`${import.meta.env.VITE_API_TABLE_SERVICE_URL}/${clientId}/tables/read`, { headers: { Authorization: `Bearer ${token}` } }),
           axios.get(`${import.meta.env.VITE_API_INVENTORY_SERVICE_URL}/${clientId}/inventory/read`, { headers: { Authorization: `Bearer ${token}` } }),
         ]);
-        const servedOrders = (ordersRes.data?.data || []).filter(
-          (o) => o.status?.toLowerCase() === "served" && new Date(o.created_at).toDateString() === new Date().toDateString()
+        const todayOrders = (ordersRes.data?.data || []).filter(
+          (o) => new Date(o.created_at).toDateString() === new Date().toDateString()
         );
-        setOrders(servedOrders);
+        setOrders(todayOrders);
         const tMap = {};
         (tablesRes.data?.data || []).forEach((t) => (tMap[t.id] = t));
         setTablesMap(tMap);
@@ -112,7 +112,7 @@ export default function BillingPage({ clientId, token }) {
       fetchUniqueCustomers();
     }
   }, [clientId, token]);
-  
+
   const orderSubtotal = Number(
     (selectedOrder?.items || []).reduce(
       (sum, item) =>
@@ -437,9 +437,9 @@ export default function BillingPage({ clientId, token }) {
       // setTimeout(() => {
       //   navigate(`/saas/${clientId}/orders`);
       // }, 1000);
-      
+
       return draftId;
-      } catch (err) {
+    } catch (err) {
       console.error(err);
       toast.error("Failed to save invoice draft");
       throw err;
@@ -690,7 +690,7 @@ export default function BillingPage({ clientId, token }) {
 
   const renderInvoiceContent = () => (
     <div className="flex flex-col h-full bg-bg-primary">
-      
+
       {/* Header with Order Info */}
       <div className="bg-action-primary px-4 py-3 shadow-lg flex-shrink-0">
         <div className="flex justify-between items-center">
@@ -703,7 +703,7 @@ export default function BillingPage({ clientId, token }) {
               <p className="text-text-white/80 text-xs">Invoice #{documentNumber || "Draft"}</p>
             </div>
           </div>
-          
+
           <div className="flex items-center gap-6">
             <div className="text-right">
               <div className="text-xs text-text-white/80">Table: {tablesMap[selectedOrder.table_id]?.name}</div>
@@ -862,11 +862,10 @@ export default function BillingPage({ clientId, token }) {
                       <button
                         key={statusOption}
                         type="button"
-                        className={`px-3 py-1.5 rounded-lg text-xs font-semibold transition-all ${
-                          paymentStatus === statusOption
+                        className={`px-3 py-1.5 rounded-lg text-xs font-semibold transition-all ${paymentStatus === statusOption
                             ? "bg-action-primary text-text-white shadow-md"
                             : "bg-gray-100 text-gray-700 hover:bg-gray-200"
-                        }`}
+                          }`}
                         onClick={() => setPaymentStatus(statusOption)}
                       >
                         {statusOption}
@@ -995,7 +994,7 @@ export default function BillingPage({ clientId, token }) {
   return (
     <div className="min-h-screen bg-gradient-to-br from-slate-100 via-gray-50 to-slate-100 p-4">
       <div className="max-w-8xl mx-auto">
-        
+
         {/* Header */}
         <div className="bg-action-primary rounded-2xl shadow-xl px-6 py-4 mb-4">
           <div className="flex items-center justify-between">
