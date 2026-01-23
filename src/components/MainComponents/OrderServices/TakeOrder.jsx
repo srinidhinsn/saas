@@ -927,37 +927,55 @@ const TakeOrder = ({ clientId, token, onOrderUpdate, realm }) => {
     ));
   };
 
-  const removeFromCart = (itemId, uniqueKey = null) => {
-    setHasNewItems(true);
+ const removeFromCart = (itemId, uniqueKey = null) => {
+  setHasNewItems(true);
 
-    if (uniqueKey) {
-      // Remove specific instance by unique key
-      setCart(cart.filter(i => i.frontend_unique_key !== uniqueKey));
-    } else {
-      // Remove by ID (for items without unique keys)
-      setCart(cart.filter(i => i.id !== itemId));
-    }
-  };
+  if (uniqueKey && activeOrderId) {
+    // 🔥 REMOVE FROM localStorage
+    localStorage.removeItem(`order_${activeOrderId}_new_item_${uniqueKey}`);
+
+    setCart(prev =>
+      prev.filter(i => i.frontend_unique_key !== uniqueKey)
+    );
+  } else {
+    setCart(prev => prev.filter(i => i.id !== itemId));
+  }
+};
+
 
   const updateQuantity = (itemId, change, uniqueKey = null) => {
-    setHasNewItems(true);
+  setHasNewItems(true);
 
-    setCart(cart
+  setCart(prev =>
+    prev
       .map(item => {
-        // Match by unique key if provided, otherwise by ID
         const isMatch = uniqueKey
           ? item.frontend_unique_key === uniqueKey
           : item.id === itemId && !item.frontend_unique_key;
 
-        if (isMatch) {
-          const qty = item.quantity + change;
-          return qty > 0 ? { ...item, quantity: qty } : null;
+        if (!isMatch) return item;
+
+        const qty = item.quantity + change;
+        if (qty <= 0) return null;
+
+        // 🔥 UPDATE localStorage quantity
+        if (uniqueKey && activeOrderId) {
+          const key = `order_${activeOrderId}_new_item_${uniqueKey}`;
+          const stored = JSON.parse(localStorage.getItem(key));
+          if (stored) {
+            localStorage.setItem(
+              key,
+              JSON.stringify({ ...stored, quantity: qty })
+            );
+          }
         }
-        return item;
+
+        return { ...item, quantity: qty };
       })
       .filter(Boolean)
-    );
-  };
+  );
+};
+
 
   const getTotalPrice = () => {
     return cart.reduce((total, item) =>
@@ -1133,6 +1151,8 @@ const TakeOrder = ({ clientId, token, onOrderUpdate, realm }) => {
       )[0];
 
       setActiveOrderId(activeOrder.id);
+      setCurrentBatchTimestamp(null);
+setHasNewItems(false);
       setHasNewItems(false);
       setCurrentBatchTimestamp(null);
 
