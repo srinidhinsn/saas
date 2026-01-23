@@ -242,16 +242,6 @@ const MenuCategoryTree = ({
     }
     return null;
   };
-  useEffect(() => {
-    if (!draggedItem || !dragOverItem) return;
-  
-    // regenerate slug AFTER categories update
-    updateSlugsRecursively(dragOverItem.id);
-  
-    // cleanup
-    setDraggedItem(null);
-    setDragOverItem(null);
-  }, [categories]); // 👈 CRITICAL
   
   const handleCategoryReorder = async (draggedCat, targetCat, position) => {
     const draggedParentId = findParentIdFromTree(categories, draggedCat.id);
@@ -286,17 +276,17 @@ const MenuCategoryTree = ({
       newSubs.splice(position === "above" ? idx : idx + 1, 0, draggedCat.id);
     }
   
-    // 1️⃣ update backend structure
+    // update backend
     await updateCategorySubcategories(draggedParentId, oldSubs);
+  
     if (draggedParentId !== targetParentId) {
       await updateCategorySubcategories(targetParentId, newSubs);
     }
-  
-    // refresh categories
-    await onCategoriesUpdate?.();
-  
+
+
+    // refresh UI tree
+    onCategoriesUpdate?.();
   };
-  
 
   // const generateCategoryIdFromName = (name) => {
   //   const now = new Date();
@@ -334,7 +324,27 @@ const MenuCategoryTree = ({
     }
   }, [categories, defaultOpenCategoryName]);
 
-
+  useEffect(() => {
+    if (!categories || categories.length === 0) return;
+  
+    let cancelled = false;
+  
+    const regenerate = async () => {
+      for (const root of categories) {
+        if (root.id !== "all") {
+          if (cancelled) return;
+          await updateSlugsRecursively(root.id);
+        }
+      }
+    };
+  
+    regenerate();
+  
+    return () => {
+      cancelled = true;
+    };
+  }, [JSON.stringify(categories)]);
+  
 
   const normalizeSlugPart = (name) => {
     return name

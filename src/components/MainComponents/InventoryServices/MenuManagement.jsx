@@ -117,6 +117,11 @@ const MenuManagement = ({ clientId, token, realm }) => {
     return parts.filter(Boolean).join('_'); // e.g. Dietery_Non_Veg_Gravies_Mutton_Gravy
   };
 
+  const handleItemClick = (item) => {
+    setEditingItem(item);
+    setShowEditModal(true);
+  };
+
   const flattenCategoryTree = (tree, level = 0, parentId = null) => {
     let flatList = [];
     tree.forEach(category => {
@@ -147,6 +152,13 @@ const MenuManagement = ({ clientId, token, realm }) => {
     );
 
     return match ? match.id : null;
+  };
+
+  const getSelectedCategoryName = () => {
+    if (!selectedCategory) return null;
+    if (typeof selectedCategory === 'string') return selectedCategory;
+    if (typeof selectedCategory === 'object') return selectedCategory.name;
+    return null;
   };
 
 
@@ -282,7 +294,8 @@ const MenuManagement = ({ clientId, token, realm }) => {
       // ✅ EXPLICITLY remove dietary_type
       const { dietary_type, ...cleanEditingItem } = editingItem;
 
-      const payload = {id: Number(editingItem.id),
+      const payload = {
+        id: Number(editingItem.id),
         ...cleanEditingItem,
         code: editingItem.code ? String(editingItem.code).trim() : null,
         client_id: clientId,
@@ -362,9 +375,10 @@ const MenuManagement = ({ clientId, token, realm }) => {
         const cat = flatCategories.find(c => c.id === item.category_id);
         return {
           ...item,
-          category: cat ? cat.name : "Uncategorized"
+          category: cat?.name ?? "Uncategorized"
         };
       });
+
 
       setMenuItems(enrichedItems);
 
@@ -419,11 +433,11 @@ const MenuManagement = ({ clientId, token, realm }) => {
       setCategories(categoryTree);
 
     } catch (error) {
-      console.error('Error fetching data:', error);
+      console.error('Error fetching data:', error); console.error('Error details:', error.response?.data);
     } finally {
       if (!silent) setLoading(false);
     }
-  }, [clientId, token]);
+  }, [clientId, token, realm]);
 
   useEffect(() => {
     fetchData();
@@ -462,55 +476,56 @@ const MenuManagement = ({ clientId, token, realm }) => {
   };
 
   const getFilteredItems = () => {
-    const q = (searchQuery || '').trim().toLowerCase();
+    if (!menuItems.length) {
+      return [];
+    }
 
+    const q = (searchQuery || '').trim().toLowerCase();
     let items = menuItems;
 
-    // 🔍 Search
+    // Search filter
     if (q.length > 0) {
       items = items.filter(item => {
         const name = (item.name || '').toLowerCase();
         const category = (item.category || '').toLowerCase();
         const code = String(item.code || '').toLowerCase();
-        return name.includes(q) || category.includes(q) || code.includes(q);
+        return (
+          name.includes(q) ||
+          category.includes(q) ||
+          code.includes(q)
+        );
       });
+      console.log('After search filter:', items.length);
     }
 
-    // 📂 Category - hierarchical filtering
-    if (selectedCategory && selectedCategory !== 'All Categories') {
-      // Get all descendant categories
-      const allowedCategories = getAllDescendantCategories(selectedCategory, categories);
+    const selectedCategoryName = getSelectedCategoryName();
+
+    // Skip filtering for All Categories
+    if (!selectedCategoryName || selectedCategoryName === 'All Categories') {
+      return items;
+    }
+
+    // ✅ ADDED: Only filter if categories are loaded
+    if (categories.length > 0 && categoriesFlat.length > 0) {
+      const allowedCategories = getAllDescendantCategories(
+        selectedCategoryName,
+        categories
+      );
+
+      console.log('allowedCategories:', allowedCategories);
+      console.log('Sample item categories:', items.slice(0, 3).map(i => i.category));
 
       items = items.filter(item =>
         allowedCategories.includes(item.category)
       );
+
+      console.log('After category filter:', items.length);
     }
 
-
-
+    console.log('🏁 Final items count:', items.length);
     return items;
   };
 
-  // Add these functions after your existing handleDrag, handleDrop, etc.
-  const handleEditDrag = (e) => {
-    e.preventDefault();
-    e.stopPropagation();
-    if (e.type === "dragenter" || e.type === "dragover") {
-      setDragActive(true);
-    } else if (e.type === "dragleave") {
-      setDragActive(false);
-    }
-  };
-
-  const handleEditDrop = (e) => {
-    e.preventDefault();
-    e.stopPropagation();
-    setDragActive(false);
-
-    if (e.dataTransfer.files && e.dataTransfer.files[0]) {
-      handleEditImageFile(e.dataTransfer.files[0]);
-    }
-  };
 
   const handleEditImageFile = (file) => {
     if (file && file.type.startsWith('image/')) {
@@ -561,25 +576,6 @@ const MenuManagement = ({ clientId, token, realm }) => {
     }
   };
 
-  const handleDrag = (e) => {
-    e.preventDefault();
-    e.stopPropagation();
-    if (e.type === "dragenter" || e.type === "dragover") {
-      setDragActive(true);
-    } else if (e.type === "dragleave") {
-      setDragActive(false);
-    }
-  };
-
-  const handleDrop = (e) => {
-    e.preventDefault();
-    e.stopPropagation();
-    setDragActive(false);
-
-    if (e.dataTransfer.files && e.dataTransfer.files[0]) {
-      handleImageFile(e.dataTransfer.files[0]);
-    }
-  };
 
   const handleImageFile = (file) => {
     if (file && file.type.startsWith('image/')) {
@@ -864,7 +860,6 @@ const MenuManagement = ({ clientId, token, realm }) => {
 
             const categoryId = getCategoryIdByName(row.Category);
 
-
             if (!categoryId) throw new Error("Invalid category");
 
             const payload = {
@@ -909,12 +904,22 @@ const MenuManagement = ({ clientId, token, realm }) => {
           }
         }
 
-        // 🔄 REFRESH
+        // 🔄 REFRESH - FIXED VERSION
         const itemRes = await axios.get(
           `${import.meta.env.VITE_API_INVENTORY_SERVICE_URL}/${clientId}/menu/read?realm=${realm}`,
           { headers: { Authorization: `Bearer ${token}` } }
         );
-        setMenuItems(itemRes.data.data);
+
+        // ✅ ENRICH items with category names (same as fetchData)
+        const enrichedItems = (itemRes.data.data || []).map(item => {
+          const cat = categoriesFlat.find(c => c.id === item.category_id);
+          return {
+            ...item,
+            category: cat?.name ?? "Uncategorized"
+          };
+        });
+
+        setMenuItems(enrichedItems);
 
         // 📊 RESULT
         alert(
@@ -973,7 +978,6 @@ const MenuManagement = ({ clientId, token, realm }) => {
   //     </div>
   //   );
   // }
-
   return (
     <div className="h-[90vh] bg-bg-primary overflow-x-hidden">
       <div className="mx-auto p-2">
@@ -1001,7 +1005,7 @@ const MenuManagement = ({ clientId, token, realm }) => {
             <div className="mb-4 grid gap-3 grid-cols-1 md:grid-cols-2 lg:grid-cols-3 flex-shrink-0">
               <div className="lg:col-span-1 space-y-2">
                 <h2 className="text-xl lg:text-2xl font-semibold text-text-primary">
-                  {selectedCategory}
+                  {getSelectedCategoryName() || 'All Categories'}
                   <span className="text-sm ml-2 text-text-primary">
                     ({filteredItems.length} items)
                   </span>
