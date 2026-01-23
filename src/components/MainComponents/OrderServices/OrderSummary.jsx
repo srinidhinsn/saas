@@ -1477,7 +1477,7 @@ const OrderSummaryVisible = ({ clientId, token }) => {
                   <div className="sticky bottom-0 bg-white border-t border-gray-200 px-4 py-3 space-y-3">
                     {/* Existing buttons */}
                     <div className="flex items-center gap-3">
-                      <button
+                      {/* <button
                         onClick={() => {
                           setSelectedOrder(order);
                           setEditOrderId(order.id);
@@ -1487,13 +1487,12 @@ const OrderSummaryVisible = ({ clientId, token }) => {
                         className="flex-1 px-4 py-2 rounded-lg bg-action-primary text-text-white text-sm font-semibold"
                       >
                         Edit Order
-                      </button>
+                      </button> */}
 
                       <button
                         onClick={() => status === 'ready' && handleStatusChange(order.id, 'served')}
                         disabled={status !== 'ready'}
-                        className={`flex-1 px-4 py-2 rounded-lg text-sm font-semibold transition-all
-    ${status === 'ready'
+                        className={`flex-1 px-4 py-2 rounded-lg text-sm font-semibold transition-all ${status === 'ready'
                             ? 'bg-action-success text-text-white hover:opacity-90'
                             : 'bg-gray-300 text-gray-500 cursor-not-allowed'
                           }`}
