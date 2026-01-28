@@ -13,6 +13,9 @@ import UserManagement from '../MainComponents/UserServices/UserManagement/UserMa
 import UserProfile from '../MainComponents/UserServices/ProfileManagement/UserProfile';
 import {getValidToken} from '../utils/Interceptors/Api'
 import InventoryManager from '../MainComponents/InventoryServices/InventoryManagement'
+import CounterManagement from '../V1_Components/CounterServices/CounterManagement';
+import TakeOrder_V1 from '../V1_Components/OrderServices/TakeOrder_V1';
+import Summary_V1 from '../V1_Components/OrderServices/Summary_V1';
 
 const RoutesManager = () => {
   const { clientId } = useParams();
@@ -96,6 +99,18 @@ const RoutesManager = () => {
       <Route
         path="inventory"
         element={<InventoryManager clientId={clientId} token={token} realm={realm} screenIds={screenIds} />}
+      />
+       <Route
+        path="counter-manage"
+        element={<CounterManagement clientId={clientId} token={token} realm={realm} screenIds={screenIds} />}
+      />
+       <Route
+        path="order-manage"
+        element={<TakeOrder_V1 clientId={clientId} token={token} realm={realm} screenIds={screenIds} />}
+      />
+        <Route
+        path="summary-manage"
+        element={<Summary_V1 clientId={clientId} token={token} realm={realm} screenIds={screenIds} />}
       />
       <Route path="*" element={<Navigate to="home" replace />} />
       <Route path='user-profile'  element={<UserProfile token={token} clientId={clientId}/>} />
