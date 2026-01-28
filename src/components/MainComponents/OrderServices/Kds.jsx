@@ -390,6 +390,7 @@ const KitchenDisplay = () => {
 
 
     const handleItemStatusChange = async (orderId, itemBackendId, newStatus) => {
+        
         try {
             const orderIdInt = parseInt(orderId, 10);
             const order = orders.find(o => o.id === orderIdInt);
@@ -432,6 +433,9 @@ const KitchenDisplay = () => {
                 },
                 { headers: { Authorization: `Bearer ${token}` } }
             );
+if (derivedStatus === "ready") {
+  clearNewItemsStorage(orderId);
+}
 
             // 📣 DISPATCH EVENT ONLY WHEN ALL ITEMS ARE SERVED
             if (derivedStatus === "ready" && order.status !== "ready") {
