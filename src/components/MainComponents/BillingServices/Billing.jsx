@@ -1,16 +1,19 @@
 import React, { useEffect, useState, useRef } from "react";
 import axios from "axios";
-import { useNavigate } from "react-router-dom";
+import { useNavigate, useSearchParams } from "react-router-dom";
 import { toast } from "react-toastify";
 import jsPDF from "jspdf";
 import CustomerAutocomplete from './CustomerAutocomplete';
+import { Search, Calendar, Eye, X, Save, Printer } from 'lucide-react';
 
 
 export default function BillingPage({ clientId, token }) {
   const invoiceRef = useRef(null);
   const navigate = useNavigate();
+  const [searchParams] = useSearchParams();
 
   const [orders, setOrders] = useState([]);
+  const [filteredOrders, setFilteredOrders] = useState([]);
   const [tablesMap, setTablesMap] = useState({});
   const [inventoryMap, setInventoryMap] = useState({});
   const [selectedOrder, setSelectedOrder] = useState(null);
@@ -34,6 +37,10 @@ export default function BillingPage({ clientId, token }) {
   const [customersList, setCustomersList] = useState([]);
   const [gstManuallyEdited, setGstManuallyEdited] = useState(false);
 
+  // New state for filters
+  const [searchQuery, setSearchQuery] = useState("");
+  const [dateFilter, setDateFilter] = useState(new Date().toISOString().split('T')[0]);
+
   const safeNum = (num) => (typeof num === "number" && !isNaN(num) ? num : 0);
 
   const updateBalance = (sumOfPayments) => {
@@ -50,13 +57,14 @@ export default function BillingPage({ clientId, token }) {
           axios.get(`${import.meta.env.VITE_API_TABLE_SERVICE_URL}/${clientId}/tables/read`, { headers: { Authorization: `Bearer ${token}` } }),
           axios.get(`${import.meta.env.VITE_API_INVENTORY_SERVICE_URL}/${clientId}/inventory/read`, { headers: { Authorization: `Bearer ${token}` } }),
         ]);
-        const todayOrders = (ordersRes.data?.data || []).filter(
-          (o) => new Date(o.created_at).toDateString() === new Date().toDateString()
-        );
-        setOrders(todayOrders);
+        
+        const allOrders = ordersRes.data?.data || [];
+        setOrders(allOrders);
+        
         const tMap = {};
         (tablesRes.data?.data || []).forEach((t) => (tMap[t.id] = t));
         setTablesMap(tMap);
+        
         const iMap = {};
         (invRes.data?.data || []).forEach((i) => (iMap[i.id] = i));
         setInventoryMap(iMap);
@@ -68,6 +76,31 @@ export default function BillingPage({ clientId, token }) {
     }
     fetchAll();
   }, [clientId, token]);
+
+  // Filter orders based on search and date
+  useEffect(() => {
+    let filtered = [...orders];
+
+    // Date filter
+    if (dateFilter) {
+      filtered = filtered.filter(order => {
+        const orderDate = new Date(order.created_at).toISOString().split('T')[0];
+        return orderDate === dateFilter;
+      });
+    }
+
+    // Search filter
+    if (searchQuery.trim()) {
+      const query = searchQuery.toLowerCase();
+      filtered = filtered.filter(order => {
+        const tableName = (tablesMap[order.table_id]?.name || '').toLowerCase();
+        const orderId = order.id.toString();
+        return tableName.includes(query) || orderId.includes(query);
+      });
+    }
+
+    setFilteredOrders(filtered);
+  }, [searchQuery, dateFilter, orders, tablesMap]);
 
   const fetchUniqueCustomers = async () => {
     try {
@@ -106,12 +139,25 @@ export default function BillingPage({ clientId, token }) {
     }
   };
 
-
   useEffect(() => {
     if (clientId && token) {
       fetchUniqueCustomers();
     }
   }, [clientId, token]);
+
+  // Auto-open invoice when orderId is in URL params
+  useEffect(() => {
+    const orderIdFromUrl = searchParams.get('orderId');
+    
+    if (orderIdFromUrl && orders.length > 0 && !selectedOrder && !loading) {
+      const matchingOrder = orders.find(order => order.id.toString() === orderIdFromUrl.toString());
+      if (matchingOrder) {
+        handleSelectOrder(matchingOrder);
+      } else {
+        toast.info(`Order #${orderIdFromUrl} not found`);
+      }
+    }
+  }, [orders, selectedOrder, loading, searchParams]);
 
   const orderSubtotal = Number(
     (selectedOrder?.items || []).reduce(
@@ -433,15 +479,32 @@ export default function BillingPage({ clientId, token }) {
         { headers: { Authorization: `Bearer ${token}` } }
       );
 
-      toast.success("Invoice draft saved!");
-      // setTimeout(() => {
-      //   navigate(`/saas/${clientId}/orders`);
-      // }, 1000);
+      // Update table status to vacant after saving invoice
+      if (selectedOrder.table_id) {
+        try {
+          const tableData = tablesMap[selectedOrder.table_id];
+          await axios.post(
+            `${import.meta.env.VITE_API_TABLE_SERVICE_URL}/${clientId}/tables/update`,
+            {
+              id: selectedOrder.table_id,
+              client_id: clientId,
+              name: tableData?.name || `Table ${selectedOrder.table_id}`,
+              table_type: tableData?.table_type || "Regular",
+              status: 'Vacant',
+              location_zone: tableData?.location_zone || "Main"
+            },
+            { headers: { Authorization: `Bearer ${token}` } }
+          );
+        } catch (tableErr) {
+          console.error("Failed to update table status:", tableErr.response?.data || tableErr.message);
+        }
+      }
 
+      toast.success("Invoice saved successfully!");
       return draftId;
     } catch (err) {
       console.error(err);
-      toast.error("Failed to save invoice draft");
+      toast.error("Failed to save invoice");
       throw err;
     } finally {
       setSaving(false);
@@ -470,7 +533,7 @@ export default function BillingPage({ clientId, token }) {
           }));
         }
       } catch {
-        toast.error("Please save invoice draft before printing.");
+        toast.error("Please save invoice before printing.");
         return;
       }
     }
@@ -488,7 +551,7 @@ export default function BillingPage({ clientId, token }) {
         setStatus("Issued");
       } catch (err) {
         console.error("Invoice issue error: ", err);
-        toast.error("Failed to generate invoice number before print.");
+        toast.error("Failed to generate invoice number");
         return;
       }
     }
@@ -582,8 +645,8 @@ export default function BillingPage({ clientId, token }) {
 
         doc.text(item.name || "Unnamed", 45, y);
         doc.text(`${item.quantity || 0}`, pageWidth - 260, y);
-        doc.text(`Rs.${(item.unit_price ?? 0).toFixed(2)}`, pageWidth - 180, y);
-        doc.text(`Rs.${((item.unit_price ?? 0) * (item.quantity ?? 0)).toFixed(2)}`, pageWidth - 80, y);
+        doc.text(`₹${(item.unit_price ?? 0).toFixed(2)}`, pageWidth - 180, y);
+        doc.text(`₹${((item.unit_price ?? 0) * (item.quantity ?? 0)).toFixed(2)}`, pageWidth - 80, y);
         y += 20;
       });
 
@@ -596,17 +659,17 @@ export default function BillingPage({ clientId, token }) {
       doc.setFont("helvetica", "normal");
       doc.setFontSize(10);
       doc.text("Subtotal:", pageWidth - 200, y);
-      doc.text(`Rs.${orderSubtotal.toFixed(2)}`, pageWidth - 80, y, { align: "right" });
+      doc.text(`₹${orderSubtotal.toFixed(2)}`, pageWidth - 80, y, { align: "right" });
       y += 18;
 
       doc.text("Discount:", pageWidth - 200, y);
       doc.setTextColor(239, 68, 68);
-      doc.text(`-Rs.${calculatedDiscount.toFixed(2)}`, pageWidth - 80, y, { align: "right" });
+      doc.text(`-₹${calculatedDiscount.toFixed(2)}`, pageWidth - 80, y, { align: "right" });
       y += 18;
 
       doc.setTextColor(0, 0, 0);
       doc.text(`GST (${taxPercent}%):`, pageWidth - 200, y);
-      doc.text(`Rs.${calculatedGST.toFixed(2)}`, pageWidth - 80, y, { align: "right" });
+      doc.text(`₹${calculatedGST.toFixed(2)}`, pageWidth - 80, y, { align: "right" });
       y += 25;
 
       doc.setFillColor(239, 246, 255);
@@ -615,7 +678,7 @@ export default function BillingPage({ clientId, token }) {
       doc.setFontSize(14);
       doc.setTextColor(59, 130, 246);
       doc.text("TOTAL:", pageWidth - 200, y);
-      doc.text(`Rs.${total.toFixed(2)}`, pageWidth - 80, y, { align: "right" });
+      doc.text(`₹${total.toFixed(2)}`, pageWidth - 80, y, { align: "right" });
 
       y += 40;
 
@@ -631,7 +694,7 @@ export default function BillingPage({ clientId, token }) {
       if (splitPaymentEnabled && paymentSplits.length > 1) {
         paymentSplits.forEach((split, idx) => {
           doc.text(`${idx + 1}. ${split.method}:`, 45, y);
-          doc.text(`Rs.${Number(split.amount).toFixed(2)}`, 200, y);
+          doc.text(`₹${Number(split.amount).toFixed(2)}`, 200, y);
           y += 15;
         });
       } else {
@@ -660,87 +723,64 @@ export default function BillingPage({ clientId, token }) {
       toast.success("Invoice PDF downloaded successfully!");
     } catch (err) {
       console.error("Error generating PDF:", err);
-      toast.error("Failed to generate invoice PDF.");
+      toast.error("Failed to generate invoice PDF");
     }
-
-    setSaving(false);
   };
-
-  useEffect(() => {
-    async function fetchPaidInvoices() {
-      try {
-        const res = await axios.get(
-          `${import.meta.env.VITE_API_BILLING_SERVICE_URL}/${clientId}/invoice/read_document`,
-          {
-            headers: { Authorization: `Bearer ${token}` },
-            params: { client_id: clientId }
-          }
-        );
-        const today = (new Date()).toISOString().slice(0, 10);
-        const paid = (res.data?.data || []).filter(
-          inv => inv.payment_status?.toLowerCase() === "paid" && (inv.document_date || "").slice(0, 10) === today
-        );
-        setPaidInvoices(paid);
-      } catch (err) {
-        setPaidInvoices([]);
-      }
-    }
-    fetchPaidInvoices();
-  }, [clientId, token, selectedOrder]);
 
   const renderInvoiceContent = () => (
     <div className="flex flex-col h-full bg-bg-primary">
-
-      {/* Header with Order Info */}
-      <div className="bg-action-primary px-4 py-3 shadow-lg flex-shrink-0">
-        <div className="flex justify-between items-center">
+      {/* Header */}
+      <div className="bg-action-primary px-6 py-4 shadow-lg flex-shrink-0 rounded-t-2xl">
+        <div className="flex flex-col md:flex-row justify-between items-start md:items-center gap-4">
           <div className="flex items-center gap-3">
-            <div className="w-10 h-10 bg-white/20 backdrop-blur-md rounded-xl flex items-center justify-center text-text-white font-bold text-lg shadow-md border border-white/30">
+            <div className="w-12 h-12 bg-white/20 backdrop-blur-md rounded-xl flex items-center justify-center text-text-white font-bold text-xl shadow-md border border-white/30">
               {clientId.charAt(0).toUpperCase()}
             </div>
             <div>
-              <h1 className="text-xl font-bold text-text-white">{clientId.toUpperCase()}</h1>
-              <p className="text-text-white/80 text-xs">Invoice #{documentNumber || "Draft"}</p>
+              <h1 className="text-2xl font-bold text-text-white">{clientId.toUpperCase()}</h1>
+              <p className="text-text-white/80 text-sm">Invoice #{documentNumber || "Draft"}</p>
             </div>
           </div>
 
-          <div className="flex items-center gap-6">
-            <div className="text-right">
-              <div className="text-xs text-text-white/80">Table: {tablesMap[selectedOrder.table_id]?.name}</div>
-              <div className="text-xs text-text-white/80">Order #{selectedOrder.id} • {selectedOrder.mode}</div>
+          <div className="flex flex-col md:flex-row items-start md:items-center gap-4">
+            <div className="text-text-white">
+              <div className="text-sm font-medium">Table: {tablesMap[selectedOrder.table_id]?.name}</div>
+              <div className="text-xs text-text-white/80">Order #{selectedOrder.id}</div>
             </div>
-            <div className="text-right text-text-white">
-              <div className="text-xs font-medium">{new Date().toLocaleDateString()}</div>
+            <div className="text-text-white">
+              <div className="text-sm font-medium">{new Date().toLocaleDateString()}</div>
               <div className="text-xs text-text-white/80">{new Date().toLocaleTimeString([], { hour: "2-digit", minute: "2-digit" })}</div>
             </div>
           </div>
         </div>
       </div>
 
-      {/* Scrollable Content */}
-      <div className="flex-1 overflow-y-auto p-4">
-        <div className="grid grid-cols-1 lg:grid-cols-12 gap-4">
-
-          {/* LEFT - Items */}
-          <div className="lg:col-span-7">
-            <div className="bg-bg-primary rounded-xl shadow-md border border-gray-200">
-              <div className="px-4 py-2 bg-gray-50 border-b border-gray-200 rounded-t-xl">
-                <h2 className="text-sm font-bold text-text-black">Order Items</h2>
+      {/* Content */}
+      <div className="flex-1 overflow-y-auto p-6">
+        <div className="grid grid-cols-1 xl:grid-cols-3 gap-6">
+          
+          {/* LEFT - Items (2/3 width on xl) */}
+          <div className="xl:col-span-2 space-y-6">
+            <div className="bg-bg-primary rounded-xl shadow-lg border border-border-default">
+              <div className="px-5 py-3 bg-bg-tertiary border-b border-border-default rounded-t-xl">
+                <h2 className="text-base font-bold text-text-primary flex items-center gap-2">
+                  📦 Order Items
+                </h2>
               </div>
 
-              <div className="p-3 space-y-2 max-h-80 overflow-y-auto">
+              <div className="p-4 space-y-2 max-h-96 overflow-y-auto">
                 {selectedOrder.items.map((item, idx) => (
-                  <div key={idx} className="flex justify-between items-start py-2 px-3 rounded-lg border border-gray-100 hover:border-action-primary hover:bg-indigo-50/50 transition-all">
+                  <div key={idx} className="flex justify-between items-center py-3 px-4 rounded-lg bg-bg-tertiary border border-border-default hover:border-action-primary transition-all">
                     <div className="flex-1">
-                      <div className="font-semibold text-text-black text-sm">{item.name}</div>
-                      <div className="text-xs text-gray-500 mt-1 flex items-center gap-2">
-                        <span className="inline-flex items-center px-2 py-0.5 rounded-md bg-gray-100 text-gray-700 font-medium">
+                      <div className="font-semibold text-text-primary">{item.name}</div>
+                      <div className="text-sm text-text-secondary mt-1 flex items-center gap-2">
+                        <span className="inline-flex items-center px-2 py-0.5 rounded-md bg-bg-primary text-text-primary font-medium text-xs">
                           {item.quantity}x
                         </span>
                         <span>@ ₹{item.unit_price?.toFixed(2)}</span>
                       </div>
                     </div>
-                    <div className="font-bold text-text-black">
+                    <div className="font-bold text-text-primary text-lg">
                       ₹{((item.unit_price || 0) * (item.quantity || 0)).toFixed(2)}
                     </div>
                   </div>
@@ -748,23 +788,23 @@ export default function BillingPage({ clientId, token }) {
               </div>
 
               {/* Totals */}
-              <div className="border-t border-gray-200 bg-gray-50 px-4 py-3 rounded-b-xl">
-                <div className="space-y-2 text-sm">
-                  <div className="flex justify-between text-gray-600">
+              <div className="border-t border-border-default bg-bg-tertiary px-5 py-4 rounded-b-xl">
+                <div className="space-y-2">
+                  <div className="flex justify-between text-text-secondary">
                     <span>Subtotal</span>
                     <span className="font-semibold">₹{orderSubtotal.toFixed(2)}</span>
                   </div>
-                  <div className="flex justify-between text-red-600">
+                  <div className="flex justify-between text-action-danger">
                     <span>Discount</span>
                     <span className="font-semibold">-₹{calculatedDiscount.toFixed(2)}</span>
                   </div>
-                  <div className="flex justify-between text-gray-600">
+                  <div className="flex justify-between text-text-secondary">
                     <span>GST ({taxPercent}%)</span>
                     <span className="font-semibold">₹{calculatedGST.toFixed(2)}</span>
                   </div>
-                  <div className="pt-2 border-t border-gray-300 flex justify-between items-center">
-                    <span className="text-base font-bold text-text-black">TOTAL</span>
-                    <span className="text-lg font-bold text-action-primary">
+                  <div className="pt-3 border-t border-border-default flex justify-between items-center">
+                    <span className="text-lg font-bold text-text-primary">TOTAL</span>
+                    <span className="text-2xl font-bold text-action-primary">
                       ₹{calculatedTotal.toFixed(2)}
                     </span>
                   </div>
@@ -773,15 +813,17 @@ export default function BillingPage({ clientId, token }) {
             </div>
           </div>
 
-          {/* RIGHT - Customer & Payment */}
-          <div className="lg:col-span-5 space-y-4">
+          {/* RIGHT - Customer & Settings (1/3 width on xl) */}
+          <div className="space-y-6">
 
             {/* Customer Details */}
-            <div className="bg-bg-primary rounded-xl shadow-md border border-gray-200">
-              <div className="px-4 py-2 bg-gray-50 border-b border-gray-200 rounded-t-xl">
-                <h3 className="text-sm font-bold text-text-black">👤 Customer</h3>
+            <div className="bg-bg-primary rounded-xl shadow-lg border border-border-default">
+              <div className="px-5 py-3 bg-bg-tertiary border-b border-border-default rounded-t-xl">
+                <h3 className="text-base font-bold text-text-primary flex items-center gap-2">
+                  👤 Customer
+                </h3>
               </div>
-              <div className="p-3 space-y-2">
+              <div className="p-4 space-y-3">
                 <CustomerAutocomplete
                   value={selectedOrder.customer_id || ""}
                   onChange={(val) => setSelectedOrder((p) => ({ ...p, customer_id: val }))}
@@ -797,13 +839,13 @@ export default function BillingPage({ clientId, token }) {
                   placeholder="Walk-in / Customer ID"
                 />
                 <input
-                  className="w-full border border-gray-300 rounded-lg px-3 py-2 text-sm focus:ring-2 focus:ring-action-primary focus:border-action-primary transition-all"
+                  className="w-full border border-border-default rounded-lg px-3 py-2 text-sm bg-bg-primary text-text-primary focus:ring-2 focus:ring-action-primary focus:border-action-primary transition-all"
                   placeholder="📞 Phone"
                   value={selectedOrder.contact_phone || ""}
                   onChange={(e) => setSelectedOrder((p) => ({ ...p, contact_phone: e.target.value }))}
                 />
                 <input
-                  className="w-full border border-gray-300 rounded-lg px-3 py-2 text-sm focus:ring-2 focus:ring-action-primary focus:border-action-primary transition-all"
+                  className="w-full border border-border-default rounded-lg px-3 py-2 text-sm bg-bg-primary text-text-primary focus:ring-2 focus:ring-action-primary focus:border-action-primary transition-all"
                   placeholder="📧 Email"
                   value={selectedOrder.contact_email || ""}
                   onChange={(e) => setSelectedOrder((p) => ({ ...p, contact_email: e.target.value }))}
@@ -812,19 +854,21 @@ export default function BillingPage({ clientId, token }) {
             </div>
 
             {/* Tax & Discount */}
-            <div className="bg-bg-primary rounded-xl shadow-md border border-gray-200">
-              <div className="px-4 py-2 bg-gray-50 border-b border-gray-200 rounded-t-xl">
-                <h3 className="text-sm font-bold text-text-black">⚙️ Tax & Discount</h3>
+            <div className="bg-bg-primary rounded-xl shadow-lg border border-border-default">
+              <div className="px-5 py-3 bg-bg-tertiary border-b border-border-default rounded-t-xl">
+                <h3 className="text-base font-bold text-text-primary flex items-center gap-2">
+                  ⚙️ Tax & Discount
+                </h3>
               </div>
-              <div className="p-3 space-y-3">
+              <div className="p-4 space-y-3">
                 <div className="grid grid-cols-3 gap-2">
                   <div>
-                    <label className="text-xs font-semibold text-gray-700 mb-1 block">GST (%)</label>
+                    <label className="text-xs font-semibold text-text-secondary mb-1 block">GST (%)</label>
                     <input
                       type="number"
                       value={taxPercent}
                       min="0"
-                      className="w-full border border-gray-300 rounded-lg px-2 py-1.5 text-sm focus:ring-2 focus:ring-action-primary"
+                      className="w-full border border-border-default rounded-lg px-2 py-2 text-sm bg-bg-primary text-text-primary focus:ring-2 focus:ring-action-primary"
                       onChange={(e) => {
                         setTaxPercent(Number(e.target.value));
                         setGstManuallyEdited(true);
@@ -832,21 +876,21 @@ export default function BillingPage({ clientId, token }) {
                     />
                   </div>
                   <div>
-                    <label className="text-xs font-semibold text-gray-700 mb-1 block">Discount</label>
+                    <label className="text-xs font-semibold text-text-secondary mb-1 block">Discount</label>
                     <input
                       type="number"
                       value={discount}
                       min="0"
-                      className="w-full border border-gray-300 rounded-lg px-2 py-1.5 text-sm focus:ring-2 focus:ring-action-primary"
+                      className="w-full border border-border-default rounded-lg px-2 py-2 text-sm bg-bg-primary text-text-primary focus:ring-2 focus:ring-action-primary"
                       onChange={(e) => setDiscount(Number(e.target.value))}
                     />
                   </div>
                   <div>
-                    <label className="text-xs font-semibold text-gray-700 mb-1 block">Type</label>
+                    <label className="text-xs font-semibold text-text-secondary mb-1 block">Type</label>
                     <select
                       value={discountIsPercent ? "percent" : "fixed"}
                       onChange={(e) => setDiscountIsPercent(e.target.value === "percent")}
-                      className="w-full border border-gray-300 rounded-lg px-2 py-1.5 text-sm focus:ring-2 focus:ring-action-primary bg-bg-primary"
+                      className="w-full border border-border-default rounded-lg px-2 py-2 text-sm bg-bg-primary text-text-primary focus:ring-2 focus:ring-action-primary"
                     >
                       <option value="percent">%</option>
                       <option value="fixed">₹</option>
@@ -856,16 +900,17 @@ export default function BillingPage({ clientId, token }) {
 
                 {/* Payment Status */}
                 <div>
-                  <label className="text-xs font-semibold text-gray-700 mb-1.5 block">Payment Status</label>
+                  <label className="text-xs font-semibold text-text-secondary mb-2 block">Payment Status</label>
                   <div className="flex gap-2 flex-wrap">
                     {["Pending", "Paid", "Partial", "Due"].map((statusOption) => (
                       <button
                         key={statusOption}
                         type="button"
-                        className={`px-3 py-1.5 rounded-lg text-xs font-semibold transition-all ${paymentStatus === statusOption
+                        className={`px-3 py-1.5 rounded-lg text-xs font-semibold transition-all ${
+                          paymentStatus === statusOption
                             ? "bg-action-primary text-text-white shadow-md"
-                            : "bg-gray-100 text-gray-700 hover:bg-gray-200"
-                          }`}
+                            : "bg-bg-tertiary text-text-secondary hover:bg-bg-secondary border border-border-default"
+                        }`}
                         onClick={() => setPaymentStatus(statusOption)}
                       >
                         {statusOption}
@@ -877,9 +922,11 @@ export default function BillingPage({ clientId, token }) {
             </div>
 
             {/* Payment Method */}
-            <div className="bg-bg-primary rounded-xl shadow-md border border-gray-200">
-              <div className="px-4 py-2 bg-gray-50 border-b border-gray-200 rounded-t-xl flex items-center justify-between">
-                <h3 className="text-sm font-bold text-text-black">💳 Payment</h3>
+            <div className="bg-bg-primary rounded-xl shadow-lg border border-border-default">
+              <div className="px-5 py-3 bg-bg-tertiary border-b border-border-default rounded-t-xl flex items-center justify-between">
+                <h3 className="text-base font-bold text-text-primary flex items-center gap-2">
+                  💳 Payment
+                </h3>
                 <label className="flex items-center gap-2 cursor-pointer">
                   <input
                     type="checkbox"
@@ -892,15 +939,15 @@ export default function BillingPage({ clientId, token }) {
                       else setPaymentSplits([{ method, amount: total }]);
                     }}
                   />
-                  <span className="text-xs font-medium text-gray-600">Split</span>
+                  <span className="text-xs font-medium text-text-secondary">Split</span>
                 </label>
               </div>
 
-              <div className="p-3">
+              <div className="p-4">
                 {splitPaymentEnabled ? (
                   <div className="space-y-2">
                     {paymentSplits.map((split, idx) => (
-                      <div key={idx} className="flex gap-2 items-center p-2 rounded-lg bg-gray-50 border border-gray-200">
+                      <div key={idx} className="flex gap-2 items-center p-2 rounded-lg bg-bg-tertiary border border-border-default">
                         <select
                           value={split.method}
                           onChange={(e) => {
@@ -908,7 +955,7 @@ export default function BillingPage({ clientId, token }) {
                             newSplits[idx].method = e.target.value;
                             setPaymentSplits(newSplits);
                           }}
-                          className="flex-1 border border-gray-300 rounded-lg px-2 py-1.5 text-sm focus:ring-2 focus:ring-action-primary bg-bg-primary"
+                          className="flex-1 border border-border-default rounded-lg px-2 py-1.5 text-sm bg-bg-primary text-text-primary focus:ring-2 focus:ring-action-primary"
                         >
                           <option>Cash</option>
                           <option>UPI</option>
@@ -922,22 +969,22 @@ export default function BillingPage({ clientId, token }) {
                           value={split.amount}
                           onChange={(e) => updateSplitAmount(idx, e.target.value)}
                           onBlur={() => onSplitAmountBlur()}
-                          className="w-24 border border-gray-300 rounded-lg px-2 py-1.5 text-sm focus:ring-2 focus:ring-action-primary"
+                          className="w-24 border border-border-default rounded-lg px-2 py-1.5 text-sm bg-bg-primary text-text-primary focus:ring-2 focus:ring-action-primary"
                         />
                         <button
                           type="button"
                           onClick={() => removeSplitRow(idx)}
-                          className="text-red-600 hover:bg-red-50 font-bold px-2 py-1 rounded-lg"
+                          className="text-action-danger hover:bg-red-50 font-bold px-2 py-1 rounded-lg"
                           disabled={paymentSplits.length === 1}
                         >
-                          ×
+                          <X size={16} />
                         </button>
                       </div>
                     ))}
                     <button
                       type="button"
                       onClick={addSplitRow}
-                      className="w-full bg-action-primary hover:bg-action-primary/90 text-text-white px-3 py-2 rounded-lg text-sm font-semibold transition-all"
+                      className="w-full bg-action-primary hover:bg-action-primary/90 text-text-white px-3 py-2 rounded-lg text-sm font-semibold transition-all flex items-center justify-center gap-2"
                     >
                       + Add Payment
                     </button>
@@ -950,7 +997,7 @@ export default function BillingPage({ clientId, token }) {
                         setMethod(e.target.value);
                         setPaymentSplits([{ method: e.target.value, amount: total }]);
                       }}
-                      className="flex-1 border border-gray-300 rounded-lg px-3 py-2 text-sm focus:ring-2 focus:ring-action-primary bg-bg-primary"
+                      className="flex-1 border border-border-default rounded-lg px-3 py-2 text-sm bg-bg-primary text-text-primary focus:ring-2 focus:ring-action-primary"
                     >
                       <option>Cash</option>
                       <option>UPI</option>
@@ -961,7 +1008,7 @@ export default function BillingPage({ clientId, token }) {
                       type="number"
                       value={total}
                       readOnly
-                      className="w-28 border border-gray-300 rounded-lg px-3 py-2 bg-gray-50 text-sm font-semibold text-right"
+                      className="w-28 border border-border-default rounded-lg px-3 py-2 bg-bg-tertiary text-sm font-semibold text-right text-text-primary"
                     />
                   </div>
                 )}
@@ -973,15 +1020,17 @@ export default function BillingPage({ clientId, token }) {
               <button
                 onClick={saveInvoiceDraft}
                 disabled={saving}
-                className="flex-1 bg-action-primary hover:bg-action-primary/90 text-text-white px-4 py-2.5 rounded-xl font-bold shadow-lg transition-all disabled:opacity-50"
+                className="flex-1 bg-action-primary hover:bg-action-primary/90 text-text-white px-4 py-3 rounded-xl font-bold shadow-lg transition-all disabled:opacity-50 flex items-center justify-center gap-2"
               >
-                {saving ? "Saving..." : "💾 Save"}
+                <Save size={18} />
+                {saving ? "Saving..." : "Save"}
               </button>
               <button
                 onClick={printInvoice}
-                className="flex-1 bg-bg-primary border-2 border-action-primary hover:border-action-primary hover:bg-indigo-50 text-gray-700 px-4 py-2.5 rounded-xl font-bold transition-all shadow-md"
+                className="flex-1 bg-bg-primary border-2 border-action-primary hover:bg-action-primary/10 text-text-primary px-4 py-3 rounded-xl font-bold transition-all shadow-md flex items-center justify-center gap-2"
               >
-                📄 Print
+                <Printer size={18} />
+                Print
               </button>
             </div>
 
@@ -992,85 +1041,134 @@ export default function BillingPage({ clientId, token }) {
   );
 
   return (
-    <div className="min-h-screen bg-gradient-to-br from-slate-100 via-gray-50 to-slate-100 p-4">
-      <div className="max-w-8xl mx-auto">
+    <div className="min-h-screen bg-bg-primary p-4 md:p-6">
+      <div className="max-w-[1800px] mx-auto">
 
         {/* Header */}
-        <div className="bg-action-primary rounded-2xl shadow-xl px-6 py-4 mb-4">
-          <div className="flex items-center justify-between">
+        <div className="bg-action-primary rounded-2xl shadow-xl px-6 py-5 mb-6">
+          <div className="flex flex-col md:flex-row items-start md:items-center justify-between gap-4">
             <div className="flex items-center gap-3">
-              <div className="w-12 h-12 bg-white/20 backdrop-blur-md rounded-xl flex items-center justify-center text-text-white font-bold text-xl shadow-md border border-white/30">
+              <div className="w-14 h-14 bg-white/20 backdrop-blur-md rounded-xl flex items-center justify-center text-text-white font-bold text-2xl shadow-md border border-white/30">
                 {clientId.charAt(0).toUpperCase()}
               </div>
               <div>
-                <h1 className="text-2xl font-bold text-text-white">{clientId.toUpperCase()}</h1>
-                <p className="text-text-white/80 text-sm">Today's Orders</p>
+                <h1 className="text-2xl md:text-3xl font-bold text-text-white">{clientId.toUpperCase()}</h1>
+                <div className="text-lg font-bold text-text-white/80">{filteredOrders.length} orders found</div>
+              </div>
+            </div>
+            <div className="flex-1">
+              <div className="relative">
+                <Search className="absolute left-3 top-1/2 -translate-y-1/2 text-text-secondary" size={20} />
+                <input
+                  type="text"
+                  placeholder="Search by table name or order ID..."
+                  value={searchQuery}
+                  onChange={(e) => setSearchQuery(e.target.value)}
+                  className="w-full pl-10 pr-4 py-2.5 border border-border-default rounded-lg bg-bg-primary text-text-primary placeholder-text-secondary focus:ring-2 focus:ring-action-primary focus:border-action-primary transition-all"
+                />
+              </div>
+            </div>
+            <div className="md:w-64">
+              <div className="relative">
+                <Calendar className="absolute left-3 top-1/2 -translate-y-1/2 text-text-secondary" size={20} />
+                <input
+                  type="date"
+                  value={dateFilter}
+                  onChange={(e) => setDateFilter(e.target.value)}
+                  className="w-full pl-10 pr-4 py-2.5 border border-border-default rounded-lg bg-bg-primary text-text-primary focus:ring-2 focus:ring-action-primary focus:border-action-primary transition-all"
+                />
               </div>
             </div>
             <div className="text-text-white text-right">
-              <div className="text-sm font-medium">{new Date().toLocaleDateString()}</div>
-              <div className="text-xs text-text-white/80">{orders.length} served orders</div>
+              
+              
             </div>
           </div>
         </div>
 
-        {/* Orders Grid */}
+        {/* Orders Table */}
         {loading ? (
           <div className="flex flex-col items-center justify-center py-20">
-            <div className="w-16 h-16 border-4 border-indigo-200 border-t-indigo-600 rounded-full animate-spin"></div>
-            <p className="text-gray-500 text-sm mt-4">Loading orders...</p>
+            <div className="w-16 h-16 border-4 border-action-primary/30 border-t-action-primary rounded-full animate-spin"></div>
+            <p className="text-text-secondary text-sm mt-4">Loading orders...</p>
           </div>
-        ) : orders.length === 0 ? (
-          <div className="flex flex-col items-center justify-center py-20 text-center bg-bg-primary rounded-2xl shadow-lg">
+        ) : filteredOrders.length === 0 ? (
+          <div className="flex flex-col items-center justify-center py-20 text-center bg-bg-primary rounded-2xl shadow-lg border border-border-default">
             <div className="text-7xl mb-4">📭</div>
-            <p className="text-xl font-bold text-text-black mb-2">No Orders Yet</p>
-            <p className="text-gray-500">No served orders for today</p>
+            <p className="text-xl font-bold text-text-primary mb-2">No Orders Found</p>
+            <p className="text-text-secondary">Try adjusting your filters or search query</p>
           </div>
         ) : (
-          <div className="grid grid-cols-1 sm:grid-cols-2 lg:grid-cols-3 xl:grid-cols-4 gap-4">
-            {orders.map((order) => {
-              const tableName = tablesMap[order.table_id]?.name || `Table ${order.table_id}`;
-              const orderTotal = Number(order.total_price ?? 0);
+          <div className="bg-bg-primary rounded-xl shadow-lg border border-border-default overflow-hidden">
+            <div className="overflow-x-auto">
+              <table className="w-full">
+                <thead className="bg-bg-tertiary border-b border-border-default">
+                  <tr>
+                    <th className="px-6 py-4 text-left text-xs font-bold text-text-primary uppercase tracking-wider">Order ID</th>
+                    <th className="px-6 py-4 text-left text-xs font-bold text-text-primary uppercase tracking-wider">Table</th>
+                    <th className="px-6 py-4 text-left text-xs font-bold text-text-primary uppercase tracking-wider">Items</th>
+                    <th className="px-6 py-4 text-left text-xs font-bold text-text-primary uppercase tracking-wider">Total</th>
+                    {/* <th className="px-6 py-4 text-left text-xs font-bold text-text-primary uppercase tracking-wider">Time</th> */}
+                    {/* <th className="px-6 py-4 text-left text-xs font-bold text-text-primary uppercase tracking-wider">Status</th> */}
+                    <th className="px-6 py-4 text-center text-xs font-bold text-text-primary uppercase tracking-wider">Action</th>
+                  </tr>
+                </thead>
+                <tbody className="divide-y divide-border-default">
+                  {filteredOrders.map((order, index) => {
+                    const tableName = tablesMap[order.table_id]?.name || `Table ${order.table_id}`;
+                    const orderTotal = Number(order.total_price ?? 0);
 
-              return (
-                <div
-                  key={order.id}
-                  onClick={() => handleSelectOrder(order)}
-                  className="bg-bg-primary rounded-xl shadow-md hover:shadow-xl border-2 border-gray-200 hover:border-action-primary p-4 cursor-pointer transition-all duration-200 hover:scale-105"
-                >
-                  <div className="flex justify-between items-start mb-3">
-                    <div>
-                      <h3 className="text-lg font-bold text-text-black">{tableName}</h3>
-                      <p className="text-xs text-gray-500">Order #{order.id}</p>
-                    </div>
-                    <div className="text-right">
-                      <div className="text-lg font-bold text-action-primary">₹{orderTotal.toFixed(2)}</div>
-                      <div className="text-xs text-gray-500">
-                        {new Date(order.created_at).toLocaleTimeString([], { hour: "2-digit", minute: "2-digit" })}
-                      </div>
-                    </div>
-                  </div>
-                  <div className="flex items-center justify-between pt-3 border-t border-gray-100">
-                    <span className="inline-flex items-center px-3 py-1 rounded-full text-xs font-medium bg-purple-100 text-purple-700">
-                      {order.mode || "Dine-In"}
-                    </span>
-                    <span className="text-gray-400 text-xs">{order.items?.length || 0} items</span>
-                  </div>
-                </div>
-              );
-            })}
+                    return (
+                      <tr 
+                        key={order.id} 
+                        className={`hover:bg-bg-tertiary  ? 'bg-bg-primary' : 'bg-bg-secondary'}`}
+                      >
+                        <td className="px-6 py-4 whitespace-nowrap">
+                          <div className="text-sm font-semibold text-text-primary">#{order.id}</div>
+                        </td>
+                        <td className="px-6 py-4 whitespace-nowrap">
+                          <div className="text-sm font-medium text-text-primary">{tableName}</div>
+                          <div className="text-xs text-text-secondary">{order.mode || "Dine-In"}</div>
+                        </td>
+                        <td className="px-6 py-4 whitespace-nowrap">
+                          <div className="text-sm text-text-primary">{order.items?.length || 0} items</div>
+                        </td>
+                        <td className="px-6 py-4 whitespace-nowrap">
+                          <div className="text-sm font-bold text-action-primary">₹{orderTotal.toFixed(2)}</div>
+                        </td>
+                        
+                        {/* <td className="px-6 py-4 whitespace-nowrap">
+                          <span className="inline-flex items-center px-2.5 py-1 rounded-full text-xs font-semibold bg-action-primary/10 text-action-primary">
+                            {order.status || "Served"}
+                          </span>
+                        </td> */}
+                        <td className="px-6 py-4 whitespace-nowrap text-center">
+                          <button
+                            onClick={() => handleSelectOrder(order)}
+                            className="inline-flex items-center gap-2 px-4 py-2 bg-action-primary hover:bg-action-primary/90 text-text-white rounded-lg font-semibold transition-all shadow-md hover:shadow-lg"
+                          >
+                            <Eye size={16} />
+                            View
+                          </button>
+                        </td>
+                      </tr>
+                    );
+                  })}
+                </tbody>
+              </table>
+            </div>
           </div>
         )}
 
         {/* Invoice Modal */}
         {invoiceModalOpen && selectedOrder && (
           <div className="fixed inset-0 bg-black/60 backdrop-blur-sm flex items-center justify-center z-50 p-4">
-            <div className="bg-bg-primary rounded-2xl shadow-2xl w-full max-w-7xl h-[90vh] flex flex-col relative">
+            <div className="bg-bg-primary rounded-2xl shadow-2xl w-full max-w-[1600px] h-[90vh] flex flex-col relative">
               <button
-                className="absolute top-4 right-4 z-10 text-gray-500 hover:text-gray-700 hover:bg-gray-100 text-2xl font-bold w-10 h-10 rounded-full flex items-center justify-center transition-all shadow-md bg-bg-primary"
+                className="absolute top-4 right-4 z-10 text-text-secondary hover:text-text-primary hover:bg-bg-tertiary text-2xl font-bold w-10 h-10 rounded-full flex items-center justify-center transition-all shadow-md bg-bg-primary border border-border-default"
                 onClick={() => setInvoiceModalOpen(false)}
               >
-                ×
+                <X size={24} />
               </button>
               {renderInvoiceContent()}
             </div>

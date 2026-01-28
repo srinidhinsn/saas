@@ -1,10 +1,11 @@
 import React, { useState, useEffect, useRef } from 'react';
-import { ShoppingCart, Plus, Minus, X, Check, StickyNote, Search, Users, Package } from 'lucide-react';
+import { ShoppingCart, Plus, Minus, X, Check, StickyNote, Search, Users, Package, Trash2 } from 'lucide-react';
 import axios from 'axios';
 import CategoryTree from '../InventoryServices/CategoryTree';
 import ImagePreview from '../../utils/ImagePreview';
 import { Eye, Lock, Printer } from 'lucide-react';
 import { useNavigate } from 'react-router-dom';
+import { toast } from 'react-toastify';
 
 const TABLE_STATUS_CONFIG = {
   vacant: {
@@ -27,7 +28,15 @@ const TABLE_STATUS_CONFIG = {
     border: 'border-action-primary',
     badge: 'bg-red-100 text-action-primary',
     icon: Eye,
-    viewable: true, // Add this flag
+    viewable: true,
+  },
+  served: {
+    clickable: false,
+    bg: 'bg-blue-50',
+    border: 'border-blue-400',
+    badge: 'bg-blue-100 text-blue-700',
+    icon: Eye,
+    viewable: true,
   },
   reserved: {
     clickable: false,
@@ -38,8 +47,6 @@ const TABLE_STATUS_CONFIG = {
   },
 };
 
-
-
 const TableReservation = ({
   tables = [],
   orderMode = "dinein",
@@ -48,8 +55,9 @@ const TableReservation = ({
   onSelectDineIn,
   onViewOrder,
   tableOrders = {},
-  // handleStatusChange
   onPrintBill,
+  onDeleteOrder,
+  onMarkAsServed,
 }) => {
   const [selectedSections, setSelectedSections] = useState([]);
   const [selectedZones, setSelectedZones] = useState([]);
@@ -188,6 +196,9 @@ const TableReservation = ({
                       const statusKey = table.status?.toLowerCase();
                       const config = TABLE_STATUS_CONFIG[statusKey] || TABLE_STATUS_CONFIG.vacant;
                       const orderInfo = tableOrders[table.id];
+                      
+                      // Check if table has viewable order (occupied or served status with order info)
+                      const hasViewableOrder = (statusKey === 'occupied' || statusKey === 'served') && orderInfo;
 
                       return (
                         <div
@@ -199,35 +210,35 @@ const TableReservation = ({
                             onClick={() => {
                               if (config.clickable) {
                                 onSelectTable(table);
-                              } else if (statusKey === 'occupied' && onViewOrder) {
+                              } else if (hasViewableOrder && onViewOrder) {
                                 onViewOrder(table);
                               }
                             }}
-                            className={`${config.clickable || statusKey === 'occupied' ? 'cursor-pointer' : ''}`}
+                            className={`${config.clickable || hasViewableOrder ? 'cursor-pointer' : ''}`}
                           >
                             <div className="flex justify-between px-3 py-2 bg-action-primary text-white">
-
                               {/* TABLE NUMBER */}
                               <span className="font-bold text-xl tracking-wide">
                                 {table.table_number}
                               </span>
 
                               {/* ORDER STATUS */}
-                              {statusKey === 'occupied' && orderInfo && (
+                              {hasViewableOrder && (
                                 <span
                                   className={`text-xl px-2 py-0.5 rounded-full font-semibold
                                     ${orderInfo.status === 'pending' ? 'bg-orange-100 text-orange-700' :
                                       orderInfo.status === 'preparing' ? 'bg-blue-100 text-blue-700' :
-                                        'bg-green-100 text-green-700'}
+                                        orderInfo.status === 'ready' ? 'bg-green-100 text-green-700' :
+                                          orderInfo.status === 'served' ? 'bg-purple-100 text-purple-700' :
+                                            'bg-gray-100 text-gray-700'}
                                   `}
                                 >
                                   {orderInfo.status?.toUpperCase()}
                                 </span>
                               )}
 
-
                               {/* ORDER ID */}
-                              {statusKey === 'occupied' && orderInfo && (
+                              {hasViewableOrder && (
                                 <div className="text-xl opacity-90 mt-1">
                                   #{orderInfo.id}
                                 </div>
@@ -235,74 +246,72 @@ const TableReservation = ({
                             </div>
 
                             {/* ===== BODY ===== */}
-                            {/* {statusKey === 'occupied' && orderInfo && (
-                                orderInfo.status?.toLowerCase() === 'served' ? (
-                                  <Printer
-                                    size={28}
-                                    className="text-green-600 cursor-pointer"
+                            <div className="p-6 flex items-center justify-between">
+                              {statusKey === 'vacant' && <span className="text-2xl">-</span>}
+                              {(statusKey === 'occupied' || statusKey === 'served') && <Eye size={28} className="text-blue-600" />}
+                              
+                              {/* ACTION BUTTONS FOR OCCUPIED/SERVED TABLES */}
+                              {hasViewableOrder && (
+                                <div className="flex gap-2">
+                                  {/* Print Bill Button */}
+                                  <button
                                     onClick={(e) => {
                                       e.stopPropagation();
-                                      navigate(`/billing/${orderInfo.id}`);
+                                      if (onPrintBill) {
+                                        onPrintBill(orderInfo.id, table.id);
+                                      }
                                     }}
-                                  />
-                                ) : (
-                                  <Eye size={28} className="text-blue-600" />
-                                )
-                              )} */}
-                            {/* ICON */}
-                            <div className="p-6 flex items-center justify-between ">
-                              {statusKey === 'vacant' && <span className="text-2xl">-</span>}
-                              {statusKey === 'occupied' && <Eye size={28} className="text-blue-600" />}
-                              {/* MARK AS SERVED BUTTON - FIXED */}
-                              {statusKey === 'occupied' && orderInfo && (
-                                <button
-                                  onClick={(e) => {
-                                    e.stopPropagation();
-                                    if (onPrintBill) {
-                                      onPrintBill(orderInfo.id, table.id);
-                                    }
-                                  }}
-                                  className="text-yellow-600 "
-                                >
-                                  <Printer size={16} />
-                                 
-                                </button>
+                                    className="text-yellow-600 hover:scale-110 transition-transform"
+                                    title="Print Bill"
+                                  >
+                                    <Printer size={16} />
+                                  </button>
+                                  
+                                  {/* Delete Order Button */}
+                                  <button
+                                    onClick={(e) => {
+                                      e.stopPropagation();
+                                      if (onDeleteOrder) {
+                                        onDeleteOrder(orderInfo.id, table.id);
+                                      }
+                                    }}
+                                    className="text-red-600 hover:scale-110 transition-transform"
+                                    title="Delete Order"
+                                  >
+                                    <Trash2 size={16} />
+                                  </button>
+                                </div>
                               )}
                               {statusKey === 'reserved' && <Lock size={28} className="text-yellow-600" />}
                             </div>
 
+                            {/* STATUS BADGE */}
                             <div
                               className={`py-2 text-center text-xs font-semibold border-t rounded
                                 ${statusKey === 'occupied' ? 'text-blue-600 bg-blue-50' :
-                                  statusKey === 'reserved' ? 'text-yellow-600 bg-yellow-50' :
-                                    'text-green-600 bg-green-50'}`}
+                                  statusKey === 'served' ? 'text-purple-600 bg-purple-50' :
+                                    statusKey === 'reserved' ? 'text-yellow-600 bg-yellow-50' :
+                                      'text-green-600 bg-green-50'}`}
                             >
                               {table.status?.toUpperCase()}
                             </div>
                           </div>
 
-                          {/* MARK AS SERVED BUTTON - FIXED */}
-                          {/* {statusKey === 'occupied' && orderInfo && (
+                          {/* MARK AS SERVED BUTTON */}
+                          {hasViewableOrder && orderInfo.status === 'ready' && (
                             <button
-                              onClick={async (e) => {
+                              onClick={(e) => {
                                 e.stopPropagation();
-                                if (orderInfo.status === 'ready' && handleStatusChange) {
-                                  await handleStatusChange(orderInfo.id, 'served');
+                                if (onMarkAsServed) {
+                                  onMarkAsServed(orderInfo.id, table.id);
                                 }
                               }}
-                              disabled={orderInfo.status !== 'ready'}
-                              className={`flex-1 px-4 py-2 rounded-lg text-sm font-semibold transition-all w-full
-                                ${orderInfo.status === 'ready'
-                                  ? 'bg-action-success text-text-white hover:opacity-90'
-                                  : 'bg-gray-300 text-gray-500 cursor-not-allowed'
-                                }`}
+                              className="w-full px-4 py-2 bg-green-600 text-white text-sm font-semibold hover:bg-green-700 transition-colors"
                             >
                               Mark as Served
                             </button>
-                          )} */}
-
+                          )}
                         </div>
-
                       );
                     })}
                 </div>
@@ -318,13 +327,9 @@ const TableReservation = ({
           Takeaway selected. Opening menu…
         </div>
       )}
-
     </div>
   );
 };
-
-
-
 
 const NoteModal = ({ isOpen, onClose, itemName }) => {
   if (!isOpen) return null;
@@ -354,7 +359,6 @@ const NoteModal = ({ isOpen, onClose, itemName }) => {
   );
 };
 
-// Line Items Modal Component
 const LineItemsModal = ({ isOpen, onClose, mainItem, lineItems, onAddWithLineItems, onAddMainOnly }) => {
   if (!isOpen) return null;
 
@@ -399,9 +403,45 @@ const LineItemsModal = ({ isOpen, onClose, mainItem, lineItems, onAddWithLineIte
   );
 };
 
-
-
-
+// Delete Confirmation Modal Component
+const DeleteConfirmModal = ({ isOpen, onClose, onConfirm }) => {
+  if (!isOpen) return null;
+  
+  return (
+    <div className="fixed inset-0 z-50 flex items-center justify-center p-4 bg-black/50">
+      <div className="rounded-lg w-full max-w-sm bg-white shadow-xl">
+        <div className="px-6 py-4 border-b flex justify-between items-center">
+          <h2 className="text-lg font-bold text-red-600">Delete Order</h2>
+          <button onClick={onClose} className="text-gray-500 hover:text-gray-700">
+            <X size={20} />
+          </button>
+        </div>
+        <div className="px-6 py-5">
+          <p className="text-sm text-gray-700">
+            Are you sure you want to delete this order? This action cannot be undone.
+          </p>
+        </div>
+        <div className="px-6 py-4 flex gap-3 bg-gray-50 rounded-b-lg">
+          <button
+            onClick={onClose}
+            className="flex-1 py-2.5 rounded-lg font-medium text-sm border border-gray-300 bg-white text-gray-700 hover:bg-gray-50"
+          >
+            Cancel
+          </button>
+          <button
+            onClick={() => {
+              onConfirm();
+              onClose();
+            }}
+            className="flex-1 py-2.5 rounded-lg bg-red-600 text-white font-medium text-sm hover:bg-red-700"
+          >
+            Delete
+          </button>
+        </div>
+      </div>
+    </div>
+  );
+};
 
 const TakeOrder = ({ clientId, token, onOrderUpdate, realm }) => {
   const [searchOpen, setSearchOpen] = useState(false);
@@ -434,7 +474,10 @@ const TakeOrder = ({ clientId, token, onOrderUpdate, realm }) => {
   const [currentBatchTimestamp, setCurrentBatchTimestamp] = useState(null);
   const [isOrderFormOpen, setIsOrderFormOpen] = useState(false);
   const [tableOrders, setTableOrders] = useState({});
+  const [showDeleteConfirm, setShowDeleteConfirm] = useState(false);
+  const [orderToDelete, setOrderToDelete] = useState(null);
   const navigate = useNavigate();
+
   // ============ UTILITY FUNCTIONS ============
   const flattenCategoryTree = (tree, level = 0, parentId = null) => {
     let flatList = [];
@@ -514,9 +557,12 @@ const TakeOrder = ({ clientId, token, onOrderUpdate, realm }) => {
       const ordersMap = {};
 
       tableList.forEach(table => {
-        if (table.status?.toLowerCase() === 'occupied') {
+        const tableStatus = table.status?.toLowerCase();
+        
+        // Show orders for both occupied and served tables
+        if (tableStatus === 'occupied' || tableStatus === 'served') {
           const tableOrder = allOrders
-            .filter(o => o.table_id === table.id && o.status?.toLowerCase() !== 'served')
+            .filter(o => o.table_id === table.id && o.status?.toLowerCase() !== 'completed')
             .sort((a, b) => new Date(b.created_at) - new Date(a.created_at))[0];
 
           if (tableOrder) {
@@ -533,6 +579,74 @@ const TakeOrder = ({ clientId, token, onOrderUpdate, realm }) => {
       setTableOrders(ordersMap);
     } catch (err) {
       console.error("Failed to fetch table orders:", err);
+    }
+  };
+
+  // Delete Order Handler
+  const handleDeleteOrder = async (orderId, tableId) => {
+    try {
+      await axios.delete(
+        `${import.meta.env.VITE_API_ORDER_SERVICE_URL}/${clientId}/dinein/delete`,
+        {
+          params: { dinein_order_id: orderId, client_id: clientId },
+          headers: { Authorization: `Bearer ${token}` }
+        }
+      );
+
+      // Update table status to vacant
+      const tableObj = tables.find(t => t.id === tableId);
+      if (tableObj) {
+        await axios.post(
+          `${import.meta.env.VITE_API_TABLE_SERVICE_URL}/${clientId}/tables/update`,
+          {
+            id: tableId,
+            client_id: clientId,
+            name: tableObj.name,
+            table_type: tableObj.table_type,
+            status: 'Vacant',
+            location_zone: tableObj.location_zone
+          },
+          { headers: { Authorization: `Bearer ${token}` } }
+        );
+      }
+
+      toast.success('Order deleted successfully');
+      
+      // Refresh tables
+      await fetchTables();
+      
+      // Close modal
+      setShowDeleteConfirm(false);
+      setOrderToDelete(null);
+    } catch (err) {
+      console.error('Delete order error:', err);
+      toast.error('Failed to delete order');
+    }
+  };
+
+  // Mark as Served Handler - UPDATED: Only updates order status, not table status
+  const handleMarkAsServed = async (orderId, tableId) => {
+    try {
+      // Update order status to served
+      await axios.post(
+        `${import.meta.env.VITE_API_ORDER_SERVICE_URL}/${clientId}/dinein/update`,
+        {
+          id: orderId,
+          client_id: clientId,
+          status: 'served'
+        },
+        { headers: { Authorization: `Bearer ${token}` } }
+      );
+
+      // DO NOT UPDATE TABLE STATUS - User will handle this after payment
+      
+      toast.success('Order marked as served');
+      
+      // Refresh tables to update order info display
+      await fetchTables();
+    } catch (err) {
+      console.error('Mark as served error:', err.response?.data || err.message);
+      toast.error('Failed to mark order as served');
     }
   };
 
@@ -739,7 +853,6 @@ const TakeOrder = ({ clientId, token, onOrderUpdate, realm }) => {
     }
   };
 
-  // ✅ FIXED: Always create new cart entry when editing existing order
   const addToCart = (item) => {
     setHasNewItems(true);
 
@@ -748,7 +861,6 @@ const TakeOrder = ({ clientId, token, onOrderUpdate, realm }) => {
 
     let batchTimestamp = currentBatchTimestamp;
 
-    // Create new batch if not exists
     if (!batchTimestamp) {
       batchTimestamp = Date.now();
       setCurrentBatchTimestamp(batchTimestamp);
@@ -764,9 +876,7 @@ const TakeOrder = ({ clientId, token, onOrderUpdate, realm }) => {
       }
     }
 
-    // ✅ KEY FIX: When editing existing order, ALWAYS create new cart entry
     if (activeOrderId) {
-      // For existing orders, always add as new item with unique key
       const cartItem = {
         id: Number(item.id),
         name: item.name,
@@ -784,7 +894,6 @@ const TakeOrder = ({ clientId, token, onOrderUpdate, realm }) => {
 
       setCart(prev => [...prev, cartItem]);
 
-      // Save to localStorage
       localStorage.setItem(
         `order_${activeOrderId}_new_item_${uniqueKey}`,
         JSON.stringify({
@@ -796,7 +905,6 @@ const TakeOrder = ({ clientId, token, onOrderUpdate, realm }) => {
         })
       );
     } else {
-      // For new orders, allow quantity increase
       const existingItem = cart.find(i => i.id === item.id && !i.frontend_unique_key);
 
       if (existingItem) {
@@ -927,55 +1035,34 @@ const TakeOrder = ({ clientId, token, onOrderUpdate, realm }) => {
     ));
   };
 
- const removeFromCart = (itemId, uniqueKey = null) => {
-  setHasNewItems(true);
+  const removeFromCart = (itemId, uniqueKey = null) => {
+    setHasNewItems(true);
 
-  if (uniqueKey && activeOrderId) {
-    // 🔥 REMOVE FROM localStorage
-    localStorage.removeItem(`order_${activeOrderId}_new_item_${uniqueKey}`);
-
-    setCart(prev =>
-      prev.filter(i => i.frontend_unique_key !== uniqueKey)
-    );
-  } else {
-    setCart(prev => prev.filter(i => i.id !== itemId));
-  }
-};
-
+    if (uniqueKey) {
+      setCart(cart.filter(i => i.frontend_unique_key !== uniqueKey));
+    } else {
+      setCart(cart.filter(i => i.id !== itemId));
+    }
+  };
 
   const updateQuantity = (itemId, change, uniqueKey = null) => {
-  setHasNewItems(true);
+    setHasNewItems(true);
 
-  setCart(prev =>
-    prev
+    setCart(cart
       .map(item => {
         const isMatch = uniqueKey
           ? item.frontend_unique_key === uniqueKey
           : item.id === itemId && !item.frontend_unique_key;
 
-        if (!isMatch) return item;
-
-        const qty = item.quantity + change;
-        if (qty <= 0) return null;
-
-        // 🔥 UPDATE localStorage quantity
-        if (uniqueKey && activeOrderId) {
-          const key = `order_${activeOrderId}_new_item_${uniqueKey}`;
-          const stored = JSON.parse(localStorage.getItem(key));
-          if (stored) {
-            localStorage.setItem(
-              key,
-              JSON.stringify({ ...stored, quantity: qty })
-            );
-          }
+        if (isMatch) {
+          const qty = item.quantity + change;
+          return qty > 0 ? { ...item, quantity: qty } : null;
         }
-
-        return { ...item, quantity: qty };
+        return item;
       })
       .filter(Boolean)
-  );
-};
-
+    );
+  };
 
   const getTotalPrice = () => {
     return cart.reduce((total, item) =>
@@ -1002,7 +1089,6 @@ const TakeOrder = ({ clientId, token, onOrderUpdate, realm }) => {
       const headers = { Authorization: `Bearer ${token}` };
 
       if (activeOrderId) {
-        // Update existing order
         await axios.post(
           `${import.meta.env.VITE_API_ORDER_SERVICE_URL}/${clientId}/order_items/update?order_id=${activeOrderId}`,
           cart.map(i => ({
@@ -1026,7 +1112,6 @@ const TakeOrder = ({ clientId, token, onOrderUpdate, realm }) => {
           { headers }
         );
       } else {
-        // Create new order
         await axios.post(
           `${import.meta.env.VITE_API_ORDER_SERVICE_URL}/${clientId}/dinein/create`,
           {
@@ -1066,7 +1151,6 @@ const TakeOrder = ({ clientId, token, onOrderUpdate, realm }) => {
 
       await fetchTables();
 
-      // Clear batch tracking after successful order
       if (activeOrderId && currentBatchTimestamp) {
         Object.keys(localStorage).forEach(key => {
           if (key.startsWith(`order_${activeOrderId}_batch_${currentBatchTimestamp}`)) {
@@ -1121,7 +1205,6 @@ const TakeOrder = ({ clientId, token, onOrderUpdate, realm }) => {
     window.history.pushState({ view: 'order' }, '');
   };
 
-  // ✅ FIXED: Reconstruct batch history when viewing order
   const handleViewOrder = async (table) => {
     if (menuItems.length === 0) {
       alert("Menu is still loading, please wait...");
@@ -1137,8 +1220,10 @@ const TakeOrder = ({ clientId, token, onOrderUpdate, realm }) => {
       );
 
       const allOrders = response.data?.data || [];
+      
+      // Include both non-served and served orders (but not completed)
       const tableOrders = allOrders.filter(
-        o => o.table_id === table.id && o.status?.toLowerCase() !== 'served'
+        o => o.table_id === table.id && o.status?.toLowerCase() !== 'completed'
       );
 
       if (tableOrders.length === 0) {
@@ -1151,12 +1236,9 @@ const TakeOrder = ({ clientId, token, onOrderUpdate, realm }) => {
       )[0];
 
       setActiveOrderId(activeOrder.id);
-      setCurrentBatchTimestamp(null);
-setHasNewItems(false);
       setHasNewItems(false);
       setCurrentBatchTimestamp(null);
 
-      // ✅ Group items by their batch timestamp
       const batchGroups = {};
 
       (activeOrder.items || []).forEach(item => {
@@ -1164,10 +1246,8 @@ setHasNewItems(false);
         const menuItem = menuItems.find(mi => Number(mi.id) === itemId);
         const frontendKey = item.frontend_unique_key;
 
-        // Determine batch timestamp
         let batchTimestamp = null;
         if (frontendKey) {
-          // Extract timestamp from unique key (format: itemId_timestamp)
           const parts = frontendKey.split('_');
           batchTimestamp = parts[parts.length - 1];
         }
@@ -1186,7 +1266,6 @@ setHasNewItems(false);
           batch_timestamp: batchTimestamp,
         };
 
-        // Group by batch or "original" for items without batch
         const groupKey = batchTimestamp || 'original';
         if (!batchGroups[groupKey]) {
           batchGroups[groupKey] = [];
@@ -1194,7 +1273,6 @@ setHasNewItems(false);
         batchGroups[groupKey].push(cartItem);
       });
 
-      // Flatten groups back to cart array, maintaining batch order
       const sortedBatches = Object.keys(batchGroups).sort((a, b) => {
         if (a === 'original') return -1;
         if (b === 'original') return 1;
@@ -1221,7 +1299,6 @@ setHasNewItems(false);
     }
   };
 
-  // ✅ Group cart items by batch
   const oldItems = cart.filter(i => !i.batch_timestamp);
   const newItems = cart.filter(i => !!i.batch_timestamp);
 
@@ -1246,82 +1323,10 @@ setHasNewItems(false);
       ? tables.find(t => t.id === 500)?.table_number || 'Takeaway'
       : tables.find(t => t.id.toString() === selectedTable)?.table_number;
 
-
-  // const handleStatusChange = async (orderId, newStatus) => {
-  //   const order = orders.find(o => o.id === orderId);
-  //   if (!order || order.status === 'served') return;
-  //   const tableObj = tables.find(t => t.id === order.table_id);
-  //   try {
-  //     await axios.post(`${import.meta.env.VITE_API_ORDER_SERVICE_URL}/${clientId}/dinein/update`, { id: orderId, client_id: clientId, status: newStatus }, { headers: { Authorization: `Bearer ${token}` } });
-  //     if (tableObj) {
-  //       await axios.post(`${import.meta.env.VITE_API_TABLE_SERVICE_URL}/${clientId}/tables/update`, {
-  //         id: order.table_id,
-  //         client_id: clientId,
-  //         name: tableObj.name,
-  //         table_type: tableObj.table_type,
-  //         status: 'Vacant',
-  //         location_zone: tableObj.location_zone
-  //       }, { headers: { Authorization: `Bearer ${token}` } });
-  //     }
-  //     toast.success('Order status updated');
-  //     setOrders(prev => prev.map(o => o.id === orderId ? {
-  //       ...o,
-  //       status: newStatus,
-  //       has_new_items: newStatus === 'served' ? false : o.has_new_items
-  //     } : o));
-  //     if (selectedOrder?.id === orderId) {
-  //       setSelectedOrder(prev => ({
-  //         ...prev,
-  //         status: newStatus,
-  //         has_new_items: newStatus === 'served' ? false : prev.has_new_items
-  //       }));
-  //     }
-  //     if (newStatus === 'served') setEditOrderId(null);
-  //   } catch (err) {
-  //     toast.error('❌ Failed to update order status.');
-  //   }
-  // };
-
-
-  // const handleStatusChange = async (orderId, newStatus) => {
-  //   try {
-  //     // Find the table that has this order
-  //     const tableId = Object.keys(tableOrders).find(
-  //       key => tableOrders[key].id === orderId
-  //     );
-
-  //     if (!tableId) {
-  //       console.error('Order not found in tableOrders');
-  //       alert('Order not found');
-  //       return;
-  //     }
-
-  //     // ✅ ONLY update order status
-  //     await axios.post(
-  //       `${import.meta.env.VITE_API_ORDER_SERVICE_URL}/${clientId}/dinein/update`,
-  //       {
-  //         id: orderId,
-  //         client_id: clientId,
-  //         status: newStatus
-  //       },
-  //       { headers: { Authorization: `Bearer ${token}` } }
-  //     );
-
-  //     // 🔁 Refresh data so UI updates
-  //     await fetchTables();
-
-  //     console.log('✅ Order status updated to:', newStatus);
-
-  //   } catch (err) {
-  //     console.error('❌ Failed to update order status:', err);
-  //     alert('Failed to update order status. Please try again.');
-  //   }
-  // };
   const handlePrintBill = (orderId, tableId) => {
-    // Navigate to billing page with the order ID
     navigate(`/saas/${clientId}/billing?orderId=${orderId}`);
   };
-  // ============ JSX RETURN ============
+
   return (
     <div className="bg-bg-primary p-0 h-[calc(100vh-4rem)] overflow-x-hidden overflow-y-auto">
       {currentView === 'floor' && (
@@ -1333,8 +1338,12 @@ setHasNewItems(false);
           onViewOrder={handleViewOrder}
           orderMode={orderMode}
           tableOrders={tableOrders}
-          // handleStatusChange={handleStatusChange}
           onPrintBill={handlePrintBill}
+          onDeleteOrder={(orderId, tableId) => {
+            setOrderToDelete({ orderId, tableId });
+            setShowDeleteConfirm(true);
+          }}
+          onMarkAsServed={handleMarkAsServed}
         />
       )}
 
@@ -1342,7 +1351,6 @@ setHasNewItems(false);
         <div className="mx-auto px-2 py-2">
           <div className="grid lg:grid-cols-4 gap-1">
 
-            {/* CATEGORY SIDEBAR */}
             <div className="w-full lg:col-span-1">
               <div className="lg:h-[calc(98dvh-4rem)] lg:overflow-y-auto pr-1">
                 <CategoryTree
@@ -1354,10 +1362,8 @@ setHasNewItems(false);
               </div>
             </div>
 
-            {/* MENU + ORDER PANEL */}
             <div className="lg:col-span-3 flex gap-2">
 
-              {/* MENU */}
               <div className="transition-all duration-300 border-default border-border-default p-2 rounded-lg flex-1 overflow-y-auto h-[calc(98dvh-4rem)] lg:h-auto lg:max-h-[calc(98dvh-4rem)]">
 
                 <div className="mb-2 flex items-center justify-between lg:flex-row flex-col gap-2">
@@ -1447,14 +1453,12 @@ setHasNewItems(false);
                 </div>
               </div>
 
-              {/* DESKTOP CART SIDEBAR */}
               {!isMobile && (
                 <div className={`transition-all duration-300 ease-in-out ${showCart ? 'w-[22rem] opacity-100 z-30' : 'w-0 opacity-0'}`}>
                   <div className="border border-gray-300 rounded-xl bg-white">
                     <div className="shadow-xl rounded-xl lg:h-[calc(98dvh-4rem)] flex flex-col">
                       <div className="flex flex-col h-full p-4">
 
-                        {/* HEADER */}
                         <div className="pb-3 border-b space-y-2">
                           <div className="flex items-center justify-between">
                             <h2 className="text-lg font-semibold text-gray-800">
@@ -1499,7 +1503,6 @@ setHasNewItems(false);
                           )}
                         </div>
 
-                        {/* ORDER MODE TOGGLE */}
                         <div className="mt-3">
                           <div className="flex bg-gray-100 rounded-lg p-1">
                             <button
@@ -1531,7 +1534,6 @@ setHasNewItems(false);
                           </div>
                         </div>
 
-                        {/* CART ITEMS */}
                         {cart.length === 0 ? (
                           <div className="flex-1 flex items-center justify-center text-sm text-gray-400">
                             No items added
@@ -1539,7 +1541,6 @@ setHasNewItems(false);
                         ) : (
                           <>
                             <div className="flex-1 overflow-y-auto mt-4 space-y-2">
-                              {/* OLD ITEMS */}
                               {oldItems.map(item => (
                                 <div
                                   key={`old-${item.id}`}
@@ -1599,7 +1600,6 @@ setHasNewItems(false);
                                 </div>
                               ))}
 
-                              {/* NEW ITEMS SEPARATOR */}
                               {activeOrderId && newItems.length > 0 && (
                                 <div className="flex items-center gap-2 my-2">
                                   <div className="flex-1 h-px bg-gradient-to-r from-transparent via-orange-400 to-transparent"></div>
@@ -1608,7 +1608,6 @@ setHasNewItems(false);
                                 </div>
                               )}
 
-                              {/* NEW ITEMS - GROUPED BY BATCH */}
                               {batchTimestamps.map((timestamp, batchIndex) => (
                                 <React.Fragment key={timestamp}>
                                   {batchIndex > 0 && (
@@ -1681,7 +1680,6 @@ setHasNewItems(false);
                               ))}
                             </div>
 
-                            {/* ACTION BUTTONS */}
                             <div className="flex gap-2 mt-3">
                               <button
                                 onClick={handlePlaceOrder}
@@ -1713,7 +1711,6 @@ setHasNewItems(false);
         </div>
       )}
 
-      {/* MOBILE CART - Similar structure with batch grouping */}
       {isMobile && showCart && (
         <div className="fixed inset-0 z-50 flex justify-end bg-color-modalsbg animate-fade-in">
           <div className="w-full md:w-96 lg:w-[28rem] h-full overflow-y-auto bg-bg-primary animate-slide-in-right">
@@ -1735,7 +1732,6 @@ setHasNewItems(false);
                 </div>
               ) : (
                 <>
-                  {/* Mobile Order Mode Toggle */}
                   <div className="mb-6 p-4 rounded-lg bg-bg-tertiary border-border-default">
                     <div className="mb-4">
                       <div className="flex gap-2 p-1 bg-bg-tertiary rounded-lg">
@@ -1784,9 +1780,7 @@ setHasNewItems(false);
                     )}
                   </div>
 
-                  {/* Mobile Cart Items with Batch Grouping */}
                   <div className="space-y-4 mb-6 max-h-[calc(100vh-4rem)] overflow-y-auto">
-                    {/* OLD ITEMS */}
                     {oldItems.map(item => (
                       <div key={`mobile-old-${item.id}`} className="flex items-center space-x-3 p-3 lg:p-4 rounded-lg bg-bg-tertiary border-border-default animate-slide-up">
                         <div className="w-16 h-16 rounded-md overflow-hidden flex-shrink-0">
@@ -1845,7 +1839,6 @@ setHasNewItems(false);
                       </div>
                     ))}
 
-                    {/* NEW ITEMS SEPARATOR */}
                     {activeOrderId && newItems.length > 0 && (
                       <div className="flex items-center gap-2 my-3">
                         <div className="flex-1 h-px bg-gradient-to-r from-transparent via-orange-500 to-transparent"></div>
@@ -1854,7 +1847,6 @@ setHasNewItems(false);
                       </div>
                     )}
 
-                    {/* NEW ITEMS - GROUPED BY BATCH */}
                     {batchTimestamps.map((timestamp, batchIndex) => (
                       <React.Fragment key={`mobile-batch-${timestamp}`}>
                         {batchIndex > 0 && (
@@ -1957,7 +1949,6 @@ setHasNewItems(false);
         </div>
       )}
 
-      {/* MODALS & FLOATING BUTTON */}
       {showClearConfirm && (
         <div className="fixed inset-0 z-50 flex items-center justify-center bg-black/40">
           <div className="bg-white rounded-lg p-6 w-80 shadow-xl animate-scale-in">
@@ -2016,6 +2007,20 @@ setHasNewItems(false);
           setCurrentItemForNote(null);
         }}
         itemName={currentItemForNote?.name}
+      />
+
+      {/* Delete Confirmation Modal */}
+      <DeleteConfirmModal
+        isOpen={showDeleteConfirm}
+        onClose={() => {
+          setShowDeleteConfirm(false);
+          setOrderToDelete(null);
+        }}
+        onConfirm={() => {
+          if (orderToDelete) {
+            handleDeleteOrder(orderToDelete.orderId, orderToDelete.tableId);
+          }
+        }}
       />
     </div>
   );
