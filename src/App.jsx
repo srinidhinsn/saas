@@ -209,18 +209,37 @@ const LoginWrapper = ({ onLoginSuccess }) => {
   return <LoginPage clientId={clientId || 'easyfood'} onLoginSuccess={onLoginSuccess} />;
 };
 
+const HeaderSwitcher = ({ clientId, onLogout }) => {
+  const screenId = localStorage.getItem('screen_id');
+
+  if (screenId === 'user_v1') {
+    return <Headers_V1 clientId={clientId} onLogout={onLogout} />;
+  }
+
+  // default fallback
+  return <HeaderShared clientId={clientId} onLogout={onLogout} />;
+};
 const InnerAuthenticatedApp = ({ token, onLogout }) => {
   const { clientId } = useParams();
+  const finalClientId = clientId || 'easyfood';
 
   return (
     <>
-      <Headers_V1 clientId={clientId || 'easyfood'} onLogout={onLogout} />
+      <HeaderSwitcher
+        clientId={finalClientId}
+        onLogout={onLogout}
+      />
+
       <main>
-        <RoutesManager token={token} clientId={clientId || 'easyfood'} />
+        <RoutesManager
+          token={token}
+          clientId={finalClientId}
+        />
       </main>
     </>
   );
 };
+
 const RedirectToLogin = () => {
   const { clientId } = useParams();
   const storedClientId = localStorage.getItem('client_id');
@@ -247,7 +266,7 @@ const App = () => {
     localStorage.setItem('client_id', clientId); // ✅ ADD THIS
   };
 
-
+  
   const handleLogout = () => {
     setToken(null);
     setIsAuthenticated(false);
