@@ -20,6 +20,9 @@ export default function StockRecipeManager({ clientId: propClientId, token: prop
   const [loading, setLoading] = useState(false);
   const [error, setError] = useState("");
 
+  // Inventory Categories
+  const [inventoryCategories, setInventoryCategories] = useState([]);
+
   // Stock
   const [stocks, setStocks] = useState([]);
   const [categories, setCategories] = useState([]);
@@ -34,6 +37,15 @@ export default function StockRecipeManager({ clientId: propClientId, token: prop
   });
   const [isStockModalOpen, setIsStockModalOpen] = useState(false);
   const [isEditingStock, setIsEditingStock] = useState(false);
+
+  // Add Inventory Modal
+  const [isInventoryModalOpen, setIsInventoryModalOpen] = useState(false);
+  const [inventoryForm, setInventoryForm] = useState({
+    id: "",
+    name: "",
+    description: "",
+    subcategories: "",
+  });
 
   // Filters
   const [searchQuery, setSearchQuery] = useState("");
@@ -116,7 +128,7 @@ export default function StockRecipeManager({ clientId: propClientId, token: prop
 
     const loadData = async () => {
       setLoading(true);
-      await Promise.all([fetchStocks(), fetchMenuItems()]);
+      await Promise.all([fetchStocks(), fetchMenuItems(), fetchInventoryCategories()]);
       setLoading(false);
     };
 
@@ -130,7 +142,17 @@ export default function StockRecipeManager({ clientId: propClientId, token: prop
     }
   }, [activeTab]);
 
-
+  const fetchInventoryCategories = async () => {
+    try {
+      const res = await axios.get(
+        `${API_CONFIG.baseMenu(clientId)}/categories?category_id=inventory`,
+        getAuthHeaders(token)
+      );
+      setInventoryCategories(res.data?.data || []);
+    } catch (err) {
+      console.error("fetchInventoryCategories failed:", err);
+    }
+  };
 
   const fetchStocks = async () => {
     try {
@@ -193,6 +215,57 @@ export default function StockRecipeManager({ clientId: propClientId, token: prop
       setRecipe([]);
     } finally {
       setLoading(false);
+    }
+  };
+
+  // Add Inventory functions
+  const openInventoryModal = () => {
+    setInventoryForm({
+      id: "",
+      name: "",
+      description: "",
+      subcategories: "",
+    });
+    setIsInventoryModalOpen(true);
+  };
+
+  const createInventoryCategory = async () => {
+    if (!inventoryForm.name.trim()) {
+      setError("Category name is required");
+      return;
+    }
+
+    try {
+      // Create the subcategory under the existing "inventory" category
+      const subcategoryPayload = {
+        id: inventoryForm.id || inventoryForm.name.toLowerCase().replace(/\s+/g, '_'),
+        name: inventoryForm.name,
+        description: inventoryForm.description,
+        subcategories: inventoryForm.subcategories,
+        category_id: "inventory", // This makes it a subcategory of inventory
+      };
+
+      await axios.post(
+        `${API_CONFIG.baseMenu(clientId)}/category/create?client_id=${clientId}`,
+        subcategoryPayload,
+        getAuthHeaders(token)
+      );
+
+      setIsInventoryModalOpen(false);
+      setInventoryForm({
+        id: "",
+        name: "",
+        description: "",
+        subcategories: "",
+      });
+      
+      // Refresh data
+      await fetchInventoryCategories();
+      
+      alert("Inventory category created successfully!");
+    } catch (err) {
+      console.error("createInventoryCategory failed:", err);
+      setError(err.response?.data?.message || "Failed to create inventory category");
     }
   };
 
@@ -371,7 +444,13 @@ export default function StockRecipeManager({ clientId: propClientId, token: prop
             </p>
           </div>
 
-          <div className="flex gap-3">
+          <div className="flex gap-3 flex-wrap">
+            <button
+              className="flex items-center gap-2 px-4 py-2 bg-green-600 hover:bg-green-700 text-white rounded-lg font-medium text-sm transition-all shadow-sm"
+              onClick={openInventoryModal}
+            >
+              + Add Inventory
+            </button>
             <button
               className={`flex items-center gap-2 px-4 py-2 rounded-lg font-medium text-sm transition-all ${activeTab === "menu-availability"
                 ? 'bg-action-primary text-text-white shadow-sm'
@@ -381,6 +460,21 @@ export default function StockRecipeManager({ clientId: propClientId, token: prop
             >
               Menu
             </button>
+            
+            {/* Dynamic Inventory Category Tabs */}
+            {inventoryCategories.map((category) => (
+              <button
+                key={category.id}
+                className={`flex items-center gap-2 px-4 py-2 rounded-lg font-medium text-sm transition-all ${activeTab === category.id
+                  ? 'bg-purple-600 text-white shadow-sm'
+                  : 'bg-white text-gray-700 hover:text-gray-900 border border-gray-300'
+                  }`}
+                onClick={() => setActiveTab(category.id)}
+              >
+                {category.name}
+              </button>
+            ))}
+
             <button
               className={`flex items-center gap-2 px-4 py-2 rounded-lg font-medium text-sm transition-all ${activeTab === "stock"
                 ? 'bg-action-primary text-text-white shadow-sm'
@@ -453,6 +547,14 @@ export default function StockRecipeManager({ clientId: propClientId, token: prop
                 onUpdateAvailability={updateMenuAvailability}
               />
             )}
+
+            {/* Dynamic Inventory Category Content */}
+            {inventoryCategories.some(cat => cat.id === activeTab) && (
+              <InventoryCategoryTab
+                category={inventoryCategories.find(cat => cat.id === activeTab)}
+                loading={loading}
+              />
+            )}
           </main>
 
           <aside className="lg:col-span-3 space-y-6">
@@ -461,7 +563,6 @@ export default function StockRecipeManager({ clientId: propClientId, token: prop
                 <h3 className="text-lg font-semibold text-gray-800 mb-4">Filters</h3>
                 <div className="space-y-4">
                   <div>
-                    {/* <label className="block text-base font-medium text-gray-700 mb-2">Category</label> */}
                     <select
                       className="w-full px-4 py-3 text-base border border-gray-300 rounded-lg focus:ring-indigo-500 focus:border-indigo-500"
                       value={categoryFilter}
@@ -506,6 +607,10 @@ export default function StockRecipeManager({ clientId: propClientId, token: prop
                   <span className="text-gray-600">Menu items</span>
                   <span className="font-semibold text-gray-900">{menuItems.length}</span>
                 </div>
+                <div className="flex justify-between">
+                  <span className="text-gray-600">Inventories</span>
+                  <span className="font-semibold text-purple-600">{inventoryCategories.length}</span>
+                </div>
                 <div className="text-sm text-gray-500 pt-3 border-t border-gray-100">
                   Last refresh: {new Date().toLocaleTimeString()}
                 </div>
@@ -533,6 +638,24 @@ export default function StockRecipeManager({ clientId: propClientId, token: prop
               availability: "",
               unit: "",
               unit_price: "",
+            });
+          }}
+        />
+      )}
+
+      {isInventoryModalOpen && (
+        <InventoryModal
+          isOpen={isInventoryModalOpen}
+          form={inventoryForm}
+          onChange={setInventoryForm}
+          onSave={createInventoryCategory}
+          onClose={() => {
+            setIsInventoryModalOpen(false);
+            setInventoryForm({
+              id: "",
+              name: "",
+              description: "",
+              subcategories: "",
             });
           }}
         />
@@ -610,10 +733,6 @@ function StockTab({
                   <td className="px-6 py-4 whitespace-nowrap text-base font-medium text-gray-700">
                     ₹{(Number(item.unit_price) || 0).toFixed(2)}
                   </td>
-                  {/* <td className="flex  px-6 py-4 whitespace-nowrap text-right text-base font-medium">
-                    <button onClick={() => onEdit(item)} className="text-action-primary hover:text-action-primary  mr-4 border flex items-center gap-2 px-4 py-2 rounded-lg font-medium text-sm transition-all">Edit</button>
-                    <button onClick={() => onDelete(item.id)} className="text-action-primary hover:text-action-primary border flex items-center gap-2 px-4 py-2 rounded-lg font-medium text-sm transition-all">Delete</button>
-                  </td> */}
 
                   <td className="px-6 py-4 whitespace-nowrap text-right">
                     <div className="flex justify-end gap-4">
@@ -939,6 +1058,66 @@ function MenuAvailabilityTab({ menuItems, loading, onUpdateAvailability }) {
   );
 }
 
+function InventoryCategoryTab({ category, loading }) {
+  if (!category) return null;
+
+  return (
+    <div className="bg-bg-primary rounded-xl shadow border border-gray-100 overflow-hidden">
+      <div className="bg-purple-600 p-6 border-b border-gray-100">
+        <h2 className="text-2xl font-bold text-white">{category.name}</h2>
+        {category.description && (
+          <p className="text-sm text-purple-100 mt-2">{category.description}</p>
+        )}
+      </div>
+
+      <div className="p-8">
+        {loading ? (
+          <div className="text-center py-12 text-gray-500">Loading...</div>
+        ) : (
+          <div className="space-y-6">
+            <div className="bg-gradient-to-r from-purple-50 to-indigo-50 rounded-xl p-6 border border-purple-200">
+              <h3 className="text-lg font-semibold text-gray-800 mb-2">Category Information</h3>
+              <div className="grid grid-cols-2 gap-4 text-sm">
+                <div>
+                  <span className="text-gray-600">Category ID:</span>
+                  <span className="ml-2 font-mono text-gray-900">{category.id}</span>
+                </div>
+                <div>
+                  <span className="text-gray-600">Name:</span>
+                  <span className="ml-2 font-semibold text-gray-900">{category.name}</span>
+                </div>
+                {category.subcategories && (
+                  <div className="col-span-2">
+                    <span className="text-gray-600">Subcategories:</span>
+                    <span className="ml-2 text-gray-900">{category.subcategories}</span>
+                  </div>
+                )}
+              </div>
+            </div>
+
+            <div className="bg-gray-50 rounded-xl p-8 text-center border-2 border-dashed border-gray-300">
+              <div className="text-gray-400 mb-4">
+                <svg className="w-16 h-16 mx-auto" fill="none" stroke="currentColor" viewBox="0 0 24 24">
+                  <path strokeLinecap="round" strokeLinejoin="round" strokeWidth={2} d="M20 7l-8-4-8 4m16 0l-8 4m8-4v10l-8 4m0-10L4 7m8 4v10M4 7v10l8 4" />
+                </svg>
+              </div>
+              <h3 className="text-xl font-semibold text-gray-700 mb-2">
+                Inventory Category Content
+              </h3>
+              <p className="text-gray-500 mb-4">
+                Content for this inventory category will be displayed here.
+              </p>
+              <p className="text-sm text-gray-400">
+                You can customize this section to show inventory items, statistics, or other relevant data.
+              </p>
+            </div>
+          </div>
+        )}
+      </div>
+    </div>
+  );
+}
+
 function StockModal({ isOpen, isEditing, form, categories, onChange, onSave, onClose }) {
   if (!isOpen) return null;
 
@@ -1034,6 +1213,101 @@ function StockModal({ isOpen, isEditing, form, categories, onChange, onSave, onC
             className="px-6 py-2.5 bg-action-primary text-text-white rounded-lg transition-colors"
           >
             {isEditing ? "Update" : "Create"}
+          </button>
+        </div>
+      </div>
+    </div>
+  );
+}
+
+function InventoryModal({ isOpen, form, onChange, onSave, onClose }) {
+  if (!isOpen) return null;
+
+  return (
+    <div className="fixed inset-0 z-50 flex items-center justify-center p-4">
+      <div className="absolute inset-0 bg-black/40" onClick={onClose} />
+      <div className="relative bg-bg-primary rounded-2xl shadow-2xl max-w-lg w-full p-6">
+        <h3 className="text-xl font-semibold text-gray-900 mb-6">
+          Add Inventory Category
+        </h3>
+
+        <div className="space-y-5">
+          <div>
+            <label className="block text-sm font-medium text-gray-700 mb-1">
+              Category ID (optional)
+            </label>
+            <input
+              value={form.id}
+              onChange={(e) => onChange((prev) => ({ ...prev, id: e.target.value }))}
+              placeholder="Auto-generated if left empty"
+              className="w-full px-4 py-2 border border-gray-300 rounded-lg focus:ring-2 focus:ring-indigo-500 focus:border-indigo-500"
+            />
+            <p className="text-xs text-gray-500 mt-1">
+              If empty, will use lowercase name with underscores
+            </p>
+          </div>
+
+          <div>
+            <label className="block text-sm font-medium text-gray-700 mb-1">
+              Category Name *
+            </label>
+            <input
+              required
+              value={form.name}
+              onChange={(e) => onChange((prev) => ({ ...prev, name: e.target.value }))}
+              placeholder="e.g., Beverages, Dairy, etc."
+              className="w-full px-4 py-2 border border-gray-300 rounded-lg focus:ring-2 focus:ring-indigo-500 focus:border-indigo-500"
+            />
+          </div>
+
+          <div>
+            <label className="block text-sm font-medium text-gray-700 mb-1">
+              Description
+            </label>
+            <textarea
+              value={form.description}
+              onChange={(e) => onChange((prev) => ({ ...prev, description: e.target.value }))}
+              rows={3}
+              placeholder="Describe this inventory category..."
+              className="w-full px-4 py-2 border border-gray-300 rounded-lg focus:ring-2 focus:ring-indigo-500 focus:border-indigo-500"
+            />
+          </div>
+
+          <div>
+            <label className="block text-sm font-medium text-gray-700 mb-1">
+              Subcategories (optional)
+            </label>
+            <input
+              value={form.subcategories}
+              onChange={(e) => onChange((prev) => ({ ...prev, subcategories: e.target.value }))}
+              placeholder="Comma-separated subcategory IDs"
+              className="w-full px-4 py-2 border border-gray-300 rounded-lg focus:ring-2 focus:ring-indigo-500 focus:border-indigo-500"
+            />
+            <p className="text-xs text-gray-500 mt-1">
+              e.g., soft_drinks,juices,water
+            </p>
+          </div>
+
+          <div className="bg-blue-50 border border-blue-200 rounded-lg p-4">
+            <p className="text-sm text-blue-800">
+              <strong>Note:</strong> This will create a subcategory under the existing "inventory" category.
+            </p>
+          </div>
+        </div>
+
+        <div className="mt-8 flex justify-end gap-4">
+          <button
+            type="button"
+            onClick={onClose}
+            className="px-5 py-2.5 border border-gray-300 rounded-lg hover:bg-gray-50 transition-colors"
+          >
+            Cancel
+          </button>
+          <button
+            onClick={onSave}
+            className="px-6 py-2.5 bg-green-600 hover:bg-green-700 text-white rounded-lg transition-colors"
+          >
+            Create Category
           </button>
         </div>
       </div>
