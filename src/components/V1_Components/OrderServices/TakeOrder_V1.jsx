@@ -134,6 +134,8 @@ const TakeOrder_V1 = ({ clientId, token, onOrderUpdate, realm }) => {
     const [lineItemsDetails, setLineItemsDetails] = useState([]);
     const [orderMode, setOrderMode] = useState('takeaway');
     const [currentView, setCurrentView] = useState('order');
+    const [tableModeMap, setTableModeMap] = useState({});
+
     const TAKEAWAY_TABLE_ID = 501;
     const DELIVERY_TABLE_ID = 502;
 
@@ -201,14 +203,30 @@ const TakeOrder_V1 = ({ clientId, token, onOrderUpdate, realm }) => {
             }))
             : [];
 
+        const modeMap = {};
+
+        tableList.forEach(t => {
+            const name = (t.name || '').toLowerCase();
+
+            if (name === 'delivery') {
+                modeMap[t.id] = 'delivery';
+            } else if (name === 'pickup' || name === 'takeaway') {
+                modeMap[t.id] = 'takeaway';
+            } else {
+                modeMap[t.id] = 'dinein';
+            }
+        });
 
         tableList.sort((a, b) =>
             a.table_number.localeCompare(b.table_number, undefined, { numeric: true })
         );
 
         setTables(tableList);
+        setTableModeMap(modeMap);
+
         await fetchTableOrders(tableList);
     };
+
 
     const fetchTableOrders = async (tableList) => {
         try {
@@ -250,14 +268,11 @@ const TakeOrder_V1 = ({ clientId, token, onOrderUpdate, realm }) => {
     useEffect(() => {
         window.history.pushState({ view: 'floor' }, '');
     }, []);
-    useEffect(() => {
-        if (orderMode === 'takeaway') {
-            setSelectedTable('501');
-        }
-        if (orderMode === 'delivery') {
-            setSelectedTable('502');
-        }
-    }, [orderMode]);
+    const getTableIdByMode = (mode) => {
+        return tables.find(
+            t => tableModeMap[t.id] === mode
+        )?.id || null;
+    };
 
     useEffect(() => {
         const fetchData = async () => {
@@ -727,12 +742,19 @@ const TakeOrder_V1 = ({ clientId, token, onOrderUpdate, realm }) => {
                     { headers }
                 );
             } else {
+                const tableId = getTableIdByMode(orderMode);
+
+if (!tableId) {
+    alert(`No table configured for ${orderMode}`);
+    return;
+}
+
                 // Create new order
                 await axios.post(
                     `${import.meta.env.VITE_API_ORDER_SERVICE_URL}/${clientId}/dinein/create`,
                     {
                         client_id: clientId,
-                        table_id: orderMode === 'takeaway' ? 501 : 502,
+                        table_id: tableId,
                         price: subtotal,
                         gst,
                         cst,
@@ -901,7 +923,8 @@ const TakeOrder_V1 = ({ clientId, token, onOrderUpdate, realm }) => {
 
             setCart(reconstructedCart);
             setSelectedTable(table.id.toString());
-            setOrderMode('dinein');
+            const mode = tableModeMap[table.id] || 'dinein';
+            setOrderMode(mode);            
             setCurrentView('order');
             setShowCart(true);
 
@@ -1070,26 +1093,33 @@ const TakeOrder_V1 = ({ clientId, token, onOrderUpdate, realm }) => {
                                                     </div>
                                                     <div className="flex gap-2 mt-2">
                                                         <button
-                                                            onClick={() => setOrderMode('takeaway')}
-                                                            className={`flex-1 py-1.5 rounded-lg text-sm font-semibold transition
-      ${orderMode === 'takeaway'
-                                                                    ? 'bg-action-primary text-white'
-                                                                    : 'bg-gray-100 text-gray-600 hover:bg-gray-200'}
-    `}
+                                                            onClick={() => {
+                                                                setOrderMode('takeaway');
+                                                                const id = getTableIdByMode('takeaway');
+                                                                if (id) setSelectedTable(String(id));
+                                                            }} className={`flex-1 py-1.5 rounded-lg text-sm font-semibold transition
+                                                                ${orderMode === 'takeaway'
+                                                                                                                              ? 'bg-action-primary text-white'
+                                                                                                                              : 'bg-gray-100 text-gray-600 hover:bg-gray-200'}
+                                                              `}
                                                         >
                                                             Takeaway
                                                         </button>
 
                                                         <button
-                                                            onClick={() => setOrderMode('delivery')}
-                                                            className={`flex-1 py-1.5 rounded-lg text-sm font-semibold transition
-      ${orderMode === 'delivery'
-                                                                    ? 'bg-action-primary text-white'
-                                                                    : 'bg-gray-100 text-gray-600 hover:bg-gray-200'}
-    `}
+                                                            onClick={() => {
+                                                                setOrderMode('delivery');
+                                                                const id = getTableIdByMode('delivery');
+                                                                if (id) setSelectedTable(String(id));
+                                                            }} className={`flex-1 py-1.5 rounded-lg text-sm font-semibold transition
+                                                                ${orderMode === 'delivery'
+                                                                                                                              ? 'bg-action-primary text-white'
+                                                                                                                              : 'bg-gray-100 text-gray-600 hover:bg-gray-200'}
+                                                              `}
                                                         >
                                                             Delivery
                                                         </button>
+
                                                     </div>
 
                                                     {/* Order Context */}

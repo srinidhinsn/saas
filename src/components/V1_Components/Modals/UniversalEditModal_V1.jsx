@@ -457,22 +457,17 @@ const UniversalEditModal_V1 = ({
 
                     {/* Footer */}
                     <div className="px-6 py-4 border-t border-gray-200 bg-gray-50 flex gap-3 justify-end">
-                        <button
-                            className="px-6 py-2 rounded-md bg-white text-gray-700 border border-gray-300 hover:bg-gray-50 font-medium"
-                            onClick={handleClose}
-                        >
+
+                        <button className="px-6 py-2 rounded-md bg-white text-gray-700 border border-gray-300 hover:bg-gray-50 font-medium"
+                            onClick={handleClose}>
                             Cancel
                         </button>
-                        <button
-                            className="px-6 py-2 rounded-md bg-action-primary text-text-white hover:bg-blue-700 font-medium"
-                            onClick={() => {
-                                saveEdit(table);
-                                setEditRowId(null);
-                              }}
-                              
-                        >
+
+                        <button className="px-6 py-2 rounded-md bg-action-primary text-text-white hover:bg-blue-700 font-medium"
+                            onClick={() => { saveEdit(table); setEditRowId(null); }}>
                             Save
                         </button>
+                        
                     </div>
                 </div>
             </div>

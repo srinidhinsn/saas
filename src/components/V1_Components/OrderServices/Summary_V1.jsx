@@ -1,6 +1,5 @@
 import React, { useEffect, useState } from "react";
 import axios from 'axios';
-import { toast } from "react-toastify";
 import { MdOutlineKeyboardDoubleArrowDown } from "react-icons/md";
 import Modal from "react-modal";
 import { X, Edit2, Trash2, Search, Filter, ShoppingBag, Clock, Users, Package, Truck } from 'lucide-react';
@@ -73,7 +72,7 @@ const Summary_V1 = ({ clientId, token }) => {
     const [selectedCategory, setSelectedCategory] = useState(null);
     const [activeTab, setActiveTab] = useState('items');
     const [selectedOrderModes, setSelectedOrderModes] = useState(['all']);
-
+    const [tableModeMap, setTableModeMap] = useState({});
 
     const navigate = useNavigate();
 
@@ -162,13 +161,38 @@ const Summary_V1 = ({ clientId, token }) => {
 
     const fetchTables = async () => {
         try {
-            const res = await axios.get(`${import.meta.env.VITE_API_TABLE_SERVICE_URL}/${clientId}/tables/read`, { headers: { Authorization: `Bearer ${token}` } });
-            setTables(res.data?.data || []);
-            const map = {};
-            (res.data?.data || []).forEach(t => map[t.id] = t.name);
-            setTablesMap(map);
-        } catch (e) { console.error('fetchTables', e); }
-    };
+          const res = await axios.get(
+            `${import.meta.env.VITE_API_TABLE_SERVICE_URL}/${clientId}/tables/read`,
+            { headers: { Authorization: `Bearer ${token}` } }
+          );
+      
+          const tableList = res.data?.data || [];
+          setTables(tableList);
+      
+          const nameMap = {};
+          const modeMap = {};
+      
+          tableList.forEach(t => {
+            nameMap[t.id] = t.name;
+      
+            const tableName = (t.name || '').toLowerCase();
+      
+            if (tableName === 'delivery') {
+              modeMap[t.id] = 'delivery';
+            } else if (tableName === 'pickup' || tableName === 'takeaway') {
+              modeMap[t.id] = 'takeaway';
+            } else {
+              modeMap[t.id] = 'dinein';
+            }
+          });
+      
+          setTablesMap(nameMap);
+          setTableModeMap(modeMap); // 👈 new
+        } catch (e) {
+          console.error('fetchTables', e);
+        }
+      };
+      
     // ---------- Batch & key helpers (REQUIRED) ----------
     const slugify = str => (str || '').toString().toUpperCase().replace(/[\s]+/g, '-').replace(/[^A-Z0-9-_]/g, '');
 
@@ -683,7 +707,7 @@ const Summary_V1 = ({ clientId, token }) => {
                 const todayOrders = allOrders.filter(order => {
                     const orderDate = new Date(order.created_at || order.createdAt)
                         .toLocaleDateString("en-CA");
-                        return orderDate === todayString;
+                    return orderDate === todayString;
                 });
 
                 setOrders(
@@ -790,17 +814,21 @@ const Summary_V1 = ({ clientId, token }) => {
                                 }
                             });
 
-                        return {
+                            const orderMode =
+                            tableModeMap[order.table_id] || 'dinein';
+                          
+                          return {
                             ...order,
+                            _fixedOrderMode: orderMode, 
                             items: allItems,
-                            has_new_items: false,     // ✅ no blocking
+                            has_new_items: false,
                             batch_dividers: batchDividers
-                        };
+                          };
+                          
                     })
                 );
             } catch (err) {
                 console.error("❌ Error fetching orders:", err);
-                toast.error("Failed to fetch orders");
             } finally {
                 setLoading(false);
             }
@@ -810,7 +838,7 @@ const Summary_V1 = ({ clientId, token }) => {
         fetchOrders();
         const interval = setInterval(fetchOrders, 10000);
         return () => clearInterval(interval);
-    }, [clientId, token, inventoryMap]);
+    }, [clientId, token, inventoryMap,tableModeMap]);
 
 
 
@@ -830,7 +858,6 @@ const Summary_V1 = ({ clientId, token }) => {
                     location_zone: tableObj.location_zone
                 }, { headers: { Authorization: `Bearer ${token}` } });
             }
-            toast.success('Order status updated');
             setOrders(prev => prev.map(o => o.id === orderId ? {
                 ...o,
                 status: newStatus,
@@ -845,7 +872,7 @@ const Summary_V1 = ({ clientId, token }) => {
             }
             if (newStatus === 'served') setEditOrderId(null);
         } catch (err) {
-            toast.error('❌ Failed to update order status.');
+            console.log("Shanmugam getting an error : ", err)
         }
     };
 
@@ -868,7 +895,6 @@ const Summary_V1 = ({ clientId, token }) => {
                     const updatedOrder = updatedOrders.find(o => o.id === orderId);
                     if (updatedOrder) setSelectedOrder(updatedOrder);
                 }
-                toast.success('Item removed');
                 return;
             }
 
@@ -904,9 +930,8 @@ const Summary_V1 = ({ clientId, token }) => {
                     total_price: newOrder.total_price
                 }, { headers: { Authorization: `Bearer ${token}` } });
             }
-            toast.success('Item cancelled and total updated');
         } catch (err) {
-            toast.error('❌ Failed to cancel item.');
+            console.log(err, "cancel Item error")
         }
     };
 
@@ -972,7 +997,8 @@ const Summary_V1 = ({ clientId, token }) => {
             setCurrentBatchTimestamp(null);
             setEditOrderId(null);
             setItemSearchQuery('');
-            toast.success('Items saved successfully!');
+            console.log("Item Saved Successfully");
+
 
             const res = await axios.get(`${import.meta.env.VITE_API_ORDER_SERVICE_URL}/${clientId}/dinein/read`, { headers: { Authorization: `Bearer ${token}` } });
             const allOrders = res.data?.data || [];
@@ -1102,7 +1128,6 @@ const Summary_V1 = ({ clientId, token }) => {
 
         } catch (err) {
             console.error('Save error', err);
-            toast.error('Failed to update items or total.');
         }
     };
 
@@ -1132,15 +1157,11 @@ const Summary_V1 = ({ clientId, token }) => {
             setOrders(prev => prev.filter(o => o.id !== orderToDelete));
             setShowDeleteModal(false);
             setOrderToDelete(null);
-            toast.success('Order deleted and table marked vacant.');
+            console.log('Order deleted and table marked vacant.');
             fetchTables();
         } catch (err) {
-            toast.error('❌ Failed to delete order');
+            console.log("Failed to delete the order");
         }
-    };
-
-    const toggleVisibleItems = (orderId) => {
-        setVisibleOrderId(prev => (prev === orderId ? null : orderId));
     };
 
     // First filter by date
@@ -1176,14 +1197,6 @@ const Summary_V1 = ({ clientId, token }) => {
             selectedOrderModes.includes(order._fixedOrderMode)
         );
     }
-
-    const getInitialOrderMode = (order) => {
-        if (Number(order.table_id) === 501) return 'takeaway';
-        if (!order.table_id || Number(order.table_id) === 0) return 'takeaway';
-        return 'dinein';
-    };
-
-
 
     // Then filter by status
     switch (filterMode) {

@@ -119,11 +119,7 @@ const CounterManagement = ({ clientId, token, screenIds, userId }) => {
 
                 // Exclude takeaway table
                 const filteredTables = tableList
-                    .filter(table =>
-                        table.id !== 500 &&                           // ⬅️ hard exclude takeaway table
-                        table.name?.toLowerCase() !== "take away" && // ⬅️ extra safety
-                        table.name?.toLowerCase() !== "takeaway"
-                    )
+                .filter(table => table.id !== 500)
                     .sort((a, b) =>
                         a.name.localeCompare(b.name, undefined, { numeric: true })
                     );
@@ -478,6 +474,12 @@ const CounterManagement = ({ clientId, token, screenIds, userId }) => {
         );
     };
 
+    
+    // const filteredTables = tables.filter(
+    //     table => Number(table.id) === 501 || Number(table.id) === 502
+    // );
+    
+    
     const filteredTables = getSortedTables(
         tables.filter(table => {
             const matchesSearch = table.name.toLowerCase().includes(searchTerm.toLowerCase());
