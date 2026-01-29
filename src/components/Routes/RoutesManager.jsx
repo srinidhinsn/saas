@@ -1,6 +1,6 @@
 import React, { useState, useEffect } from 'react';
 import { Routes, Route, Navigate, useParams } from 'react-router-dom';
-import {jwtDecode} from 'jwt-decode';
+import { jwtDecode } from 'jwt-decode';
 import axios from 'axios';
 import TakeOrder from '../MainComponents/OrderServices/TakeOrder';
 import OrderSummary from '../MainComponents/OrderServices/OrderSummary';
@@ -11,19 +11,20 @@ import MenuManagement from '../MainComponents/InventoryServices/MenuManagement';
 import BillingPage from '../MainComponents/BillingServices/Billing';
 import UserManagement from '../MainComponents/UserServices/UserManagement/UserManagement';
 import UserProfile from '../MainComponents/UserServices/ProfileManagement/UserProfile';
-import {getValidToken} from '../utils/Interceptors/Api'
+import { getValidToken } from '../utils/Interceptors/Api'
 import InventoryManager from '../MainComponents/InventoryServices/InventoryManagement'
 import CounterManagement from '../V1_Components/CounterServices/CounterManagement';
 import TakeOrder_V1 from '../V1_Components/OrderServices/TakeOrder_V1';
 import Summary_V1 from '../V1_Components/OrderServices/Summary_V1';
+import RoleConfig from '../MainComponents/UserServices/RoleConfiguration/RoleConfig';
 
 const RoutesManager = () => {
   const { clientId } = useParams();
   const [token, setToken] = useState(getValidToken());
   const [role, setRole] = useState(null);
-  const [realm,setRealm]= useState();
+  const [realm, setRealm] = useState();
   const [screenIds, setScreenIds] = useState([]);
-  const [userId,setUserId]=useState();
+  const [userId, setUserId] = useState();
 
   useEffect(() => {
     const t = getValidToken();
@@ -47,7 +48,7 @@ const RoutesManager = () => {
           if (res.data && res.data.data && res.data.data.screens) {
             // Extract screen_ids
             const ids = res.data.data.screens.map((s) => s.screen_id);
-            console.log("The screenIds are",ids)
+            console.log("The screenIds are", ids)
             setScreenIds(ids);
           }
         })
@@ -82,7 +83,7 @@ const RoutesManager = () => {
       />
       <Route path="summary" element={<OrderSummary token={token} clientId={clientId} />} />
 
-      <Route path="kds" element={<Kds/>}/>
+      <Route path="kds" element={<Kds />} />
 
       <Route
         path="menu"
@@ -100,20 +101,24 @@ const RoutesManager = () => {
         path="inventory"
         element={<InventoryManager clientId={clientId} token={token} realm={realm} screenIds={screenIds} />}
       />
-       <Route
+      <Route
         path="counter-manage"
         element={<CounterManagement clientId={clientId} token={token} realm={realm} screenIds={screenIds} />}
       />
-       <Route
+      <Route
         path="order-manage"
         element={<TakeOrder_V1 clientId={clientId} token={token} realm={realm} screenIds={screenIds} />}
       />
-        <Route
+      <Route
         path="summary-manage"
         element={<Summary_V1 clientId={clientId} token={token} realm={realm} screenIds={screenIds} />}
       />
+      <Route path="role-config" element={
+        <RoleConfig clientId={clientId} token={token} realm={realm} screenIds={screenIds} />
+      } />
+
       <Route path="*" element={<Navigate to="home" replace />} />
-      <Route path='user-profile'  element={<UserProfile token={token} clientId={clientId}/>} />
+      <Route path='user-profile' element={<UserProfile token={token} clientId={clientId} />} />
     </Routes>
   );
 };
