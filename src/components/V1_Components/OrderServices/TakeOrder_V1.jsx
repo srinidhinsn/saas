@@ -783,7 +783,7 @@ const TakeOrder_V1 = ({ clientId, token, onOrderUpdate, realm }) => {
                         quantity: i.quantity,
                         unit_price: i.unit_price,
                         line_total: i.unit_price * i.quantity,
-                        status: "pending",
+                        status: "ready",
                         note: i.note || "",
                         frontend_unique_key: i.frontend_unique_key || null,
                     })),
@@ -828,14 +828,14 @@ const TakeOrder_V1 = ({ clientId, token, onOrderUpdate, realm }) => {
                         gst,
                         cst,
                         total_price: total,
-                        status: "pending",
+                        status: "ready",
                         items: cart.map(i => ({
                             item_id: i.id,
                             item_name: i.name,
                             quantity: i.quantity,
                             unit_price: i.unit_price,
                             line_total: i.unit_price * i.quantity,
-                            status: "pending"
+                            status: "ready"
                         }))
                     },
                     { headers }
