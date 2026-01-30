@@ -202,29 +202,52 @@ import HeaderShared from './components/Constants/Headers/HeaderShared';
 import RoutesManager from './components/Routes/RoutesManager';
 import { injectThemeVars } from './components/utils/injectThemeVars';
 import 'react-toastify/dist/ReactToastify.css';
+import Headers_V1 from './components/V1_Components/Headers/Headers_V1';
 
 const LoginWrapper = ({ onLoginSuccess }) => {
   const { clientId } = useParams();
   return <LoginPage clientId={clientId || 'easyfood'} onLoginSuccess={onLoginSuccess} />;
 };
 
+const HeaderSwitcher = ({ clientId, onLogout }) => {
+  const screenId = localStorage.getItem('screen_id');
+
+  if (screenId === 'user_v1') {
+    return <Headers_V1 clientId={clientId} onLogout={onLogout} />;
+  }
+
+  // default fallback
+  return <HeaderShared clientId={clientId} onLogout={onLogout} />;
+};
 const InnerAuthenticatedApp = ({ token, onLogout }) => {
   const { clientId } = useParams();
+  const finalClientId = clientId || 'easyfood';
 
   return (
     <>
-      <HeaderShared clientId={clientId || 'easyfood'} onLogout={onLogout} />
+      <HeaderSwitcher
+        clientId={finalClientId}
+        onLogout={onLogout}
+      />
+
       <main>
-        <RoutesManager token={token} clientId={clientId || 'easyfood'} />
+        <RoutesManager
+          token={token}
+          clientId={finalClientId}
+        />
       </main>
     </>
   );
 };
+
 const RedirectToLogin = () => {
   const { clientId } = useParams();
-  const target = `/saas/${clientId || 'easyfood'}/login`;
-  return <Navigate to={target} replace />;
+  const storedClientId = localStorage.getItem('client_id');
+  const finalClientId = clientId || storedClientId || 'easyfood';
+
+  return <Navigate to={`/saas/${finalClientId}/login`} replace />;
 };
+
 
 const App = () => {
   const [token, setToken] = useState(() => localStorage.getItem('access_token'));
@@ -234,13 +257,16 @@ const App = () => {
     injectThemeVars();
   }, []);
 
-  const handleLoginSuccess = (accessToken, screenId) => {
+  const handleLoginSuccess = (accessToken, screenId, clientId) => {
     setToken(accessToken);
     setIsAuthenticated(true);
+
     localStorage.setItem('access_token', accessToken);
     localStorage.setItem('screen_id', screenId || '');
+    localStorage.setItem('client_id', clientId); // ✅ ADD THIS
   };
 
+  
   const handleLogout = () => {
     setToken(null);
     setIsAuthenticated(false);
@@ -265,14 +291,23 @@ const App = () => {
               isAuthenticated ? (
                 <InnerAuthenticatedApp token={token} onLogout={handleLogout} />
               ) : (
-              
+
                 <RedirectToLogin />
               )
             }
           />
 
           {/* default: if path doesn't match, try to preserve clientId in url (if present) */}
-          <Route path="/" element={<Navigate to="/saas/easyfood/login" replace />} />
+          <Route
+            path="/"
+            element={
+              <Navigate
+                to={`/saas/${localStorage.getItem('client_id') || 'easyfood'}/login`}
+                replace
+              />
+            }
+          />
+
           <Route path="*" element={<FallbackPreserveClient />} />
         </Routes>
 
@@ -295,11 +330,16 @@ const App = () => {
 const FallbackPreserveClient = () => {
   const loc = useLocation();
   const parts = loc.pathname.split('/').filter(Boolean);
+
   if (parts[0] === 'saas' && parts[1]) {
+    localStorage.setItem('client_id', parts[1]); // ✅ persist
     return <Navigate to={`/saas/${parts[1]}/login`} replace />;
   }
-  return <Navigate to={`/saas/easyfood/login`} replace />;
+
+  const storedClientId = localStorage.getItem('client_id') || 'easyfood';
+  return <Navigate to={`/saas/${storedClientId}/login`} replace />;
 };
+
 
 export default App;
 

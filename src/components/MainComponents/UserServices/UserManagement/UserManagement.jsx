@@ -1,5 +1,5 @@
 import React, { useState, useEffect, useMemo } from "react";
-import { useParams } from "react-router-dom";
+import { useNavigate, useParams } from "react-router-dom";
 import { FaLock, FaUser, FaEnvelope, FaPhone, FaCalendar, FaUserShield } from "react-icons/fa";
 import { toast, ToastContainer } from "react-toastify";
 import "react-toastify/dist/ReactToastify.css";
@@ -59,7 +59,11 @@ const UsersList = ({ onAddNew, clientId, token, onEdit }) => {
   const [searchQuery, setSearchQuery] = useState("");
   const [currentPage, setCurrentPage] = useState(1);
   const itemsPerPage = 10;
+const nav=useNavigate()
+function navigator(){
+  nav('../role-config');
 
+}
   useEffect(() => {
     const fetchRoles = async () => {
       try {
@@ -194,6 +198,13 @@ const UsersList = ({ onAddNew, clientId, token, onEdit }) => {
             <Plus size={18} />
             Add New User
           </button>
+          <button
+            onClick={navigator}
+            className="flex items-center gap-2 px-5 py-2.5 rounded-lg border border-border-default text-text-primary font-medium hover:bg-bg-tertiary transition-colors"
+          >
+            <FaUserShield />
+            Role Config
+          </button>
         </div>
 
         {/* Search Bar */}
@@ -309,8 +320,8 @@ const UsersList = ({ onAddNew, clientId, token, onEdit }) => {
                     key={i + 1}
                     onClick={() => setCurrentPage(i + 1)}
                     className={`px-3 py-1.5 rounded-lg font-medium transition-colors ${currentPage === i + 1
-                        ? "bg-action-primary text-text-white"
-                        : "bg-bg-tertiary text-text-secondary hover:bg-text-secondary"
+                      ? "bg-action-primary text-text-white"
+                      : "bg-bg-tertiary text-text-secondary hover:bg-text-secondary"
                       }`}
                   >
                     {i + 1}
@@ -417,13 +428,13 @@ const AddUserForm = ({ onCancel, onSave, clientId, token, editUser = null, isEdi
 
       const finalPayload = isEdit
         ? {
-            user_id: editUser.id,
-            first_name: formData.firstName,
-            last_name: formData.lastName,
-            email: formData.email,
-            phone: formData.phone,
-            roles: [formData.role],
-          }
+          user_id: editUser.id,
+          first_name: formData.firstName,
+          last_name: formData.lastName,
+          email: formData.email,
+          phone: formData.phone,
+          roles: [formData.role],
+        }
         : payload;
 
       await axios.post(url, finalPayload, {
@@ -466,9 +477,8 @@ const AddUserForm = ({ onCancel, onSave, clientId, token, editUser = null, isEdi
               value={formData.username}
               onChange={handleChange}
               required
-              className={`w-full px-4 py-2.5 rounded-lg border border-border-default focus:border-action-success focus:outline-none transition-colors text-text-primary placeholder-text-secondary ${
-                isEdit ? 'bg-gray-100 cursor-not-allowed' : ''
-              }`}
+              className={`w-full px-4 py-2.5 rounded-lg border border-border-default focus:border-action-success focus:outline-none transition-colors text-text-primary placeholder-text-secondary ${isEdit ? 'bg-gray-100 cursor-not-allowed' : ''
+                }`}
               placeholder="Enter username"
             />
           </div>
@@ -609,8 +619,8 @@ const AddUserForm = ({ onCancel, onSave, clientId, token, editUser = null, isEdi
             disabled={loading}
             className="flex-1 px-4 py-2.5 rounded-lg bg-action-primary text-text-white hover:bg-action-danger hover:text-text-primary transition-colors font-medium disabled:opacity-50 disabled:cursor-not-allowed"
           >
-            {loading 
-              ? (isEdit ? "Updating User..." : "Adding User...") 
+            {loading
+              ? (isEdit ? "Updating User..." : "Adding User...")
               : (isEdit ? "Update User" : "Add New User")
             }
           </button>

@@ -390,6 +390,7 @@ const KitchenDisplay = () => {
 
 
     const handleItemStatusChange = async (orderId, itemBackendId, newStatus) => {
+        
         try {
             const orderIdInt = parseInt(orderId, 10);
             const order = orders.find(o => o.id === orderIdInt);
@@ -432,6 +433,9 @@ const KitchenDisplay = () => {
                 },
                 { headers: { Authorization: `Bearer ${token}` } }
             );
+if (derivedStatus === "ready") {
+  clearNewItemsStorage(orderId);
+}
 
             // 📣 DISPATCH EVENT ONLY WHEN ALL ITEMS ARE SERVED
             if (derivedStatus === "ready" && order.status !== "ready") {
@@ -536,87 +540,6 @@ const KitchenDisplay = () => {
         return "pending";
     };
 
-
-
-    // const handleStatusChange = async (orderId, newStatus) => {
-    //     try {
-    //         const orderIdInt = parseInt(orderId, 10);
-    //         const order = orders.find(o => o.id === orderIdInt);
-    //         if (!order) return;
-
-    //         // Update all items if order status is "served"
-    //         const updatedItems =
-    //         newStatus === "served"
-    //             ? order.items.map(item => ({ ...item, status: "served" }))
-    //             : newStatus === "ready"
-    //             ? order.items.map(item => ({ ...item, status: "ready" }))
-    //             : order.items;
-
-
-    //         const cleanedItems = updatedItems.map(item => ({
-    //             item_id: item.item_id,
-    //             item_name: item.item_name,
-    //             quantity: item.quantity,
-    //             status: item.status || "new",
-    //             note: item.note || "",
-    //             slug: item.slug || "",
-    //             price: item.price || inventoryMap[item.item_id]?.price || 0,
-    //             client_id: clientId,
-    //             order_id: orderId,
-    //         }));
-
-    //         const totalPrice = cleanedItems.reduce(
-    //             (sum, item) => sum + (item.price || 0) * (item.quantity || 1),
-    //             0
-    //         );
-
-    //         // Save updated items with their statuses
-    //         await axios.post(
-    //             `${import.meta.env.VITE_API_ORDER_SERVICE_URL}/${clientId}/order_items/update?order_id=${orderIdInt}`,
-    //             cleanedItems,
-    //             { headers: { Authorization: `Bearer ${token}` } }
-    //         );
-
-    //         // Update overall order status and total price
-    //         await axios.post(
-    //             `${import.meta.env.VITE_API_ORDER_SERVICE_URL}/${clientId}/dinein/update`,
-    //             { id: orderIdInt, status: newStatus, total_price: totalPrice },
-    //             { headers: { Authorization: `Bearer ${token}` } }
-    //         );
-
-    //         // ✅ If served, clear new items tracking
-    //         if (newStatus === "served") {
-    //             clearNewItemsStorage(orderId);
-    //         }
-
-    //         // Update local state accordingly
-    //         setOrders(prev =>
-    //             prev.map(o =>
-    //                 o.id === orderId
-    //                     ? {
-    //                         ...o,
-    //                         status: newStatus,
-    //                         items: updatedItems,
-    //                         total_price: totalPrice,
-    //                         has_new_items: newStatus === 'served' ? false : o.has_new_items,
-    //                         new_items_start_index: newStatus === 'served' ? null : o.new_items_start_index,
-    //                     }
-    //                     : o
-    //             )
-    //         );
-
-    //         // Exit edit/add modes if served
-    //         if (newStatus === "served") {
-    //             if (editOrderId === orderId) setEditOrderId(null);
-    //             if (addingOrderId === orderId) setAddingOrderId(null);
-    //         }
-    //     } catch (err) {
-    //         console.error(err);
-    //         toast.error("Failed to update order status");
-    //     }
-    // };
-
-    // Calculate elapsed time since item was created
     const calculateElapsedTime = (createdAt) => {
         if (!createdAt) return "0:00";
 
