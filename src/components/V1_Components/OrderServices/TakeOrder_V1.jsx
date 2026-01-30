@@ -191,40 +191,60 @@ const TakeOrder_V1 = ({ clientId, token, onOrderUpdate, realm }) => {
     };
 
     const fetchTables = async () => {
-        const res = await axios.get(
-            `${import.meta.env.VITE_API_TABLE_SERVICE_URL}/${clientId}/tables/read`,
-            { headers: { Authorization: `Bearer ${token}` } }
-        );
+        try {
+            const res = await axios.get(
+                `${import.meta.env.VITE_API_TABLE_SERVICE_URL}/${clientId}/tables/read`,
+                { headers: { Authorization: `Bearer ${token}` } }
+            );
 
-        const tableList = Array.isArray(res.data?.data)
-            ? res.data.data.map(t => ({
-                ...t,
-                table_number: t.name || t.table_number || "-",
-            }))
-            : [];
+            const tableList = Array.isArray(res.data?.data)
+                ? res.data.data.map(t => ({
+                    ...t,
+                    table_number: t.name || t.table_number || "-",
+                }))
+                : [];
 
-        const modeMap = {};
+            const modeMap = {};
 
-        tableList.forEach(t => {
-            const name = (t.name || '').toLowerCase();
+            tableList.forEach(t => {
+                const name = (t.name || '').toLowerCase().trim();
 
-            if (name === 'delivery') {
-                modeMap[t.id] = 'delivery';
-            } else if (name === 'pickup' || name === 'takeaway') {
-                modeMap[t.id] = 'takeaway';
-            } else {
-                modeMap[t.id] = 'dinein';
+                // More flexible matching with includes()
+                if (name.includes('delivery')) {
+                    modeMap[t.id] = 'delivery';
+                    console.log(`✅ Mapped table "${t.name}" (ID: ${t.id}) → delivery`);
+                } else if (name.includes('pickup') || name.includes('takeaway')) {
+                    modeMap[t.id] = 'takeaway';
+                    console.log(`✅ Mapped table "${t.name}" (ID: ${t.id}) → takeaway`);
+                } else {
+                    modeMap[t.id] = 'dinein';
+                }
+            });
+
+            // Validate that we found the required tables
+            const hasDelivery = Object.values(modeMap).includes('delivery');
+            const hasTakeaway = Object.values(modeMap).includes('takeaway');
+
+            if (!hasDelivery) {
+                console.warn('⚠️ No "delivery" table found. Please create a table with "delivery" in its name.');
             }
-        });
+            if (!hasTakeaway) {
+                console.warn('⚠️ No "takeaway/pickup" table found. Please create a table with "takeaway" or "pickup" in its name.');
+            }
 
-        tableList.sort((a, b) =>
-            a.table_number.localeCompare(b.table_number, undefined, { numeric: true })
-        );
+            tableList.sort((a, b) =>
+                a.table_number.localeCompare(b.table_number, undefined, { numeric: true })
+            );
 
-        setTables(tableList);
-        setTableModeMap(modeMap);
+            setTables(tableList);
+            setTableModeMap(modeMap);
 
-        await fetchTableOrders(tableList);
+            console.log('📋 Final Mode Map:', modeMap);
+
+            await fetchTableOrders(tableList);
+        } catch (error) {
+            console.error('❌ Error fetching tables:', error);
+        }
     };
 
 
@@ -269,9 +289,43 @@ const TakeOrder_V1 = ({ clientId, token, onOrderUpdate, realm }) => {
         window.history.pushState({ view: 'floor' }, '');
     }, []);
     const getTableIdByMode = (mode) => {
-        return tables.find(
-            t => tableModeMap[t.id] === mode
-        )?.id || null;
+        console.log('🔍 Searching for table with mode:', mode);
+
+        // Find table by mode from the map
+        const foundTable = tables.find(t => tableModeMap[t.id] === mode);
+
+        if (foundTable) {
+            console.log(`✅ Found table: "${foundTable.name}" (ID: ${foundTable.id})`);
+            return foundTable.id;
+        }
+
+        // Fallback: Search by name directly if map lookup fails
+        console.warn(`⚠️ Mode map lookup failed for "${mode}", trying direct name search...`);
+
+        let fallbackTable = null;
+
+        if (mode === 'takeaway') {
+            fallbackTable = tables.find(t => {
+                const name = (t.name || '').toLowerCase().trim();
+                return name.includes('takeaway') || name.includes('pickup');
+            });
+        } else if (mode === 'delivery') {
+            fallbackTable = tables.find(t => {
+                const name = (t.name || '').toLowerCase().trim();
+                return name.includes('delivery');
+            });
+        }
+
+        if (fallbackTable) {
+            console.log(`✅ Found via fallback: "${fallbackTable.name}" (ID: ${fallbackTable.id})`);
+            return fallbackTable.id;
+        }
+
+        console.error(`❌ No table found for mode: ${mode}`);
+        console.error('Available tables:', tables.map(t => ({ id: t.id, name: t.name })));
+        console.error('Mode map:', tableModeMap);
+
+        return null;
     };
 
     useEffect(() => {
@@ -729,7 +783,7 @@ const TakeOrder_V1 = ({ clientId, token, onOrderUpdate, realm }) => {
                         quantity: i.quantity,
                         unit_price: i.unit_price,
                         line_total: i.unit_price * i.quantity,
-                        status: "ready",
+                        status: "pending",
                         note: i.note || "",
                         frontend_unique_key: i.frontend_unique_key || null,
                     })),
@@ -742,31 +796,46 @@ const TakeOrder_V1 = ({ clientId, token, onOrderUpdate, realm }) => {
                     { headers }
                 );
             } else {
+                // Create new order - Get table ID
                 const tableId = getTableIdByMode(orderMode);
 
-if (!tableId) {
-    alert(`No table configured for ${orderMode}`);
-    return;
-}
+                if (!tableId) {
+                    const availableTables = tables.map(t => `"${t.name}" (ID: ${t.id})`).join(', ');
+                    const errorMsg = `Cannot find table for "${orderMode}" mode.\n\n` +
+                        `Please ensure you have a table with:\n` +
+                        `- "delivery" in its name for Delivery orders\n` +
+                        `- "takeaway" or "pickup" in its name for Takeaway orders\n\n` +
+                        `Available tables: ${availableTables}`;
+
+                    alert(errorMsg);
+                    console.error('Table lookup failed:', {
+                        orderMode,
+                        tableModeMap,
+                        availableTables: tables
+                    });
+                    return;
+                }
+
+                console.log(`✅ Creating order for ${orderMode} using table ID: ${tableId}`);
 
                 // Create new order
                 await axios.post(
                     `${import.meta.env.VITE_API_ORDER_SERVICE_URL}/${clientId}/dinein/create`,
                     {
                         client_id: clientId,
-                        table_id: tableId,
+                        table_id: Number(tableId),
                         price: subtotal,
                         gst,
                         cst,
                         total_price: total,
-                        status: "ready",
+                        status: "pending",
                         items: cart.map(i => ({
                             item_id: i.id,
                             item_name: i.name,
                             quantity: i.quantity,
                             unit_price: i.unit_price,
                             line_total: i.unit_price * i.quantity,
-                            status: "ready"
+                            status: "pending"
                         }))
                     },
                     { headers }
@@ -805,9 +874,12 @@ if (!tableId) {
             setCurrentBatchTimestamp(null);
             setHasNewItems(false);
 
+            console.log('✅ Order placed successfully!');
+
         } catch (err) {
-            console.error("ORDER ERROR:", err);
-            alert("Order failed");
+            console.error("❌ ORDER ERROR:", err);
+            console.error("Error details:", err.response?.data || err.message);
+            alert(`Order failed: ${err.response?.data?.message || err.message}`);
         } finally {
             isPlacingRef.current = false;
             setIsPlacingOrder(false);
@@ -924,7 +996,7 @@ if (!tableId) {
             setCart(reconstructedCart);
             setSelectedTable(table.id.toString());
             const mode = tableModeMap[table.id] || 'dinein';
-            setOrderMode(mode);            
+            setOrderMode(mode);
             setCurrentView('order');
             setShowCart(true);
 
@@ -1099,8 +1171,8 @@ if (!tableId) {
                                                                 if (id) setSelectedTable(String(id));
                                                             }} className={`flex-1 py-1.5 rounded-lg text-sm font-semibold transition
                                                                 ${orderMode === 'takeaway'
-                                                                                                                              ? 'bg-action-primary text-white'
-                                                                                                                              : 'bg-gray-100 text-gray-600 hover:bg-gray-200'}
+                                                                    ? 'bg-action-primary text-white'
+                                                                    : 'bg-gray-100 text-gray-600 hover:bg-gray-200'}
                                                               `}
                                                         >
                                                             Takeaway
@@ -1113,8 +1185,8 @@ if (!tableId) {
                                                                 if (id) setSelectedTable(String(id));
                                                             }} className={`flex-1 py-1.5 rounded-lg text-sm font-semibold transition
                                                                 ${orderMode === 'delivery'
-                                                                                                                              ? 'bg-action-primary text-white'
-                                                                                                                              : 'bg-gray-100 text-gray-600 hover:bg-gray-200'}
+                                                                    ? 'bg-action-primary text-white'
+                                                                    : 'bg-gray-100 text-gray-600 hover:bg-gray-200'}
                                                               `}
                                                         >
                                                             Delivery
