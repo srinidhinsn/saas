@@ -9,4 +9,5 @@ python-jose
 pytest
 httpx
 python-multipart
+python-dotenv
 saas_common_lib_473815
