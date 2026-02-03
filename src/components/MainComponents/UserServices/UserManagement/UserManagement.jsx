@@ -1,10 +1,93 @@
 import React, { useState, useEffect, useMemo } from "react";
 import { useNavigate, useParams } from "react-router-dom";
 import { FaLock, FaUser, FaEnvelope, FaPhone, FaCalendar, FaUserShield } from "react-icons/fa";
-import { toast, ToastContainer } from "react-toastify";
-import "react-toastify/dist/ReactToastify.css";
 import { Search, Plus, Edit, Trash2, X, ChevronLeft, ChevronRight } from 'lucide-react';
 import axios from 'axios';
+const ConfirmModal = ({
+  open,
+  title,
+  description,
+  confirmText = "Confirm",
+  cancelText = "Cancel",
+  danger = false,
+  onConfirm,
+  onClose,
+}) => {
+  if (!open) return null;
+
+  return (
+    <div className="fixed inset-0 z-50 flex items-center justify-center bg-black/40">
+      <div className="bg-white rounded-xl shadow-xl w-full max-w-md p-6 relative animate-fadeIn">
+        {/* Close */}
+        <button
+          onClick={onClose}
+          className="absolute top-4 right-4 text-gray-400 hover:text-gray-600"
+        >
+          <X size={18} />
+        </button>
+
+        {/* Title */}
+        <h3 className="text-xl font-semibold text-gray-900">
+          {title}
+        </h3>
+
+        {/* Description */}
+        <p className="text-gray-600 mt-2">
+          {description}
+        </p>
+
+        {/* Actions */}
+        <div className="flex justify-end gap-3 mt-6">
+          <button
+            onClick={onClose}
+            className="px-4 py-2 rounded-lg border border-gray-300 text-gray-700 hover:bg-gray-100"
+          >
+            {cancelText}
+          </button>
+
+          <button
+            onClick={onConfirm}
+            className={`px-4 py-2 rounded-lg text-white ${danger
+              ? "bg-red-600 hover:bg-red-700"
+              : "bg-blue-600 hover:bg-blue-700"
+              }`}
+          >
+            {confirmText}
+          </button>
+        </div>
+      </div>
+    </div>
+  );
+};
+
+const usePermissions = (token, clientId) => {
+  const [permissions, setPermissions] = useState({});
+
+  useEffect(() => {
+    const fetchPerms = async () => {
+      const realm = JSON.parse(atob(token.split(".")[1])).realm;
+
+      const res = await axios.get(
+        `${import.meta.env.VITE_API_USER_SERVICE_URL}/${clientId}/users/permissions/catalog?realm=${realm}`,
+        { headers: { Authorization: `Bearer ${token}` } }
+      );
+
+      const perms = {};
+      (res.data?.data?.modules || []).forEach(m => {
+        perms[m.module] = m.operations || [];
+      });
+
+      console.log("FINAL PERMISSIONS MAP ✅", perms);
+      setPermissions(perms);
+    };
+
+    if (token && clientId) fetchPerms();
+  }, [token, clientId]);
+
+  return permissions;
+};
+
+
 
 const UserManagement = ({ token, clientId }) => {
   const [activeView, setActiveView] = useState('list');
@@ -12,7 +95,6 @@ const UserManagement = ({ token, clientId }) => {
 
   return (
     <div className="min-h-screen bg-bg-primary">
-      <ToastContainer position="top-right" autoClose={3000} />
       {/* Content */}
       <div className="max-w-7xl mx-auto p-4">
         {activeView === 'list' && (
@@ -59,11 +141,20 @@ const UsersList = ({ onAddNew, clientId, token, onEdit }) => {
   const [searchQuery, setSearchQuery] = useState("");
   const [currentPage, setCurrentPage] = useState(1);
   const itemsPerPage = 10;
-const nav=useNavigate()
-function navigator(){
-  nav('../role-config');
+  const permissions = usePermissions(token, clientId);
 
-}
+  const canAddRole = permissions.roles?.includes("create") ?? false;
+  const canDeleteRole = permissions.roles?.includes("delete") ?? false;
+  const canDeleteUser = permissions.users?.includes("delete") ?? false;
+  const [showAddRole, setShowAddRole] = useState(false);
+  const [showDeleteRole, setShowDeleteRole] = useState(false);
+  const [deleteUserId, setDeleteUserId] = useState(null);
+
+  const nav = useNavigate()
+  function navigator() {
+    nav('../role-config');
+
+  }
   useEffect(() => {
     const fetchRoles = async () => {
       try {
@@ -81,6 +172,9 @@ function navigator(){
     };
     if (clientId && token) fetchRoles();
   }, [clientId, token]);
+  useEffect(() => {
+    console.log("PERMISSIONS 🔥", permissions);
+  }, [permissions]);
 
   useEffect(() => {
     const fetchUsers = async () => {
@@ -103,7 +197,6 @@ function navigator(){
         }
       } catch (error) {
         console.error("Error fetching users:", error);
-        toast.error("Failed to fetch users");
       }
     };
     if (clientId && token) fetchUsers();
@@ -159,10 +252,22 @@ function navigator(){
       setSelectionModel([]);
       setChangeRoleValue("");
       setIsChangeRoleConfirmOpen(false);
-      toast.success("Roles updated successfully!");
     } catch (error) {
       console.error("Failed to update role:", error);
-      toast.error("Failed to update roles");
+    }
+  };
+  const handleDeleteUser = async (userId) => {
+    if (!window.confirm("Delete this user?")) return;
+
+    try {
+      await axios.delete(
+        `${import.meta.env.VITE_API_USER_SERVICE_URL}/${clientId}/users/${userId}`,
+        { headers: { Authorization: `Bearer ${token}` } }
+      );
+
+      setUsers(prev => prev.filter(u => u.id !== userId));
+    } catch (e) {
+      console.error("Delete failed", e);
     }
   };
 
@@ -191,20 +296,42 @@ function navigator(){
             <h2 className="text-2xl font-semibold text-text-primary">Users Management</h2>
             <p className="text-text-secondary text-sm mt-1">Manage user accounts and permissions</p>
           </div>
-          <button
-            onClick={onAddNew}
-            className="flex items-center gap-2 px-5 py-2.5 rounded-lg bg-action-primary text-text-white font-medium hover:bg-bulkActionsHover-addingHover transition-colors"
-          >
-            <Plus size={18} />
-            Add New User
-          </button>
-          <button
-            onClick={navigator}
-            className="flex items-center gap-2 px-5 py-2.5 rounded-lg border border-border-default text-text-primary font-medium hover:bg-bg-tertiary transition-colors"
-          >
-            <FaUserShield />
-            Role Config
-          </button>
+          <div className="flex items-center gap-2">
+            <button
+              onClick={onAddNew}
+              className="flex items-center gap-2 px-5 py-2.5 rounded-lg bg-action-primary text-text-white"
+            >
+              <Plus size={18} />
+              Add New User
+            </button>
+            {/* <button
+              onClick={() => setShowAddRole(true)}
+              className="flex items-center gap-2 px-5 py-2.5 rounded-lg border"
+            >
+              <Plus size={16} />
+              Add Role
+            </button>
+
+
+            <button
+              onClick={() => setShowDeleteRole(true)}
+              className="flex items-center gap-2 px-5 py-2.5 rounded-lg border text-red-600"
+            >
+              <Trash2 size={16} />
+              Delete Role
+            </button> */}
+
+
+
+            <button
+              onClick={navigator}
+              className="flex items-center gap-2 px-5 py-2.5 rounded-lg border border-border-default"
+            >
+              <FaUserShield />
+              Role Config
+            </button>
+          </div>
+
         </div>
 
         {/* Search Bar */}
@@ -283,7 +410,7 @@ function navigator(){
                     </span>
                   </td>
 
-                  <td className="px-4 py-3">
+                  <td className="px-4 py-3 flex gap-3">
                     <button
                       onClick={() => onEdit(user)}
                       className="text-action-primary hover:text-action-danger"
@@ -291,7 +418,17 @@ function navigator(){
                     >
                       <Edit size={16} />
                     </button>
+
+                    <button
+                      onClick={() => setDeleteUserId(user.id)}
+                      className="text-red-600 hover:text-red-800"
+                    >
+                      <Trash2 size={16} />
+                    </button>
+
+
                   </td>
+
 
                 </tr>
 
@@ -299,6 +436,53 @@ function navigator(){
             </tbody>
           </table>
         </div>
+        <ConfirmModal
+          open={showAddRole}
+          title="Add New Role"
+          description="Are you sure you want to create a new role? You can configure its permissions later."
+          confirmText="Create Role"
+          onClose={() => setShowAddRole(false)}
+          onConfirm={() => {
+            if (!canAddRole) {
+              alert("You don't have permission to add roles");
+              return;
+            }
+            setShowAddRole(false);
+            nav("../roles/add");
+          }}
+        />
+        <ConfirmModal
+          open={showDeleteRole}
+          title="Delete Role"
+          description="This will permanently delete the role and its configurations. This action cannot be undone."
+          confirmText="Delete Role"
+          danger
+          onClose={() => setShowDeleteRole(false)}
+          onConfirm={() => {
+            if (!canDeleteRole) {
+              alert("You don't have permission to delete roles");
+              return;
+            }
+            setShowDeleteRole(false);
+            nav("../roles");
+          }}
+        />
+        <ConfirmModal
+          open={!!deleteUserId}
+          title="Delete User"
+          description="This user will be permanently removed from the system."
+          confirmText="Delete User"
+          danger
+          onClose={() => setDeleteUserId(null)}
+          onConfirm={() => {
+            if (!canDeleteUser) {
+              alert("You don't have permission to delete users");
+              return;
+            }
+            handleDeleteUser(deleteUserId);
+            setDeleteUserId(null);
+          }}
+        />
 
         {/* Pagination */}
         {totalPages > 1 && (
@@ -441,11 +625,9 @@ const AddUserForm = ({ onCancel, onSave, clientId, token, editUser = null, isEdi
         headers: { Authorization: `Bearer ${token}` },
       });
 
-      toast.success(isEdit ? "User updated successfully!" : "User added successfully!");
       if (onSave) onSave();
     } catch (error) {
       console.error(`Failed to ${isEdit ? 'update' : 'add'} user:`, error);
-      toast.error(error?.response?.data?.detail || `Failed to ${isEdit ? 'update' : 'add'} user`);
     } finally {
       setLoading(false);
     }

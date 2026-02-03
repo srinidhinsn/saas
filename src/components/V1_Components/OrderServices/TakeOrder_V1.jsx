@@ -136,9 +136,6 @@ const TakeOrder_V1 = ({ clientId, token, onOrderUpdate, realm }) => {
     const [currentView, setCurrentView] = useState('order');
     const [tableModeMap, setTableModeMap] = useState({});
 
-    const TAKEAWAY_TABLE_ID = 501;
-    const DELIVERY_TABLE_ID = 502;
-
     const isPlacingRef = useRef(false);
     const isMobile = window.matchMedia('(max-width: 1024px)').matches;
     const [showClearConfirm, setShowClearConfirm] = useState(false);
@@ -189,64 +186,74 @@ const TakeOrder_V1 = ({ clientId, token, onOrderUpdate, realm }) => {
         traverse(categories);
         return Array.from(result);
     };
-
-    const fetchTables = async () => {
+    const normalizeTableName = (value = "") =>
+        value
+          .toLowerCase()
+          .trim()
+          .replace(/[_\-()]/g, " ")     // replace _ - ( )
+          .replace(/[^a-z\s]/g, "")     // remove symbols/numbers
+          .replace(/\s+/g, " ");        // normalize spaces
+      
+      const fetchTables = async () => {
         try {
-            const res = await axios.get(
-                `${import.meta.env.VITE_API_TABLE_SERVICE_URL}/${clientId}/tables/read`,
-                { headers: { Authorization: `Bearer ${token}` } }
-            );
-
-            const tableList = Array.isArray(res.data?.data)
-                ? res.data.data.map(t => ({
-                    ...t,
-                    table_number: t.name || t.table_number || "-",
-                }))
-                : [];
-
-            const modeMap = {};
-
-            tableList.forEach(t => {
-                const name = (t.name || '').toLowerCase().trim();
-
-                // More flexible matching with includes()
-                if (name.includes('delivery')) {
-                    modeMap[t.id] = 'delivery';
-                    console.log(`✅ Mapped table "${t.name}" (ID: ${t.id}) → delivery`);
-                } else if (name.includes('pickup') || name.includes('takeaway')) {
-                    modeMap[t.id] = 'takeaway';
-                    console.log(`✅ Mapped table "${t.name}" (ID: ${t.id}) → takeaway`);
-                } else {
-                    modeMap[t.id] = 'dinein';
-                }
-            });
-
-            // Validate that we found the required tables
-            const hasDelivery = Object.values(modeMap).includes('delivery');
-            const hasTakeaway = Object.values(modeMap).includes('takeaway');
-
-            if (!hasDelivery) {
-                console.warn('⚠️ No "delivery" table found. Please create a table with "delivery" in its name.');
+          const res = await axios.get(
+            `${import.meta.env.VITE_API_TABLE_SERVICE_URL}/${clientId}/tables/read`,
+            { headers: { Authorization: `Bearer ${token}` } }
+          );
+      
+          const tableList = Array.isArray(res.data?.data)
+            ? res.data.data.map(t => ({
+                ...t,
+                table_number: t.name || t.table_number || "-",
+              }))
+            : [];
+      
+          const modeMap = {};
+      
+          tableList.forEach(t => {
+            const normalized = normalizeTableName(t.name);
+      
+            if (normalized.includes("delivery")) {
+              modeMap[t.id] = "delivery";
             }
-            if (!hasTakeaway) {
-                console.warn('⚠️ No "takeaway/pickup" table found. Please create a table with "takeaway" or "pickup" in its name.');
+            else if (
+              normalized.includes("takeaway") ||
+              normalized.includes("take away") ||
+              normalized.includes("pickup") ||
+              normalized.includes("pick up")
+            ) {
+              modeMap[t.id] = "takeaway";
             }
-
-            tableList.sort((a, b) =>
-                a.table_number.localeCompare(b.table_number, undefined, { numeric: true })
-            );
-
-            setTables(tableList);
-            setTableModeMap(modeMap);
-
-            console.log('📋 Final Mode Map:', modeMap);
-
-            await fetchTableOrders(tableList);
+            else {
+              modeMap[t.id] = "dinein";
+            }
+          });
+      
+          // Sort tables naturally
+          tableList.sort((a, b) =>
+            a.table_number.localeCompare(b.table_number, undefined, { numeric: true })
+          );
+      
+          setTables(tableList);
+          setTableModeMap(modeMap);
+      
+          // 🔍 Debug once (remove later)
+          console.table(
+            tableList.map(t => ({
+              id: t.id,
+              name: t.name,
+              normalized: normalizeTableName(t.name),
+              mode: modeMap[t.id],
+            }))
+          );
+      
+          await fetchTableOrders(tableList);
+      
         } catch (error) {
-            console.error('❌ Error fetching tables:', error);
+          console.error("❌ Error fetching tables:", error);
         }
-    };
-
+      };
+      
 
     const fetchTableOrders = async (tableList) => {
         try {
@@ -765,9 +772,7 @@ const TakeOrder_V1 = ({ clientId, token, onOrderUpdate, realm }) => {
                 0
             );
 
-            const gst = subtotal * 0.05;
-            const cst = subtotal * 0.02;
-            const total = subtotal + gst + cst;
+        
 
             const headers = { Authorization: `Bearer ${token}` };
 
@@ -825,9 +830,7 @@ const TakeOrder_V1 = ({ clientId, token, onOrderUpdate, realm }) => {
                         client_id: clientId,
                         table_id: Number(tableId),
                         price: subtotal,
-                        gst,
-                        cst,
-                        total_price: total,
+                        total_price: subtotal,
                         status: "ready",
                         items: cart.map(i => ({
                             item_id: i.id,
