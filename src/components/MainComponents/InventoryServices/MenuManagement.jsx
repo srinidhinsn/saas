@@ -21,7 +21,7 @@ const MenuManagement = ({ clientId, token, realm }) => {
   const [menuItems, setMenuItems] = useState([]);
   const [loading, setLoading] = useState(true);
   const [dietaryFilter, setDietaryFilter] = useState("All");
-
+  const [inventoryIds, setInventoryIds] = useState([]);
   // Modal states
   const [showAddModal, setShowAddModal] = useState(false);
   const [showEditModal, setShowEditModal] = useState(false);
@@ -161,23 +161,37 @@ const MenuManagement = ({ clientId, token, realm }) => {
     return null;
   };
 
+  const fetchInventoryIds = async () => {
+    try {
+      const res = await axios.get(
+        `${import.meta.env.VITE_API_INVENTORY_SERVICE_URL}/${clientId}/menu/read_category?category_id=inventory`,
+        {
+          headers: {
+            Authorization: `Bearer ${token}`,
+          },
+        }
+      );
+  
+      // ✅ Correct key
+      const subcategories = res.data.data[0];
+      const subcats=subcategories.subCategories
+  
+      setInventoryIds(subcats);
+  
+      console.log("Inventory Subcategories:", subcats);
+    } catch (error) {
+      console.log("Error fetching inventory IDs:", error);
+    }
+  };
+  
 
-  // const generateCategoryIdFromName = (name) => {
-  //   if (!name) return null;
 
-  //   const now = new Date();
-  //   const dd = String(now.getDate()).padStart(2, "0");
-  //   const mm = String(now.getMonth() + 1).padStart(2, "0");
+  useEffect(() => {
+    fetchInventoryIds();
+  }, []);
+  
+  
 
-  //   const normalizedName = name
-  //     .trim()
-  //     .replace(/\s+/g, "_")
-  //     .replace(/[^a-zA-Z0-9_]/g, "");
-
-  //   return `${normalizedName}_${dd}_${mm}`;
-  // };
-
-  // Updated handleAddItem - explicitly removes dietary_type
   const handleAddItem = async () => {
     try {
       let imageId = null;
@@ -219,8 +233,8 @@ const MenuManagement = ({ clientId, token, realm }) => {
         serving_unit: newItem.serving_unit || null,
         created_by,
         updated_by: created_by,
-        inventory_id: 1
-      };
+        inventory_id: newItem.inventory_id 
+            };
 
       console.log("Payload before sending:", payload);
 
@@ -1254,6 +1268,7 @@ const MenuManagement = ({ clientId, token, realm }) => {
         setNewItemImageUrl={setNewItemImageUrl}
         handleAddItem={handleAddItem}
         getCategoryIdByName={getCategoryIdByName}
+        inventoryIds={inventoryIds}
       />
       <UniversalEditModal
         showModal={showEditModal}
@@ -1272,6 +1287,7 @@ const MenuManagement = ({ clientId, token, realm }) => {
         handleEditItem={handleEditItem}
         clientId={clientId}
         token={token}
+        inventoryIds={inventoryIds}
       />
 
 

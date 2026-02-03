@@ -21,6 +21,7 @@ const UniversalEditModal = ({
   handleEditItem,
   clientId,
   token,
+  inventoryIds,
 
   // Table-specific props
   editRowId,
@@ -125,6 +126,36 @@ const UniversalEditModal = ({
                   ))}
                 </select>
               </div>
+
+              {/* Inventory ID Dropdown */}
+              <div>
+                <label className="block text-sm font-medium mb-1 text-gray-700">
+                  Inventory ID <span className="text-red-600">*</span>
+                </label>
+
+                <select
+                  value={editingItem.inventory_id || ""}
+                  onChange={(e) =>
+                    setEditingItem({
+                      ...editingItem,
+                      inventory_id: e.target.value
+                    })
+                  }
+                  className="w-full px-3 py-2 rounded-md border border-gray-300 text-gray-900
+               focus:outline-none focus:ring-2 focus:ring-action-primary"
+                  required
+                >
+                  <option value="">Select Inventory ID</option>
+
+                  {(inventoryIds || []).map((inv) => (
+                    <option key={inv.id} value={inv.id}>
+                      {inv.inventory_id} - {inv.name}
+                    </option>
+                  ))}
+                </select>
+              </div>
+
+
 
               {/* Item Name */}
               <div>

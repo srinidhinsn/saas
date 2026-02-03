@@ -246,13 +246,16 @@ const TableReservation = ({
                             </div>
 
                             {/* ===== BODY ===== */}
-                            <div className="p-6 flex items-center justify-between">
+                            <div className={`p-6 flex justify-between  ${statusKey === 'occupied' ? 'text-blue-600 bg-blue-200' :
+                                  statusKey === 'served' ? 'text-purple-600 bg-purple-50' :
+                                    statusKey === 'reserved' ? 'text-yellow-600 bg-yellow-50' :
+                                      'text-green-600 bg-green-200'} `}>
                               {statusKey === 'vacant' && <span className="text-2xl">-</span>}
                               {(statusKey === 'occupied' || statusKey === 'served') && <Eye size={28} className="text-blue-600" />}
                               
                               {/* ACTION BUTTONS FOR OCCUPIED/SERVED TABLES */}
                               {hasViewableOrder && (
-                                <div className="flex gap-2">
+                                <>
                                   {/* Print Bill Button */}
                                   <button
                                     onClick={(e) => {
@@ -264,7 +267,7 @@ const TableReservation = ({
                                     className="text-yellow-600 hover:scale-110 transition-transform"
                                     title="Print Bill"
                                   >
-                                    <Printer size={16} />
+                                    <Printer size={28} />
                                   </button>
                                   
                                   {/* Delete Order Button */}
@@ -278,14 +281,14 @@ const TableReservation = ({
                                     className="text-red-600 hover:scale-110 transition-transform"
                                     title="Delete Order"
                                   >
-                                    <Trash2 size={16} />
+                                    <Trash2 size={28} />
                                   </button>
-                                </div>
+                                </>
                               )}
                               {statusKey === 'reserved' && <Lock size={28} className="text-yellow-600" />}
                             </div>
 
-                            {/* STATUS BADGE */}
+                            {/* STATUS BADGE
                             <div
                               className={`py-2 text-center text-xs font-semibold border-t rounded
                                 ${statusKey === 'occupied' ? 'text-blue-600 bg-blue-50' :
@@ -294,7 +297,7 @@ const TableReservation = ({
                                       'text-green-600 bg-green-50'}`}
                             >
                               {table.status?.toUpperCase()}
-                            </div>
+                            </div> */}
                           </div>
 
                           {/* MARK AS SERVED BUTTON */}

@@ -22,6 +22,7 @@ const UniversalAddModal = ({
   setNewItemImageUrl,
   handleAddItem,
   getCategoryIdByName,
+  inventoryIds,
 
   // Table-specific props
   tableRanges,
@@ -130,8 +131,10 @@ const UniversalAddModal = ({
         discount: '',
         code: '',
         unit: '',
-        line_item_id: []
+        line_item_id: [],
+        inventory_id: ''   // ✅ ADD THIS
       });
+
       setNewItemImage?.(null);
       setNewItemImageUrl?.('');
     } else if (modalType === 'table') {
@@ -178,6 +181,35 @@ const UniversalAddModal = ({
                 ))}
               </select>
             </div>
+
+
+            {/* Inventory Selector */}
+            <div>
+              <label className="block text-sm font-medium mb-2 text-text-primary">
+                Inventory Category *
+              </label>
+
+              <select
+                value={newItem?.inventory_id ?? ""}
+                onChange={(e) =>
+                  setNewItem((prev) => ({
+                    ...(prev || {}),
+                    inventory_id: e.target.value
+                  }))
+                }
+                className="w-full px-4 py-2 rounded-lg bg-bg-tertiary border border-border-default text-text-primary focus:outline-none focus:ring-2 focus:ring-action-primary"
+                required
+              >
+                <option value="">Select Inventory</option>
+
+                {(inventoryIds || []).map((inv) => (
+                  <option key={inv.id} value={inv.id}>
+                    {inv.name}
+                  </option>
+                ))}
+              </select>
+            </div>
+
 
             {/* Item Name */}
             <div>
@@ -365,8 +397,8 @@ const UniversalAddModal = ({
         <div className="bg-bg-primary rounded-xl w-full max-w-xl shadow-2xl border border-border-default my-8">
           <div className="sticky top-0 bg-bg-primary px-4 py-2 border-b-border-default flex justify-between items-center z-10 rounded-t-xl">
             <h3 className="text-xl font-bold text-text-primary">Add Tables</h3>
-            <button onClick={handleClose}       className="p-1.5 rounded-lg bg-action-primary text-text-white hover:opacity-90 transition-opacity   "
-                           >
+            <button onClick={handleClose} className="p-1.5 rounded-lg bg-action-primary text-text-white hover:opacity-90 transition-opacity   "
+            >
               <X size={24} />
             </button>
           </div>
