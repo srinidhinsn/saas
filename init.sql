@@ -666,3 +666,40 @@ CREATE TABLE notifications (
     updated_at TIMESTAMPTZ DEFAULT NOW()
 
 );
+
+
+
+
+INSERT INTO category (
+  id, client_id, name, description, sub_categories, slug,
+  created_by, updated_by, created_at, updated_at
+)
+VALUES (
+  'users',
+  'saas',
+  'Users',
+  'User management accesses',
+  ARRAY[
+    'register',
+    'login',
+    'add',
+    'reset-password',
+    'users',
+    'person-details',
+    'delegate-access',
+    'persons',
+    'realm',
+    'realms',
+    'screens',
+    'screens/configure',
+    'permissions',
+    'permissions/catalog',
+    'roles',
+    'roles/config'
+  ],
+  '_Realm_Restaurant_Users',
+  NULL,
+  NULL,
+  '2026-02-02 12:00:00.63831',
+  '2026-02-02 12:09:00.87962'
+);
