@@ -127,14 +127,14 @@ const RoleConfig = ({ token, clientId }) => {
   /* ===================== UI ===================== */
   return (
     <div className="min-h-screen bg-gray-50 p-4">
-      <div className="max-w-7xl mx-auto bg-white rounded-xl shadow-lg grid grid-cols-1 md:grid-cols-4 overflow-hidden">
+      <div className="max-w-7xl mx-auto bg-white rounded-xl shadow-lg grid grid-cols-1  overflow-hidden">
 
         {/* LEFT – ROLES */}
         <aside className="border-r p-4">
           <h2 className="text-lg font-semibold mb-4 flex items-center gap-2">
             <Shield size={18} /> Roles
           </h2>
-          <ul className="space-y-2">
+          <ul className="space-y-4">
             {roles.map((role,index) => {
               const roleName = typeof role === "string" ? role : role.name || role.id || "UNKNOWN";
               return (
@@ -153,36 +153,35 @@ const RoleConfig = ({ token, clientId }) => {
         </aside>
 
         {/* RIGHT – MODULES & OPS */}
-        <main className="md:col-span-3 p-6">
+        <main className=" p-6">
           {!selectedRole ? (
-            <div className="text-gray-500 text-center mt-20">
+            <div >
               Select a role to configure permissions
             </div>
           ) : (
             <>
-              <h2 className="text-xl font-semibold mb-6">
-                Permissions for <span className="text-blue-600">{selectedRole}</span>
+              <h2 >
+                Permissions for <span >{selectedRole}</span>
               </h2>
 
-              <div className="space-y-6">
+              <div>
               {modules
   .filter(mod => !HIDDEN_MODULES.includes(mod.module))
   .map(mod => (
-                  <div key={mod.module} className="border rounded-xl p-4">
-                    <h3 className="font-semibold text-gray-700 mb-3">
+                  <div key={mod.module}>
+                    <span>
                       {mod.label}
-                    </h3>
+                    </span >
 
-                    <div className="grid grid-cols-1 sm:grid-cols-2 lg:grid-cols-3 gap-3">
+                    <div>
                       {mod.operations?.map((op,index) => (
-                        <label key={`${mod.module}-${op}-${index}`} className="flex items-center gap-2 p-3 border rounded-lg cursor-pointer hover:bg-gray-50">
+                        <label key={`${mod.module}-${op}-${index}`} className="flex items-center gap-2 ">
                           <input
                             type="checkbox"
                             checked={(roleConfig[mod.module] || []).includes(op)}
                             onChange={() => toggleOperation(mod.module, op)}
-                            className="w-4 h-4 accent-blue-600"
                           />
-                          <span className="text-sm font-medium">{op}</span>
+                          <span >{op}</span>
                         </label>
                       ))}
 
