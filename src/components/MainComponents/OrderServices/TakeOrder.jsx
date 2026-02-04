@@ -1,5 +1,5 @@
 import React, { useState, useEffect, useRef } from 'react';
-import { ShoppingCart, Plus, Minus, X, Check, StickyNote, Search, Users, Package, Trash2 } from 'lucide-react';
+import { ShoppingCart, Plus, Minus, X, Check, StickyNote, Search, Users, Package, Trash2, ArrowLeft, FileText, Printer as PrinterIcon } from 'lucide-react';
 import axios from 'axios';
 import CategoryTree from '../InventoryServices/CategoryTree';
 import ImagePreview from '../../utils/ImagePreview';
@@ -197,7 +197,6 @@ const TableReservation = ({
                       const config = TABLE_STATUS_CONFIG[statusKey] || TABLE_STATUS_CONFIG.vacant;
                       const orderInfo = tableOrders[table.id];
                       
-                      // Check if table has viewable order (occupied or served status with order info)
                       const hasViewableOrder = (statusKey === 'occupied' || statusKey === 'served') && orderInfo;
 
                       return (
@@ -205,7 +204,6 @@ const TableReservation = ({
                           key={table.id}
                           className="rounded-xl overflow-hidden border shadow-sm hover:shadow-md transition bg-white"
                         >
-                          {/* ===== HEADER ===== */}
                           <div
                             onClick={() => {
                               if (config.clickable) {
@@ -217,12 +215,10 @@ const TableReservation = ({
                             className={`${config.clickable || hasViewableOrder ? 'cursor-pointer' : ''}`}
                           >
                             <div className="flex justify-between px-3 py-2 bg-action-primary text-white">
-                              {/* TABLE NUMBER */}
                               <span className="font-bold text-xl tracking-wide">
                                 {table.table_number}
                               </span>
 
-                              {/* ORDER STATUS */}
                               {hasViewableOrder && (
                                 <span
                                   className={`text-xl px-2 py-0.5 rounded-full font-semibold
@@ -237,7 +233,6 @@ const TableReservation = ({
                                 </span>
                               )}
 
-                              {/* ORDER ID */}
                               {hasViewableOrder && (
                                 <div className="text-xl opacity-90 mt-1">
                                   #{orderInfo.id}
@@ -245,7 +240,6 @@ const TableReservation = ({
                               )}
                             </div>
 
-                            {/* ===== BODY ===== */}
                             <div className={`p-6 flex justify-between  ${statusKey === 'occupied' ? 'text-blue-600 bg-blue-200' :
                                   statusKey === 'served' ? 'text-purple-600 bg-purple-50' :
                                     statusKey === 'reserved' ? 'text-yellow-600 bg-yellow-50' :
@@ -253,10 +247,8 @@ const TableReservation = ({
                               {statusKey === 'vacant' && <span className="text-2xl">-</span>}
                               {(statusKey === 'occupied' || statusKey === 'served') && <Eye size={28} className="text-blue-600" />}
                               
-                              {/* ACTION BUTTONS FOR OCCUPIED/SERVED TABLES */}
                               {hasViewableOrder && (
                                 <>
-                                  {/* Print Bill Button */}
                                   <button
                                     onClick={(e) => {
                                       e.stopPropagation();
@@ -270,7 +262,6 @@ const TableReservation = ({
                                     <Printer size={28} />
                                   </button>
                                   
-                                  {/* Delete Order Button */}
                                   <button
                                     onClick={(e) => {
                                       e.stopPropagation();
@@ -287,20 +278,8 @@ const TableReservation = ({
                               )}
                               {statusKey === 'reserved' && <Lock size={28} className="text-yellow-600" />}
                             </div>
-
-                            {/* STATUS BADGE
-                            <div
-                              className={`py-2 text-center text-xs font-semibold border-t rounded
-                                ${statusKey === 'occupied' ? 'text-blue-600 bg-blue-50' :
-                                  statusKey === 'served' ? 'text-purple-600 bg-purple-50' :
-                                    statusKey === 'reserved' ? 'text-yellow-600 bg-yellow-50' :
-                                      'text-green-600 bg-green-50'}`}
-                            >
-                              {table.status?.toUpperCase()}
-                            </div> */}
                           </div>
 
-                          {/* MARK AS SERVED BUTTON */}
                           {hasViewableOrder && orderInfo.status === 'ready' && (
                             <button
                               onClick={(e) => {
@@ -324,7 +303,6 @@ const TableReservation = ({
         );
       })}
 
-      {/* TAKEAWAY INFO */}
       {orderMode === "takeaway" && (
         <div className="text-center mt-10 text-gray-500 text-sm">
           Takeaway selected. Opening menu…
@@ -406,7 +384,6 @@ const LineItemsModal = ({ isOpen, onClose, mainItem, lineItems, onAddWithLineIte
   );
 };
 
-// Delete Confirmation Modal Component
 const DeleteConfirmModal = ({ isOpen, onClose, onConfirm }) => {
   if (!isOpen) return null;
   
@@ -479,6 +456,7 @@ const TakeOrder = ({ clientId, token, onOrderUpdate, realm }) => {
   const [tableOrders, setTableOrders] = useState({});
   const [showDeleteConfirm, setShowDeleteConfirm] = useState(false);
   const [orderToDelete, setOrderToDelete] = useState(null);
+  const [returnToView, setReturnToView] = useState('floor'); // ✅ NEW: Track where to return from billing
   const navigate = useNavigate();
 
   // ============ UTILITY FUNCTIONS ============
@@ -562,7 +540,6 @@ const TakeOrder = ({ clientId, token, onOrderUpdate, realm }) => {
       tableList.forEach(table => {
         const tableStatus = table.status?.toLowerCase();
         
-        // Show orders for both occupied and served tables
         if (tableStatus === 'occupied' || tableStatus === 'served') {
           const tableOrder = allOrders
             .filter(o => o.table_id === table.id && o.status?.toLowerCase() !== 'completed')
@@ -585,7 +562,6 @@ const TakeOrder = ({ clientId, token, onOrderUpdate, realm }) => {
     }
   };
 
-  // Delete Order Handler
   const handleDeleteOrder = async (orderId, tableId) => {
     try {
       await axios.delete(
@@ -596,7 +572,6 @@ const TakeOrder = ({ clientId, token, onOrderUpdate, realm }) => {
         }
       );
 
-      // Update table status to vacant
       const tableObj = tables.find(t => t.id === tableId);
       if (tableObj) {
         await axios.post(
@@ -615,10 +590,8 @@ const TakeOrder = ({ clientId, token, onOrderUpdate, realm }) => {
 
       toast.success('Order deleted successfully');
       
-      // Refresh tables
       await fetchTables();
       
-      // Close modal
       setShowDeleteConfirm(false);
       setOrderToDelete(null);
     } catch (err) {
@@ -627,10 +600,8 @@ const TakeOrder = ({ clientId, token, onOrderUpdate, realm }) => {
     }
   };
 
-  // Mark as Served Handler - UPDATED: Only updates order status, not table status
   const handleMarkAsServed = async (orderId, tableId) => {
     try {
-      // Update order status to served
       await axios.post(
         `${import.meta.env.VITE_API_ORDER_SERVICE_URL}/${clientId}/dinein/update`,
         {
@@ -640,12 +611,9 @@ const TakeOrder = ({ clientId, token, onOrderUpdate, realm }) => {
         },
         { headers: { Authorization: `Bearer ${token}` } }
       );
-
-      // DO NOT UPDATE TABLE STATUS - User will handle this after payment
       
       toast.success('Order marked as served');
       
-      // Refresh tables to update order info display
       await fetchTables();
     } catch (err) {
       console.error('Mark as served error:', err.response?.data || err.message);
@@ -1224,7 +1192,6 @@ const TakeOrder = ({ clientId, token, onOrderUpdate, realm }) => {
 
       const allOrders = response.data?.data || [];
       
-      // Include both non-served and served orders (but not completed)
       const tableOrders = allOrders.filter(
         o => o.table_id === table.id && o.status?.toLowerCase() !== 'completed'
       );
@@ -1326,8 +1293,27 @@ const TakeOrder = ({ clientId, token, onOrderUpdate, realm }) => {
       ? tables.find(t => t.id === 500)?.table_number || 'Takeaway'
       : tables.find(t => t.id.toString() === selectedTable)?.table_number;
 
+  // ✅ NEW: Handle navigation to billing from cart
+  const handleBillFromCart = (orderId) => {
+    setReturnToView('order'); // Remember we came from order view
+    navigate(`/saas/${clientId}/billing?orderId=${orderId || activeOrderId}&returnTo=order`);
+  };
+
+  // ✅ NEW: Handle navigation to billing from table grid
   const handlePrintBill = (orderId, tableId) => {
-    navigate(`/saas/${clientId}/billing?orderId=${orderId}`);
+    setReturnToView('floor'); // Remember we came from floor view
+    navigate(`/saas/${clientId}/billing?orderId=${orderId}&returnTo=floor`);
+  };
+
+  // ✅ NEW: Handle back to table selection
+  const handleBackToTables = () => {
+    setCurrentView('floor');
+    setShowCart(false);
+    setSelectedTable('');
+    setCart([]);
+    setActiveOrderId(null);
+    setCurrentBatchTimestamp(null);
+    setHasNewItems(false);
   };
 
   return (
@@ -1370,10 +1356,21 @@ const TakeOrder = ({ clientId, token, onOrderUpdate, realm }) => {
               <div className="transition-all duration-300 border-default border-border-default p-2 rounded-lg flex-1 overflow-y-auto h-[calc(98dvh-4rem)] lg:h-auto lg:max-h-[calc(98dvh-4rem)]">
 
                 <div className="mb-2 flex items-center justify-between lg:flex-row flex-col gap-2">
-                  <h2 className="text-xl lg:text-2xl font-semibold text-text-primary truncate">
-                    {selectedCategory}
-                    <span className="text-sm ml-2">({filteredItems.length})</span>
-                  </h2>
+                  <div className="flex items-center gap-2">
+                    {/* ✅ NEW: Back to Tables Button */}
+                    <button
+                      onClick={handleBackToTables}
+                      className="p-2 rounded-lg bg-bg-tertiary border border-border-default hover:bg-bg-secondary transition-colors"
+                      title="Back to table selection"
+                    >
+                      <ArrowLeft size={20} className="text-text-primary" />
+                    </button>
+
+                    <h2 className="text-xl lg:text-2xl font-semibold text-text-primary truncate">
+                      {selectedCategory}
+                      <span className="text-sm ml-2">({filteredItems.length})</span>
+                    </h2>
+                  </div>
 
                   <div className="relative w-64 max-w-full">
                     <Search
@@ -1490,7 +1487,6 @@ const TakeOrder = ({ clientId, token, onOrderUpdate, realm }) => {
                                         setHasNewItems(false);
                                         setShowCart(false);
                                         setCurrentView('floor');
-
                                       }}
                                       className="text-sm text-red-600 hover:underline"
                                     > Transfer
@@ -1683,10 +1679,11 @@ const TakeOrder = ({ clientId, token, onOrderUpdate, realm }) => {
                               ))}
                             </div>
 
-                            <div className="flex gap-2 mt-3">
+                            {/* ✅ UPDATED: Action Buttons Grid */}
+                            <div className="grid grid-cols-2 gap-2 mt-3">
                               <button
                                 onClick={handlePlaceOrder}
-                                className={`flex-1 py-2 rounded-lg text-sm font-semibold
+                                className={`py-2 rounded-lg text-sm font-semibold
                                   ${canPlaceOrder && !isPlacingOrder
                                     ? 'bg-action-primary text-text-white hover:bg-action-danger'
                                     : 'bg-gray-300 cursor-not-allowed'
@@ -1695,11 +1692,31 @@ const TakeOrder = ({ clientId, token, onOrderUpdate, realm }) => {
                               >
                                 {isPlacingOrder ? 'Placing...' : 'Place Order'}
                               </button>
+
+                              {/* ✅ NEW: Bill Button in Cart */}
+                              <button
+                                onClick={() => handleBillFromCart(activeOrderId)}
+                                className="py-2 rounded-lg text-sm font-semibold bg-green-600 text-white hover:bg-green-700 flex items-center justify-center gap-1"
+                              >
+                                <FileText size={16} />
+                                Bill
+                              </button>
+
                               <button
                                 onClick={handleClearCart}
-                                className="flex-1 py-2 border rounded-lg text-sm hover:bg-gray-100"
+                                className="py-2 border rounded-lg text-sm hover:bg-gray-100"
                               >
                                 Clear
+                              </button>
+
+                              {/* ✅ NEW: Print KOT Button (non-functional for now) */}
+                              <button
+                                onClick={() => toast.info('Print KOT feature coming soon')}
+                                className="py-2 border rounded-lg text-sm hover:bg-gray-100 flex items-center justify-center gap-1"
+                                title="Print KOT (Kitchen Order Ticket)"
+                              >
+                                <PrinterIcon size={16} />
+                                Print KOT
                               </button>
                             </div>
                           </>
@@ -2012,7 +2029,6 @@ const TakeOrder = ({ clientId, token, onOrderUpdate, realm }) => {
         itemName={currentItemForNote?.name}
       />
 
-      {/* Delete Confirmation Modal */}
       <DeleteConfirmModal
         isOpen={showDeleteConfirm}
         onClose={() => {
