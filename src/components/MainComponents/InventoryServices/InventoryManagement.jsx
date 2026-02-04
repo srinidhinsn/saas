@@ -22,6 +22,8 @@ export default function StockRecipeManager({ clientId: propClientId, token: prop
 
   // Inventory Categories (subcategories of id=inventory)
   const [inventoryCategories, setInventoryCategories] = useState([]);
+  // All categories for lookup
+  const [allCategories, setAllCategories] = useState([]);
 
   // Stock
   const [stocks, setStocks] = useState([]);
@@ -34,7 +36,7 @@ export default function StockRecipeManager({ clientId: propClientId, token: prop
     availability: "",
     unit: "",
     unit_price: "",
-    inventory_id: "", // Changed from hardcoded 2 to dynamic
+    inventory_id: "",
   });
   const [isStockModalOpen, setIsStockModalOpen] = useState(false);
   const [isEditingStock, setIsEditingStock] = useState(false);
@@ -123,6 +125,20 @@ export default function StockRecipeManager({ clientId: propClientId, token: prop
     );
   }, [menuAvailabilityList, menuSearchQuery]);
 
+  // Fetch all categories for name lookup
+  const fetchAllCategories = async () => {
+    try {
+      const res = await axios.get(
+        `${API_CONFIG.baseMenu(clientId)}/read_category?client_id=${clientId}`,
+        getAuthHeaders(token)
+      );
+      const categoriesData = res.data?.data || [];
+      setAllCategories(categoriesData);
+    } catch (err) {
+      console.error("fetchAllCategories failed:", err);
+    }
+  };
+
   // Fetch inventory categories (subcategories of id=inventory)
   const fetchInventoryCategories = async () => {
     try {
@@ -157,11 +173,12 @@ export default function StockRecipeManager({ clientId: propClientId, token: prop
 
   // Data fetching
   useEffect(() => {
-    if (!clientId || !realm) return;
+    if (!clientId) return;
 
     const loadData = async () => {
       setLoading(true);
       await Promise.all([
+        fetchAllCategories(),
         fetchInventoryCategories(),
         fetchStocks(),
         fetchMenuItems()
@@ -170,7 +187,7 @@ export default function StockRecipeManager({ clientId: propClientId, token: prop
     };
 
     loadData();
-  }, [clientId, realm]);
+  }, [clientId]);
 
   useEffect(() => {
     if (activeTab === "menu-availability") {
@@ -178,6 +195,7 @@ export default function StockRecipeManager({ clientId: propClientId, token: prop
     }
   }, [activeTab]);
 
+  // Fetch all stocks (no realm filter, will be filtered by inventory_id on frontend)
   const fetchStocks = async () => {
     try {
       const res = await axios.get(
@@ -185,10 +203,11 @@ export default function StockRecipeManager({ clientId: propClientId, token: prop
         getAuthHeaders(token)
       );
 
-      const inventoryItems = (res.data?.data || []).filter((item) => item.realm === "inventory");
-      setStocks(inventoryItems);
+      const allItems = res.data?.data || [];
+      setStocks(allItems);
 
-      const uniqueCategories = [...new Set(inventoryItems.map((s) => s.category || "").filter(Boolean))];
+      // Extract unique categories from all stock items
+      const uniqueCategories = [...new Set(allItems.map((s) => s.category || "").filter(Boolean))];
       setCategories(uniqueCategories);
     } catch (err) {
       console.error("fetchStocks failed:", err);
@@ -196,10 +215,11 @@ export default function StockRecipeManager({ clientId: propClientId, token: prop
     }
   };
 
+  // Fetch menu items based on inventory_id = 'menu' or realm
   const fetchMenuItems = async () => {
     try {
       const res = await axios.get(
-        `${API_CONFIG.baseMenu(clientId)}/read?realm=${realm}`,
+        `${API_CONFIG.baseMenu(clientId)}/read?client_id=${clientId}&inventory_id=menu`,
         getAuthHeaders(token)
       );
       setMenuItems(res.data?.data || []);
@@ -212,7 +232,7 @@ export default function StockRecipeManager({ clientId: propClientId, token: prop
     try {
       setLoading(true);
       const res = await axios.get(
-        `${API_CONFIG.baseMenu(clientId)}/read?realm=${realm}`,
+        `${API_CONFIG.baseMenu(clientId)}/read?client_id=${clientId}&inventory_id=menu`,
         getAuthHeaders(token)
       );
       setMenuAvailabilityList(res.data?.data || []);
@@ -229,7 +249,7 @@ export default function StockRecipeManager({ clientId: propClientId, token: prop
     try {
       setLoading(true);
       const res = await axios.get(
-        `${API_CONFIG.baseMenu(clientId)}/recipe/${menuId}?client_id=${clientId}`,
+        `${API_CONFIG.baseMenu(clientId)}/recipe/${menuId}?client_id=${clientId}&menu_inventory_id=menu`,
         getAuthHeaders(token)
       );
       const data = res.data?.data || {};
@@ -270,7 +290,6 @@ export default function StockRecipeManager({ clientId: propClientId, token: prop
         slug: slug,
         description: inventoryForm.description,
         subcategories: inventoryForm.subcategories || null,
-        category_id: "inventory",
         client_id: clientId,
       };
 
@@ -280,37 +299,39 @@ export default function StockRecipeManager({ clientId: propClientId, token: prop
         getAuthHeaders(token)
       );
 
-      // Step 2: Fetch current inventory category
+      // Step 2: Fetch current inventory category to get existing subcategories
       const inventoryCategoryRes = await axios.get(
         `${API_CONFIG.baseMenu(clientId)}/read_category?client_id=${clientId}&category_id=inventory`,
         getAuthHeaders(token)
       );
 
-      let currentSubcategories = [];
       const inventoryData = inventoryCategoryRes.data?.data || [];
+      let currentSubcategories = [];
 
       if (Array.isArray(inventoryData)) {
         const inventoryCategory = inventoryData.find(cat => cat.id === 'inventory');
         currentSubcategories = inventoryCategory?.subCategories || [];
+        console.log("Current subcategories are", currentSubcategories)
       } else if (inventoryData.subCategories) {
         currentSubcategories = inventoryData.subCategories;
       }
 
-      // Step 3: Update inventory category with new subcategory
-      const updatedSubcategoryIds = [
-        ...currentSubcategories.map(sub => sub.id),
-        categoryId
-      ].join(',');
+      // Step 3: Update inventory category's subcategories to include the new one
+      const existingSubcategoryIds = currentSubcategories.map(sub => sub.id).filter(id => id !== categoryId);
+      console.log("existing subcategories are", existingSubcategoryIds)
+      const updatedSubcategoryIds = [...existingSubcategoryIds, categoryId];
+      console.log("updated subcategories are", updatedSubcategoryIds)
 
       await axios.post(
         `${API_CONFIG.baseMenu(clientId)}/update_category?client_id=${clientId}`,
         {
           id: "inventory",
-          subcategories: updatedSubcategoryIds,
+          sub_categories: updatedSubcategoryIds,
           client_id: clientId,
         },
         getAuthHeaders(token)
       );
+
 
       setIsInventoryModalOpen(false);
       setInventoryForm({
@@ -363,9 +384,17 @@ export default function StockRecipeManager({ clientId: propClientId, token: prop
     if (!stockForm.name.trim()) return setError("Name is required");
     if (!stockForm.inventory_id) return setError("Please select an inventory");
 
+    // FIX #2: Get the selected inventory category UUID and name
+    const selectedInventory = inventoryCategories.find(inv => inv.id === stockForm.inventory_id);
+    console.log("Inventory Id = ", selectedInventory)
+    const categoryUUID = selectedInventory?.id || stockForm.inventory_id;
+    console.log("category Id = ", categoryUUID)
+
     const payload = {
       ...stockForm,
-      realm: "inventory",
+      realm: realm,
+      category_id: categoryUUID, // FIX #2: Send UUID to backend
+      inventory_id: categoryUUID, // FIX #2: Also ensure inventory_id is the UUID
       client_id: clientId,
     };
 
@@ -428,7 +457,7 @@ export default function StockRecipeManager({ clientId: propClientId, token: prop
 
     try {
       await axios.post(
-        `${API_CONFIG.baseMenu(clientId)}/recipe/update?client_id=${clientId}&menu_item_id=${selectedMenuId}`,
+        `${API_CONFIG.baseMenu(clientId)}/recipe/update?client_id=${clientId}&menu_item_id=${selectedMenuId}&menu_inventory_id=menu`,
         { recipe: updatedRecipe },
         getAuthHeaders(token)
       );
@@ -451,7 +480,7 @@ export default function StockRecipeManager({ clientId: propClientId, token: prop
 
     try {
       await axios.post(
-        `${API_CONFIG.baseMenu(clientId)}/recipe/update?client_id=${clientId}&menu_item_id=${selectedMenuId}`,
+        `${API_CONFIG.baseMenu(clientId)}/recipe/update?client_id=${clientId}&menu_item_id=${selectedMenuId}&menu_inventory_id=menu`,
         { recipe: updated },
         getAuthHeaders(token)
       );
@@ -469,7 +498,7 @@ export default function StockRecipeManager({ clientId: propClientId, token: prop
 
     try {
       await axios.post(
-        `${API_CONFIG.baseMenu(clientId)}/recipe/update?client_id=${clientId}&menu_item_id=${selectedMenuId}`,
+        `${API_CONFIG.baseMenu(clientId)}/recipe/update?client_id=${clientId}&menu_item_id=${selectedMenuId}&menu_inventory_id=menu`,
         { recipe: updated },
         getAuthHeaders(token)
       );
@@ -510,12 +539,58 @@ export default function StockRecipeManager({ clientId: propClientId, token: prop
     }
   };
 
-  // Filter stocks by selected inventory
+  // Filter stocks by selected inventory_id
   const getStocksForInventory = (inventoryId) => {
-    if (inventoryId === "menu") return [];
+    if (inventoryId === "menu" || inventoryId === "recipe") return [];
     return filteredStocks.filter(stock => stock.inventory_id === inventoryId);
   };
-  
+
+  // FIX #3: Calculate dynamic overview based on active inventory
+  const getCurrentInventoryOverview = useMemo(() => {
+    const currentInventory = inventoryCategories.find(cat => cat.id === activeTab);
+
+    if (!currentInventory) {
+      // Default overview when on Recipe tab
+      return {
+        stockCount: stocks.length,
+        lowStockCount: enhancedStocks.filter((s) => s.isLow).length,
+        menuCount: menuItems.length,
+        inventoryCount: inventoryCategories.length,
+      };
+    }
+
+    // Filter stocks for current inventory
+    const currentStocks = stocks.filter(stock => stock.inventory_id === activeTab);
+    const currentEnhancedStocks = currentStocks.map((stock) => {
+      const consumption = recipe.reduce((sum, r) => {
+        return sum + (Number(r.stock_item_id) === Number(stock.id) ? Number(r.quantity_required || 0) : 0);
+      }, 0);
+
+      const physical = Number(stock.availability || 0);
+      const effective = physical - consumption;
+      const threshold = 5;
+
+      let status = "healthy";
+      if (effective <= 0) status = "out";
+      else if (effective <= threshold) status = "low";
+
+      return {
+        ...stock,
+        effectiveAvailability: effective,
+        status,
+        isLow: status !== "healthy",
+      };
+    });
+
+    return {
+      stockCount: currentStocks.length,
+      lowStockCount: currentEnhancedStocks.filter((s) => s.isLow).length,
+      menuCount: menuItems.length,
+      inventoryCount: inventoryCategories.length,
+      inventoryName: currentInventory.name,
+    };
+  }, [activeTab, stocks, enhancedStocks, menuItems, inventoryCategories, recipe]);
+
 
   return (
     <div className="min-h-screen bg-gray-50/50 py-6 px-4 sm:px-6 lg:px-8">
@@ -535,14 +610,14 @@ export default function StockRecipeManager({ clientId: propClientId, token: prop
           </div>
 
           <div className="flex gap-3 flex-wrap">
-           
+
             {/* Dynamic Inventory Tabs */}
             {inventoryCategories.map((category) => (
               <button
                 key={category.id}
                 className={`flex items-center gap-2 px-4 py-2 rounded-lg font-medium text-sm transition-all ${activeTab === category.id
-                    ? 'bg-action-primary text-text-white shadow-sm'
-                    : 'bg-bg-tertiary text-text-secondary  hover:text-gray-900 border border-gray-300'
+                  ? 'bg-action-primary text-text-white shadow-sm'
+                  : 'bg-bg-tertiary text-text-secondary  hover:text-gray-900 border border-gray-300'
                   }`}
                 onClick={() => setActiveTab(category.id)}
               >
@@ -550,21 +625,10 @@ export default function StockRecipeManager({ clientId: propClientId, token: prop
               </button>
             ))}
 
-            {/* <button
-              className={`flex items-center gap-2 px-4 py-2 rounded-lg font-medium text-sm transition-all ${
-                activeTab === "menu-availability"
-                  ? 'bg-action-primary text-text-white shadow-sm'
-                  : 'bg-bg-tertiary text-text-secondary hover:text-text-primary border border-border-default'
-              }`}
-              onClick={() => setActiveTab("menu-availability")}
-            >
-              Menu
-            </button> */}
-
             <button
               className={`flex items-center gap-2 px-4 py-2 rounded-lg font-medium text-sm transition-all ${activeTab === "recipe"
-                  ? 'bg-action-primary text-text-white shadow-sm'
-                  : 'bg-bg-tertiary text-text-secondary hover:text-text-primary border border-border-default'
+                ? 'bg-action-primary text-text-white shadow-sm'
+                : 'bg-bg-tertiary text-text-secondary hover:text-text-primary border border-border-default'
                 }`}
               onClick={() => setActiveTab("recipe")}
             >
@@ -601,6 +665,7 @@ export default function StockRecipeManager({ clientId: propClientId, token: prop
                 }}
                 onEdit={openStockModal}
                 onDelete={deleteStock}
+                allCategories={allCategories}
               />
             )}
 
@@ -609,9 +674,9 @@ export default function StockRecipeManager({ clientId: propClientId, token: prop
             {activeTab === "menu" && (
               <MenuAvailabilityTab
                 menuItems={menuItems}
-                setMenuItems={setMenuItems}
-                clientId={clientId}
-                token={token}
+                loading={loading}
+                onUpdateAvailability={updateMenuAvailability}
+                allCategories={allCategories}
               />
             )}
 
@@ -628,16 +693,6 @@ export default function StockRecipeManager({ clientId: propClientId, token: prop
                 onAddIngredient={addIngredient}
                 onUpdateIngredient={updateIngredient}
                 onDeleteIngredient={deleteIngredient}
-              />
-            )}
-
-            {activeTab === "menu-availability" && (
-              <MenuAvailabilityTab
-                menuItems={filteredMenuItems}
-                loading={loading}
-                menuSearchQuery={menuSearchQuery}
-                onSearchChange={setMenuSearchQuery}
-                onUpdateAvailability={updateMenuAvailability}
               />
             )}
           </main>
@@ -675,26 +730,29 @@ export default function StockRecipeManager({ clientId: propClientId, token: prop
               </div>
             )}
 
+            {/* FIX #3: Dynamic Overview */}
             <div className="bg-bg-primary rounded-xl border border-gray-100 shadow p-6">
-              <h3 className="text-lg font-semibold text-gray-800 mb-4">Overview</h3>
+              <h3 className="text-lg font-semibold text-gray-800 mb-4">
+                {getCurrentInventoryOverview.inventoryName ? `${getCurrentInventoryOverview.inventoryName} Overview` : 'Overview'}
+              </h3>
               <div className="space-y-4 text-base">
                 <div className="flex justify-between">
                   <span className="text-gray-600">Stock items</span>
-                  <span className="font-semibold text-gray-900">{stocks.length}</span>
+                  <span className="font-semibold text-gray-900">{getCurrentInventoryOverview.stockCount}</span>
                 </div>
                 <div className="flex justify-between">
                   <span className="text-gray-600">Low stock</span>
                   <span className="font-semibold text-amber-600">
-                    {enhancedStocks.filter((s) => s.isLow).length}
+                    {getCurrentInventoryOverview.lowStockCount}
                   </span>
                 </div>
                 <div className="flex justify-between">
                   <span className="text-gray-600">Menu items</span>
-                  <span className="font-semibold text-gray-900">{menuItems.length}</span>
+                  <span className="font-semibold text-gray-900">{getCurrentInventoryOverview.menuCount}</span>
                 </div>
                 <div className="flex justify-between">
                   <span className="text-gray-600">Inventories</span>
-                  <span className="font-semibold text-purple-600">{inventoryCategories.length}</span>
+                  <span className="font-semibold text-purple-600">{getCurrentInventoryOverview.inventoryCount}</span>
                 </div>
                 <div className="text-sm text-gray-500 pt-3 border-t border-gray-100">
                   Last refresh: {new Date().toLocaleTimeString()}
@@ -759,8 +817,16 @@ function InventoryCategoryTab({
   onSearchChange,
   onAddNew,
   onEdit,
-  onDelete
+  onDelete,
+  allCategories
 }) {
+
+  const getCategoryName = (categoryId) => {
+    if (!categoryId) return "—";
+    const category = allCategories.find(cat => cat.id === categoryId);
+    return category?.name || categoryId;
+  };
+
   if (!category) return null;
 
   return (
@@ -784,7 +850,7 @@ function InventoryCategoryTab({
         <button
           onClick={onAddNew}
           className="ml-4 px-6 py-3 bg-action-primary border border-black-600 hover:bg-action-primary  text-text-white rounded-lg text-base font-semibold transition-colors"
-          >
+        >
           + Add Stock
         </button>
       </div>
@@ -821,11 +887,11 @@ function InventoryCategoryTab({
                       <div className="text-sm text-gray-500">{item.description}</div>
                     )}
                   </td>
-                  <td className="px-6 py-4 whitespace-nowrap text-base text-gray-600">{item.category || "—"}</td>
+                  <td className="px-6 py-4 whitespace-nowrap text-base text-gray-600"> {getCategoryName(item.category_id)}</td>
                   <td className="px-6 py-4 whitespace-nowrap">
                     <span className={`inline-flex px-3 py-1.5 text-sm font-semibold rounded-full ${item.status === "out" ? "bg-red-100 text-red-800" :
-                        item.status === "low" ? "bg-amber-100 text-amber-800" :
-                          "bg-green-100 text-green-800"
+                      item.status === "low" ? "bg-amber-100 text-amber-800" :
+                        "bg-green-100 text-green-800"
                       }`}>
                       {item.effectiveAvailability}
                     </span>
@@ -1019,7 +1085,8 @@ function RecipeTab({
   );
 }
 
-function MenuAvailabilityTab({ menuItems, loading, onUpdateAvailability }) {
+// FIX #1: Updated MenuAvailabilityTab to display category name instead of UUID
+function MenuAvailabilityTab({ menuItems, loading, onUpdateAvailability, allCategories }) {
   const [editingItem, setEditingItem] = useState(null);
   const [editForm, setEditForm] = useState({ availability: "", unit: "" });
 
@@ -1040,6 +1107,13 @@ function MenuAvailabilityTab({ menuItems, loading, onUpdateAvailability }) {
   const handleCancel = () => {
     setEditingItem(null);
     setEditForm({ availability: "", unit: "" });
+  };
+
+  // FIX #1: Helper function to get category name from UUID
+  const getCategoryName = (categoryId) => {
+    if (!categoryId) return "—";
+    const category = allCategories.find(cat => cat.id === categoryId);
+    return category?.name || categoryId;
   };
 
   return (
@@ -1085,7 +1159,7 @@ function MenuAvailabilityTab({ menuItems, loading, onUpdateAvailability }) {
                     )}
                   </td>
                   <td className="px-6 py-4 whitespace-nowrap text-sm text-gray-600">
-                    {item.category || "—"}
+                    {getCategoryName(item.category_id)}
                   </td>
                   <td className="px-6 py-4 whitespace-nowrap">
                     {editingItem === item.id ? (
@@ -1168,6 +1242,16 @@ function StockModal({
 }) {
   if (!isOpen) return null;
 
+  // Auto-populate category when inventory is selected
+  const handleInventoryChange = (inventoryId) => {
+    const selectedInventory = inventoryCategories.find(inv => inv.id === inventoryId);
+    onChange((prev) => ({
+      ...prev,
+      inventory_id: inventoryId,
+      category: selectedInventory?.name || prev.category
+    }));
+  };
+
   return (
     <div className="fixed inset-0 z-50 flex items-center justify-center p-4">
       <div className="absolute inset-0 bg-black/40" onClick={onClose} />
@@ -1182,7 +1266,7 @@ function StockModal({
             <select
               required
               value={form.inventory_id}
-              onChange={(e) => onChange((prev) => ({ ...prev, inventory_id: e.target.value }))}
+              onChange={(e) => handleInventoryChange(e.target.value)}
               className="w-full px-4 py-2 border border-gray-300 rounded-lg focus:ring-2 focus:ring-indigo-500 focus:border-indigo-500"
             >
               <option value="">Select Inventory</option>
@@ -1209,12 +1293,16 @@ function StockModal({
               value={form.category}
               onChange={(e) => onChange((prev) => ({ ...prev, category: e.target.value }))}
               className="w-full px-4 py-2 border border-gray-300 rounded-lg focus:ring-2 focus:ring-indigo-500 focus:border-indigo-500"
+              placeholder="Auto-filled from inventory"
             />
             <datalist id="categories">
               {categories.map((cat) => (
                 <option key={cat} value={cat} />
               ))}
             </datalist>
+            <p className="text-xs text-gray-500 mt-1">
+              Defaults to inventory name, can be customized
+            </p>
           </div>
 
           <div>
