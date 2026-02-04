@@ -142,10 +142,7 @@ def update_order_status(
     if not order:
         raise HTTPException(status_code=404, detail=f"Order {body.order_id} not found")
 
-    if body.status is not None:
-        order.status = body.status
-    if body.invoice_status is not None:
-        order.invoice_status = body.invoice_status    
+    order.status = body.status
     db.commit()
     db.refresh(order)
 
@@ -295,66 +292,65 @@ def update_order_status(
         data={"message": "Status updated", "new_status": order.status},
     )
 
+
+
+
 @router.post("/order_items/update")
 def update_order_items(
     client_id: str,
-    order_id: int = Query(...),
-    body: List[OrderItemModel] = None,
+    order_id: Optional[int] = Query(None),
+    body: Optional[List[OrderItemModel]] = None,
     context: SaasContext = Depends(verify_token),
-    db: Session = Depends(get_db),
+    db: Session = Depends(get_db)
 ):
-    new_items = []
+    if not order_id:
+        raise HTTPException(status_code=400, detail="Missing order_id")
 
-    for item in body:
-        inventory_item = db.query(InventoryEntity).filter(
-            InventoryEntity.id == item.item_id,
-            InventoryEntity.client_id == client_id,
-            InventoryEntity.inventory_id == 1
-        ).first()
+    try:
+        order_id = int(order_id)
+    except:
+        raise HTTPException(status_code=400, detail="Invalid order_id")
 
-        if inventory_item:
-            unit_price = Decimal(inventory_item.unit_price or 0)
+    # Fetch existing items
+    existing_items = db.query(Db_OrderItem_Entity).filter(
+        Db_OrderItem_Entity.order_id == order_id
+    ).all()
+
+    existing_map = {
+        (item.item_id, item.frontend_unique_key): item
+        for item in existing_items
+    }
+
+    for incoming in body:
+
+        key = (incoming.item_id, incoming.frontend_unique_key)
+
+        if key in existing_map:
+            # Update quantity only, keep status unchanged
+            db_item = existing_map[key]
+            db_item.quantity = incoming.quantity
+            db_item.line_total = incoming.unit_price * incoming.quantity
+
         else:
-            unit_price = Decimal(item.unit_price or item.price or 0)
-
-        quantity = Decimal(item.quantity or 1)
-        line_total = unit_price * quantity
-
-        db_item = Db_OrderItem_Entity(
-            order_id=order_id,
-            client_id=client_id,
-            item_id=item.item_id,
-            item_name=item.item_name,
-            slug=item.slug,
-            quantity=int(quantity),
-            unit_price=unit_price,
-            line_total=line_total,
-            status=item.status or OrderStatusEnum.pending,
-            frontend_unique_key=item.frontend_unique_key
-        )
-
-        new_items.append(db_item)
-
-    # SAFE delete AFTER validation
-    db.query(Db_OrderItem_Entity)\
-      .filter(Db_OrderItem_Entity.order_id == order_id)\
-      .delete()
-
-    db.add_all(new_items)
-
-    subtotal = sum(i.line_total for i in new_items)
-    db.query(Db_Order_Entity)\
-      .filter(Db_Order_Entity.id == order_id)\
-      .update({
-      "price": subtotal,
-      "total_price": subtotal   # later add tax/discount here
-  })
+            # New item → insert as pending
+            new_item = Db_OrderItem_Entity(
+                client_id=client_id,
+                order_id=order_id,
+                item_id=incoming.item_id,
+                item_name=incoming.item_name,
+                quantity=incoming.quantity,
+                unit_price=incoming.unit_price,
+                line_total=incoming.unit_price * incoming.quantity,
+                status="pending",
+                frontend_unique_key=incoming.frontend_unique_key
+            )
+            db.add(new_item)
 
     db.commit()
 
     return ResponseModel(
         screen_id=context.screen_id,
-        data={"message": "Order items updated successfully"}
+        data={"message": "Order updated without resetting old statuses"}
     )
 
 
@@ -420,7 +416,7 @@ def delete_order(client_id: str,dinein_order_id: Optional[str] = Query(None),con
 
 @router.get("/kds/orders")
 def get_kds_orders(client_id: str, context: SaasContext = Depends(verify_token), db: Session = Depends(get_db)):
-    orders = db.query(Db_Order_Entity).filter(Db_Order_Entity.client_id == str(client_id), Db_Order_Entity.status.in_([OrderStatusEnum.pending, OrderStatusEnum.preparing])
+    orders = db.query(Db_Order_Entity).filter(Db_Order_Entity.client_id == str(client_id), Db_Order_Entity.status.in_([OrderStatusEnum.pending, OrderStatusEnum.preparing, OrderStatusEnum.ready])
                                       ).order_by(Db_Order_Entity.created_at.asc()).all()
 
   
@@ -443,4 +439,3 @@ def get_kds_orders(client_id: str, context: SaasContext = Depends(verify_token),
     '''
     response = ResponseModel(screen_id=context.screen_id, data=orders)
     return response
-

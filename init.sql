@@ -342,10 +342,11 @@ CREATE TABLE "user" (
 -- Data for Name: category; Type: TABLE DATA; Schema: public; Owner: postgres
 --
 
-INSERT INTO category (id, client_id, name, description, sub_categories, slug, created_by, updated_by, created_at, updated_at) VALUES ('dietery', 'easyfood', 'Dietery', 'Dietry type', '{dietery_01,dietery_02,dietery_03,dietery_04}', '_Dietery', '1000', '1000', '2025-09-25 01:36:00.080849', '2025-09-25 01:36:00.080849');
+INSERT INTO category (id, client_id, name, description, sub_categories, slug, created_by, updated_by, created_at, updated_at) VALUES ('dietery', 'easyfood', 'Dietery', 'Dietry type', '{dietery_01,dietery_02,dietery_03,dietery_04,addons}', '_Dietery', '1000', '1000', '2025-09-25 01:36:00.080849', '2025-09-25 01:36:00.080849');
 INSERT INTO category (id, client_id, name, description, sub_categories, slug, created_by, updated_by, created_at, updated_at) VALUES ('dietery_01', 'easyfood', 'Veg', 'Veg only', NULL, '_Dietery_Veg', '1000', '1000', '2025-09-25 01:36:00.080849', '2025-09-25 01:36:00.080849');
 INSERT INTO category (id, client_id, name, description, sub_categories, slug, created_by, updated_by, created_at, updated_at) VALUES ('dietery_02', 'easyfood', 'Non-Veg', 'Non veg', NULL, '_Dietery_Non-Veg', '1000', '1000', '2025-09-25 01:36:00.080849', '2025-09-25 01:36:00.080849');
 INSERT INTO category (id, client_id, name, description, sub_categories, slug, created_by, updated_by, created_at, updated_at) VALUES ('dietery_03', 'easyfood', 'Vegan', 'Jain food', NULL, '_Dietery_Vegan', '1000', '1000', '2025-09-25 01:36:00.080849', '2025-09-25 01:36:00.080849');
+INSERT INTO category (id, client_id, name, description, sub_categories, slug, created_by, updated_by, created_at, updated_at) VALUES ('addons', 'easyfood', 'Add-ons', 'Add ons', NULL, '_Dietery_Add-ons', '1000', '1000', '2025-09-25 01:36:00.080849', '2025-09-25 01:36:00.080849');
 INSERT INTO category (id, client_id, name, description, sub_categories, slug, created_by, updated_by, created_at, updated_at) VALUES ('dietery_04', 'easyfood', 'Eggeterian', 'Egg food', NULL, '_Dietery_Eggeterian', '1000', '1000', '2025-09-25 01:36:00.080849', '2025-09-25 01:36:00.080849');
 INSERT INTO category (id, client_id, name, description, sub_categories, slug, created_by, updated_by, created_at, updated_at) VALUES ('chinese_01', 'easyfood', 'Chinese', 'Chinese delicious', '{chinese_02,chinese_03}', NULL, '1000', '1000', '2025-09-25 01:36:00.080849', '2025-09-25 01:36:00.080849');
 INSERT INTO category (id, client_id, name, description, sub_categories, slug, created_by, updated_by, created_at, updated_at) VALUES ('chinese_02', 'easyfood', 'Noodles', 'Noodles special delicious', NULL, NULL, '1000', '1000', '2025-09-25 01:36:00.080849', '2025-09-25 01:36:00.080849');
@@ -666,3 +667,44 @@ CREATE TABLE notifications (
     updated_at TIMESTAMPTZ DEFAULT NOW()
 
 );
+
+
+
+
+INSERT INTO category (
+  id, client_id, name, description, sub_categories, slug,
+  created_by, updated_by, created_at, updated_at
+)
+VALUES (
+  'users',
+  'saas',
+  'Users',
+  'User management accesses',
+  ARRAY[
+    'register',
+    'login',
+    'add',
+    'reset-password',
+    'users',
+    'person-details',
+    'delegate-access',
+    'persons',
+    'realm',
+    'realms',
+    'screens',
+    'screens/configure',
+    'permissions',
+    'permissions/catalog',
+    'roles',
+    'roles/config'
+  ],
+  '_Realm_Restaurant_Users',
+  NULL,
+  NULL,
+  '2026-02-02 12:00:00.63831',
+  '2026-02-02 12:09:00.87962'
+);
+
+ALTER TABLE inventory
+ALTER COLUMN inventory_id TYPE TEXT
+USING inventory_id::TEXT;

@@ -9,7 +9,7 @@ class InventoryEntity(Base):
 
     id = Column(BigInteger, primary_key=True, autoincrement=True)
     client_id = Column(Text, nullable=False)
-    inventory_id = Column(BigInteger, nullable=True)
+    inventory_id = Column(Text, nullable=True)
     line_item_id = Column(ARRAY(BigInteger), nullable=True)
     recipe = Column(JSONB, nullable=True, default=[])
     name = Column(Text, nullable=True)
