@@ -74,6 +74,55 @@ async def login_user(client_id: str, userReq: LoginRequest, db: Session = Depend
 
     return ResponseModel(screen_id=screen_id, data={"access_token": token, "token_type": "bearer"})
 
+# ================== DELETE USER ==================
+@router.delete("/delete")
+async def delete_user(
+    client_id: str,
+    user_id: str,
+    context: SaasContext = Depends(verify_token),
+    db: Session = Depends(get_db)
+):
+    # Permission checking
+    perms = get_user_perms(context, db, client_id)
+    if not has_user_permission(perms, "users", "delete"):
+        raise HTTPException(status_code=403, detail="User delete not allowed")
+
+    # Validating the UUID
+    try:
+        user_uuid = uuid.UUID(str(user_id))
+    except ValueError:
+        raise HTTPException(status_code=400, detail="Invalid user_id")
+
+    #Fetching user
+    user = db.query(User).filter(
+        User.id == user_uuid,
+        User.client_id == client_id
+    ).first()
+
+    if not user:
+        raise HTTPException(status_code=404, detail="User not found")
+
+    # preventing self delete
+    if str(context.user_id) == str(user_uuid):
+        raise HTTPException(status_code=400, detail="You cannot delete yourself")
+
+    #Delete related person
+    person = db.query(Person).filter(Person.id == user_uuid).first()
+    if person:
+        db.delete(person)
+
+    # Delete user
+    db.delete(user)
+    db.commit()
+
+    return ResponseModel(
+        screen_id=context.screen_id,
+        data={
+            "message": "User deleted successfully",
+            "user_id": str(user_uuid)
+        }
+    )
+
 @router.get("/test")
 async def test_msg(client_id: str, context: SaasContext = Depends(verify_token), db: Session = Depends(get_db)):
     print("test context - ", context)

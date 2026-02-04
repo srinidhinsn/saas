@@ -304,3 +304,80 @@ def update_recipe_for_menu(
     return ResponseModel(
         screen_id=context.screen_id, status="success", message="Recipe updated", data=model
     )
+
+# ============================================= Add Role ======================================================== #
+@router.post("/roles", response_model=ResponseModel)
+def add_role(client_id: str,category_id: str,value: str,context: SaasContext = Depends(verify_token),db: Session = Depends(get_db)):
+    role = value.strip().lower()
+    
+    if not role:
+        raise HTTPException(status_code=400, detail="Role name is required")
+
+    category = db.query(CategoryEntity).filter(
+        CategoryEntity.id == category_id,
+        CategoryEntity.client_id == client_id
+    ).first()
+
+    if not category:
+        raise HTTPException(status_code=404, detail="Category not found")
+
+    items = category.sub_categories or []
+
+    if role in [r.lower() for r in items]:
+        raise HTTPException(status_code=409, detail="Role already exists")
+
+    category.sub_categories = items + [role]
+
+    existing_role_row = db.query(CategoryEntity).filter(
+        CategoryEntity.id == role,
+        CategoryEntity.client_id == client_id
+    ).first()
+
+    if not existing_role_row:
+        db.add(
+            CategoryEntity(
+                id=role,
+                client_id=client_id,
+                name=role.capitalize(),
+                description=f"Role {role}",
+                sub_categories=None,
+                slug=f"_Role_{role}",
+            )
+        )
+
+    db.commit()
+    db.refresh(category)
+
+    return ResponseModel(screen_id=context.screen_id,status="success",message="Role added successfully",data=category.sub_categories)
+
+@router.delete("/roles", response_model=ResponseModel)
+def delete_role(client_id: str,category_id: str,value: str,context: SaasContext = Depends(verify_token),db: Session = Depends(get_db)):
+    role = value.strip().lower()
+
+    category = db.query(CategoryEntity).filter(
+        CategoryEntity.id == category_id,
+        CategoryEntity.client_id == client_id
+    ).first()
+
+    if not category:
+        raise HTTPException(status_code=404, detail="Category not found")
+
+    items = category.sub_categories or []
+
+    if role not in [i.lower() for i in items]:
+        raise HTTPException(status_code=404, detail="Role not found")
+
+    category.sub_categories = [i for i in items if i.lower() != role]
+
+    role_row = db.query(CategoryEntity).filter(
+        CategoryEntity.id == role,
+        CategoryEntity.client_id == client_id
+    ).first()
+
+    if role_row:
+        db.delete(role_row)
+
+    db.commit()
+    db.refresh(category)
+
+    return ResponseModel(screen_id=context.screen_id,status="success",message="Role deleted successfully",data=category.sub_categories)
