@@ -16,23 +16,23 @@ const ConfirmModal = ({
   if (!open) return null;
 
   return (
-    <div className="fixed inset-0 z-50 flex items-center justify-center bg-black/40">
-      <div className="bg-white rounded-xl shadow-xl w-full max-w-md p-6 relative animate-fadeIn">
+    <div className="fixed inset-0 z-50 flex items-center justify-center bg-black/40 p-4">
+      <div className="bg-bg-primary rounded-xl shadow-xl w-full max-w-md p-6 relative animate-fadeIn">
         {/* Close */}
         <button
           onClick={onClose}
-          className="absolute top-4 right-4 text-gray-400 hover:text-gray-600"
+          className="absolute top-4 right-4 text-text-primary"
         >
           <X size={18} />
         </button>
 
         {/* Title */}
-        <h3 className="text-xl font-semibold text-gray-900">
+        <h3 className="text-xl font-semibold text-text-primary">
           {title}
         </h3>
 
         {/* Description */}
-        <p className="text-gray-600 mt-2">
+        <p className="text-text-secondary mt-2">
           {description}
         </p>
 
@@ -40,16 +40,16 @@ const ConfirmModal = ({
         <div className="flex justify-end gap-3 mt-6">
           <button
             onClick={onClose}
-            className="px-4 py-2 rounded-lg border border-gray-300 text-gray-700 hover:bg-gray-100"
+            className="px-4 py-2 rounded-lg border border-border-default text-text-secondary hover:bg-bg-tertiary"
           >
             {cancelText}
           </button>
 
           <button
             onClick={onConfirm}
-            className={`px-4 py-2 rounded-lg text-white ${danger
-              ? "bg-red-600 hover:bg-red-700"
-              : "bg-blue-600 hover:bg-blue-700"
+            className={`px-4 py-2 rounded-lg text-text-white ${danger
+              ? "bg-action-primary hover:bg-action-danger"
+              : "bg-action-success"
               }`}
           >
             {confirmText}
@@ -59,6 +59,24 @@ const ConfirmModal = ({
     </div>
   );
 };
+const getLoggedInUserId = (token) => {
+  try {
+    const payload = JSON.parse(atob(token.split(".")[1]));
+    return payload.user_id || payload.sub || null;
+  } catch {
+    return null;
+  }
+};
+const normalizeRoles = (data) => {
+  if (!Array.isArray(data)) return [];
+
+  return data.map((r) => {
+    if (typeof r === "string") return r;
+    if (typeof r === "object" && r !== null) return r.name || r.id;
+    return "";
+  }).filter(Boolean);
+};
+
 
 const usePermissions = (token, clientId) => {
   const [permissions, setPermissions] = useState({});
@@ -77,7 +95,6 @@ const usePermissions = (token, clientId) => {
         perms[m.module] = m.operations || [];
       });
 
-      console.log("FINAL PERMISSIONS MAP ✅", perms);
       setPermissions(perms);
     };
 
@@ -143,18 +160,28 @@ const UsersList = ({ onAddNew, clientId, token, onEdit }) => {
   const itemsPerPage = 10;
   const permissions = usePermissions(token, clientId);
 
-  const canAddRole = permissions.roles?.includes("create") ?? false;
-  const canDeleteRole = permissions.roles?.includes("delete") ?? false;
+  const canAddRole = permissions.users?.includes("add") ?? false;
+  const canDeleteRole = permissions.users?.includes("add") ?? false;
   const canDeleteUser = permissions.users?.includes("delete") ?? false;
   const [showAddRole, setShowAddRole] = useState(false);
   const [showDeleteRole, setShowDeleteRole] = useState(false);
   const [deleteUserId, setDeleteUserId] = useState(null);
+  const [newRoleName, setNewRoleName] = useState("");
+  const [deleteRoleName, setDeleteRoleName] = useState("");
 
   const nav = useNavigate()
   function navigator() {
     nav('../role-config');
 
   }
+
+  const loggedInUserId = useMemo(
+    () => getLoggedInUserId(token),
+    [token]
+  );
+
+
+  // In UsersList - Fetch roles
   useEffect(() => {
     const fetchRoles = async () => {
       try {
@@ -162,19 +189,30 @@ const UsersList = ({ onAddNew, clientId, token, onEdit }) => {
           `${import.meta.env.VITE_API_INVENTORY_SERVICE_URL}/${clientId}/inventory/read_category?category_id=roles`,
           { headers: { Authorization: `Bearer ${token}` } }
         );
+
+        // console.log("Full API response:", res.data);
+
         if (res.data?.data?.length) {
           const rolesCategory = res.data.data[0];
-          setRoles(rolesCategory.subCategories || []);
+          // console.log("Roles category object:", rolesCategory);
+
+          const category = res.data?.data?.[0];
+          setRoles(normalizeRoles(category?.subCategories));
+
+
+
         }
       } catch (err) {
         console.error("Error fetching roles:", err);
+        setRoles([]);
       }
     };
     if (clientId && token) fetchRoles();
   }, [clientId, token]);
-  useEffect(() => {
-    console.log("PERMISSIONS 🔥", permissions);
-  }, [permissions]);
+  // ✅ Now roles is an array of strings like: ["admin", "waiter", "receptionist"]
+  // useEffect(() => {
+  //   console.log("PERMISSIONS 🔥", permissions);
+  // }, [permissions]);
 
   useEffect(() => {
     const fetchUsers = async () => {
@@ -201,9 +239,76 @@ const UsersList = ({ onAddNew, clientId, token, onEdit }) => {
     };
     if (clientId && token) fetchUsers();
   }, [clientId, token]);
+  const handleAddRole = async () => {
+    const role = newRoleName.trim().toLowerCase();
+
+    if (!role) {
+      alert("Role name is required");
+      return;
+    }
+
+    try {
+      const res = await axios.post(
+        `${import.meta.env.VITE_API_INVENTORY_SERVICE_URL}/${clientId}/inventory/roles`,
+        null,
+        {
+          params: {
+            category_id: "roles",
+            value: role,
+          },
+          headers: { Authorization: `Bearer ${token}` },
+        }
+      );
+
+      setRoles(normalizeRoles(res.data?.data));
+
+      setNewRoleName("");
+      setShowAddRole(false);
+    } catch (e) {
+      console.error("Add role failed", e);
+      alert(e.response?.data?.detail || "Failed to add role");
+    }
+  };
+
+  const handleDeleteRole = async () => {
+    if (!deleteRoleName) {
+      alert("Select a role to delete");
+      return;
+    }
+
+    try {
+      const res = await axios.delete(
+        `${import.meta.env.VITE_API_INVENTORY_SERVICE_URL}/${clientId}/inventory/roles`,
+        {
+          params: {
+            category_id: "roles",
+            value: deleteRoleName,
+          },
+          headers: { Authorization: `Bearer ${token}` },
+        }
+      );
+
+      setRoles(normalizeRoles(res.data?.data));
+
+      setDeleteRoleName("");
+      setShowDeleteRole(false);
+    } catch (e) {
+      console.error("Delete role failed", e);
+      alert(e.response?.data?.detail || "Failed to delete role");
+    }
+  };
+
+
 
   const filteredUsers = useMemo(() => {
     let filtered = users;
+
+    // 🚫 Remove logged-in user by ID (correct)
+    if (loggedInUserId) {
+      filtered = filtered.filter(
+        (u) => u.id !== loggedInUserId
+      );
+    }
 
     if (filterRole === "admin") {
       filtered = filtered.filter((u) => u.role === "admin");
@@ -219,7 +324,8 @@ const UsersList = ({ onAddNew, clientId, token, onEdit }) => {
     }
 
     return filtered;
-  }, [users, filterRole, searchQuery]);
+  }, [users, filterRole, searchQuery, loggedInUserId]);
+
 
   const paginatedUsers = useMemo(() => {
     const startIndex = (currentPage - 1) * itemsPerPage;
@@ -257,19 +363,23 @@ const UsersList = ({ onAddNew, clientId, token, onEdit }) => {
     }
   };
   const handleDeleteUser = async (userId) => {
-    if (!window.confirm("Delete this user?")) return;
-
     try {
       await axios.delete(
-        `${import.meta.env.VITE_API_USER_SERVICE_URL}/${clientId}/users/${userId}`,
-        { headers: { Authorization: `Bearer ${token}` } }
+        `${import.meta.env.VITE_API_USER_SERVICE_URL}/${clientId}/users/delete`,
+        {
+          params: { user_id: userId },
+          headers: { Authorization: `Bearer ${token}` },
+        }
       );
 
+      // ✅ Remove user from UI immediately
       setUsers(prev => prev.filter(u => u.id !== userId));
     } catch (e) {
       console.error("Delete failed", e);
+      alert("Failed to delete user");
     }
   };
+
 
   const toggleSelection = (userId) => {
     setSelectionModel(prev =>
@@ -291,63 +401,127 @@ const UsersList = ({ onAddNew, clientId, token, onEdit }) => {
     <div className="space-y-2">
       {/* Header Section */}
       <div className="bg-bg-primary rounded-lg shadow-sm p-2">
-        <div className="flex items-center justify-between mb-6">
-          <div>
-            <h2 className="text-2xl font-semibold text-text-primary">Users Management</h2>
-            <p className="text-text-secondary text-sm mt-1">Manage user accounts and permissions</p>
+        <div className="bg-bg-primary rounded-lg shadow-sm p-4 space-y-4">
+
+          {/* TOP ROW */}
+          <div className="flex flex-col sm:flex-row sm:items-center sm:justify-between gap-3">
+
+            {/* Title */}
+            <div>
+              <h2 className="text-xl sm:text-2xl font-semibold text-text-primary">
+                Users Management
+              </h2>
+              <p className="text-text-secondary text-xs sm:text-sm">
+                Manage user accounts and permissions
+              </p>
+            </div>
+
+            {/* Primary action only on mobile */}
+            {/* Mobile actions → 2 per row */}
+            <div className="grid grid-cols-2 gap-2 sm:hidden">
+
+              <button
+                onClick={onAddNew}
+                className="flex items-center justify-center gap-2
+             px-3 py-2.5 rounded-lg
+             bg-action-primary text-text-white w-full"
+              >
+                <Plus size={16} />
+                User
+              </button>
+
+              <button
+                onClick={() => setShowAddRole(true)}
+                className="flex items-center justify-center gap-2
+             px-3 py-2.5 rounded-lg
+             border border-border-default
+             bg-bg-primary text-text-primary w-full"
+              >
+                <Plus size={16} />
+                Role
+              </button>
+
+              <button
+                onClick={() => setShowDeleteRole(true)}
+                className="flex items-center justify-center gap-2
+             px-3 py-2.5 rounded-lg
+             border border-red-200 text-red-600 w-full"
+              >
+                <Trash2 size={16} />
+                Delete
+              </button>
+
+              <button
+                onClick={navigator}
+                className="flex items-center justify-center gap-2
+             px-3 py-2.5 rounded-lg
+             border border-border-default
+             bg-bg-primary text-text-primary w-full"
+              >
+                <FaUserShield />
+                Config
+              </button>
+
+            </div>
+
+            {/* Desktop / Tablet actions */}
+            <div className="hidden sm:flex flex-wrap items-center gap-2">
+              <button
+                onClick={onAddNew}
+                className="flex items-center gap-2 px-4 py-2 rounded-lg
+                 bg-action-primary text-text-white"
+              >
+                <Plus size={16} />
+                Add User
+              </button>
+
+              <button
+                onClick={() => setShowAddRole(true)}
+                className="flex items-center gap-2 px-4 py-2 rounded-lg border"
+              >
+                <Plus size={16} />
+                Add Role
+              </button>
+
+              <button
+                onClick={() => setShowDeleteRole(true)}
+                className="flex items-center gap-2 px-4 py-2 rounded-lg
+                 border text-red-600"
+              >
+                <Trash2 size={16} />
+                Delete Role
+              </button>
+
+              <button
+                onClick={navigator}
+                className="flex items-center gap-2 px-4 py-2 rounded-lg border"
+              >
+                <FaUserShield />
+                Role Config
+              </button>
+            </div>
           </div>
-          <div className="flex items-center gap-2">
-            <button
-              onClick={onAddNew}
-              className="flex items-center gap-2 px-5 py-2.5 rounded-lg bg-action-primary text-text-white"
-            >
-              <Plus size={18} />
-              Add New User
-            </button>
-            {/* <button
-              onClick={() => setShowAddRole(true)}
-              className="flex items-center gap-2 px-5 py-2.5 rounded-lg border"
-            >
-              <Plus size={16} />
-              Add Role
-            </button>
 
-
-            <button
-              onClick={() => setShowDeleteRole(true)}
-              className="flex items-center gap-2 px-5 py-2.5 rounded-lg border text-red-600"
-            >
-              <Trash2 size={16} />
-              Delete Role
-            </button> */}
-
-
-
-            <button
-              onClick={navigator}
-              className="flex items-center gap-2 px-5 py-2.5 rounded-lg border border-border-default"
-            >
-              <FaUserShield />
-              Role Config
-            </button>
+          {/* SEARCH */}
+          <div className="relative">
+            <Search
+              className="absolute left-3 top-1/2 -translate-y-1/2 text-text-secondary"
+              size={18}
+            />
+            <input
+              type="text"
+              placeholder="Search users..."
+              value={searchQuery}
+              onChange={(e) => {
+                setSearchQuery(e.target.value);
+                setCurrentPage(1);
+              }}
+              className="w-full pl-10 pr-3 py-2.5 rounded-lg border
+               border-border-default text-sm"
+            />
           </div>
-
         </div>
 
-        {/* Search Bar */}
-        <div className="relative mb-4">
-          <Search className="absolute left-4 top-1/2 transform -translate-y-1/2 text-text-secondary" size={20} />
-          <input
-            type="text"
-            placeholder="Search by name, username, or email..."
-            value={searchQuery}
-            onChange={(e) => {
-              setSearchQuery(e.target.value);
-              setCurrentPage(1);
-            }}
-            className="w-full pl-12 pr-4 py-2.5 rounded-lg border border-border-default transition-colors text-text-primary placeholder-text-secondary"
-          />
-        </div>
         {/* Table */}
         <div className="overflow-x-auto rounded-lg border-default border-border-default">
           <table className="w-full">
@@ -436,37 +610,67 @@ const UsersList = ({ onAddNew, clientId, token, onEdit }) => {
             </tbody>
           </table>
         </div>
+        {/* Add Role Modal */}
         <ConfirmModal
           open={showAddRole}
           title="Add New Role"
-          description="Are you sure you want to create a new role? You can configure its permissions later."
+          description={
+            <input
+              type="text"
+              placeholder="Enter role name (e.g. cashier)"
+              value={newRoleName}
+              onChange={(e) => setNewRoleName(e.target.value.toLowerCase())}
+              className="w-full mt-3 px-3 py-2 border rounded-lg"
+            />
+          }
           confirmText="Create Role"
-          onClose={() => setShowAddRole(false)}
+          onClose={() => {
+            setShowAddRole(false);
+            setNewRoleName("");
+          }}
           onConfirm={() => {
             if (!canAddRole) {
               alert("You don't have permission to add roles");
               return;
             }
-            setShowAddRole(false);
-            nav("../roles/add");
+            handleAddRole();
           }}
         />
+
+        {/* Delete Role Modal */}
         <ConfirmModal
           open={showDeleteRole}
           title="Delete Role"
-          description="This will permanently delete the role and its configurations. This action cannot be undone."
+          description={
+            <select
+              value={deleteRoleName}
+              onChange={(e) => setDeleteRoleName(e.target.value)}
+              className="w-full mt-3 px-3 py-2 border rounded-lg"
+            >
+              <option value="">Select role to delete</option>
+              {/* ✅ FIX: roles is now array of strings */}
+              {roles.map(roleName => (
+                <option key={roleName} value={roleName}>
+                  {roleName}
+                </option>
+              ))}
+            </select>
+          }
           confirmText="Delete Role"
           danger
-          onClose={() => setShowDeleteRole(false)}
+          onClose={() => {
+            setShowDeleteRole(false);
+            setDeleteRoleName("");
+          }}
           onConfirm={() => {
             if (!canDeleteRole) {
               alert("You don't have permission to delete roles");
               return;
             }
-            setShowDeleteRole(false);
-            nav("../roles");
+            handleDeleteRole();
           }}
         />
+
         <ConfirmModal
           open={!!deleteUserId}
           title="Delete User"
@@ -567,6 +771,7 @@ const AddUserForm = ({ onCancel, onSave, clientId, token, editUser = null, isEdi
     }
   }, [isEdit, editUser]);
 
+  // In AddUserForm - Fetch roles
   useEffect(() => {
     const fetchRoles = async () => {
       try {
@@ -574,17 +779,26 @@ const AddUserForm = ({ onCancel, onSave, clientId, token, editUser = null, isEdi
           `${import.meta.env.VITE_API_INVENTORY_SERVICE_URL}/${clientId}/inventory/read_category?category_id=roles`,
           { headers: { Authorization: `Bearer ${token}` } }
         );
+
         if (res.data?.data?.length) {
           const rolesCategory = res.data.data[0];
-          setRoles(rolesCategory.subCategories || []);
+
+          // ✅ FIX: Use camelCase and extract 'name' from each object
+          if (res.data?.data?.length) {
+            const category = res.data?.data?.[0];
+            setRoles(normalizeRoles(category?.subCategories));
+
+
+          }
+
         }
       } catch (err) {
         console.error("Error fetching roles:", err);
+        setRoles([]);
       }
     };
     fetchRoles();
   }, [clientId, token]);
-
   const handleChange = (e) => {
     const { name, value } = e.target;
     setFormData((prev) => ({ ...prev, [name]: value }));
@@ -778,9 +992,9 @@ const AddUserForm = ({ onCancel, onSave, clientId, token, editUser = null, isEdi
               className="w-full px-4 py-2.5 rounded-lg border border-border-default focus:border-action-success focus:outline-none transition-colors text-text-primary"
             >
               <option value="">Select Role</option>
-              {roles.map((role) => (
-                <option key={role.id} value={role.name}>
-                  {role.name}
+              {roles.map((roleName) => (
+                <option key={roleName} value={roleName}>
+                  {roleName}
                 </option>
               ))}
             </select>

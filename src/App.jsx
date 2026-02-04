@@ -210,15 +210,15 @@ const LoginWrapper = ({ onLoginSuccess }) => {
 };
 
 const HeaderSwitcher = ({ clientId, onLogout }) => {
-  const layoutScreen = localStorage.getItem('layout_screen');
+  const screenId = localStorage.getItem('screen_id');
 
-  if (layoutScreen === 'user_v1') {
+  if (screenId === 'user_v1') {
     return <Headers_V1 clientId={clientId} onLogout={onLogout} />;
   }
 
+  // default fallback
   return <HeaderShared clientId={clientId} onLogout={onLogout} />;
 };
-
 const InnerAuthenticatedApp = ({ token, onLogout }) => {
   const { clientId } = useParams();
   const finalClientId = clientId || 'easyfood';
@@ -258,16 +258,13 @@ const App = () => {
   }, []);
 
   const handleLoginSuccess = (accessToken, screenId, clientId) => {
-    localStorage.setItem('access_token', accessToken);
-  
-    // 🔥 FIX
-    localStorage.setItem('layout_screen', screenId); 
-    localStorage.setItem('client_id', clientId);
-  
     setToken(accessToken);
     setIsAuthenticated(true);
+
+    localStorage.setItem('access_token', accessToken);
+    localStorage.setItem('screen_id', screenId || '');
+    localStorage.setItem('client_id', clientId); // ✅ ADD THIS
   };
-  
 
   
   const handleLogout = () => {

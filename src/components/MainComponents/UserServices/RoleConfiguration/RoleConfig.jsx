@@ -6,6 +6,7 @@ const HIDDEN_MODULES = [
   "realms",
   "restaurant"
 ];
+const ALLOWED_MODULES = ["users", "tables", "dinein"];
 
 const RoleConfig = ({ token, clientId }) => {
   const [roles, setRoles] = useState([]);
@@ -160,22 +161,23 @@ const RoleConfig = ({ token, clientId }) => {
             </div>
           ) : (
             <>
-              <h2 >
-                Permissions for <span >{selectedRole}</span>
+              <h2 className="text-xl font-semibold mb-6">
+                Permissions for <span className="text-blue-600">{selectedRole}</span>
               </h2>
 
-              <div>
-              {modules
+              <div className="space-y-6">
+              {modules 
+               .filter(mod => ALLOWED_MODULES.includes(mod.module))
   .filter(mod => !HIDDEN_MODULES.includes(mod.module))
   .map(mod => (
                   <div key={mod.module}>
-                    <span>
+                    <h3>
                       {mod.label}
-                    </span >
+                    </h3>
 
                     <div>
                       {mod.operations?.map((op,index) => (
-                        <label key={`${mod.module}-${op}-${index}`} className="flex items-center gap-2 ">
+                        <label key={`${mod.module}-${op}-${index}`} className="flex items-center gap-2 p-3">
                           <input
                             type="checkbox"
                             checked={(roleConfig[mod.module] || []).includes(op)}
@@ -1776,22 +1778,22 @@ export default RoleConfig;
 
 //   /* ===================== UI ===================== */
 //   return (
-//     <div className="bg-gradient-to-br from-slate-50 via-blue-50 to-indigo-50">
-//       <div className=" max-w-7xl mx-auto p-4">
+//     <div className="bg-bg-primary">
+//       <div className=" max-w-7xl mx-auto p-2">
 //         <div className="grid grid-cols-1 lg:grid-cols-12 gap-4 h-full">
           
 //           {/* LEFT SIDEBAR - ROLES */}
 //           <aside className="lg:col-span-3">
-//             <div className="bg-white rounded-xl shadow-lg border border-gray-100 overflow-hidden h-full">
-//               <div className="bg-gradient-to-r from-blue-600 to-indigo-600 p-4">
-//                 <h2 className="text-base font-bold text-white flex items-center gap-2">
+//             <div className="bg-bg-primary rounded-xl shadow-lg border-default border-border-default overflow-hidden h-full">
+//               <div className="bg-action-primary p-4">
+//                 <h2 className="text-base font-bold text-text-white flex items-center gap-1">
 //                   <Shield size={18} /> 
 //                   Available Roles
 //                 </h2>
-//                 <p className="text-blue-100 text-xs mt-1">{roles.length} roles configured</p>
+//                 <p className="text-text-white text-xs">{roles.length} roles configured</p>
 //               </div>
               
-//               <div className="p-3 max-h-[calc(100vh-220px)] overflow-y-auto">
+//               <div className="p-2 max-h-[calc(100vh-220px)] overflow-y-auto">
 //                 <ul className="space-y-2">
 //                   {roles.map((role, index) => {
 //                     const roleName = typeof role === "string" ? role : role.name || role.id || "UNKNOWN";
@@ -1807,19 +1809,19 @@ export default RoleConfig;
 //                         }}
 //                         className={`group relative p-3 rounded-lg cursor-pointer transition-all duration-300 ${
 //                           isSelected 
-//                             ? "bg-gradient-to-r from-blue-600 to-indigo-600 shadow-md" 
-//                             : "bg-gray-50 hover:bg-gray-100 hover:shadow-sm"
+//                             ? "bg-action-success shadow-md" 
+//                             : "bg-bg-tertiary hover:shadow-sm"
 //                         }`}
 //                       >
 //                         <div className="flex items-center justify-between">
 //                           <span className={`font-semibold text-xs ${
-//                             isSelected ? "text-white" : "text-gray-700"
+//                             isSelected ? "text-text-white" : "text-text-secondary"
 //                           }`}>
 //                             {roleName.toUpperCase()}
 //                           </span>
-//                           {isSelected && (
-//                             <div className="w-2 h-2 rounded-full bg-white animate-pulse"></div>
-//                           )}
+//                           {/* {isSelected && (
+//                             <div className="w-2 h-2 rounded-full bg-bg-primary animate-pulse"></div>
+//                           )} */}
 //                         </div>
 //                         {isSelected && (
 //                           <div className="mt-1 pt-1 border-t border-white/20">
@@ -1839,7 +1841,7 @@ export default RoleConfig;
 //           {/* MAIN CONTENT - TRANSFER LIST */}
 //           <main className="lg:col-span-9">
 //             {!selectedRole ? (
-//               <div className="bg-white rounded-xl shadow-lg border border-gray-100 p-8 text-center h-full flex items-center justify-center">
+//               <div className="bg-bg-primary rounded-xl shadow-lg border-default border-border-default p-8 text-center h-full flex items-center justify-center">
 //                 <div className="max-w-md mx-auto">
 //                   <div className="w-16 h-16 bg-gradient-to-br from-blue-100 to-indigo-100 rounded-full flex items-center justify-center mx-auto mb-4">
 //                     <Shield className="text-blue-600" size={28} />
@@ -1854,16 +1856,16 @@ export default RoleConfig;
 //               <div className="space-y-4">
                 
 //                 {/* Role Header Card */}
-//                 <div className="bg-white rounded-xl shadow-lg border border-gray-100 p-4">
+//                 <div className="bg-bg-primary rounded-xl shadow-lg border-default border-border-default p-4">
 //                   <div className="flex flex-col md:flex-row md:items-center md:justify-between gap-3">
 //                     <div>
 //                       <div className="flex items-center gap-2 mb-1">
-//                         <Sparkles className="text-blue-600" size={20} />
-//                         <h2 className="text-xl font-bold text-gray-900">
+//                         <Sparkles className="text-action-primary" size={20} />
+//                         <h2 className="text-xl font-bold text-text-primary">
 //                           {selectedRole.toUpperCase()}
 //                         </h2>
 //                       </div>
-//                       <p className="text-gray-600 text-xs">
+//                       <p className="text-text-secondary text-xs">
 //                         {getTotalPermissions()} permissions configured across {Object.keys(roleConfig).length} modules
 //                       </p>
 //                     </div>
@@ -1871,13 +1873,13 @@ export default RoleConfig;
 //                     <button
 //                       disabled={loading}
 //                       onClick={saveConfig}
-//                       className="group relative px-6 py-2 bg-gradient-to-r from-blue-600 to-indigo-600 text-white rounded-lg font-semibold shadow-md hover:shadow-lg transition-all duration-300 disabled:opacity-50 disabled:cursor-not-allowed overflow-hidden text-sm"
+//                       className="group relative px-6 py-2 text-text-white bg-action-primary rounded-lg font-semibold shadow-md hover:shadow-lg transition-all duration-300 disabled:opacity-50 disabled:cursor-not-allowed overflow-hidden text-sm"
 //                     >
 //                       <span className="relative z-10 flex items-center gap-2">
 //                         <Check size={16} />
 //                         {loading ? "Saving..." : "Save Configuration"}
 //                       </span>
-//                       <div className="absolute inset-0 bg-gradient-to-r from-indigo-600 to-blue-600 opacity-0 group-hover:opacity-100 transition-opacity duration-300"></div>
+//                       <div className="absolute inset-0 bg-action-success opacity-0 group-hover:opacity-100 transition-opacity duration-300"></div>
 //                     </button>
 //                   </div>
 //                 </div>
