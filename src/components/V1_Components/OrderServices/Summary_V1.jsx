@@ -1149,7 +1149,7 @@ const Summary_V1 = ({ clientId, token }) => {
                     client_id: clientId,
                     name: tableObj?.name || '',
                     table_type: tableObj?.table_type || '',
-                    status: 'Vacant',
+                    status: 'Active',
                     location_zone: tableObj?.location_zone || ''
                 }, { headers: { Authorization: `Bearer ${token}` } });
             }
@@ -1157,7 +1157,7 @@ const Summary_V1 = ({ clientId, token }) => {
             setOrders(prev => prev.filter(o => o.id !== orderToDelete));
             setShowDeleteModal(false);
             setOrderToDelete(null);
-            console.log('Order deleted and table marked vacant.');
+            console.log('Order deleted');
             fetchTables();
         } catch (err) {
             console.log("Failed to delete the order");

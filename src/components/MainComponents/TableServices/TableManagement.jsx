@@ -1,4 +1,3 @@
-
 import React, { useEffect, useState, useRef } from "react";
 import { FaEdit, FaTrash, FaCheck, FaTimes, FaSearch, FaUsers, FaClock, FaPlus } from "react-icons/fa";
 import axios from 'axios';
@@ -160,15 +159,20 @@ const TableManagement = ({ clientId, token, screenIds, userId }) => {
                 const tableList = Array.isArray(result?.data) ? result.data : [];
 
                 // Exclude takeaway table
+                const EXCLUDED_TABLE_NAMES = ["takeaway", "take away", "pickup", "delivery"];
+
                 const filteredTables = tableList
-                    .filter(table =>
-                        table.id !== 500 &&                           // ⬅️ hard exclude takeaway table
-                        table.name?.toLowerCase() !== "take away" && // ⬅️ extra safety
-                        table.name?.toLowerCase() !== "takeaway"
-                    )
+                    .filter(table => {
+                        const name = table.name?.toLowerCase().trim();
+                        return (
+                            table.id !== 500 &&
+                            !EXCLUDED_TABLE_NAMES.includes(name)
+                        );
+                    })
                     .sort((a, b) =>
                         a.name.localeCompare(b.name, undefined, { numeric: true })
                     );
+                
 
                 setTables(filteredTables);
                 setOriginalTables(filteredTables);
