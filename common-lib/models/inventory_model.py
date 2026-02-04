@@ -8,7 +8,7 @@ Q = TypeVar("Q")
 class Inventory(BaseModel):
     id: Optional[int] = None
     client_id: Optional[str] = None
-    inventory_id: Optional[int] = None
+    inventory_id: Optional[str] = None
     line_item_id: Optional[List[int]] = None
     recipe: Optional[List[Dict[str, Any]]] = None
     name: Optional[str] = None
