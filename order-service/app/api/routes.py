@@ -147,7 +147,8 @@ def update_order_status(
 
     if body.total_price is not None:
        order.total_price = body.total_price
-
+    if order.status == OrderStatusEnum.served and body.status == OrderStatusEnum.served:
+         return ResponseModel(  screen_id=context.screen_id, data={"message": "Order already served", "new_status": order.status})
     db.commit()
     db.refresh(order)
 
