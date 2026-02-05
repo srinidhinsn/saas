@@ -19,7 +19,7 @@ router = APIRouter()
 
 @router.post("/dinein/create", response_model=ResponseModel[DineinOrderModel])
 def create_order(client_id: str, order: DineinOrderModel, context: SaasContext = Depends(verify_token), db: Session = Depends(get_db)):
-    db_order = Db_Order_Entity(client_id=client_id, table_id=order.table_id, status=order.status or OrderStatusEnum.new,
+    db_order = Db_Order_Entity(client_id=client_id, table_id=order.table_id, status=order.status,
                        price=order.price, gst=order.gst, cst=order.cst, discount=order.discount, invoice_status=order.invoice_status,
                        total_price=order.total_price, invoice_id=order.invoice_id, dinein_order_id=order.dinein_order_id, 
                        handler_id=order.handler_id, created_by=order.created_by, updated_by=order.updated_by)
@@ -28,7 +28,7 @@ def create_order(client_id: str, order: DineinOrderModel, context: SaasContext =
     for item in order.items:
         db_item = Db_OrderItem_Entity(order_id=db_order.id, client_id=client_id, item_id=item.item_id, item_name=item.item_name,   
                               slug=item.slug, quantity=item.quantity, unit_price=item.unit_price, line_total=item.line_total, 
-                              status=item.status or OrderStatusEnum.new)
+                              status=item.status)
 
         db.add(db_item)
     db.commit()
