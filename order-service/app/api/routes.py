@@ -142,7 +142,12 @@ def update_order_status(
     if not order:
         raise HTTPException(status_code=404, detail=f"Order {body.order_id} not found")
 
-    order.status = body.status
+    if body.status is not None:
+        order.status = body.status
+
+    if body.total_price is not None:
+       order.total_price = body.total_price
+
     db.commit()
     db.refresh(order)
 
@@ -316,17 +321,23 @@ def update_order_items(
         Db_OrderItem_Entity.order_id == order_id
     ).all()
 
-    existing_map = {
-        (item.item_id, item.frontend_unique_key): item
-        for item in existing_items
-    }
+    existing_map = {}
+    for item in existing_items:
+        if item.frontend_unique_key:
+            key=("sk",item.frontend_unique_key)
+        else:
+            key=("id",item.id)
+        existing_map[key]=item    
 
     for incoming in body:
-
-        key = (incoming.item_id, incoming.frontend_unique_key)
+        if incoming.frontend_unique_key:
+            key = ("sk", incoming.frontend_unique_key)
+        elif incoming.id:
+            key=("id",incoming.id)    
+        else:
+            continue    
 
         if key in existing_map:
-            # Update quantity only, keep status unchanged
             db_item = existing_map[key]
             db_item.quantity = incoming.quantity
             db_item.line_total = incoming.unit_price * incoming.quantity
@@ -341,7 +352,7 @@ def update_order_items(
                 quantity=incoming.quantity,
                 unit_price=incoming.unit_price,
                 line_total=incoming.unit_price * incoming.quantity,
-                status="pending",
+                status=incoming.status,
                 frontend_unique_key=incoming.frontend_unique_key
             )
             db.add(new_item)
