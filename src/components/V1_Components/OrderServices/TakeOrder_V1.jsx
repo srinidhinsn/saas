@@ -296,44 +296,27 @@ const TakeOrder_V1 = ({ clientId, token, onOrderUpdate, realm }) => {
         window.history.pushState({ view: 'floor' }, '');
     }, []);
     const getTableIdByMode = (mode) => {
-        console.log('🔍 Searching for table with mode:', mode);
-
-        // Find table by mode from the map
-        const foundTable = tables.find(t => tableModeMap[t.id] === mode);
-
-        if (foundTable) {
-            console.log(`✅ Found table: "${foundTable.name}" (ID: ${foundTable.id})`);
-            return foundTable.id;
-        }
-
-        // Fallback: Search by name directly if map lookup fails
-        console.warn(`⚠️ Mode map lookup failed for "${mode}", trying direct name search...`);
-
-        let fallbackTable = null;
-
-        if (mode === 'takeaway') {
-            fallbackTable = tables.find(t => {
-                const name = (t.name || '').toLowerCase().trim();
-                return name.includes('takeaway') || name.includes('pickup');
-            });
-        } else if (mode === 'delivery') {
-            fallbackTable = tables.find(t => {
-                const name = (t.name || '').toLowerCase().trim();
-                return name.includes('delivery');
-            });
-        }
-
-        if (fallbackTable) {
-            console.log(`✅ Found via fallback: "${fallbackTable.name}" (ID: ${fallbackTable.id})`);
-            return fallbackTable.id;
-        }
-
-        console.error(`❌ No table found for mode: ${mode}`);
-        console.error('Available tables:', tables.map(t => ({ id: t.id, name: t.name })));
-        console.error('Mode map:', tableModeMap);
-
-        return null;
-    };
+        if (!tables.length) return null;
+      
+        // 1️⃣ First: mode map (preferred)
+        const byMap = tables.find(t => tableModeMap[t.id] === mode);
+        if (byMap) return byMap.id;
+      
+        // 2️⃣ Fallback: normalize name
+        const fallback = tables.find(t => {
+          const name = (t.name || "").toLowerCase();
+          if (mode === "takeaway") {
+            return name.includes("takeaway") || name.includes("pickup");
+          }
+          if (mode === "delivery") {
+            return name.includes("delivery");
+          }
+          return false;
+        });
+      
+        return fallback?.id || null;
+      };
+      
 
     useEffect(() => {
         const fetchData = async () => {
@@ -789,15 +772,13 @@ const TakeOrder_V1 = ({ clientId, token, onOrderUpdate, realm }) => {
                         unit_price: i.unit_price,
                         line_total: i.unit_price * i.quantity,
                         status: "ready",
-                        note: i.note || "",
-                        frontend_unique_key: i.frontend_unique_key || null,
                     })),
                     { headers }
                 );
 
                 await axios.post(
                     `${import.meta.env.VITE_API_ORDER_SERVICE_URL}/${clientId}/dinein/update`,
-                    { id: activeOrderId, total_price: total },
+                    { id: activeOrderId, total_price: subtotal },
                     { headers }
                 );
             } else {
@@ -827,17 +808,15 @@ const TakeOrder_V1 = ({ clientId, token, onOrderUpdate, realm }) => {
                 await axios.post(
                     `${import.meta.env.VITE_API_ORDER_SERVICE_URL}/${clientId}/dinein/create`,
                     {
-                        client_id: clientId,
                         table_id: Number(tableId),
-                        price: subtotal,
-                        total_price: subtotal,
+                        total_price: Number(subtotal),
                         status: "ready",
                         items: cart.map(i => ({
-                            item_id: i.id,
-                            item_name: i.name,
-                            quantity: i.quantity,
-                            unit_price: i.unit_price,
-                            line_total: i.unit_price * i.quantity,
+                          item_id: Number(i.id),
+                          item_name: i.name,
+                          quantity: Number(i.quantity || 1),
+                          unit_price: Number(i.unit_price || 0),
+                          line_total: Number((i.unit_price || 0) * (i.quantity || 1)),                         
                             status: "ready"
                         }))
                     },
@@ -1027,8 +1006,14 @@ const TakeOrder_V1 = ({ clientId, token, onOrderUpdate, realm }) => {
 
     const canPlaceOrder = cart.length > 0;
     useEffect(() => {
-        setOrderMode('takeaway');
-    }, []);
+        if (tables.length > 0 && !orderMode) {
+          setOrderMode("takeaway");
+      
+          const id = getTableIdByMode("takeaway");
+          if (id) setSelectedTable(String(id));
+        }
+      }, [tables]);
+      
 
 
     const handlePrintBill = (orderId, tableId) => {
