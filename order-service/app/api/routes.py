@@ -19,7 +19,7 @@ router = APIRouter()
 
 @router.post("/dinein/create", response_model=ResponseModel[DineinOrderModel])
 def create_order(client_id: str, order: DineinOrderModel, context: SaasContext = Depends(verify_token), db: Session = Depends(get_db)):
-    db_order = Db_Order_Entity(client_id=client_id, table_id=order.table_id, status=order.status or OrderStatusEnum.new,
+    db_order = Db_Order_Entity(client_id=client_id, table_id=order.table_id, status=order.status,
                        price=order.price, gst=order.gst, cst=order.cst, discount=order.discount, invoice_status=order.invoice_status,
                        total_price=order.total_price, invoice_id=order.invoice_id, dinein_order_id=order.dinein_order_id, 
                        handler_id=order.handler_id, created_by=order.created_by, updated_by=order.updated_by)
@@ -28,7 +28,7 @@ def create_order(client_id: str, order: DineinOrderModel, context: SaasContext =
     for item in order.items:
         db_item = Db_OrderItem_Entity(order_id=db_order.id, client_id=client_id, item_id=item.item_id, item_name=item.item_name,   
                               slug=item.slug, quantity=item.quantity, unit_price=item.unit_price, line_total=item.line_total, 
-                              status=item.status or OrderStatusEnum.new)
+                              status=item.status)
 
         db.add(db_item)
     db.commit()
@@ -142,7 +142,13 @@ def update_order_status(
     if not order:
         raise HTTPException(status_code=404, detail=f"Order {body.order_id} not found")
 
-    order.status = body.status
+    if body.status is not None:
+        order.status = body.status
+
+    if body.total_price is not None:
+       order.total_price = body.total_price
+    if order.status == OrderStatusEnum.served and body.status == OrderStatusEnum.served:
+         return ResponseModel(  screen_id=context.screen_id, data={"message": "Order already served", "new_status": order.status})
     db.commit()
     db.refresh(order)
 
@@ -316,17 +322,23 @@ def update_order_items(
         Db_OrderItem_Entity.order_id == order_id
     ).all()
 
-    existing_map = {
-        (item.item_id, item.frontend_unique_key): item
-        for item in existing_items
-    }
+    existing_map = {}
+    for item in existing_items:
+        if item.frontend_unique_key:
+            key=("sk",item.frontend_unique_key)
+        else:
+            key=("id",item.id)
+        existing_map[key]=item    
 
     for incoming in body:
-
-        key = (incoming.item_id, incoming.frontend_unique_key)
+        if incoming.frontend_unique_key:
+            key = ("sk", incoming.frontend_unique_key)
+        elif incoming.id:
+            key=("id",incoming.id)    
+        else:
+            continue    
 
         if key in existing_map:
-            # Update quantity only, keep status unchanged
             db_item = existing_map[key]
             db_item.quantity = incoming.quantity
             db_item.line_total = incoming.unit_price * incoming.quantity
@@ -341,7 +353,7 @@ def update_order_items(
                 quantity=incoming.quantity,
                 unit_price=incoming.unit_price,
                 line_total=incoming.unit_price * incoming.quantity,
-                status="pending",
+                status=incoming.status,
                 frontend_unique_key=incoming.frontend_unique_key
             )
             db.add(new_item)

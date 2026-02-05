@@ -23,7 +23,7 @@ class OrderItemModel(BaseModel):
     quantity: Optional[int] = None
     unit_price: Optional[float] = None
     line_total: Optional[float] = None
-    status: Optional[OrderStatusEnum] = OrderStatusEnum.new
+    status: Optional[OrderStatusEnum]
     frontend_unique_key: Optional[str] = None
 
     class Config:
@@ -46,7 +46,7 @@ class DineinOrderModel(BaseModel):
     updated_by: Optional[str] = None
     created_at: Optional[datetime.datetime] = None
     updated_at: Optional[datetime.datetime] = None
-    status: Optional[OrderStatusEnum] = OrderStatusEnum.new
+    status: Optional[OrderStatusEnum]
     items: Optional[List[OrderItemModel]] = []
 
     class Config:
