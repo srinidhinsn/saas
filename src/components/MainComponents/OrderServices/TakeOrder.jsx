@@ -340,43 +340,93 @@ const NoteModal = ({ isOpen, onClose, itemName }) => {
   );
 };
 
-const LineItemsModal = ({ isOpen, onClose, mainItem, lineItems, onAddWithLineItems, onAddMainOnly }) => {
+// ✅ UPDATED: Checkbox-based Line Items Modal
+const LineItemsModal = ({ isOpen, onClose, mainItem, lineItems, onAddWithSelectedAddons, onAddMainOnly }) => {
+  const [selectedAddons, setSelectedAddons] = useState([]);
+
+  useEffect(() => {
+    if (isOpen) {
+      setSelectedAddons([]);
+    }
+  }, [isOpen]);
+
+  const toggleAddon = (addonId) => {
+    setSelectedAddons(prev =>
+      prev.includes(addonId)
+        ? prev.filter(id => id !== addonId)
+        : [...prev, addonId]
+    );
+  };
+
   if (!isOpen) return null;
 
   return (
-    <div className="fixed inset-0 z-50 flex items-center justify-center p-4 bg-color-modalsbg" >
-      <div className="rounded-lg max-w-lg w-full p-6 bg-bg-primary">
+    <div className="fixed inset-0 z-50 flex items-center justify-center p-4 bg-color-modalsbg">
+      <div className="rounded-lg max-w-lg w-full p-6 bg-bg-primary max-h-[80vh] overflow-y-auto">
         <h3 className="text-xl font-semibold mb-2 text-text-primary">{mainItem?.name}</h3>
-        <p className="mb-4 text-text-secondary">Item add-ons : </p>
+        <p className="mb-4 text-text-secondary">Select add-ons you want:</p>
 
         <div className="space-y-2 mb-6">
           {lineItems.map((item, index) => (
-            <div key={item.id} className="flex justify-between items-center p-3 rounded-lg bg-bg-tertiary border-border-default">
-              <span className='text-text-primary'>{index + 1}. {item.name}</span>
-              <span className="font-semibold text-action-primary">Rs.{item.unit_price}</span>
+            <div
+              key={item.id}
+              onClick={() => toggleAddon(item.id)}
+              className={`flex justify-between items-center p-3 rounded-lg cursor-pointer transition-all ${
+                selectedAddons.includes(item.id)
+                  ? 'bg-action-primary/10 border-2 border-action-primary'
+                  : 'bg-bg-tertiary border border-border-default hover:border-action-primary/50'
+              }`}
+            >
+              <div className="flex items-center gap-3 flex-1">
+                <div
+                  className={`w-5 h-5 rounded border-2 flex items-center justify-center transition-all ${
+                    selectedAddons.includes(item.id)
+                      ? 'bg-action-primary border-action-primary'
+                      : 'border-gray-300'
+                  }`}
+                >
+                  {selectedAddons.includes(item.id) && (
+                    <Check size={14} className="text-white" />
+                  )}
+                </div>
+                <span className="text-text-primary font-medium">{item.name}</span>
+              </div>
+              <span className="font-semibold text-action-primary">₹{item.unit_price}</span>
             </div>
           ))}
         </div>
 
-        <p className="text-text-secondary italic mb-4">
-          Want add-ons?
-        </p>
+        {selectedAddons.length > 0 && (
+          <div className="mb-4 p-3 bg-blue-50 rounded-lg">
+            <p className="text-sm text-blue-800">
+              <span className="font-semibold">{selectedAddons.length}</span> add-on{selectedAddons.length > 1 ? 's' : ''} selected
+            </p>
+          </div>
+        )}
 
         <div className="flex gap-3">
           <button
             onClick={onClose}
-            className="flex-1 px-4 py-2 rounded-lg transition-colors border-border-default bg-bg-tertiary text-text-primary">
+            className="flex-1 px-4 py-2 rounded-lg transition-colors border-border-default bg-bg-tertiary text-text-primary hover:bg-gray-100"
+          >
             Cancel
           </button>
           <button
             onClick={onAddMainOnly}
-            className="flex-1 px-4 py-2 rounded-lg transition-colors bg-action-primary text-text-white">
+            className="flex-1 px-4 py-2 rounded-lg transition-colors bg-gray-600 text-white hover:bg-gray-700"
+          >
             Main Only
           </button>
           <button
-            onClick={onAddWithLineItems}
-            className="flex-1 px-4 py-2 rounded-lg transition-colors bg-action-primary text-text-white">
-            With Add-ons
+            onClick={() => onAddWithSelectedAddons(selectedAddons)}
+            disabled={selectedAddons.length === 0}
+            className={`flex-1 px-4 py-2 rounded-lg transition-colors ${
+              selectedAddons.length > 0
+                ? 'bg-action-primary text-text-white hover:bg-action-danger'
+                : 'bg-gray-300 text-gray-500 cursor-not-allowed'
+            }`}
+          >
+            Add ({selectedAddons.length})
           </button>
         </div>
       </div>
@@ -456,7 +506,7 @@ const TakeOrder = ({ clientId, token, onOrderUpdate, realm }) => {
   const [tableOrders, setTableOrders] = useState({});
   const [showDeleteConfirm, setShowDeleteConfirm] = useState(false);
   const [orderToDelete, setOrderToDelete] = useState(null);
-  const [returnToView, setReturnToView] = useState('floor'); // ✅ NEW: Track where to return from billing
+  const [returnToView, setReturnToView] = useState('floor');
   const navigate = useNavigate();
 
   // ============ UTILITY FUNCTIONS ============
@@ -824,7 +874,7 @@ const TakeOrder = ({ clientId, token, onOrderUpdate, realm }) => {
     }
   };
 
-  const addToCart = (item) => {
+  const addToCart = (item, parentItemKey = null) => {
     setHasNewItems(true);
 
     const timestamp = Date.now() + Math.random();
@@ -861,6 +911,8 @@ const TakeOrder = ({ clientId, token, onOrderUpdate, realm }) => {
         frontend_unique_key: uniqueKey,
         batch_timestamp: batchTimestamp,
         is_new_item: true,
+        parent_item_key: parentItemKey, // ✅ Track parent relationship
+        is_addon: !!parentItemKey, // ✅ Mark as addon
       };
 
       setCart(prev => [...prev, cartItem]);
@@ -873,14 +925,15 @@ const TakeOrder = ({ clientId, token, onOrderUpdate, realm }) => {
           added_at: timestamp,
           batch_timestamp: batchTimestamp,
           quantity: 1,
+          parent_item_key: parentItemKey,
         })
       );
     } else {
-      const existingItem = cart.find(i => i.id === item.id && !i.frontend_unique_key);
+      const existingItem = cart.find(i => i.id === item.id && !i.frontend_unique_key && !i.parent_item_key);
 
-      if (existingItem) {
+      if (existingItem && !parentItemKey) {
         setCart(cart.map(i =>
-          i.id === item.id && !i.frontend_unique_key
+          i.id === item.id && !i.frontend_unique_key && !i.parent_item_key
             ? { ...i, quantity: i.quantity + 1 }
             : i
         ));
@@ -895,6 +948,8 @@ const TakeOrder = ({ clientId, token, onOrderUpdate, realm }) => {
           category: item.category,
           quantity: 1,
           note: "",
+          parent_item_key: parentItemKey,
+          is_addon: !!parentItemKey,
         };
         setCart(prev => [...prev, cartItem]);
       }
@@ -915,47 +970,63 @@ const TakeOrder = ({ clientId, token, onOrderUpdate, realm }) => {
     });
   };
 
-  const handleAddMainItemWithLineItems = () => {
+  // ✅ UPDATED: Handle adding main item with selected addons
+  const handleAddMainItemWithSelectedAddons = (selectedAddonIds) => {
     if (!selectedMainItem) return;
 
-    const mainItemCopy = { ...selectedMainItem };
-    const existingMainItem = cart.find(i => i.id === mainItemCopy.id);
+    const timestamp = Date.now() + Math.random();
+    const mainItemUniqueKey = `${selectedMainItem.id}_${timestamp}`;
 
-    if (existingMainItem) {
-      setCart(cart.map(i =>
-        i.id === mainItemCopy.id ? { ...i, quantity: i.quantity + 1 } : i
-      ));
-    } else {
-      setCart(prev => [...prev, { ...mainItemCopy, quantity: 1, note: "" }]);
+    let batchTimestamp = currentBatchTimestamp;
+    if (!batchTimestamp) {
+      batchTimestamp = Date.now();
+      setCurrentBatchTimestamp(batchTimestamp);
     }
 
-    lineItemsDetails.forEach(lineItem => {
-      const existingLineItem = cart.find(i => i.id === lineItem.id);
+    // Add main item
+    const mainCartItem = {
+      id: Number(selectedMainItem.id),
+      name: selectedMainItem.name,
+      unit_price: selectedMainItem.unit_price || 0,
+      image_id: selectedMainItem.image_id,
+      discount: selectedMainItem.discount || 0,
+      slug: selectedMainItem.slug,
+      category: selectedMainItem.category,
+      quantity: 1,
+      note: "",
+      frontend_unique_key: mainItemUniqueKey,
+      batch_timestamp: batchTimestamp,
+      is_new_item: true,
+      has_addons: selectedAddonIds.length > 0,
+    };
 
-      if (existingLineItem) {
-        setCart(prev =>
-          prev.map(i =>
-            i.id === lineItem.id
-              ? { ...i, quantity: i.quantity + 1 }
-              : i
-          )
-        );
-      } else {
-        setCart(prev => [
-          ...prev,
-          {
-            id: Number(lineItem.id),
-            name: lineItem.name,
-            unit_price: lineItem.unit_price,
-            image_id: lineItem.image_id,
-            discount: lineItem.discount || 0,
-            slug: lineItem.slug,
-            category: lineItem.category,
-            quantity: 1,
-            note: "",
-          }
-        ]);
-      }
+    setCart(prev => [...prev, mainCartItem]);
+
+    // Add selected addons
+    const selectedLineItems = lineItemsDetails.filter(item => selectedAddonIds.includes(item.id));
+    
+    selectedLineItems.forEach(addon => {
+      const addonTimestamp = Date.now() + Math.random();
+      const addonUniqueKey = `${addon.id}_${addonTimestamp}`;
+
+      const addonCartItem = {
+        id: Number(addon.id),
+        name: addon.name,
+        unit_price: addon.unit_price || 0,
+        image_id: addon.image_id,
+        discount: addon.discount || 0,
+        slug: addon.slug,
+        category: addon.category,
+        quantity: 1,
+        note: "",
+        frontend_unique_key: addonUniqueKey,
+        batch_timestamp: batchTimestamp,
+        is_new_item: true,
+        parent_item_key: mainItemUniqueKey, // ✅ Link to main item
+        is_addon: true,
+      };
+
+      setCart(prev => [...prev, addonCartItem]);
     });
 
     setLineItemsModalOpen(false);
@@ -1010,7 +1081,11 @@ const TakeOrder = ({ clientId, token, onOrderUpdate, realm }) => {
     setHasNewItems(true);
 
     if (uniqueKey) {
-      setCart(cart.filter(i => i.frontend_unique_key !== uniqueKey));
+      // ✅ Also remove associated addons
+      setCart(cart.filter(i => 
+        i.frontend_unique_key !== uniqueKey && 
+        i.parent_item_key !== uniqueKey
+      ));
     } else {
       setCart(cart.filter(i => i.id !== itemId));
     }
@@ -1269,6 +1344,31 @@ const TakeOrder = ({ clientId, token, onOrderUpdate, realm }) => {
     }
   };
 
+  // ✅ Group cart items with their addons
+  const getGroupedCartItems = (items) => {
+    const grouped = [];
+    const processedKeys = new Set();
+
+    items.forEach(item => {
+      if (processedKeys.has(item.frontend_unique_key || item.id)) return;
+
+      if (!item.is_addon) {
+        const mainItem = { ...item };
+        const addons = items.filter(i => i.parent_item_key === item.frontend_unique_key);
+        
+        grouped.push({
+          main: mainItem,
+          addons: addons
+        });
+
+        processedKeys.add(item.frontend_unique_key || item.id);
+        addons.forEach(addon => processedKeys.add(addon.frontend_unique_key || addon.id));
+      }
+    });
+
+    return grouped;
+  };
+
   const oldItems = cart.filter(i => !i.batch_timestamp);
   const newItems = cart.filter(i => !!i.batch_timestamp);
 
@@ -1293,19 +1393,16 @@ const TakeOrder = ({ clientId, token, onOrderUpdate, realm }) => {
       ? tables.find(t => t.id === 500)?.table_number || 'Takeaway'
       : tables.find(t => t.id.toString() === selectedTable)?.table_number;
 
-  // ✅ NEW: Handle navigation to billing from cart
   const handleBillFromCart = (orderId) => {
-    setReturnToView('order'); // Remember we came from order view
+    setReturnToView('order');
     navigate(`/saas/${clientId}/billing?orderId=${orderId || activeOrderId}&returnTo=order`);
   };
 
-  // ✅ NEW: Handle navigation to billing from table grid
   const handlePrintBill = (orderId, tableId) => {
-    setReturnToView('floor'); // Remember we came from floor view
+    setReturnToView('floor');
     navigate(`/saas/${clientId}/billing?orderId=${orderId}&returnTo=floor`);
   };
 
-  // ✅ NEW: Handle back to table selection
   const handleBackToTables = () => {
     setCurrentView('floor');
     setShowCart(false);
@@ -1314,6 +1411,84 @@ const TakeOrder = ({ clientId, token, onOrderUpdate, realm }) => {
     setActiveOrderId(null);
     setCurrentBatchTimestamp(null);
     setHasNewItems(false);
+  };
+
+  // ✅ Cart Item Component with Addon Support
+  const CartItemWithAddons = ({ group, onUpdateQuantity, onRemove }) => {
+    const { main, addons } = group;
+
+    return (
+      <div className="space-y-1">
+        {/* Main Item */}
+        <div className="flex items-center gap-2 p-3 rounded-xl border bg-white shadow-sm hover:shadow transition">
+          <div className="flex items-center gap-3 flex-1 min-w-0">
+            <div className="w-12 h-12 rounded-lg overflow-hidden border bg-white shrink-0">
+              <ImagePreview
+                clientId={clientId}
+                imageId={main.image_id}
+                token={token}
+                alt={main.name}
+                baseUrl={import.meta.env.VITE_API_DOCUMENT_SERVICE_URL}
+                urlBuilder={({ baseUrl, clientId, imageId }) =>
+                  `${baseUrl}/${clientId}/document/download?doc_id=${imageId}`
+                }
+                className="w-full h-full object-cover"
+              />
+            </div>
+
+            <div className="min-w-0 flex-1">
+              <h4 className="text-sm font-semibold truncate text-gray-800">
+                {main.name}
+              </h4>
+              <p className="text-xs font-bold text-action-primary">
+                ₹{(main.unit_price - (main.discount || 0)).toFixed(2)}
+              </p>
+            </div>
+          </div>
+
+          <div className="flex items-center gap-1">
+            <button
+              onClick={() => onUpdateQuantity(main.id, -1, main.frontend_unique_key)}
+              className="w-7 h-7 flex items-center justify-center border rounded hover:bg-gray-100"
+            >
+              <Minus size={14} />
+            </button>
+
+            <span className="w-6 text-center text-sm font-semibold">
+              {main.quantity}
+            </span>
+
+            <button
+              onClick={() => onUpdateQuantity(main.id, 1, main.frontend_unique_key)}
+              className="w-7 h-7 flex items-center justify-center border rounded hover:bg-gray-100"
+            >
+              <Plus size={14} />
+            </button>
+          </div>
+
+          <button
+            onClick={() => onRemove(main.id, main.frontend_unique_key)}
+            className="text-action-primary hover:text-red-700"
+          >
+            <X size={16} />
+          </button>
+        </div>
+
+        {/* Addons */}
+        {addons.map(addon => (
+          <div key={addon.frontend_unique_key || addon.id} className="flex items-center gap-2 p-2 pl-8 rounded-lg border border-dashed bg-blue-50/50">
+            <div className="flex items-center gap-2 flex-1 min-w-0">
+              <span className="text-xs text-blue-600">↳</span>
+              <span className="text-sm text-gray-700 truncate">{addon.name}</span>
+            </div>
+            <span className="text-xs font-semibold text-blue-600">
+              ₹{(addon.unit_price - (addon.discount || 0)).toFixed(2)}
+            </span>
+            <span className="text-xs text-gray-500 w-6 text-center">×{addon.quantity}</span>
+          </div>
+        ))}
+      </div>
+    );
   };
 
   return (
@@ -1357,7 +1532,6 @@ const TakeOrder = ({ clientId, token, onOrderUpdate, realm }) => {
 
                 <div className="mb-2 flex items-center justify-between lg:flex-row flex-col gap-2">
                   <div className="flex items-center gap-2">
-                    {/* ✅ NEW: Back to Tables Button */}
                     <button
                       onClick={handleBackToTables}
                       className="p-2 rounded-lg bg-bg-tertiary border border-border-default hover:bg-bg-secondary transition-colors"
@@ -1397,10 +1571,13 @@ const TakeOrder = ({ clientId, token, onOrderUpdate, realm }) => {
                           .toFixed(0)
                         : null;
 
+                    // ✅ Calculate addon count
+                    const addonCount = item.line_item_id?.length || 0;
+
                     return (
                       <div onClick={() => handleItemClick(item)}
                         key={item.id}
-                        className="flex gap-2 items-center bg-bg-primary border-default border-border-default rounded-xl p-1 shadow-sm hover:shadow-md transition cursor-pointer"
+                        className="flex gap-2 items-center bg-bg-primary border-default border-border-default rounded-xl p-1 shadow-sm hover:shadow-md transition cursor-pointer relative"
                       >
                         <div className="w-14 h-16 rounded-lg overflow-hidden shrink-0 bg-gray-100">
                           <ImagePreview
@@ -1446,6 +1623,15 @@ const TakeOrder = ({ clientId, token, onOrderUpdate, realm }) => {
                               </span>
                             )}
                           </div>
+
+                          {/* ✅ Show addon badge */}
+                          {addonCount > 0 && (
+                            <div className="mt-1">
+                              <span className="text-xs bg-blue-100 text-blue-700 px-2 py-0.5 rounded-full font-semibold">
+                                +{addonCount} addon{addonCount > 1 ? 's' : ''}
+                              </span>
+                            </div>
+                          )}
                         </div>
                       </div>
                     );
@@ -1508,7 +1694,7 @@ const TakeOrder = ({ clientId, token, onOrderUpdate, realm }) => {
                               onClick={() => setOrderMode('dinein')}
                               className={`flex-1 py-2 rounded-md text-sm font-medium flex items-center justify-center gap-2
                                 ${orderMode === 'dinein'
-                                  ? 'bg-action-primary text-text-white shadow'
+                                  ? 'bg-action-primary text-text-white shadow-sm'
                                   : 'text-gray-600 hover:text-gray-800'
                                 }`}
                             >
@@ -1523,7 +1709,7 @@ const TakeOrder = ({ clientId, token, onOrderUpdate, realm }) => {
                               }}
                               className={`flex-1 py-2 rounded-md text-sm font-medium flex items-center justify-center gap-2
                                 ${orderMode === 'takeaway'
-                                  ? 'bg-action-primary text-white shadow'
+                                  ? 'bg-action-primary text-white shadow-sm'
                                   : 'text-gray-600 hover:text-gray-800'
                                 }`}
                             >
@@ -1540,63 +1726,14 @@ const TakeOrder = ({ clientId, token, onOrderUpdate, realm }) => {
                         ) : (
                           <>
                             <div className="flex-1 overflow-y-auto mt-4 space-y-2">
-                              {oldItems.map(item => (
-                                <div
-                                  key={`old-${item.id}`}
-                                  className="flex items-center gap-2 p-3 rounded-xl border bg-white shadow-sm hover:shadow transition"
-                                >
-                                  <div className="flex items-center gap-3 flex-1 min-w-0">
-                                    <div className="w-12 h-12 rounded-lg overflow-hidden border bg-white shrink-0">
-                                      <ImagePreview
-                                        clientId={clientId}
-                                        imageId={item.image_id}
-                                        token={token}
-                                        alt={item.name}
-                                        baseUrl={import.meta.env.VITE_API_DOCUMENT_SERVICE_URL}
-                                        urlBuilder={({ baseUrl, clientId, imageId }) =>
-                                          `${baseUrl}/${clientId}/document/download?doc_id=${imageId}`
-                                        }
-                                        className="w-full h-full object-cover"
-                                      />
-                                    </div>
-
-                                    <div className="min-w-0">
-                                      <h4 className="text-sm font-semibold truncate text-gray-800">
-                                        {item.name}
-                                      </h4>
-                                      <p className="text-xs font-bold text-action-primary">
-                                        ₹{(item.unit_price - (item.discount || 0)).toFixed(2)}
-                                      </p>
-                                    </div>
-                                  </div>
-
-                                  <div className="flex items-center gap-1">
-                                    <button
-                                      onClick={() => updateQuantity(item.id, -1, null)}
-                                      className="w-7 h-7 flex items-center justify-center border rounded hover:bg-gray-100"
-                                    >
-                                      <Minus size={14} />
-                                    </button>
-
-                                    <span className="w-6 text-center text-sm font-semibold">
-                                      {item.quantity}
-                                    </span>
-
-                                    <button
-                                      onClick={() => updateQuantity(item.id, 1, null)}
-                                      className="w-7 h-7 flex items-center justify-center border rounded hover:bg-gray-100"
-                                    >
-                                      <Plus size={14} />
-                                    </button>
-                                  </div>
-
-                                  <button
-                                    onClick={() => removeFromCart(item.id, null)}
-                                    className="text-action-primary hover:text-red-700"
-                                  >
-                                    <X size={16} />
-                                  </button>
-                                </div>
+                              {/* ✅ Display grouped old items */}
+                              {getGroupedCartItems(oldItems).map((group, idx) => (
+                                <CartItemWithAddons
+                                  key={`old-group-${idx}`}
+                                  group={group}
+                                  onUpdateQuantity={updateQuantity}
+                                  onRemove={removeFromCart}
+                                />
                               ))}
 
                               {activeOrderId && newItems.length > 0 && (
@@ -1607,6 +1744,7 @@ const TakeOrder = ({ clientId, token, onOrderUpdate, realm }) => {
                                 </div>
                               )}
 
+                              {/* ✅ Display grouped new items */}
                               {batchTimestamps.map((timestamp, batchIndex) => (
                                 <React.Fragment key={timestamp}>
                                   {batchIndex > 0 && (
@@ -1617,69 +1755,82 @@ const TakeOrder = ({ clientId, token, onOrderUpdate, realm }) => {
                                     </div>
                                   )}
 
-                                  {groupedNewItems[timestamp].map(item => (
-                                    <div
-                                      key={item.frontend_unique_key || `new-${item.id}`}
-                                      className="flex items-center gap-2 p-3 rounded-xl border bg-orange-50 shadow-sm hover:shadow transition"
-                                    >
-                                      <div className="flex items-center gap-3 flex-1 min-w-0">
-                                        <div className="w-12 h-12 rounded-lg overflow-hidden border bg-white shrink-0">
-                                          <ImagePreview
-                                            clientId={clientId}
-                                            imageId={item.image_id}
-                                            token={token}
-                                            alt={item.name}
-                                            baseUrl={import.meta.env.VITE_API_DOCUMENT_SERVICE_URL}
-                                            urlBuilder={({ baseUrl, clientId, imageId }) =>
-                                              `${baseUrl}/${clientId}/document/download?doc_id=${imageId}`
-                                            }
-                                            className="w-full h-full object-cover"
-                                          />
+                                  {getGroupedCartItems(groupedNewItems[timestamp]).map((group, idx) => (
+                                    <div key={`new-group-${timestamp}-${idx}`} className="space-y-1">
+                                      {/* Main Item */}
+                                      <div className="flex items-center gap-2 p-3 rounded-xl border bg-orange-50 shadow-sm hover:shadow transition">
+                                        <div className="flex items-center gap-3 flex-1 min-w-0">
+                                          <div className="w-12 h-12 rounded-lg overflow-hidden border bg-white shrink-0">
+                                            <ImagePreview
+                                              clientId={clientId}
+                                              imageId={group.main.image_id}
+                                              token={token}
+                                              alt={group.main.name}
+                                              baseUrl={import.meta.env.VITE_API_DOCUMENT_SERVICE_URL}
+                                              urlBuilder={({ baseUrl, clientId, imageId }) =>
+                                                `${baseUrl}/${clientId}/document/download?doc_id=${imageId}`
+                                              }
+                                              className="w-full h-full object-cover"
+                                            />
+                                          </div>
+
+                                          <div className="min-w-0 flex-1">
+                                            <h4 className="text-sm font-semibold truncate text-gray-800">
+                                              {group.main.name}
+                                            </h4>
+                                            <p className="text-xs font-bold text-action-primary">
+                                              ₹{(group.main.unit_price - (group.main.discount || 0)).toFixed(2)}
+                                            </p>
+                                          </div>
                                         </div>
 
-                                        <div className="min-w-0">
-                                          <h4 className="text-sm font-semibold truncate text-gray-800">
-                                            {item.name}
-                                          </h4>
-                                          <p className="text-xs font-bold text-action-primary">
-                                            ₹{(item.unit_price - (item.discount || 0)).toFixed(2)}
-                                          </p>
+                                        <div className="flex items-center gap-1">
+                                          <button
+                                            onClick={() => updateQuantity(group.main.id, -1, group.main.frontend_unique_key)}
+                                            className="w-7 h-7 flex items-center justify-center border rounded hover:bg-gray-100"
+                                          >
+                                            <Minus size={14} />
+                                          </button>
+
+                                          <span className="w-6 text-center text-sm font-semibold">
+                                            {group.main.quantity}
+                                          </span>
+
+                                          <button
+                                            onClick={() => updateQuantity(group.main.id, 1, group.main.frontend_unique_key)}
+                                            className="w-7 h-7 flex items-center justify-center border rounded hover:bg-gray-100"
+                                          >
+                                            <Plus size={14} />
+                                          </button>
                                         </div>
-                                      </div>
-
-                                      <div className="flex items-center gap-1">
-                                        <button
-                                          onClick={() => updateQuantity(item.id, -1, item.frontend_unique_key)}
-                                          className="w-7 h-7 flex items-center justify-center border rounded hover:bg-gray-100"
-                                        >
-                                          <Minus size={14} />
-                                        </button>
-
-                                        <span className="w-6 text-center text-sm font-semibold">
-                                          {item.quantity}
-                                        </span>
 
                                         <button
-                                          onClick={() => updateQuantity(item.id, 1, item.frontend_unique_key)}
-                                          className="w-7 h-7 flex items-center justify-center border rounded hover:bg-gray-100"
+                                          onClick={() => removeFromCart(group.main.id, group.main.frontend_unique_key)}
+                                          className="text-action-primary hover:text-red-700"
                                         >
-                                          <Plus size={14} />
+                                          <X size={16} />
                                         </button>
                                       </div>
 
-                                      <button
-                                        onClick={() => removeFromCart(item.id, item.frontend_unique_key)}
-                                        className="text-action-primary hover:text-red-700"
-                                      >
-                                        <X size={16} />
-                                      </button>
+                                      {/* Addons */}
+                                      {group.addons.map(addon => (
+                                        <div key={addon.frontend_unique_key} className="flex items-center gap-2 p-2 pl-8 rounded-lg border border-dashed bg-orange-100/50">
+                                          <div className="flex items-center gap-2 flex-1 min-w-0">
+                                            <span className="text-xs text-orange-600">↳</span>
+                                            <span className="text-sm text-gray-700 truncate">{addon.name}</span>
+                                          </div>
+                                          <span className="text-xs font-semibold text-orange-600">
+                                            ₹{(addon.unit_price - (addon.discount || 0)).toFixed(2)}
+                                          </span>
+                                          <span className="text-xs text-gray-500 w-6 text-center">×{addon.quantity}</span>
+                                        </div>
+                                      ))}
                                     </div>
                                   ))}
                                 </React.Fragment>
                               ))}
                             </div>
 
-                            {/* ✅ UPDATED: Action Buttons Grid */}
                             <div className="grid grid-cols-2 gap-2 mt-3">
                               <button
                                 onClick={handlePlaceOrder}
@@ -1693,7 +1844,6 @@ const TakeOrder = ({ clientId, token, onOrderUpdate, realm }) => {
                                 {isPlacingOrder ? 'Placing...' : 'Place Order'}
                               </button>
 
-                              {/* ✅ NEW: Bill Button in Cart */}
                               <button
                                 onClick={() => handleBillFromCart(activeOrderId)}
                                 className="py-2 rounded-lg text-sm font-semibold bg-green-600 text-white hover:bg-green-700 flex items-center justify-center gap-1"
@@ -1709,7 +1859,6 @@ const TakeOrder = ({ clientId, token, onOrderUpdate, realm }) => {
                                 Clear
                               </button>
 
-                              {/* ✅ NEW: Print KOT Button (non-functional for now) */}
                               <button
                                 onClick={() => toast.info('Print KOT feature coming soon')}
                                 className="py-2 border rounded-lg text-sm hover:bg-gray-100 flex items-center justify-center gap-1"
@@ -1801,61 +1950,72 @@ const TakeOrder = ({ clientId, token, onOrderUpdate, realm }) => {
                   </div>
 
                   <div className="space-y-4 mb-6 max-h-[calc(100vh-4rem)] overflow-y-auto">
-                    {oldItems.map(item => (
-                      <div key={`mobile-old-${item.id}`} className="flex items-center space-x-3 p-3 lg:p-4 rounded-lg bg-bg-tertiary border-border-default animate-slide-up">
-                        <div className="w-16 h-16 rounded-md overflow-hidden flex-shrink-0">
-                          <ImagePreview
-                            clientId={clientId}
-                            imageId={item.image_id}
-                            token={token}
-                            alt={item.name}
-                            baseUrl={import.meta.env.VITE_API_DOCUMENT_SERVICE_URL}
-                            urlBuilder={({ baseUrl, clientId, imageId }) =>
-                              `${baseUrl}/${clientId}/document/download?doc_id=${imageId}`
-                            }
-                            className="w-full h-full object-cover"
-                          />
-                        </div>
+                    {/* Mobile view with grouped items */}
+                    {getGroupedCartItems(oldItems).map((group, idx) => (
+                      <div key={`mobile-old-${idx}`} className="space-y-2">
+                        <div className="flex items-center space-x-3 p-3 lg:p-4 rounded-lg bg-bg-tertiary border-border-default animate-slide-up">
+                          <div className="w-16 h-16 rounded-md overflow-hidden flex-shrink-0">
+                            <ImagePreview
+                              clientId={clientId}
+                              imageId={group.main.image_id}
+                              token={token}
+                              alt={group.main.name}
+                              baseUrl={import.meta.env.VITE_API_DOCUMENT_SERVICE_URL}
+                              urlBuilder={({ baseUrl, clientId, imageId }) =>
+                                `${baseUrl}/${clientId}/document/download?doc_id=${imageId}`
+                              }
+                              className="w-full h-full object-cover"
+                            />
+                          </div>
 
-                        <div className="flex-1 min-w-0">
-                          <h4 className="font-semibold text-sm lg:text-base truncate flex items-center gap-2 text-text-primary">
-                            {item.name}
-                            {item.note && (
+                          <div className="flex-1 min-w-0">
+                            <h4 className="font-semibold text-sm lg:text-base truncate flex items-center gap-2 text-text-primary">
+                              {group.main.name}
+                              {group.main.note && (
+                                <button
+                                  onClick={() => openNoteEditor(group.main)}
+                                  title="Has note" className='text-action-primary hover:scale-110 transition-transform'>
+                                  <StickyNote size={16} />
+                                </button>
+                              )}
+                            </h4>
+                            <p className='text-action-primary font-bold'>₹{group.main.unit_price?.toFixed(2)}</p>
+                            {!group.main.note && (
                               <button
-                                onClick={() => openNoteEditor(item)}
-                                title="Has note" className='text-action-primary hover:scale-110 transition-transform'>
-                                <StickyNote size={16} />
+                                onClick={() => openNoteEditor(group.main)}
+                                className="text-xs mt-1 text-text-secondary hover:text-action-primary transition-colors">
+                                + Add note
                               </button>
                             )}
-                          </h4>
-                          <p className='text-action-primary font-bold'>Rs.{item.unit_price?.toFixed(2)}</p>
-                          {!item.note && (
+                          </div>
+                          <div className="flex items-center space-x-2">
                             <button
-                              onClick={() => openNoteEditor(item)}
-                              className="text-xs mt-1 text-text-secondary hover:text-action-primary transition-colors">
-                              + Add note
+                              onClick={() => updateQuantity(group.main.id, -1, null)}
+                              className="p-1 rounded bg-bg-primary border-border-default hover:bg-bg-secondary transition-colors"
+                            >
+                              <Minus size={16} />
                             </button>
-                          )}
-                        </div>
-                        <div className="flex items-center space-x-2">
+                            <span className="w-8 text-center font-semibold text-text-primary">{group.main.quantity}</span>
+                            <button
+                              onClick={() => updateQuantity(group.main.id, 1, null)}
+                              className="p-1 rounded bg-bg-primary border-border-default hover:bg-bg-secondary transition-colors">
+                              <Plus size={16} />
+                            </button>
+                          </div>
                           <button
-                            onClick={() => updateQuantity(item.id, -1, null)}
-                            className="p-1 rounded bg-bg-primary border-border-default hover:bg-bg-secondary transition-colors"
-                          >
-                            <Minus size={16} />
-                          </button>
-                          <span className="w-8 text-center font-semibold text-text-primary">{item.quantity}</span>
-                          <button
-                            onClick={() => updateQuantity(item.id, 1, null)}
-                            className="p-1 rounded bg-bg-primary border-border-default hover:bg-bg-secondary transition-colors">
-                            <Plus size={16} />
+                            onClick={() => removeFromCart(group.main.id, null)}
+                            title="Remove item" className='text-action-danger hover:scale-110 transition-transform'>
+                            <X size={20} />
                           </button>
                         </div>
-                        <button
-                          onClick={() => removeFromCart(item.id, null)}
-                          title="Remove item" className='text-action-danger hover:scale-110 transition-transform'>
-                          <X size={20} />
-                        </button>
+
+                        {group.addons.map(addon => (
+                          <div key={addon.frontend_unique_key || addon.id} className="flex items-center gap-2 p-2 pl-8 ml-4 rounded-lg border border-dashed bg-blue-50/50">
+                            <span className="text-xs text-blue-600">↳</span>
+                            <span className="text-sm text-gray-700 flex-1">{addon.name}</span>
+                            <span className="text-xs font-semibold text-blue-600">₹{addon.unit_price?.toFixed(2)}</span>
+                          </div>
+                        ))}
                       </div>
                     ))}
 
@@ -1877,61 +2037,57 @@ const TakeOrder = ({ clientId, token, onOrderUpdate, realm }) => {
                           </div>
                         )}
 
-                        {groupedNewItems[timestamp].map(item => (
-                          <div key={item.frontend_unique_key || `mobile-new-${item.id}`} className="flex items-center space-x-3 p-3 lg:p-4 rounded-lg bg-orange-50 border border-orange-200 animate-slide-up">
-                            <div className="w-16 h-16 rounded-md overflow-hidden flex-shrink-0">
-                              <ImagePreview
-                                clientId={clientId}
-                                imageId={item.image_id}
-                                token={token}
-                                alt={item.name}
-                                baseUrl={import.meta.env.VITE_API_DOCUMENT_SERVICE_URL}
-                                urlBuilder={({ baseUrl, clientId, imageId }) =>
-                                  `${baseUrl}/${clientId}/document/download?doc_id=${imageId}`
-                                }
-                                className="w-full h-full object-cover"
-                              />
+                        {getGroupedCartItems(groupedNewItems[timestamp]).map((group, idx) => (
+                          <div key={`mobile-new-${timestamp}-${idx}`} className="space-y-2">
+                            <div className="flex items-center space-x-3 p-3 lg:p-4 rounded-lg bg-orange-50 border border-orange-200 animate-slide-up">
+                              <div className="w-16 h-16 rounded-md overflow-hidden flex-shrink-0">
+                                <ImagePreview
+                                  clientId={clientId}
+                                  imageId={group.main.image_id}
+                                  token={token}
+                                  alt={group.main.name}
+                                  baseUrl={import.meta.env.VITE_API_DOCUMENT_SERVICE_URL}
+                                  urlBuilder={({ baseUrl, clientId, imageId }) =>
+                                    `${baseUrl}/${clientId}/document/download?doc_id=${imageId}`
+                                  }
+                                  className="w-full h-full object-cover"
+                                />
+                              </div>
+
+                              <div className="flex-1 min-w-0">
+                                <h4 className="font-semibold text-sm lg:text-base truncate flex items-center gap-2 text-text-primary">
+                                  {group.main.name}
+                                </h4>
+                                <p className='text-action-primary font-bold'>₹{group.main.unit_price?.toFixed(2)}</p>
+                              </div>
+                              <div className="flex items-center space-x-2">
+                                <button
+                                  onClick={() => updateQuantity(group.main.id, -1, group.main.frontend_unique_key)}
+                                  className="p-1 rounded bg-bg-primary border-border-default hover:bg-bg-secondary transition-colors"
+                                >
+                                  <Minus size={16} />
+                                </button>
+                                <span className="w-8 text-center font-semibold text-text-primary">{group.main.quantity}</span>
+                                <button
+                                  onClick={() => updateQuantity(group.main.id, 1, group.main.frontend_unique_key)}
+                                  className="p-1 rounded bg-bg-primary border-border-default hover:bg-bg-secondary transition-colors">
+                                  <Plus size={16} />
+                                </button>
+                              </div>
+                              <button
+                                onClick={() => removeFromCart(group.main.id, group.main.frontend_unique_key)}
+                                title="Remove item" className='text-action-danger hover:scale-110 transition-transform'>
+                                <X size={20} />
+                              </button>
                             </div>
 
-                            <div className="flex-1 min-w-0">
-                              <h4 className="font-semibold text-sm lg:text-base truncate flex items-center gap-2 text-text-primary">
-                                {item.name}
-                                {item.note && (
-                                  <button
-                                    onClick={() => openNoteEditor(item)}
-                                    title="Has note" className='text-action-primary hover:scale-110 transition-transform'>
-                                    <StickyNote size={16} />
-                                  </button>
-                                )}
-                              </h4>
-                              <p className='text-action-primary font-bold'>Rs.{item.unit_price?.toFixed(2)}</p>
-                              {!item.note && (
-                                <button
-                                  onClick={() => openNoteEditor(item)}
-                                  className="text-xs mt-1 text-text-secondary hover:text-action-primary transition-colors">
-                                  + Add note
-                                </button>
-                              )}
-                            </div>
-                            <div className="flex items-center space-x-2">
-                              <button
-                                onClick={() => updateQuantity(item.id, -1, item.frontend_unique_key)}
-                                className="p-1 rounded bg-bg-primary border-border-default hover:bg-bg-secondary transition-colors"
-                              >
-                                <Minus size={16} />
-                              </button>
-                              <span className="w-8 text-center font-semibold text-text-primary">{item.quantity}</span>
-                              <button
-                                onClick={() => updateQuantity(item.id, 1, item.frontend_unique_key)}
-                                className="p-1 rounded bg-bg-primary border-border-default hover:bg-bg-secondary transition-colors">
-                                <Plus size={16} />
-                              </button>
-                            </div>
-                            <button
-                              onClick={() => removeFromCart(item.id, item.frontend_unique_key)}
-                              title="Remove item" className='text-action-danger hover:scale-110 transition-transform'>
-                              <X size={20} />
-                            </button>
+                            {group.addons.map(addon => (
+                              <div key={addon.frontend_unique_key} className="flex items-center gap-2 p-2 pl-8 ml-4 rounded-lg border border-dashed bg-orange-100/50">
+                                <span className="text-xs text-orange-600">↳</span>
+                                <span className="text-sm text-gray-700 flex-1">{addon.name}</span>
+                                <span className="text-xs font-semibold text-orange-600">₹{addon.unit_price?.toFixed(2)}</span>
+                              </div>
+                            ))}
                           </div>
                         ))}
                       </React.Fragment>
@@ -1941,7 +2097,7 @@ const TakeOrder = ({ clientId, token, onOrderUpdate, realm }) => {
                   <div className="border-t pt-4 mb-6 border-border-default">
                     <div className="flex justify-between items-center text-xl font-bold">
                       <span className='text-text-primary'>Total:</span>
-                      <span className='text-action-primary font-bold'>Rs.{getTotalPrice()}</span>
+                      <span className='text-action-primary font-bold'>₹{getTotalPrice()}</span>
                     </div>
                   </div>
 
@@ -2017,7 +2173,7 @@ const TakeOrder = ({ clientId, token, onOrderUpdate, realm }) => {
         mainItem={selectedMainItem}
         lineItems={lineItemsDetails}
         onAddMainOnly={handleAddMainItemOnly}
-        onAddWithLineItems={handleAddMainItemWithLineItems}
+        onAddWithSelectedAddons={handleAddMainItemWithSelectedAddons}
       />
 
       <NoteModal
