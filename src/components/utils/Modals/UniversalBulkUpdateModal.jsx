@@ -1,5 +1,6 @@
 import React from 'react';
 import { X, Edit, Trash2, Search } from 'lucide-react';
+import DropdownCheckbox from './DropdownCheckbox';
 
 const UniversalBulkUpdateModal = ({
   // Common props
@@ -17,6 +18,7 @@ const UniversalBulkUpdateModal = ({
   setBulkEditData,
   handleBulkUpdate,
   handleBulkDelete,
+  addonItems, // ✅ NEW: Addon items from parent
 
   // Table-specific props (Bulk Update)
   tables,
@@ -99,7 +101,6 @@ const UniversalBulkUpdateModal = ({
         section: "",
         location_zone: ""
       });
-
     }
   };
 
@@ -109,15 +110,14 @@ const UniversalBulkUpdateModal = ({
   if (modalType === 'menu') {
     return (
       <div className="fixed inset-0 z-50 flex items-center justify-center p-4 bg-black bg-opacity-50">
-        <div className="rounded-lg max-w-4xl w-full bg-white max-h-[90vh] flex flex-col shadow-xl">
+        <div className="rounded-lg max-w-6xl w-full bg-white max-h-[90vh] flex flex-col shadow-xl">
 
           {/* Header */}
           <div className="flex justify-between items-center px-6 py-4 border-b border-gray-200">
             <h2 className="text-xl font-semibold text-gray-900">Bulk Update & Delete</h2>
             <button
               onClick={handleClose}
-              className="p-1.5 rounded-lg bg-action-primary text-text-white hover:opacity-90 transition-opacity   "
-
+              className="p-1.5 rounded-lg bg-action-primary text-text-white hover:opacity-90 transition-opacity"
             >
               <X className="w-5 h-5" />
             </button>
@@ -162,7 +162,7 @@ const UniversalBulkUpdateModal = ({
 
           {/* Table Container */}
           <div className="flex-1 overflow-auto px-4 py-4">
-            <div className="min-w-[800px]">
+            <div className="min-w-[1000px]">
               <table className="w-full border-collapse">
                 <thead className="sticky top-0 bg-white z-10">
                   <tr className="border-b border-gray-200">
@@ -178,9 +178,8 @@ const UniversalBulkUpdateModal = ({
                     <th className="px-4 py-3 text-left text-sm font-semibold text-gray-700 bg-gray-50">Description</th>
                     <th className="px-4 py-3 text-left text-sm font-semibold text-gray-700 bg-gray-50">Price</th>
                     <th className="px-4 py-3 text-left text-sm font-semibold text-gray-700 bg-gray-50">Discount</th>
-                    <th className="px-4 py-3 text-left text-sm font-semibold text-gray-700 bg-gray-50">
-                      Code
-                    </th>
+                    <th className="px-4 py-3 text-left text-sm font-semibold text-gray-700 bg-gray-50">Code</th>
+                    <th className="px-4 py-3 text-left text-sm font-semibold text-gray-700 bg-gray-50">Add-ons</th>
                   </tr>
                 </thead>
                 <tbody>
@@ -278,8 +277,7 @@ const UniversalBulkUpdateModal = ({
                               onChange={(e) =>
                                 updateBulkEditData(item.id, 'code', e.target.value)
                               }
-                              className="w-full px-3 py-2 rounded-md border border-gray-300 text-sm
-        focus:outline-none focus:ring-2 focus:ring-action-primary"
+                              className="w-full px-3 py-2 rounded-md border border-gray-300 text-sm focus:outline-none focus:ring-2 focus:ring-action-primary"
                               placeholder="Code"
                             />
                           ) : (
@@ -288,7 +286,33 @@ const UniversalBulkUpdateModal = ({
                             </span>
                           )}
                         </td>
-
+                        {/* ✅ NEW: Add-ons Column */}
+                        <td className="px-4 py-3">
+                          {isSelected ? (
+                            <div className="w-64">
+                              <DropdownCheckbox
+                                selected={
+                                  editData.line_item_id !== undefined
+                                    ? editData.line_item_id
+                                    : Array.isArray(item.line_item_id)
+                                      ? item.line_item_id
+                                      : []
+                                }
+                                options={(addonItems || []).filter(addon => addon.id !== item.id)}
+                                onChange={(selected) =>
+                                  updateBulkEditData(item.id, 'line_item_id', selected)
+                                }
+                                label="Select Add-ons"
+                              />
+                            </div>
+                          ) : (
+                            <span className="text-sm text-gray-900">
+                              {Array.isArray(item.line_item_id) && item.line_item_id.length > 0
+                                ? `${item.line_item_id.length} add-on(s)`
+                                : '-'}
+                            </span>
+                          )}
+                        </td>
                       </tr>
                     );
                   })}
@@ -308,7 +332,7 @@ const UniversalBulkUpdateModal = ({
           <div className="px-6 py-4 border-t border-gray-200 bg-gray-50">
             <div className="flex justify-between items-center">
               <p className="text-sm text-gray-600">
-                💡 Select items by clicking checkboxes, edit fields, then click "Update Selected"
+                💡 Select items by clicking checkboxes, edit fields (including add-ons), then click "Update Selected"
               </p>
               <button
                 onClick={handleClose}
@@ -324,7 +348,6 @@ const UniversalBulkUpdateModal = ({
   }
 
   // Render Table Bulk Update Modal
-  // Render Table Bulk Update Modal
   if (modalType === 'table') {
     const filteredTables = getFilteredUpdateTables();
 
@@ -339,7 +362,7 @@ const UniversalBulkUpdateModal = ({
             </h2>
             <button
               onClick={handleClose}
-              className="p-1.5 rounded-lg bg-action-primary text-text-white hover:opacity-90 transition-opacity   "
+              className="p-1.5 rounded-lg bg-action-primary text-text-white hover:opacity-90 transition-opacity"
             >
               <X className="w-4 h-4 " />
             </button>
@@ -413,7 +436,8 @@ const UniversalBulkUpdateModal = ({
                   <option value="Reserved">Reserved</option>
                 </select>
               </div>
-              {/* SECTION */}
+
+              {/* Section */}
               <div>
                 <label className="block text-xs font-semibold mb-1.5 text-text-secondary">
                   Section
@@ -431,7 +455,7 @@ const UniversalBulkUpdateModal = ({
                 </select>
               </div>
 
-              {/* ZONE */}
+              {/* Zone */}
               <div>
                 <label className="block text-xs font-semibold mb-1.5 text-text-secondary">
                   Zone
@@ -450,7 +474,6 @@ const UniversalBulkUpdateModal = ({
                   <option value="Second Floor">Second Floor</option>
                 </select>
               </div>
-
             </div>
           </div>
 
@@ -580,7 +603,7 @@ const UniversalBulkUpdateModal = ({
                           </select>
                         </div>
 
-                        {/* SECTION */}
+                        {/* Section */}
                         <div>
                           <label className="block text-xs font-semibold mb-1.5 text-text-secondary">
                             Section
@@ -597,7 +620,7 @@ const UniversalBulkUpdateModal = ({
                           </select>
                         </div>
 
-                        {/* ZONE */}
+                        {/* Zone */}
                         <div>
                           <label className="block text-xs font-semibold mb-1.5 text-text-secondary">
                             Zone
@@ -615,7 +638,6 @@ const UniversalBulkUpdateModal = ({
                             <option value="Second Floor">Second Floor</option>
                           </select>
                         </div>
-
                       </div>
                     ) : (
                       <div className="pt-2 border-t border-border-default">
