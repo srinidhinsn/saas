@@ -6,7 +6,6 @@ const HIDDEN_MODULES = [
   "realms",
   "restaurant"
 ];
-const ALLOWED_MODULES = ["users", "tables", "dinein"];
 
 const RoleConfig = ({ token, clientId }) => {
   const [roles, setRoles] = useState([]);
@@ -167,7 +166,6 @@ const RoleConfig = ({ token, clientId }) => {
 
               <div className="space-y-6">
               {modules 
-               .filter(mod => ALLOWED_MODULES.includes(mod.module))
   .filter(mod => !HIDDEN_MODULES.includes(mod.module))
   .map(mod => (
                   <div key={mod.module}>
