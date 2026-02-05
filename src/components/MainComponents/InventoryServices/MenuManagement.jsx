@@ -22,8 +22,8 @@ const MenuManagement = ({ clientId, token, realm }) => {
   const [loading, setLoading] = useState(true);
   const [dietaryFilter, setDietaryFilter] = useState("All");
   const [inventoryIds, setInventoryIds] = useState([]);
-  const [addonItems, setAddonItems] = useState([]); // ✅ NEW: Store addon items
-  const [addonsCategoryId, setAddonsCategoryId] = useState(null); // ✅ NEW: Store addons category ID
+  const [addonItems, setAddonItems] = useState([]); // ✅ Store addon items
+  const [addonsCategoryId, setAddonsCategoryId] = useState(null); // ✅ Store addons category ID
   
   // Modal states
   const [showAddModal, setShowAddModal] = useState(false);
@@ -157,6 +157,19 @@ const MenuManagement = ({ clientId, token, realm }) => {
     return match ? match.id : null;
   };
 
+  // ✅ NEW: Get selected category ID (not name)
+  const getSelectedCategoryId = () => {
+    if (!selectedCategory) return null;
+    if (typeof selectedCategory === 'string') {
+      // If it's "All Categories", return null
+      if (selectedCategory === 'All Categories') return null;
+      // Otherwise try to find the ID by name
+      return getCategoryIdByName(selectedCategory);
+    }
+    if (typeof selectedCategory === 'object') return selectedCategory.id;
+    return null;
+  };
+
   const getSelectedCategoryName = () => {
     if (!selectedCategory) return null;
     if (typeof selectedCategory === 'string') return selectedCategory;
@@ -186,7 +199,7 @@ const MenuManagement = ({ clientId, token, realm }) => {
     }
   };
 
-  // ✅ NEW: Fetch addons category and filter addon items
+  // ✅ Fetch addons category and filter addon items
   const fetchAddonItems = useCallback(async () => {
     try {
       // First, get the addons category ID
@@ -222,7 +235,7 @@ const MenuManagement = ({ clientId, token, realm }) => {
 
   useEffect(() => {
     fetchInventoryIds();
-    fetchAddonItems(); // ✅ NEW: Fetch addons on mount
+    fetchAddonItems();
   }, [fetchAddonItems]);
 
   const handleAddItem = async () => {
@@ -282,7 +295,7 @@ const MenuManagement = ({ clientId, token, realm }) => {
       );
 
       await fetchData({ silent: true });
-      await fetchAddonItems(); // ✅ NEW: Refresh addons after adding
+      await fetchAddonItems();
 
       setShowAddModal(false);
       setNewItem({
@@ -364,7 +377,7 @@ const MenuManagement = ({ clientId, token, realm }) => {
       );
 
       await fetchData({ silent: true });
-      await fetchAddonItems(); // ✅ NEW: Refresh addons after editing
+      await fetchAddonItems();
 
       setShowEditModal(false);
       setEditingItem(null);
@@ -485,14 +498,17 @@ const MenuManagement = ({ clientId, token, realm }) => {
     fetchData();
   }, [fetchData]);
 
-  const getAllDescendantCategories = (categoryName, categoryTree) => {
-    const descendants = [categoryName];
+  // ✅ NEW: Get all descendant category IDs (not names)
+  const getAllDescendantCategoryIds = (categoryId, categoryTree) => {
+    if (!categoryId) return [];
 
-    const findCategory = (cats, name) => {
+    const descendants = [categoryId];
+
+    const findCategory = (cats, id) => {
       for (const cat of cats) {
-        if (cat.name === name) return cat;
+        if (cat.id === id) return cat;
         if (cat.children) {
-          const found = findCategory(cat.children, name);
+          const found = findCategory(cat.children, id);
           if (found) return found;
         }
       }
@@ -502,13 +518,13 @@ const MenuManagement = ({ clientId, token, realm }) => {
     const collectDescendants = (cat) => {
       if (cat.children && cat.children.length > 0) {
         cat.children.forEach(child => {
-          descendants.push(child.name);
+          descendants.push(child.id);
           collectDescendants(child);
         });
       }
     };
 
-    const category = findCategory(categoryTree, categoryName);
+    const category = findCategory(categoryTree, categoryId);
     if (category) {
       collectDescendants(category);
     }
@@ -516,6 +532,7 @@ const MenuManagement = ({ clientId, token, realm }) => {
     return descendants;
   };
 
+  // ✅ UPDATED: Filter by category ID instead of category name
   const getFilteredItems = () => {
     if (!menuItems.length) {
       return [];
@@ -538,23 +555,23 @@ const MenuManagement = ({ clientId, token, realm }) => {
       console.log('After search filter:', items.length);
     }
 
-    const selectedCategoryName = getSelectedCategoryName();
+    const selectedCategoryId = getSelectedCategoryId();
 
-    if (!selectedCategoryName || selectedCategoryName === 'All Categories') {
+    if (!selectedCategoryId) {
       return items;
     }
 
     if (categories.length > 0 && categoriesFlat.length > 0) {
-      const allowedCategories = getAllDescendantCategories(
-        selectedCategoryName,
+      const allowedCategoryIds = getAllDescendantCategoryIds(
+        selectedCategoryId,
         categories
       );
 
-      console.log('allowedCategories:', allowedCategories);
-      console.log('Sample item categories:', items.slice(0, 3).map(i => i.category));
+      console.log('allowedCategoryIds:', allowedCategoryIds);
+      console.log('Sample item category IDs:', items.slice(0, 3).map(i => i.category_id));
 
       items = items.filter(item =>
-        allowedCategories.includes(item.category)
+        allowedCategoryIds.includes(item.category_id)
       );
 
       console.log('After category filter:', items.length);
@@ -633,18 +650,49 @@ const MenuManagement = ({ clientId, token, realm }) => {
     }
   };
 
+  // ✅ UPDATED: Auto-unlink deleted addon from all items
   const handleDeleteItem = async () => {
     try {
+      const deletedItemId = deleteTarget.id;
+
       await axios.post(
         `${import.meta.env.VITE_API_INVENTORY_SERVICE_URL}/${clientId}/menu/delete`,
-        { id: deleteTarget.id },
+        { id: deletedItemId },
         { headers: { Authorization: `Bearer ${token}` } }
       );
 
-      setMenuItems(menuItems.filter(item => item.id !== deleteTarget.id));
+      // ✅ Find all items that have this addon linked
+      const itemsToUpdate = menuItems.filter(item => 
+        Array.isArray(item.line_item_id) && item.line_item_id.includes(deletedItemId)
+      );
+
+      // ✅ Update each item to remove the deleted addon
+      if (itemsToUpdate.length > 0) {
+        await Promise.all(
+          itemsToUpdate.map(item => {
+            const updatedLineItemIds = item.line_item_id.filter(id => id !== deletedItemId);
+            
+            return axios.post(
+              `${import.meta.env.VITE_API_INVENTORY_SERVICE_URL}/${clientId}/menu/update`,
+              {
+                ...item,
+                line_item_id: updatedLineItemIds,
+                client_id: clientId
+              },
+              { headers: { Authorization: `Bearer ${token}` } }
+            );
+          })
+        );
+
+        console.log(`✅ Unlinked addon from ${itemsToUpdate.length} items`);
+      }
+
+      // Refresh data
+      await fetchData({ silent: true });
+      await fetchAddonItems();
+
       setShowDeleteModal(false);
       setDeleteTarget(null);
-      await fetchAddonItems(); // ✅ NEW: Refresh addons after deleting
     } catch (error) {
       console.error('Error deleting item:', error);
       alert('Failed to delete item');
@@ -661,6 +709,7 @@ const MenuManagement = ({ clientId, token, realm }) => {
     if (!confirm) return;
 
     try {
+      // ✅ Delete all selected items
       await Promise.all(
         selectedRows.map(id =>
           axios.post(
@@ -671,10 +720,39 @@ const MenuManagement = ({ clientId, token, realm }) => {
         )
       );
 
-      setMenuItems(menuItems.filter(item => !selectedRows.includes(item.id)));
+      // ✅ Find all items that have any of the deleted items linked as addons
+      const itemsToUpdate = menuItems.filter(item => 
+        Array.isArray(item.line_item_id) && 
+        item.line_item_id.some(addonId => selectedRows.includes(addonId))
+      );
+
+      // ✅ Update each item to remove the deleted addons
+      if (itemsToUpdate.length > 0) {
+        await Promise.all(
+          itemsToUpdate.map(item => {
+            const updatedLineItemIds = item.line_item_id.filter(id => !selectedRows.includes(id));
+            
+            return axios.post(
+              `${import.meta.env.VITE_API_INVENTORY_SERVICE_URL}/${clientId}/menu/update`,
+              {
+                ...item,
+                line_item_id: updatedLineItemIds,
+                client_id: clientId
+              },
+              { headers: { Authorization: `Bearer ${token}` } }
+            );
+          })
+        );
+
+        console.log(`✅ Unlinked deleted addons from ${itemsToUpdate.length} items`);
+      }
+
+      // Refresh data
+      await fetchData({ silent: true });
+      await fetchAddonItems();
+
       setSelectedRows([]);
       setSelectAllChecked(false);
-      await fetchAddonItems(); // ✅ NEW: Refresh addons after bulk delete
     } catch (error) {
       console.error('Error deleting items:', error);
       alert('Failed to delete some items');
@@ -710,12 +788,8 @@ const MenuManagement = ({ clientId, token, realm }) => {
         })
       );
 
-      const itemRes = await axios.get(
-        `${import.meta.env.VITE_API_INVENTORY_SERVICE_URL}/${clientId}/menu/read?inventory_id=menu`,
-        { headers: { Authorization: `Bearer ${token}` } }
-      );
-      setMenuItems(itemRes.data.data);
-      await fetchAddonItems(); // ✅ NEW: Refresh addons after bulk update
+      await fetchData({ silent: true });
+      await fetchAddonItems();
 
       setShowBulkModal(false);
       setSelectedRows([]);
@@ -929,21 +1003,8 @@ const MenuManagement = ({ clientId, token, realm }) => {
           }
         }
 
-        const itemRes = await axios.get(
-          `${import.meta.env.VITE_API_INVENTORY_SERVICE_URL}/${clientId}/menu/read?inventory_id=menu`,
-          { headers: { Authorization: `Bearer ${token}` } }
-        );
-
-        const enrichedItems = (itemRes.data.data || []).map(item => {
-          const cat = categoriesFlat.find(c => c.id === item.category_id);
-          return {
-            ...item,
-            category: cat?.name ?? "Uncategorized"
-          };
-        });
-
-        setMenuItems(enrichedItems);
-        await fetchAddonItems(); // ✅ NEW: Refresh addons after import
+        await fetchData({ silent: true });
+        await fetchAddonItems();
 
         alert(
           `✅ Import completed\n\n` +
@@ -1190,7 +1251,6 @@ const MenuManagement = ({ clientId, token, realm }) => {
         </div>
       )}
 
-      {/* ✅ UPDATED: Pass addonItems instead of menuItems */}
       <UniversalAddModal
         showModal={showAddModal}
         setShowModal={setShowAddModal}
@@ -1210,7 +1270,6 @@ const MenuManagement = ({ clientId, token, realm }) => {
         inventoryIds={inventoryIds}
       />
 
-      {/* ✅ UPDATED: Pass addonItems instead of menuItems */}
       <UniversalEditModal
         showModal={showEditModal}
         setShowModal={setShowEditModal}
@@ -1229,7 +1288,6 @@ const MenuManagement = ({ clientId, token, realm }) => {
         inventoryIds={inventoryIds}
       />
 
-      {/* ✅ UPDATED: Pass addonItems */}
       <UniversalBulkUpdateModal
         showModal={showBulkModal}
         setShowModal={setShowBulkModal}
