@@ -266,7 +266,7 @@ const TakeOrder_V1 = ({ clientId, token, onOrderUpdate, realm }) => {
             const ordersMap = {};
 
             tableList.forEach(table => {
-                if (table.status?.toLowerCase() === 'occupied') {
+                if (table.status?.toLowerCase() === 'active') {
                     const tableOrder = allOrders
                         .filter(o => o.table_id === table.id && o.status?.toLowerCase() !== 'served')
                         .sort((a, b) => new Date(b.created_at) - new Date(a.created_at))[0];
@@ -778,7 +778,12 @@ const TakeOrder_V1 = ({ clientId, token, onOrderUpdate, realm }) => {
 
                 await axios.post(
                     `${import.meta.env.VITE_API_ORDER_SERVICE_URL}/${clientId}/dinein/update`,
-                    { id: activeOrderId, total_price: subtotal },
+                    {
+                        id: activeOrderId,
+                        status: "ready",
+                        total_price: subtotal
+                      }
+                      ,
                     { headers }
                 );
             } else {
@@ -814,10 +819,12 @@ const TakeOrder_V1 = ({ clientId, token, onOrderUpdate, realm }) => {
                         items: cart.map(i => ({
                           item_id: Number(i.id),
                           item_name: i.name,
+                          slug: i.name ? generateSlug(i.name) : `item_${i.id}`,
                           quantity: Number(i.quantity || 1),
                           unit_price: Number(i.unit_price || 0),
                           line_total: Number((i.unit_price || 0) * (i.quantity || 1)),                         
-                            status: "ready"
+                            status: "ready",
+                            frontend_unique_key: i.frontend_unique_key ?? null,
                         }))
                     },
                     { headers }
@@ -831,7 +838,7 @@ const TakeOrder_V1 = ({ clientId, token, onOrderUpdate, realm }) => {
                     {
                         ...tableToUpdate,
                         id: Number(selectedTable),
-                        status: "Occupied",
+                        status: "active",
                         table_type: String(tableToUpdate.table_type ?? "1")
                     },
                     { headers }
@@ -921,7 +928,6 @@ const TakeOrder_V1 = ({ clientId, token, onOrderUpdate, realm }) => {
 
             setActiveOrderId(activeOrder.id);
             setCurrentBatchTimestamp(null);
-            setHasNewItems(false);
             setHasNewItems(false);
             setCurrentBatchTimestamp(null);
 

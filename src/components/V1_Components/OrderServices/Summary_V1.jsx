@@ -113,7 +113,7 @@ const Summary_V1 = ({ clientId, token }) => {
     const [activeTab, setActiveTab] = useState('items');
     const [selectedOrderModes, setSelectedOrderModes] = useState(['all']);
     const [tableModeMap, setTableModeMap] = useState({});
-
+    const [servingOrderId, setServingOrderId] = useState(null);
     const navigate = useNavigate();
 
 
@@ -791,6 +791,7 @@ const Summary_V1 = ({ clientId, token }) => {
                         .toLocaleDateString("en-CA");
                     return orderDate === todayString;
                 });
+                if (editOrderId) return;
 
                 setOrders(
                     todayOrders.map(order => {
@@ -826,13 +827,13 @@ const Summary_V1 = ({ clientId, token }) => {
                             if (item.frontend_unique_key) {
                                 batchTs = keyToBatchMap.get(item.frontend_unique_key);
 
-                                if (!batchTs) {
-                                    const parts = item.frontend_unique_key.split("_");
-                                    const maybeTs = parseFloat(parts[parts.length - 1]);
-                                    if (!isNaN(maybeTs)) {
-                                        batchTs = Math.floor(maybeTs / 1000) * 1000;
-                                    }
-                                }
+                                // if (!batchTs) {
+                                //     const parts = item.frontend_unique_key.split("_");
+                                //     const maybeTs = parseFloat(parts[parts.length - 1]);
+                                //     if (!isNaN(maybeTs)) {
+                                //         batchTs = Math.floor(maybeTs / 1000) * 1000;
+                                //     }
+                                // }
                             }
 
                             const normalizedItem = {
@@ -935,48 +936,44 @@ const Summary_V1 = ({ clientId, token }) => {
 
 
     const handleStatusChange = async (orderId, newStatus) => {
-        const order = orders.find(o => o.id === orderId);
-        if (!order || order.status === 'served') return;
-        const tableObj = tables.find(t => t.id === order.table_id);
+        if (newStatus === 'served' && servingOrderId === orderId) return;
+
+        setServingOrderId(orderId);
         try {
-            await axios({
-                method: 'post',
-                url: `${import.meta.env.VITE_API_ORDER_SERVICE_URL}/${clientId}/dinein/update`,
-                headers: {
-                    Authorization: `Bearer ${token}`,
-                    'Content-Type': 'application/json'
-                },
-                data: {
+            await axios.post(
+                `${import.meta.env.VITE_API_ORDER_SERVICE_URL}/${clientId}/dinein/update`,
+                {
                     id: orderId,
-                    status: newStatus   // OR total_price
-                }
-            });
-            if (tableObj) {
-                await axios.post(`${import.meta.env.VITE_API_TABLE_SERVICE_URL}/${clientId}/tables/update`, {
-                    id: order.table_id,
-                    client_id: clientId,
-                    name: tableObj.name,
-                    table_type: tableObj.table_type,
-                    location_zone: tableObj.location_zone
-                }, { headers: { Authorization: `Bearer ${token}` } });
-            }
-            setOrders(prev => prev.map(o => o.id === orderId ? {
-                ...o,
-                status: newStatus,
-                has_new_items: newStatus === 'served' ? false : o.has_new_items
-            } : o));
+                    status: newStatus
+                },
+                { headers: { Authorization: `Bearer ${token}` } }
+            );
+
+            setOrders(prev =>
+                prev.map(o =>
+                    o.id === orderId
+                        ? { ...o, status: newStatus, has_new_items: false }
+                        : o
+                )
+            );
+
             if (selectedOrder?.id === orderId) {
                 setSelectedOrder(prev => ({
                     ...prev,
                     status: newStatus,
-                    has_new_items: newStatus === 'served' ? false : prev.has_new_items
+                    has_new_items: false
                 }));
             }
-            if (newStatus === 'served') setEditOrderId(null);
-        } catch (err) {
-            console.log("You got an error : ", err)
+
+            if (newStatus === 'served') {
+                setEditOrderId(null);
+                clearNewItemsStorage(orderId);
+            }
+        } finally {
+            setServingOrderId(null);
         }
     };
+
 
     const cancelItem = async (orderId, itemBackendId) => {
         const order = orders.find(o => o.id === orderId);
@@ -1058,6 +1055,8 @@ const Summary_V1 = ({ clientId, token }) => {
 
     const updateOrderItems = async (orderId, items) => {
         try {
+            const existingItems = items.filter(it => typeof it.id === 'number');
+            const newItems = items.filter(it => !it.id || typeof it.id === 'string');
             // 1️⃣ Prepare items for the API
             const allItemsForAPI = items.map(it => {
                 const price =
@@ -1066,19 +1065,32 @@ const Summary_V1 = ({ clientId, token }) => {
                     it.price ||
                     0;
 
-                return {
-                    id: typeof it.id === 'number' ? it.id : null,
-                    item_id: it.item_id,
-                    item_name: it.item_name,
-                    quantity: it.quantity || 1,
-                    unit_price: price,
-                    line_total: price * (it.quantity || 1),
-                    status: 'ready',
-                    frontend_unique_key: it.frontend_unique_key || null,
-                    slug: it.slug || ''
-                };
+                if (typeof it.id === 'number') {
+                    // Existing item from DB
+                    return {
+                        order_item_id: it.id,  // ✅ Changed from "id"
+                        item_id: it.item_id,
+                        item_name: it.item_name,
+                        quantity: it.quantity || 1,
+                        unit_price: price,
+                        line_total: price * (it.quantity || 1),
+                        status: 'ready',
+                        slug: it.slug || ''
+                    };
+                } else {
+                    // New item with frontend_unique_key
+                    return {
+                        item_id: it.item_id,
+                        item_name: it.item_name,
+                        quantity: it.quantity || 1,
+                        unit_price: price,
+                        line_total: price * (it.quantity || 1),
+                        status: 'ready',
+                        frontend_unique_key: it.frontend_unique_key || null,
+                        slug: it.slug || ''
+                    };
+                }
             });
-
             console.log('📤 Sending items to API:', allItemsForAPI);
 
             // 2️⃣ Update items
@@ -1153,7 +1165,8 @@ const Summary_V1 = ({ clientId, token }) => {
         } catch (err) {
             console.error("❌ Failed:", err);
             console.error("Error detail:", err.response?.data?.detail);
-            alert(`Failed: ${JSON.stringify(err.response?.data?.detail)}`);
+            console.error("Response:", err.response?.data);
+            alert(`Failed: ${JSON.stringify(err.response?.data)}`);
         }
     };
 
@@ -1459,11 +1472,17 @@ const Summary_V1 = ({ clientId, token }) => {
 
 
                                             <button
+                                                disabled={order.status === 'served' || servingOrderId === order.id}
                                                 onClick={() => handleStatusChange(order.id, 'served')}
-                                                className="flex-1 px-4 py-2 rounded-lg bg-action-success text-text-white"
+                                                className={`flex-1 px-4 py-2 rounded-lg
+    ${order.status === 'served' || servingOrderId === order.id
+                                                        ? 'bg-gray-300 cursor-not-allowed'
+                                                        : 'bg-action-success text-text-white'
+                                                    }`}
                                             >
                                                 Mark as Served
                                             </button>
+
 
 
                                         </div>
