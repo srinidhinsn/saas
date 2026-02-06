@@ -16,15 +16,20 @@ const MenuManagement = ({ clientId, token, realm }) => {
   const [searchQuery, setSearchQuery] = useState('');
   const searchInputRef = useRef(null);
   const [screenId, setScreenId] = useState();
-  const [selectedCategory, setSelectedCategory] = useState('All Categories');
-  const [categories, setCategories] = useState([]);
+    const [categories, setCategories] = useState([]);
   const [menuItems, setMenuItems] = useState([]);
   const [loading, setLoading] = useState(true);
   const [dietaryFilter, setDietaryFilter] = useState("All");
   const [inventoryIds, setInventoryIds] = useState([]);
   const [addonItems, setAddonItems] = useState([]); // ✅ Store addon items
   const [addonsCategoryId, setAddonsCategoryId] = useState(null); // ✅ Store addons category ID
-  
+  const [selectedCategoryId, setSelectedCategoryId] = useState(null);
+
+<MenuCategoryTree
+  selectedCategoryId={selectedCategoryId}
+  onSelectCategory={setSelectedCategoryId}
+/>
+
   // Modal states
   const [showAddModal, setShowAddModal] = useState(false);
   const [showEditModal, setShowEditModal] = useState(false);
@@ -157,25 +162,6 @@ const MenuManagement = ({ clientId, token, realm }) => {
     return match ? match.id : null;
   };
 
-  // ✅ NEW: Get selected category ID (not name)
-  const getSelectedCategoryId = () => {
-    if (!selectedCategory) return null;
-    if (typeof selectedCategory === 'string') {
-      // If it's "All Categories", return null
-      if (selectedCategory === 'All Categories') return null;
-      // Otherwise try to find the ID by name
-      return getCategoryIdByName(selectedCategory);
-    }
-    if (typeof selectedCategory === 'object') return selectedCategory.id;
-    return null;
-  };
-
-  const getSelectedCategoryName = () => {
-    if (!selectedCategory) return null;
-    if (typeof selectedCategory === 'string') return selectedCategory;
-    if (typeof selectedCategory === 'object') return selectedCategory.name;
-    return null;
-  };
 
   const fetchInventoryIds = async () => {
     try {
@@ -247,9 +233,8 @@ const MenuManagement = ({ clientId, token, realm }) => {
       }
 
       const categoryIdFromNewItem = newItem?.category_id || null;
-      const categoryIdFromSelected = (typeof selectedCategory === 'object' && selectedCategory?.id)
-        ? selectedCategory.id
-        : getCategoryIdByName(selectedCategory);
+      const categoryIdFromSelected = selectedCategoryId;
+
 
       const resolvedCategoryId = categoryIdFromNewItem || categoryIdFromSelected || null;
       const finalCategoryId = resolvedCategoryId;
@@ -340,11 +325,8 @@ const MenuManagement = ({ clientId, token, realm }) => {
         imageId = await uploadImageToDocumentService(editItemImage);
       }
 
-      const categoryId =
-        editingItem.category_id ||
-        (typeof selectedCategory === 'object'
-          ? selectedCategory.id
-          : getCategoryIdByName(selectedCategory));
+      const categoryId = editingItem.category_id || selectedCategoryId || null;
+
 
       const finalCategoryId = categoryId || null;
       const slug = generateSlug(finalCategoryId, editingItem.name);
@@ -555,11 +537,19 @@ const MenuManagement = ({ clientId, token, realm }) => {
       console.log('After search filter:', items.length);
     }
 
-    const selectedCategoryId = getSelectedCategoryId();
-
     if (!selectedCategoryId) {
       return items;
     }
+    
+    const allowedCategoryIds = getAllDescendantCategoryIds(
+      selectedCategoryId,
+      categories
+    );
+    
+    items = items.filter(item =>
+      allowedCategoryIds.includes(item.category_id)
+    );
+    
 
     if (categories.length > 0 && categoriesFlat.length > 0) {
       const allowedCategoryIds = getAllDescendantCategoryIds(
@@ -1050,7 +1040,12 @@ const MenuManagement = ({ clientId, token, realm }) => {
     window.addEventListener('keydown', onKey);
     return () => window.removeEventListener('keydown', onKey);
   }, []);
-
+  const getSelectedCategoryNameById = () => {
+    if (!selectedCategoryId) return 'All Categories';
+    const found = categoriesFlat.find(c => c.id === selectedCategoryId);
+    return found?.name || 'All Categories';
+  };
+  
   return (
     <div className="h-[90vh] bg-bg-primary overflow-x-hidden">
       <div className="mx-auto p-2">
@@ -1060,9 +1055,9 @@ const MenuManagement = ({ clientId, token, realm }) => {
             <div className="lg:sticky lg:top-2">
               <MenuCategoryTree
                 categories={categories}
-                selectedCategory={selectedCategory}
-                onSelectCategory={setSelectedCategory}
-                defaultOpenCategoryName="Dietery"
+                selectedCategoryId={selectedCategoryId}
+                onSelectCategory={setSelectedCategoryId}
+                defaultOpenCategoryName="All Categories"
                 clientId={clientId}
                 token={token}
                 onCategoriesUpdate={() => {
@@ -1076,12 +1071,11 @@ const MenuManagement = ({ clientId, token, realm }) => {
           <div className="lg:col-span-3 border-default border-border-default p-3 rounded-lg h-[88.5vh] flex flex-col">
             <div className="mb-4 grid gap-3 grid-cols-1 md:grid-cols-2 lg:grid-cols-3 flex-shrink-0">
               <div className="lg:col-span-1 space-y-2">
-                <h2 className="text-xl lg:text-2xl font-semibold text-text-primary">
-                  {getSelectedCategoryName() || 'All Categories'}
-                  <span className="text-sm ml-2 text-text-primary">
-                    ({filteredItems.length} items)
-                  </span>
-                </h2>
+              <h2 className="text-xl lg:text-2xl font-semibold text-text-primary">
+              {getSelectedCategoryNameById() || 'All Categories'}
+  <span className="text-sm ml-2">({filteredItems.length} items)</span>
+</h2>
+
               </div>
 
               {/* Search Field */}
@@ -1257,8 +1251,7 @@ const MenuManagement = ({ clientId, token, realm }) => {
         modalType="menu"
         newItem={newItem}
         setNewItem={setNewItem}
-        selectedCategory={selectedCategory}
-        setSelectedCategory={setSelectedCategory}
+        selectedCategoryId={selectedCategoryId}
         categories={categories}
         menuItems={addonItems}
         newItemImage={newItemImage}
@@ -1308,3 +1301,17 @@ const MenuManagement = ({ clientId, token, realm }) => {
 };
 
 export default MenuManagement;
+
+
+
+
+
+// ===========================================================    ===================================     =============================  //
+// ===========================================================    ===================================     =============================  //
+// ===========================================================    ===================================     =============================  //
+// ===========================================================    ===================================     =============================  //
+// ===========================================================    ===================================     =============================  //
+// ===========================================================    ===================================     =============================  //
+// ===========================================================    ===================================     =============================  //
+// ===========================================================    ===================================     =============================  //
+// ===========================================================    ===================================     =============================  //
