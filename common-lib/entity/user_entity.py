@@ -8,7 +8,7 @@ from models.user_model import UserModel, PageDefinitionModel,PersonModel
 class Person(Base):
     __tablename__ = "person"
     id = Column(UUID(as_uuid=True), primary_key=True, default=uuid.uuid4)
-    first_name = Column(String, index=True, nullable=False)
+    first_name = Column(String, nullable=False)
     last_name = Column(String, nullable=True)
     dob = Column(Date, nullable=True)
     email = Column(String, nullable=True)
@@ -37,7 +37,7 @@ class Person(Base):
 class User(Base):
     __tablename__ = "user"
     id = Column(UUID(as_uuid=True), primary_key=True, default=uuid.uuid4)
-    username = Column(String, index=True, nullable=False)
+    username = Column(String, nullable=False)
     hashed_password = Column(String, nullable=False)
     client_id = Column(String, nullable=False)
     roles = Column(ARRAY(String), default=[])

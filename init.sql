@@ -342,10 +342,11 @@ CREATE TABLE "user" (
 -- Data for Name: category; Type: TABLE DATA; Schema: public; Owner: postgres
 --
 
-INSERT INTO category (id, client_id, name, description, sub_categories, slug, created_by, updated_by, created_at, updated_at) VALUES ('dietery', 'easyfood', 'Dietery', 'Dietry type', '{dietery_01,dietery_02,dietery_03,dietery_04}', '_Dietery', '1000', '1000', '2025-09-25 01:36:00.080849', '2025-09-25 01:36:00.080849');
+INSERT INTO category (id, client_id, name, description, sub_categories, slug, created_by, updated_by, created_at, updated_at) VALUES ('dietery', 'easyfood', 'Dietery', 'Dietry type', '{dietery_01,dietery_02,dietery_03,dietery_04,addons}', '_Dietery', '1000', '1000', '2025-09-25 01:36:00.080849', '2025-09-25 01:36:00.080849');
 INSERT INTO category (id, client_id, name, description, sub_categories, slug, created_by, updated_by, created_at, updated_at) VALUES ('dietery_01', 'easyfood', 'Veg', 'Veg only', NULL, '_Dietery_Veg', '1000', '1000', '2025-09-25 01:36:00.080849', '2025-09-25 01:36:00.080849');
 INSERT INTO category (id, client_id, name, description, sub_categories, slug, created_by, updated_by, created_at, updated_at) VALUES ('dietery_02', 'easyfood', 'Non-Veg', 'Non veg', NULL, '_Dietery_Non-Veg', '1000', '1000', '2025-09-25 01:36:00.080849', '2025-09-25 01:36:00.080849');
 INSERT INTO category (id, client_id, name, description, sub_categories, slug, created_by, updated_by, created_at, updated_at) VALUES ('dietery_03', 'easyfood', 'Vegan', 'Jain food', NULL, '_Dietery_Vegan', '1000', '1000', '2025-09-25 01:36:00.080849', '2025-09-25 01:36:00.080849');
+INSERT INTO category (id, client_id, name, description, sub_categories, slug, created_by, updated_by, created_at, updated_at) VALUES ('addons', 'easyfood', 'Add-ons', 'Add ons', NULL, '_Dietery_Add-ons', '1000', '1000', '2025-09-25 01:36:00.080849', '2025-09-25 01:36:00.080849');
 INSERT INTO category (id, client_id, name, description, sub_categories, slug, created_by, updated_by, created_at, updated_at) VALUES ('dietery_04', 'easyfood', 'Eggeterian', 'Egg food', NULL, '_Dietery_Eggeterian', '1000', '1000', '2025-09-25 01:36:00.080849', '2025-09-25 01:36:00.080849');
 INSERT INTO category (id, client_id, name, description, sub_categories, slug, created_by, updated_by, created_at, updated_at) VALUES ('chinese_01', 'easyfood', 'Chinese', 'Chinese delicious', '{chinese_02,chinese_03}', NULL, '1000', '1000', '2025-09-25 01:36:00.080849', '2025-09-25 01:36:00.080849');
 INSERT INTO category (id, client_id, name, description, sub_categories, slug, created_by, updated_by, created_at, updated_at) VALUES ('chinese_02', 'easyfood', 'Noodles', 'Noodles special delicious', NULL, NULL, '1000', '1000', '2025-09-25 01:36:00.080849', '2025-09-25 01:36:00.080849');
@@ -373,6 +374,7 @@ INSERT INTO category (id, client_id, name, description, sub_categories, slug, cr
 --
 
 INSERT INTO client (id, name, realm, email, phone, logo, saved_address_ids, created_date_time, updated_date_time) VALUES ('easyfood', 'Easy Food Restaurant', 'restaurant', 'easyfood@gmail.com', NULL, NULL, NULL, '2025-09-25 01:36:00.080849', '2025-09-25 01:36:00.080849');
+
 
 --
 -- TOC entry 3390 (class 0 OID 49704)
@@ -666,3 +668,162 @@ CREATE TABLE notifications (
     updated_at TIMESTAMPTZ DEFAULT NOW()
 
 );
+
+
+
+
+INSERT INTO category (
+  id, client_id, name, description, sub_categories, slug,
+  created_by, updated_by, created_at, updated_at
+)
+VALUES (
+  'users',
+  'saas',
+  'Users',
+  'User management accesses',
+  ARRAY[
+    'register',
+    'login',
+    'add',
+    'reset-password',
+    'users',
+    'person-details',
+    'delegate-access',
+    'persons',
+    'realm',
+    'realms',
+    'screens',
+    'screens/configure',
+    'permissions',
+    'permissions/catalog',
+    'roles',
+    'roles/config'
+  ],
+  '_Realm_Restaurant_Users',
+  NULL,
+  NULL,
+  '2026-02-02 12:00:00.63831',
+  '2026-02-02 12:09:00.87962'
+);
+
+ALTER TABLE inventory
+ALTER COLUMN inventory_id TYPE TEXT
+USING inventory_id::TEXT;
+
+
+
+
+-- Feb 08 2026
+
+
+ALTER TABLE client
+ADD CONSTRAINT client_pk PRIMARY KEY (id);
+
+INSERT INTO client (id, name, realm, email, phone, logo, saved_address_ids, created_date_time, updated_date_time) VALUES ('saas', 'Saas Application', 'all', 'saas@gmail.com', NULL, NULL, NULL, '2025-09-25 01:36:00.080849', '2025-09-25 01:36:00.080849');
+
+-- Add composite primary key
+ALTER TABLE category
+ADD CONSTRAINT category_pk PRIMARY KEY (client_id, id);
+
+-- Add foreign key constraint linking client_id to client.id
+ALTER TABLE category
+ADD CONSTRAINT category_client_fk
+FOREIGN KEY (client_id)
+REFERENCES client(id)
+ON DELETE CASCADE;
+
+
+-- Add primary key on (client_id, id) so each order is unique per client
+ALTER TABLE dinein_order
+ADD CONSTRAINT dinein_order_pk PRIMARY KEY (client_id, id);
+
+-- Add foreign key linking client_id in dinein_order to client.id
+ALTER TABLE dinein_order
+ADD CONSTRAINT dinein_order_client_fk
+FOREIGN KEY (client_id)
+REFERENCES client(id)
+ON DELETE CASCADE;
+
+
+
+ALTER TABLE document
+ADD CONSTRAINT document_pk PRIMARY KEY (id, client_id, category_id);
+
+
+ALTER TABLE inventory
+ADD CONSTRAINT inventory_pk PRIMARY KEY (id, inventory_id, client_id);
+
+
+ALTER TABLE inventory
+ADD CONSTRAINT inventory_unique UNIQUE (id);
+
+-- Link client_id in order_item to client.id
+ALTER TABLE order_item
+ADD CONSTRAINT order_item_client_fk
+FOREIGN KEY (client_id)
+REFERENCES client(id)
+ON DELETE CASCADE;
+
+-- Link item_id in order_item to inventory.id
+ALTER TABLE order_item
+ADD CONSTRAINT order_item_inventory_fk
+FOREIGN KEY (item_id)
+REFERENCES inventory(id)
+ON DELETE CASCADE;
+
+
+-- Add composite primary key on (client_id, module, role)
+ALTER TABLE page_definition
+ADD CONSTRAINT page_definition_pk PRIMARY KEY (client_id, module, role);
+
+-- Add foreign key linking client_id in page_definition to client.id
+ALTER TABLE page_definition
+ADD CONSTRAINT page_definition_client_fk
+FOREIGN KEY (client_id)
+REFERENCES client(id)
+ON DELETE CASCADE;
+
+
+-- Add composite primary key on (id, client_id)
+ALTER TABLE tables
+ADD CONSTRAINT tables_pk PRIMARY KEY (id, client_id);
+
+-- Link client_id in names to client.id
+ALTER TABLE tables
+ADD CONSTRAINT tables_client_fk
+FOREIGN KEY (client_id)
+REFERENCES client(id)
+ON DELETE CASCADE;
+
+
+-- Add a new primary key constraint on (id, client_id)
+ALTER TABLE "user"
+ADD CONSTRAINT user_pk PRIMARY KEY (id, client_id);
+-- Link client_id in user to client.id
+ALTER TABLE "user"
+ADD CONSTRAINT user_client_fk
+FOREIGN KEY (client_id)
+REFERENCES client(id)
+ON DELETE CASCADE;
+
+
+
+
+
+
+
+
+-- Add composite primary key on (client_id, order_id, frontend_unique_key)
+ALTER TABLE order_item
+ADD CONSTRAINT order_item_pk PRIMARY KEY (client_id, order_id, frontend_unique_key);
+
+
+
+
+
+
+
+
+
+
+
