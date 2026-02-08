@@ -754,9 +754,6 @@ ALTER TABLE inventory
 ADD CONSTRAINT inventory_pk PRIMARY KEY (id, inventory_id, client_id);
 
 
-ALTER TABLE inventory
-ADD CONSTRAINT inventory_unique UNIQUE (id);
-
 -- Link client_id in order_item to client.id
 ALTER TABLE order_item
 ADD CONSTRAINT order_item_client_fk
