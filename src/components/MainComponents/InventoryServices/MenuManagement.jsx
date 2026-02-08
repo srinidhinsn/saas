@@ -21,7 +21,10 @@ const MenuManagement = ({ clientId, token, realm }) => {
   const [menuItems, setMenuItems] = useState([]);
   const [loading, setLoading] = useState(true);
   const [dietaryFilter, setDietaryFilter] = useState("All");
-
+  const [inventoryIds, setInventoryIds] = useState([]);
+  const [addonItems, setAddonItems] = useState([]); // ✅ Store addon items
+  const [addonsCategoryId, setAddonsCategoryId] = useState(null); // ✅ Store addons category ID
+  
   // Modal states
   const [showAddModal, setShowAddModal] = useState(false);
   const [showEditModal, setShowEditModal] = useState(false);
@@ -154,6 +157,19 @@ const MenuManagement = ({ clientId, token, realm }) => {
     return match ? match.id : null;
   };
 
+  // ✅ NEW: Get selected category ID (not name)
+  const getSelectedCategoryId = () => {
+    if (!selectedCategory) return null;
+    if (typeof selectedCategory === 'string') {
+      // If it's "All Categories", return null
+      if (selectedCategory === 'All Categories') return null;
+      // Otherwise try to find the ID by name
+      return getCategoryIdByName(selectedCategory);
+    }
+    if (typeof selectedCategory === 'object') return selectedCategory.id;
+    return null;
+  };
+
   const getSelectedCategoryName = () => {
     if (!selectedCategory) return null;
     if (typeof selectedCategory === 'string') return selectedCategory;
@@ -161,23 +177,67 @@ const MenuManagement = ({ clientId, token, realm }) => {
     return null;
   };
 
+  const fetchInventoryIds = async () => {
+    try {
+      const res = await axios.get(
+        `${import.meta.env.VITE_API_INVENTORY_SERVICE_URL}/${clientId}/menu/read_category?category_id=inventory`,
+        {
+          headers: {
+            Authorization: `Bearer ${token}`,
+          },
+        }
+      );
+  
+      const subcategories = res.data.data[0];
+      const subcats = subcategories.subCategories;
+  
+      setInventoryIds(subcats);
+  
+      console.log("Inventory Subcategories:", subcats);
+    } catch (error) {
+      console.log("Error fetching inventory IDs:", error);
+    }
+  };
 
-  // const generateCategoryIdFromName = (name) => {
-  //   if (!name) return null;
+  // ✅ Fetch addons category and filter addon items
+  const fetchAddonItems = useCallback(async () => {
+    try {
+      // First, get the addons category ID
+      const catRes = await axios.get(
+        `${import.meta.env.VITE_API_INVENTORY_SERVICE_URL}/${clientId}/menu/read_category?category_id=addons`,
+        { headers: { Authorization: `Bearer ${token}` } }
+      );
 
-  //   const now = new Date();
-  //   const dd = String(now.getDate()).padStart(2, "0");
-  //   const mm = String(now.getMonth() + 1).padStart(2, "0");
+      const addonsCategory = catRes.data.data?.[0];
+      if (!addonsCategory) {
+        console.log("Addons category not found");
+        return;
+      }
 
-  //   const normalizedName = name
-  //     .trim()
-  //     .replace(/\s+/g, "_")
-  //     .replace(/[^a-zA-Z0-9_]/g, "");
+      const addonsCatId = addonsCategory.id;
+      setAddonsCategoryId(addonsCatId);
 
-  //   return `${normalizedName}_${dd}_${mm}`;
-  // };
+      // Now filter menu items that belong to addons category
+      const itemRes = await axios.get(
+        `${import.meta.env.VITE_API_INVENTORY_SERVICE_URL}/${clientId}/menu/read?inventory_id=menu`,
+        { headers: { Authorization: `Bearer ${token}` } }
+      );
 
-  // Updated handleAddItem - explicitly removes dietary_type
+      const allItems = itemRes.data.data || [];
+      const filteredAddons = allItems.filter(item => item.category_id === addonsCatId);
+      
+      setAddonItems(filteredAddons);
+      console.log("Addon Items:", filteredAddons);
+    } catch (error) {
+      console.error("Error fetching addon items:", error);
+    }
+  }, [clientId, token]);
+
+  useEffect(() => {
+    fetchInventoryIds();
+    fetchAddonItems();
+  }, [fetchAddonItems]);
+
   const handleAddItem = async () => {
     try {
       let imageId = null;
@@ -202,7 +262,6 @@ const MenuManagement = ({ clientId, token, realm }) => {
       const slug = generateSlug(finalCategoryId, newItem.name);
       const created_by = currentUserId || localStorage.getItem('user_id') || 'system';
 
-      // ✅ EXPLICITLY remove dietary_type and any other unwanted fields
       const { dietary_type, ...cleanNewItem } = newItem;
 
       const payload = {
@@ -214,12 +273,12 @@ const MenuManagement = ({ clientId, token, realm }) => {
         slug,
         unit_price: parseFloat(newItem.unit_price) || 0,
         discount: parseFloat(newItem.discount) || 0,
-        code: newItem.code ? String(newItem.code).trim() : null, // ✅ Convert to string
-        serving_quantity: newItem.serving_quantity ? parseFloat(newItem.serving_quantity) : null, // ✅ Convert to number or null
+        code: newItem.code ? String(newItem.code).trim() : null,
+        serving_quantity: newItem.serving_quantity ? parseFloat(newItem.serving_quantity) : null,
         serving_unit: newItem.serving_unit || null,
         created_by,
         updated_by: created_by,
-        inventory_id: 1
+        inventory_id: newItem.inventory_id 
       };
 
       console.log("Payload before sending:", payload);
@@ -236,6 +295,7 @@ const MenuManagement = ({ clientId, token, realm }) => {
       );
 
       await fetchData({ silent: true });
+      await fetchAddonItems();
 
       setShowAddModal(false);
       setNewItem({
@@ -255,7 +315,6 @@ const MenuManagement = ({ clientId, token, realm }) => {
       console.error('Full error response:', error.response);
       console.error('Error data:', JSON.stringify(error.response?.data, null, 2));
 
-      // Show detailed error message
       let errorMsg = 'Failed to add item\n\n';
       if (error.response?.data?.detail) {
         if (Array.isArray(error.response.data.detail)) {
@@ -291,7 +350,6 @@ const MenuManagement = ({ clientId, token, realm }) => {
       const slug = generateSlug(finalCategoryId, editingItem.name);
       const updated_by = currentUserId || localStorage.getItem('user_id') || 'system';
 
-      // ✅ EXPLICITLY remove dietary_type
       const { dietary_type, ...cleanEditingItem } = editingItem;
 
       const payload = {
@@ -305,8 +363,8 @@ const MenuManagement = ({ clientId, token, realm }) => {
         slug,
         unit_price: parseFloat(editingItem.unit_price) || 0,
         discount: parseFloat(editingItem.discount) || 0,
-        serving_quantity: editingItem.serving_quantity ? parseFloat(editingItem.serving_quantity) : null, // ✅ Add this
-        serving_unit: editingItem.serving_unit || null, // ✅ Add this
+        serving_quantity: editingItem.serving_quantity ? parseFloat(editingItem.serving_quantity) : null,
+        serving_unit: editingItem.serving_unit || null,
         updated_by
       };
 
@@ -319,6 +377,7 @@ const MenuManagement = ({ clientId, token, realm }) => {
       );
 
       await fetchData({ silent: true });
+      await fetchAddonItems();
 
       setShowEditModal(false);
       setEditingItem(null);
@@ -349,7 +408,7 @@ const MenuManagement = ({ clientId, token, realm }) => {
           { headers: { Authorization: `Bearer ${token}` } }
         ),
         axios.get(
-          `${import.meta.env.VITE_API_INVENTORY_SERVICE_URL}/${clientId}/menu/read?realm=${realm}`,
+          `${import.meta.env.VITE_API_INVENTORY_SERVICE_URL}/${clientId}/menu/read?inventory_id=menu`,
           { headers: { Authorization: `Bearer ${token}` } }
         )
       ]);
@@ -379,7 +438,6 @@ const MenuManagement = ({ clientId, token, realm }) => {
         };
       });
 
-
       setMenuItems(enrichedItems);
 
       const getCategoryCount = (categoryName) => {
@@ -389,11 +447,9 @@ const MenuManagement = ({ clientId, token, realm }) => {
         }).length;
       };
 
-      // NEW VERSION - counts subcategories instead
       const buildCategoryTree = (flatCats) => {
         const categoryMap = new Map();
 
-        // First pass: create all category objects
         flatCats.forEach(cat => {
           categoryMap.set(cat.id, {
             ...cat,
@@ -401,7 +457,6 @@ const MenuManagement = ({ clientId, token, realm }) => {
           });
         });
 
-        // Second pass: build tree structure
         const tree = [];
         categoryMap.forEach(cat => {
           if (cat.parentId && categoryMap.has(cat.parentId)) {
@@ -411,7 +466,6 @@ const MenuManagement = ({ clientId, token, realm }) => {
           }
         });
 
-        // Third pass: add subcategory counts
         categoryMap.forEach(cat => {
           cat.count = cat.children.length;
         });
@@ -424,7 +478,7 @@ const MenuManagement = ({ clientId, token, realm }) => {
           return {
             ...cat,
             name: 'All Categories',
-            count: cat.children.length  // NEW: Subcategories count
+            count: cat.children.length
           };
         }
         return cat;
@@ -433,7 +487,8 @@ const MenuManagement = ({ clientId, token, realm }) => {
       setCategories(categoryTree);
 
     } catch (error) {
-      console.error('Error fetching data:', error); console.error('Error details:', error.response?.data);
+      console.error('Error fetching data:', error); 
+      console.error('Error details:', error.response?.data);
     } finally {
       if (!silent) setLoading(false);
     }
@@ -443,15 +498,17 @@ const MenuManagement = ({ clientId, token, realm }) => {
     fetchData();
   }, [fetchData]);
 
-  // Add this function in MenuManagement.jsx after your other helper functions
-  const getAllDescendantCategories = (categoryName, categoryTree) => {
-    const descendants = [categoryName];
+  // ✅ NEW: Get all descendant category IDs (not names)
+  const getAllDescendantCategoryIds = (categoryId, categoryTree) => {
+    if (!categoryId) return [];
 
-    const findCategory = (cats, name) => {
+    const descendants = [categoryId];
+
+    const findCategory = (cats, id) => {
       for (const cat of cats) {
-        if (cat.name === name) return cat;
+        if (cat.id === id) return cat;
         if (cat.children) {
-          const found = findCategory(cat.children, name);
+          const found = findCategory(cat.children, id);
           if (found) return found;
         }
       }
@@ -461,13 +518,13 @@ const MenuManagement = ({ clientId, token, realm }) => {
     const collectDescendants = (cat) => {
       if (cat.children && cat.children.length > 0) {
         cat.children.forEach(child => {
-          descendants.push(child.name);
+          descendants.push(child.id);
           collectDescendants(child);
         });
       }
     };
 
-    const category = findCategory(categoryTree, categoryName);
+    const category = findCategory(categoryTree, categoryId);
     if (category) {
       collectDescendants(category);
     }
@@ -475,6 +532,7 @@ const MenuManagement = ({ clientId, token, realm }) => {
     return descendants;
   };
 
+  // ✅ UPDATED: Filter by category ID instead of category name
   const getFilteredItems = () => {
     if (!menuItems.length) {
       return [];
@@ -483,7 +541,6 @@ const MenuManagement = ({ clientId, token, realm }) => {
     const q = (searchQuery || '').trim().toLowerCase();
     let items = menuItems;
 
-    // Search filter
     if (q.length > 0) {
       items = items.filter(item => {
         const name = (item.name || '').toLowerCase();
@@ -498,25 +555,23 @@ const MenuManagement = ({ clientId, token, realm }) => {
       console.log('After search filter:', items.length);
     }
 
-    const selectedCategoryName = getSelectedCategoryName();
+    const selectedCategoryId = getSelectedCategoryId();
 
-    // Skip filtering for All Categories
-    if (!selectedCategoryName || selectedCategoryName === 'All Categories') {
+    if (!selectedCategoryId) {
       return items;
     }
 
-    // ✅ ADDED: Only filter if categories are loaded
     if (categories.length > 0 && categoriesFlat.length > 0) {
-      const allowedCategories = getAllDescendantCategories(
-        selectedCategoryName,
+      const allowedCategoryIds = getAllDescendantCategoryIds(
+        selectedCategoryId,
         categories
       );
 
-      console.log('allowedCategories:', allowedCategories);
-      console.log('Sample item categories:', items.slice(0, 3).map(i => i.category));
+      console.log('allowedCategoryIds:', allowedCategoryIds);
+      console.log('Sample item category IDs:', items.slice(0, 3).map(i => i.category_id));
 
       items = items.filter(item =>
-        allowedCategories.includes(item.category)
+        allowedCategoryIds.includes(item.category_id)
       );
 
       console.log('After category filter:', items.length);
@@ -525,7 +580,6 @@ const MenuManagement = ({ clientId, token, realm }) => {
     console.log('🏁 Final items count:', items.length);
     return items;
   };
-
 
   const handleEditImageFile = (file) => {
     if (file && file.type.startsWith('image/')) {
@@ -569,13 +623,12 @@ const MenuManagement = ({ clientId, token, realm }) => {
         }
       );
 
-      return response.data.data.id; // Returns document ID
+      return response.data.data.id;
     } catch (error) {
       console.error('Image upload failed:', error);
       throw error;
     }
   };
-
 
   const handleImageFile = (file) => {
     if (file && file.type.startsWith('image/')) {
@@ -597,16 +650,47 @@ const MenuManagement = ({ clientId, token, realm }) => {
     }
   };
 
-  // Delete Item
+  // ✅ UPDATED: Auto-unlink deleted addon from all items
   const handleDeleteItem = async () => {
     try {
+      const deletedItemId = deleteTarget.id;
+
       await axios.post(
         `${import.meta.env.VITE_API_INVENTORY_SERVICE_URL}/${clientId}/menu/delete`,
-        { id: deleteTarget.id },
+        { id: deletedItemId },
         { headers: { Authorization: `Bearer ${token}` } }
       );
 
-      setMenuItems(menuItems.filter(item => item.id !== deleteTarget.id));
+      // ✅ Find all items that have this addon linked
+      const itemsToUpdate = menuItems.filter(item => 
+        Array.isArray(item.line_item_id) && item.line_item_id.includes(deletedItemId)
+      );
+
+      // ✅ Update each item to remove the deleted addon
+      if (itemsToUpdate.length > 0) {
+        await Promise.all(
+          itemsToUpdate.map(item => {
+            const updatedLineItemIds = item.line_item_id.filter(id => id !== deletedItemId);
+            
+            return axios.post(
+              `${import.meta.env.VITE_API_INVENTORY_SERVICE_URL}/${clientId}/menu/update`,
+              {
+                ...item,
+                line_item_id: updatedLineItemIds,
+                client_id: clientId
+              },
+              { headers: { Authorization: `Bearer ${token}` } }
+            );
+          })
+        );
+
+        console.log(`✅ Unlinked addon from ${itemsToUpdate.length} items`);
+      }
+
+      // Refresh data
+      await fetchData({ silent: true });
+      await fetchAddonItems();
+
       setShowDeleteModal(false);
       setDeleteTarget(null);
     } catch (error) {
@@ -615,7 +699,6 @@ const MenuManagement = ({ clientId, token, realm }) => {
     }
   };
 
-  // Bulk Delete
   const handleBulkDelete = async () => {
     if (selectedRows.length === 0) {
       alert('No items selected');
@@ -626,6 +709,7 @@ const MenuManagement = ({ clientId, token, realm }) => {
     if (!confirm) return;
 
     try {
+      // ✅ Delete all selected items
       await Promise.all(
         selectedRows.map(id =>
           axios.post(
@@ -636,7 +720,37 @@ const MenuManagement = ({ clientId, token, realm }) => {
         )
       );
 
-      setMenuItems(menuItems.filter(item => !selectedRows.includes(item.id)));
+      // ✅ Find all items that have any of the deleted items linked as addons
+      const itemsToUpdate = menuItems.filter(item => 
+        Array.isArray(item.line_item_id) && 
+        item.line_item_id.some(addonId => selectedRows.includes(addonId))
+      );
+
+      // ✅ Update each item to remove the deleted addons
+      if (itemsToUpdate.length > 0) {
+        await Promise.all(
+          itemsToUpdate.map(item => {
+            const updatedLineItemIds = item.line_item_id.filter(id => !selectedRows.includes(id));
+            
+            return axios.post(
+              `${import.meta.env.VITE_API_INVENTORY_SERVICE_URL}/${clientId}/menu/update`,
+              {
+                ...item,
+                line_item_id: updatedLineItemIds,
+                client_id: clientId
+              },
+              { headers: { Authorization: `Bearer ${token}` } }
+            );
+          })
+        );
+
+        console.log(`✅ Unlinked deleted addons from ${itemsToUpdate.length} items`);
+      }
+
+      // Refresh data
+      await fetchData({ silent: true });
+      await fetchAddonItems();
+
       setSelectedRows([]);
       setSelectAllChecked(false);
     } catch (error) {
@@ -657,7 +771,6 @@ const MenuManagement = ({ clientId, token, realm }) => {
           const editedData = bulkEditData[id] || {};
           const originalItem = menuItems.find(item => item.id === id);
 
-          // ✅ Remove dietary_type from both
           const { dietary_type: editedDietary, ...cleanEditedData } = editedData;
           const { dietary_type: originalDietary, ...cleanOriginalItem } = originalItem;
 
@@ -675,12 +788,8 @@ const MenuManagement = ({ clientId, token, realm }) => {
         })
       );
 
-      // Refresh items
-      const itemRes = await axios.get(
-        `${import.meta.env.VITE_API_INVENTORY_SERVICE_URL}/${clientId}/menu/read?realm=${realm}`,
-        { headers: { Authorization: `Bearer ${token}` } }
-      );
-      setMenuItems(itemRes.data.data);
+      await fetchData({ silent: true });
+      await fetchAddonItems();
 
       setShowBulkModal(false);
       setSelectedRows([]);
@@ -692,19 +801,15 @@ const MenuManagement = ({ clientId, token, realm }) => {
     }
   };
 
-  // Export to Excel
   const handleExportToExcel = () => {
     try {
-      // Map category id -> name quickly (categoriesFlat set in fetchData)
       const catNameById = (id) => {
         if (!id) return "Uncategorized";
-        // categoriesFlat entries: { id, name, parentId }
         const found = (categoriesFlat || []).find(c => c && c.id === id);
         return found ? found.name : ((typeof id === 'string' && id.startsWith('cat_')) ? id : "Unknown");
       };
 
       const exportData = filteredItems.map(item => {
-        // make sure line_item_id stored as array or string; normalize to comma-separated ids
         let lineItemStr = "";
         if (Array.isArray(item.line_item_id)) {
           lineItemStr = item.line_item_id.join(", ");
@@ -713,7 +818,6 @@ const MenuManagement = ({ clientId, token, realm }) => {
         } else if (item.line_item_id == null) {
           lineItemStr = "";
         } else {
-          // fallback: attempt JSON stringify
           try { lineItemStr = JSON.stringify(item.line_item_id); } catch { lineItemStr = String(item.line_item_id); }
         }
 
@@ -747,7 +851,6 @@ const MenuManagement = ({ clientId, token, realm }) => {
         };
       });
 
-      // Create worksheet and workbook
       const worksheet = XLSX.utils.json_to_sheet(exportData, {
         header: [
           "ID", "Inventory_Id", "Name", "Description", "Category", "Image", "Unit", "Unit_Price", "Unit_CST", "Unit_GST", "Total_Unit_Price", "Total_Price",
@@ -758,7 +861,6 @@ const MenuManagement = ({ clientId, token, realm }) => {
       const workbook = XLSX.utils.book_new();
       XLSX.utils.book_append_sheet(workbook, worksheet, "MenuItems");
 
-      // Use a descriptive filename
       const filename = `menu_items_${(new Date()).toISOString().slice(0, 10)}.xlsx`;
       XLSX.writeFile(workbook, filename);
     } catch (err) {
@@ -802,7 +904,6 @@ const MenuManagement = ({ clientId, token, realm }) => {
           return;
         }
 
-        // 🔍 VALIDATE BEFORE DELETE
         const validationErrors = [];
         parsedData.forEach((row, index) => {
           if (!row.Name) {
@@ -831,7 +932,6 @@ const MenuManagement = ({ clientId, token, realm }) => {
           return;
         }
 
-        // 🧹 DELETE OLD ITEMS
         await Promise.all(
           menuItems.map(item =>
             axios.post(
@@ -846,7 +946,6 @@ const MenuManagement = ({ clientId, token, realm }) => {
         let failCount = 0;
         const errors = [];
 
-        // 📥 IMPORT NEW ITEMS
         for (const [index, row] of parsedData.entries()) {
           try {
             let recipe = null;
@@ -904,24 +1003,9 @@ const MenuManagement = ({ clientId, token, realm }) => {
           }
         }
 
-        // 🔄 REFRESH - FIXED VERSION
-        const itemRes = await axios.get(
-          `${import.meta.env.VITE_API_INVENTORY_SERVICE_URL}/${clientId}/menu/read?realm=${realm}`,
-          { headers: { Authorization: `Bearer ${token}` } }
-        );
+        await fetchData({ silent: true });
+        await fetchAddonItems();
 
-        // ✅ ENRICH items with category names (same as fetchData)
-        const enrichedItems = (itemRes.data.data || []).map(item => {
-          const cat = categoriesFlat.find(c => c.id === item.category_id);
-          return {
-            ...item,
-            category: cat?.name ?? "Uncategorized"
-          };
-        });
-
-        setMenuItems(enrichedItems);
-
-        // 📊 RESULT
         alert(
           `✅ Import completed\n\n` +
           `✔ Success: ${successCount}\n` +
@@ -939,7 +1023,6 @@ const MenuManagement = ({ clientId, token, realm }) => {
 
     reader.readAsBinaryString(file);
   };
-
 
   const toggleSelectAll = () => {
     if (!selectAllChecked) {
@@ -968,16 +1051,6 @@ const MenuManagement = ({ clientId, token, realm }) => {
     return () => window.removeEventListener('keydown', onKey);
   }, []);
 
-  // if (loading) {
-  //   return (
-  //     <div className="min-h-screen flex items-center justify-center bg-bg-secondary">
-  //       <div className="text-center">
-  //         <div className="animate-spin rounded-full h-12 w-12 border-b-2 mx-auto mb-4 border-action-primary"></div>
-  //         <p className="text-text-secondary">Loading...</p>
-  //       </div>
-  //     </div>
-  //   );
-  // }
   return (
     <div className="h-[90vh] bg-bg-primary overflow-x-hidden">
       <div className="mx-auto p-2">
@@ -993,7 +1066,6 @@ const MenuManagement = ({ clientId, token, realm }) => {
                 clientId={clientId}
                 token={token}
                 onCategoriesUpdate={() => {
-                  // Refresh categories after add/edit/delete
                   fetchData();
                 }}
               />
@@ -1012,7 +1084,7 @@ const MenuManagement = ({ clientId, token, realm }) => {
                 </h2>
               </div>
 
-              {/* Search Field start >>>>>>>>>>>>>>>>>>>>>>>>>>>> */}
+              {/* Search Field */}
               <div className="lg:col-span-1">
                 <div className="relative w-full group">
                   <Search size={16} className="absolute left-3 top-1/2 -translate-y-1/2 text-text-secondary transition-colors
@@ -1026,85 +1098,52 @@ const MenuManagement = ({ clientId, token, realm }) => {
                                 hover:border-action-primary/50"/>
                 </div>
               </div>
-              {/* Search Field end <<<<<<<<<<<<<<<<<<<<<<<<<<<<<<< */}
 
-              {/* Buttons Container (Add Item,Bulk Update and Import Export) start >>>>>> */}
-              <div className="flex flex-wrap  items-center justify-end gap-2 md:justify-start lg:justify-end">
-
-                {/* Add Item Button */}
+              {/* Buttons Container */}
+              <div className="flex flex-wrap items-center justify-end gap-2 md:justify-start lg:justify-end">
                 <button onClick={() => setShowAddModal(true)}
-                  className="h-9 px-3  flex items-center gap-2 rounded-lg bg-action-primary text-white text-sm 
+                  className="h-9 px-3 flex items-center gap-2 rounded-lg bg-action-primary text-white text-sm 
                                    font-semibold shadow-sm hover:opacity-90">
-
                   <Plus size={14} />
-
                   <span>Add Item</span>
-
                 </button>
 
-                {/* Bulk Update Button */}
                 <button onClick={() => setShowBulkModal(true)}
                   className="h-9 px-3 flex items-center gap-2 rounded-lg bg-bg-tertiary border border-border-default
                                    text-sm font-semibold hover:border-action-primary hover:bg-bg-secondary">
-
                   <Edit size={14} />
-
                   <span className="hidden sm:inline">Bulk Update</span>
-
                 </button>
 
-                {/* Import Export Dropdown */}
                 <div className="relative group">
-                  {/* Main Dropdown Button */}
-                  <button className=" h-9 px-3 flex items-center gap-2 rounded-lg bg-bg-tertiary border border-border-default 
+                  <button className="h-9 px-3 flex items-center gap-2 rounded-lg bg-bg-tertiary border border-border-default 
                                       text-sm font-semibold hover:border-action-primary hover:bg-bg-secondary">
-
                     <CloudUpload size={14} />
-                    {/* <span className="hidden sm:inline"></span> */}
-                    {/* <svg
-                      className="w-4 h-4"
-                      fill="none"
-                      stroke="currentColor"
-                      strokeWidth="2"
-                      viewBox="0 0 24 24"
-                    >
-                      <path d="M19 9l-7 7-7-7" />
-                    </svg> */}
                   </button>
 
-                  {/* Dropdown Menu */}
                   <div className="absolute right-0 mt-1 w-36 bg-bg-primary border border-border-default rounded-lg shadow-lg
                                    opacity-0 invisible group-hover:opacity-100 group-hover:visible transition-all duration-200 z-50">
-
                     <button onClick={() => document.getElementById('excelInput').click()}
-                      className="w-full px-4 py-2 flex items-center gap-2 text-sm  hover:bg-bg-secondary">
-
+                      className="w-full px-4 py-2 flex items-center gap-2 text-sm hover:bg-bg-secondary">
                       <Upload size={14} />
-
                       Import
                     </button>
 
                     <button onClick={handleExportToExcel}
-                      className=" w-full px-4 py-2 flex items-center gap-2 text-sm hover:bg-bg-secondary">
-
+                      className="w-full px-4 py-2 flex items-center gap-2 text-sm hover:bg-bg-secondary">
                       <Download size={14} />
-
                       Export
                     </button>
-
                   </div>
                 </div>
 
                 <input type="file" id="excelInput" accept=".xlsx, .xls" className="hidden" onChange={handleImportFromExcel} />
-
               </div>
-              {/* Buttons Container (Add Item,Bulk Update and Import Export) end <<<<<<<<< */}
             </div>
 
-            {/* Items Grid start >>>>>>>>>>>>>>>>>>>>>>>>>>>>>>>>>>>>>>>>>>*/}
+            {/* Items Grid */}
             <div className="flex-1 overflow-y-auto">
               <div className="grid gap-2 grid-cols-2 md:grid-cols-3 lg:grid-cols-3 xl:grid-cols-4">
-
                 {filteredItems.map((item) => {
                   const discountPercent = item.discount && item.unit_price && Number(item.discount) > 0
                     ? ((Number(item.discount) * 100) / Number(item.unit_price)).toFixed(0) : null;
@@ -1113,7 +1152,6 @@ const MenuManagement = ({ clientId, token, realm }) => {
                     <div key={item.id}
                       className="relative flex gap-2 items-center bg-bg-primary border border-border-default rounded-xl p-1
                                     shadow-sm hover:shadow-md transition group overflow-hidden">
-                      {/* POP OVERLAY – hides content */}
                       <div className="absolute inset-0 bg-black/40 backdrop-blur-[2px] opacity-0 pointer-events-none z-10
                                       group-hover:animate-overlayFade"/>
                       {item.line_item_id && Array.isArray(item.line_item_id) && item.line_item_id.length > 0 && (
@@ -1122,28 +1160,13 @@ const MenuManagement = ({ clientId, token, realm }) => {
                           <span>{item.line_item_id.length} add-ons</span>
                         </div>
                       )}
-                      {/* 
-                      {item.line_item_id?.length > 0 && (
-                        <div className="absolute top-1/2 right-0 -translate-y-1/2 translate-x-full
-                                     group-hover:translate-x-[-0.75rem]  opacity-0  group-hover:opacity-100 
-                                     transition-all duration-300 ease-out bg-orange-500 text-white
-                                     text-[10px] px-2 py-1 rounded-md flex items-center gap-1 z-10 pointer-events-none">
 
-                          <Plus size={10} />
-
-                          {item.line_item_id.length} Add-ons
-
-                        </div>
-                      )} */}
-
-                      {/* IMAGE */}
-                      <div className="relative w-10 h-12 md:h-16 md:w-14  rounded-lg overflow-hidden shrink-0 bg-gray-100">
+                      <div className="relative w-10 h-12 md:h-16 md:w-14 rounded-lg overflow-hidden shrink-0 bg-gray-100">
                         {discountPercent && (
                           <div className="absolute top-1 left-1 bg-action-danger text-white text-[7px] md:text-[10px] px-1 rounded z-10">
                             {discountPercent}% OFF
                           </div>
                         )}
-
 
                         <MenuImagePreview clientId={clientId} imageId={item.image_id} token={token} alt={item.name}
                           baseUrl={import.meta.env.VITE_API_DOCUMENT_SERVICE_URL} className="w-full h-full object-cover"
@@ -1151,13 +1174,10 @@ const MenuManagement = ({ clientId, token, realm }) => {
                             `${baseUrl}/${clientId}/document/download?doc_id=${imageId}`} />
                       </div>
 
-                      {/* INFO */}
                       <div className="flex-1 min-w-0 cursor-pointer" onClick={() => handleItemClick(item)}>
-
                         <h3 className="text-[10px] md:text-[16px] font-semibold text-text-primary">
                           {item.name}
                         </h3>
-
 
                         {item.description && (
                           <p className="text-[8px] md:text-[13px] text-text-secondary line-clamp-1">
@@ -1183,10 +1203,8 @@ const MenuManagement = ({ clientId, token, realm }) => {
                         </div>
                       </div>
 
-                      {/* ACTION BUTTONS */}  {/* opacity-0 group-hover:opacity-100 */}
                       <div className="absolute top-1 right-1 flex gap-1 opacity-0 group-hover:opacity-100 transition-opacity
                        duration-200 z-20">
-
                         <button className="bg-action-primary text-white p-1 rounded-full hover:scale-110"
                           onClick={(e) => { e.stopPropagation(); setEditingItem(item); setShowEditModal(true); }}>
                           <Edit size={10} />
@@ -1196,20 +1214,17 @@ const MenuManagement = ({ clientId, token, realm }) => {
                           onClick={(e) => { e.stopPropagation(); setDeleteTarget(item); setShowDeleteModal(true); }} >
                           <Trash2 size={10} />
                         </button>
-
                       </div>
                     </div>
                   );
                 })}
               </div>
             </div>
-            {/*Items Grid end <<<<<<<<<<<<<<<<<<<<<<<<<<<<<<<<<<<<<<<<<<<<<*/}
           </div>
         </div>
       </div>
 
-
-      {/* Delete Modal start >>>>>> */}
+      {/* Delete Modal */}
       {showDeleteModal && deleteTarget && (
         <div className="fixed inset-0 z-50 flex items-center justify-center p-4 bg-color-modalsbg">
           <div className="rounded-lg max-w-md w-full p-6 bg-bg-primary">
@@ -1235,36 +1250,34 @@ const MenuManagement = ({ clientId, token, realm }) => {
           </div>
         </div>
       )}
-      {/* Delete Modal end <<<<<<<< */}
+
       <UniversalAddModal
         showModal={showAddModal}
         setShowModal={setShowAddModal}
         modalType="menu"
-
-        // Menu-specific props
         newItem={newItem}
         setNewItem={setNewItem}
         selectedCategory={selectedCategory}
         setSelectedCategory={setSelectedCategory}
         categories={categories}
-        menuItems={menuItems}
+        menuItems={addonItems}
         newItemImage={newItemImage}
         setNewItemImage={setNewItemImage}
         newItemImageUrl={newItemImageUrl}
         setNewItemImageUrl={setNewItemImageUrl}
         handleAddItem={handleAddItem}
         getCategoryIdByName={getCategoryIdByName}
+        inventoryIds={inventoryIds}
       />
+
       <UniversalEditModal
         showModal={showEditModal}
         setShowModal={setShowEditModal}
         modalType="menu"
-
-        // Menu-specific props
         editingItem={editingItem}
         setEditingItem={setEditingItem}
         categories={categories}
-        menuItems={menuItems}
+        menuItems={addonItems}
         editItemImage={editItemImage}
         setEditItemImage={setEditItemImage}
         editItemImageUrl={editItemImageUrl}
@@ -1272,16 +1285,13 @@ const MenuManagement = ({ clientId, token, realm }) => {
         handleEditItem={handleEditItem}
         clientId={clientId}
         token={token}
+        inventoryIds={inventoryIds}
       />
-
-
 
       <UniversalBulkUpdateModal
         showModal={showBulkModal}
         setShowModal={setShowBulkModal}
         modalType="menu"
-
-        // Menu-specific props
         filteredItems={filteredItems}
         selectedRows={selectedRows}
         setSelectedRows={setSelectedRows}
@@ -1291,6 +1301,7 @@ const MenuManagement = ({ clientId, token, realm }) => {
         setBulkEditData={setBulkEditData}
         handleBulkUpdate={handleBulkUpdate}
         handleBulkDelete={handleBulkDelete}
+        addonItems={addonItems}
       />
     </div>
   );

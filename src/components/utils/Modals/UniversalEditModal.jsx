@@ -13,7 +13,7 @@ const UniversalEditModal = ({
   editingItem,
   setEditingItem,
   categories,
-  menuItems,
+  menuItems, // ✅ This now receives addonItems from parent
   editItemImage,
   setEditItemImage,
   editItemImageUrl,
@@ -21,6 +21,7 @@ const UniversalEditModal = ({
   handleEditItem,
   clientId,
   token,
+  inventoryIds,
 
   // Table-specific props
   editRowId,
@@ -98,7 +99,8 @@ const UniversalEditModal = ({
           <div className="px-6 py-4 border-b border-gray-200 flex justify-between items-center">
             <h2 className="text-xl font-semibold text-gray-900">Edit Menu Item</h2>
             <button
-              onClick={handleClose} className="p-1.5 rounded-lg bg-action-primary text-text-white hover:opacity-90 transition-opacity   ">
+              onClick={handleClose} 
+              className="p-1.5 rounded-lg bg-action-primary text-text-white hover:opacity-90 transition-opacity">
               <X className="w-5 h-5" />
             </button>
           </div>
@@ -126,6 +128,34 @@ const UniversalEditModal = ({
                 </select>
               </div>
 
+              {/* Inventory ID Dropdown */}
+              <div>
+                <label className="block text-sm font-medium mb-1 text-gray-700">
+                  Inventory ID <span className="text-red-600">*</span>
+                </label>
+
+                <select
+                  value={editingItem.inventory_id || ""}
+                  onChange={(e) =>
+                    setEditingItem({
+                      ...editingItem,
+                      inventory_id: e.target.value
+                    })
+                  }
+                  className="w-full px-3 py-2 rounded-md border border-gray-300 text-gray-900
+               focus:outline-none focus:ring-2 focus:ring-action-primary"
+                  required
+                >
+                  <option value="">Select Inventory ID</option>
+
+                  {(inventoryIds || []).map((inv) => (
+                    <option key={inv.id} value={inv.id}>
+                      {inv.inventory_id} - {inv.name}
+                    </option>
+                  ))}
+                </select>
+              </div>
+
               {/* Item Name */}
               <div>
                 <label className="block text-sm font-medium mb-1 text-gray-700">
@@ -139,7 +169,6 @@ const UniversalEditModal = ({
                   required
                 />
               </div>
-
 
               {/* Description */}
               <div>
@@ -178,9 +207,8 @@ const UniversalEditModal = ({
                 </div>
               </div>
 
-              {/* Availability & Unit */}
+              {/* Code & Unit */}
               <div className="grid grid-cols-2 gap-4">
-                {/* Code */}
                 <div>
                   <label className="block text-sm font-medium mb-1 text-gray-700">
                     Code <span className="text-red-600">*</span>
@@ -195,7 +223,7 @@ const UniversalEditModal = ({
                       })
                     }
                     className="w-full px-3 py-2 rounded-md border border-gray-300 text-gray-900
-      focus:outline-none focus:ring-2 focus:ring-action-primary"
+                      focus:outline-none focus:ring-2 focus:ring-action-primary"
                     placeholder="Item Code"
                     required
                   />
@@ -282,9 +310,14 @@ const UniversalEditModal = ({
                 </div>
               </div>
 
-              {/* Add-ons */}
+              {/* Add-ons - ✅ Now only shows items from addons category, excluding current item */}
               <div>
-                <label className="block text-sm font-medium mb-1 text-gray-700">Add-ons</label>
+                <label className="block text-sm font-medium mb-1 text-gray-700">
+                  Add-ons
+                  <span className="text-xs text-gray-500 ml-2">
+                    (Only items from Addons category)
+                  </span>
+                </label>
                 <DropdownCheckbox
                   selected={Array.isArray(editingItem.line_item_id) ? editingItem.line_item_id : []}
                   options={(menuItems || []).filter(item => item.id !== editingItem.id)}
@@ -345,11 +378,10 @@ const UniversalEditModal = ({
 
             <div className="space-y-4">
               {/* No of Seating */}
-              {/* No of Seating */}
               <div>
                 <label className="block text-sm font-medium mb-1 text-gray-700">No of Seating</label>
 
-                {/* Desktop: Regular input */}
+                {/* Desktop */}
                 <input
                   type="number"
                   min="1"
@@ -362,7 +394,7 @@ const UniversalEditModal = ({
                     }`}
                 />
 
-                {/* Mobile: Input with +/- buttons */}
+                {/* Mobile */}
                 <div className={`md:hidden flex items-center gap-2 border rounded-md ${editFieldErrors?.table_type ? 'border-red-500 bg-red-50' : 'border-gray-300'
                   }`}>
                   <button
@@ -402,7 +434,7 @@ const UniversalEditModal = ({
                 )}
               </div>
 
-              {/* SECTION (AC / Non-AC) */}
+              {/* Section */}
               <div>
                 <label className="block text-sm font-medium mb-1 text-gray-700">
                   Section
@@ -420,7 +452,7 @@ const UniversalEditModal = ({
                 </select>
               </div>
 
-              {/* ZONE */}
+              {/* Zone */}
               <div>
                 <label className="block text-sm font-medium mb-1 text-gray-700">
                   Zone
@@ -439,7 +471,6 @@ const UniversalEditModal = ({
                   <option value="Second Floor">Second Floor</option>
                 </select>
               </div>
-
 
               {/* Status */}
               <div>

@@ -41,7 +41,47 @@ const SimpleDeleteConfirm = ({ isOpen, onClose, onConfirm, title = 'Delete', mes
 
 };
 
+const LineItemsModal = ({ isOpen, onClose, mainItem, lineItems, onAddMainOnly, onAddWithAddons }) => {
+    if (!isOpen) return null;
+    return (
+        <div className="fixed inset-0 z-50 flex items-center justify-center p-4 bg-color-modalsbg">
+            <div className="rounded-lg w-full max-w-lg bg-bg-primary shadow-card border-border-default border-default">
+                <div className="px-6 py-4 border-b flex justify-between items-center border-border-default">
+                    <h3 className="text-lg font-semibold text-text-primary">{mainItem?.name}</h3>
+                    <button onClick={onClose} className="text-text-secondary hover:text-gray-700 transition-colors">
+                        <X size={20} />
+                    </button>
+                </div>
 
+                <div className="px-6 py-5">
+                    <p className="text-sm mb-4 text-text-secondary">Add-ons for this item:</p>
+                    <div className="space-y-2">
+                        {lineItems.map((li, idx) => (
+                            <div key={li.id} className="flex justify-between items-center px-4 py-3 rounded-lg bg-bg-tertiary border-default border-border-default">
+                                <span className="text-sm font-medium text-text-primary">{idx + 1}. {li.name}</span>
+                                <span className="text-sm font-bold text-action-primary">₹{li.unit_price}</span>
+                            </div>
+                        ))}
+                    </div>
+                </div>
+
+                <div className="px-6 py-4 rounded-b-lg flex gap-3 bg-bg-primary border-t-border-default border-default">
+                    <button onClick={onClose} className="bg-bg-tertiary text-text-primary border-default border-border-default px-4 py-2.5 rounded-lg font-medium text-sm transition-colors"
+                    >
+                        Cancel
+                    </button>
+                    <button onClick={onAddMainOnly} className="flex-1 bg-action-primary text-text-white px-4 py-2.5 rounded-lg font-medium text-sm transition-colors">
+                        Main Only
+                    </button>
+                    <button onClick={onAddWithAddons} className="flex-1 bg-action-success text-text-white px-4 py-2.5 rounded-lg font-medium text-sm transition-colors">
+                        With Add-ons
+                    </button>
+                </div>
+            </div>
+        </div>
+    );
+
+};
 
 const Summary_V1 = ({ clientId, token }) => {
 
@@ -73,7 +113,7 @@ const Summary_V1 = ({ clientId, token }) => {
     const [activeTab, setActiveTab] = useState('items');
     const [selectedOrderModes, setSelectedOrderModes] = useState(['all']);
     const [tableModeMap, setTableModeMap] = useState({});
-
+    const [servingOrderId, setServingOrderId] = useState(null);
     const navigate = useNavigate();
 
 
@@ -161,43 +201,41 @@ const Summary_V1 = ({ clientId, token }) => {
 
     const fetchTables = async () => {
         try {
-          const res = await axios.get(
-            `${import.meta.env.VITE_API_TABLE_SERVICE_URL}/${clientId}/tables/read`,
-            { headers: { Authorization: `Bearer ${token}` } }
-          );
-      
-          const tableList = res.data?.data || [];
-          setTables(tableList);
-      
-          const nameMap = {};
-          const modeMap = {};
-      
-          tableList.forEach(t => {
-            nameMap[t.id] = t.name;
-      
-            const tableName = (t.name || '').toLowerCase();
-      
-            if (tableName === 'delivery') {
-              modeMap[t.id] = 'delivery';
-            } else if (tableName === 'pickup' || tableName === 'takeaway') {
-              modeMap[t.id] = 'takeaway';
-            } else {
-              modeMap[t.id] = 'dinein';
-            }
-          });
-      
-          setTablesMap(nameMap);
-          setTableModeMap(modeMap); // 👈 new
+            const res = await axios.get(
+                `${import.meta.env.VITE_API_TABLE_SERVICE_URL}/${clientId}/tables/read`,
+                { headers: { Authorization: `Bearer ${token}` } }
+            );
+
+            const tableList = res.data?.data || [];
+            setTables(tableList);
+
+            const nameMap = {};
+            const modeMap = {};
+
+            tableList.forEach(t => {
+                nameMap[t.id] = t.name;
+
+                const tableName = (t.name || '').toLowerCase();
+
+                if (tableName === 'delivery') {
+                    modeMap[t.id] = 'delivery';
+                } else if (tableName === 'pickup' || tableName === 'takeaway') {
+                    modeMap[t.id] = 'takeaway';
+                } else {
+                    modeMap[t.id] = 'dinein';
+                }
+            });
+
+            setTablesMap(nameMap);
+            setTableModeMap(modeMap); // 👈 new
         } catch (e) {
-          console.error('fetchTables', e);
+            console.error('fetchTables', e);
         }
-      };
-      
+    };
+
     // ---------- Batch & key helpers (REQUIRED) ----------
     const slugify = str => (str || '').toString().toUpperCase().replace(/[\s]+/g, '-').replace(/[^A-Z0-9-_]/g, '');
 
-    // ensureBatchForOrder: ensures a batch meta object exists in localStorage for the current batch timestamp.
-    // Returns { storageKey, meta } where meta contains { timestamp, started_at, seq, table_slug, time_label, added_count }.
     const ensureBatchForOrder = (orderId, tableName) => {
         let bt = currentBatchTimestamp;
         if (!bt) {
@@ -287,15 +325,27 @@ const Summary_V1 = ({ clientId, token }) => {
     }, [itemSearchQuery, allInventoryItems, showOrderDetailModal, selectedOrder, editOrderId, selectedCategory]);
 
     const handleItemSelection = (orderId, selectedItem) => {
-        if (selectedItem.line_item_id && Array.isArray(selectedItem.line_item_id) && selectedItem.line_item_id.length > 0) {
-            const lineItems = selectedItem.line_item_id.map(id => allInventoryItems.find(i => i.id === id)).filter(Boolean);
+        console.log('CLICKED ITEM 👉', selectedItem);
+        if (
+            selectedItem.line_item_id &&
+            Array.isArray(selectedItem.line_item_id) &&
+            selectedItem.line_item_id.length > 0
+        ) {
+            const lineItems = selectedItem.line_item_id
+                .map(id => allInventoryItems.find(i => i.id === id))
+                .filter(Boolean);
+
             setSelectedMainItem(selectedItem);
             setLineItemsDetails(lineItems);
             setPendingOrderId(orderId);
             setLineItemsModalOpen(true);
-        } else addItemToOrder(orderId, selectedItem);
+        } else {
+            addItemToOrder(orderId, selectedItem);
+        }
+
         setItemSearchQuery('');
     };
+
 
     const handleAddMainItemWithLineItems = () => {
         if (!selectedMainItem || !pendingOrderId) return;
@@ -446,12 +496,19 @@ const Summary_V1 = ({ clientId, token }) => {
                 deduped.push(it);
             }
 
-            return { ...o, items: deduped, has_new_items: true };
+
+            return {
+                ...o,
+                items: deduped,
+                has_new_items: true
+            };
+
         }));
 
         // update selectedOrder view if it's the same order
         if (selectedOrder?.id === orderId) {
             setSelectedOrder(prev => {
+                const newTotal = calculateOrderTotal(deduped);
                 const batches = getBatchesFromStorage(orderId);
                 batches.sort((a, b) => a.timestamp - b.timestamp);
                 const oldItems = prev.items.filter(i => !i.is_new_item);
@@ -614,6 +671,7 @@ const Summary_V1 = ({ clientId, token }) => {
 
         if (selectedOrder?.id === orderId) {
             setSelectedOrder(prev => {
+
                 const batches = getBatchesFromStorage(orderId);
                 batches.sort((a, b) => a.timestamp - b.timestamp);
                 const oldItems = prev.items.filter(i => !i.is_new_item);
@@ -654,39 +712,63 @@ const Summary_V1 = ({ clientId, token }) => {
                     seen.add(key);
                     deduped.push(it);
                 }
-
                 return { ...prev, items: deduped, has_new_items: true };
             });
         }
     };
 
 
+
     const updateItemQuantity = (orderId, itemIdentifier, newQty) => {
-        setOrders(prev => prev.map(o => {
-            if (o.id !== orderId) return o;
-            const updatedItems = o.items.map(item => {
-                const itemKey = item.id || item.frontend_unique_key;
-                if (itemKey === itemIdentifier) {
-                    // DO NOT update localStorage here - only update state
-                    return { ...item, quantity: newQty > 0 ? newQty : 1 };
-                }
-                return item;
-            });
-            const newTotal = updatedItems.reduce((s, it) => s + ((inventoryMap[it.item_id]?.unit_price || it.unit_price || it.price || 0) * (it.quantity || 1)), 0);
-            return { ...o, items: updatedItems, total_price: newTotal };
-        }));
+        const safeQty = Math.max(1, newQty);
+
+        setOrders(prev =>
+            prev.map(o => {
+                if (o.id !== orderId) return o;
+
+                const updatedItems = o.items.map(it => {
+                    const key = it.id || it.frontend_unique_key;
+                    if (key !== itemIdentifier) return it;
+
+                    const price =
+                        inventoryMap[it.item_id]?.unit_price ||
+                        it.unit_price ||
+                        it.price ||
+                        0;
+
+                    return {
+                        ...it,
+                        quantity: safeQty,
+                        line_total: price * safeQty
+                    };
+                });
+                return { ...o, items: updatedItems };
+            })
+        );
 
         if (selectedOrder?.id === orderId) {
             setSelectedOrder(prev => ({
                 ...prev,
-                items: prev.items.map(item => {
-                    const itemKey = item.id || item.frontend_unique_key;
-                    if (itemKey === itemIdentifier) return { ...item, quantity: newQty > 0 ? newQty : 1 };
-                    return item;
+                items: prev.items.map(it => {
+                    const key = it.id || it.frontend_unique_key;
+                    if (key !== itemIdentifier) return it;
+
+                    const price =
+                        inventoryMap[it.item_id]?.unit_price ||
+                        it.unit_price ||
+                        it.price ||
+                        0;
+
+                    return {
+                        ...it,
+                        quantity: safeQty,
+                        line_total: price * safeQty
+                    };
                 })
             }));
         }
     };
+
     useEffect(() => {
         const fetchOrders = async () => {
             if (!token || !clientId) {
@@ -709,6 +791,7 @@ const Summary_V1 = ({ clientId, token }) => {
                         .toLocaleDateString("en-CA");
                     return orderDate === todayString;
                 });
+                if (editOrderId) return;
 
                 setOrders(
                     todayOrders.map(order => {
@@ -744,13 +827,13 @@ const Summary_V1 = ({ clientId, token }) => {
                             if (item.frontend_unique_key) {
                                 batchTs = keyToBatchMap.get(item.frontend_unique_key);
 
-                                if (!batchTs) {
-                                    const parts = item.frontend_unique_key.split("_");
-                                    const maybeTs = parseFloat(parts[parts.length - 1]);
-                                    if (!isNaN(maybeTs)) {
-                                        batchTs = Math.floor(maybeTs / 1000) * 1000;
-                                    }
-                                }
+                                // if (!batchTs) {
+                                //     const parts = item.frontend_unique_key.split("_");
+                                //     const maybeTs = parseFloat(parts[parts.length - 1]);
+                                //     if (!isNaN(maybeTs)) {
+                                //         batchTs = Math.floor(maybeTs / 1000) * 1000;
+                                //     }
+                                // }
                             }
 
                             const normalizedItem = {
@@ -814,17 +897,17 @@ const Summary_V1 = ({ clientId, token }) => {
                                 }
                             });
 
-                            const orderMode =
+                        const orderMode =
                             tableModeMap[order.table_id] || 'dinein';
-                          
-                          return {
+
+                        return {
                             ...order,
-                            _fixedOrderMode: orderMode, 
+                            _fixedOrderMode: orderMode,
                             items: allItems,
                             has_new_items: false,
                             batch_dividers: batchDividers
-                          };
-                          
+                        };
+
                     })
                 );
             } catch (err) {
@@ -838,43 +921,59 @@ const Summary_V1 = ({ clientId, token }) => {
         fetchOrders();
         const interval = setInterval(fetchOrders, 10000);
         return () => clearInterval(interval);
-    }, [clientId, token, inventoryMap,tableModeMap]);
+    }, [clientId, token, inventoryMap, tableModeMap]);
 
+    const calculateOrderTotal = (items) =>
+        items.reduce((sum, it) => {
+            const price =
+                inventoryMap[it.item_id]?.unit_price ||
+                it.unit_price ||
+                it.price ||
+                0;
+
+            return sum + price * (it.quantity || 1);
+        }, 0);
 
 
     const handleStatusChange = async (orderId, newStatus) => {
-        const order = orders.find(o => o.id === orderId);
-        if (!order || order.status === 'served') return;
-        const tableObj = tables.find(t => t.id === order.table_id);
+        if (newStatus === 'served' && servingOrderId === orderId) return;
+
+        setServingOrderId(orderId);
         try {
-            await axios.post(`${import.meta.env.VITE_API_ORDER_SERVICE_URL}/${clientId}/dinein/update`, { id: orderId, client_id: clientId, status: newStatus }, { headers: { Authorization: `Bearer ${token}` } });
-            if (tableObj) {
-                await axios.post(`${import.meta.env.VITE_API_TABLE_SERVICE_URL}/${clientId}/tables/update`, {
-                    id: order.table_id,
-                    client_id: clientId,
-                    name: tableObj.name,
-                    table_type: tableObj.table_type,
-                    status: 'Vacant',
-                    location_zone: tableObj.location_zone
-                }, { headers: { Authorization: `Bearer ${token}` } });
-            }
-            setOrders(prev => prev.map(o => o.id === orderId ? {
-                ...o,
-                status: newStatus,
-                has_new_items: newStatus === 'served' ? false : o.has_new_items
-            } : o));
+            await axios.post(
+                `${import.meta.env.VITE_API_ORDER_SERVICE_URL}/${clientId}/dinein/update`,
+                {
+                    id: orderId,
+                    status: newStatus
+                },
+                { headers: { Authorization: `Bearer ${token}` } }
+            );
+
+            setOrders(prev =>
+                prev.map(o =>
+                    o.id === orderId
+                        ? { ...o, status: newStatus, has_new_items: false }
+                        : o
+                )
+            );
+
             if (selectedOrder?.id === orderId) {
                 setSelectedOrder(prev => ({
                     ...prev,
                     status: newStatus,
-                    has_new_items: newStatus === 'served' ? false : prev.has_new_items
+                    has_new_items: false
                 }));
             }
-            if (newStatus === 'served') setEditOrderId(null);
-        } catch (err) {
-            console.log("Shanmugam getting an error : ", err)
+
+            if (newStatus === 'served') {
+                setEditOrderId(null);
+                clearNewItemsStorage(orderId);
+            }
+        } finally {
+            setServingOrderId(null);
         }
     };
+
 
     const cancelItem = async (orderId, itemBackendId) => {
         const order = orders.find(o => o.id === orderId);
@@ -911,10 +1010,16 @@ const Summary_V1 = ({ clientId, token }) => {
                 if (o.id !== orderId) return o;
                 const updatedItems = o.items.filter(i => i.id !== itemBackendId);
                 const newTotal = updatedItems.reduce((sum, it) => {
-                    const price = inventoryMap[it.item_id]?.unit_price || it.price || 0;
-                    return sum + (it.quantity || 1) * price;
+                    const price =
+                        inventoryMap[it.item_id]?.unit_price ||
+                        it.unit_price ||
+                        it.price ||
+                        0;
+
+                    return sum + price * (it.quantity || 1);
                 }, 0);
-                return { ...o, items: updatedItems, total_price: newTotal, has_new_items: updatedItems.some(i => i.is_new_item) };
+
+                return { ...o, items: updatedItems, has_new_items: updatedItems.some(i => i.is_new_item) };
             });
 
             setOrders(updatedOrders);
@@ -925,211 +1030,146 @@ const Summary_V1 = ({ clientId, token }) => {
 
             const newOrder = updatedOrders.find(o => o.id === orderId);
             if (newOrder) {
-                await axios.post(`${import.meta.env.VITE_API_ORDER_SERVICE_URL}/${clientId}/dinein/update`, {
-                    id: orderId,
-                    total_price: newOrder.total_price
-                }, { headers: { Authorization: `Bearer ${token}` } });
+                const totalPrice = calculateOrderTotal(newOrder.items);
+
+                await axios({
+                    method: 'post',
+                    url: `${import.meta.env.VITE_API_ORDER_SERVICE_URL}/${clientId}/dinein/update`,
+                    headers: {
+                        Authorization: `Bearer ${token}`,
+                        'Content-Type': 'application/json'
+                    },
+                    data: {
+                        id: orderId,
+                        total_price: totalPrice   // ✅ THIS WAS MISSING
+                    }
+                });
+
+
             }
+
         } catch (err) {
             console.log(err, "cancel Item error")
         }
     };
 
-    // ---------- REPLACE updateOrderItems ----------
-    const updateOrderItems = async (orderId, updatedItemsWithStatuses) => {
-        const newItemsToSave = updatedItemsWithStatuses.filter(item => item.is_new_item);
-
-        // Save batch info if there are new items
-        if (newItemsToSave.length > 0 && currentBatchTimestamp) {
-            // ensure batch meta has been persisted (so storage and UI agree)
-            localStorage.setItem(`order_${orderId}_batch_${currentBatchTimestamp}`, JSON.stringify({
-                timestamp: currentBatchTimestamp,
-                started_at: Date.now()
-            }));
-
-            // Save each new item to localStorage (include batch_timestamp)
-            newItemsToSave.forEach(item => {
-                const storageKey = `order_${orderId}_new_item_${item.frontend_unique_key}`;
-                localStorage.setItem(storageKey, JSON.stringify({
-                    item_id: item.item_id,
-                    unique_key: item.frontend_unique_key,
-                    added_at: item.added_at_frontend,
-                    batch_timestamp: item.batch_timestamp || currentBatchTimestamp,
-                    quantity: item.quantity || 1,
-                    is_line_item: item.is_line_item || false
-                }));
-            });
-        }
-
-        const itemsToSave = updatedItemsWithStatuses.filter(item => typeof item.id === 'number' || item.is_new_item);
-        const cleanedItems = itemsToSave.map(item => {
-            const inventoryItem = inventoryMap[item.item_id || item.inventory_id];
-
-            const unitPrice =
-                item.unit_price ??
-                item.price ??
-                inventoryItem?.unit_price ??
-                0;
-
-            return {
-                item_id: item.item_id || item.inventory_id,
-                item_name: item.item_name || item.name,
-                quantity: item.quantity || 1,
-                status: item.status || 'pending',
-                note: item.note || '',
-                slug: item.slug || '',
-                price: unitPrice,
-                unit_price: unitPrice,
-                line_total: unitPrice * (item.quantity || 1),
-                client_id: clientId,
-                order_id: orderId,
-                frontend_unique_key: item.frontend_unique_key || null
-            };
-        });
-
-        const totalPrice = cleanedItems.reduce((s, i) => s + i.price * i.quantity, 0);
-
+    const updateOrderItems = async (orderId, items) => {
         try {
-            await axios.post(`${import.meta.env.VITE_API_ORDER_SERVICE_URL}/${clientId}/order_items/update?order_id=${orderId}`, cleanedItems, { headers: { Authorization: `Bearer ${token}` } });
-            await axios.post(`${import.meta.env.VITE_API_ORDER_SERVICE_URL}/${clientId}/dinein/update`, { id: orderId, total_price: totalPrice }, { headers: { Authorization: `Bearer ${token}` } });
+            const existingItems = items.filter(it => typeof it.id === 'number');
+            const newItems = items.filter(it => !it.id || typeof it.id === 'string');
+            // 1️⃣ Prepare items for the API
+            const allItemsForAPI = items.map(it => {
+                const price =
+                    inventoryMap[it.item_id]?.unit_price ||
+                    it.unit_price ||
+                    it.price ||
+                    0;
 
-            // reset editing state
-            setCurrentBatchTimestamp(null);
-            setEditOrderId(null);
-            setItemSearchQuery('');
-            console.log("Item Saved Successfully");
-
-
-            const res = await axios.get(`${import.meta.env.VITE_API_ORDER_SERVICE_URL}/${clientId}/dinein/read`, { headers: { Authorization: `Bearer ${token}` } });
-            const allOrders = res.data?.data || [];
-            const updatedOrderFromBackend = allOrders.find(o => o.id === orderId);
-
-            if (!updatedOrderFromBackend) {
-                return;
-            }
-
-            const batches = getBatchesFromStorage(orderId);
-            const newItemsFromStorage = getNewItemsFromStorage(orderId);
-
-            if (batches.length === 0 && newItemsFromStorage.length === 0) {
-                setOrders(prev => prev.map(o => o.id === orderId ? updatedOrderFromBackend : o));
-                if (selectedOrder?.id === orderId) setSelectedOrder(updatedOrderFromBackend);
-                return;
-            }
-
-            const storageByKey = new Map();
-            const storageByBatchAndItem = new Map();
-            newItemsFromStorage.forEach(si => {
-                if (!si) return;
-                if (si.unique_key) storageByKey.set(si.unique_key, si);
-                if (si.batch_timestamp && si.item_id) {
-                    const k = `${si.batch_timestamp}_${si.item_id}`;
-                    if (!storageByBatchAndItem.has(k)) storageByBatchAndItem.set(k, []);
-                    storageByBatchAndItem.get(k).push(si.unique_key || null);
-                }
-            });
-
-            const backendUniqueKeys = new Set(updatedOrderFromBackend.items.filter(i => i.frontend_unique_key).map(i => i.frontend_unique_key));
-
-            const oldItems = [];
-            const batchGroups = new Map();
-            batches.forEach(b => batchGroups.set(b.timestamp, []));
-
-            updatedOrderFromBackend.items.forEach(item => {
-                let matchedBatch = null;
-                if (item.frontend_unique_key && storageByKey.has(item.frontend_unique_key)) {
-                    const storageItem = storageByKey.get(item.frontend_unique_key);
-                    if (storageItem && storageItem.batch_timestamp) matchedBatch = storageItem.batch_timestamp;
-                }
-                if (!matchedBatch && item.frontend_unique_key) {
-                    const parts = item.frontend_unique_key.split('_');
-                    if (parts.length >= 2) {
-                        const extracted = parseFloat(parts[parts.length - 1]);
-                        if (!isNaN(extracted)) matchedBatch = Math.floor(extracted / 1000) * 1000;
-                    }
-                    if (matchedBatch && !storageByBatchAndItem.has(`${matchedBatch}_${item.item_id}`)) {
-                        matchedBatch = null;
-                    }
-                }
-                if (!matchedBatch) {
-                    for (const [k, keysArr] of storageByBatchAndItem.entries()) {
-                        const [_batch, _itemId] = k.split('_');
-                        if (String(item.item_id) === String(_itemId)) {
-                            matchedBatch = Number(_batch);
-                            break;
-                        }
-                    }
-                }
-                if (matchedBatch) {
-                    if (!batchGroups.has(matchedBatch)) batchGroups.set(matchedBatch, []);
-                    batchGroups.get(matchedBatch).push({ ...item, is_new_item: true, batch_timestamp: matchedBatch });
+                if (typeof it.id === 'number') {
+                    // Existing item from DB
+                    return {
+                        order_item_id: it.id,  // ✅ Changed from "id"
+                        item_id: it.item_id,
+                        item_name: it.item_name,
+                        quantity: it.quantity || 1,
+                        unit_price: price,
+                        line_total: price * (it.quantity || 1),
+                        status: 'ready',
+                        slug: it.slug || ''
+                    };
                 } else {
-                    oldItems.push(item);
+                    // New item with frontend_unique_key
+                    return {
+                        item_id: it.item_id,
+                        item_name: it.item_name,
+                        quantity: it.quantity || 1,
+                        unit_price: price,
+                        line_total: price * (it.quantity || 1),
+                        status: 'ready',
+                        frontend_unique_key: it.frontend_unique_key || null,
+                        slug: it.slug || ''
+                    };
                 }
             });
+            console.log('📤 Sending items to API:', allItemsForAPI);
 
-            newItemsFromStorage.forEach(si => {
-                if (!si || !si.unique_key) return;
-                if (backendUniqueKeys.has(si.unique_key)) return;
-                const itemInfo = inventoryMap[si.item_id];
-                if (!itemInfo) return;
-                if (!si.batch_timestamp) return;
-                if (!batchGroups.has(si.batch_timestamp)) batchGroups.set(si.batch_timestamp, []);
-                batchGroups.get(si.batch_timestamp).push({
-                    item_id: si.item_id,
-                    item_name: itemInfo.name,
-                    quantity: si.quantity || 1,
-                    price: itemInfo.unit_price,
-                    status: 'ready',
-                    note: '',
-                    slug: itemInfo.slug || generateSlug(itemInfo.name),
-                    added_at_frontend: si.added_at,
-                    frontend_unique_key: si.unique_key,
-                    is_new_item: true,
-                    batch_timestamp: si.batch_timestamp,
-                    id: si.unique_key,
-                    image: itemInfo.image
-                });
-            });
+            // 2️⃣ Update items
+            await axios.post(
+                `${import.meta.env.VITE_API_ORDER_SERVICE_URL}/${clientId}/order_items/update?order_id=${orderId}`,
+                allItemsForAPI,
+                { headers: { Authorization: `Bearer ${token}` } }
+            );
 
-            // Build final items list
-            let newAllItems = [...oldItems];
-            const sortedTs = Array.from(batchGroups.keys()).sort((a, b) => a - b);
-            sortedTs.forEach(ts => {
-                const bitems = (batchGroups.get(ts) || []).map(it => ({ ...it }));
-                if (bitems.length > 0) {
-                    bitems[0] = { ...bitems[0], _isBatchStart: true };
-                    newAllItems.push(...bitems);
-                }
-            });
+            // 3️⃣ Calculate total
+            const totalPrice = items.reduce((sum, it) => {
+                const price =
+                    inventoryMap[it.item_id]?.unit_price ||
+                    it.unit_price ||
+                    it.price ||
+                    0;
+                return sum + price * (it.quantity || 1);
+            }, 0);
 
-            // dedupe and merge quantities
-            const seen2 = new Set();
-            const dedupedNewAll = [];
-            for (const it of newAllItems) {
-                const key = it.frontend_unique_key || `${it.item_id}_${it.batch_timestamp || ''}_${it.unit_price || it.price || 0}`;
-                if (seen2.has(key)) {
-                    const existing = dedupedNewAll.find(x => (x.frontend_unique_key || `${x.item_id}_${x.batch_timestamp || ''}_${x.unit_price || x.price || 0}`) === key);
-                    if (existing) {
-                        existing.quantity = (existing.quantity || 1) + (it.quantity || 1);
-                        existing.line_total = (existing.unit_price || existing.price || 0) * existing.quantity;
+            console.log('💰 Total price:', totalPrice);
+
+            // 4️⃣ Update order total - SEND FULL MODEL ✅
+            await axios.post(
+                `${import.meta.env.VITE_API_ORDER_SERVICE_URL}/${clientId}/dinein/update`,
+                {
+                    id: orderId,
+                    client_id: clientId,
+                    table_id: selectedOrder.table_id,
+                    status: selectedOrder.status,
+                    total_price: totalPrice,
+                    items: []  // ✅ Empty array satisfies Pydantic requirement
+                },
+                {
+                    headers: {
+                        Authorization: `Bearer ${token}`,
+                        'Content-Type': 'application/json'
                     }
-                    continue;
                 }
-                seen2.add(key);
-                dedupedNewAll.push(it);
-            }
+            );
 
-            const processedOrder = { ...updatedOrderFromBackend, items: dedupedNewAll, has_new_items: dedupedNewAll.length > oldItems.length };
-            setOrders(prev => prev.map(o => o.id === orderId ? processedOrder : o));
-            if (selectedOrder?.id === orderId) setSelectedOrder(processedOrder);
+            console.log('✅ Order saved successfully');
+
+            // 5️⃣ Clear storage and refresh
             clearNewItemsStorage(orderId);
             setCurrentBatchTimestamp(null);
+            setEditOrderId(null);
+            setShowOrderDetailModal(false);
+
+            // 6️⃣ Refresh orders
+            const res = await axios.get(
+                `${import.meta.env.VITE_API_ORDER_SERVICE_URL}/${clientId}/dinein/table`,
+                { headers: { Authorization: `Bearer ${token}` } }
+            );
+
+            const allOrders = res.data?.data || [];
+            const todayString = new Date().toLocaleDateString("en-CA");
+
+            const todayOrders = allOrders
+                .filter(order => {
+                    const orderDate = new Date(order.created_at || order.createdAt)
+                        .toLocaleDateString("en-CA");
+                    return orderDate === todayString;
+                })
+                .map(order => ({
+                    ...order,
+                    _fixedOrderMode: tableModeMap[order.table_id] || 'dinein'
+                }));
+
+            setOrders(todayOrders);
+            alert('Order updated successfully!');
 
         } catch (err) {
-            console.error('Save error', err);
+            console.error("❌ Failed:", err);
+            console.error("Error detail:", err.response?.data?.detail);
+            console.error("Response:", err.response?.data);
+            alert(`Failed: ${JSON.stringify(err.response?.data)}`);
         }
     };
+
 
     const confirmDeleteOrder = async () => {
         if (!orderToDelete) return;
@@ -1149,7 +1189,6 @@ const Summary_V1 = ({ clientId, token }) => {
                     client_id: clientId,
                     name: tableObj?.name || '',
                     table_type: tableObj?.table_type || '',
-                    status: 'Vacant',
                     location_zone: tableObj?.location_zone || ''
                 }, { headers: { Authorization: `Bearer ${token}` } });
             }
@@ -1157,7 +1196,7 @@ const Summary_V1 = ({ clientId, token }) => {
             setOrders(prev => prev.filter(o => o.id !== orderToDelete));
             setShowDeleteModal(false);
             setOrderToDelete(null);
-            console.log('Order deleted and table marked vacant.');
+            console.log('Order deleted');
             fetchTables();
         } catch (err) {
             console.log("Failed to delete the order");
@@ -1411,24 +1450,39 @@ const Summary_V1 = ({ clientId, token }) => {
                                     <div className="sticky bottom-0 bg-white border-t border-gray-200 px-4 py-3 space-y-3">
                                         {/* Existing buttons */}
                                         <div className="flex items-center gap-3">
-                                            {/* <button
-                        onClick={() => {
-                          setSelectedOrder(order);
-                          setEditOrderId(order.id);
-                          setShowOrderDetailModal(true);
-                          setActiveTab('items');
-                        }}
-                        className="flex-1 px-4 py-2 rounded-lg bg-action-primary text-text-white text-sm font-semibold"
-                      >
-                        Edit Order
-                      </button> */}
+                                            <button
+                                                disabled={order.status === 'served'}
+                                                onClick={() => {
+                                                    setSelectedOrder(order);
+                                                    setEditOrderId(order.id);
+                                                    setShowOrderDetailModal(true);
+                                                    setActiveTab('items');
+                                                }}
+                                                className={`flex-1 px-4 py-2 rounded-lg text-sm font-semibold
+    ${order.status === 'served'
+                                                        ? 'bg-gray-300 text-gray-600 cursor-not-allowed'
+                                                        : 'bg-action-primary text-text-white hover:opacity-90'
+                                                    }`}
+                                            >
+                                                <div className="flex items-center justify-center gap-2">
+                                                    <Edit2 size={16} />
+                                                    Edit Order
+                                                </div>
+                                            </button>
+
 
                                             <button
+                                                disabled={order.status === 'served' || servingOrderId === order.id}
                                                 onClick={() => handleStatusChange(order.id, 'served')}
-                                                className="flex-1 px-4 py-2 rounded-lg bg-action-success text-text-white"
+                                                className={`flex-1 px-4 py-2 rounded-lg
+    ${order.status === 'served' || servingOrderId === order.id
+                                                        ? 'bg-gray-300 cursor-not-allowed'
+                                                        : 'bg-action-success text-text-white'
+                                                    }`}
                                             >
                                                 Mark as Served
                                             </button>
+
 
 
                                         </div>
@@ -1547,7 +1601,6 @@ const Summary_V1 = ({ clientId, token }) => {
                             {/* CONTENT */}
                             <div className="flex-1 flex flex-col lg:flex-row overflow-hidden">
 
-                                {/* AVAILABLE ITEMS */}
                                 {/* AVAILABLE ITEMS */}
                                 <div
                                     className={`w-full lg:w-2/5 border-r border-border-default bg-bg-tertiary flex flex-col ${activeTab === 'available' ? 'block' : 'hidden lg:flex'
@@ -1674,11 +1727,12 @@ const Summary_V1 = ({ clientId, token }) => {
                             <div className="p-4 border-t border-border-default bg-bg-tertiary flex gap-3">
                                 <button
                                     className="flex-1 bg-action-primary text-text-white py-3 rounded-xl font-semibold"
-                                    onClick={() => {
-                                        updateOrderItems(selectedOrder.id, selectedOrder.items);
+                                    onClick={async () => {
+                                        await updateOrderItems(selectedOrder.id, selectedOrder.items);
                                         setShowOrderDetailModal(false);
                                         setEditOrderId(null);
                                     }}
+
                                 >
                                     Save Changes
                                 </button>
@@ -1720,6 +1774,15 @@ const Summary_V1 = ({ clientId, token }) => {
     background: var(--color-action-primary);
   }
 `}</style>
+
+            <LineItemsModal
+                isOpen={lineItemsModalOpen}
+                onClose={() => setLineItemsModalOpen(false)}
+                mainItem={selectedMainItem}
+                lineItems={lineItemsDetails}
+                onAddMainOnly={handleAddMainItemOnly}
+                onAddWithAddons={handleAddMainItemWithLineItems}
+            />
 
             <SimpleDeleteConfirm
                 isOpen={showDeleteModal}

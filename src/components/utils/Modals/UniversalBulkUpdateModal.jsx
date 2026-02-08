@@ -1,5 +1,6 @@
 import React from 'react';
 import { X, Edit, Trash2, Search } from 'lucide-react';
+import DropdownCheckbox from './DropdownCheckbox';
 
 const UniversalBulkUpdateModal = ({
   // Common props
@@ -17,6 +18,7 @@ const UniversalBulkUpdateModal = ({
   setBulkEditData,
   handleBulkUpdate,
   handleBulkDelete,
+  addonItems, // ✅ Addon items from parent
 
   // Table-specific props (Bulk Update)
   tables,
@@ -32,6 +34,45 @@ const UniversalBulkUpdateModal = ({
   saveBulkUpdate,
   getFilteredUpdateTables
 }) => {
+
+  // ✅ NEW: State for global add-ons selection
+  const [globalAddons, setGlobalAddons] = React.useState([]);
+
+  // ✅ NEW: Apply global add-ons to all selected items
+  const applyGlobalAddons = () => {
+    if (globalAddons.length === 0) {
+      alert('Please select at least one add-on to apply');
+      return;
+    }
+
+    const updatedBulkData = { ...bulkEditData };
+    
+    selectedRows.forEach(itemId => {
+      updatedBulkData[itemId] = {
+        ...(updatedBulkData[itemId] || {}),
+        line_item_id: globalAddons
+      };
+    });
+
+    setBulkEditData(updatedBulkData);
+    alert(`Applied ${globalAddons.length} add-on(s) to ${selectedRows.length} selected item(s)`);
+  };
+
+  // ✅ NEW: Clear global add-ons for all selected items
+  const clearGlobalAddons = () => {
+    const updatedBulkData = { ...bulkEditData };
+    
+    selectedRows.forEach(itemId => {
+      updatedBulkData[itemId] = {
+        ...(updatedBulkData[itemId] || {}),
+        line_item_id: []
+      };
+    });
+
+    setBulkEditData(updatedBulkData);
+    setGlobalAddons([]);
+    alert(`Cleared add-ons for ${selectedRows.length} selected item(s)`);
+  };
 
   // Menu: Toggle all selection
   const toggleSelectAll = () => {
@@ -89,6 +130,7 @@ const UniversalBulkUpdateModal = ({
       setSelectedRows([]);
       setBulkEditData({});
       setSelectAllChecked(false);
+      setGlobalAddons([]); // ✅ Reset global addons
     } else if (modalType === 'table') {
       setSelectedUpdateTables([]);
       setBulkUpdateData({});
@@ -99,7 +141,6 @@ const UniversalBulkUpdateModal = ({
         section: "",
         location_zone: ""
       });
-
     }
   };
 
@@ -109,18 +150,55 @@ const UniversalBulkUpdateModal = ({
   if (modalType === 'menu') {
     return (
       <div className="fixed inset-0 z-50 flex items-center justify-center p-4 bg-black bg-opacity-50">
-        <div className="rounded-lg max-w-4xl w-full bg-white max-h-[90vh] flex flex-col shadow-xl">
+        <div className="rounded-lg max-w-6xl w-full bg-white max-h-[90vh] flex flex-col shadow-xl">
 
           {/* Header */}
           <div className="flex justify-between items-center px-6 py-4 border-b border-gray-200">
             <h2 className="text-xl font-semibold text-gray-900">Bulk Update & Delete</h2>
             <button
               onClick={handleClose}
-              className="p-1.5 rounded-lg bg-action-primary text-text-white hover:opacity-90 transition-opacity   "
-
+              className="p-1.5 rounded-lg bg-action-primary text-text-white hover:opacity-90 transition-opacity"
             >
               <X className="w-5 h-5" />
             </button>
+          </div>
+
+          {/* ✅ NEW: Global Add-ons Section */}
+          <div className="px-6 py-4 bg-blue-50 border-b border-blue-200">
+            <div className="flex items-start gap-4">
+              <div className="flex-1">
+                <label className="block text-sm font-semibold mb-2 text-gray-700">
+                  Apply Add-ons to All Selected Items
+                </label>
+                <div className="flex items-center gap-3">
+                  <div className="flex-1">
+                    <DropdownCheckbox
+                      selected={globalAddons}
+                      options={addonItems || []}
+                      onChange={setGlobalAddons}
+                      label="Select Add-ons to Apply Globally"
+                    />
+                  </div>
+                  <button
+                    onClick={applyGlobalAddons}
+                    disabled={selectedRows.length === 0 || globalAddons.length === 0}
+                    className="px-4 py-2 rounded-md bg-blue-600 text-white hover:bg-blue-700 transition-colors disabled:bg-gray-300 disabled:cursor-not-allowed font-medium text-sm whitespace-nowrap"
+                  >
+                    Apply to Selected ({selectedRows.length})
+                  </button>
+                  <button
+                    onClick={clearGlobalAddons}
+                    disabled={selectedRows.length === 0}
+                    className="px-4 py-2 rounded-md bg-gray-600 text-white hover:bg-gray-700 transition-colors disabled:bg-gray-300 disabled:cursor-not-allowed font-medium text-sm whitespace-nowrap"
+                  >
+                    Clear All
+                  </button>
+                </div>
+                <p className="text-xs text-gray-600 mt-2">
+                  💡 Select add-ons above and click "Apply to Selected" to add them to all {selectedRows.length} selected item(s) at once
+                </p>
+              </div>
+            </div>
           </div>
 
           {/* Action Bar */}
@@ -162,7 +240,7 @@ const UniversalBulkUpdateModal = ({
 
           {/* Table Container */}
           <div className="flex-1 overflow-auto px-4 py-4">
-            <div className="min-w-[800px]">
+            <div className="min-w-[1000px]">
               <table className="w-full border-collapse">
                 <thead className="sticky top-0 bg-white z-10">
                   <tr className="border-b border-gray-200">
@@ -178,9 +256,8 @@ const UniversalBulkUpdateModal = ({
                     <th className="px-4 py-3 text-left text-sm font-semibold text-gray-700 bg-gray-50">Description</th>
                     <th className="px-4 py-3 text-left text-sm font-semibold text-gray-700 bg-gray-50">Price</th>
                     <th className="px-4 py-3 text-left text-sm font-semibold text-gray-700 bg-gray-50">Discount</th>
-                    <th className="px-4 py-3 text-left text-sm font-semibold text-gray-700 bg-gray-50">
-                      Code
-                    </th>
+                    <th className="px-4 py-3 text-left text-sm font-semibold text-gray-700 bg-gray-50">Code</th>
+                    <th className="px-4 py-3 text-left text-sm font-semibold text-gray-700 bg-gray-50">Add-ons</th>
                   </tr>
                 </thead>
                 <tbody>
@@ -278,8 +355,7 @@ const UniversalBulkUpdateModal = ({
                               onChange={(e) =>
                                 updateBulkEditData(item.id, 'code', e.target.value)
                               }
-                              className="w-full px-3 py-2 rounded-md border border-gray-300 text-sm
-        focus:outline-none focus:ring-2 focus:ring-action-primary"
+                              className="w-full px-3 py-2 rounded-md border border-gray-300 text-sm focus:outline-none focus:ring-2 focus:ring-action-primary"
                               placeholder="Code"
                             />
                           ) : (
@@ -288,7 +364,33 @@ const UniversalBulkUpdateModal = ({
                             </span>
                           )}
                         </td>
-
+                        {/* Add-ons Column */}
+                        <td className="px-4 py-3">
+                          {isSelected ? (
+                            <div className="w-64">
+                              <DropdownCheckbox
+                                selected={
+                                  editData.line_item_id !== undefined
+                                    ? editData.line_item_id
+                                    : Array.isArray(item.line_item_id)
+                                      ? item.line_item_id
+                                      : []
+                                }
+                                options={(addonItems || []).filter(addon => addon.id !== item.id)}
+                                onChange={(selected) =>
+                                  updateBulkEditData(item.id, 'line_item_id', selected)
+                                }
+                                label="Select Add-ons"
+                              />
+                            </div>
+                          ) : (
+                            <span className="text-sm text-gray-900">
+                              {Array.isArray(item.line_item_id) && item.line_item_id.length > 0
+                                ? `${item.line_item_id.length} add-on(s)`
+                                : '-'}
+                            </span>
+                          )}
+                        </td>
                       </tr>
                     );
                   })}
@@ -308,7 +410,7 @@ const UniversalBulkUpdateModal = ({
           <div className="px-6 py-4 border-t border-gray-200 bg-gray-50">
             <div className="flex justify-between items-center">
               <p className="text-sm text-gray-600">
-                💡 Select items by clicking checkboxes, edit fields, then click "Update Selected"
+                💡 Use the global add-ons section at the top to apply add-ons to all selected items at once, or edit individual items below
               </p>
               <button
                 onClick={handleClose}
@@ -324,7 +426,6 @@ const UniversalBulkUpdateModal = ({
   }
 
   // Render Table Bulk Update Modal
-  // Render Table Bulk Update Modal
   if (modalType === 'table') {
     const filteredTables = getFilteredUpdateTables();
 
@@ -339,7 +440,7 @@ const UniversalBulkUpdateModal = ({
             </h2>
             <button
               onClick={handleClose}
-              className="p-1.5 rounded-lg bg-action-primary text-text-white hover:opacity-90 transition-opacity   "
+              className="p-1.5 rounded-lg bg-action-primary text-text-white hover:opacity-90 transition-opacity"
             >
               <X className="w-4 h-4 " />
             </button>
@@ -413,7 +514,8 @@ const UniversalBulkUpdateModal = ({
                   <option value="Reserved">Reserved</option>
                 </select>
               </div>
-              {/* SECTION */}
+
+              {/* Section */}
               <div>
                 <label className="block text-xs font-semibold mb-1.5 text-text-secondary">
                   Section
@@ -431,7 +533,7 @@ const UniversalBulkUpdateModal = ({
                 </select>
               </div>
 
-              {/* ZONE */}
+              {/* Zone */}
               <div>
                 <label className="block text-xs font-semibold mb-1.5 text-text-secondary">
                   Zone
@@ -450,7 +552,6 @@ const UniversalBulkUpdateModal = ({
                   <option value="Second Floor">Second Floor</option>
                 </select>
               </div>
-
             </div>
           </div>
 
@@ -580,7 +681,7 @@ const UniversalBulkUpdateModal = ({
                           </select>
                         </div>
 
-                        {/* SECTION */}
+                        {/* Section */}
                         <div>
                           <label className="block text-xs font-semibold mb-1.5 text-text-secondary">
                             Section
@@ -597,7 +698,7 @@ const UniversalBulkUpdateModal = ({
                           </select>
                         </div>
 
-                        {/* ZONE */}
+                        {/* Zone */}
                         <div>
                           <label className="block text-xs font-semibold mb-1.5 text-text-secondary">
                             Zone
@@ -615,7 +716,6 @@ const UniversalBulkUpdateModal = ({
                             <option value="Second Floor">Second Floor</option>
                           </select>
                         </div>
-
                       </div>
                     ) : (
                       <div className="pt-2 border-t border-border-default">

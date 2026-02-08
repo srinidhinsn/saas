@@ -126,7 +126,9 @@ const CounterManagement = ({ clientId, token, screenIds, userId }) => {
 
                 setTables(filteredTables);
                 setOriginalTables(filteredTables);
-            }
+            }console.log("ALL TABLES FROM API", result.data);
+            console.log("SCREEN ID", result.screen_id);
+            
         } catch (error) {
             console.error("Error fetching tables:", error);
         } finally {
@@ -178,16 +180,6 @@ const CounterManagement = ({ clientId, token, screenIds, userId }) => {
 
             const payload = [];
             for (let row of validRows) {
-
-
-
-
-                const error = validateCounterName(row.range, originalTables);
-                if (error) {
-                    toast.error(error);
-                    return;
-                }
-
                 payload.push({
                     client_id: clientId,
                     name: row.range.trim(),

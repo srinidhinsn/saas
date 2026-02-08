@@ -15,13 +15,14 @@ const UniversalAddModal = ({
   selectedCategory,
   setSelectedCategory,
   categories,
-  menuItems,
+  menuItems, // ✅ This now receives addonItems from parent
   newItemImage,
   setNewItemImage,
   newItemImageUrl,
   setNewItemImageUrl,
   handleAddItem,
   getCategoryIdByName,
+  inventoryIds,
 
   // Table-specific props
   tableRanges,
@@ -73,15 +74,12 @@ const UniversalAddModal = ({
         }
       } catch (err) {
         // defensive
-        // console.warn('prefill category failed', err);
       }
     }
-    // intentionally exclude getCategoryIdByName to avoid effect re-running if parent recreates that fn
-    // rely on selectedCategory + showModal which are the important triggers
     // eslint-disable-next-line react-hooks/exhaustive-deps
   }, [showModal, modalType, selectedCategory]);
 
-  // Drag handlers (same as before)
+  // Drag handlers
   const handleDrag = (e) => {
     e.preventDefault();
     e.stopPropagation();
@@ -111,13 +109,11 @@ const UniversalAddModal = ({
   };
 
   const handleRangeChange = (index, field, value) => {
-    // defensive: copy array and update
     const updated = Array.isArray(tableRanges) ? [...tableRanges] : [];
     updated[index] = { ...(updated[index] || {}) };
     updated[index][field] = field === "table_type" ? Math.max(1, Number(value) || "") : value;
     setTableRanges(updated);
   };
-
 
   const handleClose = () => {
     setShowModal(false);
@@ -130,8 +126,10 @@ const UniversalAddModal = ({
         discount: '',
         code: '',
         unit: '',
-        line_item_id: []
+        line_item_id: [],
+        inventory_id: ''
       });
+
       setNewItemImage?.(null);
       setNewItemImageUrl?.('');
     } else if (modalType === 'table') {
@@ -174,6 +172,33 @@ const UniversalAddModal = ({
                 {flattenCategories(categories || []).map(cat => (
                   <option key={cat.id} value={cat.id}>
                     {'—'.repeat(cat.level)} {cat.name}
+                  </option>
+                ))}
+              </select>
+            </div>
+
+            {/* Inventory Selector */}
+            <div>
+              <label className="block text-sm font-medium mb-2 text-text-primary">
+                Inventory Category *
+              </label>
+
+              <select
+                value={newItem?.inventory_id ?? ""}
+                onChange={(e) =>
+                  setNewItem((prev) => ({
+                    ...(prev || {}),
+                    inventory_id: e.target.value
+                  }))
+                }
+                className="w-full px-4 py-2 rounded-lg bg-bg-tertiary border border-border-default text-text-primary focus:outline-none focus:ring-2 focus:ring-action-primary"
+                required
+              >
+                <option value="">Select Inventory</option>
+
+                {(inventoryIds || []).map((inv) => (
+                  <option key={inv.id} value={inv.id}>
+                    {inv.name}
                   </option>
                 ))}
               </select>
@@ -230,7 +255,7 @@ const UniversalAddModal = ({
               </div>
             </div>
 
-            {/* Availability & Unit */}
+            {/* Code & Unit */}
             <div className="grid grid-cols-2 gap-4">
               <div>
                 <label className="block text-sm font-medium mb-2 text-text-primary">Code *</label>
@@ -326,9 +351,14 @@ const UniversalAddModal = ({
               </div>
             </div>
 
-            {/* Add-ons */}
+            {/* Add-ons - ✅ Now only shows items from addons category */}
             <div>
-              <label className="block text-sm font-medium mb-2 text-text-primary">Add-ons</label>
+              <label className="block text-sm font-medium mb-2 text-text-primary">
+                Add-ons
+                <span className="text-xs text-text-secondary ml-2">
+                  (Only items from Addons category)
+                </span>
+              </label>
               <DropdownCheckbox
                 selected={Array.isArray(newItem?.line_item_id) ? newItem.line_item_id : []}
                 options={menuItems || []}
@@ -358,15 +388,14 @@ const UniversalAddModal = ({
     );
   }
 
-  // TABLE modal (unchanged except defensive value handling)
+  // TABLE modal (unchanged)
   if (modalType === 'table') {
     return (
       <div className="fixed inset-0 bg-color-modalsbg bg-opacity-50 z-50 flex items-center justify-center p-4 overflow-y-auto">
         <div className="bg-bg-primary rounded-xl w-full max-w-xl shadow-2xl border border-border-default my-8">
           <div className="sticky top-0 bg-bg-primary px-4 py-2 border-b-border-default flex justify-between items-center z-10 rounded-t-xl">
             <h3 className="text-xl font-bold text-text-primary">Add Tables</h3>
-            <button onClick={handleClose}       className="p-1.5 rounded-lg bg-action-primary text-text-white hover:opacity-90 transition-opacity   "
-                           >
+            <button onClick={handleClose} className="p-1.5 rounded-lg bg-action-primary text-text-white hover:opacity-90 transition-opacity">
               <X size={24} />
             </button>
           </div>
@@ -380,22 +409,11 @@ const UniversalAddModal = ({
                 <div>
                   <label className="flex items-center gap-2 text-sm font-semibold mb-2 text-text-primary">
                     Table Range *
-
                     <div className="relative group cursor-pointer">
-                      {/* Info Icon */}
                       <span className="w-5 h-5 flex items-center justify-center rounded-full bg-blue-100 text-action-primary text-xs font-bold">
                         i
                       </span>
-
-                      {/* Tooltip */}
-                      <div className="
-      absolute left-1/2 -translate-x-1/2 top-7
-      hidden group-hover:block
-      w-60 p-3
-      bg-white border border-blue-200
-      rounded-lg shadow-lg z-50
-      text-xs text-gray-700
-    ">
+                      <div className="absolute left-1/2 -translate-x-1/2 top-7 hidden group-hover:block w-60 p-3 bg-white border border-blue-200 rounded-lg shadow-lg z-50 text-xs text-gray-700">
                         <div className="font-bold mb-1 text-text-primary">
                           Table Range Examples
                         </div>
@@ -423,7 +441,6 @@ const UniversalAddModal = ({
                 <div>
                   <label className="block text-sm font-semibold mb-2 text-text-primary">Seats *</label>
 
-                  {/* Desktop */}
                   <input
                     type="number"
                     min="1"
@@ -434,7 +451,6 @@ const UniversalAddModal = ({
                     placeholder="4"
                   />
 
-                  {/* Mobile with +/- buttons */}
                   <div className={`md:hidden flex items-center border rounded-lg overflow-hidden ${fieldErrors?.[index]?.table_type ? 'border-bulkActions-delete bg-red-50' : 'border-border-default'
                     }`}>
                     <button
@@ -472,6 +488,7 @@ const UniversalAddModal = ({
                     <div className="text-action-danger text-xs mt-1 font-medium">Enter seating</div>
                   )}
                 </div>
+
                 <div>
                   <label className="block text-sm font-semibold mb-2">Section *</label>
                   <select
@@ -488,7 +505,6 @@ const UniversalAddModal = ({
                       Select section
                     </div>
                   )}
-
                 </div>
 
                 <div>
@@ -509,9 +525,7 @@ const UniversalAddModal = ({
                       Select zone
                     </div>
                   )}
-
                 </div>
-
 
                 <div>
                   <label className="block text-sm font-semibold mb-2 text-text-primary">Remark</label>
@@ -526,8 +540,6 @@ const UniversalAddModal = ({
                 </div>
               </div>
             ))}
-
-
 
             <button
               className="w-full bg-action-primary text-text-white py-2 rounded-lg hover:bg-bulkActionsHover-addingHover hover:text-text-primary transition-colors font-bold text-lg shadow-lg disabled:bg-gray-300 disabled:cursor-not-allowed"
