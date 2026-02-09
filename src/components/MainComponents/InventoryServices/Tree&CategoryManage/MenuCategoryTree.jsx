@@ -9,7 +9,76 @@ const isRootCategory = (cat) =>
   cat?.id === "ditery" ||
   cat?.name?.toLowerCase() === "dietery" ||
   cat?.name?.toLowerCase() === "ditery";
+const skipOneLevel = (nodes) => {
+  if (!Array.isArray(nodes)) return [];
 
+  return nodes.map(node => {
+    // If node has children and those children have children,
+    // replace children with grandchildren
+    if (
+      node.children?.length &&
+      node.children.some(child => child.children?.length)
+    ) {
+      return {
+        ...node,
+        children: node.children.flatMap(child => child.children || [])
+      };
+    }
+
+    // Otherwise, keep structure
+    return {
+      ...node,
+      children: skipOneLevel(node.children || [])
+    };
+  });
+};
+const MENU_HIERARCHY_LEVEL = Number(
+  import.meta.env.VITE_MENU_HIERARCHY_LEVEL || 2
+);
+
+const MENU_DEFAULT_ROOT =
+  import.meta.env.VITE_MENU_DEFAULT_ROOT || "dietery";
+  const sliceTreeByLevel = (nodes, currentLevel = 1, maxLevel = 2) => {
+    if (!Array.isArray(nodes)) return [];
+  
+    return nodes.map(node => {
+      if (currentLevel >= maxLevel) {
+        // stop expansion here
+        return {
+          ...node,
+          children: []
+        };
+      }
+  
+      return {
+        ...node,
+        children: sliceTreeByLevel(
+          node.children || [],
+          currentLevel + 1,
+          maxLevel
+        )
+      };
+    });
+  };
+  const buildHierarchyView = (categories) => {
+    return categories.map(cat => {
+      if (
+        cat.id === MENU_DEFAULT_ROOT ||
+        cat.name?.toLowerCase() === MENU_DEFAULT_ROOT
+      ) {
+        return {
+          ...cat,
+          children: sliceTreeByLevel(
+            cat.children || [],
+            1,
+            MENU_HIERARCHY_LEVEL
+          )
+        };
+      }
+      return cat;
+    });
+  };
+    
 const MenuCategoryTree = ({
   categories = [],
   selectedCategoryId,
@@ -19,7 +88,8 @@ const MenuCategoryTree = ({
   token,
   onCategoriesUpdate
 }) => {
-  const [expandedCategories, setExpandedCategories] = useState(['All Categories']);
+  // const [expandedCategories, setExpandedCategories] = useState(['All Categories']);
+  const [expandedCategories, setExpandedCategories] = useState([]);
 
   // Drag & Drop states
   const [draggedItem, setDraggedItem] = useState(null);
@@ -39,6 +109,8 @@ const MenuCategoryTree = ({
   const [editDescription, setEditDescription] = useState("");
   const [editNewSubcategoryName, setEditNewSubcategoryName] = useState("");
   const [deleteTarget, setDeleteTarget] = useState(null);
+ const displayCategories = buildHierarchyView(categories);
+
 
   const generateCategoryIdFromName = (name) => {
     const now = new Date();
@@ -62,7 +134,55 @@ const MenuCategoryTree = ({
       + "_" + timestamp
     );
   };
+  const getCategoriesAtLevel = (nodes, targetLevel, level = 1) => {
+    let result = [];
+  
+    for (const node of nodes) {
+      if (level === targetLevel) {
+        result.push(node);
+      }
+      if (node.children?.length) {
+        result = result.concat(
+          getCategoriesAtLevel(node.children, targetLevel, level + 1)
+        );
+      }
+    }
+  
+    return result;
+  };
+  
+  const findPathById = (nodes, targetId, path = []) => {const quickMenuCategories = getCategoriesAtLevel(
+    categories,
+    MENU_HIERARCHY_LEVEL
+  );
+  
+    for (const node of nodes) {
+      const newPath = [...path, node.id];
+      if (node.id === targetId) return newPath;
+      if (node.children?.length) {
+        const found = findPathById(node.children, targetId, newPath);
+        if (found) return found;
+      }
+    }
+    return null;
+  };
+  useEffect(() => {
+    if (!selectedCategoryId || !categories.length) return;
 
+    const path = findPathById(categories, selectedCategoryId);
+    if (path) {
+      setExpandedCategories(path);
+    }
+  }, [selectedCategoryId, categories]);
+  useEffect(() => {
+    if (!categories?.length) return;
+  
+    const root = categories[0];
+    if (root) {
+      setExpandedCategories([root.id]);
+    }
+  }, [categories]);
+  
   const buildLocalParentMap = (cats) => {
     const map = {};
     const traverse = (nodes, parentId = null) => {
@@ -111,6 +231,21 @@ const MenuCategoryTree = ({
 
     setDragOverItem(category);
   };
+  useEffect(() => {
+    if (!categories?.length) return;
+
+    const dieteryNode = categories.find(
+      c => c.id === "dietery" || c.name?.toLowerCase() === "dietery"
+    );
+
+    if (dieteryNode) {
+      setExpandedCategories(prev =>
+        prev.includes(dieteryNode.id)
+          ? prev
+          : [...prev, dieteryNode.id]
+      );
+    }
+  }, [categories]);
 
   const handleDrop = async (e, targetCategory) => {
     e.preventDefault();
@@ -316,18 +451,6 @@ const MenuCategoryTree = ({
     return null;
   };
 
-  useEffect(() => {
-    if (!categories || categories.length === 0) {
-      setExpandedCategories(['All Categories']);
-      return;
-    }
-    const path = findCategoryByName(categories, defaultOpenCategoryName);
-    if (path && path.length > 0) {
-      setExpandedCategories(path);
-    } else {
-      setExpandedCategories(['All Categories']);
-    }
-  }, [categories, defaultOpenCategoryName]);
 
   useEffect(() => {
     if (!categories || categories.length === 0) return;
@@ -392,13 +515,14 @@ const MenuCategoryTree = ({
     return "_" + path.join("_");
   };
 
-  const toggleCategory = (categoryName) => {
+  const toggleCategory = (categoryId) => {
     setExpandedCategories(prev =>
-      prev.includes(categoryName)
-        ? prev.filter(c => c !== categoryName)
-        : [...prev, categoryName]
+      prev.includes(categoryId)
+        ? prev.filter(id => id !== categoryId)
+        : [...prev, categoryId]
     );
   };
+
 
   const handleEdit = (category) => {
     if (category.id === 'all' || category.id === 'dietery' || category.name === 'All Categories') {
@@ -627,7 +751,13 @@ const MenuCategoryTree = ({
           className="relative flex-shrink-0"
         >
           <button
-            onClick={() => onSelectCategory(category.id)}
+            onClick={() => {
+              onSelectCategory(category.id);
+              // if (category.children?.length) {
+              //   setSidebarCategories(category.children);
+              // }
+            }}
+
             className={`
               flex items-center justify-between gap-2
               px-3 py-2
@@ -685,30 +815,23 @@ const MenuCategoryTree = ({
   const renderTree = (items, level = 0) =>
     items.map((category, index) => {
       const hasChildren = category.children?.length > 0;
-      const isExpanded = expandedCategories.includes(category.name);
       const isDragging = draggedItem?.id === category.id;
       const isDragOver = dragOverItem?.id === category.id;
-
-      const categoryWithCount = {
-        ...category,
-        count: hasChildren ? category.children.length : 0
-      };
 
       return (
         <div key={category.id} className="space-y-1">
           <MenuTreeNode
-            category={categoryWithCount}
+            category={category}
             level={level}
             hasChildren={hasChildren}
             isLast={index === items.length - 1}
-            isExpanded={isExpanded}
+            isExpanded={expandedCategories.includes(category.id)}
             isSelected={
               selectedCategoryId === category.id ||
               (selectedCategoryId === null && isRootCategory(category))
             }
-            
             onSelect={() => onSelectCategory(category.id)}
-            onToggle={() => toggleCategory(category.name)}
+            onToggle={() => toggleCategory(category.id)}
             onEdit={handleEdit}
             onDelete={handleDelete}
             onDragStart={handleDragStart}
@@ -719,7 +842,7 @@ const MenuCategoryTree = ({
             dragOverPosition={isDragOver ? dragOverPosition : null}
           />
 
-          {hasChildren && isExpanded && (
+          {hasChildren && expandedCategories.includes(category.id) && (
             <div className="mt-1">
               {renderTree(category.children, level + 1)}
             </div>
@@ -727,6 +850,7 @@ const MenuCategoryTree = ({
         </div>
       );
     });
+
 
   return (
     <>
@@ -741,9 +865,10 @@ const MenuCategoryTree = ({
           </button>
         </div>
         <div className="space-y-1.5">
-          
+
           {categories && categories.length > 0 ? (
-            renderTree(categories)
+            renderTree(displayCategories)
+
           ) : (
             <div className="px-3 py-8 text-center text-text-secondary text-sm">
               No categories available
@@ -783,7 +908,8 @@ const MenuCategoryTree = ({
     "
           >
             {categories && categories.length > 0 ? (
-              renderMobileCategories(categories)
+              // renderMobileCategories(categories)
+              renderMobileCategories(displayCategories)
             ) : (
               <div className="text-text-secondary text-sm py-2">
                 No categories
@@ -956,13 +1082,3 @@ const MenuCategoryTree = ({
 };
 
 export default MenuCategoryTree;
-
-
-// ==================================       =================================    ==========================================      //
-// ==================================       =================================    ==========================================      //
-// ==================================       =================================    ==========================================      //
-// ==================================       =================================    ==========================================      //
-// ==================================       =================================    ==========================================      //
-// ==================================       =================================    ==========================================      //
-// ==================================       =================================    ==========================================      //
-// ==================================       =================================    ==========================================      //
