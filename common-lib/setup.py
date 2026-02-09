@@ -2,7 +2,7 @@ from setuptools import setup, find_packages
 
 setup(
     name = "saas_common_lib_473815",
-    version = "0.5",
+    version = "1.6",
     author = "Srinidhi Nagarajan",
     author_email = "Srinidhinsn@gmail.com",
     description = ("Packaging all common functionalities"),
