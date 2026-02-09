@@ -43,6 +43,12 @@ class InventoryEntity(Base):
         model.__dict__.pop("_sa_instance_state", None)
         return model
 
+    @staticmethod
+    def copyToModels(rows):
+        models = [Inventory(**row.__dict__) for row in rows]
+        for m in models:
+            m.__dict__.pop("_sa_instance_state", None)
+        return models
 
 
 class CategoryEntity(Base):
