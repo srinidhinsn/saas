@@ -587,12 +587,12 @@ const UniversalAddModal = ({
                 <div>
                   <label className="block text-sm font-semibold mb-2 text-text-primary">Remark</label>
                   <select
-                    value={row?.remark ?? 'Vacant'}
+                    value={row?.remark ?? 'vacant'}
                     onChange={(e) => handleRangeChange(index, 'remark', e.target.value)}
                     className="w-full px-3 py-2 border-default border-border-default rounded-lg focus:outline-none focus:ring-2 focus:ring-action-primary"
                   >
-                    <option value="Vacant">Vacant</option>
-                    <option value="Reserved">Reserved</option>
+                    <option value="vacant">Vacant</option>
+                    <option value="reserved">Reserved</option>
                   </select>
                 </div>
               </div>

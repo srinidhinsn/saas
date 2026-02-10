@@ -8,6 +8,24 @@ const TableConfigModal = ({ show, onClose, clientId, token, refresh }) => {
     const [sectionInput, setSectionInput] = useState("");
     const [zones, setZones] = useState([]);
     const [sections, setSections] = useState([]);
+    const [popup, setPopup] = useState({
+        show: false,
+        type: "success", // success | error | warning | confirm
+        message: "",
+        onConfirm: null
+    });
+    const showPopup = (type, message, onConfirm = null) => {
+        setPopup({
+            show: true,
+            type,
+            message,
+            onConfirm
+        });
+    };
+
+    const closePopup = () => {
+        setPopup({ show: false, message: "", onConfirm: null, type: "success" });
+    };
 
     const addValue = async (category, value) => {
         const clean = value.trim();
@@ -27,17 +45,16 @@ const TableConfigModal = ({ show, onClose, clientId, token, refresh }) => {
                     headers: { Authorization: `Bearer ${token}` }
                 }
             );
-
-            alert(`${clean} added successfully`);
+            showPopup("success", `${clean} added successfully`);
             setZoneInput("");
             setSectionInput("");
             refresh();
 
         } catch (err) {
             if (err.response?.status === 409) {
-                alert(`${clean} already exists`);
+                showPopup("warning", `${clean} already exists`);
             } else {
-                alert("Failed to add value");
+                showPopup("error", "Failed to add value");
                 console.error(err);
             }
         }
@@ -63,7 +80,30 @@ const TableConfigModal = ({ show, onClose, clientId, token, refresh }) => {
         if (show) loadMasters();
     }, [show]);
     const deleteValue = async (category, value) => {
-        if (!window.confirm(`Delete "${value}" ?`)) return;
+        showPopup("confirm", `Delete "${value}" ?`, async () => {
+            try {
+                await axios.delete(
+                    `${import.meta.env.VITE_API_INVENTORY_SERVICE_URL}/${clientId}/inventory/roles`,
+                    {
+                        params: {
+                            client_id: clientId,
+                            category_id: category,
+                            value: value
+                        },
+                        headers: { Authorization: `Bearer ${token}` }
+                    }
+                );
+
+                await loadMasters();
+                refresh();
+                closePopup();
+
+            } catch (err) {
+                showPopup("error", "Failed to delete");
+                console.error(err);
+            }
+        });
+        return;
 
         try {
             await axios.delete(
@@ -184,6 +224,52 @@ const TableConfigModal = ({ show, onClose, clientId, token, refresh }) => {
                 </button>
 
             </div>
+
+            {popup.show && (
+                <div className="fixed inset-0 bg-black/40 flex items-center justify-center z-[60]">
+                    <div className="bg-white rounded-xl w-[340px] p-5 shadow-2xl animate-scale-in text-center">
+
+                        <h3 className={`text-lg font-bold mb-3
+                ${popup.type === "success" ? "text-green-600" :
+                                popup.type === "error" ? "text-red-600" :
+                                    popup.type === "warning" ? "text-yellow-600" :
+                                        "text-gray-800"}
+            `}>
+                            {popup.type === "success" && "Success"}
+                            {popup.type === "error" && "Error"}
+                            {popup.type === "warning" && "Warning"}
+                            {popup.type === "confirm" && "Confirmation"}
+                        </h3>
+
+                        <p className="text-gray-700 mb-5">{popup.message}</p>
+
+                        {popup.type === "confirm" ? (
+                            <div className="flex gap-3">
+                                <button
+                                    className="flex-1 bg-red-600 text-white py-2 rounded-lg hover:bg-red-700"
+                                    onClick={popup.onConfirm}
+                                >
+                                    Yes
+                                </button>
+                                <button
+                                    className="flex-1 bg-gray-300 py-2 rounded-lg hover:bg-gray-400"
+                                    onClick={closePopup}
+                                >
+                                    Cancel
+                                </button>
+                            </div>
+                        ) : (
+                            <button
+                                className="w-full bg-gray-800 text-white py-2 rounded-lg hover:bg-gray-900"
+                                onClick={closePopup}
+                            >
+                                OK
+                            </button>
+                        )}
+                    </div>
+                </div>
+            )}
+
         </div>
     );
 };

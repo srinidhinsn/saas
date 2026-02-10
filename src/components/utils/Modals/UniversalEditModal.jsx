@@ -1,4 +1,4 @@
-import React, { useState,useEffect } from 'react';
+import React, { useState, useEffect } from 'react';
 import { X, Upload } from 'lucide-react';
 import DropdownCheckbox from './DropdownCheckbox';
 import MenuImagePreview from '../../MainComponents/InventoryServices/Tree&CategoryManage/MenuImagePreview';
@@ -27,7 +27,7 @@ const UniversalEditModal = ({
   // Table-specific props
   editRowId,
   setEditRowId,
-  tables,
+  table,
   handleEditChange,
   saveEdit,
   editFieldErrors
@@ -36,6 +36,7 @@ const UniversalEditModal = ({
   const [zoneOptions, setZoneOptions] = useState([]);
   const [sectionOptions, setSectionOptions] = useState([]);
   const [loadingMasters, setLoadingMasters] = useState(false);
+  const [statusOptions, setStatusOptions] = useState([]);
 
   // Menu Modal Functions
   const handleEditDrag = (e) => {
@@ -83,7 +84,8 @@ const UniversalEditModal = ({
 
       await Promise.all([
         fetchMasterValues("zone", setZoneOptions),
-        fetchMasterValues("section", setSectionOptions)
+        fetchMasterValues("section", setSectionOptions),
+        fetchMasterValues("status", setStatusOptions)
       ]);
 
       setLoadingMasters(false);
@@ -123,6 +125,8 @@ const UniversalEditModal = ({
     } else if (modalType === 'table') {
       setEditRowId?.(null);
     }
+
+
   };
 
   if (!showModal) return null;
@@ -387,10 +391,7 @@ const UniversalEditModal = ({
   }
 
   // Render Table Edit Modal
-  if (modalType === 'table' && editRowId) {
-    const table = (tables || []).find(t => t.id === editRowId);
-    if (!table) return null;
-
+  if (modalType === 'table' && table) {
     return (
       <div className="fixed inset-0 bg-black bg-opacity-50 z-50 flex items-center justify-center p-4">
         <div className="bg-white rounded-lg w-full max-w-md shadow-xl">
@@ -532,12 +533,22 @@ const UniversalEditModal = ({
                 <select
                   value={table.status || ""}
                   onChange={(e) => handleEditChange(table.id, "status", e.target.value)}
-                  className={`w-full px-3 py-2 rounded-md border focus:outline-none focus:ring-2 focus:ring-blue-500 focus:border-transparent ${editFieldErrors?.status ? 'border-red-500 bg-red-50' : 'border-gray-300'
+                  className={`w-full px-3 py-2 rounded-md border focus:outline-none focus:ring-2 focus:ring-blue-500 ${editFieldErrors?.status ? 'border-red-500 bg-red-50' : 'border-gray-300'
                     }`}
                 >
-                  <option value="Vacant">Vacant</option>
-                  <option value="Reserved">Reserved</option>
+                  <option value="">Select Status</option>
+
+                  {loadingMasters ? (
+                    <option disabled>Loading...</option>
+                  ) : statusOptions.length === 0 ? (
+                    <option disabled>No Status Configured</option>
+                  ) : (
+                    statusOptions.map((status, i) => (
+                      <option key={i} value={status}>{status}</option>
+                    ))
+                  )}
                 </select>
+
                 {editFieldErrors?.status && (
                   <p className="text-red-600 text-xs mt-1">{editFieldErrors.status}</p>
                 )}
@@ -555,7 +566,8 @@ const UniversalEditModal = ({
             </button>
             <button
               className="px-6 py-2 rounded-md bg-action-primary text-text-white hover:bg-blue-700 font-medium"
-              onClick={() => saveEdit(table)}
+              onClick={saveEdit}
+
             >
               Save
             </button>
