@@ -1,5 +1,5 @@
 import React, { useState, useEffect, useRef, useCallback } from 'react';
-import { Plus, Minus, X, Search, Edit, Trash2, Upload, Download, CloudUpload } from 'lucide-react';
+import { Plus, Search, Edit, Trash2, Upload, Download, CloudUpload, ArrowDown } from 'lucide-react';
 import axios from 'axios';
 import * as XLSX from 'xlsx';
 import MenuCategoryTree from './Tree&CategoryManage/MenuCategoryTree';
@@ -8,7 +8,7 @@ import UniversalAddModal from '../../utils/Modals/UniversalAddModal';
 import UniversalEditModal from '../../utils/Modals/UniversalEditModal';
 import UniversalBulkUpdateModal from '../../utils/Modals/UniversalBulkUpdateModal';
 import { jwtDecode } from "jwt-decode";
-
+import { getMenuConfig } from '../../utils/menuConfigResolver';
 
 // Main Menu Management Component
 const MenuManagement = ({ clientId, token, realm }) => {
@@ -16,7 +16,6 @@ const MenuManagement = ({ clientId, token, realm }) => {
   const [searchQuery, setSearchQuery] = useState('');
   const searchInputRef = useRef(null);
   const [screenId, setScreenId] = useState();
-  const [selectedCategory, setSelectedCategory] = useState('All Categories');
   const [categories, setCategories] = useState([]);
   const [menuItems, setMenuItems] = useState([]);
   const [loading, setLoading] = useState(true);
@@ -24,7 +23,21 @@ const MenuManagement = ({ clientId, token, realm }) => {
   const [inventoryIds, setInventoryIds] = useState([]);
   const [addonItems, setAddonItems] = useState([]); // ✅ Store addon items
   const [addonsCategoryId, setAddonsCategoryId] = useState(null); // ✅ Store addons category ID
-  
+  const [selectedCategoryId, setSelectedCategoryId] = useState(null);
+  const [dieterySubCategories, setDieterySubCategories] = useState([]);
+  const [sidebarCategories, setSidebarCategories] = useState([]);
+  // const MENU_ROOT = import.meta.env.VITE_MENU_DEFAULT_ROOT || "dietery";
+  // const MENU_LEVEL = Number(import.meta.env.VITE_MENU_HIERARCHY_LEVEL || 2);
+  const [menuConfig, setMenuConfig] = useState({
+    root: "dietery",
+    level: 2
+  });
+
+  <MenuCategoryTree
+    selectedCategoryId={selectedCategoryId}
+    onSelectCategory={setSelectedCategoryId}
+  />
+
   // Modal states
   const [showAddModal, setShowAddModal] = useState(false);
   const [showEditModal, setShowEditModal] = useState(false);
@@ -59,6 +72,9 @@ const MenuManagement = ({ clientId, token, realm }) => {
   const [selectedRows, setSelectedRows] = useState([]);
   const [selectAllChecked, setSelectAllChecked] = useState(false);
   const [bulkEditData, setBulkEditData] = useState({});
+  const [quickCatOpen, setQuickCatOpen] = useState(false);
+  const quickCatRef = useRef(null);
+
   // realm + user metadata
   const [currentUserId, setCurrentUserId] = useState(null);
   useEffect(() => {
@@ -70,6 +86,9 @@ const MenuManagement = ({ clientId, token, realm }) => {
     }
   }, [token]);
 
+  useEffect(() => {
+    console.log("CLIENT ID RAW =", JSON.stringify(clientId));
+  }, [clientId]);
 
   // returns array of category names from root -> the given categoryId (works with UUID or cat_... ids)
   const buildCategoryPath = (categoryId) => {
@@ -144,6 +163,48 @@ const MenuManagement = ({ clientId, token, realm }) => {
     return flatList;
   };
 
+  useEffect(() => {
+    if (!clientId) return;
+
+    const config = getMenuConfig(clientId);
+
+    console.log("MENU CONFIG LOADED:", clientId, config);
+
+    setMenuConfig(config);
+  }, [clientId]);
+
+  const findCategoryNode = (tree, matcher) => {
+    for (const cat of tree) {
+      if (
+        cat.id?.toLowerCase() === matcher.toLowerCase() ||
+        cat.name?.toLowerCase() === matcher.toLowerCase()
+      ) {
+        return cat;
+      }
+      if (cat.children?.length) {
+        const found = findCategoryNode(cat.children, matcher);
+        if (found) return found;
+      }
+    }
+    return null;
+  };
+  const getCategoriesAtLevel = (node, targetLevel, currentLevel = 0) => {
+    if (!node) return [];
+
+    if (currentLevel === targetLevel) {
+      return [node];
+    }
+
+    let result = [];
+    for (const child of node.children || []) {
+      result = result.concat(
+        getCategoriesAtLevel(child, targetLevel, currentLevel + 1)
+      );
+    }
+
+    return result;
+  };
+
   // Helper function to get category ID from name
   const getCategoryIdByName = (categoryName) => {
     if (!categoryName || categoryName === 'All Categories' || categoryName === 'All') return null;
@@ -157,25 +218,6 @@ const MenuManagement = ({ clientId, token, realm }) => {
     return match ? match.id : null;
   };
 
-  // ✅ NEW: Get selected category ID (not name)
-  const getSelectedCategoryId = () => {
-    if (!selectedCategory) return null;
-    if (typeof selectedCategory === 'string') {
-      // If it's "All Categories", return null
-      if (selectedCategory === 'All Categories') return null;
-      // Otherwise try to find the ID by name
-      return getCategoryIdByName(selectedCategory);
-    }
-    if (typeof selectedCategory === 'object') return selectedCategory.id;
-    return null;
-  };
-
-  const getSelectedCategoryName = () => {
-    if (!selectedCategory) return null;
-    if (typeof selectedCategory === 'string') return selectedCategory;
-    if (typeof selectedCategory === 'object') return selectedCategory.name;
-    return null;
-  };
 
   const fetchInventoryIds = async () => {
     try {
@@ -187,12 +229,12 @@ const MenuManagement = ({ clientId, token, realm }) => {
           },
         }
       );
-  
+
       const subcategories = res.data.data[0];
       const subcats = subcategories.subCategories;
-  
+
       setInventoryIds(subcats);
-  
+
       console.log("Inventory Subcategories:", subcats);
     } catch (error) {
       console.log("Error fetching inventory IDs:", error);
@@ -225,7 +267,7 @@ const MenuManagement = ({ clientId, token, realm }) => {
 
       const allItems = itemRes.data.data || [];
       const filteredAddons = allItems.filter(item => item.category_id === addonsCatId);
-      
+
       setAddonItems(filteredAddons);
       console.log("Addon Items:", filteredAddons);
     } catch (error) {
@@ -247,9 +289,8 @@ const MenuManagement = ({ clientId, token, realm }) => {
       }
 
       const categoryIdFromNewItem = newItem?.category_id || null;
-      const categoryIdFromSelected = (typeof selectedCategory === 'object' && selectedCategory?.id)
-        ? selectedCategory.id
-        : getCategoryIdByName(selectedCategory);
+      const categoryIdFromSelected = selectedCategoryId;
+
 
       const resolvedCategoryId = categoryIdFromNewItem || categoryIdFromSelected || null;
       const finalCategoryId = resolvedCategoryId;
@@ -278,7 +319,7 @@ const MenuManagement = ({ clientId, token, realm }) => {
         serving_unit: newItem.serving_unit || null,
         created_by,
         updated_by: created_by,
-        inventory_id: newItem.inventory_id 
+        inventory_id: newItem.inventory_id
       };
 
       console.log("Payload before sending:", payload);
@@ -340,11 +381,8 @@ const MenuManagement = ({ clientId, token, realm }) => {
         imageId = await uploadImageToDocumentService(editItemImage);
       }
 
-      const categoryId =
-        editingItem.category_id ||
-        (typeof selectedCategory === 'object'
-          ? selectedCategory.id
-          : getCategoryIdByName(selectedCategory));
+      const categoryId = editingItem.category_id || selectedCategoryId || null;
+
 
       const finalCategoryId = categoryId || null;
       const slug = generateSlug(finalCategoryId, editingItem.name);
@@ -389,8 +427,24 @@ const MenuManagement = ({ clientId, token, realm }) => {
       alert('Failed to update item: ' + (error.response?.data?.detail || error.message));
     }
   };
+  useEffect(() => {
+    const handleClickOutside = (event) => {
+      if (quickCatRef.current && !quickCatRef.current.contains(event.target)) {
+        setQuickCatOpen(false);
+      }
+    };
+
+    document.addEventListener("mousedown", handleClickOutside);
+    return () => document.removeEventListener("mousedown", handleClickOutside);
+  }, []);
+  const getQuickCategoryName = () => {
+    if (!selectedCategoryId) return "All Categories";
+    const found = dieterySubCategories.find(c => c.id === selectedCategoryId);
+    return found?.name || "All Categories";
+  };
 
   const fetchData = useCallback(async (options = { silent: false }) => {
+
     const { silent = false } = options;
 
     if (!clientId || !token) {
@@ -486,13 +540,61 @@ const MenuManagement = ({ clientId, token, realm }) => {
 
       setCategories(categoryTree);
 
+      // const dieteryNode = categoryTree.find(
+      //   c => c.id === 'dietery' || c.name.toLowerCase() === 'dietery'
+      // );
+
+      // const dieteryChildren = dieteryNode?.children || [];
+      // setDieterySubCategories(dieteryChildren);
+      // setSidebarCategories(categoryTree); // default
+
+
+      // 1️⃣ Find configured root
+      // const rootNode = findCategoryNode(categoryTree, MENU_ROOT);
+
+      // // 2️⃣ Extract categories at configured level
+      // let quickCategories = [];
+
+      // if (rootNode) {
+      //   quickCategories = getCategoriesAtLevel(rootNode, MENU_LEVEL);
+      // }
+
+
+      const rootNode = findCategoryNode(categoryTree, menuConfig.root);
+
+      let quickCategories = [];
+
+      if (rootNode) {
+
+        let level = menuConfig.level;
+
+        // fallback search: go upwards until categories exist
+        while (level >= 0) {
+          quickCategories = getCategoriesAtLevel(rootNode, level);
+
+          if (quickCategories.length > 0) {
+            console.log("Using hierarchy level:", level);
+            break;
+          }
+
+          level--;
+        }
+      }
+
+
+      // 3️⃣ Set them
+      setDieterySubCategories(quickCategories);
+
+      // Sidebar should still show full tree
+      setSidebarCategories(categoryTree);
+
     } catch (error) {
-      console.error('Error fetching data:', error); 
+      console.error('Error fetching data:', error);
       console.error('Error details:', error.response?.data);
     } finally {
       if (!silent) setLoading(false);
     }
-  }, [clientId, token, realm]);
+  }, [clientId, token, realm, menuConfig]);
 
   useEffect(() => {
     fetchData();
@@ -555,11 +657,19 @@ const MenuManagement = ({ clientId, token, realm }) => {
       console.log('After search filter:', items.length);
     }
 
-    const selectedCategoryId = getSelectedCategoryId();
-
     if (!selectedCategoryId) {
       return items;
     }
+
+    const allowedCategoryIds = getAllDescendantCategoryIds(
+      selectedCategoryId,
+      categories
+    );
+
+    items = items.filter(item =>
+      allowedCategoryIds.includes(item.category_id)
+    );
+
 
     if (categories.length > 0 && categoriesFlat.length > 0) {
       const allowedCategoryIds = getAllDescendantCategoryIds(
@@ -662,7 +772,7 @@ const MenuManagement = ({ clientId, token, realm }) => {
       );
 
       // ✅ Find all items that have this addon linked
-      const itemsToUpdate = menuItems.filter(item => 
+      const itemsToUpdate = menuItems.filter(item =>
         Array.isArray(item.line_item_id) && item.line_item_id.includes(deletedItemId)
       );
 
@@ -671,7 +781,7 @@ const MenuManagement = ({ clientId, token, realm }) => {
         await Promise.all(
           itemsToUpdate.map(item => {
             const updatedLineItemIds = item.line_item_id.filter(id => id !== deletedItemId);
-            
+
             return axios.post(
               `${import.meta.env.VITE_API_INVENTORY_SERVICE_URL}/${clientId}/menu/update`,
               {
@@ -721,8 +831,8 @@ const MenuManagement = ({ clientId, token, realm }) => {
       );
 
       // ✅ Find all items that have any of the deleted items linked as addons
-      const itemsToUpdate = menuItems.filter(item => 
-        Array.isArray(item.line_item_id) && 
+      const itemsToUpdate = menuItems.filter(item =>
+        Array.isArray(item.line_item_id) &&
         item.line_item_id.some(addonId => selectedRows.includes(addonId))
       );
 
@@ -731,7 +841,7 @@ const MenuManagement = ({ clientId, token, realm }) => {
         await Promise.all(
           itemsToUpdate.map(item => {
             const updatedLineItemIds = item.line_item_id.filter(id => !selectedRows.includes(id));
-            
+
             return axios.post(
               `${import.meta.env.VITE_API_INVENTORY_SERVICE_URL}/${clientId}/menu/update`,
               {
@@ -1050,7 +1160,69 @@ const MenuManagement = ({ clientId, token, realm }) => {
     window.addEventListener('keydown', onKey);
     return () => window.removeEventListener('keydown', onKey);
   }, []);
+  const getSelectedCategoryNameById = () => {
+    if (!selectedCategoryId) return 'All Categories';
+    const found = categoriesFlat.find(c => c.id === selectedCategoryId);
+    return found?.name || 'All Categories';
+  };
+  // const quickDieteryCategories = dieterySubCategories.slice(0, 2);
+  const quickDieteryCategories = dieterySubCategories;
+  const getCategoryWithParent = (catId) => {
+    const cat = categoriesFlat.find(c => c.id === catId);
+    if (!cat) return { name: "", parent: "" };
 
+    const parent = categoriesFlat.find(p => p.id === cat.parentId);
+
+    return {
+      name: cat.name,
+      parent: parent?.name || null
+    };
+  };
+
+  const getTopSectionName = (categoryId) => {
+    if (!categoryId) return null;
+
+    const rootNode = categoriesFlat.find(
+      c => c.name.toLowerCase() === menuConfig.root.toLowerCase()
+        || c.id.toLowerCase() === menuConfig.root.toLowerCase()
+    );
+
+    if (!rootNode) return null;
+
+    let current = categoriesFlat.find(c => c.id === categoryId);
+
+    // climb up until direct child of root
+    while (current && current.parentId) {
+
+      if (current.parentId === rootNode.id) {
+        return current.name; // FOUND the 1st subcategory under dietery
+      }
+
+      current = categoriesFlat.find(c => c.id === current.parentId);
+    }
+
+    return null;
+  };
+
+
+  const findNodeAndChildren = (nodes, id) => {
+    for (const node of nodes) {
+      if (node.id === id) return node;
+  
+      if (node.children?.length) {
+        const found = findNodeAndChildren(node.children, id);
+        if (found) return found;
+      }
+    }
+    return null;
+  };
+  
+  useEffect(() => {
+    if (!selectedCategoryId) {
+      setSidebarCategories(categories);
+    }
+  }, [selectedCategoryId, categories]);
+  
   return (
     <div className="h-[90vh] bg-bg-primary overflow-x-hidden">
       <div className="mx-auto p-2">
@@ -1059,87 +1231,247 @@ const MenuManagement = ({ clientId, token, realm }) => {
           <div className="lg:col-span-1">
             <div className="lg:sticky lg:top-2">
               <MenuCategoryTree
-                categories={categories}
-                selectedCategory={selectedCategory}
-                onSelectCategory={setSelectedCategory}
-                defaultOpenCategoryName="Dietery"
+                categories={sidebarCategories}
+                selectedCategoryId={selectedCategoryId}
+                onSelectCategory={setSelectedCategoryId}
                 clientId={clientId}
                 token={token}
-                onCategoriesUpdate={() => {
-                  fetchData();
-                }}
               />
+
             </div>
           </div>
 
           {/* Main Content */}
           <div className="lg:col-span-3 border-default border-border-default p-3 rounded-lg h-[88.5vh] flex flex-col">
-            <div className="mb-4 grid gap-3 grid-cols-1 md:grid-cols-2 lg:grid-cols-3 flex-shrink-0">
-              <div className="lg:col-span-1 space-y-2">
-                <h2 className="text-xl lg:text-2xl font-semibold text-text-primary">
-                  {getSelectedCategoryName() || 'All Categories'}
-                  <span className="text-sm ml-2 text-text-primary">
-                    ({filteredItems.length} items)
+            <div className="flex gap-2 overflow-x-auto scrollbar-hide lg:overflow-visible pb-2">
+              {quickDieteryCategories.map(cat => (
+                <button key={cat.id} onClick={() => {
+                  setSelectedCategoryId(cat.id);
+                
+                  const selectedNode = findNodeAndChildren(categories, cat.id);
+                
+                  if (selectedNode) {
+                    setSidebarCategories([selectedNode]);
+                  }
+                }}
+                
+                  className={`px-3 py-1.5 rounded-lg text-sm font-semibold border whitespace-nowrap transition-all flex-shrink-0`}>
+                  {/* {(() => {
+                    const info = getCategoryWithParent(cat.id);
+                    return (
+                      <div className="flex flex-col leading-tight text-left">
+                        {info.parent && (
+                          <span className="text-[10px] opacity-60">
+                            {info.parent}
+                          </span>
+                        )}
+                        <span className="text-sm font-semibold">
+                          {info.name}
+                        </span>
+                      </div>
+                    );
+                  })()} */}
+                  {(() => {
+                    const section = getTopSectionName(cat.id);
+
+                    return (
+                      <div className="flex flex-col leading-tight text-left">
+                        {section && (
+                          <span className="text-[10px] opacity-60">
+                            {section}
+                          </span>
+                        )}
+                        <span className="text-sm font-semibold">
+                          {cat.name}
+                        </span>
+                      </div>
+                    );
+                  })()}
+
+                </button>
+              ))}
+            </div>
+            <div className="flex flex-col gap-3 lg:flex-row lg:items-center lg:justify-between mb-4">
+
+              {/* LEFT: Title */}
+              <div className="flex-shrink-0">
+                <h2 className="text-lg lg:text-2xl font-semibold text-text-primary leading-tight">
+                  {getSelectedCategoryNameById() || 'All Categories'}
+                  <span className="text-sm ml-2 text-text-secondary">
+                    ({filteredItems.length})
                   </span>
                 </h2>
               </div>
 
-              {/* Search Field */}
-              <div className="lg:col-span-1">
-                <div className="relative w-full group">
-                  <Search size={16} className="absolute left-3 top-1/2 -translate-y-1/2 text-text-secondary transition-colors
-                                             group-focus-within:text-action-primary"/>
+              {/* CENTER: Quick Dietery Categories */}
+              {/* <div className="flex gap-2 overflow-x-auto scrollbar-hide lg:overflow-visible">
+                {quickDieteryCategories.map(cat => (
+                  <button
+                    key={cat.id}
+                    onClick={() => {
+                      setSelectedCategoryId(cat.id);
+                      // setSidebarCategories(cat.children || []);
+                    }}
+                    className={`
+          px-3 py-1.5 rounded-full text-sm font-semibold border whitespace-nowrap
+          transition-all
+          ${selectedCategoryId === cat.id
+                        ? 'bg-action-primary text-white border-action-primary'
+                        : 'bg-bg-tertiary text-text-primary hover:border-action-primary'}
+        `}
+                  >
+                    {cat.name}
+                  </button>
+                ))}
+              </div> */}
+              {/* <div className="relative" ref={quickCatRef}>
 
-                  <input ref={searchInputRef} type="text" value={searchQuery} onChange={(e) => setSearchQuery(e.target.value)}
-                    placeholder="Search items, category or code…"
-                    className="w-full h-9 pl-10 pr-3 rounded-lg bg-bg-tertiary border border-border-default
-                                  text-sm text-text-primary placeholder:text-text-secondary transition-all duration-200
-                                  focus:outline-none focus:ring-2 focus:ring-action-primary/30 focus:border-action-primary
-                                hover:border-action-primary/50"/>
+<button
+  onClick={() => setQuickCatOpen(prev => !prev)}
+  className="h-9 px-4 rounded-lg border border-border-default bg-bg-tertiary
+             text-sm font-semibold flex items-center gap-2 hover:border-action-primary"
+>
+  <span>{getQuickCategoryName()}</span>
+  <span className={`transition-transform ${quickCatOpen ? "rotate-180" : ""}`}>
+  <ArrowDown size={14} color="#ff0000" strokeWidth={2} />
+  </span>
+</button>
+
+{quickCatOpen && (
+  <div className="absolute z-50 mt-1 w-64 max-h-72 overflow-y-auto
+                  bg-bg-primary border border-border-default rounded-lg shadow-lg">
+
+    <button
+      onClick={() => {
+        setSelectedCategoryId(null);
+        setQuickCatOpen(false);
+      }}
+      className="w-full text-left px-4 py-2 text-sm hover:bg-bg-secondary border-b"
+    >
+      All Categories
+    </button>
+
+    {dieterySubCategories.map(cat => (
+      <button
+        key={cat.id}
+        onClick={() => {
+          setSelectedCategoryId(cat.id);
+          setQuickCatOpen(false);
+        }}
+        className={`w-full text-left px-4 py-2 text-sm hover:bg-bg-secondary
+          ${selectedCategoryId === cat.id ? "bg-action-primary/10 font-semibold" : ""}
+        `}
+      >
+        {cat.name}
+      </button>
+    ))}
+  </div>
+)}
+
+</div> */}
+
+              {/* RIGHT: Search + Actions */}
+              <div className="flex flex-col gap-2 sm:flex-row sm:items-center sm:justify-end lg:flex-nowrap lg:gap-2">
+
+                {/* Search */}
+                <div className="relative w-full sm:w-56">
+                  <Search
+                    size={16}
+                    className="absolute left-3 top-1/2 -translate-y-1/2 text-text-secondary"
+                  />
+                  <input
+                    ref={searchInputRef}
+                    type="text"
+                    value={searchQuery}
+                    onChange={(e) => setSearchQuery(e.target.value)}
+                    placeholder="Search items…"
+                    className="
+          w-full h-9 pl-10 pr-3 rounded-lg
+          bg-bg-tertiary border border-border-default
+          text-sm text-text-primary placeholder:text-text-secondary
+          focus:outline-none focus:ring-2 focus:ring-action-primary/30
+        "
+                  />
                 </div>
-              </div>
 
-              {/* Buttons Container */}
-              <div className="flex flex-wrap items-center justify-end gap-2 md:justify-start lg:justify-end">
-                <button onClick={() => setShowAddModal(true)}
-                  className="h-9 px-3 flex items-center gap-2 rounded-lg bg-action-primary text-white text-sm 
-                                   font-semibold shadow-sm hover:opacity-90">
-                  <Plus size={14} />
-                  <span>Add Item</span>
-                </button>
-
-                <button onClick={() => setShowBulkModal(true)}
-                  className="h-9 px-3 flex items-center gap-2 rounded-lg bg-bg-tertiary border border-border-default
-                                   text-sm font-semibold hover:border-action-primary hover:bg-bg-secondary">
-                  <Edit size={14} />
-                  <span className="hidden sm:inline">Bulk Update</span>
-                </button>
-
-                <div className="relative group">
-                  <button className="h-9 px-3 flex items-center gap-2 rounded-lg bg-bg-tertiary border border-border-default 
-                                      text-sm font-semibold hover:border-action-primary hover:bg-bg-secondary">
-                    <CloudUpload size={14} />
+                {/* Actions */}
+                <div className="flex gap-2 flex-wrap justify-end">
+                  <button
+                    onClick={() => setShowAddModal(true)}
+                    className="
+          h-9 px-3 flex items-center gap-2
+          rounded-lg bg-action-primary text-white
+          text-sm font-semibold shadow-sm
+          hover:opacity-90
+        "
+                  >
+                    <Plus size={14} />
+                    <span>Add Item</span>
                   </button>
 
-                  <div className="absolute right-0 mt-1 w-36 bg-bg-primary border border-border-default rounded-lg shadow-lg
-                                   opacity-0 invisible group-hover:opacity-100 group-hover:visible transition-all duration-200 z-50">
-                    <button onClick={() => document.getElementById('excelInput').click()}
-                      className="w-full px-4 py-2 flex items-center gap-2 text-sm hover:bg-bg-secondary">
-                      <Upload size={14} />
-                      Import
+                  <button
+                    onClick={() => setShowBulkModal(true)}
+                    className="
+          h-9 px-3 flex items-center gap-2
+          rounded-lg bg-bg-tertiary border border-border-default
+          text-sm font-semibold
+          hover:border-action-primary hover:bg-bg-secondary
+        "
+                  >
+                    <Edit size={14} />
+                    <span className="hidden sm:inline">Bulk Update</span>
+                  </button>
+
+                  {/* Import / Export */}
+                  <div className="relative group">
+                    <button
+                      className="
+            h-9 px-3 flex items-center gap-2
+            rounded-lg bg-bg-tertiary border border-border-default
+            text-sm font-semibold
+            hover:border-action-primary hover:bg-bg-secondary
+          "
+                    >
+                      <CloudUpload size={14} />
                     </button>
 
-                    <button onClick={handleExportToExcel}
-                      className="w-full px-4 py-2 flex items-center gap-2 text-sm hover:bg-bg-secondary">
-                      <Download size={14} />
-                      Export
-                    </button>
+                    <div
+                      className="
+            absolute right-0 mt-1 w-36
+            bg-bg-primary border border-border-default rounded-lg shadow-lg
+            opacity-0 invisible group-hover:opacity-100 group-hover:visible
+            transition-all duration-200 z-50
+          "
+                    >
+                      <button
+                        onClick={() => document.getElementById('excelInput').click()}
+                        className="w-full px-4 py-2 flex items-center gap-2 text-sm hover:bg-bg-secondary"
+                      >
+                        <Upload size={14} />
+                        Import
+                      </button>
+
+                      <button
+                        onClick={handleExportToExcel}
+                        className="w-full px-4 py-2 flex items-center gap-2 text-sm hover:bg-bg-secondary"
+                      >
+                        <Download size={14} />
+                        Export
+                      </button>
+                    </div>
                   </div>
-                </div>
 
-                <input type="file" id="excelInput" accept=".xlsx, .xls" className="hidden" onChange={handleImportFromExcel} />
+                  <input
+                    type="file"
+                    id="excelInput"
+                    accept=".xlsx, .xls"
+                    className="hidden"
+                    onChange={handleImportFromExcel}
+                  />
+                </div>
               </div>
             </div>
+
 
             {/* Items Grid */}
             <div className="flex-1 overflow-y-auto">
@@ -1257,8 +1589,7 @@ const MenuManagement = ({ clientId, token, realm }) => {
         modalType="menu"
         newItem={newItem}
         setNewItem={setNewItem}
-        selectedCategory={selectedCategory}
-        setSelectedCategory={setSelectedCategory}
+        selectedCategoryId={selectedCategoryId}
         categories={categories}
         menuItems={addonItems}
         newItemImage={newItemImage}
@@ -1308,3 +1639,11 @@ const MenuManagement = ({ clientId, token, realm }) => {
 };
 
 export default MenuManagement;
+
+
+// ==================================================================== // ============================================ //
+// ==================================================================== // ============================================ //
+// ==================================================================== // ============================================ //
+// ==================================================================== // ============================================ //
+// ==================================================================== // ============================================ //
+// ==================================================================== // ============================================ //

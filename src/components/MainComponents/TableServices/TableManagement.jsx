@@ -7,6 +7,7 @@ import UniversalEditModal from "../../utils/Modals/UniversalEditModal";
 import UniversalBulkUpdateModal from "../../utils/Modals/UniversalBulkUpdateModal";
 import UniversalBulkDeleteModal from "../../utils/Modals/UniversalBulkDeleteModal";
 import AccessGuard from "../../utils/Interceptors/ProtectedRoute";
+import TableConfigModal from "../../utils/Modals/TableConfigModal";
 
 const statusConfig = {
     Vacant: { card: "border-tableStatusBorder-vacant", icon: <FaCheck className="text-action-success text-xl" />, label: "Available" },
@@ -52,34 +53,37 @@ const TableManagement = ({ clientId, token, screenIds, userId }) => {
     const [showFirstDeleteConfirm, setShowFirstDeleteConfirm] = useState(false);
     const [showSecondDeleteConfirm, setShowSecondDeleteConfirm] = useState(false);
 
-    const [viewMode, setViewMode] = useState(false);
-    const [addItemsMode, setAddItemsMode] = useState(false);
+    const [zones, setZones] = useState([]);
+    const [sections, setSections] = useState([]);
+    const [showConfig, setShowConfig] = useState(false);
+
+
     const getColumnsByScreen = () => {
         const width = window.innerWidth;
-      
+
         if (width >= 1536) return 8; // 2xl
         if (width >= 1280) return 6; // xl
         if (width >= 1024) return 6; // lg
         if (width >= 640) return 4;  // sm
         return 2;                    // mobile
-      };
+    };
     useEffect(() => {
         if (clientId) fetchTables();
     }, [clientId]);
     const [colsPerRow, setColsPerRow] = useState(getColumnsByScreen());
 
     useEffect(() => {
-      const onResize = () => {
-        setColsPerRow(getColumnsByScreen());
-      };
-    
-      window.addEventListener("resize", onResize);
-      return () => window.removeEventListener("resize", onResize);
+        const onResize = () => {
+            setColsPerRow(getColumnsByScreen());
+        };
+
+        window.addEventListener("resize", onResize);
+        return () => window.removeEventListener("resize", onResize);
     }, []);
-    
-  
-      
-      const getSortedTables = (tablesToSort, COLS_PER_ROW) => {
+
+
+
+    const getSortedTables = (tablesToSort, COLS_PER_ROW) => {
 
 
         const occupied = tablesToSort
@@ -172,7 +176,7 @@ const TableManagement = ({ clientId, token, screenIds, userId }) => {
                     .sort((a, b) =>
                         a.name.localeCompare(b.name, undefined, { numeric: true })
                     );
-                
+
 
                 setTables(filteredTables);
                 setOriginalTables(filteredTables);
@@ -242,6 +246,34 @@ const TableManagement = ({ clientId, token, screenIds, userId }) => {
 
         return null;
     };
+
+    const fetchMasterValues = async (categoryId, setter) => {
+        try {
+            const res = await axios.get(
+                `${import.meta.env.VITE_API_INVENTORY_SERVICE_URL}/${clientId}/inventory/masters`,
+                {
+                    params: { category_id: categoryId },
+                    headers: { Authorization: `Bearer ${token}` }
+                }
+            );
+
+            setter(res.data.data || []);
+
+        } catch (err) {
+            console.error(`Error fetching ${categoryId}:`, err);
+            setter([]);
+        }
+    };
+
+
+
+    useEffect(() => {
+        if (!clientId || !token) return;
+
+        fetchMasterValues("zone", setZones);
+        fetchMasterValues("section", setSections);
+
+    }, [clientId, token]);
 
 
 
@@ -697,18 +729,27 @@ const TableManagement = ({ clientId, token, screenIds, userId }) => {
                                 </select>
                             </div>
 
-                            <div className="flex flex-wrap gap-2">
+                            <div className="flex flex-wrap gap-2 justify-center">
+                                <button
+                                    className="flex items-center gap-2 px-4 py-2 bg-action-success text-text-white rounded-lg transition-colors font-semibold text-sm shadow-md"
+                                    onClick={() => setShowConfig(true)}
+                                >
+                                    <FaEdit />   <span className="hidden md:inline">Config</span>
+                                </button>
+
                                 <button
                                     className="flex items-center gap-2 px-4 py-2 bg-action-primary text-text-white rounded-lg hover:bg-bulkActionsHover-updateHover hover:text-text-primary transition-colors font-semibold text-sm shadow-md"
                                     onClick={openBulkUpdate}
                                 >
-                                    <FaEdit /> <span>Bulk Update</span>
+                                    <FaEdit />
+                                    <span className="hidden md:inline">Bulk Update</span>
                                 </button>
+
                                 <button
                                     className="flex items-center gap-2 px-4 py-2 bg-bulkActions-delete text-text-white rounded-lg hover:bg-bulkActionsHover-deleteHover hover:text-text-primary transition-colors font-semibold text-sm shadow-md"
                                     onClick={openBulkDelete}
                                 >
-                                    <FaTrash /> <span>Bulk Delete</span>
+                                    <FaTrash /> <span className="hidden md:inline">Bulk Delete</span>
                                 </button>
                                 <button
                                     className="flex items-center gap-2 px-4 py-2 bg-bulkActions-adding text-text-white rounded-lg hover:bg-bulkActionsHover-addingHover hover:text-text-primary transition-colors font-semibold text-sm shadow-md"
@@ -730,7 +771,7 @@ const TableManagement = ({ clientId, token, screenIds, userId }) => {
                                         setFieldErrors([{}]);
                                     }}
                                 >
-                                    <FaPlus /> <span>Add Table</span>
+                                    <FaPlus /> <span className="hidden md:inline">Add Table</span>
                                 </button>
                             </div>
                         </div>
@@ -813,7 +854,10 @@ const TableManagement = ({ clientId, token, screenIds, userId }) => {
                         showModal={showAddTable}
                         setShowModal={setShowAddTable}
                         modalType="table"
-
+                        zones={zones}
+                        sections={sections}
+                        clientId={clientId}
+                        token={token}
                         // Table-specific props
                         tableRanges={tableRanges}
                         setTableRanges={setTableRanges}
@@ -826,7 +870,10 @@ const TableManagement = ({ clientId, token, screenIds, userId }) => {
                         showModal={editRowId !== null}
                         setShowModal={(show) => !show && setEditRowId(null)}
                         modalType="table"
-
+                        zones={zones}
+                        sections={sections}
+                        clientId={clientId}
+                        token={token}
                         // Table-specific props
                         editRowId={editRowId}
                         setEditRowId={setEditRowId}
@@ -840,7 +887,10 @@ const TableManagement = ({ clientId, token, screenIds, userId }) => {
                         showModal={showBulkUpdate}
                         setShowModal={setShowBulkUpdate}
                         modalType="table"
-
+                        zones={zones}
+                        sections={sections}
+                        clientId={clientId}
+                        token={token}
                         // Table-specific props
                         tables={tables}
                         bulkUpdateSearch={bulkUpdateSearch}
@@ -871,6 +921,16 @@ const TableManagement = ({ clientId, token, screenIds, userId }) => {
                         setShowSecondDeleteConfirm={setShowSecondDeleteConfirm}
                         confirmBulkDelete={confirmBulkDelete}
                         getFilteredDeleteTables={getFilteredDeleteTables}
+                    />
+                    <TableConfigModal
+                        show={showConfig}
+                        onClose={() => setShowConfig(false)}
+                        clientId={clientId}
+                        token={token}
+                        refresh={() => {
+                            fetchMasterValues("zone", setZones);
+                            fetchMasterValues("section", setSections);
+                        }}
                     />
 
                     {/* First Delete Confirmation */}
