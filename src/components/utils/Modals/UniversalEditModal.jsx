@@ -1,7 +1,8 @@
-import React, { useState } from 'react';
+import React, { useState,useEffect } from 'react';
 import { X, Upload } from 'lucide-react';
 import DropdownCheckbox from './DropdownCheckbox';
 import MenuImagePreview from '../../MainComponents/InventoryServices/Tree&CategoryManage/MenuImagePreview';
+import axios from "axios";
 
 const UniversalEditModal = ({
   // Common props
@@ -32,6 +33,9 @@ const UniversalEditModal = ({
   editFieldErrors
 }) => {
   const [dragActive, setDragActive] = useState(false);
+  const [zoneOptions, setZoneOptions] = useState([]);
+  const [sectionOptions, setSectionOptions] = useState([]);
+  const [loadingMasters, setLoadingMasters] = useState(false);
 
   // Menu Modal Functions
   const handleEditDrag = (e) => {
@@ -53,6 +57,40 @@ const UniversalEditModal = ({
       handleEditImageFile(e.dataTransfer.files[0]);
     }
   };
+  const fetchMasterValues = async (categoryId, setter) => {
+    try {
+      const res = await axios.get(
+        `${import.meta.env.VITE_API_INVENTORY_SERVICE_URL}/${clientId}/inventory/masters`,
+        {
+          params: { category_id: categoryId },
+          headers: { Authorization: `Bearer ${token}` }
+        }
+      );
+
+      setter(res?.data?.data || []);
+
+    } catch (err) {
+      console.error("Master fetch error:", categoryId, err);
+      setter([]);
+    }
+  };
+  useEffect(() => {
+    if (!showModal || modalType !== "table") return;
+    if (!clientId || !token) return;
+
+    const loadMasters = async () => {
+      setLoadingMasters(true);
+
+      await Promise.all([
+        fetchMasterValues("zone", setZoneOptions),
+        fetchMasterValues("section", setSectionOptions)
+      ]);
+
+      setLoadingMasters(false);
+    };
+
+    loadMasters();
+  }, [showModal, modalType, clientId, token]);
 
   const handleEditImageFile = (file) => {
     if (file && file.type.startsWith('image/')) {
@@ -99,7 +137,7 @@ const UniversalEditModal = ({
           <div className="px-6 py-4 border-b border-gray-200 flex justify-between items-center">
             <h2 className="text-xl font-semibold text-gray-900">Edit Menu Item</h2>
             <button
-              onClick={handleClose} 
+              onClick={handleClose}
               className="p-1.5 rounded-lg bg-action-primary text-text-white hover:opacity-90 transition-opacity">
               <X className="w-5 h-5" />
             </button>
@@ -446,10 +484,19 @@ const UniversalEditModal = ({
                   }
                   className="w-full px-3 py-2 rounded-md border border-gray-300 focus:ring-2 focus:ring-blue-500"
                 >
-                  <option value="">Select</option>
-                  <option value="AC">AC</option>
-                  <option value="Non-AC">Non-AC</option>
+                  <option value="">Select Section</option>
+
+                  {loadingMasters ? (
+                    <option disabled>Loading...</option>
+                  ) : sectionOptions.length === 0 ? (
+                    <option disabled>No Sections Configured</option>
+                  ) : (
+                    sectionOptions.map((sec, i) => (
+                      <option key={i} value={sec}>{sec}</option>
+                    ))
+                  )}
                 </select>
+
               </div>
 
               {/* Zone */}
@@ -464,12 +511,19 @@ const UniversalEditModal = ({
                   }
                   className="w-full px-3 py-2 rounded-md border border-gray-300 focus:ring-2 focus:ring-blue-500"
                 >
-                  <option value="">Select</option>
-                  <option value="Garden Area">Garden Area</option>
-                  <option value="Ground Floor">Ground Floor</option>
-                  <option value="First Floor">First Floor</option>
-                  <option value="Second Floor">Second Floor</option>
+                  <option value="">Select Zone</option>
+
+                  {loadingMasters ? (
+                    <option disabled>Loading...</option>
+                  ) : zoneOptions.length === 0 ? (
+                    <option disabled>No Zones Configured</option>
+                  ) : (
+                    zoneOptions.map((zone, i) => (
+                      <option key={i} value={zone}>{zone}</option>
+                    ))
+                  )}
                 </select>
+
               </div>
 
               {/* Status */}
