@@ -708,3 +708,11 @@ VALUES (
 ALTER TABLE inventory
 ALTER COLUMN inventory_id TYPE TEXT
 USING inventory_id::TEXT;
+
+UPDATE category
+SET sub_categories = array_cat(sub_categories, ARRAY['masters'])
+WHERE id = 'inventory' AND client_id = 'saas';
+
+INSERT INTO category (id, client_id, name, description, sub_categories, slug, created_by, updated_by, created_at, updated_at) VALUES ('zone', 'easyfood', 'Zones', 'Zone Selection', '{Ground,First,Second,third}', '_Zones', '1000', '1000', '2025-08-19 12:47:01.377214', '2025-08-19 12:47:01.377214');
+INSERT INTO category (id, client_id, name, description, sub_categories, slug, created_by, updated_by, created_at, updated_at) VALUES ('section', 'easyfood', 'Section', 'Section Selection', '{AC,Non-AC}', '_Section', '1000', '1000', '2025-08-19 12:47:01.377214', '2025-08-19 12:47:01.377214');
+INSERT INTO category (id, client_id, name, description, sub_categories, slug, created_by, updated_by, created_at, updated_at) VALUES ('status', 'easyfood', 'Status', 'Status Selection', '{Vacant,Occupied,Reserved}', '_Status', '1000', '1000', '2025-08-19 12:47:01.377214', '2025-08-19 12:47:01.377214');
