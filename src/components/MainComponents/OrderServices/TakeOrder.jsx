@@ -2383,16 +2383,38 @@ const TableReservation = ({
 
   const calculateElapsedTime = (createdAt) => {
     if (!createdAt) return null;
-
-    const now = currentTime;
-    const created = new Date(createdAt).getTime();
-    const diffMs = now - created;
-    const diffMins = Math.floor(diffMs / 60000);
-    const diffSecs = Math.floor((diffMs % 60000) / 1000);
-
-    return `${diffMins}:${diffSecs.toString().padStart(2, '0')}`;
+  
+    let created;
+  
+    if (typeof createdAt === "string") {
+      // Convert to proper ISO UTC format
+      const utcString =
+        createdAt.replace(" ", "T").split(".")[0] + "Z";
+  
+      created = new Date(utcString).getTime();
+    } else {
+      created = new Date(createdAt).getTime();
+    }
+  
+    const diffMs = Date.now() - created;
+  
+    if (diffMs < 0) return "Just now";
+  
+    const seconds = Math.floor(diffMs / 1000);
+    const minutes = Math.floor(seconds / 60);
+    const hours = Math.floor(minutes / 60);
+    const days = Math.floor(hours / 24);
+  
+    if (seconds < 60) return "Just now";
+    if (minutes === 1) return "1 min ago";
+    if (minutes < 60) return `${minutes} mins ago`;
+    if (hours === 1) return "1 hr ago";
+    if (hours < 24) return `${hours} hrs ago`;
+    if (days === 1) return "1 day ago";
+  
+    return `${days} days ago`;
   };
-
+  
   return (
     <div className="p-4 bg-bg-primary overflow-y-auto h-[calc(100vh-4rem)]">
       {/* FILTER BAR */}
@@ -2809,7 +2831,7 @@ const TakeOrder = ({ clientId, token, onOrderUpdate, realm }) => {
   const [tableOrders, setTableOrders] = useState({});
   const [showDeleteConfirm, setShowDeleteConfirm] = useState(false);
   const [orderToDelete, setOrderToDelete] = useState(null);
-  
+
   // ✅ NEW: Invoice modal state
   const [invoiceModalOpen, setInvoiceModalOpen] = useState(false);
   const [invoiceOrderData, setInvoiceOrderData] = useState(null);

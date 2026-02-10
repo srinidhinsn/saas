@@ -618,16 +618,39 @@ const KitchenDisplay = () => {
 
     // Calculate elapsed time since item was created
     const calculateElapsedTime = (createdAt) => {
-        if (!createdAt) return "0:00";
+        if (!createdAt) return null;
 
-        const now = new Date();
-        const created = new Date(createdAt);
-        const diffMs = now - created;
-        const diffMins = Math.floor(diffMs / 60000);
-        const diffSecs = Math.floor((diffMs % 60000) / 1000);
+        let created;
 
-        return `${diffMins}:${diffSecs.toString().padStart(2, '0')}`;
+        if (typeof createdAt === "string") {
+            // Convert to proper ISO UTC format
+            const utcString =
+                createdAt.replace(" ", "T").split(".")[0] + "Z";
+
+            created = new Date(utcString).getTime();
+        } else {
+            created = new Date(createdAt).getTime();
+        }
+
+        const diffMs = Date.now() - created;
+
+        if (diffMs < 0) return "Just now";
+
+        const seconds = Math.floor(diffMs / 1000);
+        const minutes = Math.floor(seconds / 60);
+        const hours = Math.floor(minutes / 60);
+        const days = Math.floor(hours / 24);
+
+        if (seconds < 60) return "Just now";
+        if (minutes === 1) return "1 min ago";
+        if (minutes < 60) return `${minutes} mins ago`;
+        if (hours === 1) return "1 hr ago";
+        if (hours < 24) return `${hours} hrs ago`;
+        if (days === 1) return "1 day ago";
+
+        return `${days} days ago`;
     };
+
     // Update timer every second
     useEffect(() => {
         const timerInterval = setInterval(() => {
@@ -774,6 +797,9 @@ const KitchenDisplay = () => {
         keysToRemove.forEach(key => localStorage.removeItem(key));
     };
 
+
+
+
     return (
 
         <>
@@ -834,6 +860,7 @@ const KitchenDisplay = () => {
                                 {filteredOrders.map((order) => {
                                     const isEditing = editOrderId === order.id;
                                     const isAdding = addingOrderId === order.id;
+                                    const elapsedTime = order?.created_at ? calculateElapsedTime(order.created_at) : null;
                                     return (
                                         <div
                                             key={order.id}
@@ -851,6 +878,11 @@ const KitchenDisplay = () => {
                                                     <span className="text-sm md:text-base font-semibold">
                                                         {tablesMap[order.table_id] || order.table_number || order.customer_name || "N/A"}
                                                     </span>
+
+                                                    <div className="flex items-center justify-center gap-2 text-xl font-semibold text-text-white">
+                                                        <Clock size={16} className="text-text-white" />
+                                                        <span>{elapsedTime}</span>
+                                                    </div>
 
                                                     <span className="text-xl font-semibold text-orange-100/80">
                                                         #{order.id}
