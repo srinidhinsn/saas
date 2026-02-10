@@ -581,7 +581,8 @@ const UniversalAddModal = ({
   showModal,
   setShowModal,
   modalType, // 'menu' or 'table'
-
+  clientId,
+  token,
   // Menu-specific props
   newItem,
   setNewItem,
@@ -597,7 +598,8 @@ const UniversalAddModal = ({
   handleAddItem,
   getCategoryIdByName,
   inventoryIds,
-
+  zones = [],
+  sections = [],
   // Table-specific props
   tableRanges,
   setTableRanges,
@@ -608,6 +610,9 @@ const UniversalAddModal = ({
 }) => {
   const [dragActive, setDragActive] = useState(false);
   const [showAddonPopup, setShowAddonPopup] = useState(false); // ✅ NEW: Popup state
+  const [zoneOptions, setZoneOptions] = useState([]);
+  const [sectionOptions, setSectionOptions] = useState([]);
+  const [loadingMasters, setLoadingMasters] = useState(false);
 
   // Memoize helpers so they're stable across renders (prevents unnecessary effect runs)
   const flattenCategories = useCallback((items = [], level = 0) => {
@@ -635,6 +640,40 @@ const UniversalAddModal = ({
     }
     return null;
   }, []);
+  const fetchMasterValues = async (categoryId, setter) => {
+    try {
+      const res = await axios.get(
+        `${import.meta.env.VITE_API_INVENTORY_SERVICE_URL}/${clientId}/inventory/masters`,
+        {
+          params: { category_id: categoryId },
+          headers: { Authorization: `Bearer ${token}` }
+        }
+      );
+
+      setter(res?.data?.data || []);
+
+    } catch (err) {
+      console.error("Master fetch error:", categoryId, err);
+      setter([]);
+    }
+  };
+  useEffect(() => {
+    if (!showModal || modalType !== "table") return;
+    if (!clientId || !token) return;
+
+    const loadMasters = async () => {
+      setLoadingMasters(true);
+
+      await Promise.all([
+        fetchMasterValues("zone", setZoneOptions),
+        fetchMasterValues("section", setSectionOptions)
+      ]);
+
+      setLoadingMasters(false);
+    };
+
+    loadMasters();
+  }, [showModal, modalType, clientId, token]);
 
   // Prefill category_id once when modal opens (guarded — don't overwrite while user types)
   useEffect(() => {
@@ -1126,10 +1165,20 @@ const UniversalAddModal = ({
                     onChange={(e) => handleRangeChange(index, "section", e.target.value)}
                     className="w-full px-3 py-2 border rounded-lg"
                   >
-                    <option value="">Select</option>
-                    <option value="AC">AC</option>
-                    <option value="Non-AC">Non-AC</option>
+                    <option value="">Select Section</option>
+
+                    {loadingMasters ? (
+                      <option disabled>Loading...</option>
+                    ) : sectionOptions.length === 0 ? (
+                      <option disabled>No Sections Configured</option>
+                    ) : (
+                      sectionOptions.map((sec, i) => (
+                        <option key={i} value={sec}>{sec}</option>
+                      ))
+                    )}
+
                   </select>
+
                   {fieldErrors?.[index]?.section && (
                     <div className="text-action-danger text-xs mt-1 font-medium">
                       Select section
@@ -1144,12 +1193,20 @@ const UniversalAddModal = ({
                     onChange={(e) => handleRangeChange(index, "location_zone", e.target.value)}
                     className="w-full px-3 py-2 border rounded-lg"
                   >
-                    <option value="">Select</option>
-                    <option value="Ground Floor">Ground Floor</option>
-                    <option value="First Floor">First Floor</option>
-                    <option value="Second Floor">Second Floor</option>
-                    <option value="Garden Area">Garden</option>
+                    <option value="">Select Zone</option>
+
+                    {loadingMasters ? (
+                      <option disabled>Loading...</option>
+                    ) : zoneOptions.length === 0 ? (
+                      <option disabled>No Zones Configured</option>
+                    ) : (
+                      zoneOptions.map((zone, i) => (
+                        <option key={i} value={zone}>{zone}</option>
+                      ))
+                    )}
+
                   </select>
+
                   {fieldErrors?.[index]?.location_zone && (
                     <div className="text-action-danger text-xs mt-1 font-medium">
                       Select zone
@@ -1160,12 +1217,12 @@ const UniversalAddModal = ({
                 <div>
                   <label className="block text-sm font-semibold mb-2 text-text-primary">Remark</label>
                   <select
-                    value={row?.remark ?? 'Vacant'}
+                    value={row?.remark ?? 'vacant'}
                     onChange={(e) => handleRangeChange(index, 'remark', e.target.value)}
                     className="w-full px-3 py-2 border-default border-border-default rounded-lg focus:outline-none focus:ring-2 focus:ring-action-primary"
                   >
-                    <option value="Vacant">Vacant</option>
-                    <option value="Reserved">Reserved</option>
+                    <option value="vacant">Vacant</option>
+                    <option value="reserved">Reserved</option>
                   </select>
                 </div>
               </div>

@@ -560,13 +560,17 @@ const UniversalEditModal = ({
   // Table-specific props
   editRowId,
   setEditRowId,
-  tables,
+  table,
   handleEditChange,
   saveEdit,
   editFieldErrors
 }) => {
   const [dragActive, setDragActive] = useState(false);
   const [showAddonPopup, setShowAddonPopup] = useState(false); // ✅ NEW: Popup state
+  const [zoneOptions, setZoneOptions] = useState([]);
+  const [sectionOptions, setSectionOptions] = useState([]);
+  const [loadingMasters, setLoadingMasters] = useState(false);
+  const [statusOptions, setStatusOptions] = useState([]);
 
   // Menu Modal Functions
   const handleEditDrag = (e) => {
@@ -588,6 +592,41 @@ const UniversalEditModal = ({
       handleEditImageFile(e.dataTransfer.files[0]);
     }
   };
+  const fetchMasterValues = async (categoryId, setter) => {
+    try {
+      const res = await axios.get(
+        `${import.meta.env.VITE_API_INVENTORY_SERVICE_URL}/${clientId}/inventory/masters`,
+        {
+          params: { category_id: categoryId },
+          headers: { Authorization: `Bearer ${token}` }
+        }
+      );
+
+      setter(res?.data?.data || []);
+
+    } catch (err) {
+      console.error("Master fetch error:", categoryId, err);
+      setter([]);
+    }
+  };
+  useEffect(() => {
+    if (!showModal || modalType !== "table") return;
+    if (!clientId || !token) return;
+
+    const loadMasters = async () => {
+      setLoadingMasters(true);
+
+      await Promise.all([
+        fetchMasterValues("zone", setZoneOptions),
+        fetchMasterValues("section", setSectionOptions),
+        fetchMasterValues("status", setStatusOptions)
+      ]);
+
+      setLoadingMasters(false);
+    };
+
+    loadMasters();
+  }, [showModal, modalType, clientId, token]);
 
   const handleEditImageFile = (file) => {
     if (file && file.type.startsWith('image/')) {
@@ -634,6 +673,8 @@ const UniversalEditModal = ({
     } else if (modalType === 'table') {
       setEditRowId?.(null);
     }
+
+
   };
 
   if (!showModal) return null;
@@ -1036,10 +1077,19 @@ const UniversalEditModal = ({
                   }
                   className="w-full px-3 py-2 rounded-md border border-gray-300 focus:ring-2 focus:ring-blue-500"
                 >
-                  <option value="">Select</option>
-                  <option value="AC">AC</option>
-                  <option value="Non-AC">Non-AC</option>
+                  <option value="">Select Section</option>
+
+                  {loadingMasters ? (
+                    <option disabled>Loading...</option>
+                  ) : sectionOptions.length === 0 ? (
+                    <option disabled>No Sections Configured</option>
+                  ) : (
+                    sectionOptions.map((sec, i) => (
+                      <option key={i} value={sec}>{sec}</option>
+                    ))
+                  )}
                 </select>
+
               </div>
 
               {/* Zone */}
@@ -1054,12 +1104,19 @@ const UniversalEditModal = ({
                   }
                   className="w-full px-3 py-2 rounded-md border border-gray-300 focus:ring-2 focus:ring-blue-500"
                 >
-                  <option value="">Select</option>
-                  <option value="Garden Area">Garden Area</option>
-                  <option value="Ground Floor">Ground Floor</option>
-                  <option value="First Floor">First Floor</option>
-                  <option value="Second Floor">Second Floor</option>
+                  <option value="">Select Zone</option>
+
+                  {loadingMasters ? (
+                    <option disabled>Loading...</option>
+                  ) : zoneOptions.length === 0 ? (
+                    <option disabled>No Zones Configured</option>
+                  ) : (
+                    zoneOptions.map((zone, i) => (
+                      <option key={i} value={zone}>{zone}</option>
+                    ))
+                  )}
                 </select>
+
               </div>
 
               {/* Status */}
@@ -1068,12 +1125,22 @@ const UniversalEditModal = ({
                 <select
                   value={table.status || ""}
                   onChange={(e) => handleEditChange(table.id, "status", e.target.value)}
-                  className={`w-full px-3 py-2 rounded-md border focus:outline-none focus:ring-2 focus:ring-blue-500 focus:border-transparent ${editFieldErrors?.status ? 'border-red-500 bg-red-50' : 'border-gray-300'
+                  className={`w-full px-3 py-2 rounded-md border focus:outline-none focus:ring-2 focus:ring-blue-500 ${editFieldErrors?.status ? 'border-red-500 bg-red-50' : 'border-gray-300'
                     }`}
                 >
-                  <option value="Vacant">Vacant</option>
-                  <option value="Reserved">Reserved</option>
+                  <option value="">Select Status</option>
+
+                  {loadingMasters ? (
+                    <option disabled>Loading...</option>
+                  ) : statusOptions.length === 0 ? (
+                    <option disabled>No Status Configured</option>
+                  ) : (
+                    statusOptions.map((status, i) => (
+                      <option key={i} value={status}>{status}</option>
+                    ))
+                  )}
                 </select>
+
                 {editFieldErrors?.status && (
                   <p className="text-red-600 text-xs mt-1">{editFieldErrors.status}</p>
                 )}
@@ -1091,7 +1158,8 @@ const UniversalEditModal = ({
             </button>
             <button
               className="px-6 py-2 rounded-md bg-action-primary text-text-white hover:bg-blue-700 font-medium"
-              onClick={() => saveEdit(table)}
+              onClick={saveEdit}
+
             >
               Save
             </button>

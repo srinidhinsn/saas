@@ -67,14 +67,14 @@ const MenuTreeNode = ({
         </div>
 
         <div className="flex items-center gap-2 flex-shrink-0">
-          {showCount && (
+          {/* {showCount && (
             <span
               className={`text-xs px-2 py-0.5 rounded-full font-semibold ${isSelected ? "bg-white text-action-primary" : "bg-bg-tertiary text-text-secondary"
                 }`}
             >
               {category.count}
             </span>
-          )}
+          )} */}
 
           {canEdit && hovered && !isSelected && (
             <div className="flex gap-1">

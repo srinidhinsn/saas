@@ -212,7 +212,7 @@ const LoginWrapper = ({ onLoginSuccess }) => {
 const HeaderSwitcher = ({ clientId, onLogout }) => {
   const screenId = localStorage.getItem('screen_id');
 
-  if (screenId === 'user_v1') {
+  if (screenId === 'ecommerce_user_v1') {
     return <Headers_V1 clientId={clientId} onLogout={onLogout} />;
   }
 
