@@ -402,3 +402,32 @@ def delete_role(client_id: str,category_id: str,value: str,context: SaasContext 
     db.refresh(category)
 
     return ResponseModel(screen_id=context.screen_id,status="success",message="Role deleted successfully",data=category.sub_categories)
+
+@router.get("/masters", response_model=ResponseModel)
+def get_master_values(
+    client_id: str,
+    category_id: str,
+    context: SaasContext = Depends(verify_token),
+    db: Session = Depends(get_db),
+):
+    category = db.query(CategoryEntity).filter(
+        CategoryEntity.id == category_id,
+        CategoryEntity.client_id == client_id
+    ).first()
+
+    if not category:
+        return ResponseModel(
+            screen_id=context.screen_id,
+            status="success",
+            message="No master values",
+            data=[]
+        )
+
+    values = category.sub_categories or []
+
+    return ResponseModel(
+        screen_id=context.screen_id,
+        status="success",
+        message="Fetched master values",
+        data=values
+    )
