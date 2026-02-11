@@ -1357,15 +1357,12 @@ const MenuManagement = ({ clientId, token, realm }) => {
   const [sidebarCategories, setSidebarCategories] = useState([]);
   // const MENU_ROOT = import.meta.env.VITE_MENU_DEFAULT_ROOT || "dietery";
   // const MENU_LEVEL = Number(import.meta.env.VITE_MENU_HIERARCHY_LEVEL || 2);
-  const [menuConfig, setMenuConfig] = useState({
-    root: "dietery",
-    level: 2
-  });
 
-  <MenuCategoryTree
-    selectedCategoryId={selectedCategoryId}
-    onSelectCategory={setSelectedCategoryId}
-  />
+  const menuConfig = React.useMemo(() => {
+    if (!clientId) return null;
+    return getMenuConfig(clientId);
+  }, [clientId]);
+  
 
   // Modal states
   const [showAddModal, setShowAddModal] = useState(false);
@@ -1467,7 +1464,31 @@ const MenuManagement = ({ clientId, token, realm }) => {
     // join with single underscore, no leading underscore
     return parts.filter(Boolean).join('_'); // e.g. Dietery_Non_Veg_Gravies_Mutton_Gravy
   };
+  const openAddModal = () => {
 
+    // Use the currently selected category in sidebar
+    const initialCategoryId = selectedCategoryId || null;
+  
+    setNewItem({
+      name: '',
+      description: '',
+      category_id: initialCategoryId || '',
+      unit_price: '',
+      discount: '',
+      code: '',
+      unit: '',
+      serving_quantity: "",
+      serving_unit: "",
+      line_item_id: [],
+      inventory_id: ''
+    });
+  
+    setNewItemImage(null);
+    setNewItemImageUrl('');
+  
+    setShowAddModal(true);
+  };
+  
   const handleItemClick = (item) => {
     setEditingItem(item);
     setShowEditModal(true);
@@ -1492,15 +1513,7 @@ const MenuManagement = ({ clientId, token, realm }) => {
     return flatList;
   };
 
-  useEffect(() => {
-    if (!clientId) return;
 
-    const config = getMenuConfig(clientId);
-
-    console.log("MENU CONFIG LOADED:", clientId, config);
-
-    setMenuConfig(config);
-  }, [clientId]);
 
   const findCategoryNode = (tree, matcher) => {
     for (const cat of tree) {
@@ -1569,7 +1582,43 @@ const MenuManagement = ({ clientId, token, realm }) => {
       console.log("Error fetching inventory IDs:", error);
     }
   };
-
+  const getModalCategories = () => {
+    if (!categories?.length || !menuConfig) return [];
+  
+    const { root } = menuConfig;
+  
+    const findRoot = (nodes) => {
+      for (const node of nodes) {
+        if (
+          String(node.id).toLowerCase() === String(root).toLowerCase() ||
+          String(node.name).toLowerCase() === String(root).toLowerCase()
+        ) {
+          return node;
+        }
+        if (node.children?.length) {
+          const found = findRoot(node.children);
+          if (found) return found;
+        }
+      }
+      return null;
+    };
+  
+    const rootNode = findRoot(categories);
+    if (!rootNode) return categories;
+  
+    const flattenedGrandChildren = (rootNode.children || [])
+      .flatMap(child => child.children || []);
+  
+    return [
+      {
+        ...rootNode,
+        id: rootNode.id,
+        name: "All Categories",
+        children: flattenedGrandChildren,
+      }
+    ];
+  };
+  
   // ✅ UPDATED: Fetch addon subcategories and all addon items
   const fetchAddonData = useCallback(async () => {
     try {
@@ -1626,12 +1675,7 @@ const MenuManagement = ({ clientId, token, realm }) => {
         imageId = await uploadImageToDocumentService(newItemImage);
       }
 
-      const categoryIdFromNewItem = newItem?.category_id || null;
-      const categoryIdFromSelected = selectedCategoryId;
-
-
-      const resolvedCategoryId = categoryIdFromNewItem || categoryIdFromSelected || null;
-      const finalCategoryId = resolvedCategoryId;
+      const finalCategoryId = newItem?.category_id || null;
 
       if (!finalCategoryId) {
         alert("Please select a valid category");
@@ -1719,10 +1763,8 @@ const MenuManagement = ({ clientId, token, realm }) => {
         imageId = await uploadImageToDocumentService(editItemImage);
       }
 
-      const categoryId = editingItem.category_id || selectedCategoryId || null;
+      const finalCategoryId = editingItem.category_id || null;
 
-
-      const finalCategoryId = categoryId || null;
       const slug = generateSlug(finalCategoryId, editingItem.name);
       const updated_by = currentUserId || localStorage.getItem('user_id') || 'system';
 
@@ -1796,7 +1838,7 @@ const MenuManagement = ({ clientId, token, realm }) => {
 
       const [catRes, itemRes] = await Promise.all([
         axios.get(
-          `${import.meta.env.VITE_API_INVENTORY_SERVICE_URL}/${clientId}/menu/read_category?category_id=dietery`,
+          `${import.meta.env.VITE_API_INVENTORY_SERVICE_URL}/${clientId}/menu/read_category?category_id=${menuConfig.root}`,
           { headers: { Authorization: `Bearer ${token}` } }
         ),
         axios.get(
@@ -2562,7 +2604,7 @@ const MenuManagement = ({ clientId, token, realm }) => {
   }, [selectedCategoryId, categories]);
   
   return (
-    <div className="h-[90vh] bg-bg-primary overflow-x-hidden">
+    <div className="h-[90vh] bg-bg-primary overflow-hidden">
       <div className="mx-auto p-2">
         <div className="lg:grid lg:grid-cols-4 gap-2">
           {/* Sidebar */}
@@ -2574,6 +2616,8 @@ const MenuManagement = ({ clientId, token, realm }) => {
                 onSelectCategory={setSelectedCategoryId}
                 clientId={clientId}
                 token={token}
+                onCategoriesUpdate={() => fetchData({ silent: true })}
+                menuConfig={menuConfig}
               />
 
             </div>
@@ -2735,7 +2779,7 @@ const MenuManagement = ({ clientId, token, realm }) => {
                 {/* Actions */}
                 <div className="flex gap-2 flex-wrap justify-end">
                   <button
-                    onClick={() => setShowAddModal(true)}
+                    onClick={openAddModal}
                     className="
           h-9 px-3 flex items-center gap-2
           rounded-lg bg-action-primary text-white
@@ -2928,7 +2972,7 @@ const MenuManagement = ({ clientId, token, realm }) => {
         newItem={newItem}
         setNewItem={setNewItem}
         selectedCategoryId={selectedCategoryId}
-        categories={categories}
+        categories={getModalCategories()}
         addonSubcategories={addonSubcategories}
         allAddonItems={allAddonItems}
         newItemImage={newItemImage}

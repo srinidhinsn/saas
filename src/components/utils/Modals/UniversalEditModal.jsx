@@ -1,7 +1,8 @@
-// import React, { useState } from 'react';
+// import React, { useState, useEffect } from 'react';
 // import { X, Upload } from 'lucide-react';
 // import DropdownCheckbox from './DropdownCheckbox';
 // import MenuImagePreview from '../../MainComponents/InventoryServices/Tree&CategoryManage/MenuImagePreview';
+// import axios from "axios";
 
 // const UniversalEditModal = ({
 //   // Common props
@@ -22,15 +23,20 @@
 //   clientId,
 //   token,
 //   inventoryIds,
+
 //   // Table-specific props
 //   editRowId,
 //   setEditRowId,
-//   tables,
+//   table,
 //   handleEditChange,
 //   saveEdit,
 //   editFieldErrors
 // }) => {
 //   const [dragActive, setDragActive] = useState(false);
+//   const [zoneOptions, setZoneOptions] = useState([]);
+//   const [sectionOptions, setSectionOptions] = useState([]);
+//   const [loadingMasters, setLoadingMasters] = useState(false);
+//   const [statusOptions, setStatusOptions] = useState([]);
 
 //   // Menu Modal Functions
 //   const handleEditDrag = (e) => {
@@ -52,6 +58,41 @@
 //       handleEditImageFile(e.dataTransfer.files[0]);
 //     }
 //   };
+//   const fetchMasterValues = async (categoryId, setter) => {
+//     try {
+//       const res = await axios.get(
+//         `${import.meta.env.VITE_API_INVENTORY_SERVICE_URL}/${clientId}/inventory/masters`,
+//         {
+//           params: { category_id: categoryId },
+//           headers: { Authorization: `Bearer ${token}` }
+//         }
+//       );
+
+//       setter(res?.data?.data || []);
+
+//     } catch (err) {
+//       console.error("Master fetch error:", categoryId, err);
+//       setter([]);
+//     }
+//   };
+//   useEffect(() => {
+//     if (!showModal || modalType !== "table") return;
+//     if (!clientId || !token) return;
+
+//     const loadMasters = async () => {
+//       setLoadingMasters(true);
+
+//       await Promise.all([
+//         fetchMasterValues("zone", setZoneOptions),
+//         fetchMasterValues("section", setSectionOptions),
+//         fetchMasterValues("status", setStatusOptions)
+//       ]);
+
+//       setLoadingMasters(false);
+//     };
+
+//     loadMasters();
+//   }, [showModal, modalType, clientId, token]);
 
 //   const handleEditImageFile = (file) => {
 //     if (file && file.type.startsWith('image/')) {
@@ -84,6 +125,8 @@
 //     } else if (modalType === 'table') {
 //       setEditRowId?.(null);
 //     }
+
+
 //   };
 
 //   if (!showModal) return null;
@@ -98,7 +141,7 @@
 //           <div className="px-6 py-4 border-b border-gray-200 flex justify-between items-center">
 //             <h2 className="text-xl font-semibold text-gray-900">Edit Menu Item</h2>
 //             <button
-//               onClick={handleClose} 
+//               onClick={handleClose}
 //               className="p-1.5 rounded-lg bg-action-primary text-text-white hover:opacity-90 transition-opacity">
 //               <X className="w-5 h-5" />
 //             </button>
@@ -348,10 +391,7 @@
 //   }
 
 //   // Render Table Edit Modal
-//   if (modalType === 'table' && editRowId) {
-//     const table = (tables || []).find(t => t.id === editRowId);
-//     if (!table) return null;
-
+//   if (modalType === 'table' && table) {
 //     return (
 //       <div className="fixed inset-0 bg-black bg-opacity-50 z-50 flex items-center justify-center p-4">
 //         <div className="bg-white rounded-lg w-full max-w-md shadow-xl">
@@ -445,10 +485,19 @@
 //                   }
 //                   className="w-full px-3 py-2 rounded-md border border-gray-300 focus:ring-2 focus:ring-blue-500"
 //                 >
-//                   <option value="">Select</option>
-//                   <option value="AC">AC</option>
-//                   <option value="Non-AC">Non-AC</option>
+//                   <option value="">Select Section</option>
+
+//                   {loadingMasters ? (
+//                     <option disabled>Loading...</option>
+//                   ) : sectionOptions.length === 0 ? (
+//                     <option disabled>No Sections Configured</option>
+//                   ) : (
+//                     sectionOptions.map((sec, i) => (
+//                       <option key={i} value={sec}>{sec}</option>
+//                     ))
+//                   )}
 //                 </select>
+
 //               </div>
 
 //               {/* Zone */}
@@ -463,12 +512,19 @@
 //                   }
 //                   className="w-full px-3 py-2 rounded-md border border-gray-300 focus:ring-2 focus:ring-blue-500"
 //                 >
-//                   <option value="">Select</option>
-//                   <option value="Garden Area">Garden Area</option>
-//                   <option value="Ground Floor">Ground Floor</option>
-//                   <option value="First Floor">First Floor</option>
-//                   <option value="Second Floor">Second Floor</option>
+//                   <option value="">Select Zone</option>
+
+//                   {loadingMasters ? (
+//                     <option disabled>Loading...</option>
+//                   ) : zoneOptions.length === 0 ? (
+//                     <option disabled>No Zones Configured</option>
+//                   ) : (
+//                     zoneOptions.map((zone, i) => (
+//                       <option key={i} value={zone}>{zone}</option>
+//                     ))
+//                   )}
 //                 </select>
+
 //               </div>
 
 //               {/* Status */}
@@ -477,12 +533,22 @@
 //                 <select
 //                   value={table.status || ""}
 //                   onChange={(e) => handleEditChange(table.id, "status", e.target.value)}
-//                   className={`w-full px-3 py-2 rounded-md border focus:outline-none focus:ring-2 focus:ring-blue-500 focus:border-transparent ${editFieldErrors?.status ? 'border-red-500 bg-red-50' : 'border-gray-300'
+//                   className={`w-full px-3 py-2 rounded-md border focus:outline-none focus:ring-2 focus:ring-blue-500 ${editFieldErrors?.status ? 'border-red-500 bg-red-50' : 'border-gray-300'
 //                     }`}
 //                 >
-//                   <option value="Vacant">Vacant</option>
-//                   <option value="Reserved">Reserved</option>
+//                   <option value="">Select Status</option>
+
+//                   {loadingMasters ? (
+//                     <option disabled>Loading...</option>
+//                   ) : statusOptions.length === 0 ? (
+//                     <option disabled>No Status Configured</option>
+//                   ) : (
+//                     statusOptions.map((status, i) => (
+//                       <option key={i} value={status}>{status}</option>
+//                     ))
+//                   )}
 //                 </select>
+
 //                 {editFieldErrors?.status && (
 //                   <p className="text-red-600 text-xs mt-1">{editFieldErrors.status}</p>
 //                 )}
@@ -500,7 +566,8 @@
 //             </button>
 //             <button
 //               className="px-6 py-2 rounded-md bg-action-primary text-text-white hover:bg-blue-700 font-medium"
-//               onClick={() => saveEdit(table)}
+//               onClick={saveEdit}
+
 //             >
 //               Save
 //             </button>
@@ -530,12 +597,11 @@
 
 
 
-
-
-import React, { useState } from 'react';
+import React, { useState, useEffect } from 'react';
 import { X, Upload, Plus } from 'lucide-react';
 import MenuImagePreview from '../../MainComponents/InventoryServices/Tree&CategoryManage/MenuImagePreview';
 import AddonSelectionPopup from './AddonSelection';
+import axios from 'axios';
 
 const UniversalEditModal = ({
   // Common props
@@ -547,8 +613,8 @@ const UniversalEditModal = ({
   editingItem,
   setEditingItem,
   categories,
-  addonSubcategories, // ✅ NEW: Addon subcategories
-  allAddonItems, // ✅ NEW: All addon items
+  addonSubcategories, // ✅ Addon subcategories
+  allAddonItems, // ✅ All addon items
   editItemImage,
   setEditItemImage,
   editItemImageUrl,
@@ -557,6 +623,7 @@ const UniversalEditModal = ({
   clientId,
   token,
   inventoryIds,
+
   // Table-specific props
   editRowId,
   setEditRowId,
@@ -566,11 +633,46 @@ const UniversalEditModal = ({
   editFieldErrors
 }) => {
   const [dragActive, setDragActive] = useState(false);
-  const [showAddonPopup, setShowAddonPopup] = useState(false); // ✅ NEW: Popup state
+  const [showAddonPopup, setShowAddonPopup] = useState(false); // ✅ Popup state
   const [zoneOptions, setZoneOptions] = useState([]);
   const [sectionOptions, setSectionOptions] = useState([]);
   const [loadingMasters, setLoadingMasters] = useState(false);
   const [statusOptions, setStatusOptions] = useState([]);
+
+  // Fetch master values for zones, sections, and status
+  const fetchMasterValues = async (categoryId, setter) => {
+    try {
+      const res = await axios.get(
+        `${import.meta.env.VITE_API_INVENTORY_SERVICE_URL}/${clientId}/inventory/masters`,
+        {
+          params: { category_id: categoryId },
+          headers: { Authorization: `Bearer ${token}` }
+        }
+      );
+      setter(res?.data?.data || []);
+    } catch (err) {
+      console.error("Master fetch error:", categoryId, err);
+      setter([]);
+    }
+  };
+
+  // Load master data for table modal
+  useEffect(() => {
+    if (!showModal || modalType !== "table") return;
+    if (!clientId || !token) return;
+
+    const loadMasters = async () => {
+      setLoadingMasters(true);
+      await Promise.all([
+        fetchMasterValues("zone", setZoneOptions),
+        fetchMasterValues("section", setSectionOptions),
+        fetchMasterValues("status", setStatusOptions)
+      ]);
+      setLoadingMasters(false);
+    };
+
+    loadMasters();
+  }, [showModal, modalType, clientId, token]);
 
   // Menu Modal Functions
   const handleEditDrag = (e) => {
@@ -592,41 +694,6 @@ const UniversalEditModal = ({
       handleEditImageFile(e.dataTransfer.files[0]);
     }
   };
-  const fetchMasterValues = async (categoryId, setter) => {
-    try {
-      const res = await axios.get(
-        `${import.meta.env.VITE_API_INVENTORY_SERVICE_URL}/${clientId}/inventory/masters`,
-        {
-          params: { category_id: categoryId },
-          headers: { Authorization: `Bearer ${token}` }
-        }
-      );
-
-      setter(res?.data?.data || []);
-
-    } catch (err) {
-      console.error("Master fetch error:", categoryId, err);
-      setter([]);
-    }
-  };
-  useEffect(() => {
-    if (!showModal || modalType !== "table") return;
-    if (!clientId || !token) return;
-
-    const loadMasters = async () => {
-      setLoadingMasters(true);
-
-      await Promise.all([
-        fetchMasterValues("zone", setZoneOptions),
-        fetchMasterValues("section", setSectionOptions),
-        fetchMasterValues("status", setStatusOptions)
-      ]);
-
-      setLoadingMasters(false);
-    };
-
-    loadMasters();
-  }, [showModal, modalType, clientId, token]);
 
   const handleEditImageFile = (file) => {
     if (file && file.type.startsWith('image/')) {
@@ -673,8 +740,6 @@ const UniversalEditModal = ({
     } else if (modalType === 'table') {
       setEditRowId?.(null);
     }
-
-
   };
 
   if (!showModal) return null;
@@ -901,7 +966,7 @@ const UniversalEditModal = ({
                   </div>
                 </div>
 
-                {/* ✅ NEW: Add-ons with Popup */}
+                {/* ✅ Add-ons with Popup */}
                 <div>
                   <label className="block text-sm font-medium mb-2 text-gray-700">
                     Add-ons
@@ -979,11 +1044,8 @@ const UniversalEditModal = ({
     );
   }
 
-  // Render Table Edit Modal (unchanged)
-  if (modalType === 'table' && editRowId) {
-    const table = (tables || []).find(t => t.id === editRowId);
-    if (!table) return null;
-
+  // Render Table Edit Modal
+  if (modalType === 'table' && table) {
     return (
       <div className="fixed inset-0 bg-black bg-opacity-50 z-50 flex items-center justify-center p-4">
         <div className="bg-white rounded-lg w-full max-w-md shadow-xl">
@@ -1089,7 +1151,6 @@ const UniversalEditModal = ({
                     ))
                   )}
                 </select>
-
               </div>
 
               {/* Zone */}
@@ -1116,7 +1177,6 @@ const UniversalEditModal = ({
                     ))
                   )}
                 </select>
-
               </div>
 
               {/* Status */}
@@ -1159,7 +1219,6 @@ const UniversalEditModal = ({
             <button
               className="px-6 py-2 rounded-md bg-action-primary text-text-white hover:bg-blue-700 font-medium"
               onClick={saveEdit}
-
             >
               Save
             </button>

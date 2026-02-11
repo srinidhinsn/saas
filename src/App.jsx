@@ -203,6 +203,7 @@ import RoutesManager from './components/Routes/RoutesManager';
 import { injectThemeVars } from './components/utils/injectThemeVars';
 import 'react-toastify/dist/ReactToastify.css';
 import Headers_V1 from './components/V1_Components/Headers/Headers_V1';
+import Super_Admin_Header from './components/Super_Admin/Headers/Super_Admin_Header';
 
 const LoginWrapper = ({ onLoginSuccess }) => {
   const { clientId } = useParams();
@@ -215,7 +216,9 @@ const HeaderSwitcher = ({ clientId, onLogout }) => {
   if (screenId === 'ecommerce_user_v1') {
     return <Headers_V1 clientId={clientId} onLogout={onLogout} />;
   }
-
+  if (screenId === 'super_admin_v1') {
+    return <Super_Admin_Header clientId={clientId} onLogout={onLogout} />;
+  }
   // default fallback
   return <HeaderShared clientId={clientId} onLogout={onLogout} />;
 };
