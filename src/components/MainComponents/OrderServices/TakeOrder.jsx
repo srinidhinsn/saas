@@ -2326,320 +2326,329 @@ const TABLE_STATUS_CONFIG = {
 };
 
 const TableReservation = ({
-  tables = [],
-  orderMode = "dinein",
-  onSelectTable,
-  onSelectTakeaway,
-  onSelectDineIn,
-  onViewOrder,
-  tableOrders = {},
-  onPrintBill,
-  onDeleteOrder,
-  onMarkAsServed,
+    tables = [],
+    orderMode = "dinein",
+    onSelectTable,
+    onSelectTakeaway,
+    onSelectDineIn,
+    onViewOrder,
+    tableOrders = {},
+    onPrintBill,
+    onDeleteOrder,
+    onMarkAsServed,
 }) => {
-  const [selectedSections, setSelectedSections] = useState([]);
-  const [selectedZones, setSelectedZones] = useState([]);
-  const [currentTime, setCurrentTime] = useState(Date.now());
+    const [selectedSections, setSelectedSections] = useState([]);
+    const [selectedZones, setSelectedZones] = useState([]);
+    const [currentTime, setCurrentTime] = useState(Date.now());
+    const getZone = (t) => t.location_zone?.trim() || "Unassigned";
+    const getSection = (t) => t.section?.trim() || "Other";
+    
 
-  useEffect(() => {
-    const interval = setInterval(() => {
-      setCurrentTime(Date.now());
-    }, 1000);
-    return () => clearInterval(interval);
-  }, []);
+    const zonesFromDB = [
+        ...new Set(
+            tables
+                .map(t => t.location_zone)
+                .filter(z => z !== null && z !== undefined && z !== "")
+        )
+    ];
 
-  const toggleFilter = (value, list, setList) => {
-    setList(prev =>
-      prev.includes(value)
-        ? prev.filter(v => v !== value)
-        : [...prev, value]
-    );
-  };
+    const sectionsFromDB = [
+        ...new Set(
+            tables
+                .map(t => t.section)
+                .filter(s => s !== null && s !== undefined && s !== "")
+        )
+    ];
 
-  const uniqueZones = [...new Set(tables.map(t => t.location_zone))];
+    useEffect(() => {
+        const interval = setInterval(() => {
+            setCurrentTime(Date.now());
+        }, 1000);
+        return () => clearInterval(interval);
+    }, []);
 
-  const getSectionsByZone = (zone) => {
-    return [...new Set(
-      filteredTables
-        .filter(t => t.location_zone === zone)
-        .map(t => t.section || 'Other')
-    )];
-  };
-
-  const filteredTables = tables.filter(t => {
-    if ((t.name || '').toLowerCase().includes('takeaway') || t.id === 500) {
-      return false;
-    }
-
-    const zoneMatch =
-      selectedZones.length === 0 || selectedZones.includes(t.location_zone);
-
-    const sectionMatch =
-      selectedSections.length === 0 || selectedSections.includes(t.section);
-
-    return zoneMatch && sectionMatch;
-  });
-
-  const visibleZones = [...new Set(filteredTables.map(t => t.location_zone))];
-
-  const calculateElapsedTime = (createdAt) => {
-    if (!createdAt) return null;
-
-    let created;
-
-    if (typeof createdAt === "string") {
-      // Convert to proper ISO UTC format
-      const utcString =
-        createdAt.replace(" ", "T").split(".")[0] + "Z";
-
-      created = new Date(utcString).getTime();
-    } else {
-      created = new Date(createdAt).getTime();
-    }
-
-    const diffMs = Date.now() - created;
-
-    if (diffMs < 0) return "Just now";
-
-    const seconds = Math.floor(diffMs / 1000);
-    const minutes = Math.floor(seconds / 60);
-    const hours = Math.floor(minutes / 60);
-    const days = Math.floor(hours / 24);
-
-    if (seconds < 60) return "Just now";
-    if (minutes === 1) return "1 min ago";
-    if (minutes < 60) return `${minutes} mins ago`;
-    if (hours === 1) return "1 hr ago";
-    if (hours < 24) return `${hours} hrs ago`;
-    if (days === 1) return "1 day ago";
-
-    return `${days} days ago`;
-  };
-
-  return (
-    <div className="p-4 bg-bg-primary overflow-y-auto h-[calc(100vh-4rem)]">
-      {/* FILTER BAR */}
-      <div className="mb-3 sticky top-0 z-10 bg-bg-primary">
-        <div className="flex flex-wrap gap-2 p-2 rounded-xl border border-border-default bg-bg-tertiary">
-          <div className="flex flex-wrap items-center gap-2 p-2 rounded-xl">
-            <button
-              onClick={() => {
-                setSelectedSections([]);
-                setSelectedZones([]);
-              }}
-              className={`px-3 py-1 rounded-full text-xs font-semibold transition
-                ${selectedSections.length === 0 && selectedZones.length === 0
-                  ? "bg-action-primary text-white"
-                  : "bg-white text-text-secondary hover:bg-gray-100"}`}
-            >
-              All
-            </button>
-
-            <div className="w-px bg-border-default mx-1" />
-
-            {["AC", "Non-AC"].map(sec => (
-              <button
-                key={sec}
-                onClick={() => toggleFilter(sec, selectedSections, setSelectedSections)}
-                className={`px-3 py-1 rounded-full text-xs font-semibold transition
-                  ${selectedSections.includes(sec)
-                    ? "bg-action-primary text-white"
-                    : "bg-white text-text-secondary hover:bg-gray-100"}`}
-              >
-                {sec}
-              </button>
-            ))}
-
-            <div className="w-px bg-border-default mx-1" />
-
-            {["Ground Floor", "First Floor", "Second Floor", "Garden Area"].map(zone => (
-              <button
-                key={zone}
-                onClick={() => toggleFilter(zone, selectedZones, setSelectedZones)}
-                className={`px-3 py-1 rounded-full text-xs font-semibold transition
-                  ${selectedZones.includes(zone)
-                    ? "bg-action-primary text-white"
-                    : "bg-white text-text-secondary hover:bg-gray-100"}`}
-              >
-                {zone}
-              </button>
-            ))}
-          </div>
-
-          <div className="ml-auto flex bg-bg-primary border-2 rounded-full border-action-primary p-1 shadow-sm">
-            <button
-              onClick={onSelectDineIn}
-              className={`px-4 py-1.5 text-xs font-semibold rounded-full transition-all
-                ${orderMode === "dinein"
-                  ? "bg-action-primary text-text-white shadow"
-                  : "text-text-secondary hover:bg-gray-100"}`}
-            >
-              Dine In
-            </button>
-
-            <button
-              onClick={onSelectTakeaway}
-              className={`px-4 py-1.5 text-xs font-semibold rounded-full transition-all flex items-center gap-1
-                ${orderMode === "takeaway"
-                  ? "bg-orange-500 text-white shadow"
-                  : "text-gray-600 hover:bg-gray-100"}`}
-            >
-              <Package size={12} />
-              Takeaway
-            </button>
-          </div>
-        </div>
-      </div>
-
-      {/* TABLE GRID */}
-      {orderMode === "dinein" && visibleZones.map(zone => {
-        const sections = getSectionsByZone(zone);
-
-        return (
-          <div key={zone} className="mb-10">
-            <h3 className="text-xl font-bold mb-4 text-gray-800">
-              {zone}
-            </h3>
-
-            {sections.map(section => (
-              <div key={section} className="mb-6">
-                <div className="flex items-center gap-2 mb-3">
-                  <span className="text-sm font-semibold px-3 py-1 rounded-full bg-gray-200">
-                    {section}
-                  </span>
-                </div>
-
-                <div className="grid gap-6 grid-cols-2 sm:grid-cols-4 md:grid-cols-5 lg:grid-cols-6 xl:grid-cols-5">
-                  {filteredTables
-                    .filter(t => t.location_zone === zone && t.section === section)
-                    .map(table => {
-                      const statusKey = table.status?.toLowerCase();
-                      const config = TABLE_STATUS_CONFIG[statusKey] || TABLE_STATUS_CONFIG.vacant;
-                      const orderInfo = tableOrders[table.id];
-
-                      const hasViewableOrder = (statusKey === 'occupied' || statusKey === 'served') && orderInfo;
-                      const elapsedTime = orderInfo?.created_at ? calculateElapsedTime(orderInfo.created_at) : null;
-
-                      return (
-                        <div
-                          key={table.id}
-                          className="rounded-xl overflow-hidden border shadow-sm hover:shadow-md transition bg-white"
-                        >
-                          <div
-                            onClick={() => {
-                              if (config.clickable) {
-                                onSelectTable(table);
-                              } else if (hasViewableOrder && onViewOrder) {
-                                onViewOrder(table);
-                              }
-                            }}
-                            className={`${config.clickable || hasViewableOrder ? 'cursor-pointer' : ''}`}
-                          >
-                            <div className="flex justify-between px-3 py-2 bg-action-primary text-white">
-                              <span className="font-bold text-xl tracking-wide">
-                                {table.table_number}
-                              </span>
-
-                              {hasViewableOrder && (
-                                <span
-                                  className={`text-xl px-2 py-0.5 rounded-full font-semibold
-                                    ${orderInfo.status === 'pending' ? 'bg-orange-100 text-orange-700' :
-                                      orderInfo.status === 'preparing' ? 'bg-blue-100 text-blue-700' :
-                                        orderInfo.status === 'ready' ? 'bg-green-100 text-green-700' :
-                                          orderInfo.status === 'served' ? 'bg-purple-100 text-purple-700' :
-                                            'bg-gray-100 text-gray-700'}
-                                  `}
-                                >
-                                  {orderInfo.status?.toUpperCase()}
-                                </span>
-                              )}
-
-                              {hasViewableOrder && (
-                                <div className="text-xl opacity-90 mt-1">
-                                  #{orderInfo.id}
-                                </div>
-                              )}
-                            </div>
-
-                            <div className={`p-6 flex justify-between  ${statusKey === 'occupied' ? 'text-blue-600 bg-blue-200' :
-                              statusKey === 'served' ? 'text-purple-600 bg-purple-50' :
-                                statusKey === 'reserved' ? 'text-yellow-600 bg-yellow-50' :
-                                  'text-green-600 bg-green-200'} `}>
-                              {statusKey === 'vacant' && <span className="text-2xl">-</span>}
-                              {(statusKey === 'occupied' || statusKey === 'served') && <Eye size={28} className="text-blue-600" />}
-
-                              {hasViewableOrder && (
-                                <>
-                                  <button
-                                    onClick={(e) => {
-                                      e.stopPropagation();
-                                      if (onPrintBill) {
-                                        onPrintBill(orderInfo.id, table.id);
-                                      }
-                                    }}
-                                    className="text-yellow-600 hover:scale-110 transition-transform"
-                                    title="Print Bill"
-                                  >
-                                    <Printer size={28} />
-                                  </button>
-
-                                  <button
-                                    onClick={(e) => {
-                                      e.stopPropagation();
-                                      if (onDeleteOrder) {
-                                        onDeleteOrder(orderInfo.id, table.id);
-                                      }
-                                    }}
-                                    className="text-red-600 hover:scale-110 transition-transform"
-                                    title="Delete Order"
-                                  >
-                                    <Trash2 size={28} />
-                                  </button>
-                                </>
-                              )}
-                              {statusKey === 'reserved' && <Lock size={28} className="text-yellow-600" />}
-                            </div>
-
-                            {hasViewableOrder && elapsedTime && (
-                              <div className="px-3 py-2 bg-gray-50 border-t border-gray-200">
-                                <div className="flex items-center justify-center gap-2 text-sm font-semibold text-gray-700">
-                                  <Clock size={16} className="text-orange-600" />
-                                  <span>{elapsedTime}</span>
-                                </div>
-                              </div>
-                            )}
-                          </div>
-
-                          {hasViewableOrder && orderInfo.status === 'ready' && (
-                            <button
-                              onClick={(e) => {
-                                e.stopPropagation();
-                                if (onMarkAsServed) {
-                                  onMarkAsServed(orderInfo.id, table.id);
-                                }
-                              }}
-                              className="w-full px-4 py-2 bg-green-600 text-white text-sm font-semibold hover:bg-green-700 transition-colors"
-                            >
-                              Mark as Served
-                            </button>
-                          )}
-                        </div>
-                      );
-                    })}
-                </div>
-              </div>
-            ))}
-          </div>
+    const toggleFilter = (value, list, setList) => {
+        setList(prev =>
+            prev.includes(value)
+                ? prev.filter(v => v !== value)
+                : [...prev, value]
         );
-      })}
+    };
 
-      {orderMode === "takeaway" && (
-        <div className="text-center mt-10 text-gray-500 text-sm">
-          Takeaway selected. Opening menu…
+    const uniqueZones = [...new Set(tables.map(t => t.location_zone))];
+
+    const getSectionsByZone = (zone) => {
+        return [
+            ...new Set(
+                filteredTables
+                .filter(t => getZone(t) === zone)
+                .map(t => getSection(t))                
+            )
+        ];
+    };
+
+
+    const filteredTables = tables.filter(t => {
+        const zone = getZone(t);
+        const section = getSection(t);
+        
+
+        const zoneMatch =
+            selectedZones.length === 0 || selectedZones.includes(zone);
+
+        const sectionMatch =
+            selectedSections.length === 0 || selectedSections.includes(section);
+
+        return zoneMatch && sectionMatch;
+    });
+
+
+    const visibleZones = [
+        ...new Set(
+            filteredTables.map(t => getZone(t))
+        )
+    ];
+
+    const calculateElapsedTime = (createdAt) => {
+        if (!createdAt) return null;
+
+        const now = currentTime;
+        const created = new Date(createdAt).getTime();
+        const diffMs = now - created;
+        const diffMins = Math.floor(diffMs / 60000);
+        const diffSecs = Math.floor((diffMs % 60000) / 1000);
+
+        return `${diffMins}:${diffSecs.toString().padStart(2, '0')}`;
+    };
+
+    return (
+        <div className="p-4 bg-bg-primary overflow-y-auto h-[calc(100vh-4rem)]">
+            {/* FILTER BAR */}
+            <div className="mb-3 sticky top-0 z-10 bg-bg-primary">
+                <div className="flex flex-wrap gap-2 p-2 rounded-xl border border-border-default bg-bg-tertiary">
+                    <div className="flex flex-wrap items-center gap-2 p-2 rounded-xl">
+                        <button
+                            onClick={() => {
+                                setSelectedSections([]);
+                                setSelectedZones([]);
+                            }}
+                            className={`px-3 py-1 rounded-full text-xs font-semibold transition
+                ${selectedSections.length === 0 && selectedZones.length === 0
+                                    ? "bg-action-primary text-white"
+                                    : "bg-white text-text-secondary hover:bg-gray-100"}`}
+                        >
+                            All
+                        </button>
+
+                        <div className="w-px bg-border-default mx-1" />
+
+                        {sectionsFromDB.map(sec => (
+                            <button
+                                key={sec}
+                                onClick={() => toggleFilter(sec, selectedSections, setSelectedSections)}
+                                className={`px-3 py-1 rounded-full text-xs font-semibold transition
+      ${selectedSections.includes(sec)
+                                        ? "bg-action-primary text-white"
+                                        : "bg-white text-text-secondary hover:bg-gray-100"}`}
+                            >
+                                {sec}
+                            </button>
+                        ))}
+
+
+
+                        <div className="w-px bg-border-default mx-1" />
+
+                        {zonesFromDB.map(zone => (
+                            <button
+                                key={zone}
+                                onClick={() => toggleFilter(zone, selectedZones, setSelectedZones)}
+                                className={`px-3 py-1 rounded-full text-xs font-semibold transition
+      ${selectedZones.includes(zone)
+                                        ? "bg-action-primary text-white"
+                                        : "bg-white text-text-secondary hover:bg-gray-100"}`}
+                            >
+                                {zone}
+                            </button>
+                        ))}
+
+
+                    </div>
+
+                    <div className="ml-auto flex bg-bg-primary border-2 rounded-full border-action-primary p-1 shadow-sm">
+                        <button
+                            onClick={onSelectDineIn}
+                            className={`px-4 py-1.5 text-xs font-semibold rounded-full transition-all
+                ${orderMode === "dinein"
+                                    ? "bg-action-primary text-text-white shadow"
+                                    : "text-text-secondary hover:bg-gray-100"}`}
+                        >
+                            Dine In
+                        </button>
+
+                        <button
+                            onClick={onSelectTakeaway}
+                            className={`px-4 py-1.5 text-xs font-semibold rounded-full transition-all flex items-center gap-1
+                ${orderMode === "takeaway"
+                                    ? "bg-orange-500 text-white shadow"
+                                    : "text-gray-600 hover:bg-gray-100"}`}
+                        >
+                            <Package size={12} />
+                            Takeaway
+                        </button>
+                    </div>
+                </div>
+            </div>
+
+            {/* TABLE GRID */}
+            {orderMode === "dinein" && visibleZones.map(zone => {
+                const sections = getSectionsByZone(zone);
+
+                return (
+                    <div key={zone} className="mb-10">
+                        <h3 className="text-xl font-bold mb-4 text-gray-800">
+                            {zone}
+                        </h3>
+
+                        {sections.map(section => (
+                            <div key={section} className="mb-6">
+                                <div className="flex items-center gap-2 mb-3">
+                                    <span className="text-sm font-semibold px-3 py-1 rounded-full bg-gray-200">
+                                        {section}
+                                    </span>
+                                </div>
+
+                                <div className="grid gap-6 grid-cols-2 sm:grid-cols-4 md:grid-cols-5 lg:grid-cols-6 xl:grid-cols-5">
+                                    {filteredTables
+                                        .filter(t => getZone(t) === zone && getSection(t) === section)
+                                        .map(table => {
+                                            const statusKey = table.status?.toLowerCase();
+                                            const config = TABLE_STATUS_CONFIG[statusKey] || TABLE_STATUS_CONFIG.vacant;
+                                            const orderInfo = tableOrders[table.id];
+
+                                            const hasViewableOrder = (statusKey === 'occupied' || statusKey === 'served') && orderInfo;
+                                            const elapsedTime = orderInfo?.created_at ? calculateElapsedTime(orderInfo.created_at) : null;
+
+                                            return (
+                                                <div
+                                                    key={table.id}
+                                                    className="rounded-xl overflow-hidden border shadow-sm hover:shadow-md transition bg-white"
+                                                >
+                                                    <div
+                                                        onClick={() => {
+                                                            if (config.clickable) {
+                                                                onSelectTable(table);
+                                                            } else if (hasViewableOrder && onViewOrder) {
+                                                                onViewOrder(table);
+                                                            }
+                                                        }}
+                                                        className={`${config.clickable || hasViewableOrder ? 'cursor-pointer' : ''}`}
+                                                    >
+                                                        <div className="flex justify-between px-3 py-2 bg-action-primary text-white">
+                                                            <span className="font-bold text-xl tracking-wide">
+                                                                {table.table_number}
+                                                            </span>
+
+                                                            {hasViewableOrder && (
+                                                                <span
+                                                                    className={`text-xl px-2 py-0.5 rounded-full font-semibold
+                                    ${orderInfo.status === 'pending' ? 'bg-orange-100 text-orange-700' :
+                                                                            orderInfo.status === 'preparing' ? 'bg-blue-100 text-blue-700' :
+                                                                                orderInfo.status === 'ready' ? 'bg-green-100 text-green-700' :
+                                                                                    orderInfo.status === 'served' ? 'bg-purple-100 text-purple-700' :
+                                                                                        'bg-gray-100 text-gray-700'}
+                                  `}
+                                                                >
+                                                                    {orderInfo.status?.toUpperCase()}
+                                                                </span>
+                                                            )}
+
+                                                            {hasViewableOrder && (
+                                                                <div className="text-xl opacity-90 mt-1">
+                                                                    #{orderInfo.id}
+                                                                </div>
+                                                            )}
+                                                        </div>
+
+                                                        <div className={`p-6 flex justify-between  ${statusKey === 'occupied' ? 'text-blue-600 bg-blue-200' :
+                                                            statusKey === 'served' ? 'text-purple-600 bg-purple-50' :
+                                                                statusKey === 'reserved' ? 'text-yellow-600 bg-yellow-50' :
+                                                                    'text-green-600 bg-green-200'} `}>
+                                                            {statusKey === 'vacant' && <span className="text-2xl">-</span>}
+                                                            {(statusKey === 'occupied' || statusKey === 'served') && <Eye size={28} className="text-blue-600" />}
+
+                                                            {hasViewableOrder && (
+                                                                <>
+                                                                    <button
+                                                                        onClick={(e) => {
+                                                                            e.stopPropagation();
+                                                                            if (onPrintBill) {
+                                                                                onPrintBill(orderInfo.id, table.id);
+                                                                            }
+                                                                        }}
+                                                                        className="text-yellow-600 hover:scale-110 transition-transform"
+                                                                        title="Print Bill"
+                                                                    >
+                                                                        <Printer size={28} />
+                                                                    </button>
+
+                                                                    <button
+                                                                        onClick={(e) => {
+                                                                            e.stopPropagation();
+                                                                            if (onDeleteOrder) {
+                                                                                onDeleteOrder(orderInfo.id, table.id);
+                                                                            }
+                                                                        }}
+                                                                        className="text-red-600 hover:scale-110 transition-transform"
+                                                                        title="Delete Order"
+                                                                    >
+                                                                        <Trash2 size={28} />
+                                                                    </button>
+                                                                </>
+                                                            )}
+                                                            {statusKey === 'reserved' && <Lock size={28} className="text-yellow-600" />}
+                                                        </div>
+
+                                                        {hasViewableOrder && elapsedTime && (
+                                                            <div className="px-3 py-2 bg-gray-50 border-t border-gray-200">
+                                                                <div className="flex items-center justify-center gap-2 text-sm font-semibold text-gray-700">
+                                                                    <Clock size={16} className="text-orange-600" />
+                                                                    <span>{elapsedTime}</span>
+                                                                </div>
+                                                            </div>
+                                                        )}
+                                                    </div>
+
+                                                    {hasViewableOrder && orderInfo.status === 'ready' && (
+                                                        <button
+                                                            onClick={(e) => {
+                                                                e.stopPropagation();
+                                                                if (onMarkAsServed) {
+                                                                    onMarkAsServed(orderInfo.id, table.id);
+                                                                }
+                                                            }}
+                                                            className="w-full px-4 py-2 bg-green-600 text-white text-sm font-semibold hover:bg-green-700 transition-colors"
+                                                        >
+                                                            Mark as Served
+                                                        </button>
+                                                    )}
+                                                </div>
+                                            );
+                                        })}
+                                </div>
+                            </div>
+                        ))}
+                    </div>
+                );
+            })}
+
+            {orderMode === "takeaway" && (
+                <div className="text-center mt-10 text-gray-500 text-sm">
+                    Takeaway selected. Opening menu…
+                </div>
+            )}
         </div>
-      )}
-    </div>
-  );
+    );
 };
 
 const NoteModal = ({ isOpen, onClose, itemName }) => {
@@ -2838,10 +2847,6 @@ const TakeOrder = ({ clientId, token, onOrderUpdate, realm }) => {
   const [invoiceModalOpen, setInvoiceModalOpen] = useState(false);
   const [invoiceOrderData, setInvoiceOrderData] = useState(null);
   const [inventoryMap, setInventoryMap] = useState({});
-  const [menuConfig, setMenuConfig] = useState({
-    root: "dietery",
-    level: 2
-  });
   const navigate = useNavigate();
 
   // ============ UTILITY FUNCTIONS ============
@@ -2863,7 +2868,11 @@ const TakeOrder = ({ clientId, token, onOrderUpdate, realm }) => {
     });
     return flatList;
   };
-
+  const menuConfig = React.useMemo(() => {
+    if (!clientId) return null;
+    return getMenuConfig(clientId);
+  }, [clientId]);
+  
   const generateSlug = (text) =>
     "_" + text.trim().replace(/[^a-zA-Z0-9\s]/g, "").replace(/\s+/g, "_");
 
@@ -2946,13 +2955,7 @@ const TakeOrder = ({ clientId, token, onOrderUpdate, realm }) => {
       console.error("Failed to fetch table orders:", err);
     }
   };
-  useEffect(() => {
-    if (!clientId) return;
 
-    const config = getMenuConfig(clientId);
-    console.log("MENU CONFIG LOADED:", clientId, config);
-    setMenuConfig(config);
-  }, [clientId]);
   const handleDeleteOrder = async (orderId, tableId) => {
     try {
       await axios.delete(
@@ -3188,10 +3191,10 @@ const TakeOrder = ({ clientId, token, onOrderUpdate, realm }) => {
   };
   useEffect(() => {
     const fetchData = async () => {
-      if (!clientId || !token) {
-        setLoading(false);
+      if (!clientId || !token || !menuConfig) {
         return;
       }
+  
 
       try {
         setLoading(true);
@@ -3199,7 +3202,7 @@ const TakeOrder = ({ clientId, token, onOrderUpdate, realm }) => {
 
         const [catRes, itemRes, invRes] = await Promise.all([
           axios.get(
-            `${import.meta.env.VITE_API_INVENTORY_SERVICE_URL}/${clientId}/menu/read_category?category_id=dietery`,
+            `${import.meta.env.VITE_API_INVENTORY_SERVICE_URL}/${clientId}/menu/read_category?category_id=${menuConfig.root}`,
             { headers: { Authorization: `Bearer ${token}` } }
           ),
           axios.get(
@@ -3327,7 +3330,7 @@ const TakeOrder = ({ clientId, token, onOrderUpdate, realm }) => {
     };
 
     fetchData();
-  }, [clientId, token, realm]);
+  }, [clientId, token, realm,menuConfig]);
   useEffect(() => {
     if (!selectedCategory || selectedCategory === 'All Categories') {
       setSidebarCategories(categories);

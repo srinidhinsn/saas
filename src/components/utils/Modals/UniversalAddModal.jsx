@@ -1317,8 +1317,6 @@ const UniversalAddModal = ({
   // Menu-specific props
   newItem,
   setNewItem,
-  selectedCategory,
-  setSelectedCategory,
   categories,
   addonSubcategories, // ✅ Addon subcategories
   allAddonItems, // ✅ All addon items
@@ -1359,17 +1357,7 @@ const UniversalAddModal = ({
     return result;
   }, []);
 
-  const findCategoryName = useCallback((items = [], targetId) => {
-    for (const item of items || []) {
-      if (!item) continue;
-      if (item.id === targetId) return item.name;
-      if (item.children) {
-        const found = findCategoryName(item.children, targetId);
-        if (found) return found;
-      }
-    }
-    return null;
-  }, []);
+  
 
   // Fetch master values for zones and sections
   const fetchMasterValues = async (categoryId, setter) => {
@@ -1404,24 +1392,6 @@ const UniversalAddModal = ({
 
     loadMasters();
   }, [showModal, modalType, clientId, token]);
-
-  // Prefill category_id once when modal opens (guarded — don't overwrite while user types)
-  useEffect(() => {
-    if (showModal && modalType === 'menu') {
-      try {
-        const initialCatId = (typeof getCategoryIdByName === 'function')
-          ? getCategoryIdByName(selectedCategory) || ''
-          : '';
-        if ((!newItem || !newItem.category_id) && initialCatId) {
-          // use functional update to avoid clobbering concurrent updates
-          setNewItem(prev => ({ ...(prev || {}), category_id: initialCatId }));
-        }
-      } catch (err) {
-        // defensive
-      }
-    }
-    // eslint-disable-next-line react-hooks/exhaustive-deps
-  }, [showModal, modalType, selectedCategory]);
 
   // Drag handlers
   const handleDrag = (e) => {
@@ -1515,15 +1485,16 @@ const UniversalAddModal = ({
               <div>
                 <label className="block text-sm font-medium mb-2 text-text-primary">Category *</label>
                 <select
-                  value={newItem?.category_id ?? (getCategoryIdByName?.(selectedCategory) ?? '')}
+                  value={newItem?.category_id || ''}
                   onChange={(e) => {
                     const selectedCatId = e.target.value;
-                    const categoryName = findCategoryName(categories, selectedCatId);
-                    if (categoryName) {
-                      setSelectedCategory(categoryName);
-                    }
-                    setNewItem(prev => ({ ...(prev || {}), category_id: selectedCatId }));
+                  
+                    setNewItem(prev => ({
+                      ...(prev || {}),
+                      category_id: selectedCatId
+                    }));
                   }}
+                  
                   className="w-full px-4 py-2 rounded-lg bg-bg-tertiary border border-border-default text-text-primary focus:outline-none focus:ring-2 focus:ring-action-primary"
                   required
                 >
