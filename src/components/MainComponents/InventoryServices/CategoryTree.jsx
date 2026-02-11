@@ -1,91 +1,3 @@
-// import React, { useState, useEffect } from 'react';
-// import TreeNode from './TreeNode';
-// import { injectThemeVars } from '../../utils/injectThemeVars';
-
-// const CategoryTree = ({ categories = [], selectedCategory, onSelectCategory }) => {
-//   const [expandedCategories, setExpandedCategories] = useState(['All Categories']);
-
-//   useEffect(() => {
-//     // ensure CSS variables are available
-//     injectThemeVars();
-//   }, []);
-
-//   const toggleCategory = (categoryName) => {
-//     setExpandedCategories(prev =>
-//       prev.includes(categoryName)
-//         ? prev.filter(c => c !== categoryName)
-//         : [...prev, categoryName]
-//     );
-//   };
-
-//   const renderTree = (items, level = 0) => {
-//     return items.map((category) => {
-//       const isExpanded = expandedCategories.includes(category.name);
-//       const isSelected = selectedCategory === category.name;
-//       const hasChildren = category.children && category.children.length > 0;
-
-//       return (
-//         <div key={category.id || category.name} className="px-1">
-//           <TreeNode
-//             category={category}
-//             isExpanded={isExpanded}
-//             onToggle={() => toggleCategory(category.name)}
-//             isSelected={isSelected}
-//             onSelect={() => onSelectCategory(category.name)}
-//             hasChildren={hasChildren}
-//             level={level}
-//           />
-//           {hasChildren && isExpanded && (
-//             <div className="mt-1 ml-3">
-//               {renderTree(category.children, level + 1)}
-//             </div>
-//           )}
-//         </div>
-//       );
-//     });
-//   };
-
-//   return (
-//     <div
-//       className="rounded-lg p-4"
-//       style={{
-//         backgroundColor: 'var(--color-bg-primary)',
-//         boxShadow: 'var(--shadow-card)',
-//         border: `1px solid var(--color-border-default)`
-//       }}
-//     >
-//       <h3
-//         className="text-lg font-semibold mb-3 px-3"
-//         style={{ color: 'var(--color-text-primary)' }}
-//       >
-//         Categories
-//       </h3>
-//       <div className="space-y-1">
-//         {categories && categories.length > 0 ? (
-//           renderTree(categories)
-//         ) : (
-//           <div className="px-3 py-4" style={{ color: 'var(--color-text-secondary)' }}>
-//             No categories
-//           </div>
-//         )}
-//       </div>
-//     </div>
-//   );
-// };
-
-// export default CategoryTree;
-
-
-
-
-
-
-// =================================================================== ///////// ===================================================== //
-// =================================================================== ///////// ===================================================== //
-// =================================================================== ///////// ===================================================== //
-// =================================================================== ///////// ===================================================== //
-// =================================================================== ///////// ===================================================== //
-// =================================================================== ///////// ===================================================== //
 import { useState, useEffect, useCallback } from "react";
 import { createPortal } from "react-dom";
 import MenuTreeNode from "./TreeNode";
@@ -103,7 +15,7 @@ const CategoryTree = ({
   token,
   onCategoriesUpdate
 }) => {
-  const [expandedCategories, setExpandedCategories] = useState(['All Categories']);
+  const [expandedCategories, setExpandedCategories] = useState([]);
   const [parentMap, setParentMap] = useState({});
 
   // Modal states
@@ -174,22 +86,35 @@ const CategoryTree = ({
   };
 
   useEffect(() => {
-    if (!categories || categories.length === 0) {
-      setExpandedCategories(['All Categories']);
-      return;
+    if (!categories || categories.length === 0) return;
+  
+    // find selected category path
+    const findPath = (nodes, targetName, path = []) => {
+      for (const node of nodes) {
+        const newPath = [...path, node.id];
+  
+        if (node.name === targetName) {
+          return newPath;
+        }
+  
+        if (node.children?.length) {
+          const result = findPath(node.children, targetName, newPath);
+          if (result) return result;
+        }
+      }
+      return null;
+    };
+  
+    const path = findPath(categories, selectedCategory);
+  
+    if (path) {
+      setExpandedCategories(path); // only open this branch
     }
-
-    const path = findCategoryByName(categories, defaultOpenCategoryName);
-
-    if (path && path.length > 0) {
-      setExpandedCategories(path);
-    } else {
-      setExpandedCategories(['All Categories']);
-    }
-
+  
     buildParentMapFromCategories(categories);
-  }, [categories, defaultOpenCategoryName]);
-
+  
+  }, [selectedCategory, categories]);
+  
   const buildParentMapFromCategories = (cats) => {
     const tempMap = {};
     const traverse = (items, parentId = null) => {
@@ -204,13 +129,14 @@ const CategoryTree = ({
     setParentMap(tempMap);
   };
 
-  const toggleCategory = (categoryName) => {
+  const toggleCategory = (categoryId) => {
     setExpandedCategories(prev =>
-      prev.includes(categoryName)
-        ? prev.filter(c => c !== categoryName)
-        : [...prev, categoryName]
+      prev.includes(categoryId)
+        ? prev.filter(id => id !== categoryId)
+        : [...prev, categoryId]
     );
   };
+  
 
   const generateSlugFromParents = (categoryId, currentName, overrideParentMap = null) => {
     const path = [];
@@ -454,8 +380,8 @@ const CategoryTree = ({
 
   const renderTree = (items, level = 0) => {
     return items.map((category) => {
-      const isExpanded = expandedCategories.includes(category.name);
-      const isSelected = selectedCategory === category.name;
+      const isExpanded = expandedCategories.includes(category.id);
+const isSelected = selectedCategory === category.name;
       const hasChildren = category.children && category.children.length > 0;
 
       return (
@@ -463,7 +389,7 @@ const CategoryTree = ({
           <MenuTreeNode
             category={category}
             isExpanded={isExpanded}
-            onToggle={() => toggleCategory(category.name)}
+            onToggle={() => toggleCategory(category.id)}
             isSelected={isSelected}
             onSelect={() => onSelectCategory(category.name)}
             hasChildren={hasChildren}

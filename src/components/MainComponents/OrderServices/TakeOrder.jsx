@@ -2283,6 +2283,7 @@ import { Eye, Lock, Printer } from 'lucide-react';
 import { useNavigate } from 'react-router-dom';
 import { toast } from 'react-toastify';
 import InvoiceModal from '../BillingServices/InvoiceModal';
+import { getMenuConfig } from '../../utils/menuConfigResolver';
 
 const TABLE_STATUS_CONFIG = {
   vacant: {
@@ -2383,38 +2384,38 @@ const TableReservation = ({
 
   const calculateElapsedTime = (createdAt) => {
     if (!createdAt) return null;
-  
+
     let created;
-  
+
     if (typeof createdAt === "string") {
       // Convert to proper ISO UTC format
       const utcString =
         createdAt.replace(" ", "T").split(".")[0] + "Z";
-  
+
       created = new Date(utcString).getTime();
     } else {
       created = new Date(createdAt).getTime();
     }
-  
+
     const diffMs = Date.now() - created;
-  
+
     if (diffMs < 0) return "Just now";
-  
+
     const seconds = Math.floor(diffMs / 1000);
     const minutes = Math.floor(seconds / 60);
     const hours = Math.floor(minutes / 60);
     const days = Math.floor(hours / 24);
-  
+
     if (seconds < 60) return "Just now";
     if (minutes === 1) return "1 min ago";
     if (minutes < 60) return `${minutes} mins ago`;
     if (hours === 1) return "1 hr ago";
     if (hours < 24) return `${hours} hrs ago`;
     if (days === 1) return "1 day ago";
-  
+
     return `${days} days ago`;
   };
-  
+
   return (
     <div className="p-4 bg-bg-primary overflow-y-auto h-[calc(100vh-4rem)]">
       {/* FILTER BAR */}
@@ -2831,12 +2832,16 @@ const TakeOrder = ({ clientId, token, onOrderUpdate, realm }) => {
   const [tableOrders, setTableOrders] = useState({});
   const [showDeleteConfirm, setShowDeleteConfirm] = useState(false);
   const [orderToDelete, setOrderToDelete] = useState(null);
-
+  const [dieterySubCategories, setDieterySubCategories] = useState([]);
+  const [sidebarCategories, setSidebarCategories] = useState([]); 
   // ✅ NEW: Invoice modal state
   const [invoiceModalOpen, setInvoiceModalOpen] = useState(false);
   const [invoiceOrderData, setInvoiceOrderData] = useState(null);
   const [inventoryMap, setInventoryMap] = useState({});
-
+  const [menuConfig, setMenuConfig] = useState({
+    root: "dietery",
+    level: 2
+  });
   const navigate = useNavigate();
 
   // ============ UTILITY FUNCTIONS ============
@@ -2941,7 +2946,13 @@ const TakeOrder = ({ clientId, token, onOrderUpdate, realm }) => {
       console.error("Failed to fetch table orders:", err);
     }
   };
+  useEffect(() => {
+    if (!clientId) return;
 
+    const config = getMenuConfig(clientId);
+    console.log("MENU CONFIG LOADED:", clientId, config);
+    setMenuConfig(config);
+  }, [clientId]);
   const handleDeleteOrder = async (orderId, tableId) => {
     try {
       await axios.delete(
@@ -3133,7 +3144,48 @@ const TakeOrder = ({ clientId, token, onOrderUpdate, realm }) => {
   useEffect(() => {
     window.history.pushState({ view: 'floor' }, '');
   }, []);
+  const findCategoryNode = (tree, matcher) => {
+    for (const cat of tree) {
+      if (
+        cat.id?.toLowerCase() === matcher.toLowerCase() ||
+        cat.name?.toLowerCase() === matcher.toLowerCase()
+      ) {
+        return cat;
+      }
+      if (cat.children?.length) {
+        const found = findCategoryNode(cat.children, matcher);
+        if (found) return found;
+      }
+    }
+    return null;
+  };
 
+  const getCategoriesAtLevel = (node, targetLevel, currentLevel = 0) => {
+    if (!node) return [];
+
+    if (currentLevel === targetLevel) {
+      return [node];
+    }
+
+    let result = [];
+    for (const child of node.children || []) {
+      result = result.concat(
+        getCategoriesAtLevel(child, targetLevel, currentLevel + 1)
+      );
+    }
+
+    return result;
+  }; const findNodeAndChildren = (nodes, id) => {
+    for (const node of nodes) {
+      if (node.id === id) return node;
+
+      if (node.children?.length) {
+        const found = findNodeAndChildren(node.children, id);
+        if (found) return found;
+      }
+    }
+    return null;
+  };
   useEffect(() => {
     const fetchData = async () => {
       if (!clientId || !token) {
@@ -3214,6 +3266,46 @@ const TakeOrder = ({ clientId, token, onOrderUpdate, realm }) => {
           return tree;
         };
 
+        const categoryTree = buildCategoryTree().map(cat => {
+          if (cat.id === 'dietery' || cat.name?.toLowerCase() === 'dietery') {
+            return {
+              ...cat,
+              name: 'All Categories',
+              count: cat.children.length
+            };
+          }
+          return cat;
+        });
+
+        setCategories(categoryTree);
+
+        // 1️⃣ Find configured root
+        const rootNode = findCategoryNode(categoryTree, menuConfig.root);
+        
+        // 2️⃣ Extract categories at configured level
+        let quickCategories = [];
+        
+        if (rootNode) {
+          let level = menuConfig.level;
+        
+          // fallback search: go upwards until categories exist
+          while (level >= 0) {
+            quickCategories = getCategoriesAtLevel(rootNode, level);
+        
+            if (quickCategories.length > 0) {
+              console.log("Using hierarchy level:", level);
+              break;
+            }
+        
+            level--;
+          }
+        }
+        
+        // 3️⃣ Set them
+        setDieterySubCategories(quickCategories);
+        
+        // Sidebar should show full tree initially
+        setSidebarCategories(categoryTree);
         const tree = buildCategoryTree().map(cat => {
           if (cat.id === 'dietery' || cat.name?.toLowerCase() === 'dietery') {
             return {
@@ -3236,7 +3328,11 @@ const TakeOrder = ({ clientId, token, onOrderUpdate, realm }) => {
 
     fetchData();
   }, [clientId, token, realm]);
-
+  useEffect(() => {
+    if (!selectedCategory || selectedCategory === 'All Categories') {
+      setSidebarCategories(categories);
+    }
+  }, [selectedCategory, categories]);
   useEffect(() => {
     if (!activeOrderId || menuItems.length === 0 || cart.length === 0) return;
 
@@ -3864,15 +3960,17 @@ const TakeOrder = ({ clientId, token, onOrderUpdate, realm }) => {
       ? tables.find(t => t.id === 500)?.table_number || 'Takeaway'
       : tables.find(t => t.id.toString() === selectedTable)?.table_number;
 
-  const handleBackToTables = () => {
-    setCurrentView('floor');
-    setShowCart(false);
-    setSelectedTable('');
-    setCart([]);
-    setActiveOrderId(null);
-    setCurrentBatchTimestamp(null);
-    setHasNewItems(false);
-  };
+      const handleBackToTables = () => {
+        setCurrentView('floor');
+        setShowCart(false);
+        setSelectedTable('');
+        setCart([]);
+        setActiveOrderId(null);
+        setCurrentBatchTimestamp(null);
+        setHasNewItems(false);
+        setSelectedCategory('All Categories'); // Reset selection
+        setSidebarCategories(categories); // Reset sidebar to full tree
+      };
 
   const CartItemWithAddons = ({ group, onUpdateQuantity, onRemove }) => {
     const { main, addons } = group;
@@ -3975,12 +4073,12 @@ const TakeOrder = ({ clientId, token, onOrderUpdate, realm }) => {
 
             <div className="w-full lg:col-span-1">
               <div className="lg:h-[calc(98dvh-4rem)] lg:overflow-y-auto pr-1">
-                <CategoryTree
-                  categories={categories}
-                  selectedCategory={selectedCategory}
-                  onSelectCategory={setSelectedCategory}
-                  defaultOpenAll
-                />
+              <CategoryTree
+  categories={sidebarCategories}
+  selectedCategory={selectedCategory}
+  onSelectCategory={setSelectedCategory}
+  defaultOpenAll
+/>
               </div>
             </div>
 
@@ -3988,36 +4086,70 @@ const TakeOrder = ({ clientId, token, onOrderUpdate, realm }) => {
 
               <div className="transition-all duration-300 border-default border-border-default p-2 rounded-lg flex-1 overflow-y-auto h-[calc(98dvh-4rem)] lg:h-auto lg:max-h-[calc(98dvh-4rem)]">
 
-                <div className="mb-2 flex items-center justify-between lg:flex-row flex-col gap-2">
-                  <div className="flex items-center gap-2">
-                    <button
-                      onClick={handleBackToTables}
-                      className="p-2 rounded-lg bg-bg-tertiary border border-border-default hover:bg-bg-secondary transition-colors"
-                      title="Back to table selection"
-                    >
-                      <ArrowLeft size={20} className="text-text-primary" />
-                    </button>
+              <div className="space-y-2">
+  {/* Quick Category Pills */}
+  <div className="flex gap-2 overflow-x-auto scrollbar-hide pb-2">
+    {dieterySubCategories.map(cat => (
+      <button
+        key={cat.id}
+        onClick={() => {
+          setSelectedCategory(cat.name);
+          
+          // Update left sidebar to show selected category with all subcategories
+          const selectedNode = findNodeAndChildren(categories, cat.id);
+          
+          if (selectedNode) {
+            // Show only this category tree in sidebar
+            setSidebarCategories([selectedNode]);
+          }
+        }}
+        className={`px-3 py-1.5 rounded-lg text-sm font-semibold border whitespace-nowrap transition-all flex-shrink-0
+          ${selectedCategory === cat.name
+            ? 'bg-action-primary text-white border-action-primary'
+            : 'bg-bg-tertiary text-text-primary hover:border-action-primary'
+          }`}
+      >
+        <div className="flex flex-col leading-tight text-left">
+          <span className="text-sm font-semibold">
+            {cat.name}
+          </span>
+        </div>
+      </button>
+    ))}
+  </div>
 
-                    <h2 className="text-xl lg:text-2xl font-semibold text-text-primary truncate">
-                      {selectedCategory}
-                      <span className="text-sm ml-2">({filteredItems.length})</span>
-                    </h2>
-                  </div>
+  {/* Header with Back button, Title, and Search */}
+  <div className="flex items-center justify-between lg:flex-row flex-col gap-2">
+    <div className="flex items-center gap-2">
+      <button
+        onClick={handleBackToTables}
+        className="p-2 rounded-lg bg-bg-tertiary border border-border-default hover:bg-bg-secondary transition-colors"
+        title="Back to table selection"
+      >
+        <ArrowLeft size={20} className="text-text-primary" />
+      </button>
 
-                  <div className="relative w-64 max-w-full">
-                    <Search
-                      size={16}
-                      className="absolute left-3 top-1/2 -translate-y-1/2 text-text-secondary"
-                    />
-                    <input
-                      ref={searchInputRef}
-                      value={searchQuery}
-                      onChange={(e) => setSearchQuery(e.target.value)}
-                      placeholder="Search items..."
-                      className="w-full pl-9 pr-3 py-2 text-sm rounded-lg border border-border-default bg-bg-primary focus:outline-none focus:ring-2 focus:ring-action-primary"
-                    />
-                  </div>
-                </div>
+      <h2 className="text-xl lg:text-2xl font-semibold text-text-primary truncate">
+        {selectedCategory}
+        <span className="text-sm ml-2">({filteredItems.length})</span>
+      </h2>
+    </div>
+
+    <div className="relative w-64 max-w-full">
+      <Search
+        size={16}
+        className="absolute left-3 top-1/2 -translate-y-1/2 text-text-secondary"
+      />
+      <input
+        ref={searchInputRef}
+        value={searchQuery}
+        onChange={(e) => setSearchQuery(e.target.value)}
+        placeholder="Search items..."
+        className="w-full pl-9 pr-3 py-2 text-sm rounded-lg border border-border-default bg-bg-primary focus:outline-none focus:ring-2 focus:ring-action-primary"
+      />
+    </div>
+  </div>
+</div>
 
                 <div className={`grid gap-2 grid-cols-2 md:grid-cols-4 ${isOrderFormOpen ? 'lg:grid-cols-3' : 'lg:grid-cols-4'}`}>
                   {filteredItems.map(item => {
