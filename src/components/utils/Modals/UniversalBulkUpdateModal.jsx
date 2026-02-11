@@ -1,12 +1,15 @@
-// import React from 'react';
+// import React, { useEffect, useState } from 'react';
 // import { X, Edit, Trash2, Search } from 'lucide-react';
 // import DropdownCheckbox from './DropdownCheckbox';
+// import axios from "axios";
 
 // const UniversalBulkUpdateModal = ({
 //   // Common props
 //   showModal,
 //   setShowModal,
 //   modalType, // 'menu' or 'table'
+//   clientId,
+//   token,
 
 //   // Menu-specific props (Bulk Update)
 //   filteredItems,
@@ -37,6 +40,9 @@
 
 //   // ✅ NEW: State for global add-ons selection
 //   const [globalAddons, setGlobalAddons] = React.useState([]);
+//   const [zoneOptions, setZoneOptions] = React.useState([]);
+//   const [sectionOptions, setSectionOptions] = React.useState([]);
+//   const [loadingMasters, setLoadingMasters] = React.useState(false);
 
 //   // ✅ NEW: Apply global add-ons to all selected items
 //   const applyGlobalAddons = () => {
@@ -57,6 +63,40 @@
 //     setBulkEditData(updatedBulkData);
 //     alert(`Applied ${globalAddons.length} add-on(s) to ${selectedRows.length} selected item(s)`);
 //   };
+//   const fetchMasterValues = async (categoryId, setter) => {
+//     try {
+//       const res = await axios.get(
+//         `${import.meta.env.VITE_API_INVENTORY_SERVICE_URL}/${clientId}/inventory/masters`,
+//         {
+//           params: { category_id: categoryId },
+//           headers: { Authorization: `Bearer ${token}` }
+//         }
+//       );
+
+//       setter(res?.data?.data || []);
+
+//     } catch (err) {
+//       console.error("Master fetch error:", categoryId, err);
+//       setter([]);
+//     }
+//   };
+//   React.useEffect(() => {
+//     if (!showModal || modalType !== "table") return;
+//     if (!clientId || !token) return;
+
+//     const loadMasters = async () => {
+//       setLoadingMasters(true);
+
+//       await Promise.all([
+//         fetchMasterValues("zone", setZoneOptions),
+//         fetchMasterValues("section", setSectionOptions)
+//       ]);
+
+//       setLoadingMasters(false);
+//     };
+
+//     loadMasters();
+//   }, [showModal, modalType, clientId, token]);
 
 //   // ✅ NEW: Clear global add-ons for all selected items
 //   const clearGlobalAddons = () => {
@@ -528,9 +568,18 @@
 //                   className="w-full px-3 py-1.5 border border-border-default rounded-lg text-sm bg-bg-primary text-text-primary"
 //                 >
 //                   <option value="">No change</option>
-//                   <option value="AC">AC</option>
-//                   <option value="Non-AC">Non-AC</option>
+
+//                   {loadingMasters ? (
+//                     <option disabled>Loading...</option>
+//                   ) : sectionOptions.length === 0 ? (
+//                     <option disabled>No Sections Configured</option>
+//                   ) : (
+//                     sectionOptions.map((sec, i) => (
+//                       <option key={i} value={sec}>{sec}</option>
+//                     ))
+//                   )}
 //                 </select>
+
 //               </div>
 
 //               {/* Zone */}
@@ -546,11 +595,18 @@
 //                   className="w-full px-3 py-1.5 border border-border-default rounded-lg text-sm bg-bg-primary text-text-primary"
 //                 >
 //                   <option value="">No change</option>
-//                   <option value="Garden Area">Garden Area</option>
-//                   <option value="Ground Floor">Ground Floor</option>
-//                   <option value="First Floor">First Floor</option>
-//                   <option value="Second Floor">Second Floor</option>
+
+//                   {loadingMasters ? (
+//                     <option disabled>Loading...</option>
+//                   ) : zoneOptions.length === 0 ? (
+//                     <option disabled>No Zones Configured</option>
+//                   ) : (
+//                     zoneOptions.map((zone, i) => (
+//                       <option key={i} value={zone}>{zone}</option>
+//                     ))
+//                   )}
 //                 </select>
+
 //               </div>
 //             </div>
 //           </div>
@@ -687,15 +743,25 @@
 //                             Section
 //                           </label>
 //                           <select
-//                             value={bulkUpdateData[table.id]?.section ?? table.section ?? ""}
+//                             value={bulkUpdateGlobal.section || ""}
 //                             onChange={e =>
-//                               handleBulkUpdateChange(table.id, "section", e.target.value)
+//                               setBulkUpdateGlobal(prev => ({ ...prev, section: e.target.value }))
 //                             }
 //                             className="w-full px-3 py-1.5 border border-border-default rounded-lg text-sm bg-bg-primary text-text-primary"
 //                           >
-//                             <option value="AC">AC</option>
-//                             <option value="Non-AC">Non-AC</option>
+//                             <option value="">No change</option>
+
+//                             {loadingMasters ? (
+//                               <option disabled>Loading...</option>
+//                             ) : sectionOptions.length === 0 ? (
+//                               <option disabled>No Sections Configured</option>
+//                             ) : (
+//                               sectionOptions.map((sec, i) => (
+//                                 <option key={i} value={sec}>{sec}</option>
+//                               ))
+//                             )}
 //                           </select>
+
 //                         </div>
 
 //                         {/* Zone */}
@@ -704,17 +770,25 @@
 //                             Zone
 //                           </label>
 //                           <select
-//                             value={bulkUpdateData[table.id]?.location_zone ?? table.location_zone}
+//                             value={bulkUpdateGlobal.location_zone || ""}
 //                             onChange={e =>
-//                               handleBulkUpdateChange(table.id, "location_zone", e.target.value)
+//                               setBulkUpdateGlobal(prev => ({ ...prev, location_zone: e.target.value }))
 //                             }
 //                             className="w-full px-3 py-1.5 border border-border-default rounded-lg text-sm bg-bg-primary text-text-primary"
 //                           >
-//                             <option value="Garden Area">Garden Area</option>
-//                             <option value="Ground Floor">Ground Floor</option>
-//                             <option value="First Floor">First Floor</option>
-//                             <option value="Second Floor">Second Floor</option>
+//                             <option value="">No change</option>
+
+//                             {loadingMasters ? (
+//                               <option disabled>Loading...</option>
+//                             ) : zoneOptions.length === 0 ? (
+//                               <option disabled>No Zones Configured</option>
+//                             ) : (
+//                               zoneOptions.map((zone, i) => (
+//                                 <option key={i} value={zone}>{zone}</option>
+//                               ))
+//                             )}
 //                           </select>
+
 //                         </div>
 //                       </div>
 //                     ) : (
@@ -773,22 +847,10 @@
 
 
 
-
-
-
-
-
-
-
-
-
-
-
-
-
 import React from 'react';
 import { X, Edit, Trash2, Search, Plus } from 'lucide-react';
 import AddonSelectionPopup from './AddonSelection';
+import axios from 'axios';
 
 const UniversalBulkUpdateModal = ({
   // Common props
@@ -808,8 +870,8 @@ const UniversalBulkUpdateModal = ({
   setBulkEditData,
   handleBulkUpdate,
   handleBulkDelete,
-  addonSubcategories, // ✅ NEW: Addon subcategories
-  allAddonItems, // ✅ NEW: All addon items
+  addonSubcategories, // ✅ Addon subcategories
+  allAddonItems, // ✅ All addon items
 
   // Table-specific props (Bulk Update)
   tables,
@@ -826,39 +888,18 @@ const UniversalBulkUpdateModal = ({
   getFilteredUpdateTables
 }) => {
 
-  // ✅ NEW: State for global add-ons popup
+  // ✅ State for global add-ons popup
   const [showGlobalAddonPopup, setShowGlobalAddonPopup] = React.useState(false);
   const [globalAddons, setGlobalAddons] = React.useState([]);
   const [zoneOptions, setZoneOptions] = React.useState([]);
   const [sectionOptions, setSectionOptions] = React.useState([]);
   const [loadingMasters, setLoadingMasters] = React.useState(false);
 
-  // ✅ NEW: State for individual item addon popup
+  // ✅ State for individual item addon popup
   const [showItemAddonPopup, setShowItemAddonPopup] = React.useState(false);
   const [currentEditingItemId, setCurrentEditingItemId] = React.useState(null);
 
-  // ✅ Apply global add-ons to all selected items
-  const applyGlobalAddons = () => {
-    if (globalAddons.length === 0) {
-      alert('Please select at least one add-on to apply');
-      return;
-    }
-
-    const updatedBulkData = { ...bulkEditData };
-
-    selectedRows.forEach(itemId => {
-      updatedBulkData[itemId] = {
-        ...(updatedBulkData[itemId] || {}),
-        line_item_id: [...globalAddons]
-      };
-
-    });
-
-    setBulkEditData(updatedBulkData);
-    setShowGlobalAddonPopup(false);
-    setGlobalAddons([]);
-    alert(`Applied ${globalAddons.length} add-on(s) to ${selectedRows.length} selected item(s)`);
-  };
+  // Fetch master values for zones and sections
   const fetchMasterValues = async (categoryId, setter) => {
     try {
       const res = await axios.get(
@@ -868,26 +909,24 @@ const UniversalBulkUpdateModal = ({
           headers: { Authorization: `Bearer ${token}` }
         }
       );
-
       setter(res?.data?.data || []);
-
     } catch (err) {
       console.error("Master fetch error:", categoryId, err);
       setter([]);
     }
   };
+
+  // Load master data for table modal
   React.useEffect(() => {
     if (!showModal || modalType !== "table") return;
     if (!clientId || !token) return;
 
     const loadMasters = async () => {
       setLoadingMasters(true);
-
       await Promise.all([
         fetchMasterValues("zone", setZoneOptions),
         fetchMasterValues("section", setSectionOptions)
       ]);
-
       setLoadingMasters(false);
     };
 
@@ -1015,7 +1054,7 @@ const UniversalBulkUpdateModal = ({
               </button>
             </div>
 
-            {/* ✅ NEW: Global Add-ons Section */}
+            {/* ✅ Global Add-ons Section */}
             <div className="px-6 py-4 bg-blue-50 border-b border-blue-200">
               <div className="flex items-start gap-4">
                 <div className="flex-1">
@@ -1032,6 +1071,7 @@ const UniversalBulkUpdateModal = ({
                     </button>
                     <button
                       onClick={clearGlobalAddons}
+                      disabled={selectedRows.length === 0}
                       className="px-4 py-2 rounded-md bg-gray-600 text-white hover:bg-gray-700 transition-colors disabled:bg-gray-300 disabled:cursor-not-allowed font-medium text-sm whitespace-nowrap"
                     >
                       Clear All
@@ -1299,7 +1339,6 @@ const UniversalBulkUpdateModal = ({
             setBulkEditData(updatedBulkData);
             setShowGlobalAddonPopup(false);
           }}
-
           addonSubcategories={addonSubcategories || []}
           allAddonItems={allAddonItems || []}
           currentItemId={null}
@@ -1329,7 +1368,7 @@ const UniversalBulkUpdateModal = ({
     );
   }
 
-  // Render Table Bulk Update Modal (unchanged from original)
+  // Render Table Bulk Update Modal
   if (modalType === 'table') {
     const filteredTables = getFilteredUpdateTables();
 
@@ -1443,7 +1482,6 @@ const UniversalBulkUpdateModal = ({
                     ))
                   )}
                 </select>
-
               </div>
 
               {/* Zone */}
@@ -1470,7 +1508,6 @@ const UniversalBulkUpdateModal = ({
                     ))
                   )}
                 </select>
-
               </div>
             </div>
           </div>
@@ -1607,9 +1644,9 @@ const UniversalBulkUpdateModal = ({
                             Section
                           </label>
                           <select
-                            value={bulkUpdateGlobal.section || ""}
+                            value={bulkUpdateData[table.id]?.section ?? table.section ?? ""}
                             onChange={e =>
-                              setBulkUpdateGlobal(prev => ({ ...prev, section: e.target.value }))
+                              handleBulkUpdateChange(table.id, "section", e.target.value)
                             }
                             className="w-full px-3 py-1.5 border border-border-default rounded-lg text-sm bg-bg-primary text-text-primary"
                           >
@@ -1625,7 +1662,6 @@ const UniversalBulkUpdateModal = ({
                               ))
                             )}
                           </select>
-
                         </div>
 
                         {/* Zone */}
@@ -1634,9 +1670,9 @@ const UniversalBulkUpdateModal = ({
                             Zone
                           </label>
                           <select
-                            value={bulkUpdateGlobal.location_zone || ""}
+                            value={bulkUpdateData[table.id]?.location_zone ?? table.location_zone ?? ""}
                             onChange={e =>
-                              setBulkUpdateGlobal(prev => ({ ...prev, location_zone: e.target.value }))
+                              handleBulkUpdateChange(table.id, "location_zone", e.target.value)
                             }
                             className="w-full px-3 py-1.5 border border-border-default rounded-lg text-sm bg-bg-primary text-text-primary"
                           >
@@ -1652,7 +1688,6 @@ const UniversalBulkUpdateModal = ({
                               ))
                             )}
                           </select>
-
                         </div>
                       </div>
                     ) : (
