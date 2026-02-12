@@ -4442,8 +4442,6 @@
 
 
 
-
-
 import React, { useState, useEffect, useRef, useCallback } from 'react';
 import { ShoppingCart, Plus, Minus, X, Check, StickyNote, Search, Users, Package, Trash2, ArrowLeft, FileText, Printer as PrinterIcon, Clock } from 'lucide-react';
 import axios from 'axios';

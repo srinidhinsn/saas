@@ -1,12 +1,15 @@
-// import React from 'react';
+// import React, { useEffect, useState } from 'react';
 // import { X, Edit, Trash2, Search } from 'lucide-react';
 // import DropdownCheckbox from './DropdownCheckbox';
+// import axios from "axios";
 
 // const UniversalBulkUpdateModal = ({
 //   // Common props
 //   showModal,
 //   setShowModal,
 //   modalType, // 'menu' or 'table'
+//   clientId,
+//   token,
 
 //   // Menu-specific props (Bulk Update)
 //   filteredItems,
@@ -37,6 +40,9 @@
 
 //   // ✅ NEW: State for global add-ons selection
 //   const [globalAddons, setGlobalAddons] = React.useState([]);
+//   const [zoneOptions, setZoneOptions] = React.useState([]);
+//   const [sectionOptions, setSectionOptions] = React.useState([]);
+//   const [loadingMasters, setLoadingMasters] = React.useState(false);
 
 //   // ✅ NEW: Apply global add-ons to all selected items
 //   const applyGlobalAddons = () => {
@@ -57,6 +63,40 @@
 //     setBulkEditData(updatedBulkData);
 //     alert(`Applied ${globalAddons.length} add-on(s) to ${selectedRows.length} selected item(s)`);
 //   };
+//   const fetchMasterValues = async (categoryId, setter) => {
+//     try {
+//       const res = await axios.get(
+//         `${import.meta.env.VITE_API_INVENTORY_SERVICE_URL}/${clientId}/inventory/masters`,
+//         {
+//           params: { category_id: categoryId },
+//           headers: { Authorization: `Bearer ${token}` }
+//         }
+//       );
+
+//       setter(res?.data?.data || []);
+
+//     } catch (err) {
+//       console.error("Master fetch error:", categoryId, err);
+//       setter([]);
+//     }
+//   };
+//   React.useEffect(() => {
+//     if (!showModal || modalType !== "table") return;
+//     if (!clientId || !token) return;
+
+//     const loadMasters = async () => {
+//       setLoadingMasters(true);
+
+//       await Promise.all([
+//         fetchMasterValues("zone", setZoneOptions),
+//         fetchMasterValues("section", setSectionOptions)
+//       ]);
+
+//       setLoadingMasters(false);
+//     };
+
+//     loadMasters();
+//   }, [showModal, modalType, clientId, token]);
 
 //   // ✅ NEW: Clear global add-ons for all selected items
 //   const clearGlobalAddons = () => {
@@ -528,9 +568,18 @@
 //                   className="w-full px-3 py-1.5 border border-border-default rounded-lg text-sm bg-bg-primary text-text-primary"
 //                 >
 //                   <option value="">No change</option>
-//                   <option value="AC">AC</option>
-//                   <option value="Non-AC">Non-AC</option>
+
+//                   {loadingMasters ? (
+//                     <option disabled>Loading...</option>
+//                   ) : sectionOptions.length === 0 ? (
+//                     <option disabled>No Sections Configured</option>
+//                   ) : (
+//                     sectionOptions.map((sec, i) => (
+//                       <option key={i} value={sec}>{sec}</option>
+//                     ))
+//                   )}
 //                 </select>
+
 //               </div>
 
 //               {/* Zone */}
@@ -546,11 +595,18 @@
 //                   className="w-full px-3 py-1.5 border border-border-default rounded-lg text-sm bg-bg-primary text-text-primary"
 //                 >
 //                   <option value="">No change</option>
-//                   <option value="Garden Area">Garden Area</option>
-//                   <option value="Ground Floor">Ground Floor</option>
-//                   <option value="First Floor">First Floor</option>
-//                   <option value="Second Floor">Second Floor</option>
+
+//                   {loadingMasters ? (
+//                     <option disabled>Loading...</option>
+//                   ) : zoneOptions.length === 0 ? (
+//                     <option disabled>No Zones Configured</option>
+//                   ) : (
+//                     zoneOptions.map((zone, i) => (
+//                       <option key={i} value={zone}>{zone}</option>
+//                     ))
+//                   )}
 //                 </select>
+
 //               </div>
 //             </div>
 //           </div>
@@ -687,15 +743,25 @@
 //                             Section
 //                           </label>
 //                           <select
-//                             value={bulkUpdateData[table.id]?.section ?? table.section ?? ""}
+//                             value={bulkUpdateGlobal.section || ""}
 //                             onChange={e =>
-//                               handleBulkUpdateChange(table.id, "section", e.target.value)
+//                               setBulkUpdateGlobal(prev => ({ ...prev, section: e.target.value }))
 //                             }
 //                             className="w-full px-3 py-1.5 border border-border-default rounded-lg text-sm bg-bg-primary text-text-primary"
 //                           >
-//                             <option value="AC">AC</option>
-//                             <option value="Non-AC">Non-AC</option>
+//                             <option value="">No change</option>
+
+//                             {loadingMasters ? (
+//                               <option disabled>Loading...</option>
+//                             ) : sectionOptions.length === 0 ? (
+//                               <option disabled>No Sections Configured</option>
+//                             ) : (
+//                               sectionOptions.map((sec, i) => (
+//                                 <option key={i} value={sec}>{sec}</option>
+//                               ))
+//                             )}
 //                           </select>
+
 //                         </div>
 
 //                         {/* Zone */}
@@ -704,17 +770,25 @@
 //                             Zone
 //                           </label>
 //                           <select
-//                             value={bulkUpdateData[table.id]?.location_zone ?? table.location_zone}
+//                             value={bulkUpdateGlobal.location_zone || ""}
 //                             onChange={e =>
-//                               handleBulkUpdateChange(table.id, "location_zone", e.target.value)
+//                               setBulkUpdateGlobal(prev => ({ ...prev, location_zone: e.target.value }))
 //                             }
 //                             className="w-full px-3 py-1.5 border border-border-default rounded-lg text-sm bg-bg-primary text-text-primary"
 //                           >
-//                             <option value="Garden Area">Garden Area</option>
-//                             <option value="Ground Floor">Ground Floor</option>
-//                             <option value="First Floor">First Floor</option>
-//                             <option value="Second Floor">Second Floor</option>
+//                             <option value="">No change</option>
+
+//                             {loadingMasters ? (
+//                               <option disabled>Loading...</option>
+//                             ) : zoneOptions.length === 0 ? (
+//                               <option disabled>No Zones Configured</option>
+//                             ) : (
+//                               zoneOptions.map((zone, i) => (
+//                                 <option key={i} value={zone}>{zone}</option>
+//                               ))
+//                             )}
 //                           </select>
+
 //                         </div>
 //                       </div>
 //                     ) : (
@@ -788,6 +862,7 @@
 import React from 'react';
 import { X, Edit, Trash2, Search, Plus } from 'lucide-react';
 import AddonSelectionPopup from './AddonSelection';
+import axios from 'axios';
 
 const UniversalBulkUpdateModal = ({
   // Common props
@@ -931,9 +1006,7 @@ const UniversalBulkUpdateModal = ({
           headers: { Authorization: `Bearer ${token}` }
         }
       );
-
       setter(res?.data?.data || []);
-
     } catch (err) {
       console.error("Master fetch error:", categoryId, err);
       setter([]);
@@ -946,12 +1019,10 @@ const UniversalBulkUpdateModal = ({
 
     const loadMasters = async () => {
       setLoadingMasters(true);
-
       await Promise.all([
         fetchMasterValues("zone", setZoneOptions),
         fetchMasterValues("section", setSectionOptions)
       ]);
-
       setLoadingMasters(false);
     };
 

@@ -1,92 +1,27 @@
-import { useState, useEffect, useCallback } from "react";
+import { useState, useEffect, useCallback,useMemo } from "react";
 import { createPortal } from "react-dom";
 import MenuTreeNode from "./MenuTreeNode";
 import { Plus, X, Edit, Trash2 } from 'lucide-react';
 import axios from 'axios';
 import { jwtDecode } from 'jwt-decode';
-const isRootCategory = (cat) =>
-  cat?.id === "dietery" ||
-  cat?.id === "ditery" ||
-  cat?.name?.toLowerCase() === "dietery" ||
-  cat?.name?.toLowerCase() === "ditery";
-const skipOneLevel = (nodes) => {
-  if (!Array.isArray(nodes)) return [];
 
-  return nodes.map(node => {
-    // If node has children and those children have children,
-    // replace children with grandchildren
-    if (
-      node.children?.length &&
-      node.children.some(child => child.children?.length)
-    ) {
-      return {
-        ...node,
-        children: node.children.flatMap(child => child.children || [])
-      };
-    }
+const isRootCategory = (cat, root) => {
+  if (!cat || !root) return false;
 
-    // Otherwise, keep structure
-    return {
-      ...node,
-      children: skipOneLevel(node.children || [])
-    };
-  });
+  return (
+    String(cat.id).toLowerCase() === String(root).toLowerCase() ||
+    String(cat.name).toLowerCase() === String(root).toLowerCase()
+  );
 };
-const MENU_HIERARCHY_LEVEL = Number(
-  import.meta.env.VITE_MENU_HIERARCHY_LEVEL || 2
-);
-
-const MENU_DEFAULT_ROOT =
-  import.meta.env.VITE_MENU_DEFAULT_ROOT || "dietery";
-  const sliceTreeByLevel = (nodes, currentLevel = 1, maxLevel = 2) => {
-    if (!Array.isArray(nodes)) return [];
-  
-    return nodes.map(node => {
-      if (currentLevel >= maxLevel) {
-        // stop expansion here
-        return {
-          ...node,
-          children: []
-        };
-      }
-  
-      return {
-        ...node,
-        children: sliceTreeByLevel(
-          node.children || [],
-          currentLevel + 1,
-          maxLevel
-        )
-      };
-    });
-  };
-  const buildHierarchyView = (categories) => {
-    return categories.map(cat => {
-      if (
-        cat.id === MENU_DEFAULT_ROOT ||
-        cat.name?.toLowerCase() === MENU_DEFAULT_ROOT
-      ) {
-        return {
-          ...cat,
-          children: sliceTreeByLevel(
-            cat.children || [],
-            1,
-            MENU_HIERARCHY_LEVEL
-          )
-        };
-      }
-      return cat;
-    });
-  };
     
 const MenuCategoryTree = ({
   categories = [],
   selectedCategoryId,
   onSelectCategory,
-  defaultOpenCategoryName = 'Dietery',
   clientId,
   token,
-  onCategoriesUpdate
+  onCategoriesUpdate,
+  menuConfig
 }) => {
   // const [expandedCategories, setExpandedCategories] = useState(['All Categories']);
   const [expandedCategories, setExpandedCategories] = useState([]);
@@ -109,8 +44,51 @@ const MenuCategoryTree = ({
   const [editDescription, setEditDescription] = useState("");
   const [editNewSubcategoryName, setEditNewSubcategoryName] = useState("");
   const [deleteTarget, setDeleteTarget] = useState(null);
- const displayCategories = buildHierarchyView(categories);
+  const getDisplayCategories = () => {
+    if (!categories?.length || !menuConfig) return [];
+  
+    const { root } = menuConfig;
+  
+    // find configured root
+    const findRoot = (nodes) => {
+      for (const node of nodes) {
+        if (
+          String(node.id).toLowerCase() === String(root).toLowerCase() ||
+          String(node.name).toLowerCase() === String(root).toLowerCase()
+        ) {
+          return node;
+        }
+        if (node.children?.length) {
+          const found = findRoot(node.children);
+          if (found) return found;
+        }
+      }
+      return null;
+    };
+  
+    const rootNode = findRoot(categories);
+    if (!rootNode) return categories;
+  
+    // 🔥 KEY LOGIC:
+    // Skip one level
+    const flattenedGrandChildren = (rootNode.children || [])
+      .flatMap(child => child.children || []);
+  
+    // Add a virtual "All Categories" node
+    return [
+      {
+        ...rootNode,
+        id: rootNode.id,
+        name: "All Categories",
+        children: flattenedGrandChildren,
+        isVirtualRoot: true
+      }
+    ];
+  };
+  
+  const displayCategories = useMemo(() => getDisplayCategories(), [categories, menuConfig]);
 
+  
 
   const generateCategoryIdFromName = (name) => {
     const now = new Date();
@@ -167,21 +145,39 @@ const MenuCategoryTree = ({
     return null;
   };
   useEffect(() => {
-    if (!selectedCategoryId || !categories.length) return;
-
-    const path = findPathById(categories, selectedCategoryId);
-    if (path) {
-      setExpandedCategories(path);
-    }
-  }, [selectedCategoryId, categories]);
-  useEffect(() => {
-    if (!categories?.length) return;
+    if (!selectedCategoryId || !displayCategories.length) return;
   
-    const root = categories[0];
-    if (root) {
-      setExpandedCategories([root.id]);
-    }
-  }, [categories]);
+    const expandParents = (nodes, targetId, parents = []) => {
+      for (const node of nodes) {
+        if (node.id === targetId) return parents;
+  
+        if (node.children?.length) {
+          const found = expandParents(node.children, targetId, [...parents, node.id]);
+          if (found) return found;
+        }
+      }
+      return null;
+    };
+  
+    const parents = expandParents(displayCategories, selectedCategoryId);
+  
+    setExpandedCategories(prev => {
+      const same =
+        prev.length === (parents?.length || 0) &&
+        prev.every((v, i) => v === parents[i]);
+  
+      return same ? prev : parents || [];
+    });
+  
+  }, [selectedCategoryId, displayCategories]);
+  
+  
+  useEffect(() => {
+    if (!displayCategories.length) return;
+  
+    setExpandedCategories([displayCategories[0].id]);
+  }, [displayCategories]);
+  
   
   const buildLocalParentMap = (cats) => {
     const map = {};
@@ -231,21 +227,7 @@ const MenuCategoryTree = ({
 
     setDragOverItem(category);
   };
-  useEffect(() => {
-    if (!categories?.length) return;
 
-    const dieteryNode = categories.find(
-      c => c.id === "dietery" || c.name?.toLowerCase() === "dietery"
-    );
-
-    if (dieteryNode) {
-      setExpandedCategories(prev =>
-        prev.includes(dieteryNode.id)
-          ? prev
-          : [...prev, dieteryNode.id]
-      );
-    }
-  }, [categories]);
 
   const handleDrop = async (e, targetCategory) => {
     e.preventDefault();
@@ -612,15 +594,17 @@ const MenuCategoryTree = ({
       );
 
       // attach to dietery
-      const dieteryNode = categories.find(c => c.id === "dietery");
+      const rootId = menuConfig?.root;
+      const rootNode = categories.find(c => c.id === rootId);
+      
       const subs = dieteryNode?.children?.map(c => c.id) || [];
 
       await axios.post(
         `${import.meta.env.VITE_API_INVENTORY_SERVICE_URL}/${clientId}/menu/update_category`,
         {
-          id: "dietery",
+          id: rootId,
           client_id: clientId,
-          name: "Dietery",
+          name: rootNode?.name || rootId,
           description: "",
           sub_categories: [...subs, newId],
           overwrite_subcategories: true,
@@ -828,7 +812,7 @@ const MenuCategoryTree = ({
             isExpanded={expandedCategories.includes(category.id)}
             isSelected={
               selectedCategoryId === category.id ||
-              (selectedCategoryId === null && isRootCategory(category))
+              (selectedCategoryId === null && isRootCategory(category, menuConfig?.root))
             }
             onSelect={() => onSelectCategory(category.id)}
             onToggle={() => toggleCategory(category.id)}
@@ -854,7 +838,7 @@ const MenuCategoryTree = ({
 
   return (
     <>
-      <div className="hidden lg:block rounded-xl p-4 bg-bg-primary border border-border-default shadow-sm">
+      <div className="hidden lg:block rounded-xl p-4 h-[88.5vh] overflow-auto bg-bg-primary border border-border-default shadow-sm">
         <div className="flex items-center justify-between mb-4 pb-3 border-b border-border-default">
           <h3 className="text-lg font-bold text-text-primary">Categories</h3>
           <button
