@@ -24,7 +24,7 @@
 //   const [inventoryIds, setInventoryIds] = useState([]);
 //   const [addonItems, setAddonItems] = useState([]); // ✅ Store addon items
 //   const [addonsCategoryId, setAddonsCategoryId] = useState(null); // ✅ Store addons category ID
-  
+
 //   // Modal states
 //   const [showAddModal, setShowAddModal] = useState(false);
 //   const [showEditModal, setShowEditModal] = useState(false);
@@ -187,12 +187,12 @@
 //           },
 //         }
 //       );
-  
+
 //       const subcategories = res.data.data[0];
 //       const subcats = subcategories.subCategories;
-  
+
 //       setInventoryIds(subcats);
-  
+
 //       console.log("Inventory Subcategories:", subcats);
 //     } catch (error) {
 //       console.log("Error fetching inventory IDs:", error);
@@ -225,7 +225,7 @@
 
 //       const allItems = itemRes.data.data || [];
 //       const filteredAddons = allItems.filter(item => item.category_id === addonsCatId);
-      
+
 //       setAddonItems(filteredAddons);
 //       console.log("Addon Items:", filteredAddons);
 //     } catch (error) {
@@ -671,7 +671,7 @@
 //         await Promise.all(
 //           itemsToUpdate.map(item => {
 //             const updatedLineItemIds = item.line_item_id.filter(id => id !== deletedItemId);
-            
+
 //             return axios.post(
 //               `${import.meta.env.VITE_API_INVENTORY_SERVICE_URL}/${clientId}/menu/update`,
 //               {
@@ -731,7 +731,7 @@
 //         await Promise.all(
 //           itemsToUpdate.map(item => {
 //             const updatedLineItemIds = item.line_item_id.filter(id => !selectedRows.includes(id));
-            
+
 //             return axios.post(
 //               `${import.meta.env.VITE_API_INVENTORY_SERVICE_URL}/${clientId}/menu/update`,
 //               {
@@ -1321,7 +1321,6 @@
 
 
 
-
 import React, { useState, useEffect, useRef, useCallback } from 'react';
 import { Plus, Search, Edit, Trash2, Upload, Download, CloudUpload, ArrowDown } from 'lucide-react';
 import axios from 'axios';
@@ -1345,11 +1344,11 @@ const MenuManagement = ({ clientId, token, realm }) => {
   const [loading, setLoading] = useState(true);
   const [dietaryFilter, setDietaryFilter] = useState("All");
   const [inventoryIds, setInventoryIds] = useState([]);
-  
+
   // ✅ UPDATED: Store addon subcategories and all addon items
   const [addonSubcategories, setAddonSubcategories] = useState([]);
   const [allAddonItems, setAllAddonItems] = useState([]);
-  
+
   const [addonItems, setAddonItems] = useState([]); // ✅ Store addon items
   const [addonsCategoryId, setAddonsCategoryId] = useState(null); // ✅ Store addons category ID
   const [selectedCategoryId, setSelectedCategoryId] = useState(null);
@@ -1599,12 +1598,12 @@ const MenuManagement = ({ clientId, token, realm }) => {
       );
 
       const allItems = itemRes.data.data || [];
-      
+
       // Filter items that belong to any addon subcategory
-      const filteredAddons = allItems.filter(item => 
+      const filteredAddons = allItems.filter(item =>
         subcategoryIds.includes(item.category_id)
       );
-      
+
       setAllAddonItems(filteredAddons);
       console.log("Addon Subcategories:", subcats);
       console.log("All Addon Items:", filteredAddons);
@@ -2050,6 +2049,144 @@ const MenuManagement = ({ clientId, token, realm }) => {
   };
 
   const filteredItems = getFilteredItems();
+
+  // ✅ UPDATED: Group items by immediate child categories and maintain order
+  const getGroupedItemsByCategory = () => {
+    if (!selectedCategoryId) {
+      // When "All Categories" is selected, group by top-level categories in order
+      const grouped = {};
+      const categoryOrderMap = new Map();
+
+      filteredItems.forEach(item => {
+        const categoryId = item.category_id;
+        const categoryInfo = categoriesFlat.find(c => c.id === categoryId);
+
+        if (!categoryInfo) {
+          if (!grouped['Uncategorized']) {
+            grouped['Uncategorized'] = [];
+          }
+          grouped['Uncategorized'].push(item);
+          return;
+        }
+
+        // Find the root parent (top-most category)
+        let rootCategory = categoryInfo;
+        let current = categoryInfo;
+
+        while (current.parentId) {
+          const parent = categoriesFlat.find(c => c.id === current.parentId);
+          if (parent && parent.name !== 'All Categories' && parent.id !== 'dietery') {
+            rootCategory = parent;
+            current = parent;
+          } else {
+            break;
+          }
+        }
+
+        const categoryName = rootCategory.name;
+
+        if (!grouped[categoryName]) {
+          grouped[categoryName] = [];
+          categoryOrderMap.set(categoryName, categoriesFlat.findIndex(c => c.id === rootCategory.id));
+        }
+
+        grouped[categoryName].push(item);
+      });
+
+      // Sort by order in categoriesFlat
+      const sortedEntries = Object.entries(grouped).sort(([nameA], [nameB]) => {
+        if (nameA === 'Uncategorized') return 1;
+        if (nameB === 'Uncategorized') return -1;
+
+        const indexA = categoryOrderMap.get(nameA) ?? Infinity;
+        const indexB = categoryOrderMap.get(nameB) ?? Infinity;
+
+        return indexA - indexB;
+      });
+
+      return Object.fromEntries(sortedEntries);
+    } else {
+      // When a specific category is selected, group by its immediate children
+      const selectedCategory = categoriesFlat.find(c => c.id === selectedCategoryId);
+
+      if (!selectedCategory) {
+        return {};
+      }
+
+      // Get immediate children of selected category
+      const childCategories = categoriesFlat.filter(c => c.parentId === selectedCategoryId);
+
+      if (childCategories.length === 0) {
+        // No children, show all items under the selected category name
+        const grouped = {};
+        grouped[selectedCategory.name] = filteredItems;
+        return grouped;
+      }
+
+      // Group by child categories
+      const grouped = {};
+      const categoryOrderMap = new Map();
+
+      childCategories.forEach((child, index) => {
+        categoryOrderMap.set(child.name, categoriesFlat.findIndex(c => c.id === child.id));
+      });
+
+      filteredItems.forEach(item => {
+        const categoryId = item.category_id;
+        const categoryInfo = categoriesFlat.find(c => c.id === categoryId);
+
+        if (!categoryInfo) {
+          if (!grouped['Uncategorized']) {
+            grouped['Uncategorized'] = [];
+          }
+          grouped['Uncategorized'].push(item);
+          return;
+        }
+
+        // Find which child category this item belongs to
+        let belongsToChild = null;
+        let current = categoryInfo;
+
+        // Traverse up to find if it belongs to any child category
+        while (current) {
+          const childMatch = childCategories.find(c => c.id === current.id);
+          if (childMatch) {
+            belongsToChild = childMatch;
+            break;
+          }
+
+          if (current.parentId) {
+            current = categoriesFlat.find(c => c.id === current.parentId);
+          } else {
+            break;
+          }
+        }
+
+        const categoryName = belongsToChild ? belongsToChild.name : (categoryInfo.name || 'Uncategorized');
+
+        if (!grouped[categoryName]) {
+          grouped[categoryName] = [];
+        }
+
+        grouped[categoryName].push(item);
+      });
+
+      // Sort by order in categoriesFlat
+      const sortedEntries = Object.entries(grouped).sort(([nameA], [nameB]) => {
+        if (nameA === 'Uncategorized') return 1;
+        if (nameB === 'Uncategorized') return -1;
+
+        const indexA = categoryOrderMap.get(nameA) ?? Infinity;
+        const indexB = categoryOrderMap.get(nameB) ?? Infinity;
+
+        return indexA - indexB;
+      });
+
+      return Object.fromEntries(sortedEntries);
+    }
+  };
+
+  const groupedItems = getGroupedItemsByCategory();
 
   const uploadImageToDocumentService = async (imageFile) => {
     try {
@@ -2546,7 +2683,7 @@ const MenuManagement = ({ clientId, token, realm }) => {
   const findNodeAndChildren = (nodes, id) => {
     for (const node of nodes) {
       if (node.id === id) return node;
-  
+
       if (node.children?.length) {
         const found = findNodeAndChildren(node.children, id);
         if (found) return found;
@@ -2554,13 +2691,13 @@ const MenuManagement = ({ clientId, token, realm }) => {
     }
     return null;
   };
-  
+
   useEffect(() => {
     if (!selectedCategoryId) {
       setSidebarCategories(categories);
     }
   }, [selectedCategoryId, categories]);
-  
+
   return (
     <div className="h-[90vh] bg-bg-primary overflow-x-hidden">
       <div className="mx-auto p-2">
@@ -2581,54 +2718,7 @@ const MenuManagement = ({ clientId, token, realm }) => {
 
           {/* Main Content */}
           <div className="lg:col-span-3 border-default border-border-default p-3 rounded-lg h-[88.5vh] flex flex-col">
-            <div className="flex gap-2 overflow-x-auto scrollbar-hide lg:overflow-visible pb-2">
-              {quickDieteryCategories.map(cat => (
-                <button key={cat.id} onClick={() => {
-                  setSelectedCategoryId(cat.id);
-                
-                  const selectedNode = findNodeAndChildren(categories, cat.id);
-                
-                  if (selectedNode) {
-                    setSidebarCategories([selectedNode]);
-                  }
-                }}
-                
-                  className={`px-3 py-1.5 rounded-lg text-sm font-semibold border whitespace-nowrap transition-all flex-shrink-0`}>
-                  {/* {(() => {
-                    const info = getCategoryWithParent(cat.id);
-                    return (
-                      <div className="flex flex-col leading-tight text-left">
-                        {info.parent && (
-                          <span className="text-[10px] opacity-60">
-                            {info.parent}
-                          </span>
-                        )}
-                        <span className="text-sm font-semibold">
-                          {info.name}
-                        </span>
-                      </div>
-                    );
-                  })()} */}
-                  {(() => {
-                    const section = getTopSectionName(cat.id);
 
-                    return (
-                      <div className="flex flex-col leading-tight text-left">
-                        {section && (
-                          <span className="text-[10px] opacity-60">
-                            {section}
-                          </span>
-                        )}
-                        <span className="text-sm font-semibold">
-                          {cat.name}
-                        </span>
-                      </div>
-                    );
-                  })()}
-
-                </button>
-              ))}
-            </div>
             <div className="flex flex-col gap-3 lg:flex-row lg:items-center lg:justify-between mb-4">
 
               {/* LEFT: Title */}
@@ -2640,73 +2730,6 @@ const MenuManagement = ({ clientId, token, realm }) => {
                   </span>
                 </h2>
               </div>
-
-              {/* CENTER: Quick Dietery Categories */}
-              {/* <div className="flex gap-2 overflow-x-auto scrollbar-hide lg:overflow-visible">
-                {quickDieteryCategories.map(cat => (
-                  <button
-                    key={cat.id}
-                    onClick={() => {
-                      setSelectedCategoryId(cat.id);
-                      // setSidebarCategories(cat.children || []);
-                    }}
-                    className={`
-          px-3 py-1.5 rounded-full text-sm font-semibold border whitespace-nowrap
-          transition-all
-          ${selectedCategoryId === cat.id
-                        ? 'bg-action-primary text-white border-action-primary'
-                        : 'bg-bg-tertiary text-text-primary hover:border-action-primary'}
-        `}
-                  >
-                    {cat.name}
-                  </button>
-                ))}
-              </div> */}
-              {/* <div className="relative" ref={quickCatRef}>
-
-<button
-  onClick={() => setQuickCatOpen(prev => !prev)}
-  className="h-9 px-4 rounded-lg border border-border-default bg-bg-tertiary
-             text-sm font-semibold flex items-center gap-2 hover:border-action-primary"
->
-  <span>{getQuickCategoryName()}</span>
-  <span className={`transition-transform ${quickCatOpen ? "rotate-180" : ""}`}>
-  <ArrowDown size={14} color="#ff0000" strokeWidth={2} />
-  </span>
-</button>
-
-{quickCatOpen && (
-  <div className="absolute z-50 mt-1 w-64 max-h-72 overflow-y-auto
-                  bg-bg-primary border border-border-default rounded-lg shadow-lg">
-
-    <button
-      onClick={() => {
-        setSelectedCategoryId(null);
-        setQuickCatOpen(false);
-      }}
-      className="w-full text-left px-4 py-2 text-sm hover:bg-bg-secondary border-b"
-    >
-      All Categories
-    </button>
-
-    {dieterySubCategories.map(cat => (
-      <button
-        key={cat.id}
-        onClick={() => {
-          setSelectedCategoryId(cat.id);
-          setQuickCatOpen(false);
-        }}
-        className={`w-full text-left px-4 py-2 text-sm hover:bg-bg-secondary
-          ${selectedCategoryId === cat.id ? "bg-action-primary/10 font-semibold" : ""}
-        `}
-      >
-        {cat.name}
-      </button>
-    ))}
-  </div>
-)}
-
-</div> */}
 
               {/* RIGHT: Search + Actions */}
               <div className="flex flex-col gap-2 sm:flex-row sm:items-center sm:justify-end lg:flex-nowrap lg:gap-2">
@@ -2811,84 +2834,108 @@ const MenuManagement = ({ clientId, token, realm }) => {
             </div>
 
 
-            {/* Items Grid */}
+            {/* ✅ Items Grid with Category Grouping */}
             <div className="flex-1 overflow-y-auto">
-              <div className="grid gap-2 grid-cols-2 md:grid-cols-3 lg:grid-cols-3 xl:grid-cols-4">
-                {filteredItems.map((item) => {
-                  const discountPercent = item.discount && item.unit_price && Number(item.discount) > 0
-                    ? ((Number(item.discount) * 100) / Number(item.unit_price)).toFixed(0) : null;
-
-                  return (
-                    <div key={item.id}
-                      className="relative flex gap-2 items-center bg-bg-primary border border-border-default rounded-xl p-1
-                                    shadow-sm hover:shadow-md transition group overflow-hidden">
-                      <div className="absolute inset-0 bg-black/40 backdrop-blur-[2px] opacity-0 pointer-events-none z-10
-                                      group-hover:animate-overlayFade"/>
-                      {item.line_item_id && Array.isArray(item.line_item_id) && item.line_item_id.length > 0 && (
-                        <div className="absolute bottom-2 right-2 bg-orange-500 text-white text-[7px] p-1 rounded-md z-10 shadow-md flex items-center gap-1">
-                          <Plus size={10} />
-                          <span>{item.line_item_id.length} add-ons</span>
-                        </div>
-                      )}
-
-                      <div className="relative w-10 h-12 md:h-16 md:w-14 rounded-lg overflow-hidden shrink-0 bg-gray-100">
-                        {discountPercent && (
-                          <div className="absolute top-1 left-1 bg-action-danger text-white text-[7px] md:text-[10px] px-1 rounded z-10">
-                            {discountPercent}% OFF
-                          </div>
-                        )}
-
-                        <MenuImagePreview clientId={clientId} imageId={item.image_id} token={token} alt={item.name}
-                          baseUrl={import.meta.env.VITE_API_DOCUMENT_SERVICE_URL} className="w-full h-full object-cover"
-                          urlBuilder={({ baseUrl, clientId, imageId }) =>
-                            `${baseUrl}/${clientId}/document/download?doc_id=${imageId}`} />
-                      </div>
-
-                      <div className="flex-1 min-w-0 cursor-pointer" onClick={() => handleItemClick(item)}>
-                        <h3 className="text-[10px] md:text-[16px] font-semibold text-text-primary">
-                          {item.name}
-                        </h3>
-
-                        {item.description && (
-                          <p className="text-[8px] md:text-[13px] text-text-secondary line-clamp-1">
-                            {item.description}
-                          </p>
-                        )}
-
-                        <div className="flex items-center gap-2 mt-1">
-                          {discountPercent ? (
-                            <>
-                              <span className="text-sm font-bold text-action-primary">
-                                ₹{(item.unit_price - item.discount).toFixed(0)}
-                              </span>
-                              <span className="text-xs line-through text-text-secondary">
-                                ₹{item.unit_price}
-                              </span>
-                            </>
-                          ) : (
-                            <span className="text-sm font-bold text-action-primary">
-                              ₹{item.unit_price}
-                            </span>
-                          )}
-                        </div>
-                      </div>
-
-                      <div className="absolute top-1 right-1 flex gap-1 opacity-0 group-hover:opacity-100 transition-opacity
-                       duration-200 z-20">
-                        <button className="bg-action-primary text-white p-1 rounded-full hover:scale-110"
-                          onClick={(e) => { e.stopPropagation(); setEditingItem(item); setShowEditModal(true); }}>
-                          <Edit size={10} />
-                        </button>
-
-                        <button className="bg-action-danger text-white p-1 rounded-full hover:scale-110"
-                          onClick={(e) => { e.stopPropagation(); setDeleteTarget(item); setShowDeleteModal(true); }} >
-                          <Trash2 size={10} />
-                        </button>
-                      </div>
+              {Object.keys(groupedItems).length === 0 ? (
+                <div className="text-center py-16">
+                  <Search className="w-16 h-16 text-text-secondary mx-auto mb-4 opacity-30" />
+                  <p className="text-text-secondary text-lg">No items found</p>
+                  <p className="text-text-secondary text-sm mt-1">Try adjusting your filters or search</p>
+                </div>
+              ) : (
+                Object.entries(groupedItems).map(([categoryName, items], idx) => (
+                  <div key={categoryName} className="mb-6">
+                    {/* Category Header */}
+                    <div className="flex items-center gap-3 mb-3">
+                      <div className="w-1 h-6 bg-action-primary rounded-full"></div>
+                      <h3 className="text-lg font-bold text-text-primary">
+                        {categoryName}
+                        <span className="text-sm ml-2 font-normal text-text-secondary">
+                          ({items.length})
+                        </span>
+                      </h3>
                     </div>
-                  );
-                })}
-              </div>
+
+                    {/* Items Grid */}
+                    <div className="grid gap-2 grid-cols-2 md:grid-cols-3 lg:grid-cols-3 xl:grid-cols-4">
+                      {items.map((item) => {
+                        const discountPercent = item.discount && item.unit_price && Number(item.discount) > 0
+                          ? ((Number(item.discount) * 100) / Number(item.unit_price)).toFixed(0) : null;
+
+                        return (
+                          <div key={item.id}
+                            className="relative flex gap-2 items-center bg-bg-primary border border-border-default rounded-xl p-1
+                                        shadow-sm hover:shadow-md transition group overflow-hidden">
+                            <div className="absolute inset-0 bg-black/40 backdrop-blur-[2px] opacity-0 pointer-events-none z-10
+                                          group-hover:animate-overlayFade"/>
+                            {item.line_item_id && Array.isArray(item.line_item_id) && item.line_item_id.length > 0 && (
+                              <div className="absolute bottom-2 right-2 bg-orange-500 text-white text-[7px] p-1 rounded-md z-10 shadow-md flex items-center gap-1">
+                                <Plus size={10} />
+                                <span>{item.line_item_id.length} add-ons</span>
+                              </div>
+                            )}
+
+                            <div className="relative w-10 h-12 md:h-16 md:w-14 rounded-lg overflow-hidden shrink-0 bg-gray-100">
+                              {discountPercent && (
+                                <div className="absolute top-1 left-1 bg-action-danger text-white text-[7px] md:text-[10px] px-1 rounded z-10">
+                                  {discountPercent}% OFF
+                                </div>
+                              )}
+
+                              <MenuImagePreview clientId={clientId} imageId={item.image_id} token={token} alt={item.name}
+                                baseUrl={import.meta.env.VITE_API_DOCUMENT_SERVICE_URL} className="w-full h-full object-cover"
+                                urlBuilder={({ baseUrl, clientId, imageId }) =>
+                                  `${baseUrl}/${clientId}/document/download?doc_id=${imageId}`} />
+                            </div>
+
+                            <div className="flex-1 min-w-0 cursor-pointer" onClick={() => handleItemClick(item)}>
+                              <h3 className="text-[10px] md:text-[16px] font-semibold text-text-primary">
+                                {item.name}
+                              </h3>
+
+                              {item.description && (
+                                <p className="text-[8px] md:text-[13px] text-text-secondary line-clamp-1">
+                                  {item.description}
+                                </p>
+                              )}
+
+                              <div className="flex items-center gap-2 mt-1">
+                                {discountPercent ? (
+                                  <>
+                                    <span className="text-sm font-bold text-action-primary">
+                                      ₹{(item.unit_price - item.discount).toFixed(0)}
+                                    </span>
+                                    <span className="text-xs line-through text-text-secondary">
+                                      ₹{item.unit_price}
+                                    </span>
+                                  </>
+                                ) : (
+                                  <span className="text-sm font-bold text-action-primary">
+                                    ₹{item.unit_price}
+                                  </span>
+                                )}
+                              </div>
+                            </div>
+
+                            <div className="absolute top-1 right-1 flex gap-1 opacity-0 group-hover:opacity-100 transition-opacity
+                             duration-200 z-20">
+                              <button className="bg-action-primary text-white p-1 rounded-full hover:scale-110"
+                                onClick={(e) => { e.stopPropagation(); setEditingItem(item); setShowEditModal(true); }}>
+                                <Edit size={10} />
+                              </button>
+
+                              <button className="bg-action-danger text-white p-1 rounded-full hover:scale-110"
+                                onClick={(e) => { e.stopPropagation(); setDeleteTarget(item); setShowDeleteModal(true); }} >
+                                <Trash2 size={10} />
+                              </button>
+                            </div>
+                          </div>
+                        );
+                      })}
+                    </div>
+                  </div>
+                ))
+              )}
             </div>
           </div>
         </div>
