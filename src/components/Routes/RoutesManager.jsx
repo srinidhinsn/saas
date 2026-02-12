@@ -17,6 +17,7 @@ import CounterManagement from '../V1_Components/CounterServices/CounterManagemen
 import TakeOrder_V1 from '../V1_Components/OrderServices/TakeOrder_V1';
 import Summary_V1 from '../V1_Components/OrderServices/Summary_V1';
 import RoleConfig from '../MainComponents/UserServices/RoleConfiguration/RoleConfig';
+import Data from '../Super_Admin/CustomerData/Data';
 
 const RoutesManager = () => {
   const { clientId } = useParams();
@@ -27,7 +28,8 @@ const RoutesManager = () => {
   const [userId, setUserId] = useState();
 
   useEffect(() => {
-    const t = getValidToken();
+    const t = localStorage.getItem("access_token");
+  
     if (!t) return;
     setToken(t);
 
@@ -113,6 +115,11 @@ const RoutesManager = () => {
         path="summary-manage"
         element={<Summary_V1 clientId={clientId} token={token} realm={realm} screenIds={screenIds} />}
       />
+      <Route
+        path="customer-data"
+        element={<Data token={token} />}
+      />
+
       <Route path="role-config" element={
         <RoleConfig clientId={clientId} token={token} realm={realm} screenIds={screenIds} />
       } />
@@ -124,3 +131,6 @@ const RoutesManager = () => {
 };
 
 export default RoutesManager;
+
+
+// =========================================================   Working ========================================================== //
