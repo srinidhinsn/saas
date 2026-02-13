@@ -1,5 +1,5 @@
 import React, { useEffect, useState } from 'react';
-import { BrowserRouter, Routes, Route, Navigate, useParams, useLocation } from 'react-router-dom';
+import { BrowserRouter, Routes, Route, Navigate, useParams, useLocation, useNavigate } from 'react-router-dom';
 import { ToastContainer } from 'react-toastify';
 import LoginPage from './components/MainComponents/UserServices/Login';
 import HeaderShared from './components/Constants/Headers/HeaderShared';
@@ -8,6 +8,7 @@ import { injectThemeVars } from './components/utils/injectThemeVars';
 import 'react-toastify/dist/ReactToastify.css';
 import Headers_V1 from './components/V1_Components/Headers/Headers_V1';
 import Super_Admin_Header from './components/Super_Admin/Headers/Super_Admin_Header';
+import { setupAuthInterceptor } from './components/utils/authInterceptor';
 
 const LoginWrapper = ({ onLoginSuccess }) => {
   const { clientId } = useParams();
@@ -26,6 +27,7 @@ const HeaderSwitcher = ({ clientId, onLogout }) => {
   // default fallback
   return <HeaderShared clientId={clientId} onLogout={onLogout} />;
 };
+
 const InnerAuthenticatedApp = ({ token, onLogout }) => {
   const { clientId } = useParams();
   const finalClientId = clientId || 'easyfood';
@@ -48,17 +50,26 @@ const InnerAuthenticatedApp = ({ token, onLogout }) => {
 };
 
 const RedirectToLogin = () => {
-  const { clientId } = useParams();
+  const location = useLocation();
+
+  // extract tenant directly from URL
+  const match = location.pathname.match(/^\/saas\/([^\/]+)/);
+  const urlClientId = match?.[1];
+
   const storedClientId = localStorage.getItem('client_id');
-  const finalClientId = clientId || storedClientId || 'easyfood';
 
-  return <Navigate to={`/saas/${finalClientId}/login`} replace />;
+  const finalClientId = urlClientId || storedClientId || 'easyfood';
+
+  // ALWAYS repair storage
+  localStorage.setItem('client_id', finalClientId);
+
+  return <Navigate to={`/saas/${finalClientId}/login`} replace state={{ from: location }} />;
 };
-
 
 const App = () => {
   const [token, setToken] = useState(() => localStorage.getItem('access_token'));
   const [isAuthenticated, setIsAuthenticated] = useState(() => !!localStorage.getItem('access_token'));
+
 
   useEffect(() => {
     injectThemeVars();
@@ -70,16 +81,31 @@ const App = () => {
 
     localStorage.setItem('access_token', accessToken);
     localStorage.setItem('screen_id', screenId || '');
-    localStorage.setItem('client_id', clientId); // ✅ ADD THIS
+    localStorage.setItem('client_id', clientId);
   };
 
-  
   const handleLogout = () => {
-    setToken(null);
-    setIsAuthenticated(false);
+    const match = location.pathname.match(/^\/saas\/([^\/]+)/);
+    const urlClientId = match?.[1];
+    const storedClientId = localStorage.getItem('client_id');
+
+    const finalClientId = urlClientId || storedClientId || 'easyfood';
+
     localStorage.removeItem('access_token');
     localStorage.removeItem('screen_id');
+
+    setToken(null);
+    setIsAuthenticated(false);
   };
+  useEffect(() => {
+    setupAuthInterceptor(handleLogout);
+  }, []);
+  useEffect(() => {
+    const match = window.location.pathname.match(/^\/saas\/([^\/]+)/);
+    if (match?.[1]) {
+      localStorage.setItem('client_id', match[1]);
+    }
+  }, []);
 
   return (
     <BrowserRouter>

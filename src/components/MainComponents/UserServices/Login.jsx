@@ -64,7 +64,7 @@ export default function LoginPage({ onLoginSuccess }) {
 
       // Call the onLoginSuccess callback to update parent state
       if (onLoginSuccess) {
-        onLoginSuccess(token, screen_id);
+        onLoginSuccess(token, screen_id,clientId);
         setShowAnimation(true);
       }
       const route = screenRouteMap[screen_id] || "home";
