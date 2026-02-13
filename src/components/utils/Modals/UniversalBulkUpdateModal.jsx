@@ -847,6 +847,18 @@
 
 
 
+
+
+
+
+
+
+
+
+
+
+
+
 import React from 'react';
 import { X, Edit, Trash2, Search, Plus } from 'lucide-react';
 import AddonSelectionPopup from './AddonSelection';
@@ -899,7 +911,92 @@ const UniversalBulkUpdateModal = ({
   const [showItemAddonPopup, setShowItemAddonPopup] = React.useState(false);
   const [currentEditingItemId, setCurrentEditingItemId] = React.useState(null);
 
-  // Fetch master values for zones and sections
+  // ✅ Get addon name by ID
+  const getAddonNameById = (id) => {
+    const addon = allAddonItems?.find(item => item.id === id);
+    return addon?.name || 'Unknown';
+  };
+
+  // ✅ FIXED: Apply global add-ons to all selected items (works both ways)
+  const handleGlobalAddonSave = (selectedAddons) => {
+    setGlobalAddons(selectedAddons);
+    setShowGlobalAddonPopup(false);
+    
+    // If items are already selected, apply immediately
+    if (selectedRows.length > 0) {
+      const updatedBulkData = { ...bulkEditData };
+
+      selectedRows.forEach(itemId => {
+        updatedBulkData[itemId] = {
+          ...(updatedBulkData[itemId] || {}),
+          line_item_id: [...selectedAddons]
+        };
+      });
+
+      setBulkEditData(updatedBulkData);
+      
+      if (selectedAddons.length > 0) {
+        alert(`Applied ${selectedAddons.length} add-on(s) to ${selectedRows.length} selected item(s)`);
+      }
+    } else if (selectedAddons.length > 0) {
+      // Addons selected but no items yet - just store them
+    }
+  };
+
+  // ✅ Clear global add-ons for all selected items
+  const clearGlobalAddons = () => {
+    if (selectedRows.length === 0) {
+      alert('No items selected');
+      return;
+    }
+
+    const updatedBulkData = { ...bulkEditData };
+
+    selectedRows.forEach(itemId => {
+      updatedBulkData[itemId] = {
+        ...(updatedBulkData[itemId] || {}),
+        line_item_id: []
+      };
+    });
+
+    setBulkEditData(updatedBulkData);
+    setGlobalAddons([]);
+  };
+
+  // ✅ Open addon popup for specific item
+  const openItemAddonPopup = (itemId) => {
+    setCurrentEditingItemId(itemId);
+    setShowItemAddonPopup(true);
+  };
+
+  // ✅ NEW: Apply global addons automatically when items are selected (if addons were already chosen)
+  React.useEffect(() => {
+    if (modalType === 'menu' && globalAddons.length > 0 && selectedRows.length > 0) {
+      const updatedBulkData = { ...bulkEditData };
+      let hasChanges = false;
+
+      selectedRows.forEach(itemId => {
+        // Only apply if this item doesn't already have the global addons set
+        const currentAddons = updatedBulkData[itemId]?.line_item_id;
+        const addonsMatch = currentAddons && 
+          currentAddons.length === globalAddons.length && 
+          currentAddons.every(id => globalAddons.includes(id));
+
+        if (!addonsMatch) {
+          updatedBulkData[itemId] = {
+            ...(updatedBulkData[itemId] || {}),
+            line_item_id: [...globalAddons]
+          };
+          hasChanges = true;
+        }
+      });
+
+      if (hasChanges) {
+        setBulkEditData(updatedBulkData);
+      }
+    }
+  }, [selectedRows, globalAddons, modalType]);
+
   const fetchMasterValues = async (categoryId, setter) => {
     try {
       const res = await axios.get(
@@ -916,7 +1013,6 @@ const UniversalBulkUpdateModal = ({
     }
   };
 
-  // Load master data for table modal
   React.useEffect(() => {
     if (!showModal || modalType !== "table") return;
     if (!clientId || !token) return;
@@ -932,34 +1028,6 @@ const UniversalBulkUpdateModal = ({
 
     loadMasters();
   }, [showModal, modalType, clientId, token]);
-
-  // ✅ Clear global add-ons for all selected items
-  const clearGlobalAddons = () => {
-    const updatedBulkData = { ...bulkEditData };
-
-    selectedRows.forEach(itemId => {
-      updatedBulkData[itemId] = {
-        ...(updatedBulkData[itemId] || {}),
-        line_item_id: []
-      };
-    });
-
-    setBulkEditData(updatedBulkData);
-    setGlobalAddons([]);
-    alert(`Cleared add-ons for ${selectedRows.length} selected item(s)`);
-  };
-
-  // ✅ Get addon name by ID
-  const getAddonNameById = (id) => {
-    const addon = allAddonItems?.find(item => item.id === id);
-    return addon?.name || 'Unknown';
-  };
-
-  // ✅ Open addon popup for specific item
-  const openItemAddonPopup = (itemId) => {
-    setCurrentEditingItemId(itemId);
-    setShowItemAddonPopup(true);
-  };
 
   // Menu: Toggle all selection
   const toggleSelectAll = () => {
@@ -1064,14 +1132,16 @@ const UniversalBulkUpdateModal = ({
                   <div className="flex items-center gap-3">
                     <button
                       onClick={() => setShowGlobalAddonPopup(true)}
-                      className="px-4 py-2 rounded-md bg-blue-600 text-white hover:bg-blue-700 transition-colors disabled:bg-gray-300 disabled:cursor-not-allowed font-medium text-sm whitespace-nowrap flex items-center gap-2"
+                      className="px-4 py-2 rounded-md bg-blue-600 text-white hover:bg-blue-700 transition-colors font-medium text-sm whitespace-nowrap flex items-center gap-2"
                     >
                       <Plus size={16} />
-                      Select Add-ons ({globalAddons.length})
+                      {globalAddons.length > 0 
+                        ? `Selected: ${globalAddons.length} add-on(s)` 
+                        : 'Select Add-ons'}
                     </button>
                     <button
                       onClick={clearGlobalAddons}
-                      disabled={selectedRows.length === 0}
+                      disabled={globalAddons.length === 0 && selectedRows.length === 0}
                       className="px-4 py-2 rounded-md bg-gray-600 text-white hover:bg-gray-700 transition-colors disabled:bg-gray-300 disabled:cursor-not-allowed font-medium text-sm whitespace-nowrap"
                     >
                       Clear All
@@ -1092,7 +1162,11 @@ const UniversalBulkUpdateModal = ({
                     )}
                   </div>
                   <p className="text-xs text-gray-600 mt-2">
-                    💡 Select add-ons and they'll be applied to all {selectedRows.length} selected item(s) at once
+                    💡 {selectedRows.length > 0 
+                      ? `${globalAddons.length > 0 ? 'Add-ons applied to' : 'Select add-ons to apply to'} ${selectedRows.length} selected item(s)`
+                      : globalAddons.length > 0 
+                        ? `${globalAddons.length} add-on(s) selected. Now select items to apply them.`
+                        : 'Select add-ons first, then select items - or vice versa!'}
                   </p>
                 </div>
               </div>
@@ -1319,26 +1393,12 @@ const UniversalBulkUpdateModal = ({
           </div>
         </div>
 
-        {/* ✅ Global Addon Selection Popup */}
+        {/* ✅ FIXED: Global Addon Selection Popup */}
         <AddonSelectionPopup
           isOpen={showGlobalAddonPopup}
           onClose={() => setShowGlobalAddonPopup(false)}
           selectedAddons={globalAddons}
-          onSave={(selectedAddons) => {
-            setGlobalAddons(selectedAddons);
-
-            const updatedBulkData = { ...bulkEditData };
-
-            selectedRows.forEach(itemId => {
-              updatedBulkData[itemId] = {
-                ...(updatedBulkData[itemId] || {}),
-                line_item_id: [...selectedAddons]
-              };
-            });
-
-            setBulkEditData(updatedBulkData);
-            setShowGlobalAddonPopup(false);
-          }}
+          onSave={handleGlobalAddonSave}
           addonSubcategories={addonSubcategories || []}
           allAddonItems={allAddonItems || []}
           currentItemId={null}
@@ -1379,7 +1439,7 @@ const UniversalBulkUpdateModal = ({
           {/* Header */}
           <div className="px-4 sm:px-6 py-3 border-b border-border-default flex justify-between items-center bg-bg-tertiary flex-shrink-0">
             <h2 className="text-base sm:text-lg font-bold text-text-primary">Update Tables
-              <span className='text-sm'>(Apply to All Selected)</span>
+              <span className='text-sm'> (Apply to All Selected)</span>
             </h2>
             <button
               onClick={handleClose}
@@ -1650,8 +1710,6 @@ const UniversalBulkUpdateModal = ({
                             }
                             className="w-full px-3 py-1.5 border border-border-default rounded-lg text-sm bg-bg-primary text-text-primary"
                           >
-                            <option value="">No change</option>
-
                             {loadingMasters ? (
                               <option disabled>Loading...</option>
                             ) : sectionOptions.length === 0 ? (
@@ -1670,14 +1728,12 @@ const UniversalBulkUpdateModal = ({
                             Zone
                           </label>
                           <select
-                            value={bulkUpdateData[table.id]?.location_zone ?? table.location_zone ?? ""}
+                            value={bulkUpdateData[table.id]?.location_zone ?? table.location_zone}
                             onChange={e =>
                               handleBulkUpdateChange(table.id, "location_zone", e.target.value)
                             }
                             className="w-full px-3 py-1.5 border border-border-default rounded-lg text-sm bg-bg-primary text-text-primary"
                           >
-                            <option value="">No change</option>
-
                             {loadingMasters ? (
                               <option disabled>Loading...</option>
                             ) : zoneOptions.length === 0 ? (
