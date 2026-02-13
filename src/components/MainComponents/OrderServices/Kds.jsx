@@ -619,37 +619,37 @@ const KitchenDisplay = () => {
     // Calculate elapsed time since item was created
     const calculateElapsedTime = (createdAt) => {
         if (!createdAt) return null;
-
+    
         let created;
-
+    
         if (typeof createdAt === "string") {
-            // Convert to proper ISO UTC format
-            const utcString =
-                createdAt.replace(" ", "T").split(".")[0] + "Z";
-
-            created = new Date(utcString).getTime();
+          // Convert to proper ISO UTC format
+          const utcString =
+            createdAt.replace(" ", "T").split(".")[0] + "Z";
+    
+          created = new Date(utcString).getTime();
         } else {
-            created = new Date(createdAt).getTime();
+          created = new Date(createdAt).getTime();
         }
-
+    
         const diffMs = Date.now() - created;
-
+    
         if (diffMs < 0) return "Just now";
-
+    
         const seconds = Math.floor(diffMs / 1000);
         const minutes = Math.floor(seconds / 60);
         const hours = Math.floor(minutes / 60);
         const days = Math.floor(hours / 24);
-
+    
         if (seconds < 60) return "Just now";
         if (minutes === 1) return "1 min ago";
         if (minutes < 60) return `${minutes} mins ago`;
         if (hours === 1) return "1 hr ago";
         if (hours < 24) return `${hours} hrs ago`;
         if (days === 1) return "1 day ago";
-
+    
         return `${days} days ago`;
-    };
+      };
 
     // Update timer every second
     useEffect(() => {
