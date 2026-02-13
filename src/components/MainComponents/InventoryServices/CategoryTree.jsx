@@ -8,7 +8,7 @@ import { jwtDecode } from 'jwt-decode';
 
 const CategoryTree = ({
   categories = [],
-  selectedCategory,
+  selectedCategoryId,
   onSelectCategory,
   defaultOpenCategoryName = 'Dietery',
   clientId,
@@ -86,34 +86,34 @@ const CategoryTree = ({
   };
 
   useEffect(() => {
-    if (!categories || categories.length === 0) return;
+    if (!categories || !selectedCategoryId) return;
   
-    // find selected category path
-    const findPath = (nodes, targetName, path = []) => {
+    const findPathById = (nodes, targetId, path = []) => {
       for (const node of nodes) {
         const newPath = [...path, node.id];
   
-        if (node.name === targetName) {
+        if (node.id === targetId) {
           return newPath;
         }
   
         if (node.children?.length) {
-          const result = findPath(node.children, targetName, newPath);
+          const result = findPathById(node.children, targetId, newPath);
           if (result) return result;
         }
       }
       return null;
     };
   
-    const path = findPath(categories, selectedCategory);
+    const path = findPathById(categories, selectedCategoryId);
   
     if (path) {
-      setExpandedCategories(path); // only open this branch
+      setExpandedCategories(path); // opens parents automatically
     }
   
     buildParentMapFromCategories(categories);
   
-  }, [selectedCategory, categories]);
+  }, [selectedCategoryId, categories]);
+  
   
   const buildParentMapFromCategories = (cats) => {
     const tempMap = {};
@@ -381,7 +381,7 @@ const CategoryTree = ({
   const renderTree = (items, level = 0) => {
     return items.map((category) => {
       const isExpanded = expandedCategories.includes(category.id);
-const isSelected = selectedCategory === category.name;
+      const isSelected = selectedCategoryId === category.id;
       const hasChildren = category.children && category.children.length > 0;
 
       return (
@@ -391,7 +391,7 @@ const isSelected = selectedCategory === category.name;
             isExpanded={isExpanded}
             onToggle={() => toggleCategory(category.id)}
             isSelected={isSelected}
-            onSelect={() => onSelectCategory(category.name)}
+            onSelect={() => onSelectCategory(category.id)}
             hasChildren={hasChildren}
             level={level}
             onEdit={handleEdit}
@@ -428,12 +428,13 @@ const isSelected = selectedCategory === category.name;
     const flatCategories = flattenAllCategories(items);
 
     return flatCategories.map((category) => {
-      const isSelected = selectedCategory === category.name;
+      const isSelected = selectedCategoryId === category.id;
+
 
       return (
         <button
           key={category.id || category.name}
-          onClick={() => onSelectCategory(category.name)}
+          onClick={() => onSelectCategory(category.id)}
           className={`flex items-center gap-2 px-4 py-2 rounded-full whitespace-nowrap font-semibold text-sm transition-all shadow-sm flex-shrink-0 ${isSelected
               ? 'bg-action-primary text-white shadow-md'
               : 'bg-bg-primary text-text-primary border-2 border-border-default hover:border-action-primary hover:bg-bg-tertiary'

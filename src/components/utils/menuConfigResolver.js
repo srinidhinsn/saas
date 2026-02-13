@@ -1,9 +1,9 @@
 export function getMenuConfig(clientId) {
 
-    console.log("------ FULL ENV ------");
-    console.log(import.meta.env);
-    console.log("EASYFOOD LEVEL =", import.meta.env.VITE_EASYFOOD_MENU_HIERARCHY_LEVEL);
-    console.log("DEFAULT LEVEL =", import.meta.env.VITE_MENU_HIERARCHY_LEVEL);
+    // console.log("------ FULL ENV ------");
+    // console.log(import.meta.env);
+    // console.log("EASYFOOD LEVEL =", import.meta.env.VITE_EASYFOOD_MENU_HIERARCHY_LEVEL);
+    // console.log("DEFAULT LEVEL =", import.meta.env.VITE_MENU_HIERARCHY_LEVEL);
   
     const normalizedClient = String(clientId)
       .trim()
