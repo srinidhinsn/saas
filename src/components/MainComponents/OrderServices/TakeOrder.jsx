@@ -2871,7 +2871,6 @@ const TakeOrder = ({ clientId, token, onOrderUpdate, realm }) => {
   const [searchOpen, setSearchOpen] = useState(false);
   const [searchQuery, setSearchQuery] = useState('');
   const searchInputRef = useRef(null);
-  const [selectedCategory, setSelectedCategory] = useState('All Categories');
   const [selectedTable, setSelectedTable] = useState('');
   const [cart, setCart] = useState([]);
   const [showCart, setShowCart] = useState(true);
@@ -2907,6 +2906,7 @@ const TakeOrder = ({ clientId, token, onOrderUpdate, realm }) => {
   const [invoiceOrderData, setInvoiceOrderData] = useState(null);
   const [inventoryMap, setInventoryMap] = useState({});
   const navigate = useNavigate();
+  const [selectedCategoryId, setSelectedCategoryId] = useState(null);
 
   // ============ UTILITY FUNCTIONS ============
   const flattenCategoryTree = (tree, level = 0, parentId = null) => {
@@ -2933,64 +2933,48 @@ const TakeOrder = ({ clientId, token, onOrderUpdate, realm }) => {
     return getMenuConfig(clientId);
   }, [clientId]);
 
-  // ✅ NEW: Helper function to determine appropriate addon category ID
   const getAddonCategoryId = (itemCategoryId) => {
-    if (!itemCategoryId || !categoriesFlat.length) return 'addons_ac'; // default fallback
-    
-    // Find the item's category path
-    const findCategoryPath = (catId) => {
-      const path = [];
-      let currentId = catId;
-      const visited = new Set();
-      
-      while (currentId && !visited.has(currentId)) {
-        visited.add(currentId);
-        const cat = categoriesFlat.find(c => c.id === currentId);
-        if (!cat) break;
-        path.unshift(cat.name?.toLowerCase() || '');
-        currentId = cat.parentId || cat.parent_id;
-      }
-      return path;
-    };
-    
-    const path = findCategoryPath(itemCategoryId);
-    
-    console.log(`🔍 Checking addon category for item category ${itemCategoryId}, path:`, path);
-    
-    // Check if item belongs to AC or Non-AC hierarchy
-    if (path.includes('ac') || path.some(p => p.includes('ac'))) {
-      console.log('✅ Using addons_ac');
-      return 'addons_ac';
-    } else if (path.includes('non_ac') || path.includes('non ac') || path.some(p => p.includes('non') && p.includes('ac'))) {
-      console.log('✅ Using addons_non_ac');
-      return 'addons_non_ac';
+    let current = itemCategoryId;
+  
+    while (current) {
+      const cat = categoriesFlat.find(c => c.id === current);
+      if (!cat) break;
+  
+      // 👇 these must be your actual DB ids
+      if (cat.id === 'AC_ROOT_ID') return 'addons_ac';
+      if (cat.id === 'NON_AC_ROOT_ID') return 'addons_non_ac';
+  
+      current = cat.parentId;
     }
-    
-    // Default to AC if unclear
-    console.log('⚠️ Defaulting to addons_ac');
+  
     return 'addons_ac';
   };
+  
 
   const generateSlug = (text) =>
     "_" + text.trim().replace(/[^a-zA-Z0-9\s]/g, "").replace(/\s+/g, "_");
 
-  const getCategoryAndChildrenNames = (categories, targetName) => {
+  const getCategoryAndChildrenIds = (categories, targetId) => {
     const result = new Set();
+  
     const traverse = (nodes, found = false) => {
       for (const node of nodes) {
-        const isTarget = node.name === targetName;
+        const isTarget = node.id === targetId;
+  
         if (isTarget || found) {
-          result.add(node.name);
+          result.add(node.id);
         }
-        if (node.children && node.children.length > 0) {
+  
+        if (node.children?.length) {
           traverse(node.children, found || isTarget);
         }
       }
     };
+  
     traverse(categories);
     return Array.from(result);
   };
-
+  
   const fetchTables = async () => {
     const res = await axios.get(
       `${import.meta.env.VITE_API_TABLE_SERVICE_URL}/${clientId}/tables/read`,
@@ -3343,8 +3327,14 @@ const TakeOrder = ({ clientId, token, onOrderUpdate, realm }) => {
 
         const enrichedItems = itemRes.data.data.map(item => {
           const cat = flatCategories.find(c => c.id === item.category_id);
-          return { ...item, category: cat?.name || "Uncategorized" };
+        
+          return {
+            ...item,
+            category_id: item.category_id,
+            category_name: cat?.name || "Uncategorized"
+          };
         });
+        
 
         setMenuItems(enrichedItems);
 
@@ -3355,9 +3345,7 @@ const TakeOrder = ({ clientId, token, onOrderUpdate, realm }) => {
             map.set(cat.id, {
               ...cat,
               count: enrichedItems.filter(i =>
-                cat.name === "All Categories"
-                  ? true
-                  : i.category === cat.name
+                i.category_id === cat.id
               ).length,
               children: []
             });
@@ -3432,12 +3420,9 @@ const TakeOrder = ({ clientId, token, onOrderUpdate, realm }) => {
 
     fetchData();
   }, [clientId, token, realm, menuConfig]);
-  
-  useEffect(() => {
-    if (!selectedCategory || selectedCategory === 'All Categories') {
-      setSidebarCategories(categories);
-    }
-  }, [selectedCategory, categories]);
+  const selectedCategoryName =
+  categoriesFlat.find(c => c.id === selectedCategoryId)?.name || "All Categories";
+
   
   useEffect(() => {
     if (!activeOrderId || menuItems.length === 0 || cart.length === 0) return;
@@ -3458,7 +3443,7 @@ const TakeOrder = ({ clientId, token, onOrderUpdate, realm }) => {
           image_id: menuItem.image_id,
           discount: menuItem.discount || 0,
           slug: menuItem.slug,
-          category: menuItem.category,
+          category: menuItem.category_name,
         };
       })
     );
@@ -3485,21 +3470,23 @@ const TakeOrder = ({ clientId, token, onOrderUpdate, realm }) => {
     const q = (searchQuery || '').trim().toLowerCase();
     let items = menuItems;
 
-    if (selectedCategory && selectedCategory !== 'All Categories') {
-      const allowedCategories = getCategoryAndChildrenNames(
+    if (selectedCategoryId) {
+      const allowedCategoryIds = getCategoryAndChildrenIds(
         categories,
-        selectedCategory
+        selectedCategoryId
       );
+    
       items = items.filter(item =>
-        allowedCategories.includes(item.category)
+        allowedCategoryIds.includes(item.category_id)
       );
     }
+    
 
     if (!q) return items;
 
     return items.filter(item => {
       const name = (item.name || '').toLowerCase();
-      const category = (item.category || '').toLowerCase();
+      const category = (item.category_name || '').toLowerCase();
       const code = String(item.code || '').toLowerCase();
 
       return (
@@ -3593,7 +3580,7 @@ const TakeOrder = ({ clientId, token, onOrderUpdate, realm }) => {
         image_id: item.image_id,
         discount: item.discount || 0,
         slug: item.slug,
-        category: item.category,
+        category: item.category_name,
         quantity: 1,
         note: "",
         frontend_unique_key: uniqueKey,
@@ -3633,7 +3620,7 @@ const TakeOrder = ({ clientId, token, onOrderUpdate, realm }) => {
           image_id: item.image_id,
           discount: item.discount || 0,
           slug: item.slug,
-          category: item.category,
+          category: item.category_name,
           quantity: 1,
           note: "",
           parent_item_key: parentItemKey,
@@ -3677,7 +3664,7 @@ const TakeOrder = ({ clientId, token, onOrderUpdate, realm }) => {
       image_id: selectedMainItem.image_id,
       discount: selectedMainItem.discount || 0,
       slug: selectedMainItem.slug,
-      category: selectedMainItem.category,
+      category: selectedMainItem.category_name,
       quantity: 1,
       note: "",
       frontend_unique_key: mainItemUniqueKey,
@@ -3701,7 +3688,7 @@ const TakeOrder = ({ clientId, token, onOrderUpdate, realm }) => {
         image_id: addon.image_id,
         discount: addon.discount || 0,
         slug: addon.slug,
-        category: addon.category,
+        category: addon.category_name,
         quantity: 1,
         note: "",
         frontend_unique_key: addonUniqueKey,
@@ -3739,7 +3726,7 @@ const TakeOrder = ({ clientId, token, onOrderUpdate, realm }) => {
           image_id: mainItemCopy.image_id,
           discount: mainItemCopy.discount || 0,
           slug: mainItemCopy.slug,
-          category: mainItemCopy.category,
+          category: mainItemCopy.category_name,
           quantity: 1,
           note: "",
         }
@@ -4015,7 +4002,7 @@ const TakeOrder = ({ clientId, token, onOrderUpdate, realm }) => {
           image_id: menuItem?.image_id,
           discount: menuItem?.discount || 0,
           slug: item.slug || menuItem?.slug,
-          category: menuItem?.category,
+          category: menuItem?.category_name,
           frontend_unique_key: frontendKey,
           batch_timestamp: batchTimestamp,
           status: item.status || "pending"
@@ -4110,7 +4097,7 @@ const TakeOrder = ({ clientId, token, onOrderUpdate, realm }) => {
     setActiveOrderId(null);
     setCurrentBatchTimestamp(null);
     setHasNewItems(false);
-    setSelectedCategory('All Categories');
+    setSelectedCategoryId("All Categories");
     setSidebarCategories(categories);
   };
 
@@ -4215,12 +4202,13 @@ const TakeOrder = ({ clientId, token, onOrderUpdate, realm }) => {
 
             <div className="w-full lg:col-span-1">
               <div className="lg:h-[calc(98dvh-4rem)] lg:overflow-y-auto pr-1">
-                <CategoryTree
-                  categories={sidebarCategories}
-                  selectedCategory={selectedCategory}
-                  onSelectCategory={setSelectedCategory}
-                  defaultOpenAll
-                />
+              <CategoryTree
+  categories={sidebarCategories}
+  selectedCategoryId={selectedCategoryId}
+  onSelectCategory={setSelectedCategoryId}
+  defaultOpenAll
+/>
+
               </div>
             </div>
 
@@ -4235,16 +4223,16 @@ const TakeOrder = ({ clientId, token, onOrderUpdate, realm }) => {
                       <button
                         key={cat.id}
                         onClick={() => {
-                          setSelectedCategory(cat.name);
-
+                          setSelectedCategoryId(cat.id);
+                        
                           const selectedNode = findNodeAndChildren(categories, cat.id);
-
                           if (selectedNode) {
                             setSidebarCategories([selectedNode]);
                           }
                         }}
+                        
                         className={`px-3 py-1.5 rounded-lg text-sm font-semibold border whitespace-nowrap transition-all flex-shrink-0
-          ${selectedCategory === cat.id
+          ${selectedCategoryId === cat.id
                             ? 'bg-action-primary text-white border-action-primary'
                             : 'bg-bg-tertiary text-text-primary hover:border-action-primary'
                           }`}
@@ -4270,7 +4258,7 @@ const TakeOrder = ({ clientId, token, onOrderUpdate, realm }) => {
                       </button>
 
                       <h2 className="text-xl lg:text-2xl font-semibold text-text-primary truncate">
-                        {selectedCategory}
+                      {selectedCategoryName}
                         <span className="text-sm ml-2">({filteredItems.length})</span>
                       </h2>
                     </div>
