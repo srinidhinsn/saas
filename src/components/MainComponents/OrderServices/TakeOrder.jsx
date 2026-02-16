@@ -6323,14 +6323,14 @@ const TakeOrder = ({ clientId, token, onOrderUpdate, realm }) => {
 
         if (isMatch) {
           const qty = item.quantity + change;
-          
+
           // ✅ FIX 2: Remove from localStorage if quantity becomes 0
           if (qty <= 0 && activeOrderId && item.frontend_unique_key) {
             const storageKey = `order_${activeOrderId}_new_item_${item.frontend_unique_key}`;
             localStorage.removeItem(storageKey);
             console.log(`🗑️ Removed from localStorage (qty=0): ${storageKey}`);
           }
-          
+
           return qty > 0 ? { ...item, quantity: qty } : null;
         }
         return item;
@@ -6363,51 +6363,47 @@ const TakeOrder = ({ clientId, token, onOrderUpdate, realm }) => {
     setIsPlacingOrder(true);
 
     try {
-      const subtotal = cart.reduce(
-        (s, i) => s + (i.unit_price || 0) * i.quantity,
-        0
-      );
-
+      const subtotal = cart.reduce((s, i) => s + (i.unit_price || 0) * i.quantity, 0);
       const gst = subtotal * 0.05;
       const cst = subtotal * 0.02;
       const total = subtotal + gst + cst;
 
       const headers = { Authorization: `Bearer ${token}` };
 
+      let createdOrderId = activeOrderId;
+
       if (activeOrderId) {
-        const itemsForBackend = cart.map(i => ({
-          client_id: clientId,
-          item_id: i.id,
-          order_id: activeOrderId,
-          item_name: i.name,
-          quantity: i.quantity,
-          unit_price: i.unit_price,
-          line_total: i.unit_price * i.quantity,
-          status: i.status || "pending",
-          note: i.note || "",
-          frontend_unique_key: i.frontend_unique_key || null,
-        }));
+        const newItemsToAdd = cart.filter(i => i.is_new_item || i.batch_timestamp);
 
-        await axios.post(
-          `${import.meta.env.VITE_API_ORDER_SERVICE_URL}/${clientId}/order_items/update?order_id=${activeOrderId}`,
-          itemsForBackend,
-          { headers }
-        );
+        if (newItemsToAdd.length > 0) {
+          const response = await axios.post(
+            `${import.meta.env.VITE_API_ORDER_SERVICE_URL}/${clientId}/dinein/create-sub-order`,
+            {
+              items: newItemsToAdd.map(i => ({
+                item_id: i.id,
+                item_name: i.name,
+                quantity: i.quantity,
+                unit_price: i.unit_price,
+                line_total: i.unit_price * i.quantity,
+                slug: i.slug,
+                frontend_unique_key: i.frontend_unique_key
+              })),
+            },
+            {
+              headers,
+              params: {
+                client_id: clientId,          // ✅ REQUIRED
+                parent_order_id: activeOrderId  // ✅ REQUIRED
+              }
+            }
+          );
 
-        const derivedStatus = deriveOrderStatusFromItems(cart);
 
-        await axios.post(
-          `${import.meta.env.VITE_API_ORDER_SERVICE_URL}/${clientId}/dinein/update`,
-          {
-            id: activeOrderId,
-            total_price: total,
-            status: derivedStatus,
-          },
-          { headers }
-        );
-      }
-      else {
-        await axios.post(
+          toast.success(`Sub-order ${response.data.data.order_number} created!`);
+        }
+      } else {
+        // ✅ Capture response
+        const response = await axios.post(
           `${import.meta.env.VITE_API_ORDER_SERVICE_URL}/${clientId}/dinein/create`,
           {
             client_id: clientId,
@@ -6423,37 +6419,34 @@ const TakeOrder = ({ clientId, token, onOrderUpdate, realm }) => {
               quantity: i.quantity,
               unit_price: i.unit_price,
               line_total: i.unit_price * i.quantity,
-              status: "pending"
+              status: "pending",
+              slug: i.slug
             }))
           },
           { headers }
         );
-      }
 
-      const tableToUpdate = tables.find(t => t.id.toString() === selectedTable);
-      if (tableToUpdate) {
-        await axios.post(
-          `${import.meta.env.VITE_API_TABLE_SERVICE_URL}/${clientId}/tables/update`,
-          {
-            ...tableToUpdate,
-            id: Number(selectedTable),
-            status: "Occupied",
-            table_type: tableToUpdate.table_type.toString()
-          },
-          { headers }
-        );
+        createdOrderId = response.data.data.id;
+
+        // ✅ UPDATE TABLE STATUS BACK
+        const tableToUpdate = tables.find(t => t.id.toString() === selectedTable);
+        if (tableToUpdate) {
+          await axios.post(
+            `${import.meta.env.VITE_API_TABLE_SERVICE_URL}/${clientId}/tables/update`,
+            {
+              ...tableToUpdate,
+              id: Number(selectedTable),
+              status: "Occupied",
+              table_type: tableToUpdate.table_type.toString()
+            },
+            { headers }
+          );
+        }
       }
 
       await fetchTables();
 
-      if (activeOrderId && currentBatchTimestamp) {
-        Object.keys(localStorage).forEach(key => {
-          if (key.startsWith(`order_${activeOrderId}_batch_${currentBatchTimestamp}`)) {
-            localStorage.removeItem(key);
-          }
-        });
-      }
-
+      // Reset UI properly
       setCart([]);
       setActiveOrderId(null);
       setShowCart(false);
@@ -6461,14 +6454,17 @@ const TakeOrder = ({ clientId, token, onOrderUpdate, realm }) => {
       setCurrentBatchTimestamp(null);
       setHasNewItems(false);
 
+      toast.success('Order placed successfully!');
+
     } catch (err) {
       console.error("ORDER ERROR:", err);
-      alert("Order failed");
+      toast.error("Order failed");
     } finally {
       isPlacingRef.current = false;
       setIsPlacingOrder(false);
     }
   };
+
 
   const handleTableSelect = (table) => {
     setSelectedTable(table.id.toString());
@@ -6697,41 +6693,42 @@ const TakeOrder = ({ clientId, token, onOrderUpdate, realm }) => {
           </div>
 
           {/* ✅ FIX 3: Make old items non-editable */}
+          {/* ✅ FIX 3: Only make old items in EXISTING orders non-editable */}
+          {/* For fresh orders (no activeOrderId) OR new items in existing orders, show full controls */}
           {!isOldItem && (
-            <div className="flex items-center gap-1">
-              <button
-                onClick={() => onUpdateQuantity(main.id, -1, main.frontend_unique_key)}
-                className="w-7 h-7 flex items-center justify-center border rounded hover:bg-gray-100"
-              >
-                <Minus size={14} />
-              </button>
+            <>
+              <div className="flex items-center gap-1">
+                <button
+                  onClick={() => onUpdateQuantity(main.id, -1, main.frontend_unique_key)}
+                  className="w-7 h-7 flex items-center justify-center border rounded hover:bg-gray-100"
+                >
+                  <Minus size={14} />
+                </button>
 
-              <span className="w-6 text-center text-sm font-semibold">
-                {main.quantity}
-              </span>
+                <span className="w-6 text-center text-sm font-semibold">
+                  {main.quantity}
+                </span>
+
+                <button
+                  onClick={() => onUpdateQuantity(main.id, 1, main.frontend_unique_key)}
+                  className="w-7 h-7 flex items-center justify-center border rounded hover:bg-gray-100"
+                >
+                  <Plus size={14} />
+                </button>
+              </div>
 
               <button
-                onClick={() => onUpdateQuantity(main.id, 1, main.frontend_unique_key)}
-                className="w-7 h-7 flex items-center justify-center border rounded hover:bg-gray-100"
+                onClick={() => onRemove(main.id, main.frontend_unique_key)}
+                className="text-action-primary hover:text-red-700"
               >
-                <Plus size={14} />
+                <X size={16} />
               </button>
-            </div>
+            </>
           )}
 
-          {/* ✅ FIX 3: Show quantity for old items */}
+          {/* ✅ FIX 3: Show quantity for old items in existing orders only */}
           {isOldItem && (
             <span className="text-sm font-semibold text-gray-600">×{main.quantity}</span>
-          )}
-
-          {/* ✅ FIX 3: Only show remove button for new items */}
-          {!isOldItem && (
-            <button
-              onClick={() => onRemove(main.id, main.frontend_unique_key)}
-              className="text-action-primary hover:text-red-700"
-            >
-              <X size={16} />
-            </button>
           )}
         </div>
 
@@ -7011,7 +7008,7 @@ const TakeOrder = ({ clientId, token, onOrderUpdate, realm }) => {
                         ) : (
                           <>
                             <div className="flex-1 overflow-y-auto mt-4 space-y-2">
-                              {/* ✅ FIX 3: Old items - non-editable */}
+                              {/* ✅ FIX 3: Old items - non-editable ONLY in existing orders */}
                               {oldItems.length > 0 && (
                                 <>
                                   {getGroupedCartItems(oldItems).map((group, idx) => (
@@ -7020,7 +7017,7 @@ const TakeOrder = ({ clientId, token, onOrderUpdate, realm }) => {
                                       group={group}
                                       onUpdateQuantity={updateQuantity}
                                       onRemove={removeFromCart}
-                                      isOldItem={true}
+                                      isOldItem={activeOrderId ? true : false}
                                     />
                                   ))}
                                 </>

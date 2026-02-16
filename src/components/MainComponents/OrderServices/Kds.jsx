@@ -17,6 +17,7 @@ const KitchenDisplay = () => {
     const [inventoryMap, setInventoryMap] = useState({});
     const [loading, setLoading] = useState(true);
     const [orderFilter, setOrderFilter] = useState("ALL");
+    // ALL | DINEIN | TAKEAWAY
 
     const [editOrderId, setEditOrderId] = useState(null);
     const [addingOrderId, setAddingOrderId] = useState(null);
@@ -41,7 +42,7 @@ const KitchenDisplay = () => {
             document.body.classList.remove("sidebar-minimized");
         }
     }, [tableIds]);
-
+    // Fetch tables
     useEffect(() => {
         if (!token || !clientId) return;
 
@@ -56,11 +57,10 @@ const KitchenDisplay = () => {
             })
             .catch(() => toast.error("Failed to fetch tables"));
     }, [clientId, token]);
-
     const generateSlug = (name) => {
         return name ? name.toLowerCase().replace(/[\s]+/g, "-") : "";
     };
-
+    // Fetch inventory items
     useEffect(() => {
         if (!token || !clientId) return;
 
@@ -69,7 +69,7 @@ const KitchenDisplay = () => {
                 headers: { Authorization: `Bearer ${token}` },
             })
             .then((res) => {
-                console.log("📦 Sample inventory item:", res.data?.data?.[0]);
+                console.log("📦 Sample inventory item:", res.data?.data?.[0]); // ✅ CHECK THIS
                 setInventoryItems(res.data?.data || []);
                 const map = {};
                 (res.data?.data || []).forEach((item) => {
@@ -79,7 +79,6 @@ const KitchenDisplay = () => {
             })
             .catch(() => toast.error("Failed to fetch inventory items"));
     }, [clientId, token]);
-
     useEffect(() => {
         const fetchOrders = async () => {
             if (!token || !clientId) {
@@ -103,28 +102,27 @@ const KitchenDisplay = () => {
 
                 console.log(`📊 Processing ${todayOrders.length} orders`);
 
-                // ✅ FIX 4: Create separate order cards for each batch
-                const expandedOrders = [];
-
-                todayOrders.forEach(order => {
+                setOrders(todayOrders.map(order => {
                     console.log(`\n🔄 Processing order ${order.id}`);
 
                     if (order.status === 'served') {
                         clearNewItemsStorage(order.id);
-                        expandedOrders.push(order);
-                        return;
+                        return order;
                     }
 
+                    // ✅ Get localStorage data
                     const newItemsFromStorage = getNewItemsFromStorage(order.id);
                     console.log(`📦 localStorage items for order ${order.id}:`, newItemsFromStorage);
 
                     if (newItemsFromStorage.length === 0) {
                         console.log(`✅ No new items for order ${order.id}`);
-                        expandedOrders.push(order);
-                        return;
+                        return order;
                     }
 
                     const storageUniqueKeys = new Set(newItemsFromStorage.map(item => item.unique_key));
+                    console.log(`🔑 Storage unique keys:`, Array.from(storageUniqueKeys));
+
+                    // ✅ Build a map: frontend_unique_key → batch_timestamp from localStorage
                     const keyToBatchMap = new Map();
                     newItemsFromStorage.forEach(storageItem => {
                         if (storageItem.unique_key && storageItem.batch_timestamp) {
@@ -132,20 +130,26 @@ const KitchenDisplay = () => {
                         }
                     });
 
+                    // ✅ Separate items into OLD and items grouped by BATCH
                     const oldItems = [];
                     const batchItemsMap = new Map();
 
+                    // ✅ Track which localStorage keys are already in backend
                     const backendUniqueKeys = new Set(
                         order.items
                             .filter(item => item.frontend_unique_key)
                             .map(item => item.frontend_unique_key)
                     );
+                    console.log(`🔑 Backend unique keys:`, Array.from(backendUniqueKeys));
 
+                    // ✅ Process backend items
                     order.items.forEach((item, idx) => {
                         if (item.frontend_unique_key) {
+                            // Item has a unique key - determine if it's new
                             let batchTimestamp = keyToBatchMap.get(item.frontend_unique_key);
 
                             if (!batchTimestamp) {
+                                // ✅ Extract timestamp from the key itself
                                 const parts = item.frontend_unique_key.split('_');
                                 if (parts.length >= 2) {
                                     const extractedTimestamp = parseFloat(parts[parts.length - 1]);
@@ -175,6 +179,7 @@ const KitchenDisplay = () => {
                         }
                     });
 
+                    // ✅ Add truly unsaved items from localStorage
                     newItemsFromStorage.forEach(storageItem => {
                         if (!backendUniqueKeys.has(storageItem.unique_key)) {
                             const itemInfo = inventoryMap[storageItem.item_id];
@@ -201,38 +206,33 @@ const KitchenDisplay = () => {
                         }
                     });
 
-                    // ✅ FIX 4: Create main order card with old items only
-                    if (oldItems.length > 0) {
-                        expandedOrders.push({
-                            ...order,
-                            items: oldItems,
-                            has_new_items: false,
-                            is_main_order: true,
-                        });
-                    }
+                    // ✅ Build final items array with batch dividers
+                    const allItems = [...oldItems];
+                    const batchDividers = [];
 
-                    // ✅ FIX 4: Create separate cards for each batch
+                    // Sort batches by timestamp
                     const sortedBatchTimestamps = Array.from(batchItemsMap.keys()).sort((a, b) => a - b);
-                    
+
                     sortedBatchTimestamps.forEach((timestamp, batchIdx) => {
                         const batchItems = batchItemsMap.get(timestamp);
                         if (batchItems && batchItems.length > 0) {
-                            expandedOrders.push({
-                                ...order,
-                                id: `${order.id}_batch_${timestamp}`, // Unique ID for batch card
-                                original_order_id: order.id, // Keep reference to original order
-                                items: batchItems,
-                                has_new_items: true,
-                                is_batch_order: true,
+                            batchDividers.push({
+                                index: allItems.length,
                                 batch_number: batchIdx + 2,
-                                batch_timestamp: timestamp,
                             });
+                            allItems.push(...batchItems);
                         }
                     });
-                });
 
-                console.log(`📊 Expanded ${todayOrders.length} orders into ${expandedOrders.length} cards`);
-                setOrders(expandedOrders);
+                    console.log(`📊 Order ${order.id} summary: ${oldItems.length} old items, ${sortedBatchTimestamps.length} batches`);
+
+                    return {
+                        ...order,
+                        items: allItems,
+                        has_new_items: batchItemsMap.size > 0,
+                        batch_dividers: batchDividers,
+                    };
+                }));
 
             } catch (err) {
                 console.error("❌ Error fetching orders:", err);
@@ -293,7 +293,7 @@ const KitchenDisplay = () => {
                     item_id: selectedItem.id,
                     item_name: selectedItem.name,
                     quantity: 1,
-                    price: selectedItem.unit_price || selectedItem.price || 0,
+                    price: selectedItem.unit_price || selectedItem.price || 0, // ✅ Handle both
                     status: "new",
                     note: "",
                     slug: selectedItem.slug || generateSlug(selectedItem.name),
@@ -318,6 +318,7 @@ const KitchenDisplay = () => {
             });
         });
 
+        // ✅ Store in localStorage
         const storageKey = `order_${orderId}_new_item_${uniqueKey}`;
         localStorage.setItem(storageKey, JSON.stringify({
             item_id: selectedItem.id,
@@ -328,6 +329,7 @@ const KitchenDisplay = () => {
         }));
         console.log(`💾 Saved to localStorage: ${storageKey}`);
 
+        // Save to backend
         setTimeout(() => {
             const order = orders.find(o => o.id === orderId);
             if (order) {
@@ -342,11 +344,6 @@ const KitchenDisplay = () => {
 
 
     const updateOrderItems = async (orderId, updatedItemsWithStatuses) => {
-        // ✅ FIX 4: Use original_order_id if this is a batch card
-        const actualOrderId = orderId.toString().includes('_batch_') 
-            ? orderId.split('_batch_')[0] 
-            : orderId;
-
         const cleanedItems = updatedItemsWithStatuses.map(item => ({
             item_id: item.item_id || item.inventory_id,
             item_name: item.name || item.item_name,
@@ -356,8 +353,8 @@ const KitchenDisplay = () => {
             slug: item.slug || "",
             price: item.price || inventoryMap[item.item_id || item.inventory_id]?.unit_price || 0,
             client_id: clientId,
-            order_id: actualOrderId,
-            frontend_unique_key: item.frontend_unique_key || null,
+            order_id: orderId,
+            frontend_unique_key: item.frontend_unique_key || null, // ✅ ADDED
         }));
 
         console.log("📤 Final payload to order_items/update:");
@@ -369,7 +366,7 @@ const KitchenDisplay = () => {
 
         try {
             await axios.post(
-                `${import.meta.env.VITE_API_ORDER_SERVICE_URL}/${clientId}/order_items/update?order_id=${actualOrderId}`,
+                `${import.meta.env.VITE_API_ORDER_SERVICE_URL}/${clientId}/order_items/update?order_id=${orderId}`,
                 cleanedItems,
                 { headers: { Authorization: `Bearer ${token}` } }
             );
@@ -377,7 +374,7 @@ const KitchenDisplay = () => {
             await axios.post(
                 `${import.meta.env.VITE_API_ORDER_SERVICE_URL}/${clientId}/dinein/update`,
                 {
-                    id: actualOrderId,
+                    id: orderId,
                     total_price: totalPrice
                 },
                 { headers: { Authorization: `Bearer ${token}` } }
@@ -394,46 +391,49 @@ const KitchenDisplay = () => {
 
     const handleItemStatusChange = async (orderId, itemBackendId, newStatus) => {
         try {
-            // ✅ FIX 4: Handle batch order IDs
-            const actualOrderId = orderId.toString().includes('_batch_') 
-                ? parseInt(orderId.split('_batch_')[0], 10)
-                : parseInt(orderId, 10);
-
-            const order = orders.find(o => o.id === orderId);
+            const orderIdInt = parseInt(orderId, 10);
+            const order = orders.find(o => o.id === orderIdInt);
             if (!order) return;
 
+            // 🔄 Update clicked item status
             const updatedItems = order.items.map(item =>
                 item.id === itemBackendId
                     ? { ...item, status: newStatus }
                     : item
             );
 
+            // ❗ Remove id before sending to backend
             const itemsForUpdate = updatedItems;
 
+            // 💰 Recalculate total
             const totalPrice = updatedItems.reduce(
                 (sum, item) =>
                     sum + (inventoryMap[item.item_id]?.price || 0) * (item.quantity || 1),
                 0
             );
 
+            // 🔄 Update items in backend
             await axios.post(
-                `${import.meta.env.VITE_API_ORDER_SERVICE_URL}/${clientId}/order_items/update?order_id=${actualOrderId}`,
+                `${import.meta.env.VITE_API_ORDER_SERVICE_URL}/${clientId}/order_items/update?order_id=${orderIdInt}`,
                 itemsForUpdate,
                 { headers: { Authorization: `Bearer ${token}` } }
             );
 
+            // 🧠 DERIVE ORDER STATUS FROM ITEMS
             const derivedStatus = deriveOrderStatusFromItems(updatedItems);
 
+            // 🔄 Update order status in backend
             await axios.post(
                 `${import.meta.env.VITE_API_ORDER_SERVICE_URL}/${clientId}/dinein/update`,
                 {
-                    id: actualOrderId,
+                    id: orderIdInt,
                     status: derivedStatus,
                     total_price: totalPrice,
                 },
                 { headers: { Authorization: `Bearer ${token}` } }
             );
 
+            // 📣 DISPATCH EVENT ONLY WHEN ALL ITEMS ARE SERVED
             if (derivedStatus === "ready" && order.status !== "ready") {
                 const collectEvent = new CustomEvent("orderCollect", {
                     detail: {
@@ -441,12 +441,13 @@ const KitchenDisplay = () => {
                             tablesMap[order.table_id] ||
                             order.table_number ||
                             "Unknown Table",
-                        orderId: actualOrderId,
+                        orderId: order.id,
                     },
                 });
                 window.dispatchEvent(collectEvent);
             }
 
+            // 🪄 Update local state
             setOrders(prev =>
                 prev.map(o =>
                     o.id === orderId
@@ -466,6 +467,9 @@ const KitchenDisplay = () => {
         }
     };
 
+
+
+    // Update item name locally
     const updateItemName = (orderId, itemId, newName) => {
         setOrders((prev) =>
             prev.map((o) => {
@@ -478,6 +482,7 @@ const KitchenDisplay = () => {
         );
     };
 
+    // Card color helper
     const cardColors = (order) => {
         if (order.table_number === "07") return "orange";
         if (order.type?.toLowerCase() === "take waay") {
@@ -531,12 +536,94 @@ const KitchenDisplay = () => {
         return "pending";
     };
 
+
+
+    // const handleStatusChange = async (orderId, newStatus) => {
+    //     try {
+    //         const orderIdInt = parseInt(orderId, 10);
+    //         const order = orders.find(o => o.id === orderIdInt);
+    //         if (!order) return;
+
+    //         // Update all items if order status is "served"
+    //         const updatedItems =
+    //         newStatus === "served"
+    //             ? order.items.map(item => ({ ...item, status: "served" }))
+    //             : newStatus === "ready"
+    //             ? order.items.map(item => ({ ...item, status: "ready" }))
+    //             : order.items;
+
+
+    //         const cleanedItems = updatedItems.map(item => ({
+    //             item_id: item.item_id,
+    //             item_name: item.item_name,
+    //             quantity: item.quantity,
+    //             status: item.status || "new",
+    //             note: item.note || "",
+    //             slug: item.slug || "",
+    //             price: item.price || inventoryMap[item.item_id]?.price || 0,
+    //             client_id: clientId,
+    //             order_id: orderId,
+    //         }));
+
+    //         const totalPrice = cleanedItems.reduce(
+    //             (sum, item) => sum + (item.price || 0) * (item.quantity || 1),
+    //             0
+    //         );
+
+    //         // Save updated items with their statuses
+    //         await axios.post(
+    //             `${import.meta.env.VITE_API_ORDER_SERVICE_URL}/${clientId}/order_items/update?order_id=${orderIdInt}`,
+    //             cleanedItems,
+    //             { headers: { Authorization: `Bearer ${token}` } }
+    //         );
+
+    //         // Update overall order status and total price
+    //         await axios.post(
+    //             `${import.meta.env.VITE_API_ORDER_SERVICE_URL}/${clientId}/dinein/update`,
+    //             { id: orderIdInt, status: newStatus, total_price: totalPrice },
+    //             { headers: { Authorization: `Bearer ${token}` } }
+    //         );
+
+    //         // ✅ If served, clear new items tracking
+    //         if (newStatus === "served") {
+    //             clearNewItemsStorage(orderId);
+    //         }
+
+    //         // Update local state accordingly
+    //         setOrders(prev =>
+    //             prev.map(o =>
+    //                 o.id === orderId
+    //                     ? {
+    //                         ...o,
+    //                         status: newStatus,
+    //                         items: updatedItems,
+    //                         total_price: totalPrice,
+    //                         has_new_items: newStatus === 'served' ? false : o.has_new_items,
+    //                         new_items_start_index: newStatus === 'served' ? null : o.new_items_start_index,
+    //                     }
+    //                     : o
+    //             )
+    //         );
+
+    //         // Exit edit/add modes if served
+    //         if (newStatus === "served") {
+    //             if (editOrderId === orderId) setEditOrderId(null);
+    //             if (addingOrderId === orderId) setAddingOrderId(null);
+    //         }
+    //     } catch (err) {
+    //         console.error(err);
+    //         toast.error("Failed to update order status");
+    //     }
+    // };
+
+    // Calculate elapsed time since item was created
     const calculateElapsedTime = (createdAt) => {
         if (!createdAt) return null;
     
         let created;
     
         if (typeof createdAt === "string") {
+          // Convert to proper ISO UTC format
           const utcString =
             createdAt.replace(" ", "T").split(".")[0] + "Z";
     
@@ -564,6 +651,7 @@ const KitchenDisplay = () => {
         return `${days} days ago`;
       };
 
+    // Update timer every second
     useEffect(() => {
         const timerInterval = setInterval(() => {
             setCurrentTime(Date.now());
@@ -571,7 +659,7 @@ const KitchenDisplay = () => {
 
         return () => clearInterval(timerInterval);
     }, []);
-
+    // Delete order confirmation and delete
     const confirmDeleteOrder = async () => {
         if (!orderToDelete) return;
         try {
@@ -590,6 +678,7 @@ const KitchenDisplay = () => {
     };
 
     useEffect(() => {
+        // Load newly added items from localStorage on mount
         const loadNewlyAddedItems = () => {
             const newItems = {};
             const keysToRemove = [];
@@ -600,11 +689,13 @@ const KitchenDisplay = () => {
                     const timestampStr = localStorage.getItem(key);
                     const timestamp = parseInt(timestampStr, 10);
                     const age = Date.now() - timestamp;
-                    const maxAge = 30 * 60 * 1000;
+                    const maxAge = 30 * 60 * 1000; // 30 minutes
 
                     if (age > maxAge) {
                         keysToRemove.push(key);
                     } else {
+                        // ✅ Parse key: "new_item_{orderId}_{itemId}_{timestamp}"
+                        // Example: "new_item_123_456_1704067200000"
                         const withoutPrefix = key.replace('new_item_', '');
                         const firstUnderscoreIndex = withoutPrefix.indexOf('_');
 
@@ -624,8 +715,10 @@ const KitchenDisplay = () => {
                 }
             }
 
+            // Remove expired items
             keysToRemove.forEach(key => localStorage.removeItem(key));
 
+            // Update ref
             newlyAddedItemsRef.current = newItems;
             console.log('📦 Final loaded items:', newItems);
         };
@@ -636,7 +729,7 @@ const KitchenDisplay = () => {
     useEffect(() => {
         const cleanupInterval = setInterval(() => {
             const keysToRemove = [];
-            const maxAge = 30 * 60 * 1000;
+            const maxAge = 30 * 60 * 1000; // 30 minutes
 
             for (let i = 0; i < localStorage.length; i++) {
                 const key = localStorage.key(i);
@@ -647,6 +740,7 @@ const KitchenDisplay = () => {
                     if (age > maxAge) {
                         keysToRemove.push(key);
 
+                        // Also remove from ref
                         const withoutPrefix = key.replace('new_item_', '');
                         const firstUnderscoreIndex = withoutPrefix.indexOf('_');
 
@@ -663,7 +757,7 @@ const KitchenDisplay = () => {
             }
 
             keysToRemove.forEach(key => localStorage.removeItem(key));
-        }, 60000);
+        }, 60000); // Check every minute
 
         return () => clearInterval(cleanupInterval);
     }, []);
@@ -676,7 +770,7 @@ const KitchenDisplay = () => {
             if (key && key.startsWith(`order_${orderId}_new_item_`)) {
                 try {
                     const data = JSON.parse(localStorage.getItem(key));
-                    if (data && data.item_id) {
+                    if (data && data.item_id) { // ✅ Validate data
                         newItems.push(data);
                     }
                 } catch (e) {
@@ -767,11 +861,6 @@ const KitchenDisplay = () => {
                                     const isEditing = editOrderId === order.id;
                                     const isAdding = addingOrderId === order.id;
                                     const elapsedTime = order?.created_at ? calculateElapsedTime(order.created_at) : null;
-                                    
-                                    // ✅ FIX 4: Show batch number badge
-                                    const isBatchCard = order.is_batch_order;
-                                    const batchNumber = order.batch_number;
-                                    
                                     return (
                                         <div
                                             key={order.id}
@@ -780,10 +869,10 @@ const KitchenDisplay = () => {
                                           transition-transform transform hover:-translate-y-0.5
                                           flex flex-col
                                           ${cardColors(order)}
-                                          ${isBatchCard ? 'ring-2 ring-orange-400' : ''}
                                         `}
                                         >
 
+                                            {/* Card header */}
                                             <div className="flex items-center justify-between px-4 py-3 bg-action-primary text-text-white">
                                                 <div className="flex items-center justify-between w-full">
                                                     <span className="text-sm md:text-base font-semibold">
@@ -795,27 +884,31 @@ const KitchenDisplay = () => {
                                                         <span>{elapsedTime}</span>
                                                     </div>
 
-                                                    <div className="flex items-center gap-2">
-                                                        <span className="text-xl font-semibold text-orange-100/80">
-                                                            #{order.original_order_id || order.id}
-                                                        </span>
-                                                        
-                                                        {/* ✅ FIX 4: Show batch badge */}
-                                                        {isBatchCard && (
-                                                            <span className="px-2 py-1 bg-orange-500 text-white text-xs font-bold rounded-full">
-                                                                +NEW
-                                                            </span>
-                                                        )}
-                                                    </div>
+                                                    <span className="text-xl font-semibold text-orange-100/80">
+                                                        #{order.id}
+                                                    </span>
+                                                </div>
+
+
+                                                <div className="flex items-center gap-2">
+                                                    {/* commented actions preserved but hidden visually */}
                                                 </div>
                                             </div>
 
+                                            {/* Card body */}
                                             <div className="bg-bg-primary px-4 py-4 space-y-3 flex-1">
                                                 {order.items.map((item, idx) => {
+                                                    const divider = order.batch_dividers?.find(d => d.index === idx);
+
                                                     return (
                                                         <React.Fragment key={item.id || idx}>
+                                                            {/* Batch divider */}
+                                                            {divider && <div className="w-full border-t-2 border-dashed border-orange-200 my-2" />}
+
+                                                            {/* Item row */}
                                                             <div
-                                                                className={`flex items-center w-full rounded-lg ${item.is_new_item ? "bg-orange-50" : "bg-white"} ${isEditing ? "cursor-pointer hover:shadow-sm" : "cursor-default"}`}>
+                                                                className={` flex items-center w-full  rounded-lg ${item.is_new_item ? "bg-orange-50" : "bg-white"} ${isEditing ? "cursor-pointer hover:shadow-sm" : "cursor-default"}`}>
+                                                                {/* Item name / editable */}
                                                                 <div className="flex-1">
                                                                     {isEditing ? (
                                                                         <input
@@ -836,6 +929,7 @@ const KitchenDisplay = () => {
                                                                     )}
                                                                 </div>
 
+                                                                {/* Status icons */}
                                                                 <div className="flex items-center gap-3 ml-3">
                                                                     <button
                                                                         type="button"
@@ -874,6 +968,7 @@ const KitchenDisplay = () => {
                                                                     </button>
                                                                 </div>
 
+                                                                {/* Measure / extra */}
                                                                 {!isEditing && !isAdding && (
                                                                     <div className="ml-3 text-sm text-gray-500">{item.measure || ""}</div>
                                                                 )}
@@ -882,6 +977,7 @@ const KitchenDisplay = () => {
                                                     );
                                                 })}
 
+                                                {/* Add item search UI when adding */}
                                                 {isAdding && (
                                                     <div className="mt-2">
                                                         <input
@@ -918,6 +1014,49 @@ const KitchenDisplay = () => {
                                                     {order.status}
                                                 </button>
                                             </div>
+
+
+                                            {/* Card footer (status action)
+                                            {!isAdding && !isEditing && order.status !== "served" && (
+                                                <div className="px-4 py-3 border-t border-gray-100 bg-white">
+                                                    <div className="flex items-center gap-3">
+                                                        {order.status === "new" && (
+                                                            <button
+                                                                className="px-3 py-2 rounded-lg bg-action-primary text-text-white font-semibold hover:bg-orange-600"
+                                                                onClick={() => handleStatusChange(order.id, "pending")}
+                                                            >
+                                                                Pending
+                                                            </button>
+                                                        )}
+                                                        {order.status === "pending" && (
+                                                            <button
+                                                                className="px-3 py-2 rounded-lg bg-yellow-100 text-yellow-700 font-semibold hover:bg-yellow-200"
+                                                                onClick={() => handleStatusChange(order.id, "preparing")}
+                                                            >
+                                                                Preparing!!!
+                                                            </button>
+                                                        )}
+                                                        {order.status === "preparing" && (
+                                                            <button
+                                                                className="px-3 py-2 rounded-lg bg-green-50 text-green-700 font-semibold hover:bg-green-100"
+                                                                onClick={() => {
+                                                                    handleStatusChange(order.id, "ready");
+
+                                                                    const collectEvent = new CustomEvent("orderCollect", {
+                                                                        detail: {
+                                                                            tableName: tablesMap[order.table_id] || order.table_number || "Unknown Table",
+                                                                            orderId: order.id,
+                                                                        },
+                                                                    });
+                                                                    window.dispatchEvent(collectEvent);
+                                                                }}
+                                                            >
+                                                                Ready To Serve !!!
+                                                            </button>
+                                                        )}
+                                                    </div>
+                                                </div>
+                                            )} */}
                                         </div>
                                     );
                                 })}
@@ -925,6 +1064,7 @@ const KitchenDisplay = () => {
                         )}
                     </div>
 
+                    {/* Delete order confirmation modal */}
                     {showDeleteModal && (
                         <div className="fixed inset-0 z-50 flex items-center justify-center bg-black bg-opacity-50">
                             <div className="w-full max-w-md rounded-xl overflow-hidden shadow-lg bg-white text-gray-900">
@@ -955,6 +1095,7 @@ const KitchenDisplay = () => {
                         </div>
                     )}
 
+                    {/* Delete item confirmation modal */}
                     {showDeleteItemModal && (
                         <div className="fixed inset-0 z-50 flex items-center justify-center bg-black bg-opacity-50">
                             <div className="w-full max-w-md rounded-xl overflow-hidden shadow-lg bg-white text-gray-900">
@@ -1020,3 +1161,4 @@ const KitchenDisplay = () => {
 };
 
 export default KitchenDisplay;
+
