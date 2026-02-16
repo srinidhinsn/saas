@@ -8,47 +8,46 @@ const Data = ({ clientId, token }) => {
     const [loading, setLoading] = useState(true);
     const [expanded, setExpanded] = useState({});
     const navigate = useNavigate();
-
+    const [realms, setRealms] = useState([]);
+    const [selectedRealm, setSelectedRealm] = useState("");
+    
     // fetch all clients (realms)
     useEffect(() => {
+        if (!selectedRealm) return;
+    
         const fetchClientsAndUsers = async () => {
             try {
                 setLoading(true);
-
-                // 1️⃣ get all clients
+    
                 const res = await axios.get(
-                    `${import.meta.env.VITE_API_USER_SERVICE_URL}/${clientId}/users/realm`,
+                    `${import.meta.env.VITE_API_USER_SERVICE_URL}/${clientId}/users/realm?realm=${selectedRealm}`,
                     {
                         headers: { Authorization: `Bearer ${token}` },
                     }
                 );
-
+    
                 const clientList = res.data.data.clients;
-
-                // 2️⃣ for each client → get users
+    
                 const fullData = await Promise.all(
                     clientList.map(async (client) => {
                         try {
-                       
                             const personRes = await axios.get(
                                 `${import.meta.env.VITE_API_USER_SERVICE_URL}/${client.id}/users/persons?client_id=${client.id}`,
                                 {
-                                  headers: { Authorization: `Bearer ${token}` },
+                                    headers: { Authorization: `Bearer ${token}` },
                                 }
-                              );
-                              
-                              const usersWithProfile = personRes.data.data.persons || [];
-                              
-                              return {
+                            );
+    
+                            return {
                                 ...client,
-                                users: usersWithProfile,
-                              };
+                                users: personRes.data.data.persons || [],
+                            };
                         } catch {
                             return { ...client, users: [] };
                         }
                     })
                 );
-
+    
                 setClients(fullData);
             } catch (err) {
                 console.error("Failed loading super admin data", err);
@@ -56,10 +55,32 @@ const Data = ({ clientId, token }) => {
                 setLoading(false);
             }
         };
-
+    
         fetchClientsAndUsers();
+    }, [selectedRealm, clientId, token]);
+    
+    useEffect(() => {
+        const fetchRealms = async () => {
+            try {
+                const res = await axios.get(
+                    `${import.meta.env.VITE_API_USER_SERVICE_URL}/${clientId}/users/realms?realm=realm`,
+                    {
+                        headers: { Authorization: `Bearer ${token}` },
+                    }
+                );
+    
+                const r = res.data.data.realms || [];
+                setRealms(r);
+    
+                if (r.length > 0) setSelectedRealm(r[0]);
+            } catch (err) {
+                console.error("Failed loading realms", err);
+            }
+        };
+    
+        fetchRealms();
     }, [clientId, token]);
-
+    
     const toggle = (id) => {
         setExpanded((prev) => ({ ...prev, [id]: !prev[id] }));
     };
@@ -81,6 +102,23 @@ const Data = ({ clientId, token }) => {
             <h1 className="text-2xl md:text-3xl font-bold mb-8 text-action-primary">
                 Customer Tenants
             </h1>
+{/* REALM SELECTOR */}
+<div className="mb-8 flex flex-wrap gap-3">
+    {realms.map((realm) => (
+        <button
+            key={realm}
+            onClick={() => setSelectedRealm(realm)}
+            className={`px-5 py-2 rounded-full text-sm font-semibold transition-all
+            ${
+                selectedRealm === realm
+                    ? "bg-action-primary text-white shadow-md scale-105"
+                    : "bg-bg-tertiary dark:bg-bg-tertiary-dark hover:scale-105"
+            }`}
+        >
+            {realm.toUpperCase()}
+        </button>
+    ))}
+</div>
 
             <div className="grid gap-6 md:grid-cols-2 xl:grid-cols-3">
                 {clients.map((client) => (
