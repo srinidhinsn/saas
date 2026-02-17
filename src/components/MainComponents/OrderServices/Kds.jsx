@@ -1,716 +1,323 @@
-import React, { useEffect, useState, useRef } from "react";
+import React, { useEffect, useState, useCallback } from "react";
 import axios from 'axios';
 import { useParams } from "react-router-dom";
 import { toast } from "react-toastify";
 import "react-toastify/dist/ReactToastify.css";
 import { FaCheckCircle, FaClock, FaHourglassHalf } from "react-icons/fa";
-import { X, Edit2, Trash2, Search, Filter, ShoppingBag, Clock, Users, Package, Truck } from 'lucide-react';
+import { Filter, Clock, Users, Package, Truck } from 'lucide-react';
 
 
 const KitchenDisplay = () => {
     const { clientId } = useParams();
     const token = localStorage.getItem("access_token");
-    const [currentBatchTimestamp, setCurrentBatchTimestamp] = useState(null);
-    const [orders, setOrders] = useState([]);
-    const [tablesMap, setTablesMap] = useState({});
-    const [inventoryItems, setInventoryItems] = useState([]);
-    const [inventoryMap, setInventoryMap] = useState({});
-    const [loading, setLoading] = useState(true);
-    const [orderFilter, setOrderFilter] = useState("ALL");
 
-    const [editOrderId, setEditOrderId] = useState(null);
-    const [addingOrderId, setAddingOrderId] = useState(null);
+    // cards = array of { card_id, sub_order_id, dinein_order_id, table_id, status, created_at, items[] }
+    // Each card maps to one DB sub-order / root-order row
+    const [cards, setCards]                     = useState([]);
+    const [tablesMap, setTablesMap]             = useState({});
+    const [inventoryItems, setInventoryItems]   = useState([]);
+    const [loading, setLoading]                 = useState(true);
+    const [orderFilter, setOrderFilter]         = useState("ALL");
+
+    const [addingCardId, setAddingCardId]           = useState(null);
+    const [itemSearchQuery, setItemSearchQuery]     = useState("");
+    const [itemSearchResults, setItemSearchResults] = useState([]);
 
     const [showDeleteModal, setShowDeleteModal] = useState(false);
-    const [orderToDelete, setOrderToDelete] = useState(null);
+    const [cardToDelete, setCardToDelete]       = useState(null);
 
-    const [showDeleteItemModal, setShowDeleteItemModal] = useState(false);
-    const [deleteItemTarget, setDeleteItemTarget] = useState({ orderId: null, itemId: null });
-
-    const [itemSearchQuery, setItemSearchQuery] = useState("");
-    const [itemSearchResults, setItemSearchResults] = useState([]);
-    const [newlyAddedItems, setNewlyAddedItems] = useState({});
-    const [tableIds, setTableId] = useState(null)
-    const newlyAddedItemsRef = useRef({});
-    const [currentTime, setCurrentTime] = useState(Date.now());
-
-    useEffect(() => {
-        if (tableIds) {
-            document.body.classList.add("sidebar-minimized");
-        } else {
-            document.body.classList.remove("sidebar-minimized");
-        }
-    }, [tableIds]);
-
+    // ─── Fetch tables ──────────────────────────────────────────────────────────
     useEffect(() => {
         if (!token || !clientId) return;
-
-        axios
-            .get(`${import.meta.env.VITE_API_TABLE_SERVICE_URL}/${clientId}/tables/read`, {
-                headers: { Authorization: `Bearer ${token}` },
-            })
-            .then((res) => {
-                const map = {};
-                (res.data?.data || []).forEach((t) => (map[t.id] = t.name));
-                setTablesMap(map);
-            })
-            .catch(() => toast.error("Failed to fetch tables"));
+        axios.get(`${import.meta.env.VITE_API_TABLE_SERVICE_URL}/${clientId}/tables/read`, {
+            headers: { Authorization: `Bearer ${token}` },
+        }).then(res => {
+            const map = {};
+            (res.data?.data || []).forEach(t => (map[t.id] = t.name));
+            setTablesMap(map);
+        }).catch(() => toast.error("Failed to fetch tables"));
     }, [clientId, token]);
 
-    const generateSlug = (name) => {
-        return name ? name.toLowerCase().replace(/[\s]+/g, "-") : "";
+    // ─── Fetch inventory ───────────────────────────────────────────────────────
+    useEffect(() => {
+        if (!token || !clientId) return;
+        axios.get(`${import.meta.env.VITE_API_INVENTORY_SERVICE_URL}/${clientId}/inventory/read`, {
+            headers: { Authorization: `Bearer ${token}` },
+        }).then(res => {
+            setInventoryItems(res.data?.data || []);
+        }).catch(() => toast.error("Failed to fetch inventory"));
+    }, [clientId, token]);
+
+    // ─── Parse /dinein/table response → one card per sub_order ────────────────
+    //
+    // Backend _merge_group() returns one merged entry per table group with:
+    //   item.batch_label   = the sub-order's dinein_order_id  ("1001" or "1001-2")
+    //   item.sub_order_id  = the DB pk of that sub-order row
+    //   sub_orders[]       = [{id, dinein_order_id, created_at, status, total_price}, ...]
+    //
+    // We split the merged items back into individual per-sub-order cards.
+    const parseIntoCards = (mergedOrder) => {
+        const subOrders = mergedOrder.sub_orders || [];
+
+        // Group merged items by their sub_order_id tag
+        const itemsBySubOrder = {};
+        (mergedOrder.items || []).forEach(item => {
+            const sid = item.sub_order_id;
+            if (!itemsBySubOrder[sid]) itemsBySubOrder[sid] = [];
+            itemsBySubOrder[sid].push(item);
+        });
+
+        // Fallback: no sub_orders metadata — treat whole group as one card
+        if (subOrders.length === 0) {
+            return [{
+                card_id:              mergedOrder.id,
+                sub_order_id:         mergedOrder.id,
+                dinein_order_id:      mergedOrder.dinein_order_id,
+                root_dinein_order_id: mergedOrder.dinein_order_id,
+                table_id:             mergedOrder.table_id,
+                status:               mergedOrder.status || "pending",
+                created_at:           mergedOrder.created_at,
+                items:                mergedOrder.items || [],
+                is_sub_order:         false,
+            }];
+        }
+
+        // One card per sub-order — root first, then chronological sub-orders
+        return subOrders
+            .slice()
+            .sort((a, b) => {
+                const aIsRoot = !String(a.dinein_order_id).includes("-");
+                const bIsRoot = !String(b.dinein_order_id).includes("-");
+                if (aIsRoot !== bIsRoot) return aIsRoot ? -1 : 1;
+                return new Date(a.created_at || 0) - new Date(b.created_at || 0);
+            })
+            .map(s => ({
+                card_id:              s.id,
+                sub_order_id:         s.id,
+                dinein_order_id:      s.dinein_order_id,
+                root_dinein_order_id: mergedOrder.dinein_order_id,
+                table_id:             mergedOrder.table_id,
+                status:               s.status || "pending",
+                created_at:           s.created_at,
+                items:                itemsBySubOrder[s.id] || [],
+                is_sub_order:         String(s.dinein_order_id).includes("-"),
+            }));
     };
 
-    useEffect(() => {
-        if (!token || !clientId) return;
+    // ─── Fetch & poll — /dinein/table ─────────────────────────────────────────
+    const fetchOrders = useCallback(async () => {
+        if (!token || !clientId) { setLoading(false); return; }
+        try {
+            const res = await axios.get(
+                `${import.meta.env.VITE_API_ORDER_SERVICE_URL}/${clientId}/dinein/table`,
+                { headers: { Authorization: `Bearer ${token}` } }
+            );
 
-        axios
-            .get(`${import.meta.env.VITE_API_INVENTORY_SERVICE_URL}/${clientId}/inventory/read`, {
-                headers: { Authorization: `Bearer ${token}` },
-            })
-            .then((res) => {
-                console.log("📦 Sample inventory item:", res.data?.data?.[0]);
-                setInventoryItems(res.data?.data || []);
-                const map = {};
-                (res.data?.data || []).forEach((item) => {
-                    map[item.id] = item;
+            const today = new Date().toLocaleDateString("en-CA");
+            const allCards = [];
+
+            (res.data?.data || []).forEach(mergedOrder => {
+                // Date filter using root created_at
+                const d = mergedOrder.created_at;
+                if (d) {
+                    const utc = typeof d === "string"
+                        ? d.replace(" ", "T").split(".")[0] + "Z"
+                        : d;
+                    const orderDate = new Date(utc).toLocaleDateString("en-CA");
+                    if (orderDate !== today) return;
+                }
+
+                // Skip fully-served groups
+                if (mergedOrder.status === "served") return;
+
+                parseIntoCards(mergedOrder).forEach(card => {
+                    // Skip cards where every item is already served
+                    if (card.items.length > 0 && card.items.every(i => i.status === "served")) return;
+                    allCards.push(card);
                 });
-                setInventoryMap(map);
-            })
-            .catch(() => toast.error("Failed to fetch inventory items"));
+            });
+
+            setCards(allCards);
+        } catch (err) {
+            console.error("❌ Error fetching orders:", err);
+            toast.error("Failed to fetch orders");
+        } finally {
+            setLoading(false);
+        }
     }, [clientId, token]);
 
     useEffect(() => {
-        const fetchOrders = async () => {
-            if (!token || !clientId) {
-                setLoading(false);
-                return;
-            }
-            try {
-                const res = await axios.get(`${import.meta.env.VITE_API_ORDER_SERVICE_URL}/${clientId}/dinein/table`, {
-                    headers: { Authorization: `Bearer ${token}` },
-                });
-
-                const allOrders = res.data?.data || [];
-                const today = new Date();
-                const todayString = today.toLocaleDateString("en-CA");
-
-                const todayOrders = allOrders.filter(order => {
-                    const orderDate = new Date(order.created_at || order.createdAt)
-                        .toLocaleDateString("en-CA");
-                    return orderDate === todayString && order.status !== "served";
-                });
-
-                console.log(`📊 Processing ${todayOrders.length} orders`);
-
-                // ✅ FIX 4: Create separate order cards for each batch
-                const expandedOrders = [];
-
-                todayOrders.forEach(order => {
-                    console.log(`\n🔄 Processing order ${order.id}`);
-
-                    if (order.status === 'served') {
-                        clearNewItemsStorage(order.id);
-                        expandedOrders.push(order);
-                        return;
-                    }
-
-                    const newItemsFromStorage = getNewItemsFromStorage(order.id);
-                    console.log(`📦 localStorage items for order ${order.id}:`, newItemsFromStorage);
-
-                    if (newItemsFromStorage.length === 0) {
-                        console.log(`✅ No new items for order ${order.id}`);
-                        expandedOrders.push(order);
-                        return;
-                    }
-
-                    const storageUniqueKeys = new Set(newItemsFromStorage.map(item => item.unique_key));
-                    const keyToBatchMap = new Map();
-                    newItemsFromStorage.forEach(storageItem => {
-                        if (storageItem.unique_key && storageItem.batch_timestamp) {
-                            keyToBatchMap.set(storageItem.unique_key, storageItem.batch_timestamp);
-                        }
-                    });
-
-                    const oldItems = [];
-                    const batchItemsMap = new Map();
-
-                    const backendUniqueKeys = new Set(
-                        order.items
-                            .filter(item => item.frontend_unique_key)
-                            .map(item => item.frontend_unique_key)
-                    );
-
-                    order.items.forEach((item, idx) => {
-                        if (item.frontend_unique_key) {
-                            let batchTimestamp = keyToBatchMap.get(item.frontend_unique_key);
-
-                            if (!batchTimestamp) {
-                                const parts = item.frontend_unique_key.split('_');
-                                if (parts.length >= 2) {
-                                    const extractedTimestamp = parseFloat(parts[parts.length - 1]);
-                                    if (!isNaN(extractedTimestamp)) {
-                                        batchTimestamp = Math.floor(extractedTimestamp / 1000) * 1000;
-                                    }
-                                }
-                            }
-
-                            if (batchTimestamp) {
-                                console.log(`✅ Item ${idx} "${item.item_name}" is NEW (batch: ${batchTimestamp})`);
-                                if (!batchItemsMap.has(batchTimestamp)) {
-                                    batchItemsMap.set(batchTimestamp, []);
-                                }
-                                batchItemsMap.get(batchTimestamp).push({
-                                    ...item,
-                                    is_new_item: true,
-                                    batch_timestamp: batchTimestamp,
-                                });
-                            } else {
-                                console.log(`❌ Item ${idx} "${item.item_name}" has unique_key but no batch - treating as OLD`);
-                                oldItems.push(item);
-                            }
-                        } else {
-                            console.log(`⬜ Item ${idx} "${item.item_name}" has no unique_key - OLD`);
-                            oldItems.push(item);
-                        }
-                    });
-
-                    newItemsFromStorage.forEach(storageItem => {
-                        if (!backendUniqueKeys.has(storageItem.unique_key)) {
-                            const itemInfo = inventoryMap[storageItem.item_id];
-                            if (itemInfo && storageItem.batch_timestamp) {
-                                console.log(`➕ Adding unsaved item from localStorage: ${itemInfo.name}`);
-                                if (!batchItemsMap.has(storageItem.batch_timestamp)) {
-                                    batchItemsMap.set(storageItem.batch_timestamp, []);
-                                }
-                                batchItemsMap.get(storageItem.batch_timestamp).push({
-                                    item_id: storageItem.item_id,
-                                    item_name: itemInfo.name,
-                                    quantity: storageItem.quantity || 1,
-                                    price: itemInfo.unit_price || itemInfo.price,
-                                    status: "new",
-                                    note: "",
-                                    slug: itemInfo.slug || generateSlug(itemInfo.name),
-                                    added_at_frontend: storageItem.added_at,
-                                    frontend_unique_key: storageItem.unique_key,
-                                    is_new_item: true,
-                                    batch_timestamp: storageItem.batch_timestamp,
-                                    id: storageItem.unique_key,
-                                });
-                            }
-                        }
-                    });
-
-                    // ✅ FIX 4: Create main order card with old items only
-                    if (oldItems.length > 0) {
-                        expandedOrders.push({
-                            ...order,
-                            items: oldItems,
-                            has_new_items: false,
-                            is_main_order: true,
-                        });
-                    }
-
-                    // ✅ FIX 4: Create separate cards for each batch
-                    const sortedBatchTimestamps = Array.from(batchItemsMap.keys()).sort((a, b) => a - b);
-                    
-                    sortedBatchTimestamps.forEach((timestamp, batchIdx) => {
-                        const batchItems = batchItemsMap.get(timestamp);
-                        if (batchItems && batchItems.length > 0) {
-                            expandedOrders.push({
-                                ...order,
-                                id: `${order.id}_batch_${timestamp}`, // Unique ID for batch card
-                                original_order_id: order.id, // Keep reference to original order
-                                items: batchItems,
-                                has_new_items: true,
-                                is_batch_order: true,
-                                batch_number: batchIdx + 2,
-                                batch_timestamp: timestamp,
-                            });
-                        }
-                    });
-                });
-
-                console.log(`📊 Expanded ${todayOrders.length} orders into ${expandedOrders.length} cards`);
-                setOrders(expandedOrders);
-
-            } catch (err) {
-                console.error("❌ Error fetching orders:", err);
-                toast.error("Failed to fetch orders");
-            } finally {
-                setLoading(false);
-            }
-        };
-
         fetchOrders();
         const interval = setInterval(fetchOrders, 10000);
         return () => clearInterval(interval);
-    }, [clientId, token, inventoryMap]);
+    }, [fetchOrders]);
 
+    // ─── Item search for add panel ─────────────────────────────────────────────
     useEffect(() => {
-        if (!addingOrderId) {
-            setItemSearchResults([]);
-            setItemSearchQuery("");
-            return;
-        }
-        const currentOrder = orders.find((o) => o.id === addingOrderId);
-        if (!currentOrder) {
-            setItemSearchResults([]);
-            return;
-        }
-        const orderedIds = new Set(currentOrder.items.map((i) => i.item_id));
-        const filtered = inventoryItems
-            .filter((item) => item.name.toLowerCase().includes(itemSearchQuery.toLowerCase()))
-            .filter((item) => !orderedIds.has(item.id));
-        setItemSearchResults(filtered);
-    }, [itemSearchQuery, addingOrderId, inventoryItems, orders]);
+        if (!addingCardId) { setItemSearchResults([]); setItemSearchQuery(""); return; }
+        const cur = cards.find(c => c.card_id === addingCardId);
+        if (!cur) { setItemSearchResults([]); return; }
+        const orderedIds = new Set((cur.items || []).map(i => i.item_id));
+        setItemSearchResults(
+            inventoryItems
+                .filter(item => item.name.toLowerCase().includes(itemSearchQuery.toLowerCase()))
+                .filter(item => !orderedIds.has(item.id))
+        );
+    }, [itemSearchQuery, addingCardId, inventoryItems, cards]);
 
+    // ─── Helpers ──────────────────────────────────────────────────────────────
+    const generateSlug = name => name ? name.toLowerCase().replace(/\s+/g, "-") : "";
 
-    const addItemToOrder = (orderId, selectedItem) => {
-        console.log("🟢 Adding item to order:", selectedItem);
+    const calculateElapsedTime = createdAt => {
+        if (!createdAt) return null;
+        const utc = typeof createdAt === "string"
+            ? createdAt.replace(" ", "T").split(".")[0] + "Z"
+            : createdAt;
+        const diff = Date.now() - new Date(utc).getTime();
+        if (diff < 0) return "Just now";
+        const s = Math.floor(diff / 1000),
+              m = Math.floor(s / 60),
+              h = Math.floor(m / 60),
+              d = Math.floor(h / 24);
+        if (s < 60)  return "Just now";
+        if (m === 1) return "1 min ago";
+        if (m < 60)  return `${m} mins ago`;
+        if (h === 1) return "1 hr ago";
+        if (h < 24)  return `${h} hrs ago`;
+        if (d === 1) return "1 day ago";
+        return `${d} days ago`;
+    };
 
-        const timestamp = Date.now() + Math.random();
-        const uniqueKey = `${selectedItem.id}_${timestamp}`;
+    const deriveStatus = items => {
+        if (!items?.length) return "pending";
+        if (items.some(i => i.status === "pending"))   return "pending";
+        if (items.some(i => i.status === "preparing")) return "preparing";
+        if (items.every(i => i.status === "served"))   return "ready";
+        return "pending";
+    };
 
-        let batchTimestamp = currentBatchTimestamp;
+    // ─── Item status change — updates only this card's sub_order_id ────────────
+    const handleItemStatusChange = async (cardId, itemId, newStatus) => {
+        const card = cards.find(c => c.card_id === cardId);
+        if (!card) return;
 
-        if (!batchTimestamp) {
-            batchTimestamp = Date.now();
-            setCurrentBatchTimestamp(batchTimestamp);
+        const updatedItems  = (card.items || []).map(i =>
+            String(i.id) === String(itemId) ? { ...i, status: newStatus } : i
+        );
+        const derivedStatus = deriveStatus(updatedItems);
 
-            const batchKey = `order_${orderId}_batch_${batchTimestamp}`;
-            localStorage.setItem(batchKey, JSON.stringify({
-                timestamp: batchTimestamp,
-                started_at: Date.now(),
+        try {
+            const payload = updatedItems.map(item => ({
+                id:                  item.id,
+                item_id:             item.item_id,
+                item_name:           item.item_name,
+                quantity:            item.quantity,
+                status:              item.status,
+                note:                item.note || "",
+                slug:                item.slug || "",
+                unit_price:          item.unit_price || 0,
+                line_total:          (item.unit_price || 0) * (item.quantity || 1),
+                client_id:           clientId,
+                order_id:            card.sub_order_id,
+                frontend_unique_key: item.frontend_unique_key || null,
             }));
-        }
 
-        setOrders(prevOrders => {
-            return prevOrders.map(order => {
-                if (order.id !== orderId) return order;
-
-                const newItem = {
-                    item_id: selectedItem.id,
-                    item_name: selectedItem.name,
-                    quantity: 1,
-                    price: selectedItem.unit_price || selectedItem.price || 0,
-                    status: "new",
-                    note: "",
-                    slug: selectedItem.slug || generateSlug(selectedItem.name),
-                    added_at_frontend: timestamp,
-                    frontend_unique_key: uniqueKey,
-                    is_new_item: true,
-                    batch_timestamp: batchTimestamp,
-                    id: uniqueKey,
-                };
-
-                const newItems = [...order.items, newItem];
-                const oldItemsCount = order.items.filter(i => !i.is_new_item).length;
-
-                console.log(`✅ Added item, oldItems: ${oldItemsCount}, totalItems: ${newItems.length}`);
-
-                return {
-                    ...order,
-                    items: newItems,
-                    has_new_items: true,
-                    new_items_start_index: oldItemsCount,
-                };
-            });
-        });
-
-        const storageKey = `order_${orderId}_new_item_${uniqueKey}`;
-        localStorage.setItem(storageKey, JSON.stringify({
-            item_id: selectedItem.id,
-            unique_key: uniqueKey,
-            added_at: timestamp,
-            batch_timestamp: batchTimestamp,
-            quantity: 1,
-        }));
-        console.log(`💾 Saved to localStorage: ${storageKey}`);
-
-        setTimeout(() => {
-            const order = orders.find(o => o.id === orderId);
-            if (order) {
-                updateOrderItems(orderId, order.items);
-            }
-        }, 0);
-
-        setItemSearchQuery("");
-        setItemSearchResults([]);
-    };
-
-
-
-    const updateOrderItems = async (orderId, updatedItemsWithStatuses) => {
-        // ✅ FIX 4: Use original_order_id if this is a batch card
-        const actualOrderId = orderId.toString().includes('_batch_') 
-            ? orderId.split('_batch_')[0] 
-            : orderId;
-
-        const cleanedItems = updatedItemsWithStatuses.map(item => ({
-            item_id: item.item_id || item.inventory_id,
-            item_name: item.name || item.item_name,
-            quantity: item.quantity || 1,
-            status: item.status || "new",
-            note: item.note || "",
-            slug: item.slug || "",
-            price: item.price || inventoryMap[item.item_id || item.inventory_id]?.unit_price || 0,
-            client_id: clientId,
-            order_id: actualOrderId,
-            frontend_unique_key: item.frontend_unique_key || null,
-        }));
-
-        console.log("📤 Final payload to order_items/update:");
-        cleanedItems.forEach((item, i) => console.log(`Item ${i + 1}:`, item));
-
-        const totalPrice = cleanedItems.reduce((sum, item) => {
-            return sum + item.price * item.quantity;
-        }, 0);
-
-        try {
             await axios.post(
-                `${import.meta.env.VITE_API_ORDER_SERVICE_URL}/${clientId}/order_items/update?order_id=${actualOrderId}`,
-                cleanedItems,
+                `${import.meta.env.VITE_API_ORDER_SERVICE_URL}/${clientId}/order_items/update?order_id=${card.sub_order_id}`,
+                payload,
                 { headers: { Authorization: `Bearer ${token}` } }
             );
 
             await axios.post(
                 `${import.meta.env.VITE_API_ORDER_SERVICE_URL}/${clientId}/dinein/update`,
-                {
-                    id: actualOrderId,
-                    total_price: totalPrice
-                },
+                { id: card.sub_order_id, status: derivedStatus },
                 { headers: { Authorization: `Bearer ${token}` } }
             );
 
-            toast.success("Item statuses & total updated!");
-        } catch (err) {
-            console.error("❌ Failed to update order items:", err);
-            toast.error("Failed to update items or total.");
-        }
-    };
-
-
-
-    const handleItemStatusChange = async (orderId, itemBackendId, newStatus) => {
-        try {
-            // ✅ FIX 4: Handle batch order IDs
-            const actualOrderId = orderId.toString().includes('_batch_') 
-                ? parseInt(orderId.split('_batch_')[0], 10)
-                : parseInt(orderId, 10);
-
-            const order = orders.find(o => o.id === orderId);
-            if (!order) return;
-
-            const updatedItems = order.items.map(item =>
-                item.id === itemBackendId
-                    ? { ...item, status: newStatus }
-                    : item
-            );
-
-            const itemsForUpdate = updatedItems;
-
-            const totalPrice = updatedItems.reduce(
-                (sum, item) =>
-                    sum + (inventoryMap[item.item_id]?.price || 0) * (item.quantity || 1),
-                0
-            );
-
-            await axios.post(
-                `${import.meta.env.VITE_API_ORDER_SERVICE_URL}/${clientId}/order_items/update?order_id=${actualOrderId}`,
-                itemsForUpdate,
-                { headers: { Authorization: `Bearer ${token}` } }
-            );
-
-            const derivedStatus = deriveOrderStatusFromItems(updatedItems);
-
-            await axios.post(
-                `${import.meta.env.VITE_API_ORDER_SERVICE_URL}/${clientId}/dinein/update`,
-                {
-                    id: actualOrderId,
-                    status: derivedStatus,
-                    total_price: totalPrice,
-                },
-                { headers: { Authorization: `Bearer ${token}` } }
-            );
-
-            if (derivedStatus === "ready" && order.status !== "ready") {
-                const collectEvent = new CustomEvent("orderCollect", {
+            if (derivedStatus === "ready" && card.status !== "ready") {
+                window.dispatchEvent(new CustomEvent("orderCollect", {
                     detail: {
-                        tableName:
-                            tablesMap[order.table_id] ||
-                            order.table_number ||
-                            "Unknown Table",
-                        orderId: actualOrderId,
+                        tableName: tablesMap[card.table_id] || "Unknown",
+                        orderId:   card.sub_order_id,
                     },
-                });
-                window.dispatchEvent(collectEvent);
+                }));
             }
 
-            setOrders(prev =>
-                prev.map(o =>
-                    o.id === orderId
-                        ? {
-                            ...o,
-                            items: updatedItems,
-                            status: derivedStatus,
-                            total_price: totalPrice,
-                        }
-                        : o
+            // Optimistic update
+            setCards(prev =>
+                prev.map(c =>
+                    c.card_id !== cardId
+                        ? c
+                        : { ...c, items: updatedItems, status: derivedStatus }
                 )
             );
 
+            // Remove card once all its items are served
+            if (derivedStatus === "ready" && updatedItems.every(i => i.status === "served")) {
+                setCards(prev => prev.filter(c => c.card_id !== cardId));
+            }
         } catch (err) {
             console.error(err);
             toast.error("Failed to update item status");
         }
     };
 
-    const updateItemName = (orderId, itemId, newName) => {
-        setOrders((prev) =>
-            prev.map((o) => {
-                if (o.id !== orderId) return o;
-                const updatedItems = o.items.map((item) =>
-                    item.item_id === itemId ? { ...item, item_name: newName } : item
-                );
-                return { ...o, items: updatedItems };
-            })
-        );
-    };
-
-    const cardColors = (order) => {
-        if (order.table_number === "07") return "orange";
-        if (order.type?.toLowerCase() === "take waay") {
-            if (order.customer_name?.toLowerCase().includes("walk") && order.order_id === 428) return "green-light";
-            else return "blue";
-        }
-        if (order.table_number === "12" || order.table_number === "01") return "red";
-        if (order.table_number === "06") return "green-dark";
-        return "default";
-    };
-
-    const statusPriority = {
-        pending: 1,
-        preparing: 2,
-        ready: 3,
-    };
-
-    const filteredOrders = orders
-        .filter(order => {
-            if (orderFilter === "ALL") return true;
-
-            const isTakeaway = Number(order.table_id) === 500;
-
-            if (orderFilter === "TAKEAWAY") return isTakeaway;
-            if (orderFilter === "DINEIN") return !isTakeaway;
-
-            return true;
-        })
-        .sort((a, b) => {
-            return (statusPriority[a.status] || 99) - (statusPriority[b.status] || 99);
-        });
 
 
-
-
-    const deriveOrderStatusFromItems = (items) => {
-        if (!items || items.length === 0) return "pending";
-
-        if (items.some(i => i.status === "pending")) {
-            return "pending";
-        }
-
-        if (items.some(i => i.status === "preparing")) {
-            return "preparing";
-        }
-
-        if (items.every(i => i.status === "served")) {
-            return "ready";
-        }
-
-        return "pending";
-    };
-
-    const calculateElapsedTime = (createdAt) => {
-        if (!createdAt) return null;
-    
-        let created;
-    
-        if (typeof createdAt === "string") {
-          const utcString =
-            createdAt.replace(" ", "T").split(".")[0] + "Z";
-    
-          created = new Date(utcString).getTime();
-        } else {
-          created = new Date(createdAt).getTime();
-        }
-    
-        const diffMs = Date.now() - created;
-    
-        if (diffMs < 0) return "Just now";
-    
-        const seconds = Math.floor(diffMs / 1000);
-        const minutes = Math.floor(seconds / 60);
-        const hours = Math.floor(minutes / 60);
-        const days = Math.floor(hours / 24);
-    
-        if (seconds < 60) return "Just now";
-        if (minutes === 1) return "1 min ago";
-        if (minutes < 60) return `${minutes} mins ago`;
-        if (hours === 1) return "1 hr ago";
-        if (hours < 24) return `${hours} hrs ago`;
-        if (days === 1) return "1 day ago";
-    
-        return `${days} days ago`;
-      };
-
-    useEffect(() => {
-        const timerInterval = setInterval(() => {
-            setCurrentTime(Date.now());
-        }, 1000);
-
-        return () => clearInterval(timerInterval);
-    }, []);
-
-    const confirmDeleteOrder = async () => {
-        if (!orderToDelete) return;
+    // ─── Delete card ───────────────────────────────────────────────────────────
+    const confirmDeleteCard = async () => {
+        if (!cardToDelete) return;
         try {
-            await axios.delete(`${import.meta.env.VITE_API_ORDER_SERVICE_URL}/${clientId}/dinein/delete`, {
-                params: { dinein_order_id: orderToDelete, client_id: clientId },
-                headers: { Authorization: `Bearer ${token}` },
-            });
-            setOrders((prev) => prev.filter((o) => o.id !== orderToDelete));
+            await axios.delete(
+                `${import.meta.env.VITE_API_ORDER_SERVICE_URL}/${clientId}/dinein/delete`,
+                {
+                    params:  { dinein_order_id: cardToDelete.sub_order_id, client_id: clientId },
+                    headers: { Authorization: `Bearer ${token}` },
+                }
+            );
+
+            if (!cardToDelete.is_sub_order) {
+                // Root delete → backend also removes all sub-orders
+                const prefix = String(cardToDelete.dinein_order_id) + "-";
+                setCards(prev => prev.filter(c =>
+                    c.card_id !== cardToDelete.card_id &&
+                    !String(c.dinein_order_id || "").startsWith(prefix)
+                ));
+            } else {
+                setCards(prev => prev.filter(c => c.card_id !== cardToDelete.card_id));
+            }
             toast.success("Order deleted");
-        } catch {
+        } catch (err) {
+            console.error(err);
             toast.error("Failed to delete order");
         } finally {
             setShowDeleteModal(false);
-            setOrderToDelete(null);
+            setCardToDelete(null);
         }
     };
 
-    useEffect(() => {
-        const loadNewlyAddedItems = () => {
-            const newItems = {};
-            const keysToRemove = [];
+    // ─── Filter + sort ─────────────────────────────────────────────────────────
+    const statusPriority = { pending: 1, preparing: 2, ready: 3 };
 
-            for (let i = 0; i < localStorage.length; i++) {
-                const key = localStorage.key(i);
-                if (key && key.startsWith('new_item_')) {
-                    const timestampStr = localStorage.getItem(key);
-                    const timestamp = parseInt(timestampStr, 10);
-                    const age = Date.now() - timestamp;
-                    const maxAge = 30 * 60 * 1000;
+    const filteredCards = cards
+        .filter(c => {
+            if (orderFilter === "ALL")      return true;
+            const isTW = Number(c.table_id) === 500;
+            if (orderFilter === "TAKEAWAY") return isTW;
+            if (orderFilter === "DINEIN")   return !isTW;
+            return true;
+        })
+        .sort((a, b) =>
+            (statusPriority[a.status] || 99) - (statusPriority[b.status] || 99)
+        );
 
-                    if (age > maxAge) {
-                        keysToRemove.push(key);
-                    } else {
-                        const withoutPrefix = key.replace('new_item_', '');
-                        const firstUnderscoreIndex = withoutPrefix.indexOf('_');
-
-                        if (firstUnderscoreIndex !== -1) {
-                            const orderId = parseInt(withoutPrefix.substring(0, firstUnderscoreIndex), 10);
-                            const uniqueKey = withoutPrefix.substring(firstUnderscoreIndex + 1);
-
-                            if (!isNaN(orderId)) {
-                                if (!newItems[orderId]) {
-                                    newItems[orderId] = {};
-                                }
-                                newItems[orderId][uniqueKey] = timestamp;
-                                console.log(`✅ Loaded: orderId=${orderId}, uniqueKey=${uniqueKey}, timestamp=${timestamp}`);
-                            }
-                        }
-                    }
-                }
-            }
-
-            keysToRemove.forEach(key => localStorage.removeItem(key));
-
-            newlyAddedItemsRef.current = newItems;
-            console.log('📦 Final loaded items:', newItems);
-        };
-
-        loadNewlyAddedItems();
-    }, []);
-
-    useEffect(() => {
-        const cleanupInterval = setInterval(() => {
-            const keysToRemove = [];
-            const maxAge = 30 * 60 * 1000;
-
-            for (let i = 0; i < localStorage.length; i++) {
-                const key = localStorage.key(i);
-                if (key && key.startsWith('new_item_')) {
-                    const timestamp = parseInt(localStorage.getItem(key), 10);
-                    const age = Date.now() - timestamp;
-
-                    if (age > maxAge) {
-                        keysToRemove.push(key);
-
-                        const withoutPrefix = key.replace('new_item_', '');
-                        const firstUnderscoreIndex = withoutPrefix.indexOf('_');
-
-                        if (firstUnderscoreIndex !== -1) {
-                            const orderId = parseInt(withoutPrefix.substring(0, firstUnderscoreIndex), 10);
-                            const uniqueKey = withoutPrefix.substring(firstUnderscoreIndex + 1);
-
-                            if (newlyAddedItemsRef.current[orderId]) {
-                                delete newlyAddedItemsRef.current[orderId][uniqueKey];
-                            }
-                        }
-                    }
-                }
-            }
-
-            keysToRemove.forEach(key => localStorage.removeItem(key));
-        }, 60000);
-
-        return () => clearInterval(cleanupInterval);
-    }, []);
-
-
-    const getNewItemsFromStorage = (orderId) => {
-        const newItems = [];
-        for (let i = 0; i < localStorage.length; i++) {
-            const key = localStorage.key(i);
-            if (key && key.startsWith(`order_${orderId}_new_item_`)) {
-                try {
-                    const data = JSON.parse(localStorage.getItem(key));
-                    if (data && data.item_id) {
-                        newItems.push(data);
-                    }
-                } catch (e) {
-                    console.error("Error parsing localStorage item:", e);
-                }
-            }
-        }
-        console.log(`🔍 Found ${newItems.length} new items for order ${orderId}:`, newItems);
-        return newItems;
-    };
-
-
-    const clearNewItemsStorage = (orderId) => {
-        const keysToRemove = [];
-        for (let i = 0; i < localStorage.length; i++) {
-            const key = localStorage.key(i);
-            if (key && (
-                key.startsWith(`order_${orderId}_new_item_`) ||
-                key.startsWith(`order_${orderId}_batch_`)
-            )) {
-                keysToRemove.push(key);
-            }
-        }
-        keysToRemove.forEach(key => localStorage.removeItem(key));
-    };
-
-
-
-
+    // ─── Render ────────────────────────────────────────────────────────────────
     return (
-
         <>
             <div className="min-h-screen w-full bg-gray-50 text-gray-900">
                 <div className="mx-auto p-6 lg:py-8">
+
+                    {/* ── Filter bar — old styling ── */}
                     <div className="mb-3 overflow-x-auto">
                         <div className="flex gap-2 min-w-max">
                             <button
@@ -755,7 +362,7 @@ const KitchenDisplay = () => {
                         </div>
                     </div>
 
-
+                    {/* ── Grid ── */}
                     <div className="w-full">
                         {loading ? (
                             <div className="flex items-center justify-center py-12">
@@ -763,160 +370,113 @@ const KitchenDisplay = () => {
                             </div>
                         ) : (
                             <div className="grid grid-cols-1 sm:grid-cols-2 lg:grid-cols-3 xl:grid-cols-4 gap-5">
-                                {filteredOrders.map((order) => {
-                                    const isEditing = editOrderId === order.id;
-                                    const isAdding = addingOrderId === order.id;
-                                    const elapsedTime = order?.created_at ? calculateElapsedTime(order.created_at) : null;
-                                    
-                                    // ✅ FIX 4: Show batch number badge
-                                    const isBatchCard = order.is_batch_order;
-                                    const batchNumber = order.batch_number;
-                                    
+                                {filteredCards.map(card => {
+                                    const isAdding    = addingCardId === card.card_id;
+                                    const elapsedTime = card.created_at ? calculateElapsedTime(card.created_at) : null;
+
                                     return (
                                         <div
-                                            key={order.id}
-                                            className={`
-                                          rounded-xl shadow-md overflow-hidden border border-gray-200 bg-white
-                                          transition-transform transform hover:-translate-y-0.5
-                                          flex flex-col
-                                          ${cardColors(order)}
-                                          ${isBatchCard ? 'ring-2 ring-orange-400' : ''}
-                                        `}
+                                            key={card.card_id}
+                                            className="rounded-xl shadow-md overflow-hidden border border-gray-200 bg-white transition-transform transform hover:-translate-y-0.5 flex flex-col"
                                         >
-
+                                            {/* ── Card header — old styling with bg-action-primary ── */}
                                             <div className="flex items-center justify-between px-4 py-3 bg-action-primary text-text-white">
                                                 <div className="flex items-center justify-between w-full">
+                                                    {/* Table name */}
                                                     <span className="text-sm md:text-base font-semibold">
-                                                        {tablesMap[order.table_id] || order.table_number || order.customer_name || "N/A"}
+                                                        {tablesMap[card.table_id] || `T-${card.table_id}`}
                                                     </span>
 
+                                                    {/* Timer */}
                                                     <div className="flex items-center justify-center gap-2 text-xl font-semibold text-text-white">
                                                         <Clock size={16} className="text-text-white" />
                                                         <span>{elapsedTime}</span>
                                                     </div>
 
-                                                    <div className="flex items-center gap-2">
+                                                    {/* Order ID — with sub-order badge if applicable */}
+                                                    <div className="flex flex-col items-end">
                                                         <span className="text-xl font-semibold text-orange-100/80">
-                                                            #{order.original_order_id || order.id}
+                                                            #{card.dinein_order_id}
                                                         </span>
-                                                        
-                                                        {/* ✅ FIX 4: Show batch badge */}
-                                                        {isBatchCard && (
-                                                            <span className="px-2 py-1 bg-orange-500 text-white text-xs font-bold rounded-full">
-                                                                +NEW
+                                                        {card.is_sub_order && (
+                                                            <span className="text-[10px] bg-white/20 rounded px-1 leading-tight">
+                                                                sub-order
                                                             </span>
                                                         )}
                                                     </div>
                                                 </div>
                                             </div>
 
+                                            {/* ── Card body — old styling ── */}
                                             <div className="bg-bg-primary px-4 py-4 space-y-3 flex-1">
-                                                {order.items.map((item, idx) => {
-                                                    return (
-                                                        <React.Fragment key={item.id || idx}>
-                                                            <div
-                                                                className={`flex items-center w-full rounded-lg ${item.is_new_item ? "bg-orange-50" : "bg-white"} ${isEditing ? "cursor-pointer hover:shadow-sm" : "cursor-default"}`}>
-                                                                <div className="flex-1">
-                                                                    {isEditing ? (
-                                                                        <input
-                                                                            value={item.item_name}
-                                                                            onChange={(e) => updateItemName(order.id, item.item_id, e.target.value)}
-                                                                            className="w-full rounded-md border border-gray-300 focus:outline-none focus:ring-2 focus:ring-orange-500 bg-white text-gray-900"
-                                                                        />
-                                                                    ) : (
-                                                                        <div className="flex items-center justify-between w-full">
-                                                                            <span className=" font-medium text-sm">
-                                                                                <span className="font-medium text-sm">
-                                                                                    <span className="mr-2">{item.quantity}  x</span>
-                                                                                    <span>{item.item_name || "Unnamed Item"}</span>
-                                                                                </span>
-
-                                                                            </span>
-                                                                        </div>
-                                                                    )}
-                                                                </div>
-
-                                                                <div className="flex items-center gap-3 ml-3">
-                                                                    <button
-                                                                        type="button"
-                                                                        onClick={() => handleItemStatusChange(order.id, item.id, "pending")}
-                                                                        title="Pending"
-                                                                        className="p-2 rounded-md hover:bg-gray-100"
-                                                                    >
-                                                                        <FaClock size={20}
-                                                                            className={item.status === "pending" ? "text-blue-600" : "text-gray-500"}
-                                                                            title="Pending"
-                                                                        />
-                                                                    </button>
-
-                                                                    <button
-                                                                        type="button"
-                                                                        onClick={() => handleItemStatusChange(order.id, item.id, "preparing")}
-                                                                        title="Preparing"
-                                                                        className="p-2 rounded-md hover:bg-gray-100"
-                                                                    >
-                                                                        <FaHourglassHalf size={20}
-                                                                            className={item.status === "preparing" ? "text-orange-500" : "text-gray-500"}
-                                                                            title="Preparing"
-                                                                        />
-                                                                    </button>
-
-                                                                    <button
-                                                                        type="button"
-                                                                        onClick={() => handleItemStatusChange(order.id, item.id, "served")}
-                                                                        title="Ready"
-                                                                        className="p-2 rounded-md hover:bg-gray-100"
-                                                                    >
-                                                                        <FaCheckCircle size={20}
-                                                                            className={item.status === "served" ? "text-green-500" : "text-gray-500"}
-                                                                            title="Ready"
-                                                                        />
-                                                                    </button>
-                                                                </div>
-
-                                                                {!isEditing && !isAdding && (
-                                                                    <div className="ml-3 text-sm text-gray-500">{item.measure || ""}</div>
-                                                                )}
+                                                {(card.items || []).map((item, idx) => (
+                                                    <div
+                                                        key={item.id || idx}
+                                                        className="flex items-center w-full rounded-lg bg-white cursor-default"
+                                                    >
+                                                        {/* Item name + qty */}
+                                                        <div className="flex-1">
+                                                            <div className="flex items-center justify-between w-full">
+                                                                <span className="font-medium text-sm">
+                                                                    <span className="mr-2">{item.quantity}  x</span>
+                                                                    <span>{item.item_name || "Unnamed Item"}</span>
+                                                                </span>
                                                             </div>
-                                                        </React.Fragment>
-                                                    );
-                                                })}
+                                                        </div>
 
-                                                {isAdding && (
-                                                    <div className="mt-2">
-                                                        <input
-                                                            type="text"
-                                                            placeholder="Search inventory items to add..."
-                                                            value={itemSearchQuery}
-                                                            onChange={(e) => setItemSearchQuery(e.target.value)}
-                                                            className="w-full px-3 py-2 rounded-md border border-gray-300 focus:outline-none focus:ring-2 focus:ring-orange-500 bg-white text-gray-900"
-                                                        />
-                                                        {itemSearchResults.length > 0 && (
-                                                            <ul className="mt-2 max-h-36 overflow-y-auto rounded-md border border-gray-200 bg-white">
-                                                                {itemSearchResults.map((it) => (
-                                                                    <li
-                                                                        key={it.id}
-                                                                        onClick={() => addItemToOrder(order.id, it)}
-                                                                        className="px-3 py-2 hover:bg-gray-100 cursor-pointer flex items-center justify-between text-sm border-b last:border-b-0"
-                                                                    >
-                                                                        <span>{it.name}</span>
-                                                                        <span className="text-gray-600">₹{it.price}</span>
-                                                                    </li>
-                                                                ))}
-                                                            </ul>
-                                                        )}
+                                                        {/* Status icons — old sizing (size 20) */}
+                                                        <div className="flex items-center gap-3 ml-3">
+                                                            <button
+                                                                type="button"
+                                                                onClick={() => handleItemStatusChange(card.card_id, item.id, "pending")}
+                                                                title="Pending"
+                                                                className="p-2 rounded-md hover:bg-gray-100"
+                                                            >
+                                                                <FaClock
+                                                                    size={20}
+                                                                    className={item.status === "pending" ? "text-blue-600" : "text-gray-500"}
+                                                                />
+                                                            </button>
+
+                                                            <button
+                                                                type="button"
+                                                                onClick={() => handleItemStatusChange(card.card_id, item.id, "preparing")}
+                                                                title="Preparing"
+                                                                className="p-2 rounded-md hover:bg-gray-100"
+                                                            >
+                                                                <FaHourglassHalf
+                                                                    size={20}
+                                                                    className={item.status === "preparing" ? "text-orange-500" : "text-gray-500"}
+                                                                />
+                                                            </button>
+
+                                                            <button
+                                                                type="button"
+                                                                onClick={() => handleItemStatusChange(card.card_id, item.id, "served")}
+                                                                title="Ready"
+                                                                className="p-2 rounded-md hover:bg-gray-100"
+                                                            >
+                                                                <FaCheckCircle
+                                                                    size={20}
+                                                                    className={item.status === "served" ? "text-green-500" : "text-gray-500"}
+                                                                />
+                                                            </button>
+                                                        </div>
                                                     </div>
-                                                )}
+                                                ))}
                                             </div>
 
-                                            <div className="px-4 py-3 border-t border-gray-100 bg-white">
+                                            {/* ── Card footer — old styling: status as colored text + add button ── */}
+                                            <div className="px-4 py-3 border-t border-gray-100 bg-white flex items-center justify-between">
                                                 <button className={`text-l font-semibold uppercase
-        ${order.status === "pending" && "text-blue-600"}
-        ${order.status === "preparing" && "text-orange-600"}
-        ${order.status === "ready" && "text-green-600"}
-    `}>
-                                                    {order.status}
+                                                    ${card.status === "pending"   ? "text-blue-600"  : ""}
+                                                    ${card.status === "preparing" ? "text-orange-600": ""}
+                                                    ${card.status === "ready"     ? "text-green-600" : ""}
+                                                `}>
+                                                    {card.status}
                                                 </button>
+
+                                               
                                             </div>
                                         </div>
                                     );
@@ -925,6 +485,7 @@ const KitchenDisplay = () => {
                         )}
                     </div>
 
+                    {/* ── Delete order confirmation modal — old styling ── */}
                     {showDeleteModal && (
                         <div className="fixed inset-0 z-50 flex items-center justify-center bg-black bg-opacity-50">
                             <div className="w-full max-w-md rounded-xl overflow-hidden shadow-lg bg-white text-gray-900">
@@ -932,78 +493,22 @@ const KitchenDisplay = () => {
                                     <h3 className="text-lg font-semibold">Confirm Delete</h3>
                                 </div>
                                 <div className="px-6 py-4">
-                                    <p className="text-sm text-gray-600">Delete this order?</p>
+                                    <p className="text-sm text-gray-600">
+                                        {!cardToDelete?.is_sub_order
+                                            ? "Delete this order and ALL its sub-orders?"
+                                            : `Delete sub-order #${cardToDelete?.dinein_order_id}?`}
+                                    </p>
                                 </div>
                                 <div className="px-6 py-4 flex justify-end gap-3 border-t">
                                     <button
-                                        onClick={confirmDeleteOrder}
+                                        onClick={confirmDeleteCard}
                                         className="px-4 py-2 rounded-md bg-red-500 text-white font-semibold hover:bg-red-600"
                                     >
                                         Yes
                                     </button>
                                     <button
-                                        onClick={() => {
-                                            setShowDeleteModal(false);
-                                            setOrderToDelete(null);
-                                        }}
+                                        onClick={() => { setShowDeleteModal(false); setCardToDelete(null); }}
                                         className="px-4 py-2 rounded-md bg-gray-100 text-gray-700 hover:bg-gray-200"
-                                    >
-                                        No
-                                    </button>
-                                </div>
-                            </div>
-                        </div>
-                    )}
-
-                    {showDeleteItemModal && (
-                        <div className="fixed inset-0 z-50 flex items-center justify-center bg-black bg-opacity-50">
-                            <div className="w-full max-w-md rounded-xl overflow-hidden shadow-lg bg-white text-gray-900">
-                                <div className="px-6 py-5 border-b">
-                                    <h3 className="text-lg font-semibold">Confirm Delete Item</h3>
-                                </div>
-                                <div className="px-6 py-4">
-                                    <p className="text-sm text-gray-600">Delete this item?</p>
-                                </div>
-                                <div className="px-6 py-4 flex justify-end gap-3 border-t">
-                                    <button
-                                        className="px-4 py-2 rounded-md bg-red-500 text-white font-semibold hover:bg-red-600"
-                                        onClick={async () => {
-                                            if (deleteItemTarget.orderId && deleteItemTarget.itemId) {
-                                                try {
-                                                    await axios.delete(`${import.meta.env.VITE_API_ORDER_SERVICE_URL}/${clientId}/order_item/delete`, {
-                                                        params: { order_item_id: deleteItemTarget.itemId, client_id: clientId },
-                                                        headers: { Authorization: `Bearer ${token}` },
-                                                    });
-                                                    setOrders((prev) =>
-                                                        prev.map((o) => {
-                                                            if (o.id !== deleteItemTarget.orderId) return o;
-                                                            const updatedItems = o.items.filter((i) => i.item_id !== deleteItemTarget.itemId);
-                                                            const newTotal = updatedItems.reduce(
-                                                                (sum, i) => sum + (i.price || 0) * (i.quantity || 1),
-                                                                0
-                                                            );
-                                                            return { ...o, items: updatedItems, total_price: newTotal };
-                                                        })
-                                                    );
-                                                    toast.success("Item deleted");
-                                                } catch {
-                                                    toast.error("Failed to delete item");
-                                                } finally {
-                                                    setShowDeleteItemModal(false);
-                                                    setDeleteItemTarget({ orderId: null, itemId: null });
-                                                }
-                                            }
-                                        }}
-                                    >
-                                        Yes
-                                    </button>
-
-                                    <button
-                                        className="px-4 py-2 rounded-md bg-gray-100 text-gray-700 hover:bg-gray-200"
-                                        onClick={() => {
-                                            setShowDeleteItemModal(false);
-                                            setDeleteItemTarget({ orderId: null, itemId: null });
-                                        }}
                                     >
                                         No
                                     </button>
@@ -1014,9 +519,7 @@ const KitchenDisplay = () => {
                 </div>
             </div>
         </>
-
     );
-
 };
 
 export default KitchenDisplay;
