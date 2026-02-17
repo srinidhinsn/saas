@@ -85,7 +85,7 @@ const RoutesManager = () => {
       />
       <Route path="summary" element={<OrderSummary token={token} clientId={clientId} />} />
 
-      <Route path="kds" element={<Kds />} />
+      <Route path="kds" element={<Kds clientId={clientId} token={token} realm={realm} screenIds={screenIds}/>} />
 
       <Route
         path="menu"
