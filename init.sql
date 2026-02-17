@@ -342,31 +342,6 @@ CREATE TABLE "user" (
 -- Data for Name: category; Type: TABLE DATA; Schema: public; Owner: postgres
 --
 
-INSERT INTO category (id, client_id, name, description, sub_categories, slug, created_by, updated_by, created_at, updated_at) VALUES ('dietery', 'easyfood', 'Dietery', 'Dietry type', '{dietery_01,dietery_02,dietery_03,dietery_04,addons}', '_Dietery', '1000', '1000', '2025-09-25 01:36:00.080849', '2025-09-25 01:36:00.080849');
-INSERT INTO category (id, client_id, name, description, sub_categories, slug, created_by, updated_by, created_at, updated_at) VALUES ('dietery_01', 'easyfood', 'Veg', 'Veg only', NULL, '_Dietery_Veg', '1000', '1000', '2025-09-25 01:36:00.080849', '2025-09-25 01:36:00.080849');
-INSERT INTO category (id, client_id, name, description, sub_categories, slug, created_by, updated_by, created_at, updated_at) VALUES ('dietery_02', 'easyfood', 'Non-Veg', 'Non veg', NULL, '_Dietery_Non-Veg', '1000', '1000', '2025-09-25 01:36:00.080849', '2025-09-25 01:36:00.080849');
-INSERT INTO category (id, client_id, name, description, sub_categories, slug, created_by, updated_by, created_at, updated_at) VALUES ('dietery_03', 'easyfood', 'Vegan', 'Jain food', NULL, '_Dietery_Vegan', '1000', '1000', '2025-09-25 01:36:00.080849', '2025-09-25 01:36:00.080849');
-INSERT INTO category (id, client_id, name, description, sub_categories, slug, created_by, updated_by, created_at, updated_at) VALUES ('addons', 'easyfood', 'Add-ons', 'Add ons', NULL, '_Dietery_Add-ons', '1000', '1000', '2025-09-25 01:36:00.080849', '2025-09-25 01:36:00.080849');
-INSERT INTO category (id, client_id, name, description, sub_categories, slug, created_by, updated_by, created_at, updated_at) VALUES ('dietery_04', 'easyfood', 'Eggeterian', 'Egg food', NULL, '_Dietery_Eggeterian', '1000', '1000', '2025-09-25 01:36:00.080849', '2025-09-25 01:36:00.080849');
-INSERT INTO category (id, client_id, name, description, sub_categories, slug, created_by, updated_by, created_at, updated_at) VALUES ('chinese_01', 'easyfood', 'Chinese', 'Chinese delicious', '{chinese_02,chinese_03}', NULL, '1000', '1000', '2025-09-25 01:36:00.080849', '2025-09-25 01:36:00.080849');
-INSERT INTO category (id, client_id, name, description, sub_categories, slug, created_by, updated_by, created_at, updated_at) VALUES ('chinese_02', 'easyfood', 'Noodles', 'Noodles special delicious', NULL, NULL, '1000', '1000', '2025-09-25 01:36:00.080849', '2025-09-25 01:36:00.080849');
-INSERT INTO category (id, client_id, name, description, sub_categories, slug, created_by, updated_by, created_at, updated_at) VALUES ('chinese_03', 'easyfood', 'Soups', 'Soups special delicious', NULL, NULL, '1000', '1000', '2025-09-25 01:36:00.080849', '2025-09-25 01:36:00.080849');
-INSERT INTO category (id, client_id, name, description, sub_categories, slug, created_by, updated_by, created_at, updated_at) VALUES ('northindian_01', 'easyfood', 'North Indian', 'North Indian Special', '{northindian_meals_02,northindian_breads_03,northindian_gravy_04}', NULL, '1000', '1000', '2025-09-25 01:36:00.080849', '2025-09-25 01:36:00.080849');
-INSERT INTO category (id, client_id, name, description, sub_categories, slug, created_by, updated_by, created_at, updated_at) VALUES ('northindian_meals_02', 'easyfood', 'North Meals', 'Unlimited north means', NULL, NULL, '1000', '1000', '2025-09-25 01:36:00.080849', '2025-09-25 01:36:00.080849');
-INSERT INTO category (id, client_id, name, description, sub_categories, slug, created_by, updated_by, created_at, updated_at) VALUES ('northindian_breads_03', 'easyfood', 'Breads', 'All roti and naans', NULL, NULL, '1000', '1000', '2025-09-25 01:36:00.080849', '2025-09-25 01:36:00.080849');
-INSERT INTO category (id, client_id, name, description, sub_categories, slug, created_by, updated_by, created_at, updated_at) VALUES ('northindian_gravy_04', 'easyfood', 'Gravy', 'All gravies of north indian style', '{northindian_veg_05,northindian_non_veg_06}', NULL, '1000', '1000', '2025-09-25 01:36:00.080849', '2025-09-25 01:36:00.080849');
-INSERT INTO category (id, client_id, name, description, sub_categories, slug, created_by, updated_by, created_at, updated_at) VALUES ('northindian_veg_05', 'easyfood', 'Veg', 'Veg only', NULL, NULL, '1000', '1000', '2025-09-25 01:36:00.080849', '2025-09-25 01:36:00.080849');
-INSERT INTO category (id, client_id, name, description, sub_categories, slug, created_by, updated_by, created_at, updated_at) VALUES ('northindian_non_veg_06', 'easyfood', 'Non-Veg', 'Non vegeterian', NULL, NULL, '1000', '1000', '2025-09-25 01:36:00.080849', '2025-09-25 01:36:00.080849');
-INSERT INTO category (id, client_id, name, description, sub_categories, slug, created_by, updated_by, created_at, updated_at) VALUES ('l_bit_rod_01', 'ram_manufacturing', 'L_BIT_ROD', 'All bit rods', '{red_wire_01,switch_01}', NULL, '1000', '1000', '2025-09-25 01:36:00.080849', '2025-09-25 01:36:00.080849');
-INSERT INTO category (id, client_id, name, description, sub_categories, slug, created_by, updated_by, created_at, updated_at) VALUES ('red_wire_01', 'ram_manufacturing', 'RED_WIRE', 'All red wires', NULL, NULL, '1000', '1000', '2025-09-25 01:36:00.080849', '2025-09-25 01:36:00.080849');
-INSERT INTO category (id, client_id, name, description, sub_categories, slug, created_by, updated_by, created_at, updated_at) VALUES ('switch_01', 'ram_manufacturing', 'SWITCH', 'All switches', NULL, NULL, '1000', '1000', '2025-09-25 01:36:00.080849', '2025-09-25 01:36:00.080849');
-INSERT INTO category (id, client_id, name, description, sub_categories, slug, created_by, updated_by, created_at, updated_at) VALUES ('switch_02', 'ram_manufacturing', 'DP SWITCH', 'All switches', '{red_wire_01}', NULL, '1000', '1000', '2025-09-25 01:36:00.080849', '2025-09-25 01:36:00.080849');
-INSERT INTO category (id, client_id, name, description, sub_categories, slug, created_by, updated_by, created_at, updated_at) VALUES ('roles', 'easyfood', 'Roles', 'Roles definition', '{admin,waiter,receptionist}', '_Roles', '1000', '1000', '2025-08-19 12:47:01.377214', '2025-08-19 12:47:01.377214');
-INSERT INTO category (id, client_id, name, description, sub_categories, slug, created_by, updated_by, created_at, updated_at) VALUES ('admin', 'easyfood', 'Admin', 'admin', NULL, '_Roles_Admin', '1000', '1000', '2025-08-19 12:47:01.377214', '2025-08-19 12:47:01.377214');
-INSERT INTO category (id, client_id, name, description, sub_categories, slug, created_by, updated_by, created_at, updated_at) VALUES ('waiter', 'easyfood', 'Waiter', 'admin', NULL, '_Roles_Waiter', '1000', '1000', '2025-08-19 12:47:01.377214', '2025-08-19 12:47:01.377214');
-INSERT INTO category (id, client_id, name, description, sub_categories, slug, created_by, updated_by, created_at, updated_at) VALUES ('receptionist', 'easyfood', 'Receptionist', 'admin', NULL, '_Roles_Receptionist', '1000', '1000', '2025-08-19 12:47:01.377214', '2025-08-19 12:47:01.377214');
-
-
 --
 -- TOC entry 3399 (class 0 OID 49740)
 -- Dependencies: 223
@@ -488,7 +463,7 @@ INSERT INTO "user" (username, hashed_password, id, client_id, roles, grants) VAL
 
 INSERT INTO category (id, client_id, name, description, sub_categories, slug, created_by, updated_by, created_at, updated_at) VALUES ('realm', 'saas', 'Realm', 'Realm of overall application framework', '{restaurant}', '_Realm', NULL, NULL, '2025-09-19 02:27:03.632856', '2025-09-19 02:27:03.632856');
 INSERT INTO category (id, client_id, name, description, sub_categories, slug, created_by, updated_by, created_at, updated_at) VALUES ('restaurant', 'saas', 'Restaurant', 'Restaurant realm in saas application', '{dinein,order,menu,inventory,users,tables,invoice,menu,document,order_item,order_items,kds}', '_Realm_Restaurant', NULL, NULL, '2025-09-19 02:27:03.632856', '2025-09-19 02:27:03.632856');
-INSERT INTO category (id, client_id, name, description, sub_categories, slug, created_by, updated_by, created_at, updated_at) VALUES ('dinein', 'saas', 'Dinein', 'All access to dine in module', '{create,update,order,table,delete}', '_Realm_Restaurant_Dinein', NULL, NULL, '2025-09-19 02:27:03.632856', '2025-09-19 02:27:03.632856');
+INSERT INTO category (id, client_id, name, description, sub_categories, slug, created_by, updated_by, created_at, updated_at) VALUES ('dinein', 'saas', 'Dinein', 'All access to dine in module', '{create,create-sub-order,update,order,table,delete,kds/orders}', '_Realm_Restaurant_Dinein', NULL, NULL, '2025-09-19 02:27:03.632856', '2025-09-19 02:27:03.632856');
 INSERT INTO category (id, client_id, name, description, sub_categories, slug, created_by, updated_by, created_at, updated_at) VALUES ('order_items', 'saas', 'Order Items', 'All access to order items module', '{update}', '_Realm_Restaurant_Order Items', NULL, NULL, '2025-09-19 02:27:03.632856', '2025-09-19 02:27:03.632856');
 INSERT INTO category (id, client_id, name, description, sub_categories, slug, created_by, updated_by, created_at, updated_at) VALUES ('order', 'saas', 'Order', 'All access to order module', '{update}', '_Realm_Restaurant_Order', NULL, NULL, '2025-09-19 02:27:03.632856', '2025-09-19 02:27:03.632856');
 INSERT INTO category (id, client_id, name, description, sub_categories, slug, created_by, updated_by, created_at, updated_at) VALUES ('order_item', 'saas', 'Order item', 'Single order item accessibility', '{update,delete}', '_Realm_Restaurant_Order item', NULL, NULL, '2025-09-19 02:27:03.632856', '2025-09-19 02:27:03.632856');
@@ -823,6 +798,47 @@ UPDATE category
 SET sub_categories = array_cat(sub_categories, ARRAY['masters'])
 WHERE id = 'inventory' AND client_id = 'saas';
 
+INSERT INTO category (id, client_id, name, description, sub_categories, slug, created_by, updated_by, created_at, updated_at) VALUES ('dietery', 'easyfood', 'Dietery', 'Dietry type', '{ac,non_ac}', '_Dietery', '1000', '1000', '2025-09-25 01:36:00.080849', '2025-09-25 01:36:00.080849');
+INSERT INTO category (id, client_id, name, description, sub_categories, slug, created_by, updated_by, created_at, updated_at) VALUES ('ac', 'easyfood', 'AC', 'AC_menus', '{dietery_01_non_ac,dietery_02_non_ac,dietery_03_non_ac,dietery_04_non_ac,addons_non_ac}', '_AC', '1000', '1000', '2025-09-25 01:36:00.080849', '2025-09-25 01:36:00.080849');
+INSERT INTO category (id, client_id, name, description, sub_categories, slug, created_by, updated_by, created_at, updated_at) VALUES ('non_ac', 'easyfood', 'NON-AC', 'Non_AC_menus', '{dietery_01_ac,dietery_02_ac,dietery_03_ac,dietery_04_ac,addons_ac}', '_NON_AC', '1000', '1000', '2025-09-25 01:36:00.080849', '2025-09-25 01:36:00.080849');
+INSERT INTO category (id, client_id, name, description, sub_categories, slug, created_by, updated_by, created_at, updated_at) VALUES ('dietery_01_non_ac', 'easyfood', 'Veg', 'Veg only', NULL, '_Dietery_Veg_Non_AC', '1000', '1000', '2025-09-25 01:36:00.080849', '2025-09-25 01:36:00.080849');
+INSERT INTO category (id, client_id, name, description, sub_categories, slug, created_by, updated_by, created_at, updated_at) VALUES ('dietery_02_non_ac', 'easyfood', 'Non-Veg', 'Non veg', NULL, '_Dietery_Non-Veg_Non_AC', '1000', '1000', '2025-09-25 01:36:00.080849', '2025-09-25 01:36:00.080849');
+INSERT INTO category (id, client_id, name, description, sub_categories, slug, created_by, updated_by, created_at, updated_at) VALUES ('dietery_03_non_ac', 'easyfood', 'Vegan', 'Jain food', NULL, '_Dietery_Vegan_Non_AC', '1000', '1000', '2025-09-25 01:36:00.080849', '2025-09-25 01:36:00.080849');
+INSERT INTO category (id, client_id, name, description, sub_categories, slug, created_by, updated_by, created_at, updated_at) VALUES ('addons_non_ac', 'easyfood', 'Add-ons', 'Add ons', NULL, '_Dietery_Add-ons_Non_AC', '1000', '1000', '2025-09-25 01:36:00.080849', '2025-09-25 01:36:00.080849');
+INSERT INTO category (id, client_id, name, description, sub_categories, slug, created_by, updated_by, created_at, updated_at) VALUES ('dietery_04_non_ac', 'easyfood', 'Eggeterian', 'Egg food', NULL, '_Dietery_Eggeterian_Non_AC', '1000', '1000', '2025-09-25 01:36:00.080849', '2025-09-25 01:36:00.080849');
+INSERT INTO category (id, client_id, name, description, sub_categories, slug, created_by, updated_by, created_at, updated_at) VALUES ('dietery_01_ac', 'easyfood', 'Veg', 'Veg only', NULL, '_Dietery_Veg_AC', '1000', '1000', '2025-09-25 01:36:00.080849', '2025-09-25 01:36:00.080849');
+INSERT INTO category (id, client_id, name, description, sub_categories, slug, created_by, updated_by, created_at, updated_at) VALUES ('dietery_02_ac', 'easyfood', 'Non-Veg', 'Non veg', NULL, '_Dietery_Non-Veg_AC', '1000', '1000', '2025-09-25 01:36:00.080849', '2025-09-25 01:36:00.080849');
+INSERT INTO category (id, client_id, name, description, sub_categories, slug, created_by, updated_by, created_at, updated_at) VALUES ('dietery_03_ac', 'easyfood', 'Vegan', 'Jain food', NULL, '_Dietery_Vegan_AC', '1000', '1000', '2025-09-25 01:36:00.080849', '2025-09-25 01:36:00.080849');
+INSERT INTO category (id, client_id, name, description, sub_categories, slug, created_by, updated_by, created_at, updated_at) VALUES ('addons_ac', 'easyfood', 'Add-ons', 'Add ons', NULL, '_Dietery_Add-ons_AC', '1000', '1000', '2025-09-25 01:36:00.080849', '2025-09-25 01:36:00.080849');
+INSERT INTO category (id, client_id, name, description, sub_categories, slug, created_by, updated_by, created_at, updated_at) VALUES ('dietery_04_ac', 'easyfood', 'Eggeterian', 'Egg food', NULL, '_Dietery_Eggeterian_AC', '1000', '1000', '2025-09-25 01:36:00.080849', '2025-09-25 01:36:00.080849');
+INSERT INTO category (id, client_id, name, description, sub_categories, slug, created_by, updated_by, created_at, updated_at) VALUES ('roles', 'easyfood', 'Roles', 'Roles definition', '{admin,waiter,receptionist}', '_Roles', '1000', '1000', '2025-08-19 12:47:01.377214', '2025-08-19 12:47:01.377214');
+INSERT INTO category (id, client_id, name, description, sub_categories, slug, created_by, updated_by, created_at, updated_at) VALUES ('admin', 'easyfood', 'Admin', 'admin', NULL, '_Roles_Admin', '1000', '1000', '2025-08-19 12:47:01.377214', '2025-08-19 12:47:01.377214');
+INSERT INTO category (id, client_id, name, description, sub_categories, slug, created_by, updated_by, created_at, updated_at) VALUES ('waiter', 'easyfood', 'Waiter', 'admin', NULL, '_Roles_Waiter', '1000', '1000', '2025-08-19 12:47:01.377214', '2025-08-19 12:47:01.377214');
+INSERT INTO category (id, client_id, name, description, sub_categories, slug, created_by, updated_by, created_at, updated_at) VALUES ('receptionist', 'easyfood', 'Receptionist', 'admin', NULL, '_Roles_Receptionist', '1000', '1000', '2025-08-19 12:47:01.377214', '2025-08-19 12:47:01.377214');
 INSERT INTO category (id, client_id, name, description, sub_categories, slug, created_by, updated_by, created_at, updated_at) VALUES ('zone', 'easyfood', 'Zones', 'Zone Selection', '{Ground,First,Second,third}', '_Zones', '1000', '1000', '2025-08-19 12:47:01.377214', '2025-08-19 12:47:01.377214');
 INSERT INTO category (id, client_id, name, description, sub_categories, slug, created_by, updated_by, created_at, updated_at) VALUES ('section', 'easyfood', 'Section', 'Section Selection', '{AC,Non-AC}', '_Section', '1000', '1000', '2025-08-19 12:47:01.377214', '2025-08-19 12:47:01.377214');
 INSERT INTO category (id, client_id, name, description, sub_categories, slug, created_by, updated_by, created_at, updated_at) VALUES ('status', 'easyfood', 'Status', 'Status Selection', '{Vacant,Occupied,Reserved}', '_Status', '1000', '1000', '2025-08-19 12:47:01.377214', '2025-08-19 12:47:01.377214');
+
+
+ALTER TABLE dinein_order
+ALTER COLUMN client_id SET NOT NULL;
+
+
+
+ALTER TABLE dinein_order
+ADD CONSTRAINT dinein_order_pk
+PRIMARY KEY (client_id, id);
+
+
+
+
+
+
+
+
+
+
+
+
+
+
