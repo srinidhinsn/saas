@@ -117,7 +117,7 @@ const RoutesManager = () => {
       />
       <Route
         path="customer-data"
-        element={<Data token={token} />}
+        element={<Data clientId={clientId} token={token} realm={realm} screenIds={screenIds}/>}
       />
 
       <Route path="role-config" element={
