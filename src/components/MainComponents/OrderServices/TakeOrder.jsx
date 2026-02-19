@@ -4768,7 +4768,6 @@
 // export default TakeOrder;
 
 
-
 import React, { useState, useEffect, useRef } from 'react';
 import {
   ShoppingCart,
@@ -4904,6 +4903,7 @@ const TableReservation = ({
   tableOrders = {},
   onPrintBill,
   onDeleteOrder,
+  onMarkAsServed,
 }) => {
   const [selectedSections, setSelectedSections] = useState([]);
   const [selectedZones, setSelectedZones]       = useState([]);
@@ -5161,7 +5161,19 @@ const TableReservation = ({
                                 </div>
                               )}
                             </div>
-                            {/* ── Mark as Served CTA removed ── */}
+
+                            {/* ── Mark as Served CTA ── */}
+                            {hasViewableOrder && orderInfo.status === 'ready' && (
+                              <button
+                                onClick={(e) => {
+                                  e.stopPropagation();
+                                  onMarkAsServed && onMarkAsServed(orderInfo.id, table.id);
+                                }}
+                                className="w-full px-4 py-2 bg-green-600 text-white text-sm font-semibold hover:bg-green-700 transition-colors"
+                              >
+                                Mark as Served
+                              </button>
+                            )}
                           </div>
                         );
                       })}
@@ -5521,6 +5533,9 @@ const TakeOrder = ({ clientId, token, onOrderUpdate, realm }) => {
         { headers: { Authorization: `Bearer ${token}` } }
       );
 
+      // Each entry in this response IS the backend's _merge_group() result:
+      // one merged object per table group whose `status` = min-priority across
+      // ALL sub-orders (i.e. the overall group status).
       const mergedGroups = res.data?.data || [];
       const map = {};
 
@@ -5528,18 +5543,23 @@ const TakeOrder = ({ clientId, token, onOrderUpdate, realm }) => {
         const tableStatus = table.status?.toLowerCase();
         if (tableStatus !== 'occupied' && tableStatus !== 'served') return;
 
+        // Find the merged group for this table that is not yet completed.
+        // There should only be one active group per table at a time.
         const mergedGroup = mergedGroups.find(
           (g) => g.table_id === table.id && g.status?.toLowerCase() !== 'completed'
         );
 
         if (mergedGroup) {
           map[table.id] = {
-            id:              mergedGroup.id,
-            dinein_order_id: mergedGroup.dinein_order_id,
+            id:              mergedGroup.id,               // root order DB id
+            dinein_order_id: mergedGroup.dinein_order_id,  // root dinein_order_id
+            // ★ Use the merged group's overall status (min-priority across all sub-orders)
+            // so "ready" only shows when EVERY sub-order is ready.
             status:          mergedGroup.status,
             created_at:      mergedGroup.created_at,
             order_count:     mergedGroup.order_count || 1,
             total_price:     mergedGroup.total_price || 0,
+            // Keep sub_orders list so handleMarkAsServed can iterate them
             sub_orders:      mergedGroup.sub_orders || [],
           };
         }
@@ -5589,6 +5609,44 @@ const TakeOrder = ({ clientId, token, onOrderUpdate, realm }) => {
       toast.error('Failed to delete order');
     }
   };
+
+  /**
+   * Requirement 1:
+   * When user clicks "Mark as Served" on a table card, we update the root
+   * order AND all of its sub-orders to "served" so the table is fully cleared.
+   */
+  /**
+   * Requirement 1:
+   * Mark ALL orders in a table group as served (root + every sub-order).
+   * The sub_orders list is already available in tableOrders state (stored by
+   * fetchTableOrders from the merged group response), so no extra API call needed.
+   */
+  const handleMarkAsServed = async (rootOrderId, tableId) => {
+    try {
+      const orderInfo   = tableOrders[tableId];
+      const subOrderIds = orderInfo?.sub_orders?.map((s) => s.id) || [];
+
+      // Combine root order ID with all sub-order IDs, deduplicated
+      const allOrderIds = Array.from(new Set([rootOrderId, ...subOrderIds]));
+
+      // Update every order in the group to "served" in parallel
+      await Promise.all(
+        allOrderIds.map((id) =>
+          axios.post(
+            `${import.meta.env.VITE_API_ORDER_SERVICE_URL}/${clientId}/dinein/update`,
+            { id, client_id: clientId, status: 'served' },
+            { headers: { Authorization: `Bearer ${token}` } }
+          )
+        )
+      );
+
+      toast.success('Order marked as served');
+      await fetchTables();
+    } catch (err) {
+      console.error(err);
+      toast.error('Failed to mark as served');
+    }
+  }; 
 
   const combineDuplicateItems = (items) => {
     const map = new Map();
@@ -5709,10 +5767,12 @@ const TakeOrder = ({ clientId, token, onOrderUpdate, realm }) => {
           ),
         ]);
 
+        // Build inventory map for price lookups
         const iMap = {};
         (invRes.data?.data || []).forEach((i) => (iMap[i.id] = i));
         setInventoryMap(iMap);
 
+        // Process category tree
         const fullTree = catRes.data.data.filter(
           (c) => c.name?.toLowerCase() !== 'all'
         );
@@ -5728,12 +5788,14 @@ const TakeOrder = ({ clientId, token, onOrderUpdate, realm }) => {
           }))
         );
 
+        // Enrich menu items with category names
         const enrichedItems = itemRes.data.data.map((item) => {
           const cat = flatCats.find((c) => c.id === item.category_id);
           return { ...item, category_name: cat?.name || 'Uncategorized' };
         });
         setMenuItems(enrichedItems);
 
+        // Build category tree for sidebar
         const buildTree = () => {
           const map = new Map();
           flatCats.forEach((c) =>
@@ -5762,6 +5824,7 @@ const TakeOrder = ({ clientId, token, onOrderUpdate, realm }) => {
         setCategories(categoryTree);
         setSidebarCategories(categoryTree);
 
+        // Determine quick-category pills level
         const rootNode = findCategoryNode(categoryTree, menuConfig.root);
         let quickCats  = [];
         if (rootNode) {
@@ -5830,6 +5893,7 @@ const TakeOrder = ({ clientId, token, onOrderUpdate, realm }) => {
         const addonItem = menuItems.find((i) => i.id === id);
         if (!addonItem) return null;
 
+        // Walk category path to verify it belongs to the addon category
         const path = [];
         let current = addonItem.category_id;
         const visited = new Set();
@@ -5898,6 +5962,7 @@ const TakeOrder = ({ clientId, token, onOrderUpdate, realm }) => {
       setCurrentBatchTimestamp(batch);
     }
 
+    // Add main item
     setCart((prev) => [
       ...prev,
       {
@@ -5918,6 +5983,7 @@ const TakeOrder = ({ clientId, token, onOrderUpdate, realm }) => {
       },
     ]);
 
+    // Add selected addons linked to the main item
     lineItemsDetails
       .filter((addon) => selectedAddonIds.includes(addon.id))
       .forEach((addon) => {
@@ -5989,6 +6055,7 @@ const TakeOrder = ({ clientId, token, onOrderUpdate, realm }) => {
   const removeFromCart = (itemId, uniqueKey = null) => {
     setHasNewItems(true);
     if (uniqueKey) {
+      // Remove item and all its child addons
       setCart((prev) =>
         prev.filter(
           (i) =>
@@ -6034,6 +6101,7 @@ const TakeOrder = ({ clientId, token, onOrderUpdate, realm }) => {
       const headers = { Authorization: `Bearer ${token}` };
 
       if (activeOrderId && activeDineinOrderId) {
+        // Sub-order: only new unsaved items
         const newOnly = cart.filter((i) => i.is_new_item && !i.saved_sub_order);
         if (newOnly.length > 0) {
           const res = await axios.post(
@@ -6054,6 +6122,7 @@ const TakeOrder = ({ clientId, token, onOrderUpdate, realm }) => {
           toast.success(`Sub-order ${res.data.data.dinein_order_id} created!`);
         }
       } else {
+        // Fresh order
         const total = cart.reduce((s, i) => s + (i.unit_price || 0) * i.quantity, 0);
         await axios.post(
           `${import.meta.env.VITE_API_ORDER_SERVICE_URL}/${clientId}/dinein/create`,
@@ -6169,6 +6238,7 @@ const TakeOrder = ({ clientId, token, onOrderUpdate, realm }) => {
       setHasNewItems(false);
       setCurrentBatchTimestamp(null);
 
+      // Reconstruct cart from server items (read-only)
       const reconstructedCart = (activeOrder.items || []).map((item) => {
         const menuItem = menuItems.find((mi) => Number(mi.id) === Number(item.item_id));
         return {
@@ -6240,6 +6310,10 @@ const TakeOrder = ({ clientId, token, onOrderUpdate, realm }) => {
       ? hasNewItems && newItems.length > 0
       : selectedTable && cart.length > 0;
 
+  /**
+   * Groups flat cart items into { main, addons[] } pairs.
+   * Only non-addon, non-child items are treated as group roots.
+   */
   const getGroupedCartItems = (items) => {
     const grouped   = [];
     const processed = new Set();
@@ -6282,6 +6356,7 @@ const TakeOrder = ({ clientId, token, onOrderUpdate, realm }) => {
             setOrderToDelete({ orderId, tableId });
             setShowDeleteConfirm(true);
           }}
+          onMarkAsServed={handleMarkAsServed}
         />
       )}
 
@@ -6498,6 +6573,7 @@ const TakeOrder = ({ clientId, token, onOrderUpdate, realm }) => {
                           {/* Cart items list */}
                           <div className="flex-1 overflow-y-auto mt-4 space-y-2">
 
+                            {/* Old/server items — read-only with status badges */}
                             {getGroupedCartItems(oldItems).map((group, idx) => (
                               <OldItemRow
                                 key={`old-${idx}`}
@@ -6507,6 +6583,7 @@ const TakeOrder = ({ clientId, token, onOrderUpdate, realm }) => {
                               />
                             ))}
 
+                            {/* Divider between old and new items */}
                             {activeOrderId && oldItems.length > 0 && newItems.length > 0 && (
                               <div className="flex items-center gap-2 my-2">
                                 <div className="flex-1 h-px bg-gradient-to-r from-transparent via-orange-400 to-transparent" />
@@ -6517,6 +6594,7 @@ const TakeOrder = ({ clientId, token, onOrderUpdate, realm }) => {
                               </div>
                             )}
 
+                            {/* New items — editable, grouped by batch */}
                             {batchTimestamps.map((ts, batchIndex) => (
                               <React.Fragment key={ts}>
                                 {batchIndex > 0 && (
@@ -6531,6 +6609,7 @@ const TakeOrder = ({ clientId, token, onOrderUpdate, realm }) => {
 
                                 {getGroupedCartItems(groupedNewItems[ts]).map((group, idx) => (
                                   <div key={`new-${ts}-${idx}`} className="space-y-1">
+                                    {/* New main item */}
                                     <div className="flex items-center gap-2 p-3 rounded-xl border bg-orange-50 shadow-sm">
                                       <div className="flex items-center gap-3 flex-1 min-w-0">
                                         <div className="w-11 h-11 rounded-lg overflow-hidden border bg-white shrink-0">
@@ -6597,6 +6676,7 @@ const TakeOrder = ({ clientId, token, onOrderUpdate, realm }) => {
                                       </button>
                                     </div>
 
+                                    {/* New item addons */}
                                     {group.addons.map((addon) => (
                                       <div
                                         key={addon.frontend_unique_key}
@@ -6668,6 +6748,7 @@ const TakeOrder = ({ clientId, token, onOrderUpdate, realm }) => {
 
       {/* ── Modals ── */}
 
+      {/* Clear cart confirmation */}
       {showClearConfirm && (
         <div className="fixed inset-0 z-50 flex items-center justify-center bg-black/40">
           <div className="bg-white rounded-lg p-6 w-80 shadow-xl">
@@ -6690,6 +6771,7 @@ const TakeOrder = ({ clientId, token, onOrderUpdate, realm }) => {
         </div>
       )}
 
+      {/* Floating cart button (mobile) */}
       {cart.length > 0 && !showCart && (
         <button
           onClick={() => setShowCart(true)}
@@ -6699,6 +6781,7 @@ const TakeOrder = ({ clientId, token, onOrderUpdate, realm }) => {
         </button>
       )}
 
+      {/* Add-on selector modal */}
       <LineItemsModal
         isOpen={lineItemsModalOpen}
         onClose={() => {
@@ -6712,6 +6795,7 @@ const TakeOrder = ({ clientId, token, onOrderUpdate, realm }) => {
         onAddWithSelectedAddons={handleAddMainItemWithSelectedAddons}
       />
 
+      {/* Delete order confirmation modal */}
       <DeleteConfirmModal
         isOpen={showDeleteConfirm}
         onClose={() => {
@@ -6725,6 +6809,7 @@ const TakeOrder = ({ clientId, token, onOrderUpdate, realm }) => {
         }}
       />
 
+      {/* Invoice modal */}
       {invoiceModalOpen && invoiceOrderData && (
         <InvoiceModal
           clientId={clientId}
