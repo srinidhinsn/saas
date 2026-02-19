@@ -76,7 +76,7 @@ const MenuTreeNode = ({
             </span>
           )} */}
 
-          {canEdit && hovered && !isSelected && (
+          {canEdit && hovered && (
             <div className="flex gap-1">
               <button
                 onClick={(e) => {
