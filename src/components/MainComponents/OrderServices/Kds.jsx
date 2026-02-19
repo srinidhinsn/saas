@@ -9,8 +9,6 @@ import { Filter, Clock, Users, Package, Truck, Trash2 } from 'lucide-react';
 
 // ─── Constants ─────────────────────────────────────────────────────────────────
 
-const STATUS_PRIORITY = { pending: 1, preparing: 2, ready: 3 };
-
 const ORDER_FILTER_OPTIONS = [
   { key: 'ALL',      label: 'All Orders', Icon: Filter },
   { key: 'DINEIN',   label: 'Dine-In',    Icon: Users  },
@@ -50,10 +48,10 @@ const calculateElapsedTime = (createdAt) => {
 // ─── Derive card-level status from its items ───────────────────────────────────
 
 const deriveStatus = (items) => {
-  if (!items?.length)                            return 'pending';
-  if (items.some((i) => i.status === 'pending')) return 'pending';
+  if (!items?.length)                              return 'pending';
+  if (items.some((i) => i.status === 'pending'))   return 'pending';
   if (items.some((i) => i.status === 'preparing')) return 'preparing';
-  if (items.every((i) => i.status === 'served')) return 'ready';
+  if (items.every((i) => i.status === 'served'))   return 'served';
   return 'pending';
 };
 
@@ -130,23 +128,6 @@ const DeleteOrderModal = ({ isOpen, onClose, onConfirm, cardToDelete }) => {
     </div>
   );
 };
-
-
-// ─── Item status icon button ───────────────────────────────────────────────────
-
-const ItemStatusButton = ({ status, activeStatus, onClick, title, children }) => (
-  <button
-    type="button"
-    onClick={onClick}
-    title={title}
-    className="p-2 rounded-md hover:bg-gray-100 transition-colors"
-  >
-    {React.cloneElement(children, {
-      size:      20,
-      className: status === activeStatus ? children.props.activeClass : 'text-gray-500',
-    })}
-  </button>
-);
 
 
 // ─── KDS card ─────────────────────────────────────────────────────────────────
@@ -246,7 +227,7 @@ const KitchenCard = ({
               <button
                 type="button"
                 onClick={() => onItemStatusChange(card.card_id, item.id, 'served')}
-                title="Mark as Ready"
+                title="Mark as Served"
                 className="p-2 rounded-md hover:bg-gray-100 transition-colors"
               >
                 <FaCheckCircle
@@ -255,7 +236,7 @@ const KitchenCard = ({
                 />
               </button>
 
-              {/* ── Requirement 2: Per-item delete button ── */}
+              {/* Per-item delete button */}
               <button
                 type="button"
                 onClick={() => onDeleteItem(card.card_id, item)}
@@ -286,7 +267,6 @@ const KitchenDisplay = () => {
   const { clientId } = useParams();
   const token = localStorage.getItem('access_token');
 
-  // cards = array of { card_id, sub_order_id, dinein_order_id, table_id, status, created_at, items[] }
   const [cards, setCards]                   = useState([]);
   const [tablesMap, setTablesMap]           = useState({});
   const [inventoryItems, setInventoryItems] = useState([]);
@@ -299,7 +279,7 @@ const KitchenDisplay = () => {
 
   // Delete item modal state
   const [showDeleteItemModal, setShowDeleteItemModal] = useState(false);
-  const [itemToDelete, setItemToDelete]               = useState(null);  // { cardId, item }
+  const [itemToDelete, setItemToDelete]               = useState(null);
 
 
   // ─── Fetch tables ────────────────────────────────────────────────────────────
@@ -335,18 +315,10 @@ const KitchenDisplay = () => {
 
 
   // ─── Parse /dinein/table merged response into per-sub-order cards ─────────────
-  //
-  // Backend _merge_group() returns one merged entry per table group with:
-  //   item.batch_label  = the sub-order's dinein_order_id ("1001" or "1001-2")
-  //   item.sub_order_id = the DB pk of that sub-order row
-  //   sub_orders[]      = [{id, dinein_order_id, created_at, status, total_price}, ...]
-  //
-  // We split merged items back into individual per-sub-order cards for the KDS.
 
   const parseIntoCards = (mergedOrder) => {
     const subOrders = mergedOrder.sub_orders || [];
 
-    // Group merged items by sub_order_id
     const itemsBySubOrder = {};
     (mergedOrder.items || []).forEach((item) => {
       const sid = item.sub_order_id;
@@ -354,7 +326,6 @@ const KitchenDisplay = () => {
       itemsBySubOrder[sid].push(item);
     });
 
-    // Fallback: no sub_orders metadata — treat entire group as one card
     if (subOrders.length === 0) {
       return [
         {
@@ -371,7 +342,7 @@ const KitchenDisplay = () => {
       ];
     }
 
-    // One card per sub-order: root first, then chronological sub-orders
+    // One card per sub-order: root first, then chronological
     return subOrders
       .slice()
       .sort((a, b) => {
@@ -412,7 +383,6 @@ const KitchenDisplay = () => {
       const allCards = [];
 
       (res.data?.data || []).forEach((mergedOrder) => {
-        // Date filter using root created_at
         const createdAt = mergedOrder.created_at;
         if (createdAt) {
           const utc = typeof createdAt === 'string'
@@ -422,11 +392,9 @@ const KitchenDisplay = () => {
           if (orderDate !== today) return;
         }
 
-        // Skip fully-served groups
         if (mergedOrder.status === 'served') return;
 
         parseIntoCards(mergedOrder).forEach((card) => {
-          // Skip cards where every item is already served
           if (card.items.length > 0 && card.items.every((i) => i.status === 'served')) return;
           allCards.push(card);
         });
@@ -458,6 +426,7 @@ const KitchenDisplay = () => {
       String(i.id) === String(itemId) ? { ...i, status: newStatus } : i
     );
     const derivedStatus = deriveStatus(updatedItems);
+    const allServed     = updatedItems.every((i) => i.status === 'served');
 
     try {
       // Update all item statuses for this sub-order
@@ -482,15 +451,18 @@ const KitchenDisplay = () => {
         { headers: { Authorization: `Bearer ${token}` } }
       );
 
-      // Update the sub-order's overall status
+      // Update the sub-order's overall status.
+      // When all items are served, set status to "served" automatically.
+      const orderStatus = allServed ? 'served' : derivedStatus;
+
       await axios.post(
         `${import.meta.env.VITE_API_ORDER_SERVICE_URL}/${clientId}/dinein/update`,
-        { id: card.sub_order_id, status: derivedStatus },
+        { id: card.sub_order_id, status: orderStatus },
         { headers: { Authorization: `Bearer ${token}` } }
       );
 
-      // Notify when order moves to ready
-      if (derivedStatus === 'ready' && card.status !== 'ready') {
+      // Notify when order moves to ready (not served — served auto-vanishes)
+      if (orderStatus === 'ready' && card.status !== 'ready') {
         window.dispatchEvent(
           new CustomEvent('orderCollect', {
             detail: {
@@ -501,18 +473,18 @@ const KitchenDisplay = () => {
         );
       }
 
-      // Optimistic UI update
-      setCards((prev) =>
-        prev.map((c) =>
-          c.card_id !== cardId
-            ? c
-            : { ...c, items: updatedItems, status: derivedStatus }
-        )
-      );
-
-      // Remove card once all items are served
-      if (derivedStatus === 'ready' && updatedItems.every((i) => i.status === 'served')) {
+      if (allServed) {
+        // All items served → remove card from KDS immediately
         setCards((prev) => prev.filter((c) => c.card_id !== cardId));
+      } else {
+        // Optimistic UI update
+        setCards((prev) =>
+          prev.map((c) =>
+            c.card_id !== cardId
+              ? c
+              : { ...c, items: updatedItems, status: orderStatus }
+          )
+        );
       }
     } catch (err) {
       console.error(err);
@@ -521,7 +493,7 @@ const KitchenDisplay = () => {
   };
 
 
-  // ─── Delete individual item from an order (Requirement 2) ─────────────────────
+  // ─── Delete individual item from an order ─────────────────────────────────────
 
   const handleDeleteItem = (cardId, item) => {
     setItemToDelete({ cardId, item });
@@ -545,7 +517,6 @@ const KitchenDisplay = () => {
     const isLastItem = remainingItems.length === 0;
 
     try {
-      // Always delete the order item record
       await axios.delete(
         `${import.meta.env.VITE_API_ORDER_SERVICE_URL}/${clientId}/order_item/delete`,
         {
@@ -554,8 +525,6 @@ const KitchenDisplay = () => {
         }
       );
 
-      // Requirement 2: if this was the last item in the card, also delete
-      // the parent dinein order row so it doesn't linger as an empty record.
       if (isLastItem) {
         await axios.delete(
           `${import.meta.env.VITE_API_ORDER_SERVICE_URL}/${clientId}/dinein/delete`,
@@ -564,10 +533,8 @@ const KitchenDisplay = () => {
             headers: { Authorization: `Bearer ${token}` },
           }
         );
-        // Remove the entire card from the KDS view
         setCards((prev) => prev.filter((c) => c.card_id !== cardId));
       } else {
-        // Update the card with remaining items and recalculate status
         setCards((prev) =>
           prev.map((c) =>
             c.card_id !== cardId
@@ -607,7 +574,6 @@ const KitchenDisplay = () => {
       );
 
       if (!cardToDelete.is_sub_order) {
-        // Root delete → backend also removes all sub-orders; remove them from UI too
         const prefix = String(cardToDelete.dinein_order_id) + '-';
         setCards((prev) =>
           prev.filter(
@@ -631,20 +597,16 @@ const KitchenDisplay = () => {
   };
 
 
-  // ─── Filter + sort cards ──────────────────────────────────────────────────────
+  // ─── Filter cards — NO status-based sorting, chronological only ───────────────
 
-  const filteredCards = cards
-    .filter((card) => {
-      if (orderFilter === 'ALL') return true;
-      const isTakeaway = Number(card.table_id) === 500;
-      if (orderFilter === 'TAKEAWAY') return isTakeaway;
-      if (orderFilter === 'DINEIN')   return !isTakeaway;
-      return true;
-    })
-    .sort(
-      (a, b) =>
-        (STATUS_PRIORITY[a.status] || 99) - (STATUS_PRIORITY[b.status] || 99)
-    );
+  const filteredCards = cards.filter((card) => {
+    if (orderFilter === 'ALL') return true;
+    const isTakeaway = Number(card.table_id) === 500;
+    if (orderFilter === 'TAKEAWAY') return isTakeaway;
+    if (orderFilter === 'DINEIN')   return !isTakeaway;
+    return true;
+  });
+  // Cards are already in chronological order from parseIntoCards (root → sub-orders by created_at)
 
 
   // ─── Render ───────────────────────────────────────────────────────────────────
