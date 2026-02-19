@@ -44,12 +44,55 @@ const MenuCategoryTree = ({
   const [editDescription, setEditDescription] = useState("");
   const [editNewSubcategoryName, setEditNewSubcategoryName] = useState("");
   const [deleteTarget, setDeleteTarget] = useState(null);
+  // const getDisplayCategories = () => {
+  //   if (!categories?.length || !menuConfig) return [];
+  
+  //   const { root } = menuConfig;
+  
+  //   // find configured root
+  //   const findRoot = (nodes) => {
+  //     for (const node of nodes) {
+  //       if (
+  //         String(node.id).toLowerCase() === String(root).toLowerCase() ||
+  //         String(node.name).toLowerCase() === String(root).toLowerCase()
+  //       ) {
+  //         return node;
+  //       }
+  //       if (node.children?.length) {
+  //         const found = findRoot(node.children);
+  //         if (found) return found;
+  //       }
+  //     }
+  //     return null;
+  //   };
+  
+  //   const rootNode = findRoot(categories);
+  //   if (!rootNode) return categories;
+  
+  //   // 🔥 KEY LOGIC:
+  //   // Skip one level
+  //   const flattenedGrandChildren = (rootNode.children || [])
+  //     .flatMap(child => child.children || []);
+  
+  //   // Add a virtual "All Categories" node
+  //   return [
+  //     {
+  //       ...rootNode,
+  //       id: rootNode.id,
+  //       name: "All Categories",
+  //       children: flattenedGrandChildren,
+  //       isVirtualRoot: true
+  //     }
+  //   ];
+  // };
+  
+
   const getDisplayCategories = () => {
     if (!categories?.length || !menuConfig) return [];
   
     const { root } = menuConfig;
   
-    // find configured root
+    // find actual configured root node
     const findRoot = (nodes) => {
       for (const node of nodes) {
         if (
@@ -69,19 +112,24 @@ const MenuCategoryTree = ({
     const rootNode = findRoot(categories);
     if (!rootNode) return categories;
   
-    // 🔥 KEY LOGIC:
-    // Skip one level
-    const flattenedGrandChildren = (rootNode.children || [])
-      .flatMap(child => child.children || []);
+    // IMPORTANT:
+    // We DO NOT clone categories anymore.
+    // We only expose level-2 categories under a virtual root.
   
-    // Add a virtual "All Categories" node
+    const visibleChildren = [];
+  
+    for (const level1 of rootNode.children || []) {
+      for (const level2 of level1.children || []) {
+        visibleChildren.push(level2); // keep SAME object reference
+      }
+    }
+  
     return [
       {
-        ...rootNode,
-        id: rootNode.id,
+        id: "__virtual_root__",
         name: "All Categories",
-        children: flattenedGrandChildren,
-        isVirtualRoot: true
+        isVirtualRoot: true,
+        children: visibleChildren
       }
     ];
   };
@@ -484,8 +532,8 @@ const MenuCategoryTree = ({
 
 
   const handleEdit = (category) => {
-    if (category.id === 'all' || category.id === 'dietery' || category.name === 'All Categories') {
-      alert("Cannot edit 'All Categories'");
+    if (category.isVirtualRoot) {
+      alert("Cannot edit root category");
       return;
     }
     setEditingCategory(category);
@@ -493,16 +541,17 @@ const MenuCategoryTree = ({
     setEditDescription(category.description || "");
     setEditNewSubcategoryName("");
     setShowEditModal(true);
-  };
+  };  
 
   const handleDelete = (category) => {
-    if (category.id === 'all' || category.id === 'dietery' || category.name === 'All Categories') {
-      alert("Cannot delete 'All Categories'");
+    if (category.isVirtualRoot) {
+      alert("Cannot delete root category");
       return;
     }
     setDeleteTarget(category);
     setShowDeleteModal(true);
   };
+  
 
   // Add the missing callback handlers
   const handleNewCategoryNameChange = useCallback((e) => {
@@ -568,20 +617,30 @@ const MenuCategoryTree = ({
         { headers: { Authorization: `Bearer ${token}` } }
       );
   
-      // 2️⃣ fetch REAL root from backend
-      const rootId = menuConfig.root;
-      const root = await fetchCategoryById(rootId);
+      // 2️⃣ decide parent
+      let parentId;
   
-      const existingSubs = root?.subCategories?.map(c => c.id) || [];
+      // If nothing selected OR "All Categories" selected → root
+      if (
+        !selectedCategoryId ||
+        selectedCategoryId === menuConfig.root
+      ) {
+        parentId = menuConfig.root;
+      } else {
+        parentId = selectedCategoryId;
+      }
   
-      // 3️⃣ append (NOT overwrite)
+      // 3️⃣ attach to parent
+      const parent = await fetchCategoryById(parentId);
+      const existingSubs = parent?.subCategories?.map(c => c.id) || [];
+  
       await axios.post(
         `${import.meta.env.VITE_API_INVENTORY_SERVICE_URL}/${clientId}/menu/update_category`,
         {
-          id: rootId,
+          id: parentId,
           client_id: clientId,
-          name: root.name,
-          description: root.description || "",
+          name: parent.name,
+          description: parent.description || "",
           sub_categories: [...new Set([...existingSubs, newId])],
           overwrite_subcategories: true,
         },
@@ -595,8 +654,7 @@ const MenuCategoryTree = ({
       console.error(err);
       alert("Failed to add category");
     }
-  };
-  
+  };  
 
   const handleEditCategory = async () => {
     if (!editingCategory) return;
@@ -704,7 +762,7 @@ const MenuCategoryTree = ({
 
     return flatCategories.map((category) => {
       const isSelected = selectedCategoryId === category.id;
-      const canEdit = category.id !== 'dietery' && category.name !== 'All Categories';
+      const canEdit = !category.isVirtualRoot;
 
       return (
         <div
@@ -787,10 +845,7 @@ const MenuCategoryTree = ({
             hasChildren={hasChildren}
             isLast={index === items.length - 1}
             isExpanded={expandedCategories.includes(category.id)}
-            isSelected={
-              selectedCategoryId === category.id ||
-              (selectedCategoryId === null && isRootCategory(category, menuConfig?.root))
-            }
+            isSelected={selectedCategoryId === category.id}
             onSelect={() => onSelectCategory(category.id)}
             onToggle={() => toggleCategory(category.id)}
             onEdit={handleEdit}
