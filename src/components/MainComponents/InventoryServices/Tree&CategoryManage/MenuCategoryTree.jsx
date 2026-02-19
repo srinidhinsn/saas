@@ -433,29 +433,6 @@ const MenuCategoryTree = ({
     return null;
   };
 
-
-  useEffect(() => {
-    if (!categories || categories.length === 0) return;
-
-    let cancelled = false;
-
-    const regenerate = async () => {
-      for (const root of categories) {
-        if (root.id !== "all") {
-          if (cancelled) return;
-          await updateSlugsRecursively(root.id);
-        }
-      }
-    };
-
-    regenerate();
-
-    return () => {
-      cancelled = true;
-    };
-  }, [JSON.stringify(categories)]);
-
-
   const normalizeSlugPart = (name) => {
     return name
       ?.trim()
@@ -565,20 +542,18 @@ const MenuCategoryTree = ({
   }, []);
 
   const handleAddCategory = async () => {
-    if (!newCategoryName.trim()) {
-      alert("Category name is required");
-      return;
-    }
-
+    if (!newCategoryName.trim()) return;
+  
     let userId = "system";
     try {
       userId = jwtDecode(token)?.user_id || userId;
-    } catch { }
-
+    } catch {}
+  
     const newId = generateCategoryIdFromName(newCategoryName);
-
+  
     try {
-      // create category
+  
+      // 1️⃣ create category
       await axios.post(
         `${import.meta.env.VITE_API_INVENTORY_SERVICE_URL}/${clientId}/menu/create_category`,
         {
@@ -592,34 +567,36 @@ const MenuCategoryTree = ({
         },
         { headers: { Authorization: `Bearer ${token}` } }
       );
-
-      // attach to dietery
-      const rootId = menuConfig?.root;
-      const rootNode = categories.find(c => c.id === rootId);
-      
-      const subs = dieteryNode?.children?.map(c => c.id) || [];
-
+  
+      // 2️⃣ fetch REAL root from backend
+      const rootId = menuConfig.root;
+      const root = await fetchCategoryById(rootId);
+  
+      const existingSubs = root?.subCategories?.map(c => c.id) || [];
+  
+      // 3️⃣ append (NOT overwrite)
       await axios.post(
         `${import.meta.env.VITE_API_INVENTORY_SERVICE_URL}/${clientId}/menu/update_category`,
         {
           id: rootId,
           client_id: clientId,
-          name: rootNode?.name || rootId,
-          description: "",
-          sub_categories: [...subs, newId],
+          name: root.name,
+          description: root.description || "",
+          sub_categories: [...new Set([...existingSubs, newId])],
           overwrite_subcategories: true,
         },
         { headers: { Authorization: `Bearer ${token}` } }
       );
-
-
+  
       closeAddModal();
       onCategoriesUpdate?.();
+  
     } catch (err) {
       console.error(err);
       alert("Failed to add category");
     }
   };
+  
 
   const handleEditCategory = async () => {
     if (!editingCategory) return;
