@@ -21,11 +21,11 @@ const MenuManagement = ({ clientId, token, realm }) => {
   const [loading, setLoading] = useState(true);
   const [dietaryFilter, setDietaryFilter] = useState("All");
   const [inventoryIds, setInventoryIds] = useState([]);
-  
+
   // ✅ UPDATED: Store addon subcategories and all addon items
   const [addonSubcategories, setAddonSubcategories] = useState([]);
   const [allAddonItems, setAllAddonItems] = useState([]);
-  
+
   const [addonItems, setAddonItems] = useState([]); // ✅ Store addon items
   const [addonsCategoryId, setAddonsCategoryId] = useState(null); // ✅ Store addons category ID
   const [selectedCategoryId, setSelectedCategoryId] = useState(null);
@@ -38,7 +38,7 @@ const MenuManagement = ({ clientId, token, realm }) => {
     if (!clientId) return null;
     return getMenuConfig(clientId);
   }, [clientId]);
-  
+
 
   // Modal states
   const [showAddModal, setShowAddModal] = useState(false);
@@ -88,9 +88,9 @@ const MenuManagement = ({ clientId, token, realm }) => {
     }
   }, [token]);
 
-  useEffect(() => {
-    console.log("CLIENT ID RAW =", JSON.stringify(clientId));
-  }, [clientId]);
+  // useEffect(() => {
+  //   console.log("CLIENT ID RAW =", JSON.stringify(clientId));
+  // }, [clientId]);
 
   // returns array of category names from root -> the given categoryId (works with UUID or cat_... ids)
   const buildCategoryPath = (categoryId) => {
@@ -140,17 +140,17 @@ const MenuManagement = ({ clientId, token, realm }) => {
     // join with single underscore, no leading underscore
     return parts.filter(Boolean).join('_'); // e.g. Dietery_Non_Veg_Gravies_Mutton_Gravy
   };
-  
+
   // ✅ NEW: Helper function to determine appropriate addon category ID
   const getAddonCategoryId = (itemCategoryId) => {
     if (!itemCategoryId || !categoriesFlat.length) return 'addons_ac'; // default fallback
-    
+
     // Find the item's category path
     const findCategoryPath = (catId) => {
       const path = [];
       let currentId = catId;
       const visited = new Set();
-      
+
       while (currentId && !visited.has(currentId)) {
         visited.add(currentId);
         const cat = categoriesFlat.find(c => c.id === currentId);
@@ -160,25 +160,25 @@ const MenuManagement = ({ clientId, token, realm }) => {
       }
       return path;
     };
-    
+
     const path = findCategoryPath(itemCategoryId);
-    
+
     // Check if item belongs to AC or Non-AC hierarchy
     if (path.includes('ac') || path.some(p => p.includes('ac'))) {
       return 'addons_ac';
     } else if (path.includes('non_ac') || path.includes('non ac') || path.some(p => p.includes('non') && p.includes('ac'))) {
       return 'addons_non_ac';
     }
-    
+
     // Default to AC if unclear
     return 'addons_ac';
   };
-  
+
   const openAddModal = () => {
 
     // Use the currently selected category in sidebar
     const initialCategoryId = selectedCategoryId || null;
-  
+
     setNewItem({
       name: '',
       description: '',
@@ -192,13 +192,13 @@ const MenuManagement = ({ clientId, token, realm }) => {
       line_item_id: [],
       inventory_id: ''
     });
-  
+
     setNewItemImage(null);
     setNewItemImageUrl('');
-  
+
     setShowAddModal(true);
   };
-  
+
   const handleItemClick = (item) => {
     setEditingItem(item);
     setShowEditModal(true);
@@ -287,16 +287,15 @@ const MenuManagement = ({ clientId, token, realm }) => {
 
       setInventoryIds(subcats);
 
-      console.log("Inventory Subcategories:", subcats);
     } catch (error) {
-      console.log("Error fetching inventory IDs:", error);
+      console.error("Error fetching inventory IDs:", error);
     }
   };
   const getModalCategories = () => {
     if (!categories?.length || !menuConfig) return [];
-  
+
     const { root } = menuConfig;
-  
+
     const findRoot = (nodes) => {
       for (const node of nodes) {
         if (
@@ -312,13 +311,13 @@ const MenuManagement = ({ clientId, token, realm }) => {
       }
       return null;
     };
-  
+
     const rootNode = findRoot(categories);
     if (!rootNode) return categories;
-  
+
     const flattenedGrandChildren = (rootNode.children || [])
       .flatMap(child => child.children || []);
-  
+
     return [
       {
         ...rootNode,
@@ -328,12 +327,11 @@ const MenuManagement = ({ clientId, token, realm }) => {
       }
     ];
   };
-  
+
   // ✅ UPDATED: Fetch addon data dynamically based on category structure
   const fetchAddonData = useCallback(async (addonCategoryId = 'addons_ac') => {
     try {
-      console.log(`🔍 Fetching addon data for category: ${addonCategoryId}`);
-      
+
       // First, get the addons category with subcategories
       const catRes = await axios.get(
         `${import.meta.env.VITE_API_INVENTORY_SERVICE_URL}/${clientId}/menu/read_category?category_id=${addonCategoryId}`,
@@ -342,13 +340,11 @@ const MenuManagement = ({ clientId, token, realm }) => {
 
       const addonsCategory = catRes.data.data?.[0];
       if (!addonsCategory) {
-        console.log(`⚠️ Addons category ${addonCategoryId} not found`);
         return { subcategories: [], items: [] };
       }
 
       // Store subcategories (can be empty)
       const subcats = addonsCategory.subCategories || [];
-      console.log(`✅ Found ${subcats.length} addon subcategories`);
 
       // Fetch all menu items
       const itemRes = await axios.get(
@@ -357,7 +353,7 @@ const MenuManagement = ({ clientId, token, realm }) => {
       );
 
       const allItems = itemRes.data.data || [];
-      
+
       // ✅ FIXED: Include items that belong to the main addon category OR its subcategories
       const subcategoryIds = subcats.map(sub => sub.id);
       const filteredAddons = allItems.filter(item => {
@@ -367,9 +363,7 @@ const MenuManagement = ({ clientId, token, realm }) => {
         if (subcategoryIds.includes(item.category_id)) return true;
         return false;
       });
-      
-      console.log(`✅ Found ${filteredAddons.length} total addon items (${allItems.filter(i => i.category_id === addonCategoryId).length} direct + ${allItems.filter(i => subcategoryIds.includes(i.category_id)).length} in subcategories)`);
-      
+
       return { subcategories: subcats, items: filteredAddons };
     } catch (error) {
       console.error(`❌ Error fetching addon data for ${addonCategoryId}:`, error);
@@ -385,7 +379,7 @@ const MenuManagement = ({ clientId, token, realm }) => {
       setAddonSubcategories(subcategories);
       setAllAddonItems(items);
     };
-    
+
     initializeData();
   }, [fetchInventoryIds, fetchAddonData]);
 
@@ -400,7 +394,6 @@ const MenuManagement = ({ clientId, token, realm }) => {
       const finalCategoryId = newItem?.category_id || null;
 
       if (!finalCategoryId) {
-        alert("Please select a valid category");
         return;
       }
 
@@ -426,7 +419,6 @@ const MenuManagement = ({ clientId, token, realm }) => {
         inventory_id: newItem.inventory_id
       };
 
-      console.log("Payload before sending:", payload);
 
       await axios.post(
         `${import.meta.env.VITE_API_INVENTORY_SERVICE_URL}/${clientId}/menu/create`,
@@ -440,7 +432,7 @@ const MenuManagement = ({ clientId, token, realm }) => {
       );
 
       await fetchData({ silent: true });
-      
+
       // ✅ Refresh addon data for the appropriate category
       const addonCatId = getAddonCategoryId(finalCategoryId);
       const { subcategories, items } = await fetchAddonData(addonCatId);
@@ -513,7 +505,6 @@ const MenuManagement = ({ clientId, token, realm }) => {
         updated_by
       };
 
-      console.log("Edit payload:", payload);
 
       await axios.post(
         `${import.meta.env.VITE_API_INVENTORY_SERVICE_URL}/${clientId}/menu/update`,
@@ -522,7 +513,7 @@ const MenuManagement = ({ clientId, token, realm }) => {
       );
 
       await fetchData({ silent: true });
-      
+
       // ✅ Refresh addon data for the appropriate category
       const addonCatId = getAddonCategoryId(finalCategoryId);
       const { subcategories, items } = await fetchAddonData(addonCatId);
@@ -536,7 +527,6 @@ const MenuManagement = ({ clientId, token, realm }) => {
     } catch (error) {
       console.error('Error updating item:', error);
       console.error('Error response:', error.response?.data);
-      alert('Failed to update item: ' + (error.response?.data?.detail || error.message));
     }
   };
   useEffect(() => {
@@ -665,7 +655,7 @@ const MenuManagement = ({ clientId, token, realm }) => {
           quickCategories = getCategoriesAtLevel(rootNode, level);
 
           if (quickCategories.length > 0) {
-            console.log("Using hierarchy level:", level);
+        
             break;
           }
 
@@ -746,7 +736,6 @@ const MenuManagement = ({ clientId, token, realm }) => {
           code.includes(q)
         );
       });
-      console.log('After search filter:', items.length);
     }
 
     if (!selectedCategoryId) {
@@ -769,17 +758,12 @@ const MenuManagement = ({ clientId, token, realm }) => {
         categories
       );
 
-      console.log('allowedCategoryIds:', allowedCategoryIds);
-      console.log('Sample item category IDs:', items.slice(0, 3).map(i => i.category_id));
-
       items = items.filter(item =>
         allowedCategoryIds.includes(item.category_id)
       );
 
-      console.log('After category filter:', items.length);
     }
 
-    console.log('🏁 Final items count:', items.length);
     return items;
   };
 
@@ -885,13 +869,11 @@ const MenuManagement = ({ clientId, token, realm }) => {
             );
           })
         );
-
-        console.log(`✅ Unlinked addon from ${itemsToUpdate.length} items`);
       }
 
       // Refresh data
       await fetchData({ silent: true });
-      
+
       // ✅ Refresh addon data
       const addonCatId = getAddonCategoryId(deleteTarget.category_id);
       const { subcategories, items } = await fetchAddonData(addonCatId);
@@ -902,7 +884,6 @@ const MenuManagement = ({ clientId, token, realm }) => {
       setDeleteTarget(null);
     } catch (error) {
       console.error('Error deleting item:', error);
-      alert('Failed to delete item');
     }
   };
 
@@ -951,12 +932,11 @@ const MenuManagement = ({ clientId, token, realm }) => {
           })
         );
 
-        console.log(`✅ Unlinked deleted addons from ${itemsToUpdate.length} items`);
       }
 
       // Refresh data
       await fetchData({ silent: true });
-      
+
       // ✅ Refresh addon data for currently selected category
       if (selectedCategoryId) {
         const addonCatId = getAddonCategoryId(selectedCategoryId);
@@ -969,13 +949,11 @@ const MenuManagement = ({ clientId, token, realm }) => {
       setSelectAllChecked(false);
     } catch (error) {
       console.error('Error deleting items:', error);
-      alert('Failed to delete some items');
     }
   };
 
   const handleBulkUpdate = async () => {
     if (selectedRows.length === 0) {
-      alert('No items selected');
       return;
     }
 
@@ -1003,7 +981,7 @@ const MenuManagement = ({ clientId, token, realm }) => {
       );
 
       await fetchData({ silent: true });
-      
+
       // ✅ Refresh addon data
       if (selectedCategoryId) {
         const addonCatId = getAddonCategoryId(selectedCategoryId);
@@ -1018,7 +996,6 @@ const MenuManagement = ({ clientId, token, realm }) => {
       setSelectAllChecked(false);
     } catch (error) {
       console.error('Error updating items:', error);
-      alert('Failed to update some items');
     }
   };
 
@@ -1086,13 +1063,37 @@ const MenuManagement = ({ clientId, token, realm }) => {
       XLSX.writeFile(workbook, filename);
     } catch (err) {
       console.error("Export failed:", err);
-      alert("Export to Excel failed — check console for details.");
     }
   };
-
+  const clean = (v) => {
+    if (
+      v === "" ||
+      v === undefined ||
+      v === null ||
+      (typeof v === "number" && isNaN(v))
+    ) {
+      return null;
+    }
+    return v;
+  };
+  
+  
+  const num = (v) => {
+    if (
+      v === "" ||
+      v === undefined ||
+      v === null ||
+      (typeof v === "number" && isNaN(v))
+    ) {
+      return 0;
+    }
+    const n = Number(v);
+    return isNaN(n) ? 0 : n;
+  };
+  
+  
   const handleImportFromExcel = (e) => {
     if (!categoriesFlat.length) {
-      alert("Categories not loaded yet. Please wait 2 seconds and try again.");
       e.target.value = "";
       return;
     }
@@ -1121,7 +1122,6 @@ const MenuManagement = ({ clientId, token, realm }) => {
         const parsedData = XLSX.utils.sheet_to_json(worksheet, { defval: "" });
 
         if (!parsedData.length) {
-          alert("Excel file is empty");
           return;
         }
 
@@ -1136,16 +1136,12 @@ const MenuManagement = ({ clientId, token, realm }) => {
         });
 
         if (validationErrors.length) {
-          alert(
-            `❌ Import blocked due to errors:\n\n${validationErrors
-              .slice(0, 5)
-              .join("\n")}${validationErrors.length > 5 ? "\n..." : ""}`
-          );
           return;
         }
 
         const confirmReplace = window.confirm(
-          `This will DELETE all ${menuItems.length} existing menu items and import ${parsedData.length} new items.\n\nContinue?`
+          `This will replace ${filteredItems.length} items in "${getSelectedCategoryNameById()}" category.
+Other categories will NOT be affected.`
         );
 
         if (!confirmReplace) {
@@ -1153,8 +1149,11 @@ const MenuManagement = ({ clientId, token, realm }) => {
           return;
         }
 
+        // delete ONLY selected category items
+        const itemsToDelete = filteredItems;
+
         await Promise.all(
-          menuItems.map(item =>
+          itemsToDelete.map(item =>
             axios.post(
               `${import.meta.env.VITE_API_INVENTORY_SERVICE_URL}/${clientId}/menu/delete`,
               { id: item.id },
@@ -1162,6 +1161,7 @@ const MenuManagement = ({ clientId, token, realm }) => {
             )
           )
         );
+
 
         let successCount = 0;
         let failCount = 0;
@@ -1178,44 +1178,71 @@ const MenuManagement = ({ clientId, token, realm }) => {
               }
             }
 
-            const categoryId = getCategoryIdByName(row.Category);
+            const categoryId = selectedCategoryId;
 
             if (!categoryId) throw new Error("Invalid category");
 
+            const generatedSlug = generateSlug(categoryId, row.Name);
+
             const payload = {
               client_id: clientId,
-              inventory_id: row.Inventory_Id || null,
-              name: row.Name,
-              description: row.Description || "",
+              inventory_id: clean(row.Inventory_Id),
+            
+              name: row.Name?.trim(),
+              description: clean(row.Description),
+            
               category_id: categoryId,
-              realm: row.Realm || realm || "",
-              code: row.Code || "",
-              serving_quantity: row.Serving_Quantity || null,
-              serving_unit: row.Serving_Unit || null,
-              unit: row.Unit || "",
-              image_id: row.Image || null,
-              unit_price: Number(row.Unit_Price || 0),
-              unit_cst: Number(row.Unit_CST || 0),
-              unit_gst: Number(row.Unit_GST || 0),
-              unit_total_price: Number(row.Total_Unit_Price || 0),
-              cst: Number(row.CST || 0),
-              gst: Number(row.GST || 0),
-              discount: Number(row.Discount || 0),
-              total_price: Number(row.Total_Price || 0),
-              slug: row.Slug || "",
+              realm: clean(row.Realm) || realm || null,
+            
+              code: row.Code != null && !isNaN(row.Code)
+              ? String(row.Code)
+              : clean(row.Code),
+            
+            
+              serving_quantity: clean(row.Serving_Quantity),
+              serving_unit: clean(row.Serving_Unit),
+              unit: clean(row.Unit),
+              image_id: clean(row.Image),
+            
+              unit_price: num(row.Unit_Price),
+              unit_cst: num(row.Unit_CST),
+              unit_gst: num(row.Unit_GST),
+              unit_total_price: num(row.Total_Unit_Price),
+            
+              cst: num(row.CST),
+              gst: num(row.GST),
+              discount: num(row.Discount),
+              total_price: num(row.Total_Price),
+            
+              slug: generatedSlug,   // ⭐⭐⭐ THIS FIXES 422
+            
               line_item_id: row.Line_Item_IDs
-                ? row.Line_Item_IDs.split(",").map(v => Number(v.trim())).filter(Boolean)
-                : [],
-              recipe,
+              ? row.Line_Item_IDs
+                  .split(",")
+                  .map(v => parseInt(v.trim(), 10))
+                  .filter(v => !isNaN(v))
+              : null,
+            
+            
+                recipe: recipe && typeof recipe === "object" && !Array.isArray(recipe)
+                ? recipe
+                : null,              
               created_by,
               updated_by
             };
+            
 
-            await axios.post(
-              `${import.meta.env.VITE_API_INVENTORY_SERVICE_URL}/${clientId}/menu/create`,
-              payload,
-              { headers: { Authorization: `Bearer ${token}` } }
-            );
+           await axios.post(
+  `${import.meta.env.VITE_API_INVENTORY_SERVICE_URL}/${clientId}/menu/create`,
+  payload,
+  {
+    headers: {
+      Authorization: `Bearer ${token}`,
+      "Content-Type": "application/json"
+    }
+  }
+);
+
 
             successCount++;
           } catch (err) {
@@ -1225,7 +1252,7 @@ const MenuManagement = ({ clientId, token, realm }) => {
         }
 
         await fetchData({ silent: true });
-        
+
         // ✅ Refresh addon data
         if (selectedCategoryId) {
           const addonCatId = getAddonCategoryId(selectedCategoryId);
@@ -1234,17 +1261,11 @@ const MenuManagement = ({ clientId, token, realm }) => {
           setAllAddonItems(items);
         }
 
-        alert(
-          `✅ Import completed\n\n` +
-          `✔ Success: ${successCount}\n` +
-          `✖ Failed: ${failCount}` +
-          (errors.length ? `\n\nErrors:\n${errors.slice(0, 5).join("\n")}` : "")
-        );
+
 
         e.target.value = "";
       } catch (err) {
         console.error("Import Error:", err);
-        alert("Import failed. Check console.");
         e.target.value = "";
       }
     };
@@ -1326,7 +1347,7 @@ const MenuManagement = ({ clientId, token, realm }) => {
   const findNodeAndChildren = (nodes, id) => {
     for (const node of nodes) {
       if (node.id === id) return node;
-  
+
       if (node.children?.length) {
         const found = findNodeAndChildren(node.children, id);
         if (found) return found;
@@ -1334,13 +1355,13 @@ const MenuManagement = ({ clientId, token, realm }) => {
     }
     return null;
   };
-  
+
   useEffect(() => {
     if (!selectedCategoryId) {
       setSidebarCategories(categories);
     }
   }, [selectedCategoryId, categories]);
-  
+
   return (
     <div className="h-[90vh] bg-bg-primary overflow-hidden">
       <div className="mx-auto p-2">
@@ -1367,14 +1388,14 @@ const MenuManagement = ({ clientId, token, realm }) => {
               {quickDieteryCategories.map(cat => (
                 <button key={cat.id} onClick={() => {
                   setSelectedCategoryId(cat.id);
-                
+
                   const selectedNode = findNodeAndChildren(categories, cat.id);
-                
+
                   if (selectedNode) {
                     setSidebarCategories([selectedNode]);
                   }
                 }}
-                
+
                   className={`px-3 py-1.5 rounded-lg text-sm font-semibold border whitespace-nowrap transition-all flex-shrink-0`}>
                   {(() => {
                     const section = getTopSectionName(cat.id);
