@@ -52,7 +52,7 @@ const deriveStatus = (items) => {
   if (!items?.length)                            return 'pending';
   if (items.some((i) => i.status === 'pending')) return 'pending';
   if (items.some((i) => i.status === 'preparing')) return 'preparing';
-  if (items.every((i) => i.status === 'served')) return 'served';
+  if (items.every((i) => i.status === 'served')) return 'ready';
   return 'pending';
 };
 
