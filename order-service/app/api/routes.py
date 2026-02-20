@@ -261,7 +261,6 @@ def get_orders_for_table(client_id: str, table_id: Optional[str] = None, context
     result = [_merge_group(group) for group in groups.values()]
     return ResponseModel(screen_id=context.screen_id, data=result)
 
-
 @router.post("/dinein/update")
 def update_order_status(
     client_id: str,
@@ -272,107 +271,74 @@ def update_order_status(
 ):
     order = (
         db.query(Db_Order_Entity)
-        .filter(Db_Order_Entity.id == body.id, Db_Order_Entity.client_id == client_id)
+        .filter(
+            Db_Order_Entity.id == body.id,
+            Db_Order_Entity.client_id == client_id
+        )
         .first()
     )
-    if not order:
-        raise HTTPException(status_code=404, detail=f"Order {body.id} not found")
 
+    if not order:
+        raise HTTPException(
+            status_code=404,
+            detail=f"Order {body.id} not found"
+        )
+
+    previous_status = order.status
+
+    # 🚫 Prevent double serving
+    if (
+        body.status == OrderStatusEnum.served
+        and previous_status == OrderStatusEnum.served
+    ):
+        return ResponseModel(
+            screen_id=context.screen_id,
+            data={
+                "message": "Order already served",
+                "new_status": order.status,
+            },
+        )
+
+    # 🔥 NEW LOGIC: If marking as served → update root + all sub-orders
+    if body.status in [OrderStatusEnum.served, OrderStatusEnum.completed]:
+
+        root_id = _root_dinein_id(order.dinein_order_id)
+
+        related_orders = db.query(Db_Order_Entity).filter(
+            Db_Order_Entity.client_id == client_id,
+            Db_Order_Entity.dinein_order_id.like(f"{root_id}%")
+        ).all()
+
+        for o in related_orders:
+           o.status = body.status
+
+        db.commit()
+
+        return ResponseModel(
+            screen_id=context.screen_id,
+            data={
+                "message": "All related orders marked as served",
+                "updated_count": len(related_orders),
+            },
+        )
+
+    # ✅ Normal single order update (for other statuses)
     if body.status is not None:
         order.status = body.status
+
     if body.total_price is not None:
         order.total_price = body.total_price
-
-    if order.status == OrderStatusEnum.served and body.status == OrderStatusEnum.served:
-        return ResponseModel(screen_id=context.screen_id, data={"message": "Order already served", "new_status": order.status})
 
     db.commit()
     db.refresh(order)
 
-    if body.status == OrderStatusEnum.served:
-        print(f"✅ Order {order.id} served — deducting inventory availability...")
-        try:
-            db_items = (
-                db.query(Db_OrderItem_Entity)
-                .filter(Db_OrderItem_Entity.order_id == order.id, Db_OrderItem_Entity.client_id == client_id)
-                .all()
-            )
-
-            def safe_decimal(v):
-                try: return Decimal(v or 0)
-                except: return Decimal(0)
-
-            def convert_to_base(value, u):
-                v = safe_decimal(value); u = (u or "").lower().strip()
-                if u in ["litre", "litres", "l"]: return v * Decimal(1000)
-                if u in ["kg", "kgs", "kilogram", "kilograms"]: return v * Decimal(1000)
-                return v
-
-            def convert_from_base(value, u):
-                v = safe_decimal(value); u = (u or "").lower().strip()
-                if u in ["litre", "litres", "l"]: return v / Decimal(1000)
-                if u in ["kg", "kgs", "kilogram", "kilograms"]: return v / Decimal(1000)
-                return v
-
-            for item in db_items:
-                menu_item = db.query(InventoryEntity).filter(
-                    InventoryEntity.id == item.item_id,
-                    InventoryEntity.client_id == client_id,
-                    InventoryEntity.inventory_id == 1,
-                ).first()
-                if not menu_item:
-                    print(f"⚠️ Menu item not found: item_id={item.item_id}"); continue
-
-                inv_unit = (menu_item.unit or "").lower().strip()
-                serving_qty = safe_decimal(menu_item.serving_quantity or 1)
-                serving_unit = (menu_item.serving_unit or inv_unit).lower().strip()
-                avail_base = convert_to_base(menu_item.availability, inv_unit)
-                used_base = convert_to_base(serving_qty, serving_unit) * safe_decimal(item.quantity)
-                menu_item.availability = convert_from_base(max(Decimal(0), avail_base - used_base), inv_unit)
-
-                for ing in (menu_item.recipe or []):
-                    try:
-                        stock_id = int(ing.get("stock_item_id") or ing.get("id") or 0)
-                        qty_req = safe_decimal(ing.get("quantity_required"))
-                        qty_unit = (ing.get("unit") or "").lower().strip()
-                    except Exception as e:
-                        print(f"⚠️ Bad recipe entry: {ing} - {e}"); continue
-                    if not stock_id: continue
-                    stock_row = db.query(InventoryEntity).filter(
-                        InventoryEntity.id == stock_id,
-                        InventoryEntity.client_id == client_id,
-                        InventoryEntity.inventory_id == 2,
-                    ).first()
-                    if not stock_row: continue
-                    su = (stock_row.unit or "").lower()
-                    sb = convert_to_base(stock_row.availability, su)
-                    ub = convert_to_base(qty_req, qty_unit) * safe_decimal(item.quantity)
-                    stock_row.availability = convert_from_base(max(Decimal(0), sb - ub), su)
-
-            db.commit()
-            print(f"✅ Inventory updated for order {order.id}")
-        except Exception as e:
-            db.rollback()
-            print(f"❌ Inventory deduction failed: {e}")
-            raise HTTPException(status_code=500, detail=f"Inventory deduction failed: {str(e)}")
-
-        billing_sync = None
-        try:
-            auth = request.headers.get("authorization", "")
-            user_jwt = auth.split(" ", 1)[1].strip() if auth.lower().startswith("bearer ") else ""
-            if not user_jwt: raise ValueError("Missing JWT")
-            from app.services.order_service import sync_served_order_to_billing_public
-            billing_sync = sync_served_order_to_billing_public(order, user_jwt)
-        except Exception as e:
-            billing_sync = {"error": str(e)}
-
-        return ResponseModel(
-            screen_id=context.screen_id,
-            data={"message": "Order served and inventory updated", "new_status": order.status, "billing_sync": billing_sync},
-        )
-
-    return ResponseModel(screen_id=context.screen_id, data={"message": "Status updated", "new_status": order.status})
-
+    return ResponseModel(
+        screen_id=context.screen_id,
+        data={
+            "message": "Status updated",
+            "new_status": order.status,
+        },
+    )
 
 @router.post("/order_items/update")
 def update_order_items(
