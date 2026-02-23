@@ -87,15 +87,15 @@ const CategoryTree = ({
 
   useEffect(() => {
     if (!categories || !selectedCategoryId) return;
-  
+
     const findPathById = (nodes, targetId, path = []) => {
       for (const node of nodes) {
         const newPath = [...path, node.id];
-  
+
         if (node.id === targetId) {
           return newPath;
         }
-  
+
         if (node.children?.length) {
           const result = findPathById(node.children, targetId, newPath);
           if (result) return result;
@@ -103,18 +103,18 @@ const CategoryTree = ({
       }
       return null;
     };
-  
+
     const path = findPathById(categories, selectedCategoryId);
-  
+
     if (path) {
       setExpandedCategories(path); // opens parents automatically
     }
-  
+
     buildParentMapFromCategories(categories);
-  
+
   }, [selectedCategoryId, categories]);
-  
-  
+
+
   const buildParentMapFromCategories = (cats) => {
     const tempMap = {};
     const traverse = (items, parentId = null) => {
@@ -136,7 +136,7 @@ const CategoryTree = ({
         : [...prev, categoryId]
     );
   };
-  
+
 
   const generateSlugFromParents = (categoryId, currentName, overrideParentMap = null) => {
     const path = [];
@@ -177,7 +177,6 @@ const CategoryTree = ({
 
   const handleAddCategory = async () => {
     if (!newCategoryName.trim()) {
-      alert("Category name is required");
       return;
     }
 
@@ -244,12 +243,10 @@ const CategoryTree = ({
       );
 
       closeAddModal();
-      alert("✅ New category added successfully!");
 
       if (onCategoriesUpdate) onCategoriesUpdate();
     } catch (err) {
       console.error("❌ Error adding category:", err.response?.data || err);
-      alert("Failed to add category");
     }
   };
 
@@ -292,7 +289,6 @@ const CategoryTree = ({
         finalSubcategories.push(newSubId);
       } catch (err) {
         console.error("Error creating subcategory:", err.response?.data || err);
-        alert("Failed to create subcategory");
         return;
       }
     }
@@ -323,12 +319,10 @@ const CategoryTree = ({
 
       setEditNewSubcategoryName("");
       closeEditModal();
-      alert("✅ Category updated successfully!");
 
       if (onCategoriesUpdate) onCategoriesUpdate();
     } catch (err) {
       console.error("Error editing category:", err.response?.data || err);
-      alert("Failed to update category");
     }
   };
 
@@ -348,18 +342,15 @@ const CategoryTree = ({
       );
 
       closeDeleteModal();
-      alert("✅ Category deleted successfully!");
 
       if (onCategoriesUpdate) onCategoriesUpdate();
     } catch (err) {
       console.error("Delete error:", err.response?.data || err);
-      alert(err.response?.data?.detail || "Failed to delete category");
     }
   };
 
   const handleEdit = (category) => {
     if (category.id === 'all' || category.id === 'dietery' || category.name === 'All Categories') {
-      alert("Cannot edit 'All Categories'");
       return;
     }
     setEditingCategory(category);
@@ -371,7 +362,6 @@ const CategoryTree = ({
 
   const handleDelete = (category) => {
     if (category.id === 'all' || category.id === 'dietery' || category.name === 'All Categories') {
-      alert("Cannot edit 'All Categories'");
       return;
     }
     setDeleteTarget(category);
@@ -436,15 +426,15 @@ const CategoryTree = ({
           key={category.id || category.name}
           onClick={() => onSelectCategory(category.id)}
           className={`flex items-center gap-2 px-4 py-2 rounded-full whitespace-nowrap font-semibold text-sm transition-all shadow-sm flex-shrink-0 ${isSelected
-              ? 'bg-action-primary text-white shadow-md'
-              : 'bg-bg-primary text-text-primary border-2 border-border-default hover:border-action-primary hover:bg-bg-tertiary'
+            ? 'bg-action-primary text-white shadow-md'
+            : 'bg-bg-primary text-text-primary border-2 border-border-default hover:border-action-primary hover:bg-bg-tertiary'
             }`}
         >
           <span>{category.name}</span>
           {typeof category.count !== 'undefined' && (
             <span className={`text-xs px-2 py-0.5 rounded-full font-bold ${isSelected
-                ? 'bg-white text-action-primary'
-                : 'bg-bg-tertiary text-text-secondary'
+              ? 'bg-white text-action-primary'
+              : 'bg-bg-tertiary text-text-secondary'
               }`}>
               {category.count}
             </span>
@@ -459,9 +449,9 @@ const CategoryTree = ({
       <div className="hidden lg:block rounded-lg p-4 bg-bg-primary shadow-md border border-border-default">
         <div className="flex items-center justify-between mb-3 px-3">
           <h3 className="text-lg font-semibold text-text-primary">
-          All  Categories
+            All  Categories
           </h3>
-  
+
         </div>
         <div className="space-y-1">
           {categories && categories.length > 0 ? (
@@ -572,7 +562,7 @@ const CategoryTree = ({
           <div className="rounded-lg max-w-md w-full p-6 bg-bg-primary shadow-xl">
             <div className="flex justify-between items-center mb-4">
               <h3 className="text-xl font-semibold text-text-primary">Edit Category</h3>
-              <button onClick={closeEditModal}  className="p-1.5 rounded-lg bg-action-primary text-text-white hover:opacity-90 transition-opacity">
+              <button onClick={closeEditModal} className="p-1.5 rounded-lg bg-action-primary text-text-white hover:opacity-90 transition-opacity">
                 <X className="h-5 w-5" />
               </button>
             </div>

@@ -381,7 +381,7 @@ const MenuManagement = ({ clientId, token, realm }) => {
     };
 
     initializeData();
-  }, [fetchInventoryIds, fetchAddonData]);
+  }, [fetchAddonData]);
 
   const handleAddItem = async () => {
     try {
