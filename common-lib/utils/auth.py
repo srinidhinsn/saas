@@ -48,10 +48,6 @@ def verify_token(req: Request = None, token: str = Depends(oauth2_scheme), db: S
         grants = payload["grants"]
         realm = payload["realm"]
 
-        if url_client_id != client_id :
-            raise HTTPException(status_code=403, detail="Switching client is not allowed. Please contact administrator.")
-
-
         if grants.index(realm) < 0 :
             raise HTTPException(status_code=403, detail="Restricted Grant. Please contact administrator.")
 
