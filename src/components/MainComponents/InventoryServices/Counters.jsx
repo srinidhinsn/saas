@@ -40,39 +40,35 @@ export default function CounterManager({ clientId, token }) {
   };
 
   // ================= Fetch All Categories =================
-const fetchAllCategories = async () => {
-  try {
-    const res = await axios.get(
-      `${API}/${clientId}/inventory/read_category`,
-      {
-        params: {
-          client_id: clientId,
-          category_id: "ac",
-        },
-        headers,
+  const fetchAllCategories = async () => {
+    try {
+      const res = await axios.get(
+        `${API}/${clientId}/inventory/read_category`,
+        {
+          params: {
+            client_id: clientId,
+            category_id: "ac",
+          },
+          headers,
+        }
+      );
+
+      const acRoot = res.data.data?.[0];
+
+      if (!acRoot) {
+        setAllCategories([]);
+        return;
       }
-    );
 
-    const acRoot = res.data.data?.[0];
+      // Keep levelOne as groups (veg, non_veg, etc)
+      const levelOne = acRoot.subCategories || [];
 
-    if (!acRoot) {
-      setAllCategories([]);
-      return;
+      setAllCategories(levelOne);
+
+    } catch (err) {
+      console.error("Error fetching AC tree:", err);
     }
-
-    const levelOne = acRoot.subCategories || [];
-
-    // Collect subcategories of veg, non_veg, eggetarian, addons
-    const actualCategories = levelOne.flatMap(
-      (node) => node.subCategories || []
-    );
-
-    setAllCategories(actualCategories);
-
-  } catch (err) {
-    console.error("Error fetching AC tree:", err);
-  }
-};
+  };
 
   useEffect(() => {
     fetchCounters();
@@ -251,35 +247,47 @@ const fetchAllCategories = async () => {
               Assign Categories to {selectedCounter.name}
             </h3>
 
-            <div className="space-y-2">
-              {allCategories
-                .filter((cat) => cat.id !== "counter")
-                .map((cat) => (
-                  <label
-                    key={cat.id}
-                    className="flex items-center gap-2 border p-2 rounded-lg"
-                  >
-                    <input
-                      type="checkbox"
-                      checked={selectedCategories.includes(cat.id)}
-                      onChange={(e) => {
-                        if (e.target.checked) {
-                          setSelectedCategories([
-                            ...selectedCategories,
-                            cat.id,
-                          ]);
-                        } else {
-                          setSelectedCategories(
-                            selectedCategories.filter(
-                              (id) => id !== cat.id
-                            )
-                          );
-                        }
-                      }}
-                    />
-                    {cat.name}
-                  </label>
-                ))}
+            <div className="space-y-4">
+              {allCategories.map((group) => (
+                <div key={group.id}>
+
+                  {/* Level One Heading */}
+                  <h4 className="font-semibold text-lg mb-2 border-b pb-1">
+                    {group.name}
+                  </h4>
+
+                  {/* Actual Categories */}
+                  <div className="space-y-2 pl-4">
+                    {group.subCategories?.map((cat) => (
+                      <label
+                        key={cat.id}
+                        className="flex items-center gap-2 border p-2 rounded-lg"
+                      >
+                        <input
+                          type="checkbox"
+                          checked={selectedCategories.includes(cat.id)}
+                          onChange={(e) => {
+                            if (e.target.checked) {
+                              setSelectedCategories([
+                                ...selectedCategories,
+                                cat.id,
+                              ]);
+                            } else {
+                              setSelectedCategories(
+                                selectedCategories.filter(
+                                  (id) => id !== cat.id
+                                )
+                              );
+                            }
+                          }}
+                        />
+                        {cat.name}
+                      </label>
+                    ))}
+                  </div>
+
+                </div>
+              ))}
             </div>
 
             <div className="flex justify-end gap-3 mt-4">
