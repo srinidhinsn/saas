@@ -18,6 +18,7 @@ import TakeOrder_V1 from '../V1_Components/OrderServices/TakeOrder_V1';
 import Summary_V1 from '../V1_Components/OrderServices/Summary_V1';
 import RoleConfig from '../MainComponents/UserServices/RoleConfiguration/RoleConfig';
 import Data from '../Super_Admin/CustomerData/Data';
+import Counters from '../MainComponents/InventoryServices/Counters'
 
 const RoutesManager = () => {
   const { clientId } = useParams();
@@ -126,6 +127,7 @@ const RoutesManager = () => {
 
       <Route path="*" element={<Navigate to="home" replace />} />
       <Route path='user-profile' element={<UserProfile token={token} clientId={clientId} />} />
+      <Route path='counter' element={<Counters token={token} clientId={clientId} />} />
     </Routes>
   );
 };
