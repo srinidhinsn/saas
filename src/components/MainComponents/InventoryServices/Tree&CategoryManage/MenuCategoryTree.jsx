@@ -1,4 +1,4 @@
-import { useState, useEffect, useCallback,useMemo } from "react";
+import { useState, useEffect, useCallback, useMemo } from "react";
 import { createPortal } from "react-dom";
 import MenuTreeNode from "./MenuTreeNode";
 import { Plus, X, Edit, Trash2 } from 'lucide-react';
@@ -13,7 +13,7 @@ const isRootCategory = (cat, root) => {
     String(cat.name).toLowerCase() === String(root).toLowerCase()
   );
 };
-    
+
 const MenuCategoryTree = ({
   categories = [],
   selectedCategoryId,
@@ -44,54 +44,12 @@ const MenuCategoryTree = ({
   const [editDescription, setEditDescription] = useState("");
   const [editNewSubcategoryName, setEditNewSubcategoryName] = useState("");
   const [deleteTarget, setDeleteTarget] = useState(null);
-  // const getDisplayCategories = () => {
-  //   if (!categories?.length || !menuConfig) return [];
-  
-  //   const { root } = menuConfig;
-  
-  //   // find configured root
-  //   const findRoot = (nodes) => {
-  //     for (const node of nodes) {
-  //       if (
-  //         String(node.id).toLowerCase() === String(root).toLowerCase() ||
-  //         String(node.name).toLowerCase() === String(root).toLowerCase()
-  //       ) {
-  //         return node;
-  //       }
-  //       if (node.children?.length) {
-  //         const found = findRoot(node.children);
-  //         if (found) return found;
-  //       }
-  //     }
-  //     return null;
-  //   };
-  
-  //   const rootNode = findRoot(categories);
-  //   if (!rootNode) return categories;
-  
-  //   // 🔥 KEY LOGIC:
-  //   // Skip one level
-  //   const flattenedGrandChildren = (rootNode.children || [])
-  //     .flatMap(child => child.children || []);
-  
-  //   // Add a virtual "All Categories" node
-  //   return [
-  //     {
-  //       ...rootNode,
-  //       id: rootNode.id,
-  //       name: "All Categories",
-  //       children: flattenedGrandChildren,
-  //       isVirtualRoot: true
-  //     }
-  //   ];
-  // };
-  
 
   const getDisplayCategories = () => {
     if (!categories?.length || !menuConfig) return [];
-  
+
     const { root } = menuConfig;
-  
+
     // find actual configured root node
     const findRoot = (nodes) => {
       for (const node of nodes) {
@@ -108,22 +66,18 @@ const MenuCategoryTree = ({
       }
       return null;
     };
-  
+
     const rootNode = findRoot(categories);
     if (!rootNode) return categories;
-  
-    // IMPORTANT:
-    // We DO NOT clone categories anymore.
-    // We only expose level-2 categories under a virtual root.
-  
+
     const visibleChildren = [];
-  
+
     for (const level1 of rootNode.children || []) {
       for (const level2 of level1.children || []) {
         visibleChildren.push(level2); // keep SAME object reference
       }
     }
-  
+
     return [
       {
         id: "__virtual_root__",
@@ -133,10 +87,8 @@ const MenuCategoryTree = ({
       }
     ];
   };
-  
-  const displayCategories = useMemo(() => getDisplayCategories(), [categories, menuConfig]);
 
-  
+  const displayCategories = useMemo(() => getDisplayCategories(), [categories, menuConfig]);
 
   const generateCategoryIdFromName = (name) => {
     const now = new Date();
@@ -160,9 +112,10 @@ const MenuCategoryTree = ({
       + "_" + timestamp
     );
   };
+
   const getCategoriesAtLevel = (nodes, targetLevel, level = 1) => {
     let result = [];
-  
+
     for (const node of nodes) {
       if (level === targetLevel) {
         result.push(node);
@@ -173,15 +126,16 @@ const MenuCategoryTree = ({
         );
       }
     }
-  
+
     return result;
   };
-  
-  const findPathById = (nodes, targetId, path = []) => {const quickMenuCategories = getCategoriesAtLevel(
-    categories,
-    MENU_HIERARCHY_LEVEL
-  );
-  
+
+  const findPathById = (nodes, targetId, path = []) => {
+    const quickMenuCategories = getCategoriesAtLevel(
+      categories,
+      MENU_HIERARCHY_LEVEL
+    );
+
     for (const node of nodes) {
       const newPath = [...path, node.id];
       if (node.id === targetId) return newPath;
@@ -192,13 +146,14 @@ const MenuCategoryTree = ({
     }
     return null;
   };
+
   useEffect(() => {
     if (!selectedCategoryId || !displayCategories.length) return;
-  
+
     const expandParents = (nodes, targetId, parents = []) => {
       for (const node of nodes) {
         if (node.id === targetId) return parents;
-  
+
         if (node.children?.length) {
           const found = expandParents(node.children, targetId, [...parents, node.id]);
           if (found) return found;
@@ -206,27 +161,25 @@ const MenuCategoryTree = ({
       }
       return null;
     };
-  
+
     const parents = expandParents(displayCategories, selectedCategoryId);
-  
+
     setExpandedCategories(prev => {
       const same =
         prev.length === (parents?.length || 0) &&
         prev.every((v, i) => v === parents[i]);
-  
+
       return same ? prev : parents || [];
     });
-  
+
   }, [selectedCategoryId, displayCategories]);
-  
-  
+
   useEffect(() => {
     if (!displayCategories.length) return;
-  
+
     setExpandedCategories([displayCategories[0].id]);
   }, [displayCategories]);
-  
-  
+
   const buildLocalParentMap = (cats) => {
     const map = {};
     const traverse = (nodes, parentId = null) => {
@@ -276,7 +229,6 @@ const MenuCategoryTree = ({
     setDragOverItem(category);
   };
 
-
   const handleDrop = async (e, targetCategory) => {
     e.preventDefault();
     e.stopPropagation();
@@ -298,7 +250,6 @@ const MenuCategoryTree = ({
       resetDragState();
     } catch (error) {
       console.error("Drop failed:", error);
-      alert("Failed to reorder categories");
       resetDragState();
     }
   };
@@ -530,10 +481,8 @@ const MenuCategoryTree = ({
     );
   };
 
-
   const handleEdit = (category) => {
     if (category.isVirtualRoot) {
-      alert("Cannot edit root category");
       return;
     }
     setEditingCategory(category);
@@ -541,17 +490,15 @@ const MenuCategoryTree = ({
     setEditDescription(category.description || "");
     setEditNewSubcategoryName("");
     setShowEditModal(true);
-  };  
+  };
 
   const handleDelete = (category) => {
     if (category.isVirtualRoot) {
-      alert("Cannot delete root category");
       return;
     }
     setDeleteTarget(category);
     setShowDeleteModal(true);
   };
-  
 
   // Add the missing callback handlers
   const handleNewCategoryNameChange = useCallback((e) => {
@@ -590,19 +537,51 @@ const MenuCategoryTree = ({
     setDeleteTarget(null);
   }, []);
 
+  // ── Shared slug helper (place above both handlers) ──────────────────────────
+  const buildSlugFromParentChain = async (newCatName, startParentId) => {
+    const parentChain = [];
+    let currentId = startParentId;
+    const visited = new Set();
+
+    while (currentId && !visited.has(currentId)) {
+      visited.add(currentId);
+      try {
+        const cat = await fetchCategoryById(currentId);
+        if (!cat) break;
+
+        parentChain.unshift(
+          (cat.name || "").trim().replace(/\s+/g, "_").replace(/[^a-zA-Z0-9_]/g, "")
+        );
+
+        // Use local tree to find next parent (API doesn't return parentId)
+        const parentFromTree = findParentIdFromTree(categories, currentId);
+        currentId = parentFromTree || null;
+
+      } catch {
+        break;
+      }
+    }
+
+    parentChain.push(
+      (newCatName || "").trim().replace(/\s+/g, "_").replace(/[^a-zA-Z0-9_]/g, "")
+    );
+
+    return "_" + parentChain.join("_");
+  };
+
+  // ── handleAddCategory ────────────────────────────────────────────────────────
   const handleAddCategory = async () => {
     if (!newCategoryName.trim()) return;
-  
+
     let userId = "system";
     try {
       userId = jwtDecode(token)?.user_id || userId;
-    } catch {}
-  
+    } catch { }
+
     const newId = generateCategoryIdFromName(newCategoryName);
-  
+
     try {
-  
-      // 1️⃣ create category
+      // 1️⃣ Create the new category
       await axios.post(
         `${import.meta.env.VITE_API_INVENTORY_SERVICE_URL}/${clientId}/menu/create_category`,
         {
@@ -616,24 +595,19 @@ const MenuCategoryTree = ({
         },
         { headers: { Authorization: `Bearer ${token}` } }
       );
-  
-      // 2️⃣ decide parent
+
+      // 2️⃣ Decide parent
       let parentId;
-  
-      // If nothing selected OR "All Categories" selected → root
-      if (
-        !selectedCategoryId ||
-        selectedCategoryId === menuConfig.root
-      ) {
+      if (!selectedCategoryId || selectedCategoryId === menuConfig.root) {
         parentId = menuConfig.root;
       } else {
         parentId = selectedCategoryId;
       }
-  
-      // 3️⃣ attach to parent
+
+      // 3️⃣ Attach new category to parent
       const parent = await fetchCategoryById(parentId);
       const existingSubs = parent?.subCategories?.map(c => c.id) || [];
-  
+
       await axios.post(
         `${import.meta.env.VITE_API_INVENTORY_SERVICE_URL}/${clientId}/menu/update_category`,
         {
@@ -646,16 +620,34 @@ const MenuCategoryTree = ({
         },
         { headers: { Authorization: `Bearer ${token}` } }
       );
-  
+
+      // 4️⃣ Build full hierarchical slug by walking up the tree
+      // e.g. _dietery_NonVeg_Gravies_NewCategory
+      const slug = await buildSlugFromParentChain(newCategoryName, parentId);
+
+      // 5️⃣ Save the slug on the newly created category
+      await axios.post(
+        `${import.meta.env.VITE_API_INVENTORY_SERVICE_URL}/${clientId}/menu/update_category`,
+        {
+          id: newId,
+          client_id: clientId,
+          name: newCategoryName.trim(),
+          description: newCategoryDescription.trim(),
+          slug,
+          overwrite_subcategories: false,
+        },
+        { headers: { Authorization: `Bearer ${token}` } }
+      );
+
       closeAddModal();
       onCategoriesUpdate?.();
-  
+
     } catch (err) {
       console.error(err);
-      alert("Failed to add category");
     }
-  };  
+  };
 
+  // ── handleEditCategory ───────────────────────────────────────────────────────
   const handleEditCategory = async () => {
     if (!editingCategory) return;
 
@@ -684,6 +676,24 @@ const MenuCategoryTree = ({
           { headers: { Authorization: `Bearer ${token}` } }
         );
 
+        const subSlug = await buildSlugFromParentChain(
+          editNewSubcategoryName,
+          editingCategory.id
+        );
+
+        await axios.post(
+          `${import.meta.env.VITE_API_INVENTORY_SERVICE_URL}/${clientId}/menu/update_category`,
+          {
+            id: newSubId,
+            client_id: clientId,
+            name: editNewSubcategoryName.trim(),
+            description: "",
+            slug: subSlug,
+            overwrite_subcategories: false,
+          },
+          { headers: { Authorization: `Bearer ${token}` } }
+        );
+
         finalSubs.push(newSubId);
       }
 
@@ -700,18 +710,16 @@ const MenuCategoryTree = ({
         { headers: { Authorization: `Bearer ${token}` } }
       );
 
-      // regenerate slugs
       await updateSlugsRecursively(editingCategory.id);
 
       closeEditModal();
       onCategoriesUpdate?.();
+
     } catch (err) {
       console.error(err);
-      alert("Failed to update category");
     }
   };
 
-  // Add missing handleDeleteCategory function
   const handleDeleteCategory = async () => {
     if (!deleteTarget) return;
 
@@ -728,16 +736,13 @@ const MenuCategoryTree = ({
       );
 
       closeDeleteModal();
-      alert("✅ Category deleted successfully!");
 
       if (onCategoriesUpdate) onCategoriesUpdate();
     } catch (err) {
       console.error("Delete error:", err.response?.data || err);
-      alert(err.response?.data?.detail || "Failed to delete category");
     }
   };
 
-  // Add missing mobile categories render function
   const flattenAllCategories = (cats) => {
     let flat = [];
     const traverse = (items) => {

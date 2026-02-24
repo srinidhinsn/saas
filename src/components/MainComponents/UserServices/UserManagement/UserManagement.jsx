@@ -67,6 +67,14 @@ const getLoggedInUserId = (token) => {
     return null;
   }
 };
+const getLoginClientId = (token) => {
+  try {
+    const payload = JSON.parse(atob(token.split(".")[1]));
+    return payload.client_id || null;
+  } catch {
+    return null;
+  }
+};
 const normalizeRoles = (data) => {
   if (!Array.isArray(data)) return [];
 
@@ -106,17 +114,18 @@ const usePermissions = (token, clientId) => {
 
 
 
-const UserManagement = ({ token, clientId }) => {
+const UserManagement = ({ token, clientId, screenIds = [] }) => {
   const [activeView, setActiveView] = useState('list');
   const [selectedUser, setSelectedUser] = useState(null);
-
+  const loginClientId = useMemo(() => getLoginClientId(token), [token]);
+  const isSuperAdmin = loginClientId === "superadmin";
   return (
     <div className="min-h-screen bg-bg-primary">
       {/* Content */}
       <div className="max-w-7xl mx-auto p-4">
         {activeView === 'list' && (
           <UsersList
-            clientId={clientId}
+            clientId={clientId}isSuperAdminScreen={isSuperAdmin}
             token={token}
             onAddNew={() => setActiveView('add')}
             onEdit={(user) => {
@@ -147,7 +156,7 @@ const UserManagement = ({ token, clientId }) => {
 };
 
 // Users List Component
-const UsersList = ({ onAddNew, clientId, token, onEdit }) => {
+const UsersList = ({ onAddNew, clientId, token, onEdit,isSuperAdminScreen}) => {
 
   const [users, setUsers] = useState([]);
   const [filterRole, setFilterRole] = useState("all");
@@ -451,17 +460,18 @@ const UsersList = ({ onAddNew, clientId, token, onEdit }) => {
                 Delete
               </button>
 
-              <button
-                onClick={navigator}
-                className="flex items-center justify-center gap-2
-             px-3 py-2.5 rounded-lg
-             border border-border-default
-             bg-bg-primary text-text-primary w-full"
-              >
-                <FaUserShield />
-                Config
-              </button>
-
+              {isSuperAdminScreen && (
+                <button
+                  onClick={navigator}
+                  className="flex items-center justify-center gap-2
+    px-3 py-2.5 rounded-lg
+    border border-border-default
+    bg-bg-primary text-text-primary w-full"
+                >
+                  <FaUserShield />
+                  Config
+                </button>
+              )}
             </div>
 
             {/* Desktop / Tablet actions */}
@@ -492,13 +502,15 @@ const UsersList = ({ onAddNew, clientId, token, onEdit }) => {
                 Delete Role
               </button>
 
-              <button
-                onClick={navigator}
-                className="flex items-center gap-2 px-4 py-2 rounded-lg border"
-              >
-                <FaUserShield />
-                Role Config
-              </button>
+              {isSuperAdminScreen && (
+                <button
+                  onClick={navigator}
+                  className="flex items-center gap-2 px-4 py-2 rounded-lg border"
+                >
+                  <FaUserShield />
+                  Role Config
+                </button>
+              )}
             </div>
           </div>
 
