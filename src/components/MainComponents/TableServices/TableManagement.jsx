@@ -1073,7 +1073,6 @@ const statusConfig = {
 
 const TableManagement = ({ clientId, token, screenIds, userId }) => {
 
-    console.log("requesterId", userId)
     const [searchTerm, setSearchTerm] = useState("");
     const [tableRanges, setTableRanges] = useState([]);
     const [tables, setTables] = useState([]);

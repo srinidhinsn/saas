@@ -9,6 +9,7 @@ import 'react-toastify/dist/ReactToastify.css';
 import Headers_V1 from './components/V1_Components/Headers/Headers_V1';
 import Super_Admin_Header from './components/Super_Admin/Headers/Super_Admin_Header';
 import { setupAuthInterceptor } from './components/utils/authInterceptor';
+import Header_Super_User from './components/Super_User/Header/Header_Super_User';
 
 const LoginWrapper = ({ onLoginSuccess }) => {
   const { clientId } = useParams();
@@ -23,6 +24,9 @@ const HeaderSwitcher = ({ clientId, onLogout }) => {
   }
   if (screenId === 'super_admin_v1') {
     return <Super_Admin_Header clientId={clientId} onLogout={onLogout} />;
+  }
+  if (screenId === 'super_user_v1') {
+    return <Header_Super_User clientId={clientId} onLogout={onLogout} />;
   }
   // default fallback
   return <HeaderShared clientId={clientId} onLogout={onLogout} />;
