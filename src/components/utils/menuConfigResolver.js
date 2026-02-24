@@ -24,7 +24,7 @@ export function getMenuConfig(clientId) {
       Number(import.meta.env.VITE_MENU_HIERARCHY_LEVEL) ||
       2;
   
-    console.log("RESOLVED CONFIG =", { root, level });
+    // console.log("RESOLVED CONFIG =", { root, level });
   
     return { root, level };
   }
