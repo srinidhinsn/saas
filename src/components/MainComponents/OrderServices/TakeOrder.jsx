@@ -4769,6 +4769,8 @@
 
 
 
+
+
 import React, { useState, useEffect, useRef } from 'react';
 import { ShoppingCart, Plus, Minus, X, Check, Search, Users, Package, Trash2, ArrowLeft, FileText, Printer as PrinterIcon, Clock } from 'lucide-react';
 import axios from 'axios';
@@ -4881,21 +4883,17 @@ const TableReservation = ({ tables=[], orderMode="dinein", onSelectTable, onSele
                     const orderInfo = tableOrders[table.id];
                     const hasViewableOrder = (statusKey === 'occupied' || statusKey === 'served') && orderInfo;
 
-                    // ── Timer from root created_at (oldest sub-order) ──────────
                     const rootCreatedAt = orderInfo?.created_at;
                     const elapsedTime   = rootCreatedAt ? calcElapsed(rootCreatedAt) : null;
 
-                    // ── Order count & total from merged group ─────────────────
                     const orderCount = orderInfo?.order_count || 1;
                     const totalPrice = orderInfo?.total_price ? `₹${Number(orderInfo.total_price).toFixed(0)}` : null;
 
                     return (
                       <div key={table.id} className="rounded-xl overflow-hidden border shadow-sm hover:shadow-md transition bg-white">
-                        {/* Clickable area */}
                         <div onClick={() => { if (config.clickable) onSelectTable(table); else if (hasViewableOrder && onViewOrder) onViewOrder(table); }}
                           className={`${config.clickable || hasViewableOrder ? 'cursor-pointer' : ''}`}>
 
-                          {/* Header row: table number | status | order id */}
                           <div className="flex justify-between items-center px-3 py-2 bg-action-primary text-white">
                             <span className="font-bold text-lg tracking-wide">{table.table_number}</span>
                             {hasViewableOrder && (
@@ -4909,27 +4907,24 @@ const TableReservation = ({ tables=[], orderMode="dinein", onSelectTable, onSele
                               </span>
                             )}
                             {hasViewableOrder && (
-                              <span className="text-xs opacity-80 font-mono">#{orderInfo.dinein_order_id || orderInfo.id}</span>
+                              <span className="text-xl opacity-80 font-bold">#{orderInfo.dinein_order_id || orderInfo.id}</span>
                             )}
                           </div>
 
-                          {/* Body: icon area | CENTER: order count + total | actions */}
                           <div className={`p-3 flex items-center justify-between gap-2
                             ${statusKey === 'occupied' ? 'text-blue-600 bg-blue-50'     :
                               statusKey === 'served'   ? 'text-purple-600 bg-purple-50' :
                               statusKey === 'reserved' ? 'text-yellow-600 bg-yellow-50' :
                               'text-green-600 bg-green-50'}`}>
 
-                            {/* Left icon */}
                             {statusKey === 'vacant'   && <span className="text-2xl text-green-400">—</span>}
                             {(statusKey === 'occupied' || statusKey === 'served') && <Eye size={22}/>}
                             {statusKey === 'reserved' && <Lock size={22}/>}
 
-                            {/* ★ Centre: order count + total price */}
                             {hasViewableOrder && (
                               <div className="flex flex-col items-center flex-1">
                                 <span className="text-xs font-bold text-gray-700">
-                                  {orderCount} order{orderCount !== 1 ? 's' : ''}
+                                  {orderCount} time orderd
                                 </span>
                                 {totalPrice && (
                                   <span className="text-sm font-bold text-action-primary">{totalPrice}</span>
@@ -4937,7 +4932,6 @@ const TableReservation = ({ tables=[], orderMode="dinein", onSelectTable, onSele
                               </div>
                             )}
 
-                            {/* Right: print + delete */}
                             {hasViewableOrder && (
                               <div className="flex gap-2">
                                 <button onClick={e => { e.stopPropagation(); onPrintBill && onPrintBill(orderInfo.id, table.id); }}
@@ -4952,7 +4946,6 @@ const TableReservation = ({ tables=[], orderMode="dinein", onSelectTable, onSele
                             )}
                           </div>
 
-                          {/* Timer row — from root created_at */}
                           {hasViewableOrder && elapsedTime && (
                             <div className="px-3 py-1.5 bg-gray-50 border-t border-gray-100">
                               <div className="flex items-center justify-center gap-1 text-xs font-semibold text-gray-600">
@@ -4963,7 +4956,6 @@ const TableReservation = ({ tables=[], orderMode="dinein", onSelectTable, onSele
                           )}
                         </div>
 
-                        {/* Mark as served CTA */}
                         {hasViewableOrder && orderInfo.status === 'ready' && (
                           <button onClick={e => { e.stopPropagation(); onMarkAsServed && onMarkAsServed(orderInfo.id, table.id); }}
                             className="w-full px-4 py-2 bg-green-600 text-white text-sm font-semibold hover:bg-green-700 transition-colors">
@@ -5041,6 +5033,143 @@ const DeleteConfirmModal = ({ isOpen, onClose, onConfirm }) => {
   );
 };
 
+// ─── KOT Print utility ───────────────────────────────────────────────────────
+/**
+ * Groups cart items by counter and triggers a print window.
+ *
+ * counterTree  – array of counter nodes, each with { id, name, subCategories: [{id}] }
+ * categoriesFlat – flat list of { id, name, parentId }
+ * itemsToPrint – array of cart items to print (new items only, or all for re-print)
+ * meta         – { tableNumber, orderMode, dineinOrderId, timestamp }
+ */
+const printKOT = ({ counterTree, categoriesFlat, itemsToPrint, meta }) => {
+  // Build a map: categoryId → counterId  (walk up the tree for each item's category)
+  const getCategoryAncestors = (categoryId) => {
+    const ancestors = new Set();
+    let cur = categoryId;
+    const visited = new Set();
+    while (cur && !visited.has(cur)) {
+      visited.add(cur);
+      ancestors.add(cur);
+      const cat = categoriesFlat.find(c => c.id === cur);
+      cur = cat?.parentId || null;
+    }
+    return ancestors;
+  };
+
+  // Build: Set of category IDs assigned to each counter
+  // counterTree node: { id, name, subCategories: [{ id }] }
+  const counterCategoryMap = {}; // counterId → Set<categoryId>
+  counterTree.forEach(counter => {
+    const assigned = new Set((counter.subCategories || []).map(sc => sc.id));
+    counterCategoryMap[counter.id] = assigned;
+  });
+
+  // For each item find which counter it belongs to
+  const findCounterForItem = (item) => {
+    const ancestors = getCategoryAncestors(item.category_id || item.category);
+    for (const counter of counterTree) {
+      const assigned = counterCategoryMap[counter.id];
+      for (const catId of assigned) {
+        if (ancestors.has(catId)) return counter;
+      }
+    }
+    return null; // unassigned
+  };
+
+  // Group items by counter
+  const groups = {}; // counterId or '__unassigned__' → { counterName, items[] }
+  itemsToPrint.forEach(item => {
+    const counter = findCounterForItem(item);
+    const key = counter ? counter.id : '__unassigned__';
+    const name = counter ? counter.name : 'General Kitchen';
+    if (!groups[key]) groups[key] = { counterName: name, items: [] };
+    groups[key].items.push(item);
+  });
+
+  const groupEntries = Object.entries(groups);
+  if (groupEntries.length === 0) {
+    toast.warn('No items to print KOT for.');
+    return;
+  }
+
+  // Build print HTML — one page per counter
+  const now = new Date();
+  const timeStr = now.toLocaleTimeString([], { hour: '2-digit', minute: '2-digit' });
+  const dateStr = now.toLocaleDateString();
+
+  const slipHtml = groupEntries.map(([, group]) => {
+    const rows = group.items.map(item => `
+      <tr>
+        <td style="padding:4px 2px;border-bottom:1px dashed #ccc;font-size:13px;">${item.name}${item.is_addon ? ' <span style="font-size:10px;color:#888;">(add-on)</span>' : ''}</td>
+        <td style="padding:4px 2px;border-bottom:1px dashed #ccc;font-size:13px;text-align:center;font-weight:bold;">${item.quantity}</td>
+        ${item.note ? `<td style="padding:4px 2px;border-bottom:1px dashed #ccc;font-size:11px;color:#555;font-style:italic;">${item.note}</td>` : '<td></td>'}
+      </tr>
+    `).join('');
+
+    return `
+      <div class="kot-slip">
+        <div style="text-align:center;border-bottom:2px solid #000;padding-bottom:6px;margin-bottom:8px;">
+          <div style="font-size:16px;font-weight:bold;letter-spacing:1px;">KOT</div>
+          <div style="font-size:13px;font-weight:bold;margin-top:2px;">Counter: ${group.counterName}</div>
+        </div>
+        <div style="display:flex;justify-content:space-between;font-size:11px;margin-bottom:6px;">
+          <span>${meta.orderMode === 'takeaway' ? '🛍 Takeaway' : `Table: ${meta.tableNumber}`}</span>
+          <span>${dateStr} ${timeStr}</span>
+        </div>
+        ${meta.dineinOrderId ? `<div style="font-size:11px;margin-bottom:6px;color:#555;">Order #${meta.dineinOrderId}</div>` : ''}
+        <table style="width:100%;border-collapse:collapse;">
+          <thead>
+            <tr style="border-bottom:2px solid #000;">
+              <th style="text-align:left;font-size:12px;padding:3px 2px;">Item</th>
+              <th style="text-align:center;font-size:12px;padding:3px 2px;">Qty</th>
+              <th style="text-align:left;font-size:12px;padding:3px 2px;">Note</th>
+            </tr>
+          </thead>
+          <tbody>${rows}</tbody>
+        </table>
+        <div style="text-align:center;margin-top:10px;font-size:11px;color:#888;">— End of KOT —</div>
+      </div>
+    `;
+  }).join('<div class="page-break"></div>');
+
+  const printWindow = window.open('', '_blank', 'width=400,height=600');
+  if (!printWindow) {
+    toast.error('Popup blocked. Please allow popups to print KOT.');
+    return;
+  }
+
+  printWindow.document.write(`
+    <!DOCTYPE html>
+    <html>
+    <head>
+      <title>KOT</title>
+      <style>
+        * { margin: 0; padding: 0; box-sizing: border-box; }
+        body { font-family: 'Courier New', monospace; background: #fff; }
+        .kot-slip { width: 72mm; padding: 8px; margin: 0 auto; }
+        .page-break { page-break-after: always; }
+        @media print {
+          body { -webkit-print-color-adjust: exact; }
+          .kot-slip { page-break-inside: avoid; }
+          .page-break { page-break-after: always; height: 0; }
+        }
+      </style>
+    </head>
+    <body>
+      ${slipHtml}
+      <script>
+        window.onload = function() {
+          window.print();
+          window.onafterprint = function() { window.close(); };
+        };
+      </script>
+    </body>
+    </html>
+  `);
+  printWindow.document.close();
+};
+
 // ─── Main TakeOrder component ─────────────────────────────────────────────────
 const TakeOrder = ({ clientId, token, onOrderUpdate, realm }) => {
   const [searchQuery, setSearchQuery]   = useState('');
@@ -5076,6 +5205,9 @@ const TakeOrder = ({ clientId, token, onOrderUpdate, realm }) => {
   const [invoiceOrderData, setInvoiceOrderData] = useState(null);
   const [inventoryMap, setInventoryMap] = useState({});
   const [selectedCategoryId, setSelectedCategoryId] = useState(null);
+
+  // ─── KOT: counter tree state ──────────────────────────────────────────────
+  const [counterTree, setCounterTree]   = useState([]);
 
   // ─── Utils ───────────────────────────────────────────────────────────────
   const flattenCategoryTree = (tree, level = 0, parentId = null) => {
@@ -5138,6 +5270,23 @@ const TakeOrder = ({ clientId, token, onOrderUpdate, realm }) => {
     return null;
   };
 
+  // ─── Fetch counter tree for KOT ──────────────────────────────────────────
+  const fetchCounterTree = async () => {
+    try {
+      const res = await axios.get(
+        `${import.meta.env.VITE_API_INVENTORY_SERVICE_URL}/${clientId}/menu/read_category`,
+        {
+          params: { client_id: clientId, category_id: 'counter' },
+          headers: { Authorization: `Bearer ${token}` },
+        }
+      );
+      const root = res.data.data?.[0];
+      setCounterTree(root?.subCategories || []);
+    } catch (err) {
+      console.error('Failed to fetch counter tree:', err);
+    }
+  };
+
   // ─── Fetch ───────────────────────────────────────────────────────────────
   const fetchTables = async () => {
     const res = await axios.get(`${import.meta.env.VITE_API_TABLE_SERVICE_URL}/${clientId}/tables/read`, { headers: { Authorization: `Bearer ${token}` } });
@@ -5163,7 +5312,7 @@ const TakeOrder = ({ clientId, token, onOrderUpdate, realm }) => {
             id:              o.id,
             dinein_order_id: o.dinein_order_id,
             status:          o.status,
-            created_at:      o.created_at,     // ★ root created_at (oldest)
+            created_at:      o.created_at,
             order_count:     o.order_count || 1,
             total_price:     o.total_price || 0,
           };
@@ -5238,6 +5387,42 @@ const TakeOrder = ({ clientId, token, onOrderUpdate, realm }) => {
     finally { setLoading(false); }
   };
 
+  // ─── KOT print handler ────────────────────────────────────────────────────
+  /**
+   * By default prints only the NEW items (the current unsaved batch).
+   * If there are no new items but there are old items (re-print scenario), prints all.
+   */
+  const handlePrintKOT = () => {
+    // Prefer printing only unsaved new items; fall back to all cart items
+    const itemsToPrint = newItems.length > 0 ? newItems : cart;
+
+    if (itemsToPrint.length === 0) {
+      toast.warn('No items to print KOT for.');
+      return;
+    }
+
+    // Enrich items with category_id from menuItems if missing
+    const enriched = itemsToPrint.map(ci => {
+      if (ci.category_id) return ci;
+      const mi = menuItems.find(m => Number(m.id) === Number(ci.id));
+      return { ...ci, category_id: mi?.category_id || null };
+    });
+
+    const tableObj = tables.find(t => t.id.toString() === selectedTable);
+
+    printKOT({
+      counterTree,
+      categoriesFlat,
+      itemsToPrint: enriched,
+      meta: {
+        tableNumber:    tableObj?.table_number || selectedTable,
+        orderMode,
+        dineinOrderId:  activeDineinOrderId,
+        timestamp:      new Date(),
+      },
+    });
+  };
+
   useEffect(() => {
     const onBack = e => { if (currentView === 'order') { e.preventDefault(); setCurrentView('floor'); setShowCart(false); window.history.pushState({ view: 'floor' }, ''); } };
     window.addEventListener('popstate', onBack); return () => window.removeEventListener('popstate', onBack);
@@ -5249,7 +5434,8 @@ const TakeOrder = ({ clientId, token, onOrderUpdate, realm }) => {
       if (!clientId || !token || !menuConfig) return;
       try {
         setLoading(true);
-        await fetchTables();
+        // Fetch counter tree alongside other data
+        await Promise.all([fetchTables(), fetchCounterTree()]);
         const [catRes, itemRes, invRes] = await Promise.all([
           axios.get(`${import.meta.env.VITE_API_INVENTORY_SERVICE_URL}/${clientId}/menu/read_category?category_id=${menuConfig.root}`, { headers: { Authorization: `Bearer ${token}` } }),
           axios.get(`${import.meta.env.VITE_API_INVENTORY_SERVICE_URL}/${clientId}/menu/read?inventory_id=menu`, { headers: { Authorization: `Bearer ${token}` } }),
@@ -5311,10 +5497,12 @@ const TakeOrder = ({ clientId, token, onOrderUpdate, realm }) => {
     const uKey = `${item.id}_${ts}`;
     let batch  = currentBatchTimestamp;
     if (!batch) { batch = Date.now(); setCurrentBatchTimestamp(batch); }
+    // Preserve category_id for KOT counter lookup
     setCart(prev => [...prev, {
       id: Number(item.id), name: item.name, unit_price: item.unit_price || 0,
       image_id: item.image_id, discount: item.discount || 0, slug: item.slug,
-      category: item.category_name, quantity: 1, note: "",
+      category: item.category_name, category_id: item.category_id || null,
+      quantity: 1, note: "",
       frontend_unique_key: uKey, batch_timestamp: batch,
       is_new_item: true, saved_sub_order: false,
       parent_item_key: parentItemKey, is_addon: !!parentItemKey,
@@ -5329,7 +5517,8 @@ const TakeOrder = ({ clientId, token, onOrderUpdate, realm }) => {
     setCart(prev => [...prev, {
       id: Number(selectedMainItem.id), name: selectedMainItem.name, unit_price: selectedMainItem.unit_price || 0,
       image_id: selectedMainItem.image_id, discount: selectedMainItem.discount || 0, slug: selectedMainItem.slug,
-      category: selectedMainItem.category_name, quantity: 1, note: "",
+      category: selectedMainItem.category_name, category_id: selectedMainItem.category_id || null,
+      quantity: 1, note: "",
       frontend_unique_key: mKey, batch_timestamp: batch, is_new_item: true, saved_sub_order: false, has_addons: selectedAddonIds.length > 0,
     }]);
     lineItemsDetails.filter(i => selectedAddonIds.includes(i.id)).forEach(addon => {
@@ -5337,7 +5526,8 @@ const TakeOrder = ({ clientId, token, onOrderUpdate, realm }) => {
       setCart(prev => [...prev, {
         id: Number(addon.id), name: addon.name, unit_price: addon.unit_price || 0,
         image_id: addon.image_id, discount: addon.discount || 0, slug: addon.slug,
-        category: addon.category_name, quantity: 1, note: "",
+        category: addon.category_name, category_id: addon.category_id || null,
+        quantity: 1, note: "",
         frontend_unique_key: aKey, batch_timestamp: batch, is_new_item: true, saved_sub_order: false,
         parent_item_key: mKey, is_addon: true,
       }]);
@@ -5353,7 +5543,8 @@ const TakeOrder = ({ clientId, token, onOrderUpdate, realm }) => {
     setCart(prev => [...prev, {
       id: Number(selectedMainItem.id), name: selectedMainItem.name || 'Unnamed Item', unit_price: selectedMainItem.unit_price || 0,
       image_id: selectedMainItem.image_id, discount: selectedMainItem.discount || 0, slug: selectedMainItem.slug,
-      category: selectedMainItem.category_name, quantity: 1, note: "",
+      category: selectedMainItem.category_name, category_id: selectedMainItem.category_id || null,
+      quantity: 1, note: "",
       frontend_unique_key: uKey, batch_timestamp: batch, is_new_item: true, saved_sub_order: false,
     }]);
     setLineItemsModalOpen(false); setSelectedMainItem(null); setLineItemsDetails([]);
@@ -5375,7 +5566,6 @@ const TakeOrder = ({ clientId, token, onOrderUpdate, realm }) => {
     }).filter(Boolean));
   };
 
-  // ★ Total = sum of unit_price * qty (no GST/CST)
   const getTotalPrice = () => cart.reduce((t, i) => t + (i.unit_price || 0) * i.quantity, 0).toFixed(2);
 
   // ─── Place order ──────────────────────────────────────────────────────────
@@ -5396,7 +5586,6 @@ const TakeOrder = ({ clientId, token, onOrderUpdate, realm }) => {
           toast.success(`Sub-order ${r.data.data.dinein_order_id} created!`);
         }
       } else {
-        // ★ Fresh order — total = sum of items, no GST/CST
         const total = cart.reduce((s, i) => s + (i.unit_price || 0) * i.quantity, 0);
         await axios.post(
           `${import.meta.env.VITE_API_ORDER_SERVICE_URL}/${clientId}/dinein/create`,
@@ -5445,7 +5634,6 @@ const TakeOrder = ({ clientId, token, onOrderUpdate, realm }) => {
       setHasNewItems(false);
       setCurrentBatchTimestamp(null);
 
-      // ★ All server items are old/read-only + carry item status for display
       const reconstructedCart = (activeOrder.items || []).map(item => {
         const menuItem = menuItems.find(mi => Number(mi.id) === Number(item.item_id));
         return {
@@ -5458,12 +5646,13 @@ const TakeOrder = ({ clientId, token, onOrderUpdate, realm }) => {
           discount:             menuItem?.discount || 0,
           slug:                 item.slug || menuItem?.slug,
           category:             menuItem?.category_name,
+          category_id:          menuItem?.category_id || null,   // ★ preserve for KOT
           frontend_unique_key:  item.frontend_unique_key,
           batch_timestamp:      null,
           is_new_item:          false,
           saved_sub_order:      true,
-          status:               item.status || "pending",    // ★ item-level status
-          batch_label:          item.batch_label,            // ★ sub-order label
+          status:               item.status || "pending",
+          batch_label:          item.batch_label,
           sub_order_id:         item.sub_order_id,
         };
       });
@@ -5506,7 +5695,7 @@ const TakeOrder = ({ clientId, token, onOrderUpdate, realm }) => {
     return grouped;
   };
 
-  // ─── Old item row (read-only) with status badge + batch label ────────────
+  // ─── Old item row (read-only) ─────────────────────────────────────────────
   const OldItemRow = ({ group }) => {
     const { main, addons } = group;
     return (
@@ -5522,7 +5711,6 @@ const TakeOrder = ({ clientId, token, onOrderUpdate, realm }) => {
             <div className="min-w-0 flex-1">
               <h4 className="text-sm font-semibold truncate text-gray-800">{main.name}</h4>
               <p className="text-xs font-bold text-action-primary">₹{(main.unit_price - (main.discount || 0)).toFixed(2)}</p>
-              {/* ★ Sub-order label + item status */}
               <div className="flex items-center gap-1.5 mt-1 flex-wrap">
                 {main.batch_label && main.batch_label !== activeDineinOrderId && (
                   <span className="text-xs text-orange-500 font-mono font-semibold">#{main.batch_label}</span>
@@ -5638,7 +5826,6 @@ const TakeOrder = ({ clientId, token, onOrderUpdate, realm }) => {
                             )}
                             {activeDineinOrderId && <span className="text-xs text-gray-500 font-mono">#{activeDineinOrderId}</span>}
                           </div>
-                          {/* ★ Total price — no GST/CST */}
                           <span className="text-base font-bold text-red-600">₹{getTotalPrice()}</span>
                         </div>
                       </div>
@@ -5725,7 +5912,15 @@ const TakeOrder = ({ clientId, token, onOrderUpdate, realm }) => {
                             </button>
                             <button onClick={handleBillFromCart} className="py-2 rounded-lg text-sm font-semibold bg-green-600 text-white hover:bg-green-700 flex items-center justify-center gap-1"><FileText size={16}/>Bill</button>
                             <button onClick={handleClearCart} className="py-2 border rounded-lg text-sm hover:bg-gray-100">Clear</button>
-                            <button onClick={() => toast.info('Print KOT coming soon')} className="py-2 border rounded-lg text-sm hover:bg-gray-100 flex items-center justify-center gap-1"><PrinterIcon size={16}/>Print KOT</button>
+                            {/* ★ Updated Print KOT button — now triggers counter-grouped KOT print */}
+                            <button
+                              onClick={handlePrintKOT}
+                              disabled={cart.length === 0}
+                              className={`py-2 border rounded-lg text-sm flex items-center justify-center gap-1 transition-colors
+                                ${cart.length > 0 ? 'hover:bg-gray-100 text-gray-700' : 'opacity-40 cursor-not-allowed text-gray-400'}`}
+                            >
+                              <PrinterIcon size={16}/>Print KOT
+                            </button>
                           </div>
                         </>
                       )}
