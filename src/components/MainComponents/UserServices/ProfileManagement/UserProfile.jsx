@@ -44,15 +44,11 @@ export default function UserProfile({clientId, token}) {
       }
 
       const apiUrl = `${import.meta.env.VITE_API_USER_SERVICE_URL}/${clientId}/users/person-details`;
-      console.log("Fetching profile from:", apiUrl);
-      console.log("Token available:", !!token);
 
       try {
         const res = await axios.get(apiUrl, { 
           headers: { Authorization: `Bearer ${token}` } 
         });
-        
-        console.log("Profile response:", res.data);
         
         if (res.data?.data?.person) {
           const p = res.data.data.person;

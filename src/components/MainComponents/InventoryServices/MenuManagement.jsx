@@ -33,7 +33,7 @@ const MenuManagement = ({ clientId, token, realm }) => {
   const [sidebarCategories, setSidebarCategories] = useState([]);
   // const MENU_ROOT = import.meta.env.VITE_MENU_DEFAULT_ROOT || "dietery";
   // const MENU_LEVEL = Number(import.meta.env.VITE_MENU_HIERARCHY_LEVEL || 2);
-
+  const savedCategoryRef = useRef(localStorage.getItem("menu_selected_category"));
   const menuConfig = React.useMemo(() => {
     if (!clientId) return null;
     return getMenuConfig(clientId);
@@ -381,7 +381,7 @@ const MenuManagement = ({ clientId, token, realm }) => {
     };
 
     initializeData();
-  }, [ fetchAddonData]);
+  }, [fetchAddonData]);
 
   const handleAddItem = async () => {
     try {
@@ -655,7 +655,7 @@ const MenuManagement = ({ clientId, token, realm }) => {
           quickCategories = getCategoriesAtLevel(rootNode, level);
 
           if (quickCategories.length > 0) {
-        
+
             break;
           }
 
@@ -667,8 +667,10 @@ const MenuManagement = ({ clientId, token, realm }) => {
       // 3️⃣ Set them
       setDieterySubCategories(quickCategories);
 
-      // Sidebar should still show full tree
-      setSidebarCategories(categoryTree);
+      // Only show full tree if no saved category
+      if (!savedCategoryRef.current) {
+        setSidebarCategories(categoryTree);
+      }
 
     } catch (error) {
       console.error('Error fetching data:', error);
@@ -1076,8 +1078,8 @@ const MenuManagement = ({ clientId, token, realm }) => {
     }
     return v;
   };
-  
-  
+
+
   const num = (v) => {
     if (
       v === "" ||
@@ -1090,8 +1092,8 @@ const MenuManagement = ({ clientId, token, realm }) => {
     const n = Number(v);
     return isNaN(n) ? 0 : n;
   };
-  
-  
+
+
   const handleImportFromExcel = (e) => {
     if (!categoriesFlat.length) {
       e.target.value = "";
@@ -1187,61 +1189,61 @@ Other categories will NOT be affected.`
             const payload = {
               client_id: clientId,
               inventory_id: clean(row.Inventory_Id),
-            
+
               name: row.Name?.trim(),
               description: clean(row.Description),
-            
+
               category_id: categoryId,
               realm: clean(row.Realm) || realm || null,
-            
+
               code: row.Code != null && !isNaN(row.Code)
-              ? String(row.Code)
-              : clean(row.Code),
-            
-            
+                ? String(row.Code)
+                : clean(row.Code),
+
+
               serving_quantity: clean(row.Serving_Quantity),
               serving_unit: clean(row.Serving_Unit),
               unit: clean(row.Unit),
               image_id: clean(row.Image),
-            
+
               unit_price: num(row.Unit_Price),
               unit_cst: num(row.Unit_CST),
               unit_gst: num(row.Unit_GST),
               unit_total_price: num(row.Total_Unit_Price),
-            
+
               cst: num(row.CST),
               gst: num(row.GST),
               discount: num(row.Discount),
               total_price: num(row.Total_Price),
-            
+
               slug: generatedSlug,   // ⭐⭐⭐ THIS FIXES 422
-            
+
               line_item_id: row.Line_Item_IDs
-              ? row.Line_Item_IDs
+                ? row.Line_Item_IDs
                   .split(",")
                   .map(v => parseInt(v.trim(), 10))
                   .filter(v => !isNaN(v))
-              : null,
-            
-            
-                recipe: recipe && typeof recipe === "object" && !Array.isArray(recipe)
+                : null,
+
+
+              recipe: recipe && typeof recipe === "object" && !Array.isArray(recipe)
                 ? recipe
-                : null,              
+                : null,
               created_by,
               updated_by
             };
-            
 
-           await axios.post(
-  `${import.meta.env.VITE_API_INVENTORY_SERVICE_URL}/${clientId}/menu/create`,
-  payload,
-  {
-    headers: {
-      Authorization: `Bearer ${token}`,
-      "Content-Type": "application/json"
-    }
-  }
-);
+
+            await axios.post(
+              `${import.meta.env.VITE_API_INVENTORY_SERVICE_URL}/${clientId}/menu/create`,
+              payload,
+              {
+                headers: {
+                  Authorization: `Bearer ${token}`,
+                  "Content-Type": "application/json"
+                }
+              }
+            );
 
 
             successCount++;
@@ -1282,7 +1284,30 @@ Other categories will NOT be affected.`
       setSelectAllChecked(false);
     }
   };
+  useEffect(() => {
+    if (!categories?.length) return;
 
+    const saved = savedCategoryRef.current;
+    if (!saved) return;
+
+    const findNode = (nodes, id) => {
+      for (const node of nodes) {
+        if (node.id === id) return node;
+        if (node.children?.length) {
+          const found = findNode(node.children, id);
+          if (found) return found;
+        }
+      }
+      return null;
+    };
+
+    const node = findNode(categories, saved);
+
+    if (node) {
+      setSelectedCategoryId(saved);
+      setSidebarCategories([node]);
+    }
+  }, [categories]);
   useEffect(() => {
     if (searchOpen && searchInputRef.current) {
       const t = setTimeout(() => searchInputRef.current.focus(), 80);
@@ -1372,7 +1397,10 @@ Other categories will NOT be affected.`
               <MenuCategoryTree
                 categories={sidebarCategories}
                 selectedCategoryId={selectedCategoryId}
-                onSelectCategory={setSelectedCategoryId}
+                onSelectCategory={(id) => {
+                  setSelectedCategoryId(id);
+                  localStorage.setItem("menu_selected_category", id);
+                }}
                 clientId={clientId}
                 token={token}
                 onCategoriesUpdate={() => fetchData({ silent: true })}
@@ -1388,6 +1416,8 @@ Other categories will NOT be affected.`
               {quickDieteryCategories.map(cat => (
                 <button key={cat.id} onClick={() => {
                   setSelectedCategoryId(cat.id);
+                  localStorage.setItem("menu_selected_category", cat.id);
+                  savedCategoryRef.current = cat.id;
 
                   const selectedNode = findNodeAndChildren(categories, cat.id);
 

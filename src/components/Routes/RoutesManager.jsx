@@ -19,6 +19,8 @@ import Summary_V1 from '../V1_Components/OrderServices/Summary_V1';
 import RoleConfig from '../MainComponents/UserServices/RoleConfiguration/RoleConfig';
 import Data from '../Super_Admin/CustomerData/Data';
 import Counters from '../MainComponents/InventoryServices/Counters'
+import Order_Place from '../Super_User/Order_Place/Order_Place';
+import Summary_Super_User from '../Super_User/Order_Place/Summary_Super_User';
 
 const RoutesManager = () => {
   const { clientId } = useParams();
@@ -30,7 +32,7 @@ const RoutesManager = () => {
 
   useEffect(() => {
     const t = localStorage.getItem("access_token");
-  
+
     if (!t) return;
     setToken(t);
 
@@ -51,7 +53,6 @@ const RoutesManager = () => {
           if (res.data && res.data.data && res.data.data.screens) {
             // Extract screen_ids
             const ids = res.data.data.screens.map((s) => s.screen_id);
-            console.log("The screenIds are", ids)
             setScreenIds(ids);
           }
         })
@@ -86,7 +87,7 @@ const RoutesManager = () => {
       />
       <Route path="summary" element={<OrderSummary token={token} clientId={clientId} />} />
 
-      <Route path="kds" element={<Kds clientId={clientId} token={token} realm={realm} screenIds={screenIds}/>} />
+      <Route path="kds" element={<Kds clientId={clientId} token={token} realm={realm} screenIds={screenIds} />} />
 
       <Route
         path="menu"
@@ -118,13 +119,20 @@ const RoutesManager = () => {
       />
       <Route
         path="customer-data"
-        element={<Data clientId={clientId} token={token} realm={realm} screenIds={screenIds}/>}
+        element={<Data clientId={clientId} token={token} realm={realm} screenIds={screenIds} />}
       />
 
       <Route path="role-config" element={
         <RoleConfig clientId={clientId} token={token} realm={realm} screenIds={screenIds} />
       } />
 
+      <Route path="order-place" element={
+        <Order_Place clientId={clientId} token={token} realm={realm} screenIds={screenIds} />
+      } />
+
+      <Route path="order-summary" element={
+        <Summary_Super_User clientId={clientId} token={token} realm={realm} screenIds={screenIds} />
+      } />
       <Route path="*" element={<Navigate to="home" replace />} />
       <Route path='user-profile' element={<UserProfile token={token} clientId={clientId} />} />
       <Route path='counter' element={<Counters token={token} clientId={clientId} />} />

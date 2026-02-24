@@ -4783,10 +4783,10 @@ import { getMenuConfig } from '../../utils/menuConfigResolver';
 // ─── Status badge helper ─────────────────────────────────────────────────────
 const ItemStatusBadge = ({ status }) => {
   const cfg = {
-    pending:   { bg: 'bg-blue-100',   text: 'text-blue-700',   label: 'Pending' },
+    pending: { bg: 'bg-blue-100', text: 'text-blue-700', label: 'Pending' },
     preparing: { bg: 'bg-orange-100', text: 'text-orange-700', label: 'Preparing' },
-    ready:     { bg: 'bg-green-100',  text: 'text-green-700',  label: 'Ready' },
-    served:    { bg: 'bg-gray-100',   text: 'text-gray-600',   label: 'Served' },
+    ready: { bg: 'bg-green-100', text: 'text-green-700', label: 'Ready' },
+    served: { bg: 'bg-gray-100', text: 'text-gray-600', label: 'Served' },
   }[status] || { bg: 'bg-gray-100', text: 'text-gray-500', label: status || '—' };
   return (
     <span className={`text-xs font-semibold px-2 py-0.5 rounded-full ${cfg.bg} ${cfg.text}`}>
@@ -4796,42 +4796,42 @@ const ItemStatusBadge = ({ status }) => {
 };
 
 const TABLE_STATUS_CONFIG = {
-  vacant:   { clickable: true,  bg: 'bg-action-success', border: 'border-border-default', badge: 'bg-green-100 text-action-success' },
-  available:{ clickable: true,  bg: 'bg-action-success', border: 'border-border-default', badge: 'bg-green-100 text-green-700' },
+  vacant: { clickable: true, bg: 'bg-action-success', border: 'border-border-default', badge: 'bg-green-100 text-action-success' },
+  available: { clickable: true, bg: 'bg-action-success', border: 'border-border-default', badge: 'bg-green-100 text-green-700' },
   occupied: { clickable: false, bg: 'bg-action-primary', border: 'border-action-primary', badge: 'bg-red-100 text-action-primary', viewable: true },
-  served:   { clickable: false, bg: 'bg-blue-50',        border: 'border-blue-400',       badge: 'bg-blue-100 text-blue-700',  viewable: true },
-  reserved: { clickable: false, bg: 'bg-yellow-50',      border: 'border-yellow-400',     badge: 'bg-yellow-100 text-yellow-700' },
+  served: { clickable: false, bg: 'bg-blue-50', border: 'border-blue-400', badge: 'bg-blue-100 text-blue-700', viewable: true },
+  reserved: { clickable: false, bg: 'bg-yellow-50', border: 'border-yellow-400', badge: 'bg-yellow-100 text-yellow-700' },
 };
 
 // ─── Table reservation floor view ────────────────────────────────────────────
-const TableReservation = ({ tables=[], orderMode="dinein", onSelectTable, onSelectTakeaway, onSelectDineIn, onViewOrder, tableOrders={}, onPrintBill, onDeleteOrder, onMarkAsServed }) => {
+const TableReservation = ({ tables = [], orderMode = "dinein", onSelectTable, onSelectTakeaway, onSelectDineIn, onViewOrder, tableOrders = {}, onPrintBill, onDeleteOrder, onMarkAsServed }) => {
   const [selectedSections, setSelectedSections] = useState([]);
-  const [selectedZones, setSelectedZones]       = useState([]);
+  const [selectedZones, setSelectedZones] = useState([]);
 
-  const getZone    = t => t.location_zone?.trim() || "Unassigned";
-  const getSection = t => t.section?.trim()       || "Other";
-  const zonesFromDB    = [...new Set(tables.map(t => t.location_zone).filter(Boolean))];
+  const getZone = t => t.location_zone?.trim() || "Unassigned";
+  const getSection = t => t.section?.trim() || "Other";
+  const zonesFromDB = [...new Set(tables.map(t => t.location_zone).filter(Boolean))];
   const sectionsFromDB = [...new Set(tables.map(t => t.section).filter(Boolean))];
   const toggleFilter = (v, set) => set(p => p.includes(v) ? p.filter(x => x !== v) : [...p, v]);
 
   const filteredTables = tables.filter(t => {
     const z = getZone(t), s = getSection(t);
     return (selectedZones.length === 0 || selectedZones.includes(z))
-        && (selectedSections.length === 0 || selectedSections.includes(s));
+      && (selectedSections.length === 0 || selectedSections.includes(s));
   });
-  const visibleZones    = [...new Set(filteredTables.map(t => getZone(t)))];
+  const visibleZones = [...new Set(filteredTables.map(t => getZone(t)))];
   const getSectionsByZone = zone => [...new Set(filteredTables.filter(t => getZone(t) === zone).map(t => getSection(t)))];
 
   const calcElapsed = createdAt => {
     if (!createdAt) return null;
-    const utc  = typeof createdAt === "string" ? createdAt.replace(" ", "T").split(".")[0] + "Z" : createdAt;
+    const utc = typeof createdAt === "string" ? createdAt.replace(" ", "T").split(".")[0] + "Z" : createdAt;
     const diff = Date.now() - new Date(utc).getTime();
     if (diff < 0) return "Just now";
     const s = Math.floor(diff / 1000), m = Math.floor(s / 60), h = Math.floor(m / 60), d = Math.floor(h / 24);
-    if (s < 60)  return "Just now";
-    if (m === 1) return "1 min ago";  if (m < 60) return `${m} mins ago`;
-    if (h === 1) return "1 hr ago";   if (h < 24) return `${h} hrs ago`;
-    if (d === 1) return "1 day ago";  return `${d} days ago`;
+    if (s < 60) return "Just now";
+    if (m === 1) return "1 min ago"; if (m < 60) return `${m} mins ago`;
+    if (h === 1) return "1 hr ago"; if (h < 24) return `${h} hrs ago`;
+    if (d === 1) return "1 day ago"; return `${d} days ago`;
   };
 
   return (
@@ -4842,12 +4842,12 @@ const TableReservation = ({ tables=[], orderMode="dinein", onSelectTable, onSele
           <div className="flex flex-wrap items-center gap-2 p-2 rounded-xl">
             <button onClick={() => { setSelectedSections([]); setSelectedZones([]); }}
               className={`px-3 py-1 rounded-full text-xs font-semibold transition ${selectedSections.length === 0 && selectedZones.length === 0 ? "bg-action-primary text-white" : "bg-white text-text-secondary hover:bg-gray-100"}`}>All</button>
-            <div className="w-px bg-border-default mx-1"/>
+            <div className="w-px bg-border-default mx-1" />
             {sectionsFromDB.map(sec => (
               <button key={sec} onClick={() => toggleFilter(sec, setSelectedSections)}
                 className={`px-3 py-1 rounded-full text-xs font-semibold transition ${selectedSections.includes(sec) ? "bg-action-primary text-white" : "bg-white text-text-secondary hover:bg-gray-100"}`}>{sec}</button>
             ))}
-            <div className="w-px bg-border-default mx-1"/>
+            <div className="w-px bg-border-default mx-1" />
             {zonesFromDB.map(zone => (
               <button key={zone} onClick={() => toggleFilter(zone, setSelectedZones)}
                 className={`px-3 py-1 rounded-full text-xs font-semibold transition ${selectedZones.includes(zone) ? "bg-action-primary text-white" : "bg-white text-text-secondary hover:bg-gray-100"}`}>{zone}</button>
@@ -4858,7 +4858,7 @@ const TableReservation = ({ tables=[], orderMode="dinein", onSelectTable, onSele
               className={`px-4 py-1.5 text-xs font-semibold rounded-full transition-all ${orderMode === "dinein" ? "bg-action-primary text-text-white shadow" : "text-text-secondary hover:bg-gray-100"}`}>Dine In</button>
             <button onClick={onSelectTakeaway}
               className={`px-4 py-1.5 text-xs font-semibold rounded-full transition-all flex items-center gap-1 ${orderMode === "takeaway" ? "bg-orange-500 text-white shadow" : "text-gray-600 hover:bg-gray-100"}`}>
-              <Package size={12}/>Takeaway
+              <Package size={12} />Takeaway
             </button>
           </div>
         </div>
@@ -4877,13 +4877,13 @@ const TableReservation = ({ tables=[], orderMode="dinein", onSelectTable, onSele
                 <div className="grid gap-4 grid-cols-2 sm:grid-cols-4 md:grid-cols-5 lg:grid-cols-6 xl:grid-cols-5">
                   {filteredTables.filter(t => getZone(t) === zone && getSection(t) === section).map(table => {
                     const statusKey = table.status?.toLowerCase();
-                    const config    = TABLE_STATUS_CONFIG[statusKey] || TABLE_STATUS_CONFIG.vacant;
+                    const config = TABLE_STATUS_CONFIG[statusKey] || TABLE_STATUS_CONFIG.vacant;
                     const orderInfo = tableOrders[table.id];
                     const hasViewableOrder = (statusKey === 'occupied' || statusKey === 'served') && orderInfo;
 
                     // ── Timer from root created_at (oldest sub-order) ──────────
                     const rootCreatedAt = orderInfo?.created_at;
-                    const elapsedTime   = rootCreatedAt ? calcElapsed(rootCreatedAt) : null;
+                    const elapsedTime = rootCreatedAt ? calcElapsed(rootCreatedAt) : null;
 
                     // ── Order count & total from merged group ─────────────────
                     const orderCount = orderInfo?.order_count || 1;
@@ -4900,11 +4900,11 @@ const TableReservation = ({ tables=[], orderMode="dinein", onSelectTable, onSele
                             <span className="font-bold text-lg tracking-wide">{table.table_number}</span>
                             {hasViewableOrder && (
                               <span className={`text-xs px-2 py-0.5 rounded-full font-semibold
-                                ${orderInfo.status === 'pending'   ? 'bg-orange-100 text-orange-700' :
-                                  orderInfo.status === 'preparing' ? 'bg-blue-100 text-blue-700'   :
-                                  orderInfo.status === 'ready'     ? 'bg-green-100 text-green-700' :
-                                  orderInfo.status === 'served'    ? 'bg-purple-100 text-purple-700' :
-                                  'bg-gray-100 text-gray-700'}`}>
+                                ${orderInfo.status === 'pending' ? 'bg-orange-100 text-orange-700' :
+                                  orderInfo.status === 'preparing' ? 'bg-blue-100 text-blue-700' :
+                                    orderInfo.status === 'ready' ? 'bg-green-100 text-green-700' :
+                                      orderInfo.status === 'served' ? 'bg-purple-100 text-purple-700' :
+                                        'bg-gray-100 text-gray-700'}`}>
                                 {orderInfo.status?.toUpperCase()}
                               </span>
                             )}
@@ -4915,15 +4915,15 @@ const TableReservation = ({ tables=[], orderMode="dinein", onSelectTable, onSele
 
                           {/* Body: icon area | CENTER: order count + total | actions */}
                           <div className={`p-3 flex items-center justify-between gap-2
-                            ${statusKey === 'occupied' ? 'text-blue-600 bg-blue-50'     :
-                              statusKey === 'served'   ? 'text-purple-600 bg-purple-50' :
-                              statusKey === 'reserved' ? 'text-yellow-600 bg-yellow-50' :
-                              'text-green-600 bg-green-50'}`}>
+                            ${statusKey === 'occupied' ? 'text-blue-600 bg-blue-50' :
+                              statusKey === 'served' ? 'text-purple-600 bg-purple-50' :
+                                statusKey === 'reserved' ? 'text-yellow-600 bg-yellow-50' :
+                                  'text-green-600 bg-green-50'}`}>
 
                             {/* Left icon */}
-                            {statusKey === 'vacant'   && <span className="text-2xl text-green-400">—</span>}
-                            {(statusKey === 'occupied' || statusKey === 'served') && <Eye size={22}/>}
-                            {statusKey === 'reserved' && <Lock size={22}/>}
+                            {statusKey === 'vacant' && <span className="text-2xl text-green-400">—</span>}
+                            {(statusKey === 'occupied' || statusKey === 'served') && <Eye size={22} />}
+                            {statusKey === 'reserved' && <Lock size={22} />}
 
                             {/* ★ Centre: order count + total price */}
                             {hasViewableOrder && (
@@ -4942,11 +4942,11 @@ const TableReservation = ({ tables=[], orderMode="dinein", onSelectTable, onSele
                               <div className="flex gap-2">
                                 <button onClick={e => { e.stopPropagation(); onPrintBill && onPrintBill(orderInfo.id, table.id); }}
                                   className="text-yellow-600 hover:scale-110 transition-transform" title="Print Bill">
-                                  <Printer size={22}/>
+                                  <Printer size={22} />
                                 </button>
                                 <button onClick={e => { e.stopPropagation(); onDeleteOrder && onDeleteOrder(orderInfo.id, table.id); }}
                                   className="text-red-600 hover:scale-110 transition-transform" title="Delete Order">
-                                  <Trash2 size={22}/>
+                                  <Trash2 size={22} />
                                 </button>
                               </div>
                             )}
@@ -4956,7 +4956,7 @@ const TableReservation = ({ tables=[], orderMode="dinein", onSelectTable, onSele
                           {hasViewableOrder && elapsedTime && (
                             <div className="px-3 py-1.5 bg-gray-50 border-t border-gray-100">
                               <div className="flex items-center justify-center gap-1 text-xs font-semibold text-gray-600">
-                                <Clock size={13} className="text-orange-500"/>
+                                <Clock size={13} className="text-orange-500" />
                                 <span>{elapsedTime}</span>
                               </div>
                             </div>
@@ -5001,7 +5001,7 @@ const LineItemsModal = ({ isOpen, onClose, mainItem, lineItems, onAddWithSelecte
                 ${selectedAddons.includes(item.id) ? 'bg-action-primary/10 border-2 border-action-primary' : 'bg-bg-tertiary border border-border-default hover:border-action-primary/50'}`}>
               <div className="flex items-center gap-3 flex-1">
                 <div className={`w-5 h-5 rounded border-2 flex items-center justify-center transition-all ${selectedAddons.includes(item.id) ? 'bg-action-primary border-action-primary' : 'border-gray-300'}`}>
-                  {selectedAddons.includes(item.id) && <Check size={14} className="text-white"/>}
+                  {selectedAddons.includes(item.id) && <Check size={14} className="text-white" />}
                 </div>
                 <span className="text-text-primary font-medium">{item.name}</span>
               </div>
@@ -5029,7 +5029,7 @@ const DeleteConfirmModal = ({ isOpen, onClose, onConfirm }) => {
       <div className="rounded-lg w-full max-w-sm bg-white shadow-xl">
         <div className="px-6 py-4 border-b flex justify-between items-center">
           <h2 className="text-lg font-bold text-red-600">Delete Order</h2>
-          <button onClick={onClose} className="text-gray-500 hover:text-gray-700"><X size={20}/></button>
+          <button onClick={onClose} className="text-gray-500 hover:text-gray-700"><X size={20} /></button>
         </div>
         <div className="px-6 py-5"><p className="text-sm text-gray-700">Are you sure? This cannot be undone.</p></div>
         <div className="px-6 py-4 flex gap-3 bg-gray-50 rounded-b-lg">
@@ -5043,31 +5043,31 @@ const DeleteConfirmModal = ({ isOpen, onClose, onConfirm }) => {
 
 // ─── Main TakeOrder component ─────────────────────────────────────────────────
 const TakeOrder = ({ clientId, token, onOrderUpdate, realm }) => {
-  const [searchQuery, setSearchQuery]   = useState('');
-  const searchInputRef                  = useRef(null);
+  const [searchQuery, setSearchQuery] = useState('');
+  const searchInputRef = useRef(null);
   const [selectedTable, setSelectedTable] = useState('');
-  const [cart, setCart]                 = useState([]);
-  const [showCart, setShowCart]         = useState(true);
-  const [tables, setTables]             = useState([]);
-  const [categories, setCategories]     = useState([]);
+  const [cart, setCart] = useState([]);
+  const [showCart, setShowCart] = useState(true);
+  const [tables, setTables] = useState([]);
+  const [categories, setCategories] = useState([]);
   const [categoriesFlat, setCategoriesFlat] = useState([]);
-  const [menuItems, setMenuItems]       = useState([]);
-  const [loading, setLoading]           = useState(true);
+  const [menuItems, setMenuItems] = useState([]);
+  const [loading, setLoading] = useState(true);
   const [isPlacingOrder, setIsPlacingOrder] = useState(false);
   const [lineItemsModalOpen, setLineItemsModalOpen] = useState(false);
-  const [selectedMainItem, setSelectedMainItem]     = useState(null);
-  const [lineItemsDetails, setLineItemsDetails]     = useState([]);
-  const [orderMode, setOrderMode]       = useState('dinein');
+  const [selectedMainItem, setSelectedMainItem] = useState(null);
+  const [lineItemsDetails, setLineItemsDetails] = useState([]);
+  const [orderMode, setOrderMode] = useState('dinein');
   const [takeawayTableId, setTakeawayTableId] = useState(null);
-  const isPlacingRef                    = useRef(false);
-  const isMobile                        = window.matchMedia('(max-width: 1024px)').matches;
+  const isPlacingRef = useRef(false);
+  const isMobile = window.matchMedia('(max-width: 1024px)').matches;
   const [showClearConfirm, setShowClearConfirm] = useState(false);
-  const [currentView, setCurrentView]   = useState('floor');
-  const [activeOrderId, setActiveOrderId]         = useState(null);
+  const [currentView, setCurrentView] = useState('floor');
+  const [activeOrderId, setActiveOrderId] = useState(null);
   const [activeDineinOrderId, setActiveDineinOrderId] = useState(null);
-  const [hasNewItems, setHasNewItems]   = useState(false);
+  const [hasNewItems, setHasNewItems] = useState(false);
   const [currentBatchTimestamp, setCurrentBatchTimestamp] = useState(null);
-  const [tableOrders, setTableOrders]   = useState({});
+  const [tableOrders, setTableOrders] = useState({});
   const [showDeleteConfirm, setShowDeleteConfirm] = useState(false);
   const [orderToDelete, setOrderToDelete] = useState(null);
   const [dieterySubCategories, setDieterySubCategories] = useState([]);
@@ -5076,7 +5076,7 @@ const TakeOrder = ({ clientId, token, onOrderUpdate, realm }) => {
   const [invoiceOrderData, setInvoiceOrderData] = useState(null);
   const [inventoryMap, setInventoryMap] = useState({});
   const [selectedCategoryId, setSelectedCategoryId] = useState(null);
-
+  const savedCategoryRef = useRef(localStorage.getItem("pos_selected_category"));
   // ─── Utils ───────────────────────────────────────────────────────────────
   const flattenCategoryTree = (tree, level = 0, parentId = null) => {
     let flat = [];
@@ -5094,7 +5094,7 @@ const TakeOrder = ({ clientId, token, onOrderUpdate, realm }) => {
     while (cur) {
       const cat = categoriesFlat.find(c => c.id === cur);
       if (!cat) break;
-      if (cat.id === 'AC_ROOT_ID')     return 'addons_ac';
+      if (cat.id === 'AC_ROOT_ID') return 'addons_ac';
       if (cat.id === 'NON_AC_ROOT_ID') return 'addons_non_ac';
       cur = cat.parentId;
     }
@@ -5160,12 +5160,12 @@ const TakeOrder = ({ clientId, token, onOrderUpdate, realm }) => {
             .filter(o => o.table_id === table.id && o.status?.toLowerCase() !== 'completed')
             .sort((a, b) => new Date(b.created_at) - new Date(a.created_at))[0];
           if (o) map[table.id] = {
-            id:              o.id,
+            id: o.id,
             dinein_order_id: o.dinein_order_id,
-            status:          o.status,
-            created_at:      o.created_at,     // ★ root created_at (oldest)
-            order_count:     o.order_count || 1,
-            total_price:     o.total_price || 0,
+            status: o.status,
+            created_at: o.created_at,     // ★ root created_at (oldest)
+            order_count: o.order_count || 1,
+            total_price: o.total_price || 0,
           };
         }
       });
@@ -5257,7 +5257,7 @@ const TakeOrder = ({ clientId, token, onOrderUpdate, realm }) => {
         ]);
         const iMap = {}; (invRes.data?.data || []).forEach(i => (iMap[i.id] = i)); setInventoryMap(iMap);
         const fullTree = catRes.data.data.filter(c => c.name?.toLowerCase() !== "all");
-        const subIds   = new Set(); fullTree.forEach(c => c.subCategories?.forEach(s => subIds.add(s.id)));
+        const subIds = new Set(); fullTree.forEach(c => c.subCategories?.forEach(s => subIds.add(s.id)));
         const topLevel = fullTree.filter(c => !subIds.has(c.id));
         const flatCats = flattenCategoryTree(topLevel);
         setCategoriesFlat(flatCats.map(c => ({ id: c.id, name: (c.name || '').trim(), parentId: c.parentId ?? c.parent_id ?? null })));
@@ -5278,7 +5278,30 @@ const TakeOrder = ({ clientId, token, onOrderUpdate, realm }) => {
     };
     fetchData();
   }, [clientId, token, realm, menuConfig]);
+  useEffect(() => {
+    if (!categories?.length) return;
 
+    const saved = savedCategoryRef.current;
+    if (!saved) return;
+
+    const findNode = (nodes, id) => {
+      for (const n of nodes) {
+        if (n.id === id) return n;
+        if (n.children?.length) {
+          const f = findNode(n.children, id);
+          if (f) return f;
+        }
+      }
+      return null;
+    };
+
+    const node = findNode(categories, saved);
+
+    if (node) {
+      setSelectedCategoryId(saved);
+      setSidebarCategories([node]);
+    }
+  }, [categories]);
   const selectedCategoryName = categoriesFlat.find(c => c.id === selectedCategoryId)?.name || "All Categories";
 
   const getFilteredItems = () => {
@@ -5294,7 +5317,7 @@ const TakeOrder = ({ clientId, token, onOrderUpdate, realm }) => {
   const handleItemClick = item => {
     if (item.line_item_id && Array.isArray(item.line_item_id) && item.line_item_id.length > 0) {
       const addonCatId = getAddonCategoryId(item.category_id);
-      const lineItems  = item.line_item_id.map(id => {
+      const lineItems = item.line_item_id.map(id => {
         const ai = menuItems.find(i => i.id === id); if (!ai) return null;
         const path = []; let cur = ai.category_id; const vis = new Set();
         while (cur && !vis.has(cur)) { vis.add(cur); const cat = categoriesFlat.find(c => c.id === cur); if (!cat) break; path.unshift(cat.id); cur = cat.parentId || cat.parent_id; }
@@ -5307,9 +5330,9 @@ const TakeOrder = ({ clientId, token, onOrderUpdate, realm }) => {
 
   const addToCart = (item, parentItemKey = null) => {
     setHasNewItems(true);
-    const ts   = Date.now() + Math.random();
+    const ts = Date.now() + Math.random();
     const uKey = `${item.id}_${ts}`;
-    let batch  = currentBatchTimestamp;
+    let batch = currentBatchTimestamp;
     if (!batch) { batch = Date.now(); setCurrentBatchTimestamp(batch); }
     setCart(prev => [...prev, {
       id: Number(item.id), name: item.name, unit_price: item.unit_price || 0,
@@ -5422,10 +5445,10 @@ const TakeOrder = ({ clientId, token, onOrderUpdate, realm }) => {
     finally { isPlacingRef.current = false; setIsPlacingOrder(false); }
   };
 
-  const handleTableSelect  = table => { setSelectedTable(table.id.toString()); setCurrentView('order'); window.history.pushState({ view: 'order' }, ''); };
+  const handleTableSelect = table => { setSelectedTable(table.id.toString()); setCurrentView('order'); window.history.pushState({ view: 'order' }, ''); };
   const handleTakeawaySelect = () => { setOrderMode('takeaway'); setSelectedTable(takeawayTableId.toString()); setCurrentView('order'); window.history.pushState({ view: 'order' }, ''); };
-  const handleClearCart    = () => { if (cart.length === 0) return; setShowClearConfirm(true); };
-  const confirmClearCart   = () => {
+  const handleClearCart = () => { if (cart.length === 0) return; setShowClearConfirm(true); };
+  const confirmClearCart = () => {
     setCart([]); setSelectedTable(''); setCurrentView('floor'); setShowCart(false); setShowClearConfirm(false);
     setActiveOrderId(null); setActiveDineinOrderId(null); setCurrentBatchTimestamp(null); setHasNewItems(false);
   };
@@ -5449,22 +5472,22 @@ const TakeOrder = ({ clientId, token, onOrderUpdate, realm }) => {
       const reconstructedCart = (activeOrder.items || []).map(item => {
         const menuItem = menuItems.find(mi => Number(mi.id) === Number(item.item_id));
         return {
-          id:                   Number(item.item_id),
-          name:                 item.item_name || menuItem?.name || 'Unnamed Item',
-          unit_price:           item.unit_price || menuItem?.unit_price || 0,
-          quantity:             item.quantity || 1,
-          note:                 item.note || '',
-          image_id:             menuItem?.image_id,
-          discount:             menuItem?.discount || 0,
-          slug:                 item.slug || menuItem?.slug,
-          category:             menuItem?.category_name,
-          frontend_unique_key:  item.frontend_unique_key,
-          batch_timestamp:      null,
-          is_new_item:          false,
-          saved_sub_order:      true,
-          status:               item.status || "pending",    // ★ item-level status
-          batch_label:          item.batch_label,            // ★ sub-order label
-          sub_order_id:         item.sub_order_id,
+          id: Number(item.item_id),
+          name: item.item_name || menuItem?.name || 'Unnamed Item',
+          unit_price: item.unit_price || menuItem?.unit_price || 0,
+          quantity: item.quantity || 1,
+          note: item.note || '',
+          image_id: menuItem?.image_id,
+          discount: menuItem?.discount || 0,
+          slug: item.slug || menuItem?.slug,
+          category: menuItem?.category_name,
+          frontend_unique_key: item.frontend_unique_key,
+          batch_timestamp: null,
+          is_new_item: false,
+          saved_sub_order: true,
+          status: item.status || "pending",    // ★ item-level status
+          batch_label: item.batch_label,            // ★ sub-order label
+          sub_order_id: item.sub_order_id,
         };
       });
 
@@ -5481,16 +5504,15 @@ const TakeOrder = ({ clientId, token, onOrderUpdate, realm }) => {
   const handleBackToTables = () => {
     setCurrentView('floor'); setShowCart(false); setSelectedTable(''); setCart([]);
     setActiveOrderId(null); setActiveDineinOrderId(null); setCurrentBatchTimestamp(null); setHasNewItems(false);
-    setSelectedCategoryId("All Categories"); setSidebarCategories(categories);
   };
 
   // ─── Split cart ───────────────────────────────────────────────────────────
   const oldItems = cart.filter(i => !i.is_new_item || i.saved_sub_order);
   const newItems = cart.filter(i => i.is_new_item && !i.saved_sub_order);
 
-  const groupedNewItems   = newItems.reduce((acc, item) => { const b = item.batch_timestamp || 'default'; if (!acc[b]) acc[b] = []; acc[b].push(item); return acc; }, {});
-  const batchTimestamps   = Object.keys(groupedNewItems).sort();
-  const canPlaceOrder     = orderMode === 'takeaway' ? cart.length > 0 : activeOrderId ? hasNewItems && newItems.length > 0 : selectedTable && cart.length > 0;
+  const groupedNewItems = newItems.reduce((acc, item) => { const b = item.batch_timestamp || 'default'; if (!acc[b]) acc[b] = []; acc[b].push(item); return acc; }, {});
+  const batchTimestamps = Object.keys(groupedNewItems).sort();
+  const canPlaceOrder = orderMode === 'takeaway' ? cart.length > 0 : activeOrderId ? hasNewItems && newItems.length > 0 : selectedTable && cart.length > 0;
 
   const getGroupedCartItems = items => {
     const grouped = []; const processed = new Set();
@@ -5517,7 +5539,7 @@ const TakeOrder = ({ clientId, token, onOrderUpdate, realm }) => {
               <ImagePreview clientId={clientId} imageId={main.image_id} token={token} alt={main.name}
                 baseUrl={import.meta.env.VITE_API_DOCUMENT_SERVICE_URL}
                 urlBuilder={({ baseUrl, clientId, imageId }) => `${baseUrl}/${clientId}/document/download?doc_id=${imageId}`}
-                className="w-full h-full object-cover"/>
+                className="w-full h-full object-cover" />
             </div>
             <div className="min-w-0 flex-1">
               <h4 className="text-sm font-semibold truncate text-gray-800">{main.name}</h4>
@@ -5527,7 +5549,7 @@ const TakeOrder = ({ clientId, token, onOrderUpdate, realm }) => {
                 {main.batch_label && main.batch_label !== activeDineinOrderId && (
                   <span className="text-xs text-orange-500 font-mono font-semibold">#{main.batch_label}</span>
                 )}
-                {main.status && <ItemStatusBadge status={main.status}/>}
+                {main.status && <ItemStatusBadge status={main.status} />}
               </div>
             </div>
           </div>
@@ -5564,7 +5586,14 @@ const TakeOrder = ({ clientId, token, onOrderUpdate, realm }) => {
             {/* Category sidebar */}
             <div className="w-full lg:col-span-1">
               <div className="lg:h-[calc(98dvh-4rem)] lg:overflow-y-auto pr-1">
-                <CategoryTree categories={sidebarCategories} selectedCategoryId={selectedCategoryId} onSelectCategory={setSelectedCategoryId} defaultOpenAll/>
+                <CategoryTree categories={sidebarCategories} selectedCategoryId={selectedCategoryId} onSelectCategory={(id) => {
+                  setSelectedCategoryId(id);
+                  localStorage.setItem("pos_selected_category", id);
+                  savedCategoryRef.current = id;
+
+                  const node = findNodeAndChildren(categories, id);
+                  if (node) setSidebarCategories([node]);
+                }} defaultOpenAll />
               </div>
             </div>
 
@@ -5576,7 +5605,11 @@ const TakeOrder = ({ clientId, token, onOrderUpdate, realm }) => {
                   {/* Sub-category pills */}
                   <div className="flex gap-2 overflow-x-auto scrollbar-hide pb-2">
                     {dieterySubCategories.map(cat => (
-                      <button key={cat.id} onClick={() => { setSelectedCategoryId(cat.id); const n = findNodeAndChildren(categories, cat.id); if (n) setSidebarCategories([n]); }}
+                      <button key={cat.id} onClick={() => {
+                        setSelectedCategoryId(cat.id);
+                        localStorage.setItem("pos_selected_category", cat.id);
+                        savedCategoryRef.current = cat.id; const n = findNodeAndChildren(categories, cat.id); if (n) setSidebarCategories([n]);
+                      }}
                         className={`px-3 py-1.5 rounded-lg text-sm font-semibold border whitespace-nowrap transition-all flex-shrink-0
                           ${selectedCategoryId === cat.id ? 'bg-action-primary text-white border-action-primary' : 'bg-bg-tertiary text-text-primary hover:border-action-primary'}`}>
                         {cat.name}
@@ -5585,13 +5618,13 @@ const TakeOrder = ({ clientId, token, onOrderUpdate, realm }) => {
                   </div>
                   <div className="flex items-center justify-between lg:flex-row flex-col gap-2">
                     <div className="flex items-center gap-2">
-                      <button onClick={handleBackToTables} className="p-2 rounded-lg bg-bg-tertiary border border-border-default hover:bg-bg-secondary"><ArrowLeft size={20}/></button>
+                      <button onClick={handleBackToTables} className="p-2 rounded-lg bg-bg-tertiary border border-border-default hover:bg-bg-secondary"><ArrowLeft size={20} /></button>
                       <h2 className="text-xl font-semibold text-text-primary truncate">{selectedCategoryName}<span className="text-sm ml-2">({filteredItems.length})</span></h2>
                     </div>
                     <div className="relative w-64 max-w-full">
-                      <Search size={16} className="absolute left-3 top-1/2 -translate-y-1/2 text-text-secondary"/>
+                      <Search size={16} className="absolute left-3 top-1/2 -translate-y-1/2 text-text-secondary" />
                       <input ref={searchInputRef} value={searchQuery} onChange={e => setSearchQuery(e.target.value)} placeholder="Search items..."
-                        className="w-full pl-9 pr-3 py-2 text-sm rounded-lg border border-border-default bg-bg-primary focus:outline-none focus:ring-2 focus:ring-action-primary"/>
+                        className="w-full pl-9 pr-3 py-2 text-sm rounded-lg border border-border-default bg-bg-primary focus:outline-none focus:ring-2 focus:ring-action-primary" />
                     </div>
                   </div>
                 </div>
@@ -5607,7 +5640,7 @@ const TakeOrder = ({ clientId, token, onOrderUpdate, realm }) => {
                           <ImagePreview clientId={clientId} imageId={item.image_id} token={token} alt={item.name}
                             baseUrl={import.meta.env.VITE_API_DOCUMENT_SERVICE_URL}
                             urlBuilder={({ baseUrl, clientId, imageId }) => `${baseUrl}/${clientId}/document/download?doc_id=${imageId}`}
-                            className="w-full h-full object-cover"/>
+                            className="w-full h-full object-cover" />
                         </div>
                         <div className="flex-1 min-w-0">
                           <h3 className="text-sm font-semibold text-text-primary line-clamp-2">{item.name}</h3>
@@ -5646,8 +5679,8 @@ const TakeOrder = ({ clientId, token, onOrderUpdate, realm }) => {
                       {/* Dine-in / takeaway toggle */}
                       <div className="mt-3">
                         <div className="flex bg-gray-100 rounded-lg p-1">
-                          <button onClick={() => setOrderMode('dinein')} className={`flex-1 py-2 rounded-md text-sm font-medium flex items-center justify-center gap-2 ${orderMode === 'dinein' ? 'bg-action-primary text-white shadow-sm' : 'text-gray-600 hover:text-gray-800'}`}><Users size={16}/>Dine In</button>
-                          <button onClick={() => { setOrderMode('takeaway'); setSelectedTable(takeawayTableId?.toString()); }} className={`flex-1 py-2 rounded-md text-sm font-medium flex items-center justify-center gap-2 ${orderMode === 'takeaway' ? 'bg-action-primary text-white shadow-sm' : 'text-gray-600 hover:text-gray-800'}`}><Package size={16}/>Takeaway</button>
+                          <button onClick={() => setOrderMode('dinein')} className={`flex-1 py-2 rounded-md text-sm font-medium flex items-center justify-center gap-2 ${orderMode === 'dinein' ? 'bg-action-primary text-white shadow-sm' : 'text-gray-600 hover:text-gray-800'}`}><Users size={16} />Dine In</button>
+                          <button onClick={() => { setOrderMode('takeaway'); setSelectedTable(takeawayTableId?.toString()); }} className={`flex-1 py-2 rounded-md text-sm font-medium flex items-center justify-center gap-2 ${orderMode === 'takeaway' ? 'bg-action-primary text-white shadow-sm' : 'text-gray-600 hover:text-gray-800'}`}><Package size={16} />Takeaway</button>
                         </div>
                       </div>
 
@@ -5658,15 +5691,15 @@ const TakeOrder = ({ clientId, token, onOrderUpdate, realm }) => {
                           <div className="flex-1 overflow-y-auto mt-4 space-y-2">
                             {/* OLD items — read-only with status badge */}
                             {getGroupedCartItems(oldItems).map((group, idx) => (
-                              <OldItemRow key={`old-${idx}`} group={group}/>
+                              <OldItemRow key={`old-${idx}`} group={group} />
                             ))}
 
                             {/* Divider */}
                             {activeOrderId && oldItems.length > 0 && newItems.length > 0 && (
                               <div className="flex items-center gap-2 my-2">
-                                <div className="flex-1 h-px bg-gradient-to-r from-transparent via-orange-400 to-transparent"/>
+                                <div className="flex-1 h-px bg-gradient-to-r from-transparent via-orange-400 to-transparent" />
                                 <span className="text-xs font-semibold text-orange-600 px-2">NEW ITEMS</span>
-                                <div className="flex-1 h-px bg-gradient-to-r from-orange-400 via-transparent to-transparent"/>
+                                <div className="flex-1 h-px bg-gradient-to-r from-orange-400 via-transparent to-transparent" />
                               </div>
                             )}
 
@@ -5675,9 +5708,9 @@ const TakeOrder = ({ clientId, token, onOrderUpdate, realm }) => {
                               <React.Fragment key={ts}>
                                 {bi > 0 && (
                                   <div className="flex items-center gap-2 my-2">
-                                    <div className="flex-1 h-px bg-gradient-to-r from-transparent via-orange-400 to-transparent"/>
+                                    <div className="flex-1 h-px bg-gradient-to-r from-transparent via-orange-400 to-transparent" />
                                     <span className="text-xs font-semibold text-orange-600 px-2">NEW ITEMS</span>
-                                    <div className="flex-1 h-px bg-gradient-to-r from-orange-400 via-transparent to-transparent"/>
+                                    <div className="flex-1 h-px bg-gradient-to-r from-orange-400 via-transparent to-transparent" />
                                   </div>
                                 )}
                                 {getGroupedCartItems(groupedNewItems[ts]).map((group, idx) => (
@@ -5688,7 +5721,7 @@ const TakeOrder = ({ clientId, token, onOrderUpdate, realm }) => {
                                           <ImagePreview clientId={clientId} imageId={group.main.image_id} token={token} alt={group.main.name}
                                             baseUrl={import.meta.env.VITE_API_DOCUMENT_SERVICE_URL}
                                             urlBuilder={({ baseUrl, clientId, imageId }) => `${baseUrl}/${clientId}/document/download?doc_id=${imageId}`}
-                                            className="w-full h-full object-cover"/>
+                                            className="w-full h-full object-cover" />
                                         </div>
                                         <div className="min-w-0 flex-1">
                                           <h4 className="text-sm font-semibold truncate text-gray-800">{group.main.name}</h4>
@@ -5696,11 +5729,11 @@ const TakeOrder = ({ clientId, token, onOrderUpdate, realm }) => {
                                         </div>
                                       </div>
                                       <div className="flex items-center gap-1">
-                                        <button onClick={() => updateQuantity(group.main.id, -1, group.main.frontend_unique_key)} className="w-7 h-7 flex items-center justify-center border rounded hover:bg-gray-100"><Minus size={14}/></button>
+                                        <button onClick={() => updateQuantity(group.main.id, -1, group.main.frontend_unique_key)} className="w-7 h-7 flex items-center justify-center border rounded hover:bg-gray-100"><Minus size={14} /></button>
                                         <span className="w-6 text-center text-sm font-semibold">{group.main.quantity}</span>
-                                        <button onClick={() => updateQuantity(group.main.id, 1, group.main.frontend_unique_key)} className="w-7 h-7 flex items-center justify-center border rounded hover:bg-gray-100"><Plus size={14}/></button>
+                                        <button onClick={() => updateQuantity(group.main.id, 1, group.main.frontend_unique_key)} className="w-7 h-7 flex items-center justify-center border rounded hover:bg-gray-100"><Plus size={14} /></button>
                                       </div>
-                                      <button onClick={() => removeFromCart(group.main.id, group.main.frontend_unique_key)} className="text-action-primary hover:text-red-700"><X size={16}/></button>
+                                      <button onClick={() => removeFromCart(group.main.id, group.main.frontend_unique_key)} className="text-action-primary hover:text-red-700"><X size={16} /></button>
                                     </div>
                                     {group.addons.map(addon => (
                                       <div key={addon.frontend_unique_key} className="flex items-center gap-2 p-2 pl-8 rounded-lg border border-dashed bg-orange-100/50">
@@ -5723,9 +5756,9 @@ const TakeOrder = ({ clientId, token, onOrderUpdate, realm }) => {
                               disabled={!canPlaceOrder || isPlacingOrder}>
                               {isPlacingOrder ? 'Placing...' : 'Place Order'}
                             </button>
-                            <button onClick={handleBillFromCart} className="py-2 rounded-lg text-sm font-semibold bg-green-600 text-white hover:bg-green-700 flex items-center justify-center gap-1"><FileText size={16}/>Bill</button>
+                            <button onClick={handleBillFromCart} className="py-2 rounded-lg text-sm font-semibold bg-green-600 text-white hover:bg-green-700 flex items-center justify-center gap-1"><FileText size={16} />Bill</button>
                             <button onClick={handleClearCart} className="py-2 border rounded-lg text-sm hover:bg-gray-100">Clear</button>
-                            <button onClick={() => toast.info('Print KOT coming soon')} className="py-2 border rounded-lg text-sm hover:bg-gray-100 flex items-center justify-center gap-1"><PrinterIcon size={16}/>Print KOT</button>
+                            <button onClick={() => toast.info('Print KOT coming soon')} className="py-2 border rounded-lg text-sm hover:bg-gray-100 flex items-center justify-center gap-1"><PrinterIcon size={16} />Print KOT</button>
                           </div>
                         </>
                       )}
@@ -5752,17 +5785,17 @@ const TakeOrder = ({ clientId, token, onOrderUpdate, realm }) => {
       )}
 
       {cart.length > 0 && !showCart && (
-        <button onClick={() => setShowCart(true)} className="fixed bottom-6 right-6 bg-action-primary text-white p-4 rounded-full shadow-lg z-40"><ShoppingCart size={24}/></button>
+        <button onClick={() => setShowCart(true)} className="fixed bottom-6 right-6 bg-action-primary text-white p-4 rounded-full shadow-lg z-40"><ShoppingCart size={24} /></button>
       )}
 
-      <LineItemsModal isOpen={lineItemsModalOpen} onClose={() => { setLineItemsModalOpen(false); setSelectedMainItem(null); setLineItemsDetails([]); }} mainItem={selectedMainItem} lineItems={lineItemsDetails} onAddMainOnly={handleAddMainItemOnly} onAddWithSelectedAddons={handleAddMainItemWithSelectedAddons}/>
-      <DeleteConfirmModal isOpen={showDeleteConfirm} onClose={() => { setShowDeleteConfirm(false); setOrderToDelete(null); }} onConfirm={() => { if (orderToDelete) handleDeleteOrder(orderToDelete.orderId, orderToDelete.tableId); }}/>
+      <LineItemsModal isOpen={lineItemsModalOpen} onClose={() => { setLineItemsModalOpen(false); setSelectedMainItem(null); setLineItemsDetails([]); }} mainItem={selectedMainItem} lineItems={lineItemsDetails} onAddMainOnly={handleAddMainItemOnly} onAddWithSelectedAddons={handleAddMainItemWithSelectedAddons} />
+      <DeleteConfirmModal isOpen={showDeleteConfirm} onClose={() => { setShowDeleteConfirm(false); setOrderToDelete(null); }} onConfirm={() => { if (orderToDelete) handleDeleteOrder(orderToDelete.orderId, orderToDelete.tableId); }} />
 
       {invoiceModalOpen && invoiceOrderData && (
         <InvoiceModal clientId={clientId} token={token} selectedOrder={invoiceOrderData}
           tablesMap={tables.reduce((m, t) => { m[t.id] = t; return m; }, {})} inventoryMap={inventoryMap}
           onClose={() => { setInvoiceModalOpen(false); setInvoiceOrderData(null); fetchTables(); }}
-          onSave={id => { console.log('Invoice saved:', id); fetchTables(); }}/>
+          onSave={id => { console.log('Invoice saved:', id); fetchTables(); }} />
       )}
     </div>
   );
