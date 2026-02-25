@@ -10,11 +10,39 @@ import { Filter, Clock, Users, Package, Truck, Trash2 } from 'lucide-react';
 // ─── Constants ─────────────────────────────────────────────────────────────────
 
 
+// ─── Dynamic Configuration ─────────────────────────────────────────────────────
+
+const KDS_CONFIG = {
+  FILTERS: {
+    ALL: 'ALL',
+    DINEIN: 'DINEIN',
+    TAKEAWAY: 'TAKEAWAY',
+    DELIVERY: 'DELIVERY',
+  },
+
+  STATUS: {
+    PENDING: 'pending',
+    PREPARING: 'preparing',
+    SERVED: 'served',
+    READY: 'ready',
+  },
+
+  TAKEAWAY_TABLE_IDS: [500], // can support multiple IDs
+
+  POLL_INTERVAL_MS: 10000,
+
+  DATE_FORMAT: 'en-CA',
+
+  DEFAULT_TABLE_PREFIX: 'T-',
+
+  DEFAULT_UNKNOWN_LABEL: 'Unknown',
+};
+
 const ORDER_FILTER_OPTIONS = [
-  { key: 'ALL',      label: 'All Orders', Icon: Filter },
-  { key: 'DINEIN',   label: 'Dine-In',    Icon: Users  },
-  { key: 'TAKEAWAY', label: 'Takeaway',   Icon: Package },
-  { key: 'DELIVERY', label: 'Delivery',   Icon: Truck  },
+  { key: KDS_CONFIG.FILTERS.ALL, label: 'All Orders', Icon: Filter },
+  { key: KDS_CONFIG.FILTERS.DINEIN, label: 'Dine-In', Icon: Users },
+  { key: KDS_CONFIG.FILTERS.TAKEAWAY, label: 'Takeaway', Icon: Package },
+  { key: KDS_CONFIG.FILTERS.DELIVERY, label: 'Delivery', Icon: Truck },
 ];
 
 
@@ -49,13 +77,15 @@ const calculateElapsedTime = (createdAt) => {
 // ─── Derive card-level status from its items ───────────────────────────────────
 
 const deriveStatus = (items) => {
-  if (!items?.length)                            return 'pending';
-  if (items.some((i) => i.status === 'pending')) return 'pending';
-  if (items.some((i) => i.status === 'preparing')) return 'preparing';
-  if (items.every((i) => i.status === 'served')) return 'ready';
-  return 'pending';
-};
+  const { PENDING, PREPARING, SERVED, READY } = KDS_CONFIG.STATUS;
 
+  if (!items?.length) return PENDING;
+  if (items.some((i) => i.status === PENDING)) return PENDING;
+  if (items.some((i) => i.status === PREPARING)) return PREPARING;
+  if (items.every((i) => i.status === SERVED)) return READY;
+
+  return PENDING;
+};
 
 // ─── Delete item confirmation modal ───────────────────────────────────────────
 
@@ -159,11 +189,11 @@ const KitchenCard = ({
   const elapsedTime = card.created_at ? calculateElapsedTime(card.created_at) : null;
 
   const statusColorClass =
-    card.status === 'pending'
+    card.status === KDS_CONFIG.STATUS.PENDING
       ? 'text-blue-600'
-      : card.status === 'preparing'
+      : card.status === KDS_CONFIG.STATUS.PREPARING
       ? 'text-orange-600'
-      : card.status === 'ready'
+      : card.status === KDS_CONFIG.STATUS.READY
       ? 'text-green-600'
       : '';
 
@@ -176,7 +206,7 @@ const KitchenCard = ({
 
           {/* Table name */}
           <span className="text-sm md:text-base font-semibold">
-            {tablesMap[card.table_id] || `T-${card.table_id}`}
+            {tablesMap[card.table_id] || `${KDS_CONFIG.DEFAULT_TABLE_PREFIX}${card.table_id}`}
           </span>
 
           {/* Elapsed timer */}
@@ -215,7 +245,7 @@ const KitchenCard = ({
             <div className="flex items-center gap-1 ml-3">
               <button
                 type="button"
-                onClick={() => onItemStatusChange(card.card_id, item.id, 'pending')}
+                onClick={() => onItemStatusChange(card.card_id, item.id, KDS_CONFIG.STATUS.PENDING)}
                 title="Mark as Pending"
                 className="p-2 rounded-md hover:bg-gray-100 transition-colors"
               >
@@ -227,7 +257,7 @@ const KitchenCard = ({
 
               <button
                 type="button"
-                onClick={() => onItemStatusChange(card.card_id, item.id, 'preparing')}
+                onClick={() => onItemStatusChange(card.card_id, item.id, KDS_CONFIG.STATUS.PREPARING)}
                 title="Mark as Preparing"
                 className="p-2 rounded-md hover:bg-gray-100 transition-colors"
               >
@@ -239,7 +269,7 @@ const KitchenCard = ({
 
               <button
                 type="button"
-                onClick={() => onItemStatusChange(card.card_id, item.id, 'served')}
+                onClick={() => onItemStatusChange(card.card_id, item.id, KDS_CONFIG.STATUS.SERVED)}
                 title="Mark as Ready"
                 className="p-2 rounded-md hover:bg-gray-100 transition-colors"
               >
@@ -402,8 +432,8 @@ const KitchenDisplay = () => {
         { headers: { Authorization: `Bearer ${token}` } }
       );
 
-      const today    = new Date().toLocaleDateString('en-CA');
-      const allCards = [];
+const today = new Date().toLocaleDateString(KDS_CONFIG.DATE_FORMAT);      
+const allCards = [];
 
       (res.data?.data || []).forEach((mergedOrder) => {
         // Date filter using root created_at
@@ -412,16 +442,16 @@ const KitchenDisplay = () => {
           const utc = typeof createdAt === 'string'
             ? createdAt.replace(' ', 'T').split('.')[0] + 'Z'
             : createdAt;
-          const orderDate = new Date(utc).toLocaleDateString('en-CA');
+          const orderDate = new Date(utc).toLocaleDateString(KDS_CONFIG.DATE_FORMAT);
           if (orderDate !== today) return;
         }
 
         // Skip fully-served groups
-        if (mergedOrder.status === 'served') return;
+        if (mergedOrder.status === KDS_CONFIG.STATUS.SERVED) return;
 
         parseIntoCards(mergedOrder).forEach((card) => {
           // Skip cards where every item is already served
-          if (card.items.length > 0 && card.items.every((i) => i.status === 'served')) return;
+          if (card.items.length > 0 && card.items.every((i) => i.status === KDS_CONFIG.STATUS.SERVED)) return;
           allCards.push(card);
         });
       });
@@ -437,7 +467,7 @@ const KitchenDisplay = () => {
 
   useEffect(() => {
     fetchOrders();
-    const interval = setInterval(fetchOrders, 10_000);
+const interval = setInterval(fetchOrders, KDS_CONFIG.POLL_INTERVAL_MS);
     return () => clearInterval(interval);
   }, [fetchOrders]);
 
@@ -484,11 +514,11 @@ const KitchenDisplay = () => {
       );
 
       // Notify when order moves to ready
-      if (derivedStatus === 'ready' && card.status !== 'ready') {
+      if (derivedStatus === KDS_CONFIG.STATUS.READY && card.status !== KDS_CONFIG.STATUS.READY  ) {
         window.dispatchEvent(
           new CustomEvent('orderCollect', {
             detail: {
-              tableName: tablesMap[card.table_id] || 'Unknown',
+              tableName: tablesMap[card.table_id] || KDS_CONFIG.DEFAULT_UNKNOWN_LABEL,
               orderId:   card.sub_order_id,
             },
           })
@@ -629,10 +659,10 @@ const KitchenDisplay = () => {
 
   const filteredCards = cards
     .filter((card) => {
-      if (orderFilter === 'ALL') return true;
-      const isTakeaway = Number(card.table_id) === 500;
-      if (orderFilter === 'TAKEAWAY') return isTakeaway;
-      if (orderFilter === 'DINEIN')   return !isTakeaway;
+     if (orderFilter === KDS_CONFIG.FILTERS.ALL) return true;
+      const isTakeaway = KDS_CONFIG.TAKEAWAY_TABLE_IDS.includes(Number(card.table_id));
+      if (orderFilter === KDS_CONFIG.FILTERS.TAKEAWAY) return isTakeaway;
+      if (orderFilter === KDS_CONFIG.FILTERS.DINEIN)   return !isTakeaway;
       return true;
     })
 
