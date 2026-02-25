@@ -7,13 +7,13 @@ export const navMap = {
   data: (clientId) => `/${APP_ROOT}/${clientId}/customer-data`,
   table: (clientId) => `/${APP_ROOT}/${clientId}/managing-tables`,
   menu: (clientId) => `/${APP_ROOT}/${clientId}/menu`,
-  billing: (clientId) => `/${APP_ROOT}/${clientId}/billing`,
+  billing: (clientId) => `/${APP_ROOT}/${clientId}/billing-super-user`,
   users: (clientId) => `/${APP_ROOT}/${clientId}/users`,
   inventory: (clientId) => `/${APP_ROOT}/${clientId}/inventory`,
   role: (clientId) => `/${APP_ROOT}/${clientId}/role`,
   order: (clientId) => `/${APP_ROOT}/${clientId}/order-place`,
   summary: (clientId) => `/${APP_ROOT}/${clientId}/order-summary`,
-  kds: (clientId) => `/${APP_ROOT}/${clientId}/kds`,
+  kds: (clientId) => `/${APP_ROOT}/${clientId}/kds-super-user`,
   details: (clientId) => `/${APP_ROOT}/${clientId}/details`,
   documents: (clientId) => `/${APP_ROOT}/${clientId}/documents`,
   profile: (clientId) => `/${APP_ROOT}/${clientId}/user-profile`,
@@ -125,7 +125,8 @@ const Header_Super_User = ({ onLogout }) => {
           {/* <NavLink id="role">Role</NavLink> */}
           <NavLink id="order">Order</NavLink>
           <NavLink id="summary">Summary</NavLink>
-          {/* <NavLink id="kds">KDS</NavLink> */}
+          <NavLink id="kds">KDS</NavLink>
+          <NavLink id="billing">Billing</NavLink>
           {/* <NavLink id="details">Details</NavLink>
           <NavLink id="documents">Documents</NavLink> */}
 
@@ -200,7 +201,7 @@ const Header_Super_User = ({ onLogout }) => {
         aria-hidden={!mobileOpen}
       />
 
-     <nav
+      <nav
         className={`lg:hidden fixed right-0 top-0 z-50 w-full max-w-xs h-full shadow-lg transform transition-transform duration-300 bg-bg-primary dark:bg-bg-primary-dark ${mobileOpen ? 'translate-x-0' : 'translate-x-full'}`}
         aria-hidden={!mobileOpen}
       >

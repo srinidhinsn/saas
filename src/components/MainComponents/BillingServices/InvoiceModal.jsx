@@ -4,10 +4,10 @@ import { toast } from "react-toastify";
 import jsPDF from "jspdf";
 import CustomerAutocomplete from './CustomerAutocomplete';
 import { X, Save, Printer } from 'lucide-react';
-
-export default function InvoiceModal({ 
-  clientId, 
-  token, 
+import { loadRazorpay } from "../../utils/RazorPay/loadRazorpay";
+export default function InvoiceModal({
+  clientId,
+  token,
   selectedOrder: initialOrder,
   tablesMap,
   inventoryMap,
@@ -29,7 +29,10 @@ export default function InvoiceModal({
   const [status, setStatus] = useState("Draft");
   const [customersList, setCustomersList] = useState([]);
   const [gstManuallyEdited, setGstManuallyEdited] = useState(false);
-
+  const [paymentMode, setPaymentMode] = useState(null);
+  const [upiQR, setUpiQR] = useState(null);
+  const [processingPayment, setProcessingPayment] = useState(false);
+  const [razorpayOrder, setRazorpayOrder] = useState(null);
   const safeNum = (num) => (typeof num === "number" && !isNaN(num) ? num : 0);
 
   const updateBalance = (sumOfPayments) => {
@@ -262,133 +265,243 @@ export default function InvoiceModal({
       }
     }
   }, [total]);
+  const handleCashPayment = async () => {
+    setPaymentStatus("Paid");
+    await saveInvoiceDraft();
+    toast.success("Cash payment received");
+    onSave(selectedOrder.id);
+    onClose();
+  };
+  const handleCardPayment = async () => {
 
-   const saveInvoiceDraft = async () => {
-     if (!selectedOrder) {
-       toast.error("Select an order first");
-       return;
-     }
-     if (!selectedOrder.items || selectedOrder.items.length === 0) {
-       toast.error("Selected order has no items");
-       return;
-     }
-     if (splitPaymentEnabled) {
-       const sumPayments = paymentSplits.reduce((sum, p) => sum + Number(p.amount), 0);
-       if (Number(sumPayments.toFixed(2)) !== Number(total.toFixed(2))) {
-         toast.error("Split payment amounts do not sum up to the total");
-         return;
-       }
-       if (paymentSplits.length < 2) {
-         toast.error("Add at least two payment methods for split payment");
-         return;
-       }
-     }
- 
-     let paymentMethodArray;
-     if (splitPaymentEnabled) {
-       paymentMethodArray = paymentSplits.map((p) => ({
-         method: p.method,
-         amount: Number(p.amount || 0),
-       }));
-     } else {
-       paymentMethodArray = [{ method, amount: Number(total) }];
-     }
- 
-     setSaving(true);
-     try {
-       const payload = {
-         client_id: clientId,
-         document_type: "Invoice",
-         document_date: new Date().toISOString(),
-         order_id: selectedOrder.id.toString(),
-         reference_number: tablesMap[selectedOrder.table_id]?.name || `Table ${selectedOrder.table_id}`,
-         subtotal: orderSubtotal,
-         tax_amount: calculatedGST,
-         tax_rate: taxPercent,
-         discount_amount: calculatedDiscount,
-         discount: discountIsPercent ? discount : calculatedDiscount,
-         total_amount: calculatedTotal,
-         payment_status: paymentStatus,
-         payment_method: paymentMethodArray,
-         single_payment_amount: splitPaymentEnabled ? null : Number(total.toFixed(2)),
-         status: status,
-         customer_id: selectedOrder.customer_id || "",
-         contact_email: selectedOrder.contact_email || "",
-         contact_phone: selectedOrder.contact_phone || "",
-       };
- 
-       let draftId = invoiceDraftId;
-       if (!draftId) {
-         const res = await axios.post(
-           `${import.meta.env.VITE_API_BILLING_SERVICE_URL}/${clientId}/invoice/create_document`,
-           payload,
-           { headers: { Authorization: `Bearer ${token}` } }
-         );
-         draftId = res?.data?.data?.id;
-         if (!draftId) throw new Error("Draft creation failed");
-         setInvoiceDraftId(draftId);
-       } else {
-         await axios.post(
-           `${import.meta.env.VITE_API_BILLING_SERVICE_URL}/${clientId}/invoice/update_document`,
-           { id: draftId, ...payload },
-           { headers: { Authorization: `Bearer ${token}` } }
-         );
-       }
- 
-       const itemsPayload = selectedOrder.items.map((item) => ({
-         item_ref_id: item.item_id?.toString(),
-         description: item.description || "",
-         quantity: item.quantity || 0,
-         unit_price: item.unit_price || 0,
-         total: (item.unit_price || 0) * (item.quantity || 0),
-       }));
- 
-       await axios.post(
-         `${import.meta.env.VITE_API_BILLING_SERVICE_URL}/${clientId}/invoice/create?document_id=${draftId}&client_id=${clientId}`,
-         itemsPayload,
-         { headers: { Authorization: `Bearer ${token}` } }
-       );
-       await axios.post(
-         `${import.meta.env.VITE_API_ORDER_SERVICE_URL}/${clientId}/dinein/update`,
-         {
-           id: selectedOrder.id,
-           status: "completed",
-           invoice_status: paymentStatus.toLowerCase(),
-         },
-         { headers: { Authorization: `Bearer ${token}` } }
-       );
- 
-       // Update table status to vacant after saving invoice
-       if (selectedOrder.table_id) {
-         try {
-           const tableData = tablesMap[selectedOrder.table_id];
-           await axios.post(
-             `${import.meta.env.VITE_API_TABLE_SERVICE_URL}/${clientId}/tables/update`,
-             {
-               id: selectedOrder.table_id,
-               client_id: clientId,
-               name: tableData?.name || `Table ${selectedOrder.table_id}`,
-               table_type: tableData?.table_type || "Regular",
-               status: 'Vacant',
-               location_zone: tableData?.location_zone || "Main"
-             },
-             { headers: { Authorization: `Bearer ${token}` } }
-           );
-         } catch (tableErr) {
-           console.error("Failed to update table status:", tableErr.response?.data || tableErr.message);
-         }
-       }
- 
-       toast.success("Invoice saved successfully!");
-       return draftId;
-     } catch (err) {
-       console.error(err);
-       toast.error("Failed to save invoice");
-       throw err;
-     } finally {
-       setSaving(false);
-     }
-   };
+    setProcessingPayment(true);
+
+    const ok = await loadRazorpay();
+    if (!ok) {
+      toast.error("Razorpay SDK failed to load");
+      setProcessingPayment(false);
+      return;
+    }
+
+    try {
+
+      // create order in backend
+      const res = await axios.post(
+        `${import.meta.env.VITE_API_ORDER_SERVICE_URL}/${clientId}/create-order`,
+        {
+          amount: total,
+          order_id: selectedOrder.id
+        },
+        { headers: { Authorization: `Bearer ${token}` } }
+      );
+
+      const order = res.data;
+
+      const options = {
+        key: import.meta.env.VITE_RAZORPAY_KEY_ID,
+        amount: order.amount,
+        currency: "INR",
+        name: clientId,
+        description: `Invoice #${selectedOrder.id}`,
+        order_id: order.id,
+
+        handler: async function (response) {
+
+          await axios.post(
+            `${import.meta.env.VITE_API_ORDER_SERVICE_URL}/${clientId}/verify-payment`,
+            response,
+            { headers: { Authorization: `Bearer ${token}` } }
+          );
+        
+          toast.info("Waiting for payment confirmation...");
+        
+          // start polling server
+          const checkPayment = setInterval(async () => {
+            try {
+              const res = await axios.get(
+                `${import.meta.env.VITE_API_ORDER_SERVICE_URL}/${clientId}/payment-status`,
+                {
+                  params: { order_id: selectedOrder.id },
+                  headers: { Authorization: `Bearer ${token}` }
+                }
+              );
+        
+              if (res.data.paid) {
+                clearInterval(checkPayment);
+        
+                toast.success("Payment confirmed ✔");
+        
+                onSave(selectedOrder.id);
+                onClose();
+              }
+            } catch (e) {
+              console.log("polling...");
+            }
+          }, 3000);
+        },
+
+        theme: { color: "#6366f1" }
+      };
+
+      const rzp = new window.Razorpay(options);
+      rzp.open();
+
+    } catch (err) {
+      console.error(err);
+      toast.error("Payment failed");
+    }
+
+    setProcessingPayment(false);
+  }; const handleUPIPayment = async () => {
+
+    setProcessingPayment(true);
+
+    try {
+
+      const res = await axios.post(
+        `${import.meta.env.VITE_API_ORDER_SERVICE_URL}/${clientId}/upi-order`,
+        { amount: total },
+        { headers: { Authorization: `Bearer ${token}` } }
+      );
+
+      const upiString =
+        `upi://pay?pa=${res.data.order_id}@razorpay&pn=${clientId}&am=${total}&cu=INR`;
+
+      setRazorpayOrder(res.data.order_id);
+      setUpiQR(upiString);
+
+    } catch (err) {
+      toast.error("UPI failed");
+    }
+
+    setProcessingPayment(false);
+  };
+  const saveInvoiceDraft = async () => {
+    if (!selectedOrder) {
+      toast.error("Select an order first");
+      return;
+    }
+    if (!selectedOrder.items || selectedOrder.items.length === 0) {
+      toast.error("Selected order has no items");
+      return;
+    }
+    if (splitPaymentEnabled) {
+      const sumPayments = paymentSplits.reduce((sum, p) => sum + Number(p.amount), 0);
+      if (Number(sumPayments.toFixed(2)) !== Number(total.toFixed(2))) {
+        toast.error("Split payment amounts do not sum up to the total");
+        return;
+      }
+      if (paymentSplits.length < 2) {
+        toast.error("Add at least two payment methods for split payment");
+        return;
+      }
+    }
+
+    let paymentMethodArray;
+    if (splitPaymentEnabled) {
+      paymentMethodArray = paymentSplits.map((p) => ({
+        method: p.method,
+        amount: Number(p.amount || 0),
+      }));
+    } else {
+      paymentMethodArray = [{ method, amount: Number(total) }];
+    }
+
+    setSaving(true);
+    try {
+      const payload = {
+        client_id: clientId,
+        document_type: "Invoice",
+        document_date: new Date().toISOString(),
+        order_id: selectedOrder.id.toString(),
+        reference_number: tablesMap[selectedOrder.table_id]?.name || `Table ${selectedOrder.table_id}`,
+        subtotal: orderSubtotal,
+        tax_amount: calculatedGST,
+        tax_rate: taxPercent,
+        discount_amount: calculatedDiscount,
+        discount: discountIsPercent ? discount : calculatedDiscount,
+        total_amount: calculatedTotal,
+        payment_status: paymentStatus,
+        payment_method: paymentMethodArray,
+        single_payment_amount: splitPaymentEnabled ? null : Number(total.toFixed(2)),
+        status: status,
+        customer_id: selectedOrder.customer_id || "",
+        contact_email: selectedOrder.contact_email || "",
+        contact_phone: selectedOrder.contact_phone || "",
+      };
+
+      let draftId = invoiceDraftId;
+      if (!draftId) {
+        const res = await axios.post(
+          `${import.meta.env.VITE_API_BILLING_SERVICE_URL}/${clientId}/invoice/create_document`,
+          payload,
+          { headers: { Authorization: `Bearer ${token}` } }
+        );
+        draftId = res?.data?.data?.id;
+        if (!draftId) throw new Error("Draft creation failed");
+        setInvoiceDraftId(draftId);
+      } else {
+        await axios.post(
+          `${import.meta.env.VITE_API_BILLING_SERVICE_URL}/${clientId}/invoice/update_document`,
+          { id: draftId, ...payload },
+          { headers: { Authorization: `Bearer ${token}` } }
+        );
+      }
+
+      const itemsPayload = selectedOrder.items.map((item) => ({
+        item_ref_id: item.item_id?.toString(),
+        description: item.description || "",
+        quantity: item.quantity || 0,
+        unit_price: item.unit_price || 0,
+        total: (item.unit_price || 0) * (item.quantity || 0),
+      }));
+
+      await axios.post(
+        `${import.meta.env.VITE_API_BILLING_SERVICE_URL}/${clientId}/invoice/create?document_id=${draftId}&client_id=${clientId}`,
+        itemsPayload,
+        { headers: { Authorization: `Bearer ${token}` } }
+      );
+      // await axios.post(
+      //   `${import.meta.env.VITE_API_ORDER_SERVICE_URL}/${clientId}/dinein/update`,
+      //   {
+      //     id: selectedOrder.id,
+      //     status: "served",
+      //     invoice_status: paymentStatus.toLowerCase(),
+      //   },
+      //   { headers: { Authorization: `Bearer ${token}` } }
+      // );
+
+      // Update table status to vacant after saving invoice
+      if (selectedOrder.table_id) {
+        try {
+          const tableData = tablesMap[selectedOrder.table_id];
+          await axios.post(
+            `${import.meta.env.VITE_API_TABLE_SERVICE_URL}/${clientId}/tables/update`,
+            {
+              id: selectedOrder.table_id,
+              client_id: clientId,
+              name: tableData?.name || `Table ${selectedOrder.table_id}`,
+              table_type: tableData?.table_type || "Regular",
+              status: 'Vacant',
+              location_zone: tableData?.location_zone || "Main"
+            },
+            { headers: { Authorization: `Bearer ${token}` } }
+          );
+        } catch (tableErr) {
+          console.error("Failed to update table status:", tableErr.response?.data || tableErr.message);
+        }
+      }
+
+      toast.success("Invoice saved successfully!");
+      return draftId;
+    } catch (err) {
+      console.error(err);
+      toast.error("Failed to save invoice");
+      throw err;
+    } finally {
+      setSaving(false);
+    }
+  };
 
   const printInvoice = async () => {
     if (!selectedOrder || !selectedOrder.items?.length) {
@@ -646,7 +759,7 @@ export default function InvoiceModal({
           {/* Content */}
           <div className="flex-1 overflow-y-auto p-6">
             <div className="grid grid-cols-1 xl:grid-cols-3 gap-6">
-              
+
               {/* LEFT - Items (2/3 width on xl) */}
               <div className="xl:col-span-2 space-y-6">
                 <div className="bg-bg-primary rounded-xl shadow-lg border border-border-default">
@@ -794,11 +907,10 @@ export default function InvoiceModal({
                           <button
                             key={statusOption}
                             type="button"
-                            className={`px-3 py-1.5 rounded-lg text-xs font-semibold transition-all ${
-                              paymentStatus === statusOption
+                            className={`px-3 py-1.5 rounded-lg text-xs font-semibold transition-all ${paymentStatus === statusOption
                                 ? "bg-action-primary text-text-white shadow-md"
                                 : "bg-bg-tertiary text-text-secondary hover:bg-bg-secondary border border-border-default"
-                            }`}
+                              }`}
                             onClick={() => setPaymentStatus(statusOption)}
                           >
                             {statusOption}
@@ -902,11 +1014,31 @@ export default function InvoiceModal({
                     )}
                   </div>
                 </div>
-
+                {upiQR && (
+                  <div className="mt-4 text-center border-t pt-4">
+                    <p className="font-semibold mb-2">Scan to Pay ₹{total}</p>
+                    <img
+                      src={`https://api.qrserver.com/v1/create-qr-code/?size=260x260&data=${encodeURIComponent(upiQR)}`}
+                      alt="UPI QR"
+                      className="mx-auto"
+                    />
+                    <p className="text-xs mt-2 text-gray-500">Google Pay / PhonePe / Paytm</p>
+                  </div>
+                )}
                 {/* Action Buttons */}
                 <div className="flex gap-3">
                   <button
-                    onClick={saveInvoiceDraft}
+                     onClick={() => {
+                      if (splitPaymentEnabled) {
+                        toast.info("Complete payments first");
+                        return;
+                      }
+                  
+                      if (method === "Cash") handleCashPayment();
+                      else if (method === "Card") handleCardPayment();
+                      else if (method === "UPI") handleUPIPayment();
+                      else saveInvoiceDraft();
+                    }}
                     disabled={saving}
                     className="flex-1 bg-action-primary hover:bg-action-primary/90 text-text-white px-4 py-3 rounded-xl font-bold shadow-lg transition-all disabled:opacity-50 flex items-center justify-center gap-2"
                   >

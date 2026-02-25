@@ -3,10 +3,10 @@ import axios from 'axios';
 import { toast } from "react-toastify";
 import { MdOutlineKeyboardDoubleArrowDown } from "react-icons/md";
 import Modal from "react-modal";
-import { X, Edit2, Trash2, Search, Filter, ShoppingBag, Clock, Users, Package, Truck } from 'lucide-react';
+import { X, Edit2, Trash2, Search, Filter, FileText, Users, Package, Truck } from 'lucide-react';
 import { useNavigate } from "react-router-dom";
 import { useTenant } from "../../../context/TenantContext";
-
+import InvoiceModal from "../../MainComponents/BillingServices/InvoiceModal";
 Modal.setAppElement("#root");
 
 const SimpleDeleteConfirm = ({ isOpen, onClose, onConfirm, title = 'Delete', message = 'Are you sure?' }) => {
@@ -83,7 +83,7 @@ const LineItemsModal = ({ isOpen, onClose, mainItem, lineItems, onAddMainOnly, o
 
 };
 
-const Summary_Super_User = ({token }) => {
+const Summary_Super_User = ({ token }) => {
 
   const [orders, setOrders] = useState([]);
   const [loading, setLoading] = useState(true);
@@ -113,9 +113,10 @@ const Summary_Super_User = ({token }) => {
   const [activeTab, setActiveTab] = useState('items');
   const [selectedOrderModes, setSelectedOrderModes] = useState(['all']);
   const { clientId: tenantClientId } = useTenant();
-
+  const [activeOrderId, setActiveOrderId] = useState(null);
   const navigate = useNavigate();
-
+  const [invoiceModalOpen, setInvoiceModalOpen] = useState(false);
+  const [invoiceOrderData, setInvoiceOrderData] = useState(null);
 
   // possible values: 'dinein', 'takeaway', 'delivery'
   const getOrderBgColor = (status) => {
@@ -312,6 +313,15 @@ const Summary_Super_User = ({token }) => {
     setItemSearchQuery('');
   };
 
+  const combineDuplicateItems = items => {
+    const m = new Map();
+    items.forEach(item => {
+      const k = item.item_id.toString();
+      if (m.has(k)) m.get(k).quantity += item.quantity || 0;
+      else m.set(k, { ...item });
+    });
+    return Array.from(m.values());
+  };
   const handleAddMainItemWithLineItems = () => {
     if (!selectedMainItem || !pendingOrderId) return;
     let batchTimestamp = currentBatchTimestamp;
@@ -513,6 +523,40 @@ const Summary_Super_User = ({token }) => {
     }
   };
 
+  const handleBillFromCart = async (orderId) => {
+    try {
+      setLoading(true);
+
+      const r = await axios.get(
+        `${import.meta.env.VITE_API_ORDER_SERVICE_URL}/${tenantClientId}/dinein/table`,
+        { headers: { Authorization: `Bearer ${token}` } }
+      );
+
+      const order = (r.data?.data || []).find(o => o.id === orderId);
+      if (!order) return;
+
+      const enriched = (order.items || []).map(item => {
+        const inv = inventoryMap[item.item_id] || {};
+        return {
+          ...item,
+          unit_price: item.unit_price ?? inv.unit_price ?? 0,
+          name: item.item_name ?? inv.name ?? "Unnamed Item"
+        };
+      });
+
+      setInvoiceOrderData({
+        ...order,
+        items: combineDuplicateItems(enriched)
+      });
+
+      setInvoiceModalOpen(true);
+
+    } catch (e) {
+      console.error(e);
+    } finally {
+      setLoading(false);
+    }
+  };
 
   const handleAddMainItemOnly = () => {
     if (!selectedMainItem || !pendingOrderId) return;
@@ -721,7 +765,7 @@ const Summary_Super_User = ({token }) => {
               _fixedOrderMode: order._fixedOrderMode ?? getInitialOrderMode(order)
             };
           }
-          
+
 
           // read normalized storage items for this order
           const rawNewItems = getNewItemsFromStorage(order.id) || [];
@@ -862,7 +906,7 @@ const Summary_Super_User = ({token }) => {
             items: deduped,
             has_new_items: batchItemsMap.size > 0
           };
-          
+
         });
 
         setOrders(processed);
@@ -1174,7 +1218,7 @@ const Summary_Super_User = ({token }) => {
       if (selectedOrder?.id === orderId) setSelectedOrder(processedOrder);
       clearNewItemsStorage(orderId);
       setCurrentBatchTimestamp(null);
-      
+
     } catch (err) {
       console.error('Save error', err);
       toast.error('Failed to update items or total.');
@@ -1257,7 +1301,7 @@ const Summary_Super_User = ({token }) => {
     if (Number(order.table_id) === 500) return 'takeaway';
     return 'dinein';
   };
-  
+
 
   // Then filter by status
   switch (filterMode) {
@@ -1412,8 +1456,8 @@ const Summary_Super_User = ({token }) => {
                   <div className="bg-action-primary px-4 py-3 text-text-black rounded-t-2xl">
                     <div className="flex justify-between">
                       <span className="inline-flex items-center gap-1 px-2 py-1 rounded-full text-[10px] font-semibold bg-bg-primary text-text-secondary border border-border-default">
-                        {order._fixedOrderMode=== 'dinein' ? <Users size={10} /> : <Package size={10} />}
-                        {order._fixedOrderMode=== 'dinein' ? 'Dine In' : 'Takeaway'}
+                        {order._fixedOrderMode === 'dinein' ? <Users size={10} /> : <Package size={10} />}
+                        {order._fixedOrderMode === 'dinein' ? 'Dine In' : 'Takeaway'}
                       </span>
 
 
@@ -1430,7 +1474,7 @@ const Summary_Super_User = ({token }) => {
 
                     <div className="flex items-center justify-between mt-2 gap-2">
                       <h3 className="text-lg font-bold text-text-white truncate">
-                        {order._fixedOrderMode  === 'takeaway'
+                        {order._fixedOrderMode === 'takeaway'
                           ? order.customer_name || 'Take Away'
                           : tablesMap[order.table_id] || order.table || order.table_id}
                       </h3>
@@ -1487,13 +1531,14 @@ const Summary_Super_User = ({token }) => {
                       >
                         Edit Order
                       </button> */}
+                      <button onClick={() => handleBillFromCart(order.id)} className="py-2 px-4 rounded-lg text-sm font-semibold bg-green-600 text-white hover:bg-green-700 flex items-center justify-center gap-1"><FileText size={16} />Bill</button>
 
                       <button
                         onClick={() => status === 'ready' && handleStatusChange(order.id, 'served')}
                         disabled={status !== 'ready'}
-                        className={`flex-1 px-4 py-2 rounded-lg text-sm font-semibold transition-all ${status === 'ready'
-                            ? 'bg-action-success text-text-white hover:opacity-90'
-                            : 'bg-gray-300 text-gray-500 cursor-not-allowed'
+                        className={`flex-1 px-2 py-2 rounded-lg text-sm font-semibold transition-all ${status === 'ready'
+                          ? 'bg-action-success text-text-white hover:opacity-90'
+                          : 'bg-gray-300 text-gray-500 cursor-not-allowed'
                           }`}
                       >
                         Mark as Served
@@ -1788,7 +1833,24 @@ const Summary_Super_User = ({token }) => {
     background: var(--color-action-primary);
   }
 `}</style>
-
+      {invoiceModalOpen && invoiceOrderData && (
+        <InvoiceModal
+          clientId={tenantClientId}
+          token={token}
+          selectedOrder={invoiceOrderData}
+          tablesMap={tablesMap}
+          inventoryMap={inventoryMap}
+          onClose={() => {
+            setInvoiceModalOpen(false);
+            setInvoiceOrderData(null);
+            fetchTables();
+          }}
+          onSave={(id) => {
+            console.log('Invoice saved:', id);
+            fetchTables();
+          }}
+        />
+      )}
       <LineItemsModal
         isOpen={lineItemsModalOpen}
         onClose={() => setLineItemsModalOpen(false)}
