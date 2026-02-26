@@ -708,6 +708,7 @@ const MenuManagement = ({ clientId, token, realm }) => {
     if (!categories?.length) return;
     const saved = savedCategoryRef.current;
     if (!saved) return;
+
     const findNode = (nodes, id) => {
       for (const node of nodes) {
         if (node.id === id) return node;
@@ -715,8 +716,32 @@ const MenuManagement = ({ clientId, token, realm }) => {
       }
       return null;
     };
+
+    // Find the saved node
     const node = findNode(categories, saved);
-    if (node) { setSelectedCategoryId(saved); setSidebarCategories([node]); }
+    if (!node) return;
+
+    // Find its parent (first level under root)
+    const findParentAtLevel = (nodes, targetId, parentNode = null, level = 0) => {
+      for (const n of nodes) {
+        if (n.id === targetId) {
+          // Return the parent at level 1 (AC/Non-AC level)
+          return level === 2 ? parentNode : n;
+        }
+        if (n.children?.length) {
+          const found = findParentAtLevel(n.children, targetId, n, level + 1);
+          if (found) return found;
+        }
+      }
+      return null;
+    };
+
+    const parentCategory = findParentAtLevel(categories, saved);
+    if (parentCategory) {
+      setSelectedCategoryId(parentCategory.id);
+      localStorage.setItem("menu_selected_category", parentCategory.id);
+      setSidebarCategories([parentCategory]);
+    }
   }, [categories]);
 
   useEffect(() => {
