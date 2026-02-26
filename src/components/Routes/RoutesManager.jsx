@@ -21,6 +21,8 @@ import Data from '../Super_Admin/CustomerData/Data';
 import Counters from '../MainComponents/InventoryServices/Counters'
 import Order_Place from '../Super_User/Order_Place/Order_Place';
 import Summary_Super_User from '../Super_User/Order_Place/Summary_Super_User';
+import BillingPage_Super_User from '../Super_User/Billing/Billing_Super_User';
+import KitchenDisplay_Super_User from '../Super_User/Order_Place/KitchenDisplay';
 
 const RoutesManager = () => {
   const { clientId } = useParams();
@@ -132,6 +134,13 @@ const RoutesManager = () => {
 
       <Route path="order-summary" element={
         <Summary_Super_User clientId={clientId} token={token} realm={realm} screenIds={screenIds} />
+      } />
+      <Route path="billing-super-user" element={
+        <BillingPage_Super_User clientId={clientId} token={token} realm={realm} screenIds={screenIds} />
+      } />
+
+      <Route path="kds-super-user" element={
+        <KitchenDisplay_Super_User clientId={clientId} token={token} realm={realm} screenIds={screenIds} />
       } />
       <Route path="*" element={<Navigate to="home" replace />} />
       <Route path='user-profile' element={<UserProfile token={token} clientId={clientId} />} />
