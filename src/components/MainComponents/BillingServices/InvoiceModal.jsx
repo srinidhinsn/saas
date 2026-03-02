@@ -4,7 +4,8 @@ import { toast } from "react-toastify";
 import jsPDF from "jspdf";
 import CustomerAutocomplete from './CustomerAutocomplete';
 import { X, Save, Printer } from 'lucide-react';
-import { loadRazorpay } from "../../utils/RazorPay/loadRazorpay";
+import RazorpayPayment from "../../Constants/RazorPay/RazorpayPayment";
+
 export default function InvoiceModal({
   clientId,
   token,
@@ -29,10 +30,7 @@ export default function InvoiceModal({
   const [status, setStatus] = useState("Draft");
   const [customersList, setCustomersList] = useState([]);
   const [gstManuallyEdited, setGstManuallyEdited] = useState(false);
-  const [paymentMode, setPaymentMode] = useState(null);
-  const [upiQR, setUpiQR] = useState(null);
-  const [processingPayment, setProcessingPayment] = useState(false);
-  const [razorpayOrder, setRazorpayOrder] = useState(null);
+  const [showRazorpayModal, setShowRazorpayModal] = useState(false);
   const safeNum = (num) => (typeof num === "number" && !isNaN(num) ? num : 0);
 
   const updateBalance = (sumOfPayments) => {
@@ -265,117 +263,7 @@ export default function InvoiceModal({
       }
     }
   }, [total]);
-  const handleCashPayment = async () => {
-    setPaymentStatus("Paid");
-    await saveInvoiceDraft();
-    toast.success("Cash payment received");
-    onSave(selectedOrder.id);
-    onClose();
-  };
-  const handleCardPayment = async () => {
 
-    setProcessingPayment(true);
-
-    const ok = await loadRazorpay();
-    if (!ok) {
-      toast.error("Razorpay SDK failed to load");
-      setProcessingPayment(false);
-      return;
-    }
-
-    try {
-
-      // create order in backend
-      const res = await axios.post(
-        `${import.meta.env.VITE_API_ORDER_SERVICE_URL}/${clientId}/create-order`,
-        {
-          amount: total,
-          order_id: selectedOrder.id
-        },
-        { headers: { Authorization: `Bearer ${token}` } }
-      );
-
-      const order = res.data;
-
-      const options = {
-        key: import.meta.env.VITE_RAZORPAY_KEY_ID,
-        amount: order.amount,
-        currency: "INR",
-        name: clientId,
-        description: `Invoice #${selectedOrder.id}`,
-        order_id: order.id,
-
-        handler: async function (response) {
-
-          await axios.post(
-            `${import.meta.env.VITE_API_ORDER_SERVICE_URL}/${clientId}/verify-payment`,
-            response,
-            { headers: { Authorization: `Bearer ${token}` } }
-          );
-        
-          toast.info("Waiting for payment confirmation...");
-        
-          // start polling server
-          const checkPayment = setInterval(async () => {
-            try {
-              const res = await axios.get(
-                `${import.meta.env.VITE_API_ORDER_SERVICE_URL}/${clientId}/payment-status`,
-                {
-                  params: { order_id: selectedOrder.id },
-                  headers: { Authorization: `Bearer ${token}` }
-                }
-              );
-        
-              if (res.data.paid) {
-                clearInterval(checkPayment);
-        
-                toast.success("Payment confirmed ✔");
-        
-                onSave(selectedOrder.id);
-                onClose();
-              }
-            } catch (e) {
-              console.log("polling...");
-            }
-          }, 3000);
-        },
-
-        theme: { color: "#6366f1" }
-      };
-
-      const rzp = new window.Razorpay(options);
-      rzp.open();
-
-    } catch (err) {
-      console.error(err);
-      toast.error("Payment failed");
-    }
-
-    setProcessingPayment(false);
-  }; const handleUPIPayment = async () => {
-
-    setProcessingPayment(true);
-
-    try {
-
-      const res = await axios.post(
-        `${import.meta.env.VITE_API_ORDER_SERVICE_URL}/${clientId}/upi-order`,
-        { amount: total },
-        { headers: { Authorization: `Bearer ${token}` } }
-      );
-
-      const upiString =
-        `upi://pay?pa=${res.data.order_id}@razorpay&pn=${clientId}&am=${total}&cu=INR`;
-
-      setRazorpayOrder(res.data.order_id);
-      setUpiQR(upiString);
-
-    } catch (err) {
-      toast.error("UPI failed");
-    }
-
-    setProcessingPayment(false);
-  };
   const saveInvoiceDraft = async () => {
     if (!selectedOrder) {
       toast.error("Select an order first");
@@ -461,36 +349,26 @@ export default function InvoiceModal({
         itemsPayload,
         { headers: { Authorization: `Bearer ${token}` } }
       );
-      // await axios.post(
-      //   `${import.meta.env.VITE_API_ORDER_SERVICE_URL}/${clientId}/dinein/update`,
-      //   {
-      //     id: selectedOrder.id,
-      //     status: "served",
-      //     invoice_status: paymentStatus.toLowerCase(),
-      //   },
-      //   { headers: { Authorization: `Bearer ${token}` } }
-      // );
-
       // Update table status to vacant after saving invoice
-      if (selectedOrder.table_id) {
-        try {
-          const tableData = tablesMap[selectedOrder.table_id];
-          await axios.post(
-            `${import.meta.env.VITE_API_TABLE_SERVICE_URL}/${clientId}/tables/update`,
-            {
-              id: selectedOrder.table_id,
-              client_id: clientId,
-              name: tableData?.name || `Table ${selectedOrder.table_id}`,
-              table_type: tableData?.table_type || "Regular",
-              status: 'Vacant',
-              location_zone: tableData?.location_zone || "Main"
-            },
-            { headers: { Authorization: `Bearer ${token}` } }
-          );
-        } catch (tableErr) {
-          console.error("Failed to update table status:", tableErr.response?.data || tableErr.message);
-        }
-      }
+      // if (selectedOrder.table_id) {
+      //   try {
+      //     const tableData = tablesMap[selectedOrder.table_id];
+      //     await axios.post(
+      //       `${import.meta.env.VITE_API_TABLE_SERVICE_URL}/${clientId}/tables/update`,
+      //       {
+      //         id: selectedOrder.table_id,
+      //         client_id: clientId,
+      //         name: tableData?.name || `Table ${selectedOrder.table_id}`,
+      //         table_type: tableData?.table_type || "Regular",
+      //         status: 'vacant',
+      //         location_zone: tableData?.location_zone || "Main"
+      //       },
+      //       { headers: { Authorization: `Bearer ${token}` } }
+      //     );
+      //   } catch (tableErr) {
+      //     console.error("Failed to update table status:", tableErr.response?.data || tableErr.message);
+      //   }
+      // }
 
       toast.success("Invoice saved successfully!");
       return draftId;
@@ -500,6 +378,26 @@ export default function InvoiceModal({
       throw err;
     } finally {
       setSaving(false);
+    }
+  };
+
+  const handlePaymentClick = async () => {
+
+    // Ensure invoice exists
+    let draftId = invoiceDraftId;
+
+    if (!draftId) {
+      draftId = await saveInvoiceDraft();
+    }
+
+    const needsRazorpay = splitPaymentEnabled
+      ? paymentSplits.some(s => s.method.includes('razorpay'))
+      : method.includes('razorpay');
+
+    if (needsRazorpay) {
+      setShowRazorpayModal(true);
+    } else {
+      toast.success("Cash payment saved");
     }
   };
 
@@ -515,7 +413,11 @@ export default function InvoiceModal({
     if (!currentInvoiceDraftId) {
       try {
         currentInvoiceDraftId = await saveInvoiceDraft();
-        const updatedDraft = await fetchInvoiceDraft(selectedOrder.id);
+        const updated = await fetchInvoiceDraft(selectedOrder.id);
+        if (updated?.id) {
+          setInvoiceDraftId(updated.id);
+          setPaymentStatus(updated.payment_status || "Paid");
+        }
         if (updatedDraft) {
           setSelectedOrder(prev => ({
             ...prev,
@@ -908,8 +810,8 @@ export default function InvoiceModal({
                             key={statusOption}
                             type="button"
                             className={`px-3 py-1.5 rounded-lg text-xs font-semibold transition-all ${paymentStatus === statusOption
-                                ? "bg-action-primary text-text-white shadow-md"
-                                : "bg-bg-tertiary text-text-secondary hover:bg-bg-secondary border border-border-default"
+                              ? "bg-action-primary text-text-white shadow-md"
+                              : "bg-bg-tertiary text-text-secondary hover:bg-bg-secondary border border-border-default"
                               }`}
                             onClick={() => setPaymentStatus(statusOption)}
                           >
@@ -958,8 +860,8 @@ export default function InvoiceModal({
                               className="flex-1 border border-border-default rounded-lg px-2 py-1.5 text-sm bg-bg-primary text-text-primary focus:ring-2 focus:ring-action-primary"
                             >
                               <option>Cash</option>
-                              <option>UPI</option>
-                              <option>Card</option>
+                              <option value="razorpay_upi">UPI (Razorpay)</option>
+                              <option value="razorpay_card">Card (Razorpay)</option>
                               <option>Due</option>
                             </select>
                             <input
@@ -1000,8 +902,8 @@ export default function InvoiceModal({
                           className="flex-1 border border-border-default rounded-lg px-3 py-2 text-sm bg-bg-primary text-text-primary focus:ring-2 focus:ring-action-primary"
                         >
                           <option>Cash</option>
-                          <option>UPI</option>
-                          <option>Card</option>
+                          <option value="razorpay_upi">UPI (Razorpay)</option>
+                          <option value="razorpay_card">Card (Razorpay)</option>
                           <option>Due</option>
                         </select>
                         <input
@@ -1014,31 +916,11 @@ export default function InvoiceModal({
                     )}
                   </div>
                 </div>
-                {upiQR && (
-                  <div className="mt-4 text-center border-t pt-4">
-                    <p className="font-semibold mb-2">Scan to Pay ₹{total}</p>
-                    <img
-                      src={`https://api.qrserver.com/v1/create-qr-code/?size=260x260&data=${encodeURIComponent(upiQR)}`}
-                      alt="UPI QR"
-                      className="mx-auto"
-                    />
-                    <p className="text-xs mt-2 text-gray-500">Google Pay / PhonePe / Paytm</p>
-                  </div>
-                )}
+
                 {/* Action Buttons */}
                 <div className="flex gap-3">
                   <button
-                     onClick={() => {
-                      if (splitPaymentEnabled) {
-                        toast.info("Complete payments first");
-                        return;
-                      }
-                  
-                      if (method === "Cash") handleCashPayment();
-                      else if (method === "Card") handleCardPayment();
-                      else if (method === "UPI") handleUPIPayment();
-                      else saveInvoiceDraft();
-                    }}
+                    onClick={handlePaymentClick}
                     disabled={saving}
                     className="flex-1 bg-action-primary hover:bg-action-primary/90 text-text-white px-4 py-3 rounded-xl font-bold shadow-lg transition-all disabled:opacity-50 flex items-center justify-center gap-2"
                   >
@@ -1059,6 +941,69 @@ export default function InvoiceModal({
           </div>
         </div>
       </div>
+      {showRazorpayModal && (
+        <RazorpayPayment
+          amount={total}
+          orderId={selectedOrder.id}
+          clientId={clientId}
+          token={token}
+          splitPayments={splitPaymentEnabled ? paymentSplits.filter(s => s.method.includes('razorpay')) : []}
+          isSplitPayment={splitPaymentEnabled}
+          customerDetails={{
+            name: selectedOrder.customer_id || 'Customer',
+            email: selectedOrder.contact_email || '',
+            phone: selectedOrder.contact_phone || ''
+          }}
+          onPaymentSuccess={async (response) => {
+            try {
+
+              // ALWAYS create invoice BEFORE verify
+              const docId = invoiceDraftId || await saveInvoiceDraft();
+
+              if (!docId) {
+                toast.error("Invoice not created");
+                return;
+              }
+
+              // IMPORTANT: force number
+              const payload = {
+                document_id: Number(docId),
+                razorpay_payment_id: String(response.razorpay_payment_id),
+                razorpay_order_id: String(response.razorpay_order_id),
+                razorpay_signature: String(response.razorpay_signature)
+              };
+
+              console.log("VERIFY PAYLOAD:", payload);
+
+              await axios.post(
+                `${import.meta.env.VITE_API_BILLING_SERVICE_URL}/${clientId}/invoice/verify`,
+                payload,
+                {
+                  headers: {
+                    Authorization: `Bearer ${token}`,
+                    "Content-Type": "application/json"
+                  }
+                }
+              );
+
+              setPaymentStatus("Paid");
+              setShowRazorpayModal(false);
+
+              toast.success("Payment verified!");
+
+            } catch (err) {
+              console.error("VERIFY ERROR", err.response?.data);
+              toast.error("Payment verification failed");
+            }
+          }}
+          onPaymentFailure={(error) => {
+            console.error('Payment failed:', error);
+            setShowRazorpayModal(false);
+            toast.error('Payment failed. Please try again.');
+          }}
+          onClose={() => setShowRazorpayModal(false)}
+        />
+      )}
     </div>
   );
 }
