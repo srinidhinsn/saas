@@ -11,6 +11,7 @@ class OrderStatusEnum(str, Enum):
     ready = "ready"
     served = "served"
     cancelled = "cancelled"
+    completed ="completed"
 
 
 class OrderItemModel(BaseModel):
@@ -33,10 +34,6 @@ class OrderItemModel(BaseModel):
 class DineinOrderModel(BaseModel):
     id: Optional[int] = None
     client_id: Optional[str] = None
-
-    # Business-facing order identifier.
-    # Fresh orders: dinein_order_id == str(id), e.g. "1001"
-    # Sub-orders:   dinein_order_id == "<parent_dinein_order_id>-<n>", e.g. "1001-1"
     dinein_order_id: Optional[str] = None
     table_id: Optional[int] = None
     invoice_id: Optional[str] = None

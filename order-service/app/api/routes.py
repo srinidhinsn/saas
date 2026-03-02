@@ -11,100 +11,12 @@ from utils.auth import verify_token
 from models.saas_context import SaasContext
 from typing import Optional
 from entity.inventory_entity import InventoryEntity
+from ..services.order_service import _root_dinein_id, _order_row_to_flat, STATUS_PRIORITY, _merge_group
 # from app.services.order_service import deduct_inventory_after_order
 from decimal import Decimal
 
 
 router = APIRouter()
-
-
-# ── Private helpers ─────────────────────────────────────────────────────────
-
-def _root_dinein_id(dinein_order_id: str) -> str:
-    """Return the root part of a dinein_order_id.  "1001-2" → "1001" """
-    return dinein_order_id.split("-")[0] if dinein_order_id else dinein_order_id
-
-
-STATUS_PRIORITY = {"new": 0, "pending": 1, "preparing": 2, "ready": 3, "served": 4}
-
-
-def _order_row_to_flat(order) -> dict:
-    """Convert a single DB order row to a flat dict for KDS (no merging)."""
-    items = []
-    for item in order.items:
-        m = Db_OrderItem_Entity.copyToModel(item).dict()
-        items.append(m)
-    return {
-        "id": order.id,
-        "dinein_order_id": order.dinein_order_id,
-        "table_id": order.table_id,
-        "client_id": order.client_id,
-        "status": order.status,
-        "created_at": order.created_at,
-        "items": items,
-        "total_price": order.total_price or 0,
-        "is_sub_order": "-" in (order.dinein_order_id or ""),
-    }
-
-
-def _merge_group(orders: list) -> dict:
-    """
-    Merge root + sub-order DB rows into one response dict for /dinein/table.
-    Used by TakeOrder floor view to show one entry per table group.
-    Includes sub_orders metadata so the frontend can calculate:
-      - timer (root created_at)
-      - order count (len(sub_orders) + 1)
-      - total price (sum of all items unit_price * quantity)
-    Items carry batch_label and sub_order_id for the view-order cart reconstruction.
-    """
-    orders = sorted(orders, key=lambda o: o.created_at or 0)
-    root = orders[0]
-    merged_items = []
-    for order in orders:
-        for item in order.items:
-            m = Db_OrderItem_Entity.copyToModel(item).dict()
-            m["batch_label"] = order.dinein_order_id
-            m["sub_order_id"] = order.id
-            merged_items.append(m)
-
-    statuses = [o.status for o in orders if o.status]
-    overall = min(statuses, key=lambda s: STATUS_PRIORITY.get(s, 99)) if statuses else "pending"
-
-    # sub_orders metadata for TakeOrder (timer, count, price)
-    sub_orders_meta = [
-        {
-            "id": o.id,
-            "dinein_order_id": o.dinein_order_id,
-            "created_at": o.created_at,
-            "status": o.status,
-            "total_price": o.total_price or 0,
-        }
-        for o in orders
-    ]
-
-    # Total price = sum of all items' unit_price * quantity (no GST/CST)
-    total_price = sum(
-        (item.unit_price or 0) * (item.quantity or 1)
-        for order in orders
-        for item in order.items
-    )
-
-    return {
-        "id": root.id,
-        "dinein_order_id": root.dinein_order_id,
-        "table_id": root.table_id,
-        "client_id": root.client_id,
-        "status": overall,
-        "created_at": root.created_at,          # oldest = root timer
-        "items": merged_items,
-        "total_price": total_price,
-        "item_names": [i.get("item_name", "") for i in merged_items],
-        "sub_orders": sub_orders_meta,           # for TakeOrder count + timer
-        "order_count": len(orders),              # total batches incl. root
-    }
-
-# ───────────────────────────────────────────────────────────────────────────
-
 
 @router.post("/dinein/create", response_model=ResponseModel[DineinOrderModel])
 def create_order(client_id: str, order: DineinOrderModel, context: SaasContext = Depends(verify_token), db: Session = Depends(get_db)):

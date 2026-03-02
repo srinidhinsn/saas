@@ -1,9 +1,8 @@
-from sqlalchemy import Column, Integer, String, Float, DateTime, ForeignKey, ARRAY, BigInteger
+from sqlalchemy import Column, Integer, String, Float, DateTime, ForeignKey, ARRAY,BigInteger
 from sqlalchemy.orm import declarative_base, relationship
 import datetime
 from models.order_model import OrderItemModel, DineinOrderModel
 Base = declarative_base()
-from sqlalchemy import ForeignKeyConstraint
 
 
 # DineinOrders Table
@@ -12,12 +11,7 @@ class DineinOrder(Base):
 
     id = Column(Integer, primary_key=True)
     client_id = Column(String, nullable=True)
-
-    # dinein_order_id acts as the business-facing order number.
-    # For a fresh order its value equals str(id), e.g. "1001".
-    # For sub-orders it is "<parent_dinein_order_id>-<n>", e.g. "1001-1", "1001-2".
-    dinein_order_id = Column(String, nullable=True, index=True)
-
+    dinein_order_id = Column(String, nullable=True)
     table_id = Column(Integer, nullable=True)
     invoice_id = Column(String, nullable=True)
     handler_id = Column(String, nullable=True)
@@ -53,8 +47,11 @@ class DineinOrder(Base):
         """Convert SQLAlchemy DineinOrders entities into Pydantic models."""
         dineinOrdersModels = [DineinOrderModel(
             **order.__dict__) for order in dinein_orders]
+
+        # Remove SQLAlchemy metadata (_sa_instance_state)
         for model in dineinOrdersModels:
             model.__dict__.pop("_sa_instance_state", None)
+
         return dineinOrdersModels
 
     @staticmethod
@@ -74,8 +71,8 @@ class OrderItem(Base):
     item_name = Column(String, nullable=True)
     slug = Column(String, nullable=True)
     quantity = Column(Integer, nullable=True)
-    unit_price = Column(Float, nullable=True)
-    line_total = Column(Float, nullable=True)
+    unit_price = Column(Float, nullable=True)   
+    line_total = Column(Float, nullable=True)   
     status = Column(String, nullable=True)
     frontend_unique_key = Column(String, nullable=True)
 
