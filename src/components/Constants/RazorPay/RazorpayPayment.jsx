@@ -151,26 +151,30 @@ const RazorpayPayment = ({
       }
 
       // Step 3: Open Razorpay Checkout
-      const response = await openRazorpayCheckout(razorpayOrder, methodOptions);
+    // Step 3: Open Razorpay Checkout
+const response = await openRazorpayCheckout(razorpayOrder, methodOptions);
 
-      // Step 4: Verify payment on backend
-      const verificationData = {
-        razorpay_order_id: response.razorpay_order_id,
-        razorpay_payment_id: response.razorpay_payment_id,
-        razorpay_signature: response.razorpay_signature,
-        order_id: orderId,
-        amount: amount,
-        payment_method: paymentMethod,
-      };
+// Step 4: VERIFY PAYMENT HERE (THIS IS THE FIX)
+await axios.post(
+  `${import.meta.env.VITE_API_BILLING_SERVICE_URL}/${clientId}/invoice/verify`,
+  {
+    document_id: orderId,   // invoice id coming from parent
+    razorpay_payment_id: response.razorpay_payment_id,
+    razorpay_order_id: response.razorpay_order_id,
+    razorpay_signature: response.razorpay_signature
+  },
+  {
+    headers: {
+      Authorization: `Bearer ${token}`,
+      "Content-Type": "application/json"
+    }
+  }
+);
 
-     
-      setPaymentStatus('success');
+setPaymentStatus('success');
 
-      onPaymentSuccess && onPaymentSuccess({
-        razorpay_payment_id: response.razorpay_payment_id,
-        razorpay_order_id: response.razorpay_order_id,
-        razorpay_signature: response.razorpay_signature,
-      });
+// Inform parent only AFTER successful verification
+onPaymentSuccess && onPaymentSuccess(response);
 
     } catch (error) {
       console.error('Payment failed:', error);
@@ -317,9 +321,7 @@ const RazorpayPayment = ({
   };
 
   // Don't show if payment is successful (let parent handle close)
-  if (paymentStatus === 'success') {
-    return null;
-  }
+
 
   return (
     <div className="fixed inset-0 bg-black/60 backdrop-blur-sm flex items-center justify-center z-[100] p-4">

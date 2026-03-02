@@ -26,7 +26,7 @@ const RestaurantSelector = ({ token, superClientId }) => {
     <select
       value={clientId || ""}
       onChange={(e) => switchTenant(e.target.value)}
-      className="border rounded-lg px-3 py-2 bg-white"
+      className="border-none outline-none rounded-lg px-3 py-2 bg-bg-primary "
     >
       <option value="">Select Restaurant</option>
       {clients.map((c) => (
