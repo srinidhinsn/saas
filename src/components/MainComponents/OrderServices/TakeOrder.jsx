@@ -524,7 +524,7 @@ const TakeOrder = ({ clientId, token, onOrderUpdate, realm }) => {
         { params: { dinein_order_id: orderId, client_id: clientId }, headers: { Authorization: `Bearer ${token}` } });
       const tableObj = tables.find(t => t.id === tableId);
       if (tableObj) await axios.post(`${import.meta.env.VITE_API_TABLE_SERVICE_URL}/${clientId}/tables/update`,
-        { id: tableId, client_id: clientId, name: tableObj.name, table_type: tableObj.table_type, status: 'Vacant', location_zone: tableObj.location_zone },
+        { id: tableId, client_id: clientId, name: tableObj.name, table_type: tableObj.table_type, status: 'vacant', location_zone: tableObj.location_zone },
         { headers: { Authorization: `Bearer ${token}` } });
       toast.success('Order deleted');
       await fetchTables(); setShowDeleteConfirm(false); setOrderToDelete(null);

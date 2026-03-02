@@ -38,24 +38,36 @@ export default function InvoiceModal({
     setBalanceAmount(bal < 0 ? 0 : Number(bal.toFixed(2)));
   };
 
-  const orderSubtotal = Number(
-    (selectedOrder?.items || []).reduce(
-      (sum, item) =>
-        sum + (Number(item.unit_price) || 0) * (Number(item.quantity) || 0),
-      0
-    ).toFixed(2)
-  );
+// 1️⃣ Subtotal
+const orderSubtotal = Number(
+  (selectedOrder?.items || []).reduce(
+    (sum, item) =>
+      sum + (Number(item.unit_price) || 0) * (Number(item.quantity) || 0),
+    0
+  ).toFixed(2)
+);
 
-  const calculatedDiscount = discountIsPercent
-    ? (orderSubtotal * discount) / 100
-    : discount;
+// 2️⃣ GST on subtotal
+const calculatedGST = Number(
+  (orderSubtotal * (taxPercent / 100)).toFixed(2)
+);
 
-  const calculatedGST = (orderSubtotal - calculatedDiscount) * (taxPercent / 100);
+// 3️⃣ Amount after tax
+const amountAfterTax = Number(
+  (orderSubtotal + calculatedGST).toFixed(2)
+);
 
-  const calculatedTotal = Number(
-    (orderSubtotal - calculatedDiscount + calculatedGST).toFixed(2)
-  );
-  const total = calculatedTotal;
+// 4️⃣ Discount on final amount (after tax)
+const calculatedDiscount = discountIsPercent
+  ? Number(((amountAfterTax * discount) / 100).toFixed(2))
+  : Number(discount);
+
+// 5️⃣ Final Total
+const calculatedTotal = Number(
+  (amountAfterTax - calculatedDiscount).toFixed(2)
+);
+
+const total = calculatedTotal;
 
   const sumSplits = (splits) => splits.reduce((sum, s) => sum + Number(s.amount), 0);
 
@@ -273,16 +285,27 @@ export default function InvoiceModal({
       toast.error("Selected order has no items");
       return;
     }
+
     if (splitPaymentEnabled) {
-      const sumPayments = paymentSplits.reduce((sum, p) => sum + Number(p.amount), 0);
-      if (Number(sumPayments.toFixed(2)) !== Number(total.toFixed(2))) {
-        toast.error("Split payment amounts do not sum up to the total");
-        return;
-      }
       if (paymentSplits.length < 2) {
         toast.error("Add at least two payment methods for split payment");
         return;
       }
+
+      const sumPayments = paymentSplits.reduce((sum, p) => sum + Number(p.amount), 0);
+      const roundedSum = Number(sumPayments.toFixed(2));
+      const roundedTotal = Number(total.toFixed(2));
+
+      if (roundedSum < roundedTotal) {
+        toast.error(`Split payment total ₹${roundedSum.toFixed(2)} is less than invoice total ₹${roundedTotal.toFixed(2)}`);
+        return;
+      }
+      if (roundedSum > roundedTotal) {
+        toast.error(`Split payment total ₹${roundedSum.toFixed(2)} exceeds invoice total ₹${roundedTotal.toFixed(2)}`);
+        return;
+      }
+    } else {
+      setPaymentSplits([{ method, amount: total }]);
     }
 
     let paymentMethodArray;
@@ -292,7 +315,7 @@ export default function InvoiceModal({
         amount: Number(p.amount || 0),
       }));
     } else {
-      paymentMethodArray = [{ method, amount: Number(total) }];
+      paymentMethodArray = [{ method, amount: total }];
     }
 
     setSaving(true);
@@ -311,7 +334,7 @@ export default function InvoiceModal({
         total_amount: calculatedTotal,
         payment_status: paymentStatus,
         payment_method: paymentMethodArray,
-        single_payment_amount: splitPaymentEnabled ? null : Number(total.toFixed(2)),
+        single_payment_amount: splitPaymentEnabled ? null : Number(paymentSplits[0]?.amount ?? total),  // ✅ also fixed here
         status: status,
         customer_id: selectedOrder.customer_id || "",
         contact_email: selectedOrder.contact_email || "",
@@ -349,26 +372,6 @@ export default function InvoiceModal({
         itemsPayload,
         { headers: { Authorization: `Bearer ${token}` } }
       );
-      // Update table status to vacant after saving invoice
-      // if (selectedOrder.table_id) {
-      //   try {
-      //     const tableData = tablesMap[selectedOrder.table_id];
-      //     await axios.post(
-      //       `${import.meta.env.VITE_API_TABLE_SERVICE_URL}/${clientId}/tables/update`,
-      //       {
-      //         id: selectedOrder.table_id,
-      //         client_id: clientId,
-      //         name: tableData?.name || `Table ${selectedOrder.table_id}`,
-      //         table_type: tableData?.table_type || "Regular",
-      //         status: 'vacant',
-      //         location_zone: tableData?.location_zone || "Main"
-      //       },
-      //       { headers: { Authorization: `Bearer ${token}` } }
-      //     );
-      //   } catch (tableErr) {
-      //     console.error("Failed to update table status:", tableErr.response?.data || tableErr.message);
-      //   }
-      // }
 
       toast.success("Invoice saved successfully!");
       return draftId;
@@ -382,22 +385,38 @@ export default function InvoiceModal({
   };
 
   const handlePaymentClick = async () => {
-
-    // Ensure invoice exists
+    // Run validation + save — if validation fails, saveInvoiceDraft returns undefined
     let draftId = invoiceDraftId;
 
     if (!draftId) {
-      draftId = await saveInvoiceDraft();
+      try {
+        draftId = await saveInvoiceDraft();
+      } catch {
+        // saveInvoiceDraft threw — error toast already shown inside
+        return;
+      }
+    } else {
+      // Draft exists but we still need to validate + update with latest values
+      try {
+        await saveInvoiceDraft();
+      } catch {
+        return;
+      }
     }
 
-    const needsRazorpay = splitPaymentEnabled
-      ? paymentSplits.some(s => s.method.includes('razorpay'))
-      : method.includes('razorpay');
+    // If draftId is still null/undefined, validation blocked the save
+    if (!draftId) return;
 
+    const isOnlineMethod = (m) =>
+      m === "razorpay_upi" || m === "razorpay_card";
+    
+    const needsRazorpay = splitPaymentEnabled
+      ? paymentSplits.some(s => isOnlineMethod(s.method))
+      : isOnlineMethod(method);
     if (needsRazorpay) {
       setShowRazorpayModal(true);
     } else {
-      toast.success("Cash payment saved");
+      toast.success("Payment saved successfully!");
     }
   };
 
@@ -910,7 +929,7 @@ export default function InvoiceModal({
                           type="number"
                           value={total}
                           readOnly
-                          className="w-28 border border-border-default rounded-lg px-3 py-2 bg-bg-tertiary text-sm font-semibold text-right text-text-primary"
+                          className="w-28 border border-border-default rounded-lg px-3 py-2 text-sm font-semibold text-right text-text-primary bg-bg-tertiary cursor-not-allowed opacity-70"
                         />
                       </div>
                     )}
@@ -944,7 +963,7 @@ export default function InvoiceModal({
       {showRazorpayModal && (
         <RazorpayPayment
           amount={total}
-          orderId={selectedOrder.id}
+          orderId={invoiceDraftId}
           clientId={clientId}
           token={token}
           splitPayments={splitPaymentEnabled ? paymentSplits.filter(s => s.method.includes('razorpay')) : []}
@@ -966,25 +985,25 @@ export default function InvoiceModal({
               }
 
               // IMPORTANT: force number
-              const payload = {
-                document_id: Number(docId),
-                razorpay_payment_id: String(response.razorpay_payment_id),
-                razorpay_order_id: String(response.razorpay_order_id),
-                razorpay_signature: String(response.razorpay_signature)
-              };
+              // const payload = {
+              //   document_id: Number(docId),
+              //   razorpay_payment_id: String(response.razorpay_payment_id),
+              //   razorpay_order_id: String(response.razorpay_order_id),
+              //   razorpay_signature: String(response.razorpay_signature)
+              // };
 
-              console.log("VERIFY PAYLOAD:", payload);
+              // console.log("VERIFY PAYLOAD:", payload);
 
-              await axios.post(
-                `${import.meta.env.VITE_API_BILLING_SERVICE_URL}/${clientId}/invoice/verify`,
-                payload,
-                {
-                  headers: {
-                    Authorization: `Bearer ${token}`,
-                    "Content-Type": "application/json"
-                  }
-                }
-              );
+              // await axios.post(
+              //   `${import.meta.env.VITE_API_BILLING_SERVICE_URL}/${clientId}/invoice/verify`,
+              //   payload,
+              //   {
+              //     headers: {
+              //       Authorization: `Bearer ${token}`,
+              //       "Content-Type": "application/json"
+              //     }
+              //   }
+              // );
 
               setPaymentStatus("Paid");
               setShowRazorpayModal(false);
