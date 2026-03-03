@@ -131,11 +131,11 @@ const OrderItemsViewModal = ({ isOpen, onClose, order, inventoryMap }) => {
 
   const getItemStatusStyle = (status) => {
     switch (status?.toLowerCase()) {
-      case 'pending':   return 'bg-orange-100 text-orange-700';
+      case 'pending': return 'bg-orange-100 text-orange-700';
       case 'preparing': return 'bg-blue-100 text-blue-700';
-      case 'ready':     return 'bg-green-100 text-green-700';
-      case 'served':    return 'bg-gray-100 text-gray-600';
-      default:          return 'bg-bg-tertiary text-text-secondary';
+      case 'ready': return 'bg-green-100 text-green-700';
+      case 'served': return 'bg-gray-100 text-gray-600';
+      default: return 'bg-bg-tertiary text-text-secondary';
     }
   };
 
@@ -292,10 +292,10 @@ const OrderItemsViewModal = ({ isOpen, onClose, order, inventoryMap }) => {
 
 const StatusBadge = ({ status }) => {
   const styles = {
-    pending:   'bg-orange-100 text-orange-700 border-orange-200',
+    pending: 'bg-orange-100 text-orange-700 border-orange-200',
     preparing: 'bg-blue-100 text-blue-700 border-blue-200',
-    ready:     'bg-green-100 text-green-700 border-green-200',
-    served:    'bg-gray-100 text-gray-600 border-gray-200',
+    ready: 'bg-green-100 text-green-700 border-green-200',
+    served: 'bg-gray-100 text-gray-600 border-gray-200',
   };
   const s = status?.toLowerCase();
   return (
@@ -325,44 +325,44 @@ const OrderSummaryVisible = ({ clientId, token }) => {
   const navigate = useNavigate();
 
   // ── Data ──────────────────────────────────────────────────────────────────
-  const [orders, setOrders]                         = useState([]);
-  const [loading, setLoading]                       = useState(true);
-  const [inventoryMap, setInventoryMap]             = useState({});
-  const [allInventoryItems, setAllInventoryItems]   = useState([]);
-  const [tablesMap, setTablesMap]                   = useState({});
-  const [tables, setTables]                         = useState([]);
+  const [orders, setOrders] = useState([]);
+  const [loading, setLoading] = useState(true);
+  const [inventoryMap, setInventoryMap] = useState({});
+  const [allInventoryItems, setAllInventoryItems] = useState([]);
+  const [tablesMap, setTablesMap] = useState({});
+  const [tables, setTables] = useState([]);
 
   // ── Singular filter state ─────────────────────────────────────────────────
   const todayDate = new Date().toISOString().split('T')[0];
-  const [selectedDate, setSelectedDate]             = useState(todayDate);
-  const [filterMode, setFilterMode]                 = useState(0);
+  const [selectedDate, setSelectedDate] = useState(todayDate);
+  const [filterMode, setFilterMode] = useState(0);
   // Single order-mode selection — NOT multi-select
-  const [selectedOrderMode, setSelectedOrderMode]   = useState('all');
+  const [selectedOrderMode, setSelectedOrderMode] = useState('all');
 
   // ── View modal ────────────────────────────────────────────────────────────
-  const [viewOrder, setViewOrder]                   = useState(null);
-  const [showViewModal, setShowViewModal]           = useState(false);
+  const [viewOrder, setViewOrder] = useState(null);
+  const [showViewModal, setShowViewModal] = useState(false);
 
   // ── Delete ────────────────────────────────────────────────────────────────
-  const [showDeleteModal, setShowDeleteModal]       = useState(false);
-  const [orderToDelete, setOrderToDelete]           = useState(null);
-  const [showDeleteModals, setShowDeleteModals]     = useState(false);
-  const [deleteTarget, setDeleteTarget]             = useState({ orderId: null, itemBackendId: null });
+  const [showDeleteModal, setShowDeleteModal] = useState(false);
+  const [orderToDelete, setOrderToDelete] = useState(null);
+  const [showDeleteModals, setShowDeleteModals] = useState(false);
+  const [deleteTarget, setDeleteTarget] = useState({ orderId: null, itemBackendId: null });
 
   // ── Order detail / edit modal (kept from original) ────────────────────────
   const [showOrderDetailModal, setShowOrderDetailModal] = useState(false);
-  const [selectedOrder, setSelectedOrder]           = useState(null);
-  const [editOrderId, setEditOrderId]               = useState(null);
-  const [activeTab, setActiveTab]                   = useState('items');
-  const [itemSearchQuery, setItemSearchQuery]       = useState('');
-  const [itemSearchResults, setItemSearchResults]   = useState([]);
-  const [selectedCategory, setSelectedCategory]     = useState(null);
+  const [selectedOrder, setSelectedOrder] = useState(null);
+  const [editOrderId, setEditOrderId] = useState(null);
+  const [activeTab, setActiveTab] = useState('items');
+  const [itemSearchQuery, setItemSearchQuery] = useState('');
+  const [itemSearchResults, setItemSearchResults] = useState([]);
+  const [selectedCategory, setSelectedCategory] = useState(null);
   const [currentBatchTimestamp, setCurrentBatchTimestamp] = useState(null);
   const [lineItemsModalOpen, setLineItemsModalOpen] = useState(false);
-  const [selectedMainItem, setSelectedMainItem]     = useState(null);
-  const [lineItemsDetails, setLineItemsDetails]     = useState([]);
-  const [pendingOrderId, setPendingOrderId]         = useState(null);
-  const [visibleOrderId, setVisibleOrderId]         = useState(null);
+  const [selectedMainItem, setSelectedMainItem] = useState(null);
+  const [lineItemsDetails, setLineItemsDetails] = useState([]);
+  const [pendingOrderId, setPendingOrderId] = useState(null);
+  const [visibleOrderId, setVisibleOrderId] = useState(null);
 
   // ─────────────────────────────────────────────────────────────────────────
   // localStorage helpers (preserved exactly from original)
@@ -378,11 +378,11 @@ const OrderSummaryVisible = ({ clientId, token }) => {
         try {
           const raw = JSON.parse(localStorage.getItem(key));
           if (!raw) continue;
-          const unique_key      = raw.unique_key || raw.frontend_unique_key || raw.id || null;
+          const unique_key = raw.unique_key || raw.frontend_unique_key || raw.id || null;
           const batch_timestamp = raw.batch_timestamp
             ? Number(raw.batch_timestamp)
             : raw.batchTs ? Number(raw.batchTs) : null;
-          const item_id  = raw.item_id || raw.inventory_id || raw.inventoryId || raw.itemId || null;
+          const item_id = raw.item_id || raw.inventory_id || raw.inventoryId || raw.itemId || null;
           const added_at = raw.added_at || raw.added_at_frontend || raw.addedAt || raw.addedAtFrontend || null;
           const quantity = raw.quantity || 1;
           arr.push({ ...raw, unique_key, batch_timestamp, item_id, added_at, quantity });
@@ -454,22 +454,22 @@ const OrderSummaryVisible = ({ clientId, token }) => {
         meta = JSON.parse(raw);
       } else {
         let seq = 1;
-        const seqKey    = `order_${orderId}_batch_seq`;
+        const seqKey = `order_${orderId}_batch_seq`;
         const prevSeqRaw = localStorage.getItem(seqKey);
         if (prevSeqRaw) {
           const prev = parseInt(prevSeqRaw, 10);
           if (!isNaN(prev)) seq = prev + 1;
         }
-        const now       = new Date(bt);
-        const hh        = String(now.getHours()).padStart(2, '0');
-        const mm        = String(now.getMinutes()).padStart(2, '0');
+        const now = new Date(bt);
+        const hh = String(now.getHours()).padStart(2, '0');
+        const mm = String(now.getMinutes()).padStart(2, '0');
         const timeLabel = `${hh}-${mm}`;
         meta = {
-          timestamp:   bt,
-          started_at:  Date.now(),
+          timestamp: bt,
+          started_at: Date.now(),
           seq,
-          table_slug:  slugify(tableName || ''),
-          time_label:  timeLabel,
+          table_slug: slugify(tableName || ''),
+          time_label: timeLabel,
           added_count: 0,
         };
         localStorage.setItem(storageKey, JSON.stringify(meta));
@@ -482,10 +482,10 @@ const OrderSummaryVisible = ({ clientId, token }) => {
   };
 
   const generateFrontendKeyFromBatch = (orderId, batchMeta) => {
-    const tableSlug  = batchMeta.table_slug || 'TBL';
-    const timeLabel  = batchMeta.time_label || '00-00';
+    const tableSlug = batchMeta.table_slug || 'TBL';
+    const timeLabel = batchMeta.time_label || '00-00';
     const itemsCount = batchMeta.added_count || 0;
-    const seq        = batchMeta.seq || 1;
+    const seq = batchMeta.seq || 1;
     return `${tableSlug}_${timeLabel}_${itemsCount}_${orderId}_${seq}`;
   };
 
@@ -524,7 +524,7 @@ const OrderSummaryVisible = ({ clientId, token }) => {
         (res.data.data || []).forEach(i => (map[i.id] = i));
         setInventoryMap(map);
       })
-      .catch(() => {});
+      .catch(() => { });
   }, [clientId, token]);
 
   // ─────────────────────────────────────────────────────────────────────────
@@ -575,7 +575,7 @@ const OrderSummaryVisible = ({ clientId, token }) => {
     }
 
     const rawNewItems = getNewItemsFromStorage(order.id) || [];
-    const storageByKey          = new Map();
+    const storageByKey = new Map();
     const storageByBatchAndItem = new Map();
 
     rawNewItems.forEach(si => {
@@ -594,7 +594,7 @@ const OrderSummaryVisible = ({ clientId, token }) => {
         .map(i => String(i.frontend_unique_key))
     );
 
-    const oldItems      = [];
+    const oldItems = [];
     const batchItemsMap = new Map();
 
     const pushToBatch = (batchTs, itemObj) => {
@@ -608,7 +608,7 @@ const OrderSummaryVisible = ({ clientId, token }) => {
       );
       if (existingIndex >= 0) {
         const ex = batchItemsMap.get(ts)[existingIndex];
-        ex.quantity  = (ex.quantity || 1) + (itemObj.quantity || 1);
+        ex.quantity = (ex.quantity || 1) + (itemObj.quantity || 1);
         ex.line_total = (ex.unit_price || ex.price || 0) * ex.quantity;
         if (!ex.frontend_unique_key && itemObj.frontend_unique_key)
           ex.frontend_unique_key = itemObj.frontend_unique_key;
@@ -619,7 +619,7 @@ const OrderSummaryVisible = ({ clientId, token }) => {
 
     (order.items || []).forEach(item => {
       const backendKey = item.frontend_unique_key ? String(item.frontend_unique_key) : null;
-      const itemId     = item.item_id || item.inventory_id || item.id || null;
+      const itemId = item.item_id || item.inventory_id || item.id || null;
       let matchedBatch = null;
 
       if (backendKey && storageByKey.has(backendKey)) {
@@ -663,20 +663,20 @@ const OrderSummaryVisible = ({ clientId, token }) => {
       const itemInfo = inventoryMap[si.item_id];
       if (!itemInfo) return;
       pushToBatch(si.batch_timestamp, {
-        item_id:             si.item_id,
-        item_name:           itemInfo.name,
-        quantity:            si.quantity || 1,
-        price:               itemInfo.unit_price,
-        unit_price:          itemInfo.unit_price,
-        status:              'pending',
-        note:                '',
-        slug:                itemInfo.slug || generateSlug(itemInfo.name),
-        added_at_frontend:   si.added_at,
+        item_id: si.item_id,
+        item_name: itemInfo.name,
+        quantity: si.quantity || 1,
+        price: itemInfo.unit_price,
+        unit_price: itemInfo.unit_price,
+        status: 'pending',
+        note: '',
+        slug: itemInfo.slug || generateSlug(itemInfo.name),
+        added_at_frontend: si.added_at,
         frontend_unique_key: si.unique_key,
-        is_new_item:         true,
-        batch_timestamp:     si.batch_timestamp,
-        id:                  si.unique_key,
-        image:               itemInfo.image,
+        is_new_item: true,
+        batch_timestamp: si.batch_timestamp,
+        id: si.unique_key,
+        image: itemInfo.image,
       });
     });
 
@@ -690,7 +690,7 @@ const OrderSummaryVisible = ({ clientId, token }) => {
       }
     });
 
-    const seen    = new Set();
+    const seen = new Set();
     const deduped = [];
     for (const it of allItems) {
       const key = it.frontend_unique_key
@@ -703,7 +703,7 @@ const OrderSummaryVisible = ({ clientId, token }) => {
             : `${x.item_id}_${x.batch_timestamp || 0}_${x.unit_price || x.price || 0}`) === key
         );
         if (existing) {
-          existing.quantity  = (existing.quantity || 1) + (it.quantity || 1);
+          existing.quantity = (existing.quantity || 1) + (it.quantity || 1);
           existing.line_total = (existing.unit_price || existing.price || 0) * existing.quantity;
         }
         continue;
@@ -715,8 +715,8 @@ const OrderSummaryVisible = ({ clientId, token }) => {
     return {
       ...order,
       _fixedOrderMode: order._fixedOrderMode ?? getInitialOrderMode(order),
-      items:           deduped,
-      has_new_items:   batchItemsMap.size > 0,
+      items: deduped,
+      has_new_items: batchItemsMap.size > 0,
     };
   };
 
@@ -752,7 +752,7 @@ const OrderSummaryVisible = ({ clientId, token }) => {
   // ─────────────────────────────────────────────────────────────────────────
 
   const handleStatusChange = async (orderId, newStatus) => {
-    const order    = orders.find(o => o.id === orderId);
+    const order = orders.find(o => o.id === orderId);
     if (!order || order.status === 'served') return;
     const tableObj = tables.find(t => t.id === order.table_id);
     try {
@@ -765,11 +765,11 @@ const OrderSummaryVisible = ({ clientId, token }) => {
         await axios.post(
           `${import.meta.env.VITE_API_TABLE_SERVICE_URL}/${clientId}/tables/update`,
           {
-            id:            order.table_id,
-            client_id:     clientId,
-            name:          tableObj.name,
-            table_type:    tableObj.table_type,
-            status:        'vacant',
+            id: order.table_id,
+            client_id: clientId,
+            name: tableObj.name,
+            table_type: tableObj.table_type,
+            status: 'vacant',
             location_zone: tableObj.location_zone,
           },
           { headers: { Authorization: `Bearer ${token}` } }
@@ -798,7 +798,7 @@ const OrderSummaryVisible = ({ clientId, token }) => {
 
   const cancelItem = async (orderId, itemBackendId) => {
     const order = orders.find(o => o.id === orderId);
-    const item  = order?.items.find(i => i.id === itemBackendId);
+    const item = order?.items.find(i => i.id === itemBackendId);
     if (!item) return;
     try {
       if (
@@ -819,7 +819,7 @@ const OrderSummaryVisible = ({ clientId, token }) => {
       await axios.delete(
         `${import.meta.env.VITE_API_ORDER_SERVICE_URL}/${clientId}/order_item/delete`,
         {
-          params:  { order_item_id: itemBackendId, client_id: clientId },
+          params: { order_item_id: itemBackendId, client_id: clientId },
           headers: { Authorization: `Bearer ${token}` },
         }
       );
@@ -878,7 +878,7 @@ const OrderSummaryVisible = ({ clientId, token }) => {
       await axios.delete(
         `${import.meta.env.VITE_API_ORDER_SERVICE_URL}/${clientId}/dinein/delete`,
         {
-          params:  { dinein_order_id: orderToDelete, client_id: clientId },
+          params: { dinein_order_id: orderToDelete, client_id: clientId },
           headers: { Authorization: `Bearer ${token}` },
         }
       );
@@ -889,11 +889,11 @@ const OrderSummaryVisible = ({ clientId, token }) => {
         await axios.post(
           `${import.meta.env.VITE_API_TABLE_SERVICE_URL}/${clientId}/tables/update`,
           {
-            id:            tableIdOfDel,
-            client_id:     clientId,
-            name:          tableObj?.name || '',
-            table_type:    tableObj?.table_type || '',
-            status:        'vacant',
+            id: tableIdOfDel,
+            client_id: clientId,
+            name: tableObj?.name || '',
+            table_type: tableObj?.table_type || '',
+            status: 'vacant',
             location_zone: tableObj?.location_zone || '',
           },
           { headers: { Authorization: `Bearer ${token}` } }
@@ -967,7 +967,7 @@ const OrderSummaryVisible = ({ clientId, token }) => {
   };
 
   const addItemToOrderWithBatch = (orderId, selectedItem, forcedBatchTimestamp, isMainItem = false) => {
-    let batchKey  = `order_${orderId}_batch_${forcedBatchTimestamp}`;
+    let batchKey = `order_${orderId}_batch_${forcedBatchTimestamp}`;
     let batchMeta = null;
     try {
       const raw = localStorage.getItem(batchKey);
@@ -976,8 +976,8 @@ const OrderSummaryVisible = ({ clientId, token }) => {
 
     if (!batchMeta) {
       const tableName = tablesMap?.[selectedOrder?.table_id] || (selectedOrder?.table || '');
-      const ensured   = ensureBatchForOrder(orderId, tableName);
-      batchKey  = ensured.storageKey;
+      const ensured = ensureBatchForOrder(orderId, tableName);
+      batchKey = ensured.storageKey;
       batchMeta = ensured.meta;
     }
     if (!batchMeta) return;
@@ -1000,7 +1000,7 @@ const OrderSummaryVisible = ({ clientId, token }) => {
       const idOrKey = existingItemInBatch.id || existingItemInBatch.frontend_unique_key;
       updateItemQuantity(orderId, idOrKey, (existingItemInBatch.quantity || 1) + 1);
       try {
-        const sk  = `order_${orderId}_new_item_${existingItemInBatch.frontend_unique_key || existingItemInBatch.id || uniqueKey}`;
+        const sk = `order_${orderId}_new_item_${existingItemInBatch.frontend_unique_key || existingItemInBatch.id || uniqueKey}`;
         const raw = JSON.parse(localStorage.getItem(sk) || '{}');
         raw.quantity = (raw.quantity || existingItemInBatch.quantity || 1) + 1;
         localStorage.setItem(sk, JSON.stringify(raw));
@@ -1009,42 +1009,42 @@ const OrderSummaryVisible = ({ clientId, token }) => {
     }
 
     const newItem = {
-      item_id:             selectedItem.id,
-      item_name:           selectedItem.name,
-      quantity:            1,
-      price:               selectedItem.unit_price,
-      status:              'pending',
-      note:                '',
-      slug:                selectedItem.slug || generateSlug(selectedItem.name),
-      added_at_frontend:   Date.now() + Math.random(),
+      item_id: selectedItem.id,
+      item_name: selectedItem.name,
+      quantity: 1,
+      price: selectedItem.unit_price,
+      status: 'pending',
+      note: '',
+      slug: selectedItem.slug || generateSlug(selectedItem.name),
+      added_at_frontend: Date.now() + Math.random(),
       frontend_unique_key: uniqueKey,
-      is_new_item:         true,
-      unit_price:          selectedItem.unit_price || 0,
-      line_total:          (selectedItem.unit_price || 0) * 1,
-      batch_timestamp:     batchMeta.timestamp,
-      id:                  uniqueKey,
-      image:               selectedItem.image,
-      is_line_item:        !isMainItem,
+      is_new_item: true,
+      unit_price: selectedItem.unit_price || 0,
+      line_total: (selectedItem.unit_price || 0) * 1,
+      batch_timestamp: batchMeta.timestamp,
+      id: uniqueKey,
+      image: selectedItem.image,
+      is_line_item: !isMainItem,
     };
 
     try {
       localStorage.setItem(
         `order_${orderId}_new_item_${uniqueKey}`,
         JSON.stringify({
-          item_id:         newItem.item_id,
-          unique_key:      uniqueKey,
-          added_at:        newItem.added_at_frontend,
+          item_id: newItem.item_id,
+          unique_key: uniqueKey,
+          added_at: newItem.added_at_frontend,
           batch_timestamp: newItem.batch_timestamp,
-          quantity:        newItem.quantity,
-          is_line_item:    newItem.is_line_item,
+          quantity: newItem.quantity,
+          is_line_item: newItem.is_line_item,
         })
       );
     } catch { /* ignore */ }
 
     const rebuildOrder = (o) => {
       if (o.id !== orderId) return o;
-      const batches         = getBatchesFromStorage(orderId);
-      const oldItems        = o.items.filter(i => !i.is_new_item);
+      const batches = getBatchesFromStorage(orderId);
+      const oldItems = o.items.filter(i => !i.is_new_item);
       const newItemsByBatch = new Map();
       batches.forEach(b => newItemsByBatch.set(b.timestamp, []));
       o.items.forEach(item => {
@@ -1084,7 +1084,7 @@ const OrderSummaryVisible = ({ clientId, token }) => {
   };
 
   const addItemToOrder = (orderId, selectedItem) => {
-    const tableName    = tablesMap?.[selectedOrder?.table_id] || (selectedOrder?.table || '');
+    const tableName = tablesMap?.[selectedOrder?.table_id] || (selectedOrder?.table || '');
     const { storageKey, meta } = ensureBatchForOrder(orderId, tableName);
     if (!meta) return;
     try {
@@ -1104,32 +1104,32 @@ const OrderSummaryVisible = ({ clientId, token }) => {
       newItemsToSave.forEach(item => {
         const sk = `order_${orderId}_new_item_${item.frontend_unique_key}`;
         localStorage.setItem(sk, JSON.stringify({
-          item_id:         item.item_id,
-          unique_key:      item.frontend_unique_key,
-          added_at:        item.added_at_frontend,
+          item_id: item.item_id,
+          unique_key: item.frontend_unique_key,
+          added_at: item.added_at_frontend,
           batch_timestamp: item.batch_timestamp || currentBatchTimestamp,
-          quantity:        item.quantity || 1,
-          is_line_item:    item.is_line_item || false,
+          quantity: item.quantity || 1,
+          is_line_item: item.is_line_item || false,
         }));
       });
     }
     const cleanedItems = updatedItemsWithStatuses
       .filter(item => typeof item.id === 'number' || item.is_new_item)
       .map(item => {
-        const inv       = inventoryMap[item.item_id || item.inventory_id];
+        const inv = inventoryMap[item.item_id || item.inventory_id];
         const unitPrice = item.unit_price ?? item.price ?? inv?.unit_price ?? 0;
         return {
-          item_id:             item.item_id || item.inventory_id,
-          item_name:           item.item_name || item.name,
-          quantity:            item.quantity || 1,
-          status:              item.status || 'pending',
-          note:                item.note || '',
-          slug:                item.slug || '',
-          price:               unitPrice,
-          unit_price:          unitPrice,
-          line_total:          unitPrice * (item.quantity || 1),
-          client_id:           clientId,
-          order_id:            orderId,
+          item_id: item.item_id || item.inventory_id,
+          item_name: item.item_name || item.name,
+          quantity: item.quantity || 1,
+          status: item.status || 'pending',
+          note: item.note || '',
+          slug: item.slug || '',
+          price: unitPrice,
+          unit_price: unitPrice,
+          line_total: unitPrice * (item.quantity || 1),
+          client_id: clientId,
+          order_id: orderId,
           frontend_unique_key: item.frontend_unique_key || null,
         };
       });
@@ -1150,12 +1150,12 @@ const OrderSummaryVisible = ({ clientId, token }) => {
       setItemSearchQuery('');
       toast.success('Items saved successfully!');
 
-      const res       = await axios.get(
+      const res = await axios.get(
         `${import.meta.env.VITE_API_ORDER_SERVICE_URL}/${clientId}/dinein/table`,
         { headers: { Authorization: `Bearer ${token}` } }
       );
       const allOrders = res.data?.data || [];
-      const fresh     = allOrders.find(o => o.id === orderId);
+      const fresh = allOrders.find(o => o.id === orderId);
       if (!fresh) return;
       const processed = processOrder(fresh);
       setOrders(prev => prev.map(o => (o.id === orderId ? processed : o)));
@@ -1174,9 +1174,9 @@ const OrderSummaryVisible = ({ clientId, token }) => {
 
   let filteredOrders = selectedDate
     ? orders.filter(order => {
-        const orderDate = new Date(order.created_at).toLocaleDateString('en-CA');
-        return orderDate === selectedDate;
-      })
+      const orderDate = new Date(order.created_at).toLocaleDateString('en-CA');
+      return orderDate === selectedDate;
+    })
     : orders;
 
   // Single mode selection (not multi)
@@ -1240,495 +1240,496 @@ const OrderSummaryVisible = ({ clientId, token }) => {
   return (
     <div className="min-h-screen bg-bg-primary">
       <div className="mx-auto px-4 py-3">
+        <div className="bg-action-primary rounded-2xl shadow-xl px-6 py-5 mb-6">
+          {/* ── Filter bar ── */}
+          <div className="flex flex-wrap gap-8 items-center rounded-xl p-3">
 
-        {/* ── Filter bar ── */}
-        <div className="mb-4 flex flex-wrap gap-3 items-center bg-bg-tertiary border border-border-default rounded-xl p-3">
-
-          {/* Order mode — singular selection */}
-          <div className="flex gap-2">
-            {[
-              { value: 'all',      label: 'All',      icon: <Filter size={14} /> },
-              { value: 'dinein',   label: 'Dine In',  icon: <Users size={14} /> },
-              { value: 'takeaway', label: 'Takeaway', icon: <Package size={14} /> },
-              { value: 'delivery', label: 'Delivery', icon: <Truck size={14} /> },
-            ].map(({ value, label, icon }) => (
-              <button
-                key={value}
-                onClick={() => setSelectedOrderMode(value)}
-                className={`flex items-center gap-1.5 px-3 py-1.5 rounded-lg font-medium text-sm transition-all
+            {/* Order mode — singular selection */}
+            <div className="flex gap-4">
+              {[
+                { value: 'all', label: 'All', icon: <Filter size={20} /> },
+                { value: 'dinein', label: 'Dine In', icon: <Users size={20} /> },
+                { value: 'takeaway', label: 'Takeaway', icon: <Package size={20} /> },
+                { value: 'delivery', label: 'Delivery', icon: <Truck size={20} /> },
+              ].map(({ value, label, icon }) => (
+                <button
+                  key={value}
+                  onClick={() => setSelectedOrderMode(value)}
+                  className={`flex items-center gap-1.5 px-3 py-1.5 rounded-lg font-bold text-lg transition-all
                   ${selectedOrderMode === value
-                    ? 'bg-action-primary text-text-white shadow-sm'
-                    : 'bg-bg-primary text-text-secondary hover:text-text-primary border border-border-default'}`}
+                      ? 'bg-action-primary text-text-white shadow-sm'
+                      : 'bg-bg-primary text-text-secondary hover:text-text-primary border border-border-default'}`}
+                >
+                  {icon}
+                  <span>{label}</span>
+                </button>
+              ))}
+            </div>
+
+            <div className="w-px h-6 bg-border-default mx-1 hidden sm:block" />
+
+            {/* Status filter */}
+            <div className="relative">
+              <Filter
+                className="absolute left-3 top-1/2 -translate-y-1/2 text-text-secondary"
+                size={15}
+              />
+              <select
+                value={filterMode}
+                onChange={e => setFilterMode(Number(e.target.value))}
+                className="pl-9 pr-4 py-1.5 rounded-lg bg-bg-primary border border-border-default text-text-primary text-sm"
               >
-                {icon}
-                <span>{label}</span>
-              </button>
-            ))}
-          </div>
+                <option value={0}>All Status</option>
+                <option value={2}>Pending</option>
+                <option value={3}>Preparing</option>
+                <option value={4}>Ready</option>
+                <option value={5}>Served</option>
+              </select>
+            </div>
 
-          <div className="w-px h-6 bg-border-default mx-1 hidden sm:block" />
-
-          {/* Status filter */}
-          <div className="relative">
-            <Filter
-              className="absolute left-3 top-1/2 -translate-y-1/2 text-text-secondary"
-              size={15}
+            {/* Date */}
+            <input
+              type="date"
+              value={selectedDate}
+              onChange={e => setSelectedDate(e.target.value)}
+              className="px-3 py-1.5 rounded-lg bg-bg-primary border border-border-default text-text-primary text-sm"
             />
-            <select
-              value={filterMode}
-              onChange={e => setFilterMode(Number(e.target.value))}
-              className="pl-9 pr-4 py-1.5 rounded-lg bg-bg-primary border border-border-default text-text-primary text-sm"
-            >
-              <option value={0}>All Status</option>
-              <option value={2}>Pending</option>
-              <option value={3}>Preparing</option>
-              <option value={4}>Ready</option>
-              <option value={5}>Served</option>
-            </select>
+
+            <div className="ml-auto text-sm font-semibold text-text-secondary">
+              {filteredOrders.length} order{filteredOrders.length !== 1 ? 's' : ''}
+            </div>
+          </div>
           </div>
 
-          {/* Date */}
-          <input
-            type="date"
-            value={selectedDate}
-            onChange={e => setSelectedDate(e.target.value)}
-            className="px-3 py-1.5 rounded-lg bg-bg-primary border border-border-default text-text-primary text-sm"
-          />
+          {/* ── Orders table ── */}
+          {loading ? (
+            <div className="flex items-center justify-center py-24">
+              <div className="w-8 h-8 border-2 border-action-primary border-t-transparent rounded-full animate-spin" />
+            </div>
+          ) : filteredOrders.length === 0 ? (
+            <div className="rounded-xl p-16 text-center bg-bg-primary border border-border-default shadow-card">
+              <ShoppingBag
+                size={40}
+                className="mx-auto mb-3 text-text-secondary opacity-40"
+              />
+              <p className="text-text-secondary text-base font-medium">No orders found</p>
+            </div>
+          ) : (
+            <div className="rounded-xl overflow-hidden border border-border-default shadow-card bg-bg-primary">
+              <table className="w-full">
 
-          <div className="ml-auto text-sm font-semibold text-text-secondary">
-            {filteredOrders.length} order{filteredOrders.length !== 1 ? 's' : ''}
-          </div>
-        </div>
+                {/* Table head */}
+                <thead className="bg-bg-tertiary border-b border-border-default">
+                  <tr>
+                    <th className="px-6 py-4 text-left text-xs font-bold text-text-primary uppercase tracking-wider">
+                      Order #
+                    </th>
+                    <th className="px-6 py-4 text-left text-xs font-bold text-text-primary uppercase tracking-wider">
+                      Table / Customer
+                    </th>
+                    <th className="px-6 py-4 text-left text-xs font-bold text-text-primary uppercase tracking-wider">
+                      Mode
+                    </th>
+                    <th className="px-6 py-4 text-left text-xs font-bold text-text-primary uppercase tracking-wider">
+                      Items
+                    </th>
+                    <th className="px-6 py-4 text-left text-xs font-bold text-text-primary uppercase tracking-wider">
+                      Total Price
+                    </th>
+                    <th className="px-6 py-4 text-left text-xs font-bold text-text-primary uppercase tracking-wider">
+                      Status
+                    </th>
+                    <th className="px-6 py-4 text-left text-xs font-bold text-text-primary uppercase tracking-wider">
+                      Actions
+                    </th>
+                  </tr>
+                </thead>
 
-        {/* ── Orders table ── */}
-        {loading ? (
-          <div className="flex items-center justify-center py-24">
-            <div className="w-8 h-8 border-2 border-action-primary border-t-transparent rounded-full animate-spin" />
-          </div>
-        ) : filteredOrders.length === 0 ? (
-          <div className="rounded-xl p-16 text-center bg-bg-primary border border-border-default shadow-card">
-            <ShoppingBag
-              size={40}
-              className="mx-auto mb-3 text-text-secondary opacity-40"
-            />
-            <p className="text-text-secondary text-base font-medium">No orders found</p>
-          </div>
-        ) : (
-          <div className="rounded-xl overflow-hidden border border-border-default shadow-card bg-bg-primary">
-            <table className="w-full text-sm">
+                {/* Table body */}
+                <tbody className="divide-y divide-border-default">
+                  {filteredOrders.map((order, rowIdx) => {
+                    const status = order.status?.toLowerCase();
+                    const orderTotal = getOrderTotal(order);
+                    const isEven = rowIdx % 2 === 0;
 
-              {/* Table head */}
-              <thead className="bg-action-primary text-text-white">
-                <tr>
-                  <th className="text-left px-4 py-3 font-semibold text-xs uppercase tracking-wider">
-                    Order #
-                  </th>
-                  <th className="text-left px-4 py-3 font-semibold text-xs uppercase tracking-wider">
-                    Table / Customer
-                  </th>
-                  <th className="text-center px-4 py-3 font-semibold text-xs uppercase tracking-wider">
-                    Mode
-                  </th>
-                  <th className="text-center px-4 py-3 font-semibold text-xs uppercase tracking-wider">
-                    Items
-                  </th>
-                  <th className="text-right px-4 py-3 font-semibold text-xs uppercase tracking-wider">
-                    Total Price
-                  </th>
-                  <th className="text-center px-4 py-3 font-semibold text-xs uppercase tracking-wider">
-                    Status
-                  </th>
-                  <th className="text-center px-4 py-3 font-semibold text-xs uppercase tracking-wider">
-                    Actions
-                  </th>
-                </tr>
-              </thead>
-
-              {/* Table body */}
-              <tbody className="divide-y divide-border-default">
-                {filteredOrders.map((order, rowIdx) => {
-                  const status     = order.status?.toLowerCase();
-                  const orderTotal = getOrderTotal(order);
-                  const isEven     = rowIdx % 2 === 0;
-
-                  return (
-                    <tr
-                      key={order.id}
-                      className={`transition-colors hover:bg-action-primary/5
+                    return (
+                      <tr
+                        key={order.id}
+                        className={`hover:bg-bg-tertiary transition-colors
                         ${isEven ? 'bg-bg-primary' : 'bg-bg-tertiary'}`}
-                    >
-                      {/* Order # */}
-                      <td className="px-4 py-3">
-                        <div className="flex items-center gap-1.5">
-                          <span className="font-bold text-action-primary">#{order.id}</span>
-                          {order.has_new_items && (
-                            <span className="text-[9px] font-bold text-text-white bg-action-primary px-1.5 py-0.5 rounded-full uppercase">
-                              New
-                            </span>
-                          )}
-                        </div>
-                      </td>
+                      >
+                        {/* Order # */}
+                        <td className="px-6 py-4 whitespace-nowrap">
+                          <div className="flex items-center gap-1.5">
+                            <span className="font-bold text-action-primary">#{order.id}</span>
+                            {order.has_new_items && (
+                              <span className="text-[9px] font-bold text-text-white bg-action-primary px-1.5 py-0.5 rounded-full uppercase">
+                                New
+                              </span>
+                            )}
+                          </div>
+                        </td>
 
-                      {/* Table / Customer */}
-                      <td className="px-4 py-3 font-medium text-text-primary">
-                        {order._fixedOrderMode === 'takeaway'
-                          ? order.customer_name || 'Takeaway'
-                          : tablesMap[order.table_id] ||
+                        {/* Table / Customer */}
+                        <td className="px-6 py-4 whitespace-nowrap">
+                          {order._fixedOrderMode === 'takeaway'
+                            ? order.customer_name || 'Takeaway'
+                            : tablesMap[order.table_id] ||
                             order.table ||
                             String(order.table_id)}
-                      </td>
+                        </td>
 
-                      {/* Mode */}
-                      <td className="px-4 py-3 text-center">
-                        <span className="inline-flex items-center gap-1 px-2.5 py-1 rounded-full text-xs font-semibold bg-bg-tertiary text-text-secondary border border-border-default">
-                          {getOrderModeIcon(order._fixedOrderMode)}
-                          {getOrderModeLabel(order._fixedOrderMode)}
-                        </span>
-                      </td>
+                        {/* Mode */}
+                        <td className="px-6 py-4 whitespace-nowrap">
+                          <span className="inline-flex items-center gap-1 px-2.5 py-1 rounded-full text-xs font-semibold bg-bg-tertiary text-text-secondary border border-border-default">
+                            {getOrderModeIcon(order._fixedOrderMode)}
+                            {getOrderModeLabel(order._fixedOrderMode)}
+                          </span>
+                        </td>
 
-                      {/* Items count */}
-                      <td className="px-4 py-3 text-center font-semibold text-text-primary">
-                        {order.items.length}
-                      </td>
+                        {/* Items count */}
+                        <td className="px-6 py-4 whitespace-nowrap">
+                          {order.items.length}
+                        </td>
 
-                      {/* Total price — computed from backend items via inventoryMap */}
-                      <td className="px-4 py-3 text-right font-bold text-text-primary">
-                        ₹{orderTotal.toFixed(2)}
-                      </td>
+                        {/* Total price — computed from backend items via inventoryMap */}
+                        <td className="px-6 py-4 whitespace-nowrap">
+                          ₹{orderTotal.toFixed(2)}
+                        </td>
 
-                      {/* Status */}
-                      <td className="px-4 py-3 text-center">
-                        <StatusBadge status={order.status} />
-                      </td>
+                        {/* Status */}
+                        <td className="px-6 py-4 whitespace-nowrap">
+                          <StatusBadge status={order.status} />
+                        </td>
 
-                      {/* Actions */}
-                      <td className="px-4 py-3">
-                        <div className="flex items-center justify-center gap-4 flex-wrap">
+                        {/* Actions */}
+                        <td className="px-6 py-4 whitespace-nowrap">
+                          <div className="flex items-center justify-center gap-4 flex-wrap">
 
-                          {/* View items */}
-                          <button
-                            onClick={() => {
-                              setViewOrder({
-                                ...order,
-                                _tableName:
-                                  tablesMap[order.table_id] ||
-                                  order.table ||
-                                  String(order.table_id),
-                              });
-                              setShowViewModal(true);
-                            }}
-                            className="p-1.5 rounded-lg bg-action-primary/10 text-action-primary hover:bg-action-primary hover:text-text-white transition-colors"
-                            title="View items"
-                          >
-                            <Eye size={15} />
-                          </button>
-
-                          {/* Mark as Served */}
-                          {status === 'ready' && (
+                            {/* View items */}
                             <button
-                              onClick={() => handleStatusChange(order.id, 'served')}
-                              className="px-2.5 py-1 rounded-lg bg-action-success text-text-white text-xs font-semibold hover:opacity-90 transition-colors whitespace-nowrap"
+                              onClick={() => {
+                                setViewOrder({
+                                  ...order,
+                                  _tableName:
+                                    tablesMap[order.table_id] ||
+                                    order.table ||
+                                    String(order.table_id),
+                                });
+                                setShowViewModal(true);
+                              }}
+                              className="p-1.5 rounded-lg bg-action-primary/10 text-action-primary hover:bg-action-primary hover:text-text-white transition-colors"
+                              title="View items"
                             >
-                              Mark As Served
+                              <Eye size={15} />
                             </button>
-                          )}
 
-                          {/* Generate Bill */}
-                          {status === 'served' && (
+                            {/* Mark as Served */}
+                            {status === 'ready' && (
+                              <button
+                                onClick={() => handleStatusChange(order.id, 'served')}
+                                className="px-2.5 py-1 rounded-lg bg-action-success text-text-white text-xs font-semibold hover:opacity-90 transition-colors whitespace-nowrap"
+                              >
+                                Mark As Served
+                              </button>
+                            )}
+
+                            {/* Generate Bill */}
+                            {status === 'served' && (
+                              <button
+                                onClick={() => handleGenerateBill(order)}
+                                className="px-2.5 py-1 rounded-lg bg-green-700 text-text-white text-xs font-semibold hover:bg-green-800 transition-colors whitespace-nowrap"
+                              >
+                                Generate Bill
+                              </button>
+                            )}
+
+                            {/* Delete */}
                             <button
-                              onClick={() => handleGenerateBill(order)}
-                              className="px-2.5 py-1 rounded-lg bg-green-700 text-text-white text-xs font-semibold hover:bg-green-800 transition-colors whitespace-nowrap"
+                              onClick={() => {
+                                setOrderToDelete(order.id);
+                                setShowDeleteModal(true);
+                              }}
+                              className="p-1.5 rounded-lg bg-action-danger/10 text-action-danger hover:bg-action-danger hover:text-text-white transition-colors"
+                              title="Delete order"
                             >
-                              Generate Bill
+                              <Trash2 size={15} />
                             </button>
-                          )}
+                          </div>
+                        </td>
+                      </tr>
+                    );
+                  })}
+                </tbody>
+              </table>
+            </div>
+          )}
+        </div>
 
-                          {/* Delete */}
-                          <button
-                            onClick={() => {
-                              setOrderToDelete(order.id);
-                              setShowDeleteModal(true);
-                            }}
-                            className="p-1.5 rounded-lg bg-action-danger/10 text-action-danger hover:bg-action-danger hover:text-text-white transition-colors"
-                            title="Delete order"
-                          >
-                            <Trash2 size={15} />
-                          </button>
-                        </div>
-                      </td>
-                    </tr>
-                  );
-                })}
-              </tbody>
-            </table>
-          </div>
-        )}
-      </div>
-
-      {/* ── Order detail / edit modal (preserved from original) ── */}
-      {showOrderDetailModal && selectedOrder && (
-        <div
-          className="fixed inset-0 z-50 flex items-center justify-center p-4 bg-color-modalsbg backdrop-blur-sm"
-          onClick={() => {
-            setShowOrderDetailModal(false);
-            setEditOrderId(null);
-            setActiveTab('items');
-          }}
-        >
+        {/* ── Order detail / edit modal (preserved from original) ── */}
+        {showOrderDetailModal && selectedOrder && (
           <div
-            className="rounded-xl w-full max-w-3xl max-h-[90vh] flex flex-col bg-bg-primary shadow-card border border-border-default"
-            onClick={e => e.stopPropagation()}
+            className="fixed inset-0 z-50 flex items-center justify-center p-4 bg-color-modalsbg backdrop-blur-sm"
+            onClick={() => {
+              setShowOrderDetailModal(false);
+              setEditOrderId(null);
+              setActiveTab('items');
+            }}
           >
-            {/* Header */}
-            <div className="px-4 sm:px-6 py-4 border-b border-border-default bg-bg-tertiary rounded-t-xl">
-              <div className="flex items-center justify-between gap-4">
-                <div>
-                  <h3 className="text-lg sm:text-xl font-bold text-text-primary">
-                    {tablesMap[selectedOrder.table_id] ||
-                      selectedOrder.table ||
-                      selectedOrder.table_id}
-                  </h3>
-                  <span className="text-2xl font-extrabold text-text-primary">
-                    {selectedOrder.items.length} items
-                  </span>
-                </div>
-                <div className="flex items-center gap-3">
-                  <div className="text-right bg-action-primary/10 px-4 py-2 rounded-xl border border-action-primary/20">
-                    <div className="text-xs font-semibold text-text-secondary uppercase">Total</div>
-                    <div className="text-xl font-bold text-action-primary">
-                      ₹{selectedOrder.items
-                        .reduce(
-                          (sum, item) =>
-                            sum +
-                            ((inventoryMap[item.item_id]?.unit_price ||
-                              item.unit_price ||
-                              item.price ||
-                              0) *
-                              (item.quantity || 1)),
-                          0
-                        )
-                        .toFixed(2)}
-                    </div>
+            <div
+              className="rounded-xl w-full max-w-3xl max-h-[90vh] flex flex-col bg-bg-primary shadow-card border border-border-default"
+              onClick={e => e.stopPropagation()}
+            >
+              {/* Header */}
+              <div className="px-4 sm:px-6 py-4 border-b border-border-default bg-bg-tertiary rounded-t-xl">
+                <div className="flex items-center justify-between gap-4">
+                  <div>
+                    <h3 className="text-lg sm:text-xl font-bold text-text-primary">
+                      {tablesMap[selectedOrder.table_id] ||
+                        selectedOrder.table ||
+                        selectedOrder.table_id}
+                    </h3>
+                    <span className="text-2xl font-extrabold text-text-primary">
+                      {selectedOrder.items.length} items
+                    </span>
                   </div>
-                  <button
-                    className="p-2 rounded-xl hover:bg-bg-tertiary"
-                    onClick={() => {
-                      setShowOrderDetailModal(false);
-                      setEditOrderId(null);
-                      setActiveTab('items');
-                    }}
-                  >
-                    <X size={20} />
-                  </button>
-                </div>
-              </div>
-            </div>
-
-            {/* Mobile tabs */}
-            <div className="lg:hidden border-b border-border-default bg-bg-tertiary">
-              <div className="flex">
-                <button
-                  className={`flex-1 py-3 text-sm font-semibold
-                    ${activeTab === 'items'
-                      ? 'text-action-primary border-b-2 border-action-primary bg-bg-primary'
-                      : 'text-text-secondary'}`}
-                  onClick={() => setActiveTab('items')}
-                >
-                  Items
-                </button>
-                <button
-                  className={`flex-1 py-3 text-sm font-semibold
-                    ${activeTab === 'available'
-                      ? 'text-action-primary border-b-2 border-action-primary bg-bg-primary'
-                      : 'text-text-secondary'}`}
-                  onClick={() => setActiveTab('available')}
-                >
-                  Add Items
-                </button>
-              </div>
-            </div>
-
-            {/* Content */}
-            <div className="flex-1 flex flex-col lg:flex-row overflow-hidden">
-
-              {/* Available items (add) */}
-              <div
-                className={`w-full lg:w-2/5 border-r border-border-default bg-bg-tertiary flex flex-col
-                  ${activeTab === 'available' ? 'block' : 'hidden lg:flex'}`}
-              >
-                <div className="p-4 border-b border-border-default bg-bg-primary shrink-0">
-                  <input
-                    type="text"
-                    className="w-full px-4 py-2 rounded-xl border border-border-default bg-bg-primary text-text-primary"
-                    placeholder="Search items..."
-                    value={itemSearchQuery}
-                    onChange={e => setItemSearchQuery(e.target.value)}
-                  />
-                </div>
-                <div className="flex-1 overflow-y-auto p-4 space-y-2">
-                  {(itemSearchResults.length > 0 ? itemSearchResults : allInventoryItems).map(item => (
-                    <div
-                      key={item.id}
-                      className="p-3 rounded-xl bg-bg-primary border border-border-default cursor-pointer hover:border-action-primary transition-colors"
+                  <div className="flex items-center gap-3">
+                    <div className="text-right bg-action-primary/10 px-4 py-2 rounded-xl border border-action-primary/20">
+                      <div className="text-xs font-semibold text-text-secondary uppercase">Total</div>
+                      <div className="text-xl font-bold text-action-primary">
+                        ₹{selectedOrder.items
+                          .reduce(
+                            (sum, item) =>
+                              sum +
+                              ((inventoryMap[item.item_id]?.unit_price ||
+                                item.unit_price ||
+                                item.price ||
+                                0) *
+                                (item.quantity || 1)),
+                            0
+                          )
+                          .toFixed(2)}
+                      </div>
+                    </div>
+                    <button
+                      className="p-2 rounded-xl hover:bg-bg-tertiary"
                       onClick={() => {
-                        handleItemSelection(selectedOrder.id, item);
+                        setShowOrderDetailModal(false);
+                        setEditOrderId(null);
                         setActiveTab('items');
                       }}
                     >
-                      <div className="font-semibold text-text-primary">{item.name}</div>
-                      <div className="text-sm font-bold text-action-primary">₹{item.unit_price}</div>
-                    </div>
-                  ))}
+                      <X size={20} />
+                    </button>
+                  </div>
                 </div>
               </div>
 
-              {/* Order items */}
-              <div
-                className={`w-full lg:w-3/5 bg-bg-primary
-                  ${activeTab === 'items' ? 'block' : 'hidden lg:block'}`}
-              >
-                <div className="p-4 space-y-2 overflow-y-auto max-h-[calc(90vh-200px)]">
-                  {selectedOrder.items.map((item, idx) => {
-                    const prev        = selectedOrder.items[idx - 1];
-                    const showDivider =
-                      item._isBatchStart ||
-                      (item.is_new_item &&
-                        (!prev ||
-                          (prev.batch_timestamp || null) !== (item.batch_timestamp || null)));
+              {/* Mobile tabs */}
+              <div className="lg:hidden border-b border-border-default bg-bg-tertiary">
+                <div className="flex">
+                  <button
+                    className={`flex-1 py-3 text-sm font-semibold
+                    ${activeTab === 'items'
+                        ? 'text-action-primary border-b-2 border-action-primary bg-bg-primary'
+                        : 'text-text-secondary'}`}
+                    onClick={() => setActiveTab('items')}
+                  >
+                    Items
+                  </button>
+                  <button
+                    className={`flex-1 py-3 text-sm font-semibold
+                    ${activeTab === 'available'
+                        ? 'text-action-primary border-b-2 border-action-primary bg-bg-primary'
+                        : 'text-text-secondary'}`}
+                    onClick={() => setActiveTab('available')}
+                  >
+                    Add Items
+                  </button>
+                </div>
+              </div>
 
-                    return (
-                      <div key={item.id || idx}>
-                        {showDivider && (
-                          <div className="flex items-center my-4">
-                            <div className="flex-1 h-px bg-gradient-to-r from-transparent via-action-primary to-transparent" />
-                            <span className="px-3 py-1.5 text-action-primary bg-action-primary/10 text-xs font-bold rounded-full mx-3 border border-action-primary/30">
-                              New Items
-                            </span>
-                            <div className="flex-1 h-px bg-gradient-to-r from-transparent via-action-primary to-transparent" />
-                          </div>
-                        )}
-                        <div className="flex items-center justify-between p-3 rounded-xl bg-bg-tertiary border border-border-default">
-                          <div className="font-semibold text-sm text-text-primary">
-                            {item.item_name || item.item_id}
-                          </div>
-                          <div className="flex items-center gap-2">
-                            <button
-                              onClick={() =>
-                                updateItemQuantity(
-                                  selectedOrder.id,
-                                  item.id || item.frontend_unique_key,
-                                  Math.max(1, item.quantity - 1)
-                                )
-                              }
-                              className="px-3 py-1 rounded-lg border border-border-default bg-bg-primary text-text-primary"
-                            >
-                              −
-                            </button>
-                            <span className="px-3 font-bold text-text-primary">{item.quantity}</span>
-                            <button
-                              onClick={() =>
-                                updateItemQuantity(
-                                  selectedOrder.id,
-                                  item.id || item.frontend_unique_key,
-                                  item.quantity + 1
-                                )
-                              }
-                              className="px-3 py-1 rounded-lg border border-border-default bg-bg-primary text-text-primary"
-                            >
-                              +
-                            </button>
-                            <button
-                              className="p-2 rounded-lg bg-action-danger/10 text-action-danger"
-                              onClick={() => {
-                                setDeleteTarget({
-                                  orderId:       selectedOrder.id,
-                                  itemBackendId: item.id,
-                                });
-                                setShowDeleteModals(true);
-                              }}
-                            >
-                              <Trash2 size={16} />
-                            </button>
+              {/* Content */}
+              <div className="flex-1 flex flex-col lg:flex-row overflow-hidden">
+
+                {/* Available items (add) */}
+                <div
+                  className={`w-full lg:w-2/5 border-r border-border-default bg-bg-tertiary flex flex-col
+                  ${activeTab === 'available' ? 'block' : 'hidden lg:flex'}`}
+                >
+                  <div className="p-4 border-b border-border-default bg-bg-primary shrink-0">
+                    <input
+                      type="text"
+                      className="w-full px-4 py-2 rounded-xl border border-border-default bg-bg-primary text-text-primary"
+                      placeholder="Search items..."
+                      value={itemSearchQuery}
+                      onChange={e => setItemSearchQuery(e.target.value)}
+                    />
+                  </div>
+                  <div className="flex-1 overflow-y-auto p-4 space-y-2">
+                    {(itemSearchResults.length > 0 ? itemSearchResults : allInventoryItems).map(item => (
+                      <div
+                        key={item.id}
+                        className="p-3 rounded-xl bg-bg-primary border border-border-default cursor-pointer hover:border-action-primary transition-colors"
+                        onClick={() => {
+                          handleItemSelection(selectedOrder.id, item);
+                          setActiveTab('items');
+                        }}
+                      >
+                        <div className="font-semibold text-text-primary">{item.name}</div>
+                        <div className="text-sm font-bold text-action-primary">₹{item.unit_price}</div>
+                      </div>
+                    ))}
+                  </div>
+                </div>
+
+                {/* Order items */}
+                <div
+                  className={`w-full lg:w-3/5 bg-bg-primary
+                  ${activeTab === 'items' ? 'block' : 'hidden lg:block'}`}
+                >
+                  <div className="p-4 space-y-2 overflow-y-auto max-h-[calc(90vh-200px)]">
+                    {selectedOrder.items.map((item, idx) => {
+                      const prev = selectedOrder.items[idx - 1];
+                      const showDivider =
+                        item._isBatchStart ||
+                        (item.is_new_item &&
+                          (!prev ||
+                            (prev.batch_timestamp || null) !== (item.batch_timestamp || null)));
+
+                      return (
+                        <div key={item.id || idx}>
+                          {showDivider && (
+                            <div className="flex items-center my-4">
+                              <div className="flex-1 h-px bg-gradient-to-r from-transparent via-action-primary to-transparent" />
+                              <span className="px-3 py-1.5 text-action-primary bg-action-primary/10 text-xs font-bold rounded-full mx-3 border border-action-primary/30">
+                                New Items
+                              </span>
+                              <div className="flex-1 h-px bg-gradient-to-r from-transparent via-action-primary to-transparent" />
+                            </div>
+                          )}
+                          <div className="flex items-center justify-between p-3 rounded-xl bg-bg-tertiary border border-border-default">
+                            <div className="font-semibold text-sm text-text-primary">
+                              {item.item_name || item.item_id}
+                            </div>
+                            <div className="flex items-center gap-2">
+                              <button
+                                onClick={() =>
+                                  updateItemQuantity(
+                                    selectedOrder.id,
+                                    item.id || item.frontend_unique_key,
+                                    Math.max(1, item.quantity - 1)
+                                  )
+                                }
+                                className="px-3 py-1 rounded-lg border border-border-default bg-bg-primary text-text-primary"
+                              >
+                                −
+                              </button>
+                              <span className="px-3 font-bold text-text-primary">{item.quantity}</span>
+                              <button
+                                onClick={() =>
+                                  updateItemQuantity(
+                                    selectedOrder.id,
+                                    item.id || item.frontend_unique_key,
+                                    item.quantity + 1
+                                  )
+                                }
+                                className="px-3 py-1 rounded-lg border border-border-default bg-bg-primary text-text-primary"
+                              >
+                                +
+                              </button>
+                              <button
+                                className="p-2 rounded-lg bg-action-danger/10 text-action-danger"
+                                onClick={() => {
+                                  setDeleteTarget({
+                                    orderId: selectedOrder.id,
+                                    itemBackendId: item.id,
+                                  });
+                                  setShowDeleteModals(true);
+                                }}
+                              >
+                                <Trash2 size={16} />
+                              </button>
+                            </div>
                           </div>
                         </div>
-                      </div>
-                    );
-                  })}
+                      );
+                    })}
+                  </div>
                 </div>
               </div>
-            </div>
 
-            {/* Footer */}
-            <div className="p-4 border-t border-border-default bg-bg-tertiary flex gap-3 rounded-b-xl">
-              <button
-                className="flex-1 bg-action-primary text-text-white py-3 rounded-xl font-semibold"
-                onClick={() => {
-                  updateOrderItems(selectedOrder.id, selectedOrder.items);
-                  setShowOrderDetailModal(false);
-                  setEditOrderId(null);
-                }}
-              >
-                Save Changes
-              </button>
-              <button
-                className="flex-1 bg-bg-primary border border-border-default py-3 rounded-xl font-semibold text-text-primary"
-                onClick={() => {
-                  setShowOrderDetailModal(false);
-                  setEditOrderId(null);
-                  setActiveTab('items');
-                }}
-              >
-                Cancel
-              </button>
+              {/* Footer */}
+              <div className="p-4 border-t border-border-default bg-bg-tertiary flex gap-3 rounded-b-xl">
+                <button
+                  className="flex-1 bg-action-primary text-text-white py-3 rounded-xl font-semibold"
+                  onClick={() => {
+                    updateOrderItems(selectedOrder.id, selectedOrder.items);
+                    setShowOrderDetailModal(false);
+                    setEditOrderId(null);
+                  }}
+                >
+                  Save Changes
+                </button>
+                <button
+                  className="flex-1 bg-bg-primary border border-border-default py-3 rounded-xl font-semibold text-text-primary"
+                  onClick={() => {
+                    setShowOrderDetailModal(false);
+                    setEditOrderId(null);
+                    setActiveTab('items');
+                  }}
+                >
+                  Cancel
+                </button>
+              </div>
             </div>
           </div>
-        </div>
-      )}
+        )}
 
-      {/* ── Modals ── */}
-      <OrderItemsViewModal
-        isOpen={showViewModal}
-        onClose={() => { setShowViewModal(false); setViewOrder(null); }}
-        order={viewOrder}
-        inventoryMap={inventoryMap}
-      />
+        {/* ── Modals ── */}
+        <OrderItemsViewModal
+          isOpen={showViewModal}
+          onClose={() => { setShowViewModal(false); setViewOrder(null); }}
+          order={viewOrder}
+          inventoryMap={inventoryMap}
+        />
 
-      <LineItemsModal
-        isOpen={lineItemsModalOpen}
-        onClose={() => setLineItemsModalOpen(false)}
-        mainItem={selectedMainItem}
-        lineItems={lineItemsDetails}
-        onAddMainOnly={handleAddMainItemOnly}
-        onAddWithAddons={handleAddMainItemWithLineItems}
-      />
+        <LineItemsModal
+          isOpen={lineItemsModalOpen}
+          onClose={() => setLineItemsModalOpen(false)}
+          mainItem={selectedMainItem}
+          lineItems={lineItemsDetails}
+          onAddMainOnly={handleAddMainItemOnly}
+          onAddWithAddons={handleAddMainItemWithLineItems}
+        />
 
-      <SimpleDeleteConfirm
-        isOpen={showDeleteModal}
-        onClose={() => setShowDeleteModal(false)}
-        onConfirm={confirmDeleteOrder}
-        title="Delete Order"
-        message="Want to delete this order?"
-      />
+        <SimpleDeleteConfirm
+          isOpen={showDeleteModal}
+          onClose={() => setShowDeleteModal(false)}
+          onConfirm={confirmDeleteOrder}
+          title="Delete Order"
+          message="Want to delete this order?"
+        />
 
-      <SimpleDeleteConfirm
-        isOpen={showDeleteModals}
-        onClose={() => setShowDeleteModals(false)}
-        onConfirm={() => {
-          cancelItem(deleteTarget.orderId, deleteTarget.itemBackendId);
-          setShowDeleteModals(false);
-        }}
-        title="Delete Item"
-        message="Are you sure you want to delete this item?"
-      />
+        <SimpleDeleteConfirm
+          isOpen={showDeleteModals}
+          onClose={() => setShowDeleteModals(false)}
+          onConfirm={() => {
+            cancelItem(deleteTarget.orderId, deleteTarget.itemBackendId);
+            setShowDeleteModals(false);
+          }}
+          title="Delete Item"
+          message="Are you sure you want to delete this item?"
+        />
 
-      <style>{`
+        <style>{`
         .custom-scrollbar::-webkit-scrollbar { width: 8px; }
         .custom-scrollbar::-webkit-scrollbar-track { background: var(--color-bg-tertiary); border-radius: 10px; }
         .custom-scrollbar::-webkit-scrollbar-thumb { background: var(--color-border-default); border-radius: 10px; }
         .custom-scrollbar::-webkit-scrollbar-thumb:hover { background: var(--color-action-primary); }
       `}</style>
-    </div>
-  );
+      </div>
+      );
 };
 
-export default OrderSummaryVisible;
+      export default OrderSummaryVisible;

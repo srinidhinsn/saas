@@ -90,28 +90,24 @@ const MenuCategoryTree = ({
 
   const displayCategories = useMemo(() => getDisplayCategories(), [categories, menuConfig]);
 
-  const generateCategoryIdFromName = (name) => {
-    const now = new Date();
+const normalizeIdPart = (value) => {
+  return value
+    ?.toLowerCase()
+    .trim()
+    .replace(/\s+/g, "_")
+    .replace(/[^a-z0-9_]/g, "")
+    .replace(/_+/g, "_")
+    .replace(/^_|_$/g, "");
+};
 
-    const timestamp =
-      now.getFullYear().toString().slice(-2) +
-      String(now.getMonth() + 1).padStart(2, "0") +
-      String(now.getDate()).padStart(2, "0") +
-      String(now.getHours()).padStart(2, "0") +
-      String(now.getMinutes()).padStart(2, "0") +
-      String(now.getSeconds()).padStart(2, "0");
+const generateCategoryId = (name, parentName) => {
+  const normalizedName = normalizeIdPart(name);
+  const normalizedParentName = normalizeIdPart(parentName);
 
-    return (
-      name
-        .toLowerCase()
-        .trim()
-        .replace(/\s+/g, "_")
-        .replace(/[^a-z0-9_]/g, "")
-        .replace(/_+/g, "_")
-        .replace(/^_|_$/g, "")
-      + "_" + timestamp
-    );
-  };
+  if (!normalizedParentName) return normalizedName;
+
+  return `${normalizedName}_${normalizedParentName}`;
+};
 
   const getCategoriesAtLevel = (nodes, targetLevel, level = 1) => {
     let result = [];
@@ -578,8 +574,22 @@ const MenuCategoryTree = ({
       userId = jwtDecode(token)?.user_id || userId;
     } catch { }
 
-    const newId = generateCategoryIdFromName(newCategoryName);
+  // Decide parent
+const rootNode = categories.find(
+  cat =>
+    String(cat.id).toLowerCase() === String(menuConfig.root).toLowerCase() ||
+    String(cat.name).toLowerCase() === String(menuConfig.root).toLowerCase()
+);
 
+let parent = rootNode;
+
+// If root has children, attach to first child
+if (rootNode?.children?.length) {
+  parent = rootNode.children[0];
+}
+
+// 🔥 Generate ID using parent.name (NOT parent.id)
+const newId = generateCategoryId(newCategoryName, parent?.name);
     try {
       // 1️⃣ Create the new category
       await axios.post(
@@ -597,13 +607,25 @@ const MenuCategoryTree = ({
       );
 
       // 2️⃣ Decide parent
-      let parentId;
-      if (!selectedCategoryId || selectedCategoryId === menuConfig.root) {
-        parentId = menuConfig.root;
-      } else {
-        parentId = selectedCategoryId;
-      }
+      // let parentId;
+      // if (!selectedCategoryId || selectedCategoryId === menuConfig.root) {
+      //   parentId = menuConfig.root;
+      // } else {
+      //   parentId = selectedCategoryId;
+      // }
+      // Always attach to first parent under root
+      const rootNode = categories.find(
+        cat =>
+          String(cat.id).toLowerCase() === String(menuConfig.root).toLowerCase() ||
+          String(cat.name).toLowerCase() === String(menuConfig.root).toLowerCase()
+      );
 
+      let parentId = menuConfig.root;
+
+      // If root exists and has children, attach to first child of root
+      if (rootNode?.children?.length) {
+        parentId = rootNode.children[0].id;
+      }
       // 3️⃣ Attach new category to parent
       const parent = await fetchCategoryById(parentId);
       const existingSubs = parent?.subCategories?.map(c => c.id) || [];
@@ -660,8 +682,10 @@ const MenuCategoryTree = ({
       let finalSubs = editingCategory.children?.map(c => c.id) || [];
 
       if (editNewSubcategoryName.trim()) {
-        const newSubId = generateCategoryIdFromName(editNewSubcategoryName);
-
+      const newSubId = generateCategoryId(
+  editNewSubcategoryName,
+  editingCategory.name
+);
         await axios.post(
           `${import.meta.env.VITE_API_INVENTORY_SERVICE_URL}/${clientId}/menu/create_category`,
           {

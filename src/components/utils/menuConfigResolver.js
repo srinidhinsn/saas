@@ -39,56 +39,11 @@ export function getMenuConfig(clientId) {
     import.meta.env.VITE_INVENTORY_CATEGORY_ROOT ??
     "inventory";
 
-  // ─── Addon category IDs ──────────────────────────────────────────────────────
-  // .env: VITE_ADDON_CATEGORY_AC=addons_ac
-  //   OR  VITE_{PREFIX}_ADDON_CATEGORY_AC=addons_ac
-  const addonCategoryAC =
-    import.meta.env[`VITE_${prefix}_ADDON_CATEGORY_AC`] ??
-    import.meta.env.VITE_ADDON_CATEGORY_AC ??
-    "addons_ac";
-
-  // .env: VITE_ADDON_CATEGORY_NON_AC=addons_non_ac
-  //   OR  VITE_{PREFIX}_ADDON_CATEGORY_NON_AC=addons_non_ac
-  const addonCategoryNonAC =
-    import.meta.env[`VITE_${prefix}_ADDON_CATEGORY_NON_AC`] ??
-    import.meta.env.VITE_ADDON_CATEGORY_NON_AC ??
-    "addons_non_ac";
-
-  // ─── Non-AC detection keywords ───────────────────────────────────────────────
-  // ⚠️  MUST be checked BEFORE AC keywords — "non_ac" contains "ac" so order matters.
-  // .env: VITE_ADDON_NON_AC_KEYWORDS=non_ac,non ac,non-ac
-  //   OR  VITE_{PREFIX}_ADDON_NON_AC_KEYWORDS=non_ac,non ac,non-ac
-  const addonNonACKeywordsRaw =
-    import.meta.env[`VITE_${prefix}_ADDON_NON_AC_KEYWORDS`] ??
-    import.meta.env.VITE_ADDON_NON_AC_KEYWORDS ??
-    "non_ac,non ac,non-ac";
-
-  // ─── AC detection keywords (only checked when Non-AC didn't match) ───────────
-  // .env: VITE_ADDON_AC_KEYWORDS=ac
-  //   OR  VITE_{PREFIX}_ADDON_AC_KEYWORDS=ac
-  const addonACKeywordsRaw =
-    import.meta.env[`VITE_${prefix}_ADDON_AC_KEYWORDS`] ??
-    import.meta.env.VITE_ADDON_AC_KEYWORDS ??
-    "ac";
-
-  const addonNonACKeywords = addonNonACKeywordsRaw
-    .split(",")
-    .map((k) => k.trim().toLowerCase())
-    .filter(Boolean);
-
-  const addonACKeywords = addonACKeywordsRaw
-    .split(",")
-    .map((k) => k.trim().toLowerCase())
-    .filter(Boolean);
 
   return {
     root,
     level,
     menuInventoryId,
     inventoryCategoryRoot,
-    addonCategoryAC,
-    addonCategoryNonAC,
-    addonNonACKeywords, // checked first — before AC
-    addonACKeywords,
   };
 }
