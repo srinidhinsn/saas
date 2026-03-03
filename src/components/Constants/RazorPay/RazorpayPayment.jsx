@@ -81,7 +81,7 @@ const RazorpayPayment = ({
   const openRazorpayCheckout = (razorpayOrder, options = {}) => {
     return new Promise((resolve, reject) => {
       if (!window.Razorpay) {
-        reject(new Error('Razorpay SDK not loaded'));
+        reject(new Error('Razorpay not loaded'));
         return;
       }
 
@@ -119,199 +119,134 @@ const RazorpayPayment = ({
       razorpay.open();
     });
   };
+/**
+ * Handle Single Payment
+ */
+const handleSinglePayment = async () => {
+  setLoading(true);
+  setPaymentStatus('processing');
 
-  /**
-   * Handle Single Payment
-   */
-  const handleSinglePayment = async () => {
-    setLoading(true);
-    setPaymentStatus('processing');
+  try {
+    const razorpayOrder = await createRazorpayOrder(amount);
 
-    try {
-      // Step 1: Create Razorpay Order
-      const razorpayOrder = await createRazorpayOrder(amount);
-
-      // Step 2: Configure payment method specific options
-      const methodOptions = {};
-      
-      if (paymentMethod === 'upi') {
-        methodOptions.method = 'upi';
-        if (upiMode === 'vpa' && upiId) {
-          methodOptions['upi[flow]'] = 'collect';
-          methodOptions['upi[vpa]'] = upiId;
-        } else {
-          methodOptions['upi[flow]'] = 'qr';
-        }
-      } else if (paymentMethod === 'card') {
-        methodOptions.method = 'card';
-      } else if (paymentMethod === 'netbanking') {
-        methodOptions.method = 'netbanking';
-      } else if (paymentMethod === 'wallet') {
-        methodOptions.method = 'wallet';
+    const methodOptions = {};
+    if (paymentMethod === 'upi') {
+      methodOptions.method = 'upi';
+      if (upiMode === 'vpa' && upiId) {
+        methodOptions['upi[flow]'] = 'collect';
+        methodOptions['upi[vpa]'] = upiId;
+      } else {
+        methodOptions['upi[flow]'] = 'qr';
       }
-
-      // Step 3: Open Razorpay Checkout
-    // Step 3: Open Razorpay Checkout
-const response = await openRazorpayCheckout(razorpayOrder, methodOptions);
-
-// Step 4: VERIFY PAYMENT HERE (THIS IS THE FIX)
-await axios.post(
-  `${import.meta.env.VITE_API_BILLING_SERVICE_URL}/${clientId}/invoice/verify`,
-  {
-    document_id: orderId,   // invoice id coming from parent
-    razorpay_payment_id: response.razorpay_payment_id,
-    razorpay_order_id: response.razorpay_order_id,
-    razorpay_signature: response.razorpay_signature
-  },
-  {
-    headers: {
-      Authorization: `Bearer ${token}`,
-      "Content-Type": "application/json"
+    } else if (paymentMethod === 'card') {
+      methodOptions.method = 'card';
+    } else if (paymentMethod === 'netbanking') {
+      methodOptions.method = 'netbanking';
+    } else if (paymentMethod === 'wallet') {
+      methodOptions.method = 'wallet';
     }
+
+    const response = await openRazorpayCheckout(razorpayOrder, methodOptions);
+
+    // ✅ Don't verify here — pass raw Razorpay response up to parent
+    // Parent (InvoiceModal) owns the document_id and handles verify
+    setPaymentStatus('success');
+    onPaymentSuccess && onPaymentSuccess({
+      razorpay_payment_id: response.razorpay_payment_id,
+      razorpay_order_id:   response.razorpay_order_id,
+      razorpay_signature:  response.razorpay_signature,
+    });
+
+  } catch (error) {
+    console.error('Payment failed:', error);
+    setPaymentStatus('failed');
+    toast.error(error.message || 'Payment failed');
+    onPaymentFailure && onPaymentFailure({ error: error.message });
+  } finally {
+    setLoading(false);
   }
-);
+};
 
-setPaymentStatus('success');
+/**
+ * Handle Split Payment
+ */
+const handleSplitPayment = async () => {
+  setLoading(true);
+  setPaymentStatus('processing');
+  const completedRazorpayPayments = [];
 
-// Inform parent only AFTER successful verification
-onPaymentSuccess && onPaymentSuccess(response);
+  try {
+    const razorpayPayments = splitPayments.filter(
+      split => !['Cash', 'Due'].includes(split.method)
+    );
 
-    } catch (error) {
-      console.error('Payment failed:', error);
-      setPaymentStatus('failed');
-      const errorMessage = error.message || 'Payment failed';
-      toast.error(errorMessage);
-      onPaymentFailure && onPaymentFailure({ error: errorMessage });
-    } finally {
-      setLoading(false);
+    if (razorpayPayments.length === 0) {
+      toast.error('No online payments to process');
+      return;
     }
-  };
 
-  /**
-   * Handle Split Payment
-   * Process multiple payments sequentially
-   */
-  const handleSplitPayment = async () => {
-    setLoading(true);
-    setPaymentStatus('processing');
-    const payments = [];
+    for (let i = 0; i < razorpayPayments.length; i++) {
+      const split = razorpayPayments[i];
+      setCurrentPaymentIndex(i + 1);
+      toast.info(`Processing payment ${i + 1} of ${razorpayPayments.length}: ${split.method} - ₹${split.amount}`);
 
-    try {
-      // Filter only Razorpay payments (exclude Cash/Due)
-      const razorpayPayments = splitPayments.filter(
-        split => !['Cash', 'Due'].includes(split.method)
-      );
+      const razorpayOrder = await createRazorpayOrder(split.amount);
 
-      if (razorpayPayments.length === 0) {
-        toast.error('No online payments to process');
-        return;
+      let method = split.method.toLowerCase();
+      if (method.includes('upi')) method = 'upi';
+      else if (method.includes('card')) method = 'card';
+
+      const methodOptions = {};
+      if (method === 'upi') {
+        methodOptions.method = 'upi';
+        methodOptions['upi[flow]'] = 'qr';
+      } else if (method === 'card') {
+        methodOptions.method = 'card';
       }
 
-      // Process each payment sequentially
-      for (let i = 0; i < razorpayPayments.length; i++) {
-        const split = razorpayPayments[i];
-        setCurrentPaymentIndex(i + 1);
-
-        toast.info(`Processing payment ${i + 1} of ${razorpayPayments.length}: ${split.method} - ₹${split.amount}`);
-
-        // Create Razorpay order for this split
-        const razorpayOrder = await createRazorpayOrder(split.amount);
-
-        // Determine payment method
-        let method = split.method.toLowerCase();
-        if (method.includes('upi')) method = 'upi';
-        else if (method.includes('card')) method = 'card';
-
-        const methodOptions = {};
-        if (method === 'upi') {
-          methodOptions.method = 'upi';
-          methodOptions['upi[flow]'] = 'qr';
-        } else if (method === 'card') {
-          methodOptions.method = 'card';
-        }
-
-        // Open checkout for this payment
-        const response = await openRazorpayCheckout(razorpayOrder, {
-          ...methodOptions,
-          description: `Split Payment ${i + 1}/${razorpayPayments.length} - Order #${orderId}`,
-        });
-
-        // Verify this payment
-        const verificationData = {
-          razorpay_order_id: response.razorpay_order_id,
-          razorpay_payment_id: response.razorpay_payment_id,
-          razorpay_signature: response.razorpay_signature,
-          order_id: orderId,
-          amount: split.amount,
-          payment_method: split.method,
-          split_index: i,
-        };
-
-        payments.push({
-          method: split.method,
-          amount: split.amount,
-          razorpay_payment_id: response.razorpay_payment_id,
-          razorpay_order_id: response.razorpay_order_id,
-        });
-
-        // Track completed payment
-        const completedPayment = {
-          method: split.method,
-          amount: split.amount,
-          status: 'completed',
-          razorpay_payment_id: response.razorpay_payment_id,
-          razorpay_order_id: response.razorpay_order_id,
-        };
-
-        payments.push(completedPayment);
-        setCompletedPayments(prev => [...prev, completedPayment]);
-
-        toast.success(`Payment ${i + 1} completed: ₹${split.amount}`);
-      }
-
-      // Add Cash/Due payments (offline)
-      const offlinePayments = splitPayments
-        .filter(split => ['Cash', 'Due'].includes(split.method))
-        .map(split => ({
-          method: split.method,
-          amount: split.amount,
-          status: 'completed',
-          payment_id: `offline_${Date.now()}`,
-        }));
-
-      payments.push(...offlinePayments);
-
-      // All payments successful
-      setPaymentStatus('success');
-      toast.success('All payments completed successfully!');
-      
-      onPaymentSuccess && onPaymentSuccess({
-        split_payments: payments,
-        total_amount: amount,
-        order_id: orderId,
-        is_split_payment: true,
+      const response = await openRazorpayCheckout(razorpayOrder, {
+        ...methodOptions,
+        description: `Split Payment ${i + 1}/${razorpayPayments.length} - Order #${orderId}`,
       });
 
-    } catch (error) {
-      console.error('Split payment failed:', error);
-      setPaymentStatus('failed');
-      const errorMessage = error.message || 'Split payment failed';
-      toast.error(`${errorMessage}. ${payments.length} of ${splitPayments.length} completed.`);
-      
-      onPaymentFailure && onPaymentFailure({
-        error: errorMessage,
-        completed_payments: payments,
-        failed_at_index: payments.length,
+      // ✅ Collect each split's verification data
+      completedRazorpayPayments.push({
+        method:              split.method,
+        amount:              split.amount,
+        razorpay_payment_id: response.razorpay_payment_id,
+        razorpay_order_id:   response.razorpay_order_id,
+        razorpay_signature:  response.razorpay_signature,
       });
-    } finally {
-      setLoading(false);
-      setCurrentPaymentIndex(0);
+
+      toast.success(`Payment ${i + 1} completed: ₹${split.amount}`);
     }
-  };
 
-  /**
-   * Main payment handler
-   */
+    setPaymentStatus('success');
+    toast.success('All payments completed!');
+
+    // ✅ Pass all split payment data up to parent for verification
+    onPaymentSuccess && onPaymentSuccess({
+      is_split_payment:        true,
+      completed_razorpay_payments: completedRazorpayPayments,
+      // For single-verify compat, expose the last payment's fields too
+      razorpay_payment_id: completedRazorpayPayments[0]?.razorpay_payment_id,
+      razorpay_order_id:   completedRazorpayPayments[0]?.razorpay_order_id,
+      razorpay_signature:  completedRazorpayPayments[0]?.razorpay_signature,
+    });
+
+  } catch (error) {
+    console.error('Split payment failed:', error);
+    setPaymentStatus('failed');
+    toast.error(error.message || 'Split payment failed');
+    onPaymentFailure && onPaymentFailure({
+      error: error.message,
+      completed_payments: completedRazorpayPayments,
+    });
+  } finally {
+    setLoading(false);
+    setCurrentPaymentIndex(0);
+  }
+};
   const handlePayment = () => {
     if (isSplitPayment) {
       handleSplitPayment();

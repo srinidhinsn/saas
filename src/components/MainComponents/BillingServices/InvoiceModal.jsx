@@ -38,36 +38,36 @@ export default function InvoiceModal({
     setBalanceAmount(bal < 0 ? 0 : Number(bal.toFixed(2)));
   };
 
-// 1️⃣ Subtotal
-const orderSubtotal = Number(
-  (selectedOrder?.items || []).reduce(
-    (sum, item) =>
-      sum + (Number(item.unit_price) || 0) * (Number(item.quantity) || 0),
-    0
-  ).toFixed(2)
-);
+  // 1️⃣ Subtotal
+  const orderSubtotal = Number(
+    (selectedOrder?.items || []).reduce(
+      (sum, item) =>
+        sum + (Number(item.unit_price) || 0) * (Number(item.quantity) || 0),
+      0
+    ).toFixed(2)
+  );
 
-// 2️⃣ GST on subtotal
-const calculatedGST = Number(
-  (orderSubtotal * (taxPercent / 100)).toFixed(2)
-);
+  // 2️⃣ GST on subtotal
+  const calculatedGST = Number(
+    (orderSubtotal * (taxPercent / 100)).toFixed(2)
+  );
 
-// 3️⃣ Amount after tax
-const amountAfterTax = Number(
-  (orderSubtotal + calculatedGST).toFixed(2)
-);
+  // 3️⃣ Amount after tax
+  const amountAfterTax = Number(
+    (orderSubtotal + calculatedGST).toFixed(2)
+  );
 
-// 4️⃣ Discount on final amount (after tax)
-const calculatedDiscount = discountIsPercent
-  ? Number(((amountAfterTax * discount) / 100).toFixed(2))
-  : Number(discount);
+  // 4️⃣ Discount on final amount (after tax)
+  const calculatedDiscount = discountIsPercent
+    ? Number(((amountAfterTax * discount) / 100).toFixed(2))
+    : Number(discount);
 
-// 5️⃣ Final Total
-const calculatedTotal = Number(
-  (amountAfterTax - calculatedDiscount).toFixed(2)
-);
+  // 5️⃣ Final Total
+  const calculatedTotal = Number(
+    (amountAfterTax - calculatedDiscount).toFixed(2)
+  );
 
-const total = calculatedTotal;
+  const total = calculatedTotal;
 
   const sumSplits = (splits) => splits.reduce((sum, s) => sum + Number(s.amount), 0);
 
@@ -440,7 +440,7 @@ const total = calculatedTotal;
 
     const isOnlineMethod = (m) =>
       m === "razorpay_upi" || m === "razorpay_card";
-    
+
     const needsRazorpay = splitPaymentEnabled
       ? paymentSplits.some(s => isOnlineMethod(s.method))
       : isOnlineMethod(method);
@@ -1006,44 +1006,79 @@ const total = calculatedTotal;
           }}
           onPaymentSuccess={async (response) => {
             try {
-
-              // ALWAYS create invoice BEFORE verify
-              const docId = invoiceDraftId || await saveInvoiceDraft();
-
+              const docId = invoiceDraftId;
               if (!docId) {
-                toast.error("Invoice not created");
+                toast.error("Invoice ID missing — save before paying");
                 return;
               }
-
-              // IMPORTANT: force number
-              // const payload = {
-              //   document_id: Number(docId),
-              //   razorpay_payment_id: String(response.razorpay_payment_id),
-              //   razorpay_order_id: String(response.razorpay_order_id),
-              //   razorpay_signature: String(response.razorpay_signature)
-              // };
-
-              // console.log("VERIFY PAYLOAD:", payload);
-
-              // await axios.post(
-              //   `${import.meta.env.VITE_API_BILLING_SERVICE_URL}/${clientId}/invoice/verify`,
-              //   payload,
-              //   {
-              //     headers: {
-              //       Authorization: `Bearer ${token}`,
-              //       "Content-Type": "application/json"
-              //     }
-              //   }
-              // );
-
+          
+              const isSplit = response?.is_split_payment;
+              const paymentsToVerify = isSplit
+                ? response.completed_razorpay_payments   // array of { razorpay_payment_id, order_id, signature }
+                : [{
+                    razorpay_payment_id: response.razorpay_payment_id,
+                    razorpay_order_id:   response.razorpay_order_id,
+                    razorpay_signature:  response.razorpay_signature,
+                  }];
+          
+              // ✅ Verify each Razorpay payment sequentially
+              for (const p of paymentsToVerify) {
+                if (!p.razorpay_payment_id || !p.razorpay_order_id || !p.razorpay_signature) {
+                  console.warn("Skipping invalid payment entry:", p);
+                  continue;
+                }
+                await axios.post(
+                  `${import.meta.env.VITE_API_BILLING_SERVICE_URL}/${clientId}/invoice/verify?client_id=${clientId}`,
+                  {
+                    document_id:         Number(docId),
+                    razorpay_payment_id: String(p.razorpay_payment_id),
+                    razorpay_order_id:   String(p.razorpay_order_id),
+                    razorpay_signature:  String(p.razorpay_signature),
+                  },
+                  {
+                    headers: {
+                      Authorization: `Bearer ${token}`,
+                      "Content-Type": "application/json",
+                    },
+                  }
+                );
+              }
+          
+              // Update order status
+              await axios.post(
+                `${import.meta.env.VITE_API_ORDER_SERVICE_URL}/${clientId}/dinein/update`,
+                { id: selectedOrder.id, status: "served", invoice_status: "paid" },
+                { headers: { Authorization: `Bearer ${token}` } }
+              );
+          
+              // Free the table
+              if (selectedOrder.table_id) {
+                try {
+                  const tableData = tablesMap[selectedOrder.table_id];
+                  await axios.post(
+                    `${import.meta.env.VITE_API_TABLE_SERVICE_URL}/${clientId}/tables/update`,
+                    {
+                      id:            selectedOrder.table_id,
+                      client_id:     clientId,
+                      name:          tableData?.name || `Table ${selectedOrder.table_id}`,
+                      table_type:    tableData?.table_type || "Regular",
+                      status:        "vacant",
+                      location_zone: tableData?.location_zone || "Main",
+                    },
+                    { headers: { Authorization: `Bearer ${token}` } }
+                  );
+                } catch (tableErr) {
+                  console.error("Table update failed:", tableErr.response?.data || tableErr.message);
+                }
+              }
+          
               setPaymentStatus("Paid");
               setShowRazorpayModal(false);
-
-              toast.success("Payment verified!");
-
+              toast.success("Payment verified successfully!");
+          
             } catch (err) {
-              console.error("VERIFY ERROR", err.response?.data);
-              toast.error("Payment verification failed");
+              console.error("VERIFY ERROR:", err.response?.data || err.message);
+              toast.error("Verification failed: " + (err.response?.data?.detail || err.message));
             }
           }}
           onPaymentFailure={(error) => {
