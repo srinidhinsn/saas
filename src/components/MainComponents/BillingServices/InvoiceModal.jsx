@@ -975,72 +975,79 @@ export default function InvoiceModal({
           }}
           onPaymentSuccess={async (response) => {
             try {
-
-              // ALWAYS create invoice BEFORE verify
-              const docId = invoiceDraftId || await saveInvoiceDraft();
-
+              const docId = invoiceDraftId;
               if (!docId) {
-                toast.error("Invoice not created");
+                toast.error("Invoice ID missing — save before paying");
                 return;
               }
-
-              // IMPORTANT: force number
-              // const payload = {
-              //   document_id: Number(docId),
-              //   razorpay_payment_id: String(response.razorpay_payment_id),
-              //   razorpay_order_id: String(response.razorpay_order_id),
-              //   razorpay_signature: String(response.razorpay_signature)
-              // };
-
-              // console.log("VERIFY PAYLOAD:", payload);
-
-              // await axios.post(
-              //   `${import.meta.env.VITE_API_BILLING_SERVICE_URL}/${clientId}/invoice/verify`,
-              //   payload,
-              //   {
-              //     headers: {
-              //       Authorization: `Bearer ${token}`,
-              //       "Content-Type": "application/json"
-              //     }
-              //   }
-              // );
+          
+              const isSplit = response?.is_split_payment;
+              const paymentsToVerify = isSplit
+                ? response.completed_razorpay_payments   // array of { razorpay_payment_id, order_id, signature }
+                : [{
+                    razorpay_payment_id: response.razorpay_payment_id,
+                    razorpay_order_id:   response.razorpay_order_id,
+                    razorpay_signature:  response.razorpay_signature,
+                  }];
+          
+              // ✅ Verify each Razorpay payment sequentially
+              for (const p of paymentsToVerify) {
+                if (!p.razorpay_payment_id || !p.razorpay_order_id || !p.razorpay_signature) {
+                  console.warn("Skipping invalid payment entry:", p);
+                  continue;
+                }
+                await axios.post(
+                  `${import.meta.env.VITE_API_BILLING_SERVICE_URL}/${clientId}/invoice/verify?client_id=${clientId}`,
+                  {
+                    document_id:         Number(docId),
+                    razorpay_payment_id: String(p.razorpay_payment_id),
+                    razorpay_order_id:   String(p.razorpay_order_id),
+                    razorpay_signature:  String(p.razorpay_signature),
+                  },
+                  {
+                    headers: {
+                      Authorization: `Bearer ${token}`,
+                      "Content-Type": "application/json",
+                    },
+                  }
+                );
+              }
+          
+              // Update order status
               await axios.post(
                 `${import.meta.env.VITE_API_ORDER_SERVICE_URL}/${clientId}/dinein/update`,
-                {
-                  id: selectedOrder.id,
-                  status: "served",
-                  invoice_status: paymentStatus.toLowerCase(),
-                },
+                { id: selectedOrder.id, status: "served", invoice_status: "paid" },
                 { headers: { Authorization: `Bearer ${token}` } }
               );
-
+          
+              // Free the table
               if (selectedOrder.table_id) {
                 try {
                   const tableData = tablesMap[selectedOrder.table_id];
                   await axios.post(
                     `${import.meta.env.VITE_API_TABLE_SERVICE_URL}/${clientId}/tables/update`,
                     {
-                      id: selectedOrder.table_id,
-                      client_id: clientId,
-                      name: tableData?.name || `Table ${selectedOrder.table_id}`,
-                      table_type: tableData?.table_type || "Regular",
-                      status: 'vacant',
-                      location_zone: tableData?.location_zone || "Main"
+                      id:            selectedOrder.table_id,
+                      client_id:     clientId,
+                      name:          tableData?.name || `Table ${selectedOrder.table_id}`,
+                      table_type:    tableData?.table_type || "Regular",
+                      status:        "vacant",
+                      location_zone: tableData?.location_zone || "Main",
                     },
                     { headers: { Authorization: `Bearer ${token}` } }
                   );
                 } catch (tableErr) {
-                  console.error("Failed to update table status:", tableErr.response?.data || tableErr.message);
+                  console.error("Table update failed:", tableErr.response?.data || tableErr.message);
                 }
               }
+          
               setPaymentStatus("Paid");
               setShowRazorpayModal(false);
-
-              toast.success("Payment verified!");
-
+              toast.success("Payment verified successfully!");
+          
             } catch (err) {
-              console.error("VERIFY ERROR", err.response?.data);
-              toast.error("Payment verification failed");
+              console.error("VERIFY ERROR:", err.response?.data || err.message);
+              toast.error("Verification failed: " + (err.response?.data?.detail || err.message));
             }
           }}
           onPaymentFailure={(error) => {
