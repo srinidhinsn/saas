@@ -70,11 +70,9 @@ def update_billing_document_route(
     db: Session = Depends(get_db)
 ):
     if not updates.id:
-        raise HTTPException(
-            status_code=400, detail="Missing billing document ID")
+        raise HTTPException(status_code=400, detail="Missing billing document ID")
     if client_id != context.client_id:
         raise HTTPException(status_code=403, detail="Unauthorized")
-
     # Ensure that the new columns are properly updated
     if updates.payment_status:
         updates.payment_status = updates.payment_status
@@ -124,7 +122,7 @@ def delete_billing_document_route(
 @router.get("/read", response_model=ResponseModel[List[BillingDocumentItem]])
 def read_billing_document_items(
     client_id: str,
-    document_id: Optional[int] = None,
+    document_id: Optional[int] = None, 
     context: SaasContext = Depends(verify_token),
     db: Session = Depends(get_db)
 ):
@@ -169,7 +167,6 @@ def update_billing_items(
         data=updated_items
     )
 
-
 @router.post("/delete", response_model=ResponseModel[List[BillingDocumentItem]])
 def delete_billing_items(
     items: List[BillingDocumentItem],  # Now accepting full objects
@@ -196,8 +193,7 @@ def _verify_internal_service(authorization: Optional[str] = Header(None)):
     Simple internal bearer auth for service-to-service calls.
     """
     if not authorization or not authorization.startswith("Bearer "):
-        raise HTTPException(
-            status_code=401, detail="Missing/invalid Authorization")
+        raise HTTPException(status_code=401, detail="Missing/invalid Authorization")
     token = authorization.split(" ", 1)[1]
     if token != os.getenv("BILLING_INT_TOKEN", "change-me"):
         raise HTTPException(status_code=403, detail="Forbidden")
@@ -216,8 +212,6 @@ def _verify_internal_service(authorization: Optional[str] = Header(None)):
 #         raise
 #     except Exception as e:
 #         raise HTTPException(status_code=400, detail=str(e))
-
-
 # ...
 
 @router.post("/from-order-service", response_model=ResponseModel[dict])
@@ -233,8 +227,7 @@ def intake_from_order_service_public(
 
     # Enforce the payload also targets the same tenant
     if payload.get("client_id") != client_id:
-        raise HTTPException(
-            status_code=400, detail="payload.client_id must match path client_id")
+        raise HTTPException(status_code=400, detail="payload.client_id must match path client_id")
 
     result = upsert_from_order_payload(db, payload)
     return ResponseModel(
@@ -260,15 +253,13 @@ def generate_invoice_route(
     try:
         dt = datetime.fromisoformat(document_date) if document_date else None
     except Exception:
-        raise HTTPException(
-            status_code=400, detail="Invalid document_date; use ISO format (YYYY-MM-DD or full ISO)")
+        raise HTTPException(status_code=400, detail="Invalid document_date; use ISO format (YYYY-MM-DD or full ISO)")
 
     try:
         result = generate_invoice(db, client_id, invoice_id, dt, due_in_days)
         return ResponseModel(screen_id=context.screen_id, status="success", message="Invoice generated", data=result)
     except Exception as e:
         raise HTTPException(status_code=400, detail=str(e))
-
 
 @router.post("/issue", response_model=ResponseModel[dict])
 def issue_invoice_route(
@@ -286,7 +277,6 @@ def issue_invoice_route(
     except Exception as e:
         raise HTTPException(status_code=400, detail=str(e))
 
-
 @router.post("/razorpay")
 def create_order(client_id: str, request_data: RazorpayOrderRequest, context: SaasContext = Depends(verify_token), db: Session = Depends(get_db)):
     if client_id != context.client_id:
@@ -303,13 +293,10 @@ def create_order(client_id: str, request_data: RazorpayOrderRequest, context: Sa
         raise HTTPException(
             status_code=400, detail=f"Failed to create Razorpay order: {str(e)}")
 
-
-
 @router.post("/verify")
 async def verify_payment(client_id: str,body: RazorpayVerifyRequest,context: SaasContext = Depends(verify_token),db: Session = Depends(get_db)):
     if client_id != context.client_id:
         raise HTTPException(status_code=403, detail="Unauthorized")
-
     # Signature verification here
     body_str = f"{body.razorpay_order_id}|{body.razorpay_payment_id}"
     key = os.getenv("RAZORPAY_KEY_SECRET", "")
@@ -324,7 +311,6 @@ async def verify_payment(client_id: str,body: RazorpayVerifyRequest,context: Saa
 
     if generated_signature != body.razorpay_signature:
         raise HTTPException(status_code=400, detail="Invalid payment signature")
-
     # Fetch from Razorpay
     try:
         payment = razorpay_client.payment.fetch(body.razorpay_payment_id)
@@ -333,7 +319,6 @@ async def verify_payment(client_id: str,body: RazorpayVerifyRequest,context: Saa
 
     if payment["status"] not in ["captured", "authorized"]:
         raise HTTPException(status_code=400, detail=f"Payment not captured: {payment['status']}")
-
     # Load invoice
     invoice = db.query(BillingDocumentEntity).filter(
         BillingDocumentEntity.id == body.document_id,
@@ -341,7 +326,6 @@ async def verify_payment(client_id: str,body: RazorpayVerifyRequest,context: Saa
     ).first()
     if not invoice:
         raise HTTPException(status_code=404, detail=f"Invoice not found: id={body.document_id}")
-
     # Enrich payment_method JSONB
     existing_methods = list(invoice.payment_method or [])
     updated_methods  = []
