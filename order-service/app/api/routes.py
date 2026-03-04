@@ -198,19 +198,6 @@ def update_order_status(
 
     previous_status = order.status
 
-    # 🚫 Prevent double serving
-    if (
-        body.status == OrderStatusEnum.served
-        and previous_status == OrderStatusEnum.served
-    ):
-        return ResponseModel(
-            screen_id=context.screen_id,
-            data={
-                "message": "Order already served",
-                "new_status": order.status,
-            },
-        )
-
     # 🔥 NEW LOGIC: If marking as served → update root + all sub-orders
     if body.status in [OrderStatusEnum.served, OrderStatusEnum.completed]:
 

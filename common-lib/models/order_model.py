@@ -5,7 +5,7 @@ from enum import Enum
 
 
 class OrderStatusEnum(str, Enum):
-    new = "new"
+    draft = "draft"
     pending = "pending"
     preparing = "preparing"
     ready = "ready"
