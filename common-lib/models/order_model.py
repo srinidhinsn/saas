@@ -5,12 +5,13 @@ from enum import Enum
 
 
 class OrderStatusEnum(str, Enum):
-    new = "new"
+    draft = "draft"
     pending = "pending"
     preparing = "preparing"
     ready = "ready"
     served = "served"
     cancelled = "cancelled"
+    completed ="completed"
 
 
 class OrderItemModel(BaseModel):
@@ -23,11 +24,12 @@ class OrderItemModel(BaseModel):
     quantity: Optional[int] = None
     unit_price: Optional[float] = None
     line_total: Optional[float] = None
-    status: Optional[OrderStatusEnum]
+    status: Optional[OrderStatusEnum] = None
     frontend_unique_key: Optional[str] = None
 
     class Config:
         orm_mode = True
+
 
 class DineinOrderModel(BaseModel):
     id: Optional[int] = None
@@ -46,7 +48,7 @@ class DineinOrderModel(BaseModel):
     updated_by: Optional[str] = None
     created_at: Optional[datetime.datetime] = None
     updated_at: Optional[datetime.datetime] = None
-    status: Optional[OrderStatusEnum]
+    status: Optional[OrderStatusEnum] = None
     items: Optional[List[OrderItemModel]] = []
 
     class Config:
