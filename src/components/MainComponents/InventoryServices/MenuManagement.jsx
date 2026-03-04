@@ -82,41 +82,62 @@ const MenuManagement = ({ clientId, token, realm }) => {
     return pathNames; // nearest-first: [leafName, parentName, grandparentName, ...]
   }, []);
 
-  // ─── Resolve the correct addon category ID for a given menu category ─────────
-  //     Uses keywords from menuConfig (env-driven). Non-AC is checked FIRST
-  //     because "non_ac" contains the substring "ac" — order matters.
+
+  // ─── Get top-level section name dynamically ─────────────────────────
+  const getTopLevelSection = useCallback((categoryId) => {
+    if (!categoryId || !categoriesFlat.length || !menuConfig) return null;
+
+    const rootNode = categoriesFlat.find(
+      c =>
+        c.name.toLowerCase() === menuConfig.root.toLowerCase() ||
+        c.id.toLowerCase() === menuConfig.root.toLowerCase()
+    );
+
+    if (!rootNode) return null;
+
+    let current = categoriesFlat.find(c => c.id === categoryId);
+
+    while (current && current.parentId) {
+      if (current.parentId === rootNode.id) {
+        console.log("Current name", current.name)
+        return current.name; // THIS is AC / Rooftop / Garden etc
+      }
+      current = categoriesFlat.find(c => c.id === current.parentId);
+    }
+
+    return null;
+  }, [categoriesFlat, menuConfig]);
+
+
+
   const getAddonCategoryId = useCallback((itemCategoryId) => {
-    if (!menuConfig) return 'addons_ac';
-    const { addonCategoryAC, addonCategoryNonAC, addonNonACKeywords, addonACKeywords } = menuConfig;
+    if (!itemCategoryId) return null;
 
-    if (!itemCategoryId || !categoriesFlat.length) return addonCategoryAC;
+    const sectionName = getTopLevelSection(itemCategoryId);
+    if (!sectionName) return null;
 
-    const pathNames = buildPathNames(itemCategoryId, categoriesFlat);
+    // convert to slug format
+    const slug = sectionName
+      .trim()
+      .toLowerCase()
+      .replace(/[\s-]+/g, "_")   // convert space OR hyphen to _
+      .replace(/[^a-z0-9_]/g, "")
+      .replace(/_+/g, "_");      // avoid double underscores
+    console.log("Slug =", slug)
+    return `addons_${slug}`;
+  }, [getTopLevelSection]);
 
-    // Check Non-AC first (before AC — avoids "non_ac" falsely matching "ac")
-    const isNonAC = addonNonACKeywords.some(kw =>
-      pathNames.some(p => p === kw || p.includes(kw))
-    );
-    if (isNonAC) return addonCategoryNonAC;
 
-    const isAC = addonACKeywords.some(kw =>
-      pathNames.some(p => p === kw || p.includes(kw))
-    );
-    if (isAC) return addonCategoryAC;
 
-    return addonCategoryAC; // default
-  }, [categoriesFlat, menuConfig, buildPathNames]);
-
-  // ─── Fetch addon subcategories + items for a given addon category ID ─────────
-  //     Uses menuInventoryId from config — not hardcoded "menu"
   const fetchAddonData = useCallback(async (addonCategoryId) => {
-    if (!menuConfig) return { subcategories: [], items: [] };
-    const resolvedId = addonCategoryId ?? menuConfig.addonCategoryAC;
+    if (!menuConfig || !addonCategoryId) {
+      return { subcategories: [], items: [] };
+    }
 
     try {
       const [catRes, itemRes] = await Promise.all([
         axios.get(
-          `${import.meta.env.VITE_API_INVENTORY_SERVICE_URL}/${clientId}/menu/read_category?category_id=${resolvedId}`,
+          `${import.meta.env.VITE_API_INVENTORY_SERVICE_URL}/${clientId}/menu/read_category?category_id=${addonCategoryId}`,
           { headers: { Authorization: `Bearer ${token}` } }
         ),
         axios.get(
@@ -126,38 +147,49 @@ const MenuManagement = ({ clientId, token, realm }) => {
       ]);
 
       const addonsCategory = catRes.data.data?.[0];
-      if (!addonsCategory) return { subcategories: [], items: [] };
+
+      if (!addonsCategory) {
+        // No addon category created yet
+        return { subcategories: [], items: [] };
+      }
 
       const subcats = addonsCategory.subCategories || [];
       const allItems = itemRes.data.data || [];
 
       const subcategoryIds = new Set(subcats.map(s => s.id));
+
       const filteredAddons = allItems.filter(
-        item => item.category_id === resolvedId || subcategoryIds.has(item.category_id)
+        item =>
+          item.category_id === addonCategoryId ||
+          subcategoryIds.has(item.category_id)
       );
 
       return { subcategories: subcats, items: filteredAddons };
     } catch (error) {
-      console.error(`Error fetching addon data for ${resolvedId}:`, error);
+      console.warn(`Addon category not found: ${addonCategoryId}`);
       return { subcategories: [], items: [] };
     }
   }, [clientId, token, menuConfig]);
 
-  // ─── Re-fetch addons whenever selected category changes ──────────────────────
-  //     This is the key fix: switching to Non-AC category now loads Non-AC addons
-  useEffect(() => {
-    if (!menuConfig || !categoriesFlat.length) return;
 
-    // Use selectedCategoryId if available, otherwise fall back to AC default
-    const addonCatId = selectedCategoryId
-      ? getAddonCategoryId(selectedCategoryId)
-      : menuConfig.addonCategoryAC;
+
+  useEffect(() => {
+    if (!selectedCategoryId) return;
+
+    const addonCatId = getAddonCategoryId(selectedCategoryId);
+
+    if (!addonCatId) {
+      setAddonSubcategories([]);
+      setAllAddonItems([]);
+      return;
+    }
 
     fetchAddonData(addonCatId).then(({ subcategories, items }) => {
       setAddonSubcategories(subcategories);
       setAllAddonItems(items);
     });
-  }, [selectedCategoryId, categoriesFlat, menuConfig, getAddonCategoryId, fetchAddonData]);
+  }, [selectedCategoryId, getAddonCategoryId, fetchAddonData]);
+
 
   const buildCategoryPath = (categoryId) => {
     if (!categoryId) return [];
