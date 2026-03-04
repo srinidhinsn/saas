@@ -48,10 +48,6 @@ def verify_token(req: Request = None, token: str = Depends(oauth2_scheme), db: S
         grants = payload["grants"]
         realm = payload["realm"]
 
-        if url_client_id != client_id :
-            raise HTTPException(status_code=403, detail="Switching client is not allowed. Please contact administrator.")
-
-
         if grants.index(realm) < 0 :
             raise HTTPException(status_code=403, detail="Restricted Grant. Please contact administrator.")
 
@@ -76,7 +72,7 @@ def verify_token(req: Request = None, token: str = Depends(oauth2_scheme), db: S
                     access_category = lookup.get(url_module)
                     print("access_category - ", access_category)
                     if access_category.sub_categories.index(url_operation) >= 0 :
-                        page_definitions = get_page_definition(roles, url_module, client_id, db)
+                        page_definitions = get_page_definition(roles, url_module, url_client_id, db)
                         pageDefinitionModels = PageDefinition.copyToModels(page_definitions)
                         print("pageDefinitionModels - ", pageDefinitionModels)
                         screenId = get_screen_id(pageDefinitionModels, url_operation)
@@ -85,7 +81,7 @@ def verify_token(req: Request = None, token: str = Depends(oauth2_scheme), db: S
                         if (screenId == "accessRestricted"):
                             raise HTTPException(status_code=403, detail="Restricted Access. Please contact administrator.")
 
-                        context = SaasContext(client_id, url_module, url_operation, str(payload.get("user_id")), roles, grants, screenId)
+                        context = SaasContext(url_client_id, url_module, url_operation, str(payload.get("user_id")), roles, grants, screenId)
                         saasContext.set(context)
                     if context is None:
                         raise HTTPException(status_code=403, detail="Restricted Access. Please contact administrator.")
