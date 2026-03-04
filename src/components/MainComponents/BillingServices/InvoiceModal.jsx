@@ -373,6 +373,37 @@ export default function InvoiceModal({
         { headers: { Authorization: `Bearer ${token}` } }
       );
 
+          await axios.post(
+        `${import.meta.env.VITE_API_ORDER_SERVICE_URL}/${clientId}/dinein/update`,
+        {
+          id: selectedOrder.id,
+          status: "served",
+          invoice_status: paymentStatus.toLowerCase(),
+        },
+        { headers: { Authorization: `Bearer ${token}` } }
+      );
+
+      // Update table status to vacant after saving invoice
+      if (selectedOrder.table_id) {
+        try {
+          const tableData = tablesMap[selectedOrder.table_id];
+          await axios.post(
+            `${import.meta.env.VITE_API_TABLE_SERVICE_URL}/${clientId}/tables/update`,
+            {
+              id: selectedOrder.table_id,
+              client_id: clientId,
+              name: tableData?.name || `Table ${selectedOrder.table_id}`,
+              table_type: tableData?.table_type || "Regular",
+              status: 'Vacant',
+              location_zone: tableData?.location_zone || "Main"
+            },
+            { headers: { Authorization: `Bearer ${token}` } }
+          );
+        } catch (tableErr) {
+          console.error("Failed to update table status:", tableErr.response?.data || tableErr.message);
+        }
+      }
+
       toast.success("Invoice saved successfully!");
       return draftId;
     } catch (err) {
