@@ -118,11 +118,10 @@ const MenuManagement = ({ clientId, token, realm }) => {
 
     // convert to slug format
     const slug = sectionName
-      .trim()
-      .toLowerCase()
-      .replace(/[\s-]+/g, "_")   // convert space OR hyphen to _
-      .replace(/[^a-z0-9_]/g, "")
-      .replace(/_+/g, "_");      // avoid double underscores
+  .trim()
+  .toLowerCase()
+  .replace(/[\s-]+/g, "")
+  .replace(/[^a-z0-9]/g, "");
     console.log("Slug =", slug)
     return `addons_${slug}`;
   }, [getTopLevelSection]);

@@ -24,52 +24,92 @@ const TABLE_STATUS_CONFIG = {
   reserved: { clickable: false, bg: 'bg-yellow-50', border: 'border-yellow-400', badge: 'bg-yellow-100 text-yellow-700' },
 };
 
-// localStorage key prefix — drafts survive page refresh
-const DRAFT_STORAGE_KEY = 'takeorder_draft_';
-
-// ─────────────────────────────────────────────────────────────────────────────
-// Draft localStorage helpers
-// ─────────────────────────────────────────────────────────────────────────────
-
-function readDraft(tableId) {
+async function readDraft(tableId, clientId, token) {
   try {
-    const raw = localStorage.getItem(DRAFT_STORAGE_KEY + tableId);
-    return raw ? JSON.parse(raw) : null;
+    const r = await axios.get(
+      `${import.meta.env.VITE_API_ORDER_SERVICE_URL}/${clientId}/dinein/table`,
+      { headers: { Authorization: `Bearer ${token}` } }
+    );
+    const allOrders = r.data?.data || [];
+    return allOrders.find(
+      o => o.status === 'draft' && String(o.table_id) === String(tableId)
+    ) || null;
   } catch {
     return null;
   }
 }
 
-function writeDraft(tableId, data) {
+async function writeDraft(tableId, cart, clientId, token) {
+  // If a draft already exists for this table, delete it first then recreate.
+  // Reuses the existing DELETE + CREATE endpoints with no new API needed.
   try {
-    localStorage.setItem(DRAFT_STORAGE_KEY + tableId, JSON.stringify(data));
-  } catch {
-    // localStorage quota exceeded — fail silently
-  }
-}
-
-function deleteDraft(tableId) {
-  try {
-    localStorage.removeItem(DRAFT_STORAGE_KEY + tableId);
-  } catch {
-    // ignore
-  }
-}
-
-function getAllDraftTableIds() {
-  const ids = [];
-  try {
-    for (let i = 0; i < localStorage.length; i++) {
-      const key = localStorage.key(i);
-      if (key && key.startsWith(DRAFT_STORAGE_KEY)) {
-        ids.push(key.replace(DRAFT_STORAGE_KEY, ''));
-      }
+    // Find existing draft id to delete it
+    const existing = await readDraft(tableId, clientId, token);
+    if (existing) {
+      await axios.delete(
+        `${import.meta.env.VITE_API_ORDER_SERVICE_URL}/${clientId}/dinein/delete`,
+        {
+          params: { dinein_order_id: existing.id },
+          headers: { Authorization: `Bearer ${token}` },
+        }
+      );
     }
-  } catch {
-    // ignore
+
+    const total = cart.reduce((s, i) => s + (i.unit_price || 0) * i.quantity, 0);
+
+    await axios.post(
+      `${import.meta.env.VITE_API_ORDER_SERVICE_URL}/${clientId}/dinein/create`,
+      {
+        client_id: clientId,
+        table_id: Number(tableId),
+        price: total,
+        gst: 0,
+        cst: 0,
+        total_price: total,
+        status: 'draft',           // ← the only new thing
+        items: cart.map(i => ({
+          item_id: i.id,
+          item_name: i.name,
+          quantity: i.quantity,
+          unit_price: i.unit_price,
+          line_total: (i.unit_price || 0) * i.quantity,
+          status: 'draft',
+          slug: i.slug || '',
+          frontend_unique_key: i.frontend_unique_key,
+        })),
+      },
+      { headers: { Authorization: `Bearer ${token}` } }
+    );
+    return true;
+  } catch (err) {
+    console.error('writeDraft failed:', err);
+    return false;
   }
-  return ids;
 }
+
+async function deleteDraftFromDB(tableId, clientId, token) {
+  try {
+    const existing = await readDraft(tableId, clientId, token);
+    if (!existing) return;
+    await axios.delete(
+      `${import.meta.env.VITE_API_ORDER_SERVICE_URL}/${clientId}/dinein/delete`,
+      {
+        params: { dinein_order_id: existing.id },
+        headers: { Authorization: `Bearer ${token}` },
+      }
+    );
+  } catch (err) {
+    console.warn('deleteDraft warning:', err?.response?.data || err.message);
+  }
+}
+
+function getDraftTableIdsFromOrders(allOrders) {
+  return (allOrders || [])
+    .filter(o => o.status === 'draft')
+    .map(o => String(o.table_id));
+}
+
+
 
 // ─────────────────────────────────────────────────────────────────────────────
 // ItemStatusBadge
@@ -909,55 +949,24 @@ const TakeOrder = ({ clientId, token, onOrderUpdate, realm }) => {
   // Draft helpers
   // ─────────────────────────────────────────────────────────────────────────
 
-  const refreshDraftTableIds = useCallback(() => {
-    setDraftTableIds(getAllDraftTableIds());
-  }, []);
 
-  const handleSaveDraft = useCallback(() => {
+  const handleSaveDraft = useCallback(async () => {
     if (!selectedTable || cart.length === 0) {
       toast.warn('Nothing to save — cart is empty.');
       return;
     }
-    const now = Date.now();
-    writeDraft(selectedTable, {
-      cart,
-      savedAt: now,
-      orderMode,
-      activeOrderId,
-      activeDineinOrderId,
-      currentBatchTimestamp,
-      hasNewItems,
-    });
-    setDraftSavedAt(now);
-    refreshDraftTableIds();
-    toast.success('Draft saved! You can return to this table anytime.');
-  }, [
-    selectedTable, cart, orderMode,
-    activeOrderId, activeDineinOrderId,
-    currentBatchTimestamp, hasNewItems,
-    refreshDraftTableIds,
-  ]);
+    const ok = await writeDraft(selectedTable, cart, clientId, token);
+    if (ok) {
+      const now = Date.now();
+      setDraftSavedAt(now);
+      await fetchTables();                  // refreshes floor DRAFT badges
+      toast.success('Draft saved! You can return to this table anytime.');
+    } else {
+      toast.error('Failed to save draft.');
+    }
+  }, [selectedTable, cart, clientId, token]);
 
-  const restoreDraftForTable = useCallback((tableId) => {
-    const draft = readDraft(tableId);
-    if (!draft) return false;
-    setCart(draft.cart || []);
-    setOrderMode(draft.orderMode || 'dinein');
-    setActiveOrderId(draft.activeOrderId || null);
-    setActiveDineinOrderId(draft.activeDineinOrderId || null);
-    setCurrentBatchTimestamp(draft.currentBatchTimestamp || null);
-    setHasNewItems(draft.hasNewItems || false);
-    setDraftSavedAt(draft.savedAt || null);
-    setShowCart(true);   // always show cart when restoring a draft
-    return true;
-  }, []);
 
-  const clearDraftForTable = useCallback((tableId) => {
-    if (!tableId) return;
-    deleteDraft(tableId);
-    setDraftSavedAt(null);
-    refreshDraftTableIds();
-  }, [refreshDraftTableIds]);
 
   // ─────────────────────────────────────────────────────────────────────────
   // Category / tree utilities
@@ -1070,34 +1079,36 @@ const TakeOrder = ({ clientId, token, onOrderUpdate, realm }) => {
     return flat;
   };
 
-  const getAddonCategoryId = useCallback((itemCategoryId) => {
-    if (!menuConfig) return 'addons_ac';
-    const { addonCategoryAC, addonCategoryNonAC, addonNonACKeywords, addonACKeywords } = menuConfig;
-    if (!itemCategoryId || !categoriesFlat.length) return addonCategoryAC;
+const getAddonCategoryId = useCallback((itemCategoryId) => {
+  if (!itemCategoryId || !categoriesFlat.length) return null;
 
-    const pathNames = [];
-    let cur = itemCategoryId;
-    const visited = new Set();
-    while (cur && !visited.has(cur)) {
-      visited.add(cur);
-      const cat = categoriesFlat.find(c => c.id === cur);
-      if (!cat) break;
-      pathNames.push((cat.name || '').toLowerCase());
-      cur = cat.parentId || cat.parent_id;
+  // 1️⃣ Find root node (like "dietery")
+  const rootNode = categoriesFlat.find(
+    c => c.parentId === null || c.parentId === undefined
+  );
+
+  if (!rootNode) return null;
+
+  // 2️⃣ Start from item's category
+  let current = categoriesFlat.find(c => c.id === itemCategoryId);
+
+  // 3️⃣ Climb upward until direct child of root
+  while (current && current.parentId) {
+    if (current.parentId === rootNode.id) {
+      const slug = current.name
+        .trim()
+        .toLowerCase()
+        .replace(/[\s-]+/g, "")
+        .replace(/[^a-z0-9]/g, "");
+
+      return `addons_${slug}`;
     }
 
-    const isNonAC = addonNonACKeywords.some(kw =>
-      pathNames.some(p => p === kw || p.includes(kw))
-    );
-    if (isNonAC) return addonCategoryNonAC;
+    current = categoriesFlat.find(c => c.id === current.parentId);
+  }
 
-    const isAC = addonACKeywords.some(kw =>
-      pathNames.some(p => p === kw || p.includes(kw))
-    );
-    if (isAC) return addonCategoryAC;
-
-    return addonCategoryAC;
-  }, [categoriesFlat, menuConfig]);
+  return null;
+}, [categoriesFlat]);
 
   const getCategoryAndChildrenIds = (cats, targetId) => {
     const result = new Set();
@@ -1166,6 +1177,7 @@ const TakeOrder = ({ clientId, token, onOrderUpdate, realm }) => {
     }
   };
 
+
   const fetchTableOrders = async (tableList) => {
     try {
       const r = await axios.get(
@@ -1173,6 +1185,10 @@ const TakeOrder = ({ clientId, token, onOrderUpdate, realm }) => {
         { headers: { Authorization: `Bearer ${token}` } }
       );
       const allOrders = r.data?.data || [];
+
+      // ▼ ADD THIS ONE LINE — populates the floor DRAFT badges from server
+      setDraftTableIds(getDraftTableIdsFromOrders(allOrders));
+
       const map = {};
       tableList.forEach(table => {
         const s = table.status?.toLowerCase();
@@ -1324,7 +1340,6 @@ const TakeOrder = ({ clientId, token, onOrderUpdate, realm }) => {
           }
         }
         setDieterySubCategories(qc);
-        refreshDraftTableIds();
       } catch (err) {
         console.error('Fetch error:', err);
       } finally {
@@ -1385,10 +1400,10 @@ const TakeOrder = ({ clientId, token, onOrderUpdate, realm }) => {
   // Table / order selection
   // ─────────────────────────────────────────────────────────────────────────
 
-  const handleTableSelect = (table) => {
+
+  const handleTableSelect = async (table) => {
     const tableIdStr = table.id.toString();
 
-    // Reset any previous active-order context
     setActiveOrderId(null);
     setActiveDineinOrderId(null);
     setHasNewItems(false);
@@ -1402,6 +1417,7 @@ const TakeOrder = ({ clientId, token, onOrderUpdate, realm }) => {
       toast.info('Draft restored for this table.', { autoClose: 2000 });
     } else {
       setCart([]);
+      setDraftSavedAt(null);
       setShowCart(true);
     }
 
@@ -1712,7 +1728,7 @@ const TakeOrder = ({ clientId, token, onOrderUpdate, realm }) => {
           toast.success(`Sub-order ${r.data.data.dinein_order_id} created!`);
         }
       } else {
-        // Create a brand-new order
+        const existingDraft = await readDraft(selectedTable, clientId, token);
         const total = cart.reduce((s, i) => s + (i.unit_price || 0) * i.quantity, 0);
         const res = await axios.post(
           `${import.meta.env.VITE_API_ORDER_SERVICE_URL}/${clientId}/dinein/create`,
@@ -1747,9 +1763,9 @@ const TakeOrder = ({ clientId, token, onOrderUpdate, realm }) => {
             `${import.meta.env.VITE_API_TABLE_SERVICE_URL}/${clientId}/tables/update`,
             {
               ...tableToUpdate,
-              id: Number(selectedTable),
-              status: 'Occupied',
-              table_type: tableToUpdate.table_type.toString(),
+              id         : Number(selectedTable),
+              status     : 'Occupied',
+              table_type : tableToUpdate.table_type.toString(),
             },
             { headers }
           );
@@ -1757,7 +1773,7 @@ const TakeOrder = ({ clientId, token, onOrderUpdate, realm }) => {
       }
 
       // Clean up on success
-      clearDraftForTable(selectedTable);
+      await deleteDraftFromDB(selectedTable, clientId, token);
       await fetchTables();
       setCart([]);
       setActiveOrderId(null);
@@ -1785,8 +1801,8 @@ const TakeOrder = ({ clientId, token, onOrderUpdate, realm }) => {
     setShowClearConfirm(true);
   };
 
-  const confirmClearCart = () => {
-    clearDraftForTable(selectedTable);
+  const confirmClearCart = async () => {
+    await deleteDraftFromDB(selectedTable, clientId, token);
     setCart([]);
     setSelectedTable('');
     setCurrentView('floor');
