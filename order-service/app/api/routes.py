@@ -1,3 +1,4 @@
+
 from fastapi import APIRouter, Depends, HTTPException, Query, Request
 from fastapi.responses import FileResponse
 from sqlalchemy.orm import Session
@@ -25,6 +26,7 @@ def create_order(client_id: str, order: DineinOrderModel, context: SaasContext =
                        handler_id=order.handler_id, created_by=order.created_by, updated_by=order.updated_by)
     db.add(db_order)
     db.flush()
+    db_order.dinein_order_id=str(db_order.id)
     for item in order.items:
         db_item = Db_OrderItem_Entity(order_id=db_order.id, client_id=client_id, item_id=item.item_id, item_name=item.item_name,   
                               slug=item.slug, quantity=item.quantity, unit_price=item.unit_price, line_total=item.line_total, 
@@ -52,7 +54,7 @@ def create_order(client_id: str, order: DineinOrderModel, context: SaasContext =
         ) for i in db_items
     ]
     dinein_model = DineinOrderModel(
-        id=db_order.id, table_id=db_order.table_id, client_id=db_order.client_id, status=db_order.status,
+        id=db_order.id, table_id=db_order.table_id, client_id=db_order.client_id, status=db_order.status, dinein_order_id=db_order.dinein_order_id,
         created_at=db_order.created_at, items=order_items)
     response = ResponseModel(screen_id=context.screen_id, data=dinein_model)
     return response
@@ -147,6 +149,8 @@ def update_order_status(
 
     if body.total_price is not None:
        order.total_price = body.total_price
+    if body.table_id is not None:
+       order.table_id=body.table_id   
     if order.status == OrderStatusEnum.served and body.status == OrderStatusEnum.served:
          return ResponseModel(  screen_id=context.screen_id, data={"message": "Order already served", "new_status": order.status})
     db.commit()
