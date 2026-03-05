@@ -60,16 +60,16 @@ const calculateElapsedTime = (createdAt) => {
   if (diffMs < 0) return 'Just now';
 
   const totalSeconds = Math.floor(diffMs / 1000);
-  const minutes      = Math.floor(totalSeconds / 60);
-  const hours        = Math.floor(minutes / 60);
-  const days         = Math.floor(hours / 24);
+  const minutes = Math.floor(totalSeconds / 60);
+  const hours = Math.floor(minutes / 60);
+  const days = Math.floor(hours / 24);
 
   if (totalSeconds < 60) return 'Just now';
-  if (minutes === 1)     return '1 min ago';
-  if (minutes < 60)      return `${minutes} mins ago`;
-  if (hours === 1)       return '1 hr ago';
-  if (hours < 24)        return `${hours} hrs ago`;
-  if (days === 1)        return '1 day ago';
+  if (minutes === 1) return '1 min ago';
+  if (minutes < 60) return `${minutes} mins ago`;
+  if (hours === 1) return '1 hr ago';
+  if (hours < 24) return `${hours} hrs ago`;
+  if (days === 1) return '1 day ago';
   return `${days} days ago`;
 };
 
@@ -171,7 +171,7 @@ const ItemStatusButton = ({ status, activeStatus, onClick, title, children }) =>
     className="p-2 rounded-md hover:bg-gray-100 transition-colors"
   >
     {React.cloneElement(children, {
-      size:      20,
+      size: 20,
       className: status === activeStatus ? children.props.activeClass : 'text-gray-500',
     })}
   </button>
@@ -192,10 +192,10 @@ const KitchenCard = ({
     card.status === KDS_CONFIG.STATUS.PENDING
       ? 'text-blue-600'
       : card.status === KDS_CONFIG.STATUS.PREPARING
-      ? 'text-orange-600'
-      : card.status === KDS_CONFIG.STATUS.READY
-      ? 'text-green-600'
-      : '';
+        ? 'text-orange-600'
+        : card.status === KDS_CONFIG.STATUS.READY
+          ? 'text-green-600'
+          : '';
 
   return (
     <div className="rounded-xl shadow-md overflow-hidden border border-gray-200 bg-white transition-transform transform hover:-translate-y-0.5 flex flex-col">
@@ -311,19 +311,19 @@ const KitchenDisplay = () => {
   const token = localStorage.getItem('access_token');
 
   // cards = array of { card_id, sub_order_id, dinein_order_id, table_id, status, created_at, items[] }
-  const [cards, setCards]                   = useState([]);
-  const [tablesMap, setTablesMap]           = useState({});
+  const [cards, setCards] = useState([]);
+  const [tablesMap, setTablesMap] = useState({});
   const [inventoryItems, setInventoryItems] = useState([]);
-  const [loading, setLoading]               = useState(true);
-  const [orderFilter, setOrderFilter]       = useState('ALL');
+  const [loading, setLoading] = useState(true);
+  const [orderFilter, setOrderFilter] = useState('ALL');
 
   // Delete order modal state
   const [showDeleteOrderModal, setShowDeleteOrderModal] = useState(false);
-  const [cardToDelete, setCardToDelete]                 = useState(null);
+  const [cardToDelete, setCardToDelete] = useState(null);
 
   // Delete item modal state
   const [showDeleteItemModal, setShowDeleteItemModal] = useState(false);
-  const [itemToDelete, setItemToDelete]               = useState(null);  // { cardId, item }
+  const [itemToDelete, setItemToDelete] = useState(null);  // { cardId, item }
 
 
   // ─── Fetch tables ────────────────────────────────────────────────────────────
@@ -382,15 +382,15 @@ const KitchenDisplay = () => {
     if (subOrders.length === 0) {
       return [
         {
-          card_id:              mergedOrder.id,
-          sub_order_id:         mergedOrder.id,
-          dinein_order_id:      mergedOrder.dinein_order_id,
+          card_id: mergedOrder.id,
+          sub_order_id: mergedOrder.id,
+          dinein_order_id: mergedOrder.dinein_order_id,
           root_dinein_order_id: mergedOrder.dinein_order_id,
-          table_id:             mergedOrder.table_id,
-          status:               mergedOrder.status || 'pending',
-          created_at:           mergedOrder.created_at,
-          items:                mergedOrder.items || [],
-          is_sub_order:         false,
+          table_id: mergedOrder.table_id,
+          status: mergedOrder.status || 'pending',
+          created_at: mergedOrder.created_at,
+          items: mergedOrder.items || [],
+          is_sub_order: false,
         },
       ];
     }
@@ -405,15 +405,15 @@ const KitchenDisplay = () => {
         return new Date(a.created_at || 0) - new Date(b.created_at || 0);
       })
       .map((subOrder) => ({
-        card_id:              subOrder.id,
-        sub_order_id:         subOrder.id,
-        dinein_order_id:      subOrder.dinein_order_id,
+        card_id: subOrder.id,
+        sub_order_id: subOrder.id,
+        dinein_order_id: subOrder.dinein_order_id,
         root_dinein_order_id: mergedOrder.dinein_order_id,
-        table_id:             mergedOrder.table_id,
-        status:               subOrder.status || 'pending',
-        created_at:           subOrder.created_at,
-        items:                itemsBySubOrder[subOrder.id] || [],
-        is_sub_order:         String(subOrder.dinein_order_id).includes('-'),
+        table_id: mergedOrder.table_id,
+        status: subOrder.status || 'pending',
+        created_at: subOrder.created_at,
+        items: itemsBySubOrder[subOrder.id] || [],
+        is_sub_order: String(subOrder.dinein_order_id).includes('-'),
       }));
   };
 
@@ -432,11 +432,12 @@ const KitchenDisplay = () => {
         { headers: { Authorization: `Bearer ${token}` } }
       );
 
-const today = new Date().toLocaleDateString(KDS_CONFIG.DATE_FORMAT);      
-const allCards = [];
+      const today = new Date().toLocaleDateString(KDS_CONFIG.DATE_FORMAT);
+      const allCards = [];
 
       (res.data?.data || []).forEach((mergedOrder) => {
         // Date filter using root created_at
+        if (mergedOrder.status === 'draft') return;
         const createdAt = mergedOrder.created_at;
         if (createdAt) {
           const utc = typeof createdAt === 'string'
@@ -467,7 +468,7 @@ const allCards = [];
 
   useEffect(() => {
     fetchOrders();
-const interval = setInterval(fetchOrders, KDS_CONFIG.POLL_INTERVAL_MS);
+    const interval = setInterval(fetchOrders, KDS_CONFIG.POLL_INTERVAL_MS);
     return () => clearInterval(interval);
   }, [fetchOrders]);
 
@@ -478,7 +479,7 @@ const interval = setInterval(fetchOrders, KDS_CONFIG.POLL_INTERVAL_MS);
     const card = cards.find((c) => c.card_id === cardId);
     if (!card) return;
 
-    const updatedItems  = (card.items || []).map((i) =>
+    const updatedItems = (card.items || []).map((i) =>
       String(i.id) === String(itemId) ? { ...i, status: newStatus } : i
     );
     const derivedStatus = deriveStatus(updatedItems);
@@ -486,17 +487,17 @@ const interval = setInterval(fetchOrders, KDS_CONFIG.POLL_INTERVAL_MS);
     try {
       // Update all item statuses for this sub-order
       const payload = updatedItems.map((item) => ({
-        id:                  item.id,
-        item_id:             item.item_id,
-        item_name:           item.item_name,
-        quantity:            item.quantity,
-        status:              item.status,
-        note:                item.note || '',
-        slug:                item.slug || '',
-        unit_price:          item.unit_price || 0,
-        line_total:          (item.unit_price || 0) * (item.quantity || 1),
-        client_id:           clientId,
-        order_id:            card.sub_order_id,
+        id: item.id,
+        item_id: item.item_id,
+        item_name: item.item_name,
+        quantity: item.quantity,
+        status: item.status,
+        note: item.note || '',
+        slug: item.slug || '',
+        unit_price: item.unit_price || 0,
+        line_total: (item.unit_price || 0) * (item.quantity || 1),
+        client_id: clientId,
+        order_id: card.sub_order_id,
         frontend_unique_key: item.frontend_unique_key || null,
       }));
 
@@ -514,12 +515,12 @@ const interval = setInterval(fetchOrders, KDS_CONFIG.POLL_INTERVAL_MS);
       );
 
       // Notify when order moves to ready
-      if (derivedStatus === KDS_CONFIG.STATUS.READY && card.status !== KDS_CONFIG.STATUS.READY  ) {
+      if (derivedStatus === KDS_CONFIG.STATUS.READY && card.status !== KDS_CONFIG.STATUS.READY) {
         window.dispatchEvent(
           new CustomEvent('orderCollect', {
             detail: {
               tableName: tablesMap[card.table_id] || KDS_CONFIG.DEFAULT_UNKNOWN_LABEL,
-              orderId:   card.sub_order_id,
+              orderId: card.sub_order_id,
             },
           })
         );
@@ -573,7 +574,7 @@ const interval = setInterval(fetchOrders, KDS_CONFIG.POLL_INTERVAL_MS);
       await axios.delete(
         `${import.meta.env.VITE_API_ORDER_SERVICE_URL}/${clientId}/order_item/delete`,
         {
-          params:  { order_item_id: item.id },
+          params: { order_item_id: item.id },
           headers: { Authorization: `Bearer ${token}` },
         }
       );
@@ -584,7 +585,7 @@ const interval = setInterval(fetchOrders, KDS_CONFIG.POLL_INTERVAL_MS);
         await axios.delete(
           `${import.meta.env.VITE_API_ORDER_SERVICE_URL}/${clientId}/dinein/delete`,
           {
-            params:  { dinein_order_id: card.sub_order_id, client_id: clientId },
+            params: { dinein_order_id: card.sub_order_id, client_id: clientId },
             headers: { Authorization: `Bearer ${token}` },
           }
         );
@@ -625,7 +626,7 @@ const interval = setInterval(fetchOrders, KDS_CONFIG.POLL_INTERVAL_MS);
       await axios.delete(
         `${import.meta.env.VITE_API_ORDER_SERVICE_URL}/${clientId}/dinein/delete`,
         {
-          params:  { dinein_order_id: cardToDelete.sub_order_id, client_id: clientId },
+          params: { dinein_order_id: cardToDelete.sub_order_id, client_id: clientId },
           headers: { Authorization: `Bearer ${token}` },
         }
       );
@@ -659,10 +660,10 @@ const interval = setInterval(fetchOrders, KDS_CONFIG.POLL_INTERVAL_MS);
 
   const filteredCards = cards
     .filter((card) => {
-     if (orderFilter === KDS_CONFIG.FILTERS.ALL) return true;
+      if (orderFilter === KDS_CONFIG.FILTERS.ALL) return true;
       const isTakeaway = KDS_CONFIG.TAKEAWAY_TABLE_IDS.includes(Number(card.table_id));
       if (orderFilter === KDS_CONFIG.FILTERS.TAKEAWAY) return isTakeaway;
-      if (orderFilter === KDS_CONFIG.FILTERS.DINEIN)   return !isTakeaway;
+      if (orderFilter === KDS_CONFIG.FILTERS.DINEIN) return !isTakeaway;
       return true;
     })
 
@@ -681,11 +682,10 @@ const interval = setInterval(fetchOrders, KDS_CONFIG.POLL_INTERVAL_MS);
                 <button
                   key={key}
                   onClick={() => setOrderFilter(key)}
-                  className={`flex items-center gap-2 px-4 py-2 rounded-lg font-medium text-sm transition-all ${
-                    orderFilter === key
+                  className={`flex items-center gap-2 px-4 py-2 rounded-lg font-medium text-sm transition-all ${orderFilter === key
                       ? 'bg-action-primary text-text-white shadow-sm'
                       : 'bg-bg-tertiary text-text-secondary hover:text-text-primary border border-border-default'
-                  }`}
+                    }`}
                 >
                   <Icon size={16} />
                   {label}
