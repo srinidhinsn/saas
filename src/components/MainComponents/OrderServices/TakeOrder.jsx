@@ -17,11 +17,11 @@ import { getMenuConfig } from '../../utils/menuConfigResolver';
 // ─────────────────────────────────────────────────────────────────────────────
 
 const TABLE_STATUS_CONFIG = {
-  vacant:   { clickable: true,  bg: 'bg-action-success', border: 'border-border-default', badge: 'bg-green-100 text-action-success' },
-  available:{ clickable: true,  bg: 'bg-action-success', border: 'border-border-default', badge: 'bg-green-100 text-green-700' },
+  vacant: { clickable: true, bg: 'bg-action-success', border: 'border-border-default', badge: 'bg-green-100 text-action-success' },
+  available: { clickable: true, bg: 'bg-action-success', border: 'border-border-default', badge: 'bg-green-100 text-green-700' },
   occupied: { clickable: false, bg: 'bg-action-primary', border: 'border-action-primary', badge: 'bg-red-100 text-action-primary', viewable: true },
-  served:   { clickable: false, bg: 'bg-blue-50',        border: 'border-blue-400',       badge: 'bg-blue-100 text-blue-700',  viewable: true },
-  reserved: { clickable: false, bg: 'bg-yellow-50',      border: 'border-yellow-400',     badge: 'bg-yellow-100 text-yellow-700' },
+  served: { clickable: false, bg: 'bg-blue-50', border: 'border-blue-400', badge: 'bg-blue-100 text-blue-700', viewable: true },
+  reserved: { clickable: false, bg: 'bg-yellow-50', border: 'border-yellow-400', badge: 'bg-yellow-100 text-yellow-700' },
 };
 
 // localStorage key prefix — drafts survive page refresh
@@ -77,10 +77,10 @@ function getAllDraftTableIds() {
 
 const ItemStatusBadge = ({ status }) => {
   const cfg = {
-    pending:   { bg: 'bg-blue-100',   text: 'text-blue-700',   label: 'Pending' },
+    pending: { bg: 'bg-blue-100', text: 'text-blue-700', label: 'Pending' },
     preparing: { bg: 'bg-orange-100', text: 'text-orange-700', label: 'Preparing' },
-    ready:     { bg: 'bg-green-100',  text: 'text-green-700',  label: 'Ready' },
-    served:    { bg: 'bg-gray-100',   text: 'text-gray-600',   label: 'Served' },
+    ready: { bg: 'bg-green-100', text: 'text-green-700', label: 'Ready' },
+    served: { bg: 'bg-gray-100', text: 'text-gray-600', label: 'Served' },
   }[status] || { bg: 'bg-gray-100', text: 'text-gray-500', label: status || '—' };
 
   return (
@@ -261,7 +261,7 @@ const printKOT = ({ counterTree, categoriesFlat, itemsToPrint, meta }) => {
   const groups = {};
   parentItems.forEach(item => {
     const counter = findCounterForItem(item);
-    const key  = counter ? counter.id : '__unassigned__';
+    const key = counter ? counter.id : '__unassigned__';
     const name = counter ? counter.name : 'General Kitchen';
     if (!groups[key]) groups[key] = { counterName: name, items: [] };
     groups[key].items.push({
@@ -276,7 +276,7 @@ const printKOT = ({ counterTree, categoriesFlat, itemsToPrint, meta }) => {
     return;
   }
 
-  const now     = new Date();
+  const now = new Date();
   const timeStr = now.toLocaleTimeString([], { hour: '2-digit', minute: '2-digit' });
   const dateStr = now.toLocaleDateString();
 
@@ -291,8 +291,8 @@ const printKOT = ({ counterTree, categoriesFlat, itemsToPrint, meta }) => {
             ${item.quantity}
           </td>
           ${item.note
-            ? `<td style="padding:4px 2px;border-bottom:1px dashed #ccc;font-size:11px;color:#555;font-style:italic;">${item.note}</td>`
-            : '<td></td>'}
+          ? `<td style="padding:4px 2px;border-bottom:1px dashed #ccc;font-size:11px;color:#555;font-style:italic;">${item.note}</td>`
+          : '<td></td>'}
         </tr>
       `;
       const addonRows = (item.linkedAddons || []).map(addon => `
@@ -320,8 +320,8 @@ const printKOT = ({ counterTree, categoriesFlat, itemsToPrint, meta }) => {
           <span>${dateStr} ${timeStr}</span>
         </div>
         ${meta.dineinOrderId
-          ? `<div style="font-size:11px;margin-bottom:6px;color:#555;">Order #${meta.dineinOrderId}</div>`
-          : ''}
+        ? `<div style="font-size:11px;margin-bottom:6px;color:#555;">Order #${meta.dineinOrderId}</div>`
+        : ''}
         <table style="width:100%;border-collapse:collapse;">
           <thead>
             <tr style="border-bottom:2px solid #000;">
@@ -513,12 +513,12 @@ const TableReservation = ({
   onMarkAsServed,
 }) => {
   const [selectedSections, setSelectedSections] = useState([]);
-  const [selectedZones, setSelectedZones]       = useState([]);
+  const [selectedZones, setSelectedZones] = useState([]);
 
-  const getZone    = t => t.location_zone?.trim() || 'Unassigned';
-  const getSection = t => t.section?.trim()       || 'Other';
+  const getZone = t => t.location_zone?.trim() || 'Unassigned';
+  const getSection = t => t.section?.trim() || 'Other';
 
-  const zonesFromDB    = [...new Set(tables.map(t => t.location_zone).filter(Boolean))];
+  const zonesFromDB = [...new Set(tables.map(t => t.location_zone).filter(Boolean))];
   const sectionsFromDB = [...new Set(tables.map(t => t.section).filter(Boolean))];
 
   const toggleFilter = (value, setter) => {
@@ -530,17 +530,17 @@ const TableReservation = ({
   const filteredTables = tables.filter(t => {
     const z = getZone(t);
     const s = getSection(t);
-    return (selectedZones.length === 0    || selectedZones.includes(z))
-        && (selectedSections.length === 0 || selectedSections.includes(s));
+    return (selectedZones.length === 0 || selectedZones.includes(z))
+      && (selectedSections.length === 0 || selectedSections.includes(s));
   });
 
-  const visibleZones      = [...new Set(filteredTables.map(t => getZone(t)))];
+  const visibleZones = [...new Set(filteredTables.map(t => getZone(t)))];
   const getSectionsByZone = zone =>
     [...new Set(filteredTables.filter(t => getZone(t) === zone).map(t => getSection(t)))];
 
   const calcElapsed = (createdAt) => {
     if (!createdAt) return null;
-    const utc  = typeof createdAt === 'string'
+    const utc = typeof createdAt === 'string'
       ? createdAt.replace(' ', 'T').split('.')[0] + 'Z'
       : createdAt;
     const diff = Date.now() - new Date(utc).getTime();
@@ -549,21 +549,21 @@ const TableReservation = ({
     const m = Math.floor(s / 60);
     const h = Math.floor(m / 60);
     const d = Math.floor(h / 24);
-    if (s < 60)  return 'Just now';
+    if (s < 60) return 'Just now';
     if (m === 1) return '1 min ago';
-    if (m < 60)  return `${m} mins ago`;
+    if (m < 60) return `${m} mins ago`;
     if (h === 1) return '1 hr ago';
-    if (h < 24)  return `${h} hrs ago`;
+    if (h < 24) return `${h} hrs ago`;
     if (d === 1) return '1 day ago';
     return `${d} days ago`;
   };
 
   const getOrderStatusStyle = (status) => {
     const map = {
-      pending:   'bg-orange-100 text-orange-700',
+      pending: 'bg-orange-100 text-orange-700',
       preparing: 'bg-blue-100 text-blue-700',
-      ready:     'bg-green-100 text-green-700',
-      served:    'bg-purple-100 text-purple-700',
+      ready: 'bg-green-100 text-green-700',
+      served: 'bg-purple-100 text-purple-700',
     };
     return map[status] || 'bg-gray-100 text-gray-700';
   };
@@ -653,14 +653,14 @@ const TableReservation = ({
                   {filteredTables
                     .filter(t => getZone(t) === zone && getSection(t) === section)
                     .map(table => {
-                      const statusKey        = table.status?.toLowerCase();
-                      const config           = TABLE_STATUS_CONFIG[statusKey] || TABLE_STATUS_CONFIG.vacant;
-                      const orderInfo        = tableOrders[table.id];
+                      const statusKey = table.status?.toLowerCase();
+                      const config = TABLE_STATUS_CONFIG[statusKey] || TABLE_STATUS_CONFIG.vacant;
+                      const orderInfo = tableOrders[table.id];
                       const hasViewableOrder = (statusKey === 'occupied' || statusKey === 'served') && orderInfo;
-                      const tableHasDraft    = draftTableIds.includes(table.id.toString());
-                      const elapsedTime      = orderInfo?.created_at ? calcElapsed(orderInfo.created_at) : null;
-                      const orderCount       = orderInfo?.order_count || 1;
-                      const totalPrice       = orderInfo?.total_price
+                      const tableHasDraft = draftTableIds.includes(table.id.toString());
+                      const elapsedTime = orderInfo?.created_at ? calcElapsed(orderInfo.created_at) : null;
+                      const orderCount = orderInfo?.order_count || 1;
+                      const totalPrice = orderInfo?.total_price
                         ? `₹${Number(orderInfo.total_price).toFixed(0)}`
                         : null;
 
@@ -702,13 +702,13 @@ const TableReservation = ({
                             <div
                               className={`p-3 flex items-center justify-between gap-2
                                 ${statusKey === 'occupied' ? 'text-blue-600 bg-blue-50'
-                                : statusKey === 'served'   ? 'text-purple-600 bg-purple-50'
-                                : statusKey === 'reserved' ? 'text-yellow-600 bg-yellow-50'
-                                : 'text-green-600 bg-green-50'}`}
+                                  : statusKey === 'served' ? 'text-purple-600 bg-purple-50'
+                                    : statusKey === 'reserved' ? 'text-yellow-600 bg-yellow-50'
+                                      : 'text-green-600 bg-green-50'}`}
                             >
-                              {statusKey === 'vacant'                               && <span className="text-2xl text-green-400">—</span>}
+                              {statusKey === 'vacant' && <span className="text-2xl text-green-400">—</span>}
                               {(statusKey === 'occupied' || statusKey === 'served') && <Eye size={22} />}
-                              {statusKey === 'reserved'                             && <Lock size={22} />}
+                              {statusKey === 'reserved' && <Lock size={22} />}
 
                               {hasViewableOrder && (
                                 <div className="flex flex-col items-center flex-1">
@@ -783,58 +783,123 @@ const TableReservation = ({
 // ─────────────────────────────────────────────────────────────────────────────
 // TakeOrder — main component
 // ─────────────────────────────────────────────────────────────────────────────
+const TransferTableModal = ({ isOpen, onClose, tables, currentTableId, onConfirm }) => {
+  const [selectedNewTable, setSelectedNewTable] = useState(null);
 
+  useEffect(() => {
+    if (isOpen) setSelectedNewTable(null);
+  }, [isOpen]);
+
+  if (!isOpen) return null;
+
+  const vacantTables = tables.filter(
+    t => t.status?.toLowerCase() === 'vacant' && t.id.toString() !== currentTableId
+  );
+
+  return (
+    <div className="fixed inset-0 z-50 flex items-center justify-center p-4 bg-black/50">
+      <div className="rounded-lg w-full max-w-sm bg-white shadow-xl">
+        <div className="px-6 py-4 border-b flex justify-between items-center">
+          <h2 className="text-lg font-bold text-gray-800">Transfer Table</h2>
+          <button onClick={onClose} className="text-gray-500 hover:text-gray-700">
+            <X size={20} />
+          </button>
+        </div>
+
+        <div className="px-6 py-4 max-h-72 overflow-y-auto">
+          {vacantTables.length === 0 ? (
+            <p className="text-sm text-gray-500 text-center py-4">No vacant tables available.</p>
+          ) : (
+            <div className="grid grid-cols-3 gap-2">
+              {vacantTables.map(t => (
+                <button
+                  key={t.id}
+                  onClick={() => setSelectedNewTable(t)}
+                  className={`py-3 rounded-lg border-2 text-sm font-bold transition
+                    ${selectedNewTable?.id === t.id
+                      ? 'border-action-primary bg-action-primary/10 text-action-primary'
+                      : 'border-gray-200 hover:border-action-primary text-gray-700'}`}
+                >
+                  {t.table_number}
+                </button>
+              ))}
+            </div>
+          )}
+        </div>
+
+        <div className="px-6 py-4 flex gap-3 bg-gray-50 rounded-b-lg">
+          <button
+            onClick={onClose}
+            className="flex-1 py-2.5 rounded-lg font-medium text-sm border border-gray-300 bg-white text-gray-700 hover:bg-gray-50"
+          >
+            Cancel
+          </button>
+          <button
+            onClick={() => { if (selectedNewTable) { onConfirm(selectedNewTable); onClose(); } }}
+            disabled={!selectedNewTable}
+            className={`flex-1 py-2.5 rounded-lg font-medium text-sm text-white transition
+              ${selectedNewTable ? 'bg-action-primary hover:bg-action-danger' : 'bg-gray-300 cursor-not-allowed'}`}
+          >
+            Transfer
+          </button>
+        </div>
+      </div>
+    </div>
+  );
+};
 const TakeOrder = ({ clientId, token, onOrderUpdate, realm }) => {
 
   // ── View ──────────────────────────────────────────────────────────────────
   const [currentView, setCurrentView] = useState('floor');
-  const [orderMode, setOrderMode]     = useState('dinein');
+  const [orderMode, setOrderMode] = useState('dinein');
 
   // ── Remote data ───────────────────────────────────────────────────────────
-  const [tables, setTables]                         = useState([]);
-  const [tableOrders, setTableOrders]               = useState({});
-  const [menuItems, setMenuItems]                   = useState([]);
-  const [categories, setCategories]                 = useState([]);
-  const [categoriesFlat, setCategoriesFlat]         = useState([]);
+  const [tables, setTables] = useState([]);
+  const [tableOrders, setTableOrders] = useState({});
+  const [menuItems, setMenuItems] = useState([]);
+  const [categories, setCategories] = useState([]);
+  const [categoriesFlat, setCategoriesFlat] = useState([]);
   const [dieterySubCategories, setDieterySubCategories] = useState([]);
-  const [sidebarCategories, setSidebarCategories]   = useState([]);
-  const [counterTree, setCounterTree]               = useState([]);
-  const [inventoryMap, setInventoryMap]             = useState({});
-  const [loading, setLoading]                       = useState(true);
+  const [sidebarCategories, setSidebarCategories] = useState([]);
+  const [counterTree, setCounterTree] = useState([]);
+  const [inventoryMap, setInventoryMap] = useState({});
+  const [loading, setLoading] = useState(true);
 
   // ── Order context ─────────────────────────────────────────────────────────
-  const [selectedTable, setSelectedTable]               = useState('');
-  const [takeawayTableId, setTakeawayTableId]           = useState(500);
-  const [activeOrderId, setActiveOrderId]               = useState(null);
-  const [activeDineinOrderId, setActiveDineinOrderId]   = useState(null);
+  const [selectedTable, setSelectedTable] = useState('');
+  const [takeawayTables, setTakeawayTables] = useState([]);
+  const [dineinTableId, setDineinTableId] = useState(null);
+  const [takeawayTableId, setTakeawayTableId] = useState(null);
+  const [activeOrderId, setActiveOrderId] = useState(null);
+  const [activeDineinOrderId, setActiveDineinOrderId] = useState(null);
 
   // ── Cart ──────────────────────────────────────────────────────────────────
-  const [cart, setCart]                               = useState([]);
-  const [showCart, setShowCart]                       = useState(false);
-  const [hasNewItems, setHasNewItems]                 = useState(false);
+  const [cart, setCart] = useState([]);
+  const [showCart, setShowCart] = useState(false);
+  const [hasNewItems, setHasNewItems] = useState(false);
   const [currentBatchTimestamp, setCurrentBatchTimestamp] = useState(null);
-  const [isPlacingOrder, setIsPlacingOrder]           = useState(false);
-  const isPlacingRef                                  = useRef(false);
+  const [isPlacingOrder, setIsPlacingOrder] = useState(false);
+  const isPlacingRef = useRef(false);
 
   // ── Drafts ────────────────────────────────────────────────────────────────
-  const [draftSavedAt, setDraftSavedAt]   = useState(null);
+  const [draftSavedAt, setDraftSavedAt] = useState(null);
   const [draftTableIds, setDraftTableIds] = useState([]);   // for floor DRAFT badges
 
   // ── UI state ──────────────────────────────────────────────────────────────
-  const [selectedCategoryId, setSelectedCategoryId]   = useState(null);
-  const [searchQuery, setSearchQuery]                 = useState('');
-  const [showClearConfirm, setShowClearConfirm]       = useState(false);
-  const [showDeleteConfirm, setShowDeleteConfirm]     = useState(false);
-  const [orderToDelete, setOrderToDelete]             = useState(null);
-  const [lineItemsModalOpen, setLineItemsModalOpen]   = useState(false);
-  const [selectedMainItem, setSelectedMainItem]       = useState(null);
-  const [lineItemsDetails, setLineItemsDetails]       = useState([]);
-  const [invoiceModalOpen, setInvoiceModalOpen]       = useState(false);
-  const [invoiceOrderData, setInvoiceOrderData]       = useState(null);
+  const [selectedCategoryId, setSelectedCategoryId] = useState(null);
+  const [searchQuery, setSearchQuery] = useState('');
+  const [showClearConfirm, setShowClearConfirm] = useState(false);
+  const [showDeleteConfirm, setShowDeleteConfirm] = useState(false);
+  const [orderToDelete, setOrderToDelete] = useState(null);
+  const [lineItemsModalOpen, setLineItemsModalOpen] = useState(false);
+  const [selectedMainItem, setSelectedMainItem] = useState(null);
+  const [lineItemsDetails, setLineItemsDetails] = useState([]);
+  const [invoiceModalOpen, setInvoiceModalOpen] = useState(false);
+  const [invoiceOrderData, setInvoiceOrderData] = useState(null);
 
   const searchInputRef = useRef(null);
-  const isMobile       = window.matchMedia('(max-width: 1024px)').matches;
-
+  const isMobile = window.matchMedia('(max-width: 1024px)').matches;
+  const [showTransferModal, setShowTransferModal] = useState(false);
   const menuConfig = useMemo(
     () => (clientId ? getMenuConfig(clientId) : null),
     [clientId]
@@ -897,7 +962,97 @@ const TakeOrder = ({ clientId, token, onOrderUpdate, realm }) => {
   // ─────────────────────────────────────────────────────────────────────────
   // Category / tree utilities
   // ─────────────────────────────────────────────────────────────────────────
+  const handleTransferTable = async (newTable) => {
+    if (!activeOrderId) {
+      toast.error('No active order to transfer.');
+      return;
+    }
 
+    console.log('[Transfer] activeOrderId:', activeOrderId, 'activeDineinOrderId:', activeDineinOrderId, 'from table:', selectedTable, '→ to table:', newTable.id);
+
+    try {
+      setLoading(true);
+      const headers = { Authorization: `Bearer ${token}` };
+      const oldTableId = Number(selectedTable);
+      const newTableId = newTable.id;
+
+      // ── Step 1: Update order's table_id in DB ──────────────────────────
+      // Send ONLY the fields needed for transfer — no items array
+      // so the backend doesn't accidentally wipe or re-insert items.
+      const updateRes = await axios.post(
+        `${import.meta.env.VITE_API_ORDER_SERVICE_URL}/${clientId}/dinein/update`,
+        {
+          id: activeOrderId,
+          client_id: clientId,
+          table_id: newTableId,
+        },
+        { headers }
+      );
+      console.log('[Transfer] dinein/update response:', updateRes.data);
+
+      // ── Step 2: Vacate old table ───────────────────────────────────────
+      const oldTable = tables.find(t => t.id === oldTableId);
+      if (oldTable) {
+        await axios.post(
+          `${import.meta.env.VITE_API_TABLE_SERVICE_URL}/${clientId}/tables/update`,
+          {
+            ...oldTable,
+            id: oldTableId,
+            status: 'vacant',
+            table_type: String(oldTable.table_type),
+          },
+          { headers }
+        );
+      }
+
+      // ── Step 3: Occupy new table ───────────────────────────────────────
+      await axios.post(
+        `${import.meta.env.VITE_API_TABLE_SERVICE_URL}/${clientId}/tables/update`,
+        {
+          ...newTable,
+          id: newTableId,
+          status: 'Occupied',
+          table_type: String(newTable.table_type),
+        },
+        { headers }
+      );
+
+      // ── Step 4: Verify the order now has the new table_id ─────────────
+      const verifyRes = await axios.get(
+        `${import.meta.env.VITE_API_ORDER_SERVICE_URL}/${clientId}/dinein/table`,
+        { headers }
+      );
+      const allOrders = verifyRes.data?.data || [];
+      const transferredOrder = allOrders.find(o => o.id === activeOrderId);
+      console.log('[Transfer] Order after update:', transferredOrder);
+
+      if (transferredOrder && Number(transferredOrder.table_id) !== newTableId) {
+        console.warn('[Transfer] WARNING: table_id still shows', transferredOrder.table_id, '— DB update may not have worked');
+        toast.warn('Transfer may not have saved correctly — check backend logs');
+      }
+
+      // ── Step 5: Update local state ─────────────────────────────────────
+      clearDraftForTable(selectedTable);
+      setSelectedTable(newTableId.toString());
+      // Keep activeOrderId + activeDineinOrderId — same order, just new table
+      // Keep cart intact
+
+      // Refresh floor so tableOrders re-maps to new table
+      await fetchTables();
+
+      toast.success(`Transferred to Table ${newTable.table_number}`);
+    } catch (err) {
+      console.error('[Transfer] Failed:', err);
+      if (err.response) {
+        console.error('[Transfer] Backend said:', err.response.status, JSON.stringify(err.response.data));
+        toast.error(`Transfer failed: ${err.response.data?.message || err.response.data?.detail || err.response.status}`);
+      } else {
+        toast.error('Transfer failed — check console');
+      }
+    } finally {
+      setLoading(false);
+    }
+  };
   const flattenCategoryTree = (tree, level = 0, parentId = null) => {
     let flat = [];
     tree.forEach(c => {
@@ -960,7 +1115,7 @@ const TakeOrder = ({ clientId, token, onOrderUpdate, realm }) => {
   const findCategoryNode = (tree, matcher) => {
     for (const c of tree) {
       if (
-        c.id?.toLowerCase()   === matcher.toLowerCase() ||
+        c.id?.toLowerCase() === matcher.toLowerCase() ||
         c.name?.toLowerCase() === matcher.toLowerCase()
       ) return c;
       if (c.children?.length) {
@@ -1023,7 +1178,7 @@ const TakeOrder = ({ clientId, token, onOrderUpdate, realm }) => {
         const s = table.status?.toLowerCase();
         if (s === 'occupied' || s === 'served') {
           const o = allOrders
-            .filter(o => o.table_id === table.id && o.status?.toLowerCase() !== 'completed')
+            .filter(o => Number(o.table_id) === Number(table.id) && o.status?.toLowerCase() !== 'completed')
             .sort((a, b) => new Date(b.created_at) - new Date(a.created_at))[0];
           if (o) {
             map[table.id] = {
@@ -1044,19 +1199,43 @@ const TakeOrder = ({ clientId, token, onOrderUpdate, realm }) => {
   };
 
   const fetchTables = async () => {
+
+    const takeawayRoots =
+      (import.meta.env.VITE_EASYFOOD_TAKEAWAY_TABLE_DEFAULT_ROOT || "")
+        .split(",")
+        .map(v => v.trim().toLowerCase());
+
     const res = await axios.get(
       `${import.meta.env.VITE_API_TABLE_SERVICE_URL}/${clientId}/tables/read`,
       { headers: { Authorization: `Bearer ${token}` } }
     );
+
     const list = Array.isArray(res.data?.data)
-      ? res.data.data.map(t => ({ ...t, table_number: t.name || t.table_number || '-' }))
+      ? res.data.data.map(t => ({
+        ...t,
+        table_number: t.name || t.table_number || "-"
+      }))
       : [];
-    const tw = list.find(t => Number(t.id) === 500);
-    if (tw) setTakeawayTableId(tw.id);
+
+    // detect takeaway tables from ENV
+    const takeaway = list.filter(t =>
+      takeawayRoots.some(root =>
+        (t.name || "").toLowerCase().startsWith(root)
+      )
+    );
+
+    setTakeawayTables(takeaway);
+
+    if (takeaway.length > 0) {
+      setTakeawayTableId(takeaway[0].id);
+    }
+
     list.sort((a, b) =>
       a.table_number.localeCompare(b.table_number, undefined, { numeric: true })
     );
+
     setTables(list);
+
     await fetchTableOrders(list);
   };
 
@@ -1091,7 +1270,7 @@ const TakeOrder = ({ clientId, token, onOrderUpdate, realm }) => {
         setInventoryMap(iMap);
 
         const fullTree = catRes.data.data.filter(c => c.name?.toLowerCase() !== 'all');
-        const subIds   = new Set();
+        const subIds = new Set();
         fullTree.forEach(c => c.subCategories?.forEach(s => subIds.add(s.id)));
         const topLevel = fullTree.filter(c => !subIds.has(c.id));
         const flatCats = flattenCategoryTree(topLevel);
@@ -1215,8 +1394,8 @@ const TakeOrder = ({ clientId, token, onOrderUpdate, realm }) => {
     setHasNewItems(false);
     setCurrentBatchTimestamp(null);
     setOrderMode('dinein');
+    setDineinTableId(tableIdStr);
     setSelectedTable(tableIdStr);
-
     // Try to restore a saved draft; if none, start fresh with an empty, visible cart
     const restored = restoreDraftForTable(tableIdStr);
     if (restored) {
@@ -1230,13 +1409,24 @@ const TakeOrder = ({ clientId, token, onOrderUpdate, realm }) => {
   };
 
   const handleTakeawaySelect = () => {
-    const tableIdStr = takeawayTableId.toString();
+
+    if (!takeawayTables.length) {
+      toast.error("No takeaway table configured");
+      return;
+    }
+
+    const tableIdStr =
+      takeawayTableId || takeawayTables[0].id.toString();
+
     setOrderMode('takeaway');
+
+    setTakeawayTableId(tableIdStr);
     setSelectedTable(tableIdStr);
     setActiveOrderId(null);
     setActiveDineinOrderId(null);
 
     const restored = restoreDraftForTable(tableIdStr);
+
     if (restored) {
       toast.info('Draft restored.', { autoClose: 2000 });
     } else {
@@ -1258,9 +1448,10 @@ const TakeOrder = ({ clientId, token, onOrderUpdate, realm }) => {
         `${import.meta.env.VITE_API_ORDER_SERVICE_URL}/${clientId}/dinein/table`,
         { headers: { Authorization: `Bearer ${token}` } }
       );
-      const allOrders   = r.data?.data || [];
+      const allOrders = r.data?.data || [];
+      // AFTER — strict type coercion on both sides
       const tableGroups = allOrders.filter(
-        o => o.table_id === table.id && o.status?.toLowerCase() !== 'completed'
+        o => Number(o.table_id) === Number(table.id) && o.status?.toLowerCase() !== 'completed'
       );
       if (tableGroups.length === 0) {
         alert('No active order');
@@ -1320,7 +1511,7 @@ const TakeOrder = ({ clientId, token, onOrderUpdate, realm }) => {
   // ─────────────────────────────────────────────────────────────────────────
 
   const getGroupedCartItems = (items) => {
-    const grouped   = [];
+    const grouped = [];
     const processed = new Set();
     items.forEach(item => {
       const key = item.frontend_unique_key || item.id;
@@ -1339,7 +1530,7 @@ const TakeOrder = ({ clientId, token, onOrderUpdate, realm }) => {
     cart.reduce((t, i) => t + (i.unit_price || 0) * i.quantity, 0).toFixed(2);
 
   const buildCartItem = (item, extra = {}) => {
-    const ts  = Date.now() + Math.random();
+    const ts = Date.now() + Math.random();
     const key = `${item.id}_${ts}`;
     return {
       id: Number(item.id),
@@ -1463,7 +1654,7 @@ const TakeOrder = ({ clientId, token, onOrderUpdate, realm }) => {
     lineItemsDetails
       .filter(i => selectedAddonIds.includes(i.id))
       .forEach(addon => {
-        const ts      = Date.now() + Math.random();
+        const ts = Date.now() + Math.random();
         const addonEntry = buildCartItem(addon, {
           batch_timestamp: batch,
           parent_item_key: mainKey,
@@ -1523,7 +1714,7 @@ const TakeOrder = ({ clientId, token, onOrderUpdate, realm }) => {
       } else {
         // Create a brand-new order
         const total = cart.reduce((s, i) => s + (i.unit_price || 0) * i.quantity, 0);
-        await axios.post(
+        const res = await axios.post(
           `${import.meta.env.VITE_API_ORDER_SERVICE_URL}/${clientId}/dinein/create`,
           {
             client_id: clientId,
@@ -1545,6 +1736,11 @@ const TakeOrder = ({ clientId, token, onOrderUpdate, realm }) => {
           },
           { headers }
         );
+        const newOrder = res.data?.data;
+        if (newOrder?.id) {
+          setActiveOrderId(newOrder.id);
+          setActiveDineinOrderId(newOrder.dinein_order_id);
+        }
         const tableToUpdate = tables.find(t => t.id.toString() === selectedTable);
         if (tableToUpdate) {
           await axios.post(
@@ -1777,8 +1973,8 @@ const TakeOrder = ({ clientId, token, onOrderUpdate, realm }) => {
     // eslint-disable-next-line react-hooks/exhaustive-deps
   }, [menuItems, selectedCategoryId, searchQuery, categories]);
 
-  const oldItems        = cart.filter(i => !i.is_new_item || i.saved_sub_order);
-  const newItems        = cart.filter(i => i.is_new_item && !i.saved_sub_order);
+  const oldItems = cart.filter(i => !i.is_new_item || i.saved_sub_order);
+  const newItems = cart.filter(i => i.is_new_item && !i.saved_sub_order);
   const groupedNewItems = newItems.reduce((acc, item) => {
     const b = item.batch_timestamp || 'default';
     if (!acc[b]) acc[b] = [];
@@ -1974,20 +2170,31 @@ const TakeOrder = ({ clientId, token, onOrderUpdate, realm }) => {
                                 {tables.find(t => t.id.toString() === selectedTable)?.table_number}
                               </span>
                             )}
-                            <button
-                              onClick={() => {
-                                setOrderMode('dinein');
-                                setSelectedTable('');
-                                setActiveOrderId(null);
-                                setCurrentBatchTimestamp(null);
-                                setHasNewItems(false);
-                                setShowCart(false);
-                                setCurrentView('floor');
-                              }}
-                              className="text-sm text-red-600 hover:underline"
-                            >
-                              Transfer
-                            </button>
+
+                            {orderMode === 'takeaway' && (
+                              <select
+                                value={selectedTable}
+                                onChange={(e) => {
+                                  setSelectedTable(e.target.value);
+                                  setTakeawayTableId(e.target.value);
+                                }} className="border-none outline-none rounded px-2 py-1 text-sm bg-white"
+                              >
+                                <option value="">Select Table</option>
+                                {takeawayTables.map(t => (
+                                  <option key={t.id} value={t.id}>
+                                    {t.table_number}
+                                  </option>
+                                ))}
+                              </select>
+                            )}
+                            {activeOrderId && (
+                              <button
+                                onClick={() => setShowTransferModal(true)}
+                                className="text-sm text-red-600 hover:underline"
+                              >
+                                Transfer
+                              </button>
+                            )}
                             {activeDineinOrderId && (
                               <span className="text-xs text-gray-500 font-mono">
                                 #{activeDineinOrderId}
@@ -2016,8 +2223,12 @@ const TakeOrder = ({ clientId, token, onOrderUpdate, realm }) => {
                       <div className="mt-3">
                         <div className="flex bg-gray-100 rounded-lg p-1">
                           <button
-                            onClick={() => setOrderMode('dinein')}
-                            className={`flex-1 py-2 rounded-md text-sm font-medium flex items-center justify-center gap-2
+                            onClick={() => {
+                              setOrderMode('dinein');
+                              if (dineinTableId) {
+                                setSelectedTable(dineinTableId);
+                              }
+                            }} className={`flex-1 py-2 rounded-md text-sm font-medium flex items-center justify-center gap-2
                               ${orderMode === 'dinein'
                                 ? 'bg-action-primary text-white shadow-sm'
                                 : 'text-gray-600 hover:text-gray-800'}`}
@@ -2027,7 +2238,14 @@ const TakeOrder = ({ clientId, token, onOrderUpdate, realm }) => {
                           <button
                             onClick={() => {
                               setOrderMode('takeaway');
-                              setSelectedTable(takeawayTableId?.toString());
+
+                              const id =
+                                takeawayTableId || takeawayTables[0]?.id?.toString();
+
+                              if (id) {
+                                setTakeawayTableId(id);
+                                setSelectedTable(id);
+                              }
                             }}
                             className={`flex-1 py-2 rounded-md text-sm font-medium flex items-center justify-center gap-2
                               ${orderMode === 'takeaway'
@@ -2220,7 +2438,13 @@ const TakeOrder = ({ clientId, token, onOrderUpdate, realm }) => {
           }
         }}
       />
-
+      <TransferTableModal
+        isOpen={showTransferModal}
+        onClose={() => setShowTransferModal(false)}
+        tables={tables}
+        currentTableId={selectedTable}
+        onConfirm={handleTransferTable}
+      />
       {invoiceModalOpen && invoiceOrderData && (
         <InvoiceModal
           clientId={clientId}

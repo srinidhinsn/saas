@@ -548,7 +548,8 @@ const TakeOrder_V1 = ({ clientId, token, onOrderUpdate, realm }) => {
   const [lineItemsDetails, setLineItemsDetails] = useState([]);
   const [invoiceModalOpen, setInvoiceModalOpen] = useState(false);
   const [invoiceOrderData, setInvoiceOrderData] = useState(null);
-
+  const [deliveryTables, setDeliveryTables] = useState([]);
+  const [takeawayTables, setTakeawayTables] = useState([]);
   const searchInputRef = useRef(null);
   const isMobile = window.matchMedia('(max-width: 1024px)').matches;
   const [deliveryTableId, setDeliveryTableId] = useState(null);
@@ -777,25 +778,27 @@ const TakeOrder_V1 = ({ clientId, token, onOrderUpdate, realm }) => {
     const deliveryRoots = getEnvTableRoots('VITE_EASYFOOD_DELIVERY_TABLE_DEFAULT_ROOT');
     const takeawayRoots = getEnvTableRoots('VITE_EASYFOOD_TAKEAWAY_TABLE_DEFAULT_ROOT');
 
-    // 🔥 Find matching tables by NAME
-    const deliveryTable = list.find(t =>
+    const deliveryTables = list.filter(t =>
       deliveryRoots.includes((t.name || '').toLowerCase())
     );
 
-    const takeawayTable = list.find(t =>
+    const takeawayTables = list.filter(t =>
       takeawayRoots.includes((t.name || '').toLowerCase())
     );
 
-    if (deliveryTable) {
-      setDeliveryTableId(deliveryTable.id);
-      console.log("Delivery table detected:", deliveryTable.name);
-      if (orderMode === 'delivery') {
-        setSelectedTable(deliveryTable.id.toString());
+    setDeliveryTables(deliveryTables);
+    setTakeawayTables(takeawayTables);
+
+    if (deliveryTables.length > 0) {
+      setDeliveryTableId(deliveryTables[0].id);
+
+      if (orderMode === "delivery") {
+        setSelectedTable(deliveryTables[0].id.toString());
       }
     }
 
-    if (takeawayTable) {
-      setTakeawayTableId(takeawayTable.id);
+    if (takeawayTables.length > 0) {
+      setTakeawayTableId(takeawayTables[0].id);
     }
 
     list.sort((a, b) =>
@@ -1278,14 +1281,14 @@ const TakeOrder_V1 = ({ clientId, token, onOrderUpdate, realm }) => {
             gst: 0,
             cst: 0,
             total_price: total,
-            status: 'pending',
+            status: 'ready',
             items: cart.map(i => ({
               item_id: i.id,
               item_name: i.name,
               quantity: i.quantity,
               unit_price: i.unit_price,
               line_total: i.unit_price * i.quantity,
-              status: 'pending',
+              status: 'ready',
               slug: i.slug,
             })),
           },
@@ -1720,30 +1723,47 @@ const TakeOrder_V1 = ({ clientId, token, onOrderUpdate, realm }) => {
                     </div>
 
                     {/* Dine-in / Takeaway toggle */}
-                    <div className="mt-3">
+                    <div className="mt-3 space-y-2">
+
                       <div className="flex bg-gray-100 rounded-lg p-1">
                         <button
                           onClick={() => setOrderMode('delivery')}
                           className={`flex-1 py-2 rounded-md text-sm font-medium flex items-center justify-center gap-2
-                              ${orderMode === 'delivery'
+      ${orderMode === 'delivery'
                               ? 'bg-action-primary text-white shadow-sm'
                               : 'text-gray-600 hover:text-gray-800'}`}
                         >
                           <Users size={16} /> Delivery
                         </button>
+
                         <button
-                          onClick={() => {
-                            setOrderMode('takeaway');
-                            setSelectedTable(takeawayTableId?.toString());
-                          }}
+                          onClick={() => setOrderMode('takeaway')}
                           className={`flex-1 py-2 rounded-md text-sm font-medium flex items-center justify-center gap-2
-                              ${orderMode === 'takeaway'
+      ${orderMode === 'takeaway'
                               ? 'bg-action-primary text-white shadow-sm'
                               : 'text-gray-600 hover:text-gray-800'}`}
                         >
                           <Package size={16} /> Takeaway
                         </button>
                       </div>
+
+                      {/* TABLE SELECTOR */}
+                      {(orderMode === "delivery" || orderMode === "takeaway") && (
+                        <select
+                          value={selectedTable || ""}
+                          onChange={(e) => setSelectedTable(e.target.value)}
+                          className="w-full border rounded-lg p-2 text-sm"
+                        >
+                          <option value="">Select Table</option>
+
+                          {(orderMode === "delivery" ? deliveryTables : takeawayTables).map(t => (
+                            <option key={t.id} value={t.id}>
+                              {t.name}
+                            </option>
+                          ))}
+                        </select>
+                      )}
+
                     </div>
 
                     {/* Cart body */}

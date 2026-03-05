@@ -34,7 +34,7 @@ const TABLE_STATUS_CONFIG = {
 };
 
 // ─── Table reservation floor view ────────────────────────────────────────────
-const TableReservation = ({ tables = [],token,clientId, orderMode = "dinein", onSelectTable, onSelectTakeaway, onSelectDineIn, onViewOrder, tableOrders = {}, onPrintBill, onDeleteOrder, onMarkAsServed }) => {
+const TableReservation = ({ tables = [], token, clientId, orderMode = "dinein", onSelectTable, onSelectTakeaway, onSelectDineIn, onViewOrder, tableOrders = {}, onPrintBill, onDeleteOrder, onMarkAsServed }) => {
   const [selectedSections, setSelectedSections] = useState([]);
   const [selectedZones, setSelectedZones] = useState([]);
 
@@ -84,7 +84,7 @@ const TableReservation = ({ tables = [],token,clientId, orderMode = "dinein", on
             ))}
           </div>
           <div className="">
-          <RestaurantSelector token={token} superClientId={clientId} />
+            <RestaurantSelector token={token} superClientId={clientId} />
 
           </div>
           <div className="ml-auto flex bg-bg-primary border-2 rounded-full border-action-primary p-1 shadow-sm">
@@ -380,7 +380,6 @@ const TakeOrder = ({ token, onOrderUpdate, realm }) => {
   const [selectedMainItem, setSelectedMainItem] = useState(null);
   const [lineItemsDetails, setLineItemsDetails] = useState([]);
   const [orderMode, setOrderMode] = useState('dinein');
-  const [takeawayTableId, setTakeawayTableId] = useState(null);
   const isPlacingRef = useRef(false);
   const isMobile = window.matchMedia('(max-width: 1024px)').matches;
   const [showClearConfirm, setShowClearConfirm] = useState(false);
@@ -399,7 +398,7 @@ const TakeOrder = ({ token, onOrderUpdate, realm }) => {
   const [inventoryMap, setInventoryMap] = useState({});
   const [selectedCategoryId, setSelectedCategoryId] = useState(null);
   const [counterTree, setCounterTree] = useState([]);
-
+  const [takeawayTables, setTakeawayTables] = useState([]);
   // All IDs and keywords come from menuConfigResolver — nothing hardcoded here
   const menuConfig = React.useMemo(() => clientId ? getMenuConfig(clientId) : null, [clientId]);
 
@@ -498,11 +497,37 @@ const TakeOrder = ({ token, onOrderUpdate, realm }) => {
 
   // ─── Fetch ───────────────────────────────────────────────────────────────
   const fetchTables = async () => {
-    const res = await axios.get(`${import.meta.env.VITE_API_TABLE_SERVICE_URL}/${clientId}/tables/read`, { headers: { Authorization: `Bearer ${token}` } });
-    const list = Array.isArray(res.data?.data) ? res.data.data.map(t => ({ ...t, table_number: t.name || t.table_number || "-" })) : [];
-    const tw = list.find(t => Number(t.id) === 500); if (tw) setTakeawayTableId(tw.id);
-    list.sort((a, b) => a.table_number.localeCompare(b.table_number, undefined, { numeric: true }));
+    const takeawayRoots =
+      (import.meta.env.VITE_EASYFOOD_TAKEAWAY_TABLE_DEFAULT_ROOT || "")
+        .split(",")
+        .map(v => v.trim().toLowerCase());
+
+    const res = await axios.get(
+      `${import.meta.env.VITE_API_TABLE_SERVICE_URL}/${clientId}/tables/read`,
+      { headers: { Authorization: `Bearer ${token}` } }
+    );
+
+    const list = Array.isArray(res.data?.data)
+      ? res.data.data.map(t => ({
+        ...t,
+        table_number: t.name || t.table_number || "-"
+      }))
+      : [];
+
+    const takeaway = list.filter(t =>
+      takeawayRoots.some(root =>
+        (t.name || "").toLowerCase().startsWith(root)
+      )
+    );
+
+    setTakeawayTables(takeaway);
+
+    list.sort((a, b) =>
+      a.table_number.localeCompare(b.table_number, undefined, { numeric: true })
+    );
+
     setTables(list);
+
     await fetchTableOrders(list);
   };
 
@@ -822,8 +847,20 @@ const TakeOrder = ({ token, onOrderUpdate, realm }) => {
   };
 
   const handleTableSelect = table => { setSelectedTable(table.id.toString()); setCurrentView('order'); window.history.pushState({ view: 'order' }, ''); };
-  const handleTakeawaySelect = () => { setOrderMode('takeaway'); setSelectedTable(takeawayTableId.toString()); setCurrentView('order'); window.history.pushState({ view: 'order' }, ''); };
-  const handleClearCart = () => { if (cart.length === 0) return; setShowClearConfirm(true); };
+  const handleTakeawaySelect = () => {
+    if (!takeawayTables.length) {
+      toast.error("No takeaway table configured");
+      return;
+    }
+
+    const defaultTakeawayTable = takeawayTables[0];
+
+    setOrderMode("takeaway");
+    setSelectedTable(defaultTakeawayTable.id.toString());
+    setCurrentView("order");
+
+    window.history.pushState({ view: "order" }, "");
+  }; const handleClearCart = () => { if (cart.length === 0) return; setShowClearConfirm(true); };
   const confirmClearCart = () => {
     setCart([]); setSelectedTable(''); setCurrentView('floor'); setShowCart(false); setShowClearConfirm(false);
     setActiveOrderId(null); setActiveDineinOrderId(null); setCurrentBatchTimestamp(null); setHasNewItems(false);
@@ -930,7 +967,7 @@ const TakeOrder = ({ token, onOrderUpdate, realm }) => {
           <div className="grid lg:grid-cols-4 gap-1">
             <div className="w-full lg:col-span-1">
               <div className="lg:h-[calc(98dvh-4rem)] lg:overflow-y-auto pr-1">
-               
+
                 <CategoryTree categories={sidebarCategories} selectedCategoryId={selectedCategoryId} onSelectCategory={setSelectedCategoryId} defaultOpenAll />
               </div>
             </div>
@@ -1007,8 +1044,32 @@ const TakeOrder = ({ token, onOrderUpdate, realm }) => {
                       <div className="mt-3">
                         <div className="flex bg-gray-100 rounded-lg p-1">
                           <button onClick={() => setOrderMode('dinein')} className={`flex-1 py-2 rounded-md text-sm font-medium flex items-center justify-center gap-2 ${orderMode === 'dinein' ? 'bg-action-primary text-white shadow-sm' : 'text-gray-600 hover:text-gray-800'}`}><Users size={16} />Dine In</button>
-                          <button onClick={() => { setOrderMode('takeaway'); setSelectedTable(takeawayTableId?.toString()); }} className={`flex-1 py-2 rounded-md text-sm font-medium flex items-center justify-center gap-2 ${orderMode === 'takeaway' ? 'bg-action-primary text-white shadow-sm' : 'text-gray-600 hover:text-gray-800'}`}><Package size={16} />Takeaway</button>
+
+                          <button
+                            onClick={() => setOrderMode('takeaway')}
+                            className={`flex-1 py-2 rounded-md text-sm font-medium flex items-center justify-center gap-2
+      ${orderMode === 'takeaway'
+                                ? 'bg-action-primary text-white shadow-sm'
+                                : 'text-gray-600 hover:text-gray-800'}`}
+                          >
+                            <Package size={16} /> Takeaway
+                          </button>
                         </div>
+                        {orderMode === "takeaway" && (
+                          <select
+                            value={selectedTable || ""}
+                            onChange={(e) => setSelectedTable(e.target.value)}
+                            className="w-full border rounded-lg p-2 text-sm"
+                          >
+                            <option value="">Select Table</option>
+
+                            {takeawayTables.map(t => (
+                              <option key={t.id} value={t.id}>
+                                {t.name}
+                              </option>
+                            ))}
+                          </select>
+                        )}
                       </div>
 
                       {cart.length === 0 ? (

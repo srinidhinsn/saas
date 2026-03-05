@@ -121,8 +121,7 @@ const Header_Super_User = ({ onLogout }) => {
         </button>
 
         <div className="hidden lg:flex items-center space-x-8 text-text-primary">
-          {/* <NavLink id="users">Users</NavLink> */}
-          {/* <NavLink id="role">Role</NavLink> */}
+          <NavLink id="data">Clients</NavLink>
           <NavLink id="order">Order</NavLink>
           <NavLink id="summary">Summary</NavLink>
           <NavLink id="kds">KDS</NavLink>
