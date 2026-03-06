@@ -23,53 +23,154 @@ const TABLE_STATUS_CONFIG = {
   served: { clickable: false, bg: 'bg-blue-50', border: 'border-blue-400', badge: 'bg-blue-100 text-blue-700', viewable: true },
   reserved: { clickable: false, bg: 'bg-yellow-50', border: 'border-yellow-400', badge: 'bg-yellow-100 text-yellow-700' },
 };
+const TransferTableModal = ({ isOpen, onClose, tables, currentTableId, onConfirm }) => {
+  const [selectedNewTable, setSelectedNewTable] = useState(null);
 
-// localStorage key prefix — drafts survive page refresh
-const DRAFT_STORAGE_KEY = 'takeorder_draft_';
+  useEffect(() => {
+    if (isOpen) setSelectedNewTable(null);
+  }, [isOpen]);
 
-// ─────────────────────────────────────────────────────────────────────────────
-// Draft localStorage helpers
-// ─────────────────────────────────────────────────────────────────────────────
+  if (!isOpen) return null;
 
-function readDraft(tableId) {
+  const vacantTables = tables.filter(
+    t => t.status?.toLowerCase() === 'vacant' && t.id.toString() !== currentTableId
+  );
+
+  return (
+    <div className="fixed inset-0 z-50 flex items-center justify-center p-4 bg-black/50">
+      <div className="rounded-lg w-full max-w-sm bg-white shadow-xl">
+        <div className="px-6 py-4 border-b flex justify-between items-center">
+          <h2 className="text-lg font-bold text-gray-800">Transfer Table</h2>
+          <button onClick={onClose} className="text-gray-500 hover:text-gray-700">
+            <X size={20} />
+          </button>
+        </div>
+        <div className="px-6 py-4 max-h-72 overflow-y-auto">
+          {vacantTables.length === 0 ? (
+            <p className="text-sm text-gray-500 text-center py-4">No vacant tables available.</p>
+          ) : (
+            <div className="grid grid-cols-3 gap-2">
+              {vacantTables.map(t => (
+                <button
+                  key={t.id}
+                  onClick={() => setSelectedNewTable(t)}
+                  className={`py-3 rounded-lg border-2 text-sm font-bold transition
+                    ${selectedNewTable?.id === t.id
+                      ? 'border-action-primary bg-action-primary/10 text-action-primary'
+                      : 'border-gray-200 hover:border-action-primary text-gray-700'}`}
+                >
+                  {t.table_number}
+                </button>
+              ))}
+            </div>
+          )}
+        </div>
+        <div className="px-6 py-4 flex gap-3 bg-gray-50 rounded-b-lg">
+          <button
+            onClick={onClose}
+            className="flex-1 py-2.5 rounded-lg font-medium text-sm border border-gray-300 bg-white text-gray-700 hover:bg-gray-50"
+          >
+            Cancel
+          </button>
+          <button
+            onClick={() => { if (selectedNewTable) { onConfirm(selectedNewTable); onClose(); } }}
+            disabled={!selectedNewTable}
+            className={`flex-1 py-2.5 rounded-lg font-medium text-sm text-white transition
+              ${selectedNewTable ? 'bg-action-primary hover:bg-action-danger' : 'bg-gray-300 cursor-not-allowed'}`}
+          >
+            Transfer
+          </button>
+        </div>
+      </div>
+    </div>
+  );
+};
+async function readDraft(tableId, clientId, token) {
   try {
-    const raw = localStorage.getItem(DRAFT_STORAGE_KEY + tableId);
-    return raw ? JSON.parse(raw) : null;
+    const r = await axios.get(
+      `${import.meta.env.VITE_API_ORDER_SERVICE_URL}/${clientId}/dinein/table`,
+      { headers: { Authorization: `Bearer ${token}` } }
+    );
+    const allOrders = r.data?.data || [];
+    return allOrders.find(
+      o => o.status === 'draft' && String(o.table_id) === String(tableId)
+    ) || null;
   } catch {
     return null;
   }
 }
 
-function writeDraft(tableId, data) {
+async function writeDraft(tableId, cart, clientId, token) {
+  // If a draft already exists for this table, delete it first then recreate.
+  // Reuses the existing DELETE + CREATE endpoints with no new API needed.
   try {
-    localStorage.setItem(DRAFT_STORAGE_KEY + tableId, JSON.stringify(data));
-  } catch {
-    // localStorage quota exceeded — fail silently
-  }
-}
-
-function deleteDraft(tableId) {
-  try {
-    localStorage.removeItem(DRAFT_STORAGE_KEY + tableId);
-  } catch {
-    // ignore
-  }
-}
-
-function getAllDraftTableIds() {
-  const ids = [];
-  try {
-    for (let i = 0; i < localStorage.length; i++) {
-      const key = localStorage.key(i);
-      if (key && key.startsWith(DRAFT_STORAGE_KEY)) {
-        ids.push(key.replace(DRAFT_STORAGE_KEY, ''));
-      }
+    // Find existing draft id to delete it
+    const existing = await readDraft(tableId, clientId, token);
+    if (existing) {
+      await axios.delete(
+        `${import.meta.env.VITE_API_ORDER_SERVICE_URL}/${clientId}/dinein/delete`,
+        {
+          params: { dinein_order_id: existing.id },
+          headers: { Authorization: `Bearer ${token}` },
+        }
+      );
     }
-  } catch {
-    // ignore
+
+    const total = cart.reduce((s, i) => s + (i.unit_price || 0) * i.quantity, 0);
+
+    await axios.post(
+      `${import.meta.env.VITE_API_ORDER_SERVICE_URL}/${clientId}/dinein/create`,
+      {
+        client_id: clientId,
+        table_id: Number(tableId),
+        price: total,
+        gst: 0,
+        cst: 0,
+        total_price: total,
+        status: 'draft',           // ← the only new thing
+        items: cart.map(i => ({
+          item_id: i.id,
+          item_name: i.name,
+          quantity: i.quantity,
+          unit_price: i.unit_price,
+          line_total: (i.unit_price || 0) * i.quantity,
+          status: 'draft',
+          slug: i.slug || '',
+          frontend_unique_key: i.frontend_unique_key,
+        })),
+      },
+      { headers: { Authorization: `Bearer ${token}` } }
+    );
+    return true;
+  } catch (err) {
+    console.error('writeDraft failed:', err);
+    return false;
   }
-  return ids;
 }
+
+async function deleteDraftFromDB(tableId, clientId, token) {
+  try {
+    const existing = await readDraft(tableId, clientId, token);
+    if (!existing) return;
+    await axios.delete(
+      `${import.meta.env.VITE_API_ORDER_SERVICE_URL}/${clientId}/dinein/delete`,
+      {
+        params: { dinein_order_id: existing.id },
+        headers: { Authorization: `Bearer ${token}` },
+      }
+    );
+  } catch (err) {
+    console.warn('deleteDraft warning:', err?.response?.data || err.message);
+  }
+}
+
+function getDraftTableIdsFromOrders(allOrders) {
+  return (allOrders || [])
+    .filter(o => o.status === 'draft')
+    .map(o => String(o.table_id));
+}
+
+
 
 // ─────────────────────────────────────────────────────────────────────────────
 // ItemStatusBadge
@@ -783,70 +884,7 @@ const TableReservation = ({
 // ─────────────────────────────────────────────────────────────────────────────
 // TakeOrder — main component
 // ─────────────────────────────────────────────────────────────────────────────
-const TransferTableModal = ({ isOpen, onClose, tables, currentTableId, onConfirm }) => {
-  const [selectedNewTable, setSelectedNewTable] = useState(null);
 
-  useEffect(() => {
-    if (isOpen) setSelectedNewTable(null);
-  }, [isOpen]);
-
-  if (!isOpen) return null;
-
-  const vacantTables = tables.filter(
-    t => t.status?.toLowerCase() === 'vacant' && t.id.toString() !== currentTableId
-  );
-
-  return (
-    <div className="fixed inset-0 z-50 flex items-center justify-center p-4 bg-black/50">
-      <div className="rounded-lg w-full max-w-sm bg-white shadow-xl">
-        <div className="px-6 py-4 border-b flex justify-between items-center">
-          <h2 className="text-lg font-bold text-gray-800">Transfer Table</h2>
-          <button onClick={onClose} className="text-gray-500 hover:text-gray-700">
-            <X size={20} />
-          </button>
-        </div>
-
-        <div className="px-6 py-4 max-h-72 overflow-y-auto">
-          {vacantTables.length === 0 ? (
-            <p className="text-sm text-gray-500 text-center py-4">No vacant tables available.</p>
-          ) : (
-            <div className="grid grid-cols-3 gap-2">
-              {vacantTables.map(t => (
-                <button
-                  key={t.id}
-                  onClick={() => setSelectedNewTable(t)}
-                  className={`py-3 rounded-lg border-2 text-sm font-bold transition
-                    ${selectedNewTable?.id === t.id
-                      ? 'border-action-primary bg-action-primary/10 text-action-primary'
-                      : 'border-gray-200 hover:border-action-primary text-gray-700'}`}
-                >
-                  {t.table_number}
-                </button>
-              ))}
-            </div>
-          )}
-        </div>
-
-        <div className="px-6 py-4 flex gap-3 bg-gray-50 rounded-b-lg">
-          <button
-            onClick={onClose}
-            className="flex-1 py-2.5 rounded-lg font-medium text-sm border border-gray-300 bg-white text-gray-700 hover:bg-gray-50"
-          >
-            Cancel
-          </button>
-          <button
-            onClick={() => { if (selectedNewTable) { onConfirm(selectedNewTable); onClose(); } }}
-            disabled={!selectedNewTable}
-            className={`flex-1 py-2.5 rounded-lg font-medium text-sm text-white transition
-              ${selectedNewTable ? 'bg-action-primary hover:bg-action-danger' : 'bg-gray-300 cursor-not-allowed'}`}
-          >
-            Transfer
-          </button>
-        </div>
-      </div>
-    </div>
-  );
-};
 const TakeOrder = ({ clientId, token, onOrderUpdate, realm }) => {
 
   // ── View ──────────────────────────────────────────────────────────────────
@@ -872,7 +910,7 @@ const TakeOrder = ({ clientId, token, onOrderUpdate, realm }) => {
   const [takeawayTableId, setTakeawayTableId] = useState(null);
   const [activeOrderId, setActiveOrderId] = useState(null);
   const [activeDineinOrderId, setActiveDineinOrderId] = useState(null);
-
+  const [showTransferModal, setShowTransferModal] = useState(false);
   // ── Cart ──────────────────────────────────────────────────────────────────
   const [cart, setCart] = useState([]);
   const [showCart, setShowCart] = useState(false);
@@ -899,7 +937,7 @@ const TakeOrder = ({ clientId, token, onOrderUpdate, realm }) => {
 
   const searchInputRef = useRef(null);
   const isMobile = window.matchMedia('(max-width: 1024px)').matches;
-  const [showTransferModal, setShowTransferModal] = useState(false);
+
   const menuConfig = useMemo(
     () => (clientId ? getMenuConfig(clientId) : null),
     [clientId]
@@ -909,150 +947,29 @@ const TakeOrder = ({ clientId, token, onOrderUpdate, realm }) => {
   // Draft helpers
   // ─────────────────────────────────────────────────────────────────────────
 
-  const refreshDraftTableIds = useCallback(() => {
-    setDraftTableIds(getAllDraftTableIds());
-  }, []);
 
-  const handleSaveDraft = useCallback(() => {
+  const handleSaveDraft = useCallback(async () => {
     if (!selectedTable || cart.length === 0) {
       toast.warn('Nothing to save — cart is empty.');
       return;
     }
-    const now = Date.now();
-    writeDraft(selectedTable, {
-      cart,
-      savedAt: now,
-      orderMode,
-      activeOrderId,
-      activeDineinOrderId,
-      currentBatchTimestamp,
-      hasNewItems,
-    });
-    setDraftSavedAt(now);
-    refreshDraftTableIds();
-    toast.success('Draft saved! You can return to this table anytime.');
-  }, [
-    selectedTable, cart, orderMode,
-    activeOrderId, activeDineinOrderId,
-    currentBatchTimestamp, hasNewItems,
-    refreshDraftTableIds,
-  ]);
+    const ok = await writeDraft(selectedTable, cart, clientId, token);
+    if (ok) {
+      const now = Date.now();
+      setDraftSavedAt(now);
+      await fetchTables();                  // refreshes floor DRAFT badges
+      toast.success('Draft saved! You can return to this table anytime.');
+    } else {
+      toast.error('Failed to save draft.');
+    }
+  }, [selectedTable, cart, clientId, token]);
 
-  const restoreDraftForTable = useCallback((tableId) => {
-    const draft = readDraft(tableId);
-    if (!draft) return false;
-    setCart(draft.cart || []);
-    setOrderMode(draft.orderMode || 'dinein');
-    setActiveOrderId(draft.activeOrderId || null);
-    setActiveDineinOrderId(draft.activeDineinOrderId || null);
-    setCurrentBatchTimestamp(draft.currentBatchTimestamp || null);
-    setHasNewItems(draft.hasNewItems || false);
-    setDraftSavedAt(draft.savedAt || null);
-    setShowCart(true);   // always show cart when restoring a draft
-    return true;
-  }, []);
 
-  const clearDraftForTable = useCallback((tableId) => {
-    if (!tableId) return;
-    deleteDraft(tableId);
-    setDraftSavedAt(null);
-    refreshDraftTableIds();
-  }, [refreshDraftTableIds]);
 
   // ─────────────────────────────────────────────────────────────────────────
   // Category / tree utilities
   // ─────────────────────────────────────────────────────────────────────────
-  const handleTransferTable = async (newTable) => {
-    if (!activeOrderId) {
-      toast.error('No active order to transfer.');
-      return;
-    }
 
-    console.log('[Transfer] activeOrderId:', activeOrderId, 'activeDineinOrderId:', activeDineinOrderId, 'from table:', selectedTable, '→ to table:', newTable.id);
-
-    try {
-      setLoading(true);
-      const headers = { Authorization: `Bearer ${token}` };
-      const oldTableId = Number(selectedTable);
-      const newTableId = newTable.id;
-
-      // ── Step 1: Update order's table_id in DB ──────────────────────────
-      // Send ONLY the fields needed for transfer — no items array
-      // so the backend doesn't accidentally wipe or re-insert items.
-      const updateRes = await axios.post(
-        `${import.meta.env.VITE_API_ORDER_SERVICE_URL}/${clientId}/dinein/update`,
-        {
-          id: activeOrderId,
-          client_id: clientId,
-          table_id: newTableId,
-        },
-        { headers }
-      );
-      console.log('[Transfer] dinein/update response:', updateRes.data);
-
-      // ── Step 2: Vacate old table ───────────────────────────────────────
-      const oldTable = tables.find(t => t.id === oldTableId);
-      if (oldTable) {
-        await axios.post(
-          `${import.meta.env.VITE_API_TABLE_SERVICE_URL}/${clientId}/tables/update`,
-          {
-            ...oldTable,
-            id: oldTableId,
-            status: 'vacant',
-            table_type: String(oldTable.table_type),
-          },
-          { headers }
-        );
-      }
-
-      // ── Step 3: Occupy new table ───────────────────────────────────────
-      await axios.post(
-        `${import.meta.env.VITE_API_TABLE_SERVICE_URL}/${clientId}/tables/update`,
-        {
-          ...newTable,
-          id: newTableId,
-          status: 'Occupied',
-          table_type: String(newTable.table_type),
-        },
-        { headers }
-      );
-
-      // ── Step 4: Verify the order now has the new table_id ─────────────
-      const verifyRes = await axios.get(
-        `${import.meta.env.VITE_API_ORDER_SERVICE_URL}/${clientId}/dinein/table`,
-        { headers }
-      );
-      const allOrders = verifyRes.data?.data || [];
-      const transferredOrder = allOrders.find(o => o.id === activeOrderId);
-      console.log('[Transfer] Order after update:', transferredOrder);
-
-      if (transferredOrder && Number(transferredOrder.table_id) !== newTableId) {
-        console.warn('[Transfer] WARNING: table_id still shows', transferredOrder.table_id, '— DB update may not have worked');
-        toast.warn('Transfer may not have saved correctly — check backend logs');
-      }
-
-      // ── Step 5: Update local state ─────────────────────────────────────
-      clearDraftForTable(selectedTable);
-      setSelectedTable(newTableId.toString());
-      // Keep activeOrderId + activeDineinOrderId — same order, just new table
-      // Keep cart intact
-
-      // Refresh floor so tableOrders re-maps to new table
-      await fetchTables();
-
-      toast.success(`Transferred to Table ${newTable.table_number}`);
-    } catch (err) {
-      console.error('[Transfer] Failed:', err);
-      if (err.response) {
-        console.error('[Transfer] Backend said:', err.response.status, JSON.stringify(err.response.data));
-        toast.error(`Transfer failed: ${err.response.data?.message || err.response.data?.detail || err.response.status}`);
-      } else {
-        toast.error('Transfer failed — check console');
-      }
-    } finally {
-      setLoading(false);
-    }
-  };
   const flattenCategoryTree = (tree, level = 0, parentId = null) => {
     let flat = [];
     tree.forEach(c => {
@@ -1071,33 +988,35 @@ const TakeOrder = ({ clientId, token, onOrderUpdate, realm }) => {
   };
 
   const getAddonCategoryId = useCallback((itemCategoryId) => {
-    if (!menuConfig) return 'addons_ac';
-    const { addonCategoryAC, addonCategoryNonAC, addonNonACKeywords, addonACKeywords } = menuConfig;
-    if (!itemCategoryId || !categoriesFlat.length) return addonCategoryAC;
+    if (!itemCategoryId || !categoriesFlat.length) return null;
 
-    const pathNames = [];
-    let cur = itemCategoryId;
-    const visited = new Set();
-    while (cur && !visited.has(cur)) {
-      visited.add(cur);
-      const cat = categoriesFlat.find(c => c.id === cur);
-      if (!cat) break;
-      pathNames.push((cat.name || '').toLowerCase());
-      cur = cat.parentId || cat.parent_id;
+    // 1️⃣ Find root node (like "dietery")
+    const rootNode = categoriesFlat.find(
+      c => c.parentId === null || c.parentId === undefined
+    );
+
+    if (!rootNode) return null;
+
+    // 2️⃣ Start from item's category
+    let current = categoriesFlat.find(c => c.id === itemCategoryId);
+
+    // 3️⃣ Climb upward until direct child of root
+    while (current && current.parentId) {
+      if (current.parentId === rootNode.id) {
+        const slug = current.name
+          .trim()
+          .toLowerCase()
+          .replace(/[\s-]+/g, "")
+          .replace(/[^a-z0-9]/g, "");
+
+        return `addons_${slug}`;
+      }
+
+      current = categoriesFlat.find(c => c.id === current.parentId);
     }
 
-    const isNonAC = addonNonACKeywords.some(kw =>
-      pathNames.some(p => p === kw || p.includes(kw))
-    );
-    if (isNonAC) return addonCategoryNonAC;
-
-    const isAC = addonACKeywords.some(kw =>
-      pathNames.some(p => p === kw || p.includes(kw))
-    );
-    if (isAC) return addonCategoryAC;
-
-    return addonCategoryAC;
-  }, [categoriesFlat, menuConfig]);
+    return null;
+  }, [categoriesFlat]);
 
   const getCategoryAndChildrenIds = (cats, targetId) => {
     const result = new Set();
@@ -1166,6 +1085,7 @@ const TakeOrder = ({ clientId, token, onOrderUpdate, realm }) => {
     }
   };
 
+
   const fetchTableOrders = async (tableList) => {
     try {
       const r = await axios.get(
@@ -1173,12 +1093,20 @@ const TakeOrder = ({ clientId, token, onOrderUpdate, realm }) => {
         { headers: { Authorization: `Bearer ${token}` } }
       );
       const allOrders = r.data?.data || [];
+
+      // ▼ ADD THIS ONE LINE — populates the floor DRAFT badges from server
+      setDraftTableIds(getDraftTableIdsFromOrders(allOrders));
+
       const map = {};
       tableList.forEach(table => {
         const s = table.status?.toLowerCase();
         if (s === 'occupied' || s === 'served') {
           const o = allOrders
-            .filter(o => Number(o.table_id) === Number(table.id) && o.status?.toLowerCase() !== 'completed')
+            .filter(o =>
+              o.table_id === table.id &&
+              o.status?.toLowerCase() !== 'completed' &&
+              o.status?.toLowerCase() !== 'draft'      // ← exclude drafts from occupied map
+            )
             .sort((a, b) => new Date(b.created_at) - new Date(a.created_at))[0];
           if (o) {
             map[table.id] = {
@@ -1198,11 +1126,11 @@ const TakeOrder = ({ clientId, token, onOrderUpdate, realm }) => {
     }
   };
 
+  // REMOVE the old fetchTables and REPLACE WITH:
   const fetchTables = async () => {
-
     const takeawayRoots =
-      (import.meta.env.VITE_EASYFOOD_TAKEAWAY_TABLE_DEFAULT_ROOT || "")
-        .split(",")
+      (import.meta.env.VITE_EASYFOOD_TAKEAWAY_TABLE_DEFAULT_ROOT || '')
+        .split(',')
         .map(v => v.trim().toLowerCase());
 
     const res = await axios.get(
@@ -1213,19 +1141,17 @@ const TakeOrder = ({ clientId, token, onOrderUpdate, realm }) => {
     const list = Array.isArray(res.data?.data)
       ? res.data.data.map(t => ({
         ...t,
-        table_number: t.name || t.table_number || "-"
+        table_number: t.name || t.table_number || '-',
       }))
       : [];
 
-    // detect takeaway tables from ENV
     const takeaway = list.filter(t =>
       takeawayRoots.some(root =>
-        (t.name || "").toLowerCase().startsWith(root)
+        (t.name || '').toLowerCase().startsWith(root)
       )
     );
 
     setTakeawayTables(takeaway);
-
     if (takeaway.length > 0) {
       setTakeawayTableId(takeaway[0].id);
     }
@@ -1233,12 +1159,9 @@ const TakeOrder = ({ clientId, token, onOrderUpdate, realm }) => {
     list.sort((a, b) =>
       a.table_number.localeCompare(b.table_number, undefined, { numeric: true })
     );
-
     setTables(list);
-
     await fetchTableOrders(list);
   };
-
   // ─────────────────────────────────────────────────────────────────────────
   // Initial data load
   // ─────────────────────────────────────────────────────────────────────────
@@ -1324,7 +1247,6 @@ const TakeOrder = ({ clientId, token, onOrderUpdate, realm }) => {
           }
         }
         setDieterySubCategories(qc);
-        refreshDraftTableIds();
       } catch (err) {
         console.error('Fetch error:', err);
       } finally {
@@ -1384,24 +1306,92 @@ const TakeOrder = ({ clientId, token, onOrderUpdate, realm }) => {
   // ─────────────────────────────────────────────────────────────────────────
   // Table / order selection
   // ─────────────────────────────────────────────────────────────────────────
+  const handleTransferTable = async (newTable) => {
+    if (!activeOrderId) {
+      toast.error('No active order to transfer.');
+      return;
+    }
+    try {
+      setLoading(true);
+      const headers = { Authorization: `Bearer ${token}` };
+      const oldTableId = Number(selectedTable);
+      const newTableId = newTable.id;
 
-  const handleTableSelect = (table) => {
+      await axios.post(
+        `${import.meta.env.VITE_API_ORDER_SERVICE_URL}/${clientId}/dinein/update`,
+        { id: activeOrderId, client_id: clientId, table_id: newTableId },
+        { headers }
+      );
+
+      const oldTable = tables.find(t => t.id === oldTableId);
+      if (oldTable) {
+        await axios.post(
+          `${import.meta.env.VITE_API_TABLE_SERVICE_URL}/${clientId}/tables/update`,
+          { ...oldTable, id: oldTableId, status: 'vacant', table_type: String(oldTable.table_type) },
+          { headers }
+        );
+      }
+
+      await axios.post(
+        `${import.meta.env.VITE_API_TABLE_SERVICE_URL}/${clientId}/tables/update`,
+        { ...newTable, id: newTableId, status: 'Occupied', table_type: String(newTable.table_type) },
+        { headers }
+      );
+
+      setSelectedTable(newTableId.toString());
+      setDineinTableId(newTableId.toString());
+      await fetchTables();
+      toast.success(`Transferred to Table ${newTable.table_number}`);
+    } catch (err) {
+      console.error('[Transfer] Failed:', err);
+      toast.error('Transfer failed');
+    } finally {
+      setLoading(false);
+    }
+  };
+
+  const handleTableSelect = async (table) => {
     const tableIdStr = table.id.toString();
 
-    // Reset any previous active-order context
     setActiveOrderId(null);
     setActiveDineinOrderId(null);
     setHasNewItems(false);
     setCurrentBatchTimestamp(null);
     setOrderMode('dinein');
-    setDineinTableId(tableIdStr);
     setSelectedTable(tableIdStr);
-    // Try to restore a saved draft; if none, start fresh with an empty, visible cart
-    const restored = restoreDraftForTable(tableIdStr);
-    if (restored) {
+    setDineinTableId(tableIdStr);
+    const draft = await readDraft(tableIdStr, clientId, token);
+
+    if (draft) {
+      // Reconstruct cart from draft order items
+      const restoredCart = (draft.items || []).map(item => {
+        const menuItem = menuItems.find(mi => Number(mi.id) === Number(item.item_id));
+        return {
+          id: Number(item.item_id),
+          name: item.item_name || menuItem?.name || 'Item',
+          unit_price: item.unit_price ?? menuItem?.unit_price ?? 0,
+          discount: menuItem?.discount || 0,
+          image_id: menuItem?.image_id,
+          slug: item.slug || menuItem?.slug,
+          category: menuItem?.category_name,
+          category_id: menuItem?.category_id || null,
+          quantity: item.quantity || 1,
+          note: '',
+          frontend_unique_key: item.frontend_unique_key,
+          batch_timestamp: null,
+          is_new_item: true,
+          saved_sub_order: false,
+          status: 'draft',
+        };
+      });
+      setCart(restoredCart);
+      setHasNewItems(true);
+      setDraftSavedAt(Date.now());
+      setShowCart(true);
       toast.info('Draft restored for this table.', { autoClose: 2000 });
     } else {
       setCart([]);
+      setDraftSavedAt(null);
       setShowCart(true);
     }
 
@@ -1409,34 +1399,20 @@ const TakeOrder = ({ clientId, token, onOrderUpdate, realm }) => {
   };
 
   const handleTakeawaySelect = () => {
-
     if (!takeawayTables.length) {
-      toast.error("No takeaway table configured");
+      toast.error('No takeaway table configured');
       return;
     }
 
-    const tableIdStr =
-      takeawayTableId || takeawayTables[0].id.toString();
-
+    const tableIdStr = (takeawayTableId || takeawayTables[0].id).toString();
     setOrderMode('takeaway');
-
-    setTakeawayTableId(tableIdStr);
     setSelectedTable(tableIdStr);
     setActiveOrderId(null);
     setActiveDineinOrderId(null);
-
-    const restored = restoreDraftForTable(tableIdStr);
-
-    if (restored) {
-      toast.info('Draft restored.', { autoClose: 2000 });
-    } else {
-      setCart([]);
-      setShowCart(true);
-    }
-
+    setCart([]);
+    setShowCart(true);
     goToOrderView();
   };
-
   const handleViewOrder = async (table) => {
     if (menuItems.length === 0) {
       alert('Menu still loading...');
@@ -1449,9 +1425,8 @@ const TakeOrder = ({ clientId, token, onOrderUpdate, realm }) => {
         { headers: { Authorization: `Bearer ${token}` } }
       );
       const allOrders = r.data?.data || [];
-      // AFTER — strict type coercion on both sides
       const tableGroups = allOrders.filter(
-        o => Number(o.table_id) === Number(table.id) && o.status?.toLowerCase() !== 'completed'
+        o => o.table_id === table.id && o.status?.toLowerCase() !== 'completed'
       );
       if (tableGroups.length === 0) {
         alert('No active order');
@@ -1712,35 +1687,58 @@ const TakeOrder = ({ clientId, token, onOrderUpdate, realm }) => {
           toast.success(`Sub-order ${r.data.data.dinein_order_id} created!`);
         }
       } else {
-        // Create a brand-new order
+        const existingDraft = await readDraft(selectedTable, clientId, token);
         const total = cart.reduce((s, i) => s + (i.unit_price || 0) * i.quantity, 0);
-        const res = await axios.post(
-          `${import.meta.env.VITE_API_ORDER_SERVICE_URL}/${clientId}/dinein/create`,
-          {
-            client_id: clientId,
-            table_id: Number(selectedTable),
-            price: total,
-            gst: 0,
-            cst: 0,
-            total_price: total,
-            status: 'pending',
-            items: cart.map(i => ({
-              item_id: i.id,
-              item_name: i.name,
-              quantity: i.quantity,
-              unit_price: i.unit_price,
-              line_total: i.unit_price * i.quantity,
+        const itemsPayload = cart.map(i => ({
+          item_id: i.id,
+          item_name: i.name,
+          quantity: i.quantity,
+          unit_price: i.unit_price,
+          line_total: i.unit_price * i.quantity,
+          status: 'pending',
+          slug: i.slug || '',
+          frontend_unique_key: i.frontend_unique_key,
+        }));
+
+        if (existingDraft) {
+          // ── Promote draft → pending using existing /dinein/update ──────
+          // Step 1: replace items via existing /order_items/update
+          await axios.post(
+            `${import.meta.env.VITE_API_ORDER_SERVICE_URL}/${clientId}/order_items/update?order_id=${existingDraft.id}`,
+            itemsPayload,
+            { headers }
+          );
+          // Step 2: flip status + fix dinein_order_id via /dinein/update
+          await axios.post(
+            `${import.meta.env.VITE_API_ORDER_SERVICE_URL}/${clientId}/dinein/update`,
+            {
+              id: existingDraft.id,
               status: 'pending',
-              slug: i.slug,
-            })),
-          },
-          { headers }
-        );
-        const newOrder = res.data?.data;
-        if (newOrder?.id) {
-          setActiveOrderId(newOrder.id);
-          setActiveDineinOrderId(newOrder.dinein_order_id);
+              total_price: total,
+              // tells backend to reset dinein_order_id from "DRAFT-X" → "X"
+              dinein_order_id: String(existingDraft.id),
+            },
+            { headers }
+          );
+        } else {
+          // No draft — create fresh as before (unchanged)
+          await axios.post(
+            `${import.meta.env.VITE_API_ORDER_SERVICE_URL}/${clientId}/dinein/create`,
+            {
+              client_id: clientId,
+              table_id: Number(selectedTable),
+              price: total,
+              gst: 0,
+              cst: 0,
+              total_price: total,
+              status: 'pending',
+              items: itemsPayload,
+            },
+            { headers }
+          );
         }
+
+        // Update table to Occupied — unchanged
         const tableToUpdate = tables.find(t => t.id.toString() === selectedTable);
         if (tableToUpdate) {
           await axios.post(
@@ -1757,7 +1755,7 @@ const TakeOrder = ({ clientId, token, onOrderUpdate, realm }) => {
       }
 
       // Clean up on success
-      clearDraftForTable(selectedTable);
+      await deleteDraftFromDB(selectedTable, clientId, token);
       await fetchTables();
       setCart([]);
       setActiveOrderId(null);
@@ -1785,8 +1783,8 @@ const TakeOrder = ({ clientId, token, onOrderUpdate, realm }) => {
     setShowClearConfirm(true);
   };
 
-  const confirmClearCart = () => {
-    clearDraftForTable(selectedTable);
+  const confirmClearCart = async () => {
+    await deleteDraftFromDB(selectedTable, clientId, token);
     setCart([]);
     setSelectedTable('');
     setCurrentView('floor');
@@ -2177,7 +2175,8 @@ const TakeOrder = ({ clientId, token, onOrderUpdate, realm }) => {
                                 onChange={(e) => {
                                   setSelectedTable(e.target.value);
                                   setTakeawayTableId(e.target.value);
-                                }} className="border-none outline-none rounded px-2 py-1 text-sm bg-white"
+                                }}
+                                className="border-none outline-none rounded px-2 py-1 text-sm bg-white"
                               >
                                 <option value="">Select Table</option>
                                 {takeawayTables.map(t => (
@@ -2225,10 +2224,9 @@ const TakeOrder = ({ clientId, token, onOrderUpdate, realm }) => {
                           <button
                             onClick={() => {
                               setOrderMode('dinein');
-                              if (dineinTableId) {
-                                setSelectedTable(dineinTableId);
-                              }
-                            }} className={`flex-1 py-2 rounded-md text-sm font-medium flex items-center justify-center gap-2
+                              if (dineinTableId) setSelectedTable(dineinTableId);
+                            }}
+                            className={`flex-1 py-2 rounded-md text-sm font-medium flex items-center justify-center gap-2
                               ${orderMode === 'dinein'
                                 ? 'bg-action-primary text-white shadow-sm'
                                 : 'text-gray-600 hover:text-gray-800'}`}
@@ -2238,14 +2236,7 @@ const TakeOrder = ({ clientId, token, onOrderUpdate, realm }) => {
                           <button
                             onClick={() => {
                               setOrderMode('takeaway');
-
-                              const id =
-                                takeawayTableId || takeawayTables[0]?.id?.toString();
-
-                              if (id) {
-                                setTakeawayTableId(id);
-                                setSelectedTable(id);
-                              }
+                              setSelectedTable(takeawayTableId?.toString());
                             }}
                             className={`flex-1 py-2 rounded-md text-sm font-medium flex items-center justify-center gap-2
                               ${orderMode === 'takeaway'
