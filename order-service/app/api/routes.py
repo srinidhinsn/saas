@@ -24,7 +24,7 @@ def create_order(client_id: str, order: DineinOrderModel, context: SaasContext =
         client_id=client_id, table_id=order.table_id, status=order.status,
         price=order.price, gst=order.gst, cst=order.cst, discount=order.discount,
         invoice_status=order.invoice_status, total_price=order.total_price,
-        invoice_id=order.invoice_id, dinein_order_id=None,
+        invoice_id=order.invoice_id, dinein_order_id=order.dinein_order_id,
         handler_id=order.handler_id, created_by=order.created_by, updated_by=order.updated_by,
     )
     db.add(db_order)
@@ -54,7 +54,7 @@ def create_order(client_id: str, order: DineinOrderModel, context: SaasContext =
     dinein_model = DineinOrderModel(
         id=db_order.id, dinein_order_id=db_order.dinein_order_id, table_id=db_order.table_id,
         client_id=db_order.client_id, status=db_order.status, created_at=db_order.created_at,
-        items=order_items,
+        items=order_items
     )
     return ResponseModel(screen_id=context.screen_id, data=dinein_model)
 
@@ -227,6 +227,9 @@ def update_order_status(
 
     if body.total_price is not None:
         order.total_price = body.total_price
+
+    if body.table_id is not None:
+        order.table_id = body.table_id    
 
     db.commit()
     db.refresh(order)
