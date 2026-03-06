@@ -891,7 +891,7 @@ const Summary_V1 = ({ clientId, token }) => {
           client_id: clientId,
           name: tableObj.name,
           table_type: tableObj.table_type,
-          status: 'Vacant',
+          status: 'vacant',
           location_zone: tableObj.location_zone
         }, { headers: { Authorization: `Bearer ${token}` } });
       }
@@ -1189,7 +1189,7 @@ const Summary_V1 = ({ clientId, token }) => {
           client_id: clientId,
           name: tableObj?.name || '',
           table_type: tableObj?.table_type || '',
-          status: 'Vacant',
+          status: 'vacant',
           location_zone: tableObj?.location_zone || ''
         }, { headers: { Authorization: `Bearer ${token}` } });
       }

@@ -260,18 +260,18 @@ const handleSplitPayment = async () => {
 
   return (
     <div className="fixed inset-0 bg-black/60 backdrop-blur-sm flex items-center justify-center z-[100] p-4">
-      <div className="bg-white rounded-2xl shadow-2xl w-full max-w-md relative">
+      <div className="bg-bg-primary rounded-2xl shadow-2xl w-full max-w-md relative">
         {/* Close button */}
         <button
           onClick={onClose}
           disabled={loading}
-          className="absolute top-4 right-4 text-gray-400 hover:text-gray-600 disabled:opacity-50"
+          className="absolute top-4 right-4 text-text-secondary hover:text-gray-600 disabled:opacity-50"
         >
           <X size={24} />
         </button>
 
         {/* Header */}
-        <div className="bg-gradient-to-r from-blue-600 to-purple-600 px-6 py-5 rounded-t-2xl">
+        <div className="bg-action-primary px-6 py-5 rounded-t-2xl">
           <h2 className="text-2xl font-bold text-white">Payment</h2>
           <p className="text-blue-100 text-sm mt-1">
             {isSplitPayment ? 'Split Payment Mode' : 'Secure Payment via Razorpay'}
@@ -282,7 +282,7 @@ const handleSplitPayment = async () => {
         <div className="p-6 space-y-6">
           
           {/* Amount Display */}
-          <div className="bg-gradient-to-r from-blue-50 to-purple-50 rounded-xl p-4 border border-blue-200">
+          <div className="bg-action-primary rounded-xl p-4 border border-blue-200">
             <div className="text-sm text-gray-600 mb-1">
               {isSplitPayment ? 'Total Amount' : 'Amount to Pay'}
             </div>

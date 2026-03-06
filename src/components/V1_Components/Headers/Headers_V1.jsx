@@ -3,6 +3,7 @@ import React, { useEffect, useState } from 'react';
 import { useNavigate, useParams, useLocation } from 'react-router-dom';
 
 export const navMap = {
+  customer: (clientId) => `/${APP_ROOT}/${clientId}/customer-data`,
   home: (clientId) => `/${APP_ROOT}/${clientId}/home`,
   counter: (clientId) => `/${APP_ROOT}/${clientId}/counter-manage`,
   menu: (clientId) => `/${APP_ROOT}/${clientId}/menu`,
@@ -97,6 +98,7 @@ const Headers_V1 = ({ onLogout }) => {
     <header className="shadow-md sticky top-0 z-50 bg-bg-primary dark:bg-bg-primary-dark border-b border-border-default dark:border-border-default-dark transition-colors duration-300">
       <div className="mx-auto px-4 md:px-2 py-3 lg:py-4 flex items-center justify-between">
         <div className="hidden lg:flex items-center space-x-8 md:space-x-2 text-text-primary">
+          <NavLink id="customer">Clients</NavLink>
           <NavLink id="home">DashBoard</NavLink>
           <NavLink id="counter">Counter</NavLink>
           <NavLink id="menu">Menu</NavLink>
@@ -150,6 +152,14 @@ const Headers_V1 = ({ onLogout }) => {
                     className="block px-4 py-2 hover:bg-bg-tertiary"
                   >
                     Profile
+                  </NavLink>
+                </li>
+                <li>
+                  <NavLink
+                    id="settings"
+                    className="block px-4 py-2 hover:bg-bg-tertiary"
+                  >
+                    Settings
                   </NavLink>
                 </li>
                 <li

@@ -23,7 +23,68 @@ const TABLE_STATUS_CONFIG = {
   served: { clickable: false, bg: 'bg-blue-50', border: 'border-blue-400', badge: 'bg-blue-100 text-blue-700', viewable: true },
   reserved: { clickable: false, bg: 'bg-yellow-50', border: 'border-yellow-400', badge: 'bg-yellow-100 text-yellow-700' },
 };
+const TransferTableModal = ({ isOpen, onClose, tables, currentTableId, onConfirm }) => {
+  const [selectedNewTable, setSelectedNewTable] = useState(null);
 
+  useEffect(() => {
+    if (isOpen) setSelectedNewTable(null);
+  }, [isOpen]);
+
+  if (!isOpen) return null;
+
+  const vacantTables = tables.filter(
+    t => t.status?.toLowerCase() === 'vacant' && t.id.toString() !== currentTableId
+  );
+
+  return (
+    <div className="fixed inset-0 z-50 flex items-center justify-center p-4 bg-black/50">
+      <div className="rounded-lg w-full max-w-sm bg-white shadow-xl">
+        <div className="px-6 py-4 border-b flex justify-between items-center">
+          <h2 className="text-lg font-bold text-gray-800">Transfer Table</h2>
+          <button onClick={onClose} className="text-gray-500 hover:text-gray-700">
+            <X size={20} />
+          </button>
+        </div>
+        <div className="px-6 py-4 max-h-72 overflow-y-auto">
+          {vacantTables.length === 0 ? (
+            <p className="text-sm text-gray-500 text-center py-4">No vacant tables available.</p>
+          ) : (
+            <div className="grid grid-cols-3 gap-2">
+              {vacantTables.map(t => (
+                <button
+                  key={t.id}
+                  onClick={() => setSelectedNewTable(t)}
+                  className={`py-3 rounded-lg border-2 text-sm font-bold transition
+                    ${selectedNewTable?.id === t.id
+                      ? 'border-action-primary bg-action-primary/10 text-action-primary'
+                      : 'border-gray-200 hover:border-action-primary text-gray-700'}`}
+                >
+                  {t.table_number}
+                </button>
+              ))}
+            </div>
+          )}
+        </div>
+        <div className="px-6 py-4 flex gap-3 bg-gray-50 rounded-b-lg">
+          <button
+            onClick={onClose}
+            className="flex-1 py-2.5 rounded-lg font-medium text-sm border border-gray-300 bg-white text-gray-700 hover:bg-gray-50"
+          >
+            Cancel
+          </button>
+          <button
+            onClick={() => { if (selectedNewTable) { onConfirm(selectedNewTable); onClose(); } }}
+            disabled={!selectedNewTable}
+            className={`flex-1 py-2.5 rounded-lg font-medium text-sm text-white transition
+              ${selectedNewTable ? 'bg-action-primary hover:bg-action-danger' : 'bg-gray-300 cursor-not-allowed'}`}
+          >
+            Transfer
+          </button>
+        </div>
+      </div>
+    </div>
+  );
+};
 async function readDraft(tableId, clientId, token) {
   try {
     const r = await axios.get(
@@ -844,10 +905,12 @@ const TakeOrder = ({ clientId, token, onOrderUpdate, realm }) => {
 
   // ── Order context ─────────────────────────────────────────────────────────
   const [selectedTable, setSelectedTable] = useState('');
-  const [takeawayTableId, setTakeawayTableId] = useState(500);
+  const [takeawayTables, setTakeawayTables] = useState([]);
+  const [dineinTableId, setDineinTableId] = useState(null);
+  const [takeawayTableId, setTakeawayTableId] = useState(null);
   const [activeOrderId, setActiveOrderId] = useState(null);
   const [activeDineinOrderId, setActiveDineinOrderId] = useState(null);
-
+  const [showTransferModal, setShowTransferModal] = useState(false);
   // ── Cart ──────────────────────────────────────────────────────────────────
   const [cart, setCart] = useState([]);
   const [showCart, setShowCart] = useState(false);
@@ -924,36 +987,36 @@ const TakeOrder = ({ clientId, token, onOrderUpdate, realm }) => {
     return flat;
   };
 
-const getAddonCategoryId = useCallback((itemCategoryId) => {
-  if (!itemCategoryId || !categoriesFlat.length) return null;
+  const getAddonCategoryId = useCallback((itemCategoryId) => {
+    if (!itemCategoryId || !categoriesFlat.length) return null;
 
-  // 1️⃣ Find root node (like "dietery")
-  const rootNode = categoriesFlat.find(
-    c => c.parentId === null || c.parentId === undefined
-  );
+    // 1️⃣ Find root node (like "dietery")
+    const rootNode = categoriesFlat.find(
+      c => c.parentId === null || c.parentId === undefined
+    );
 
-  if (!rootNode) return null;
+    if (!rootNode) return null;
 
-  // 2️⃣ Start from item's category
-  let current = categoriesFlat.find(c => c.id === itemCategoryId);
+    // 2️⃣ Start from item's category
+    let current = categoriesFlat.find(c => c.id === itemCategoryId);
 
-  // 3️⃣ Climb upward until direct child of root
-  while (current && current.parentId) {
-    if (current.parentId === rootNode.id) {
-      const slug = current.name
-        .trim()
-        .toLowerCase()
-        .replace(/[\s-]+/g, "")
-        .replace(/[^a-z0-9]/g, "");
+    // 3️⃣ Climb upward until direct child of root
+    while (current && current.parentId) {
+      if (current.parentId === rootNode.id) {
+        const slug = current.name
+          .trim()
+          .toLowerCase()
+          .replace(/[\s-]+/g, "")
+          .replace(/[^a-z0-9]/g, "");
 
-      return `addons_${slug}`;
+        return `addons_${slug}`;
+      }
+
+      current = categoriesFlat.find(c => c.id === current.parentId);
     }
 
-    current = categoriesFlat.find(c => c.id === current.parentId);
-  }
-
-  return null;
-}, [categoriesFlat]);
+    return null;
+  }, [categoriesFlat]);
 
   const getCategoryAndChildrenIds = (cats, targetId) => {
     const result = new Set();
@@ -1063,23 +1126,42 @@ const getAddonCategoryId = useCallback((itemCategoryId) => {
     }
   };
 
+  // REMOVE the old fetchTables and REPLACE WITH:
   const fetchTables = async () => {
+    const takeawayRoots =
+      (import.meta.env.VITE_EASYFOOD_TAKEAWAY_TABLE_DEFAULT_ROOT || '')
+        .split(',')
+        .map(v => v.trim().toLowerCase());
+
     const res = await axios.get(
       `${import.meta.env.VITE_API_TABLE_SERVICE_URL}/${clientId}/tables/read`,
       { headers: { Authorization: `Bearer ${token}` } }
     );
+
     const list = Array.isArray(res.data?.data)
-      ? res.data.data.map(t => ({ ...t, table_number: t.name || t.table_number || '-' }))
+      ? res.data.data.map(t => ({
+        ...t,
+        table_number: t.name || t.table_number || '-',
+      }))
       : [];
-    const tw = list.find(t => Number(t.id) === 500);
-    if (tw) setTakeawayTableId(tw.id);
+
+    const takeaway = list.filter(t =>
+      takeawayRoots.some(root =>
+        (t.name || '').toLowerCase().startsWith(root)
+      )
+    );
+
+    setTakeawayTables(takeaway);
+    if (takeaway.length > 0) {
+      setTakeawayTableId(takeaway[0].id);
+    }
+
     list.sort((a, b) =>
       a.table_number.localeCompare(b.table_number, undefined, { numeric: true })
     );
     setTables(list);
     await fetchTableOrders(list);
   };
-
   // ─────────────────────────────────────────────────────────────────────────
   // Initial data load
   // ─────────────────────────────────────────────────────────────────────────
@@ -1224,7 +1306,49 @@ const getAddonCategoryId = useCallback((itemCategoryId) => {
   // ─────────────────────────────────────────────────────────────────────────
   // Table / order selection
   // ─────────────────────────────────────────────────────────────────────────
+  const handleTransferTable = async (newTable) => {
+    if (!activeOrderId) {
+      toast.error('No active order to transfer.');
+      return;
+    }
+    try {
+      setLoading(true);
+      const headers = { Authorization: `Bearer ${token}` };
+      const oldTableId = Number(selectedTable);
+      const newTableId = newTable.id;
 
+      await axios.post(
+        `${import.meta.env.VITE_API_ORDER_SERVICE_URL}/${clientId}/dinein/update`,
+        { id: activeOrderId, client_id: clientId, table_id: newTableId },
+        { headers }
+      );
+
+      const oldTable = tables.find(t => t.id === oldTableId);
+      if (oldTable) {
+        await axios.post(
+          `${import.meta.env.VITE_API_TABLE_SERVICE_URL}/${clientId}/tables/update`,
+          { ...oldTable, id: oldTableId, status: 'vacant', table_type: String(oldTable.table_type) },
+          { headers }
+        );
+      }
+
+      await axios.post(
+        `${import.meta.env.VITE_API_TABLE_SERVICE_URL}/${clientId}/tables/update`,
+        { ...newTable, id: newTableId, status: 'Occupied', table_type: String(newTable.table_type) },
+        { headers }
+      );
+
+      setSelectedTable(newTableId.toString());
+      setDineinTableId(newTableId.toString());
+      await fetchTables();
+      toast.success(`Transferred to Table ${newTable.table_number}`);
+    } catch (err) {
+      console.error('[Transfer] Failed:', err);
+      toast.error('Transfer failed');
+    } finally {
+      setLoading(false);
+    }
+  };
 
   const handleTableSelect = async (table) => {
     const tableIdStr = table.id.toString();
@@ -1235,7 +1359,7 @@ const getAddonCategoryId = useCallback((itemCategoryId) => {
     setCurrentBatchTimestamp(null);
     setOrderMode('dinein');
     setSelectedTable(tableIdStr);
-
+    setDineinTableId(tableIdStr);
     const draft = await readDraft(tableIdStr, clientId, token);
 
     if (draft) {
@@ -1275,23 +1399,20 @@ const getAddonCategoryId = useCallback((itemCategoryId) => {
   };
 
   const handleTakeawaySelect = () => {
-    const tableIdStr = takeawayTableId.toString();
+    if (!takeawayTables.length) {
+      toast.error('No takeaway table configured');
+      return;
+    }
+
+    const tableIdStr = (takeawayTableId || takeawayTables[0].id).toString();
     setOrderMode('takeaway');
     setSelectedTable(tableIdStr);
     setActiveOrderId(null);
     setActiveDineinOrderId(null);
-
-    const restored = restoreDraftForTable(tableIdStr);
-    if (restored) {
-      toast.info('Draft restored.', { autoClose: 2000 });
-    } else {
-      setCart([]);
-      setShowCart(true);
-    }
-
+    setCart([]);
+    setShowCart(true);
     goToOrderView();
   };
-
   const handleViewOrder = async (table) => {
     if (menuItems.length === 0) {
       alert('Menu still loading...');
@@ -1569,14 +1690,14 @@ const getAddonCategoryId = useCallback((itemCategoryId) => {
         const existingDraft = await readDraft(selectedTable, clientId, token);
         const total = cart.reduce((s, i) => s + (i.unit_price || 0) * i.quantity, 0);
         const itemsPayload = cart.map(i => ({
-          item_id             : i.id,
-          item_name           : i.name,
-          quantity            : i.quantity,
-          unit_price          : i.unit_price,
-          line_total          : i.unit_price * i.quantity,
-          status              : 'pending',
-          slug                : i.slug || '',
-          frontend_unique_key : i.frontend_unique_key,
+          item_id: i.id,
+          item_name: i.name,
+          quantity: i.quantity,
+          unit_price: i.unit_price,
+          line_total: i.unit_price * i.quantity,
+          status: 'pending',
+          slug: i.slug || '',
+          frontend_unique_key: i.frontend_unique_key,
         }));
 
         if (existingDraft) {
@@ -1591,9 +1712,9 @@ const getAddonCategoryId = useCallback((itemCategoryId) => {
           await axios.post(
             `${import.meta.env.VITE_API_ORDER_SERVICE_URL}/${clientId}/dinein/update`,
             {
-              id            : existingDraft.id,
-              status        : 'pending',
-              total_price   : total,
+              id: existingDraft.id,
+              status: 'pending',
+              total_price: total,
               // tells backend to reset dinein_order_id from "DRAFT-X" → "X"
               dinein_order_id: String(existingDraft.id),
             },
@@ -1604,14 +1725,14 @@ const getAddonCategoryId = useCallback((itemCategoryId) => {
           await axios.post(
             `${import.meta.env.VITE_API_ORDER_SERVICE_URL}/${clientId}/dinein/create`,
             {
-              client_id   : clientId,
-              table_id    : Number(selectedTable),
-              price       : total,
-              gst         : 0,
-              cst         : 0,
-              total_price : total,
-              status      : 'pending',
-              items       : itemsPayload,
+              client_id: clientId,
+              table_id: Number(selectedTable),
+              price: total,
+              gst: 0,
+              cst: 0,
+              total_price: total,
+              status: 'pending',
+              items: itemsPayload,
             },
             { headers }
           );
@@ -1624,9 +1745,9 @@ const getAddonCategoryId = useCallback((itemCategoryId) => {
             `${import.meta.env.VITE_API_TABLE_SERVICE_URL}/${clientId}/tables/update`,
             {
               ...tableToUpdate,
-              id         : Number(selectedTable),
-              status     : 'Occupied',
-              table_type : tableToUpdate.table_type.toString(),
+              id: Number(selectedTable),
+              status: 'Occupied',
+              table_type: tableToUpdate.table_type.toString(),
             },
             { headers }
           );
@@ -2047,20 +2168,32 @@ const getAddonCategoryId = useCallback((itemCategoryId) => {
                                 {tables.find(t => t.id.toString() === selectedTable)?.table_number}
                               </span>
                             )}
-                            <button
-                              onClick={() => {
-                                setOrderMode('dinein');
-                                setSelectedTable('');
-                                setActiveOrderId(null);
-                                setCurrentBatchTimestamp(null);
-                                setHasNewItems(false);
-                                setShowCart(false);
-                                setCurrentView('floor');
-                              }}
-                              className="text-sm text-red-600 hover:underline"
-                            >
-                              Transfer
-                            </button>
+
+                            {orderMode === 'takeaway' && (
+                              <select
+                                value={selectedTable}
+                                onChange={(e) => {
+                                  setSelectedTable(e.target.value);
+                                  setTakeawayTableId(e.target.value);
+                                }}
+                                className="border-none outline-none rounded px-2 py-1 text-sm bg-white"
+                              >
+                                <option value="">Select Table</option>
+                                {takeawayTables.map(t => (
+                                  <option key={t.id} value={t.id}>
+                                    {t.table_number}
+                                  </option>
+                                ))}
+                              </select>
+                            )}
+                            {activeOrderId && (
+                              <button
+                                onClick={() => setShowTransferModal(true)}
+                                className="text-sm text-red-600 hover:underline"
+                              >
+                                Transfer
+                              </button>
+                            )}
                             {activeDineinOrderId && (
                               <span className="text-xs text-gray-500 font-mono">
                                 #{activeDineinOrderId}
@@ -2089,7 +2222,10 @@ const getAddonCategoryId = useCallback((itemCategoryId) => {
                       <div className="mt-3">
                         <div className="flex bg-gray-100 rounded-lg p-1">
                           <button
-                            onClick={() => setOrderMode('dinein')}
+                            onClick={() => {
+                              setOrderMode('dinein');
+                              if (dineinTableId) setSelectedTable(dineinTableId);
+                            }}
                             className={`flex-1 py-2 rounded-md text-sm font-medium flex items-center justify-center gap-2
                               ${orderMode === 'dinein'
                                 ? 'bg-action-primary text-white shadow-sm'
@@ -2293,7 +2429,13 @@ const getAddonCategoryId = useCallback((itemCategoryId) => {
           }
         }}
       />
-
+      <TransferTableModal
+        isOpen={showTransferModal}
+        onClose={() => setShowTransferModal(false)}
+        tables={tables}
+        currentTableId={selectedTable}
+        onConfirm={handleTransferTable}
+      />
       {invoiceModalOpen && invoiceOrderData && (
         <InvoiceModal
           clientId={clientId}
