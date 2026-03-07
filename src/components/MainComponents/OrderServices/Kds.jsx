@@ -1,4 +1,4 @@
-import React, { useEffect, useState, useCallback } from 'react';
+import React, { useEffect, useState, useCallback, useRef } from 'react';
 import axios from 'axios';
 import { useParams } from 'react-router-dom';
 import { toast } from 'react-toastify';
@@ -57,20 +57,16 @@ const calculateElapsedTime = (createdAt) => {
       : createdAt;
 
   const diffMs = Date.now() - new Date(utcString).getTime();
-  if (diffMs < 0) return 'Just now';
+  if (diffMs < 0) return '0m';
 
   const totalSeconds = Math.floor(diffMs / 1000);
-  const minutes = Math.floor(totalSeconds / 60);
-  const hours = Math.floor(minutes / 60);
-  const days = Math.floor(hours / 24);
+  const totalMinutes = Math.floor(totalSeconds / 60);
+  const hours = Math.floor(totalMinutes / 60);
+  const minutes = totalMinutes % 60;
 
-  if (totalSeconds < 60) return 'Just now';
-  if (minutes === 1) return '1 min ago';
-  if (minutes < 60) return `${minutes} mins ago`;
-  if (hours === 1) return '1 hr ago';
-  if (hours < 24) return `${hours} hrs ago`;
-  if (days === 1) return '1 day ago';
-  return `${days} days ago`;
+  if (totalSeconds < 60) return '< 1m';
+  if (hours > 0) return `${hours}h ${minutes}m`;
+  return `${totalMinutes}m`;
 };
 
 
@@ -317,6 +313,10 @@ const KitchenDisplay = () => {
   const [loading, setLoading] = useState(true);
   const [orderFilter, setOrderFilter] = useState('ALL');
 
+  // Stores the canonical item order (array of item ids) per card_id.
+  // Persists across re-renders and poll ticks so item positions never shift.
+  const itemOrderRef = useRef({});
+
   // Delete order modal state
   const [showDeleteOrderModal, setShowDeleteOrderModal] = useState(false);
   const [cardToDelete, setCardToDelete] = useState(null);
@@ -370,7 +370,7 @@ const KitchenDisplay = () => {
   const parseIntoCards = (mergedOrder) => {
     const subOrders = mergedOrder.sub_orders || [];
 
-    // Group merged items by sub_order_id
+    // Group merged items by sub_order_id — preserve server-returned order
     const itemsBySubOrder = {};
     (mergedOrder.items || []).forEach((item) => {
       const sid = item.sub_order_id;
@@ -395,15 +395,10 @@ const KitchenDisplay = () => {
       ];
     }
 
-    // One card per sub-order: root first, then chronological sub-orders
+    // One card per sub-order: sort strictly by created_at ascending
     return subOrders
       .slice()
-      .sort((a, b) => {
-        const aIsRoot = !String(a.dinein_order_id).includes('-');
-        const bIsRoot = !String(b.dinein_order_id).includes('-');
-        if (aIsRoot !== bIsRoot) return aIsRoot ? -1 : 1;
-        return new Date(a.created_at || 0) - new Date(b.created_at || 0);
-      })
+      .sort((a, b) => new Date(a.created_at || 0) - new Date(b.created_at || 0))
       .map((subOrder) => ({
         card_id: subOrder.id,
         sub_order_id: subOrder.id,
@@ -457,7 +452,55 @@ const KitchenDisplay = () => {
         });
       });
 
-      setCards(allCards);
+      // Sort all cards by created_at ascending so newest orders appear last
+      allCards.sort((a, b) => new Date(a.created_at || 0) - new Date(b.created_at || 0));
+
+      // Stabilise item order using a ref so positions survive refresh + navigation.
+      // On first sight of a card, record item ids in server-arrival order.
+      // On subsequent polls, reorder items to match that recorded order.
+      const stableCards = allCards.map((incoming) => {
+        const cardId = incoming.card_id;
+        const incomingItemIds = incoming.items.map((i) => i.id);
+
+        if (!itemOrderRef.current[cardId]) {
+          // First time we see this card — lock in the server order as canonical
+          itemOrderRef.current[cardId] = incomingItemIds;
+        } else {
+          // Merge: keep known order, append any genuinely new items at the end
+          const lockedIds = itemOrderRef.current[cardId];
+          const lockedSet = new Set(lockedIds);
+          const incomingSet = new Set(incomingItemIds);
+
+          // Drop ids that no longer exist on the server (deleted items)
+          const prunedLocked = lockedIds.filter((id) => incomingSet.has(id));
+
+          // Append brand-new item ids not yet in our locked list
+          incomingItemIds.forEach((id) => {
+            if (!lockedSet.has(id)) prunedLocked.push(id);
+          });
+
+          itemOrderRef.current[cardId] = prunedLocked;
+        }
+
+        // Build a lookup map then re-order items by the locked id sequence
+        const itemById = {};
+        incoming.items.forEach((i) => { itemById[i.id] = i; });
+        const orderedItems = itemOrderRef.current[cardId]
+          .filter((id) => itemById[id]) // skip ids that vanished
+          .map((id) => itemById[id]);
+
+        return { ...incoming, items: orderedItems };
+      });
+
+      // Clean up ref entries for cards that are no longer active
+      const activeIds = new Set(allCards.map((c) => c.card_id));
+      Object.keys(itemOrderRef.current).forEach((id) => {
+        if (!activeIds.has(Number(id)) && !activeIds.has(id)) {
+          delete itemOrderRef.current[id];
+        }
+      });
+
+      setCards(stableCards);
     } catch (err) {
       console.error('Error fetching orders:', err);
       toast.error('Failed to fetch orders');
@@ -479,6 +522,7 @@ const KitchenDisplay = () => {
     const card = cards.find((c) => c.card_id === cardId);
     if (!card) return;
 
+    // Preserve original item order — only update the status of the changed item
     const updatedItems = (card.items || []).map((i) =>
       String(i.id) === String(itemId) ? { ...i, status: newStatus } : i
     );
@@ -526,7 +570,7 @@ const KitchenDisplay = () => {
         );
       }
 
-      // Optimistic UI update
+      // Optimistic UI update — keep card position stable, only update items + status
       setCards((prev) =>
         prev.map((c) =>
           c.card_id !== cardId
@@ -656,7 +700,7 @@ const KitchenDisplay = () => {
   };
 
 
-  // ─── Filter + sort cards ──────────────────────────────────────────────────────
+  // ─── Filter cards (sort already applied at fetch time) ───────────────────────
 
   const filteredCards = cards
     .filter((card) => {
@@ -665,7 +709,7 @@ const KitchenDisplay = () => {
       if (orderFilter === KDS_CONFIG.FILTERS.TAKEAWAY) return isTakeaway;
       if (orderFilter === KDS_CONFIG.FILTERS.DINEIN) return !isTakeaway;
       return true;
-    })
+    });
 
 
   // ─── Render ───────────────────────────────────────────────────────────────────
