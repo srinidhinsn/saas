@@ -1,11 +1,12 @@
 import React, { useEffect, useState } from "react";
 import axios from 'axios';
+import { toast } from "react-toastify";
+import { MdOutlineKeyboardDoubleArrowDown } from "react-icons/md";
 import Modal from "react-modal";
-import { X, Edit2, Trash2, Search, Filter, ShoppingBag, Clock, Users, Package, Truck } from 'lucide-react';
+import { X, Edit2, Trash2, Search, Filter, FileText, Users, Package, Truck } from 'lucide-react';
 import { useNavigate } from "react-router-dom";
-import BillingPage from '../../MainComponents/BillingServices/Billing'
-
-
+import { useTenant } from "../../../context/TenantContext";
+import InvoiceModal from "../../MainComponents/BillingServices/InvoiceModal";
 Modal.setAppElement("#root");
 
 const SimpleDeleteConfirm = ({ isOpen, onClose, onConfirm, title = 'Delete', message = 'Are you sure?' }) => {
@@ -82,7 +83,7 @@ const LineItemsModal = ({ isOpen, onClose, mainItem, lineItems, onAddMainOnly, o
 
 };
 
-const Summary_V1 = ({ clientId, token }) => {
+const Summary_Super_User = ({ token }) => {
 
   const [orders, setOrders] = useState([]);
   const [loading, setLoading] = useState(true);
@@ -111,10 +112,11 @@ const Summary_V1 = ({ clientId, token }) => {
   const [selectedCategory, setSelectedCategory] = useState(null);
   const [activeTab, setActiveTab] = useState('items');
   const [selectedOrderModes, setSelectedOrderModes] = useState(['all']);
-
-
+  const { clientId: tenantClientId } = useTenant();
+  const [activeOrderId, setActiveOrderId] = useState(null);
   const navigate = useNavigate();
-
+  const [invoiceModalOpen, setInvoiceModalOpen] = useState(false);
+  const [invoiceOrderData, setInvoiceOrderData] = useState(null);
 
   // possible values: 'dinein', 'takeaway', 'delivery'
   const getOrderBgColor = (status) => {
@@ -200,7 +202,7 @@ const Summary_V1 = ({ clientId, token }) => {
 
   const fetchTables = async () => {
     try {
-      const res = await axios.get(`${import.meta.env.VITE_API_TABLE_SERVICE_URL}/${clientId}/tables/read`, { headers: { Authorization: `Bearer ${token}` } });
+      const res = await axios.get(`${import.meta.env.VITE_API_TABLE_SERVICE_URL}/${tenantClientId}/tables/read`, { headers: { Authorization: `Bearer ${token}` } });
       setTables(res.data?.data || []);
       const map = {};
       (res.data?.data || []).forEach(t => map[t.id] = t.name);
@@ -265,10 +267,10 @@ const Summary_V1 = ({ clientId, token }) => {
     return `${tableSlug}_${timeLabel}_${itemsCount}_${orderId}_${seq}`;
   };
 
-  useEffect(() => { if (clientId) fetchTables(); }, [clientId]);
+  useEffect(() => { if (tenantClientId) fetchTables(); }, [tenantClientId]);
 
   useEffect(() => {
-    axios.get(`${import.meta.env.VITE_API_INVENTORY_SERVICE_URL}/${clientId}/menu/read`, { headers: { Authorization: `Bearer ${token}` } })
+    axios.get(`${import.meta.env.VITE_API_INVENTORY_SERVICE_URL}/${tenantClientId}/menu/read`, { headers: { Authorization: `Bearer ${token}` } })
       .then(res => {
         setAllInventoryItems(res.data.data || []);
         const map = {};
@@ -276,7 +278,7 @@ const Summary_V1 = ({ clientId, token }) => {
         setInventoryMap(map);
       })
       .catch(() => { });
-  }, [clientId, token]);
+  }, [tenantClientId, token]);
 
   useEffect(() => {
     if (!showOrderDetailModal || !selectedOrder || editOrderId !== selectedOrder?.id || itemSearchQuery.trim() === '') {
@@ -311,6 +313,15 @@ const Summary_V1 = ({ clientId, token }) => {
     setItemSearchQuery('');
   };
 
+  const combineDuplicateItems = items => {
+    const m = new Map();
+    items.forEach(item => {
+      const k = item.item_id.toString();
+      if (m.has(k)) m.get(k).quantity += item.quantity || 0;
+      else m.set(k, { ...item });
+    });
+    return Array.from(m.values());
+  };
   const handleAddMainItemWithLineItems = () => {
     if (!selectedMainItem || !pendingOrderId) return;
     let batchTimestamp = currentBatchTimestamp;
@@ -512,6 +523,40 @@ const Summary_V1 = ({ clientId, token }) => {
     }
   };
 
+  const handleBillFromCart = async (orderId) => {
+    try {
+      setLoading(true);
+
+      const r = await axios.get(
+        `${import.meta.env.VITE_API_ORDER_SERVICE_URL}/${tenantClientId}/dinein/table`,
+        { headers: { Authorization: `Bearer ${token}` } }
+      );
+
+      const order = (r.data?.data || []).find(o => o.id === orderId);
+      if (!order) return;
+
+      const enriched = (order.items || []).map(item => {
+        const inv = inventoryMap[item.item_id] || {};
+        return {
+          ...item,
+          unit_price: item.unit_price ?? inv.unit_price ?? 0,
+          name: item.item_name ?? inv.name ?? "Unnamed Item"
+        };
+      });
+
+      setInvoiceOrderData({
+        ...order,
+        items: combineDuplicateItems(enriched)
+      });
+
+      setInvoiceModalOpen(true);
+
+    } catch (e) {
+      console.error(e);
+    } finally {
+      setLoading(false);
+    }
+  };
 
   const handleAddMainItemOnly = () => {
     if (!selectedMainItem || !pendingOrderId) return;
@@ -703,13 +748,13 @@ const Summary_V1 = ({ clientId, token }) => {
   };
   useEffect(() => {
     const fetchOrders = async () => {
-      if (!token || !clientId) {
+      if (!token || !tenantClientId) {
         setLoading(false);
         return;
       }
 
       try {
-        const res = await axios.get(`${import.meta.env.VITE_API_ORDER_SERVICE_URL}/${clientId}/dinein/table`, { headers: { Authorization: `Bearer ${token}` } });
+        const res = await axios.get(`${import.meta.env.VITE_API_ORDER_SERVICE_URL}/${tenantClientId}/dinein/table`, { headers: { Authorization: `Bearer ${token}` } });
         const allOrders = res.data?.data || [];
 
         const processed = allOrders.map(order => {
@@ -720,7 +765,7 @@ const Summary_V1 = ({ clientId, token }) => {
               _fixedOrderMode: order._fixedOrderMode ?? getInitialOrderMode(order)
             };
           }
-          
+
 
           // read normalized storage items for this order
           const rawNewItems = getNewItemsFromStorage(order.id) || [];
@@ -861,11 +906,12 @@ const Summary_V1 = ({ clientId, token }) => {
             items: deduped,
             has_new_items: batchItemsMap.size > 0
           };
-          
+
         });
 
         setOrders(processed);
       } catch (err) {
+        toast.error('Failed to fetch orders');
         console.error(err);
       } finally {
         setLoading(false);
@@ -875,7 +921,7 @@ const Summary_V1 = ({ clientId, token }) => {
     fetchOrders();
     const interval = setInterval(fetchOrders, 10000);
     return () => clearInterval(interval);
-  }, [clientId, token, inventoryMap]);
+  }, [tenantClientId, token, inventoryMap]);
 
 
 
@@ -884,9 +930,9 @@ const Summary_V1 = ({ clientId, token }) => {
     if (!order || order.status === 'served') return;
     const tableObj = tables.find(t => t.id === order.table_id);
     try {
-      await axios.post(`${import.meta.env.VITE_API_ORDER_SERVICE_URL}/${clientId}/dinein/update`, { id: orderId, client_id: clientId, status: newStatus }, { headers: { Authorization: `Bearer ${token}` } });
+      await axios.post(`${import.meta.env.VITE_API_ORDER_SERVICE_URL}/${tenantClientId}/dinein/update`, { id: orderId, client_id: clientId, status: newStatus }, { headers: { Authorization: `Bearer ${token}` } });
       if (tableObj) {
-        await axios.post(`${import.meta.env.VITE_API_TABLE_SERVICE_URL}/${clientId}/tables/update`, {
+        await axios.post(`${import.meta.env.VITE_API_TABLE_SERVICE_URL}/${tenantClientId}/tables/update`, {
           id: order.table_id,
           client_id: clientId,
           name: tableObj.name,
@@ -895,6 +941,7 @@ const Summary_V1 = ({ clientId, token }) => {
           location_zone: tableObj.location_zone
         }, { headers: { Authorization: `Bearer ${token}` } });
       }
+      toast.success('Order status updated');
       setOrders(prev => prev.map(o => o.id === orderId ? {
         ...o,
         status: newStatus,
@@ -909,7 +956,7 @@ const Summary_V1 = ({ clientId, token }) => {
       }
       if (newStatus === 'served') setEditOrderId(null);
     } catch (err) {
-        console.log("Order status " , err);
+      toast.error('❌ Failed to update order status.');
     }
   };
 
@@ -932,10 +979,11 @@ const Summary_V1 = ({ clientId, token }) => {
           const updatedOrder = updatedOrders.find(o => o.id === orderId);
           if (updatedOrder) setSelectedOrder(updatedOrder);
         }
+        toast.success('Item removed');
         return;
       }
 
-      await axios.delete(`${import.meta.env.VITE_API_ORDER_SERVICE_URL}/${clientId}/order_item/delete`, {
+      await axios.delete(`${import.meta.env.VITE_API_ORDER_SERVICE_URL}/${tenantClientId}/order_item/delete`, {
         params: { order_item_id: itemBackendId, client_id: clientId },
         headers: { Authorization: `Bearer ${token}` }
       });
@@ -962,13 +1010,14 @@ const Summary_V1 = ({ clientId, token }) => {
 
       const newOrder = updatedOrders.find(o => o.id === orderId);
       if (newOrder) {
-        await axios.post(`${import.meta.env.VITE_API_ORDER_SERVICE_URL}/${clientId}/dinein/update`, {
+        await axios.post(`${import.meta.env.VITE_API_ORDER_SERVICE_URL}/${tenantClientId}/dinein/update`, {
           id: orderId,
           total_price: newOrder.total_price
         }, { headers: { Authorization: `Bearer ${token}` } });
       }
+      toast.success('Item cancelled and total updated');
     } catch (err) {
-        console.log(" cancel item error" , err);
+      toast.error('❌ Failed to cancel item.');
     }
   };
 
@@ -1027,19 +1076,23 @@ const Summary_V1 = ({ clientId, token }) => {
     const totalPrice = cleanedItems.reduce((s, i) => s + i.price * i.quantity, 0);
 
     try {
-      await axios.post(`${import.meta.env.VITE_API_ORDER_SERVICE_URL}/${clientId}/order_items/update?order_id=${orderId}`, cleanedItems, { headers: { Authorization: `Bearer ${token}` } });
-      await axios.post(`${import.meta.env.VITE_API_ORDER_SERVICE_URL}/${clientId}/dinein/update`, { id: orderId, total_price: totalPrice }, { headers: { Authorization: `Bearer ${token}` } });
+      await axios.post(`${import.meta.env.VITE_API_ORDER_SERVICE_URL}/${tenantClientId}/order_items/update?order_id=${orderId}`, cleanedItems, { headers: { Authorization: `Bearer ${token}` } });
+      await axios.post(`${import.meta.env.VITE_API_ORDER_SERVICE_URL}/${tenantClientId}/dinein/update`, { id: orderId, total_price: totalPrice }, { headers: { Authorization: `Bearer ${token}` } });
 
       // reset editing state
       setCurrentBatchTimestamp(null);
       setEditOrderId(null);
       setItemSearchQuery('');
+      toast.success('Items saved successfully!');
 
-      const res = await axios.get(`${import.meta.env.VITE_API_ORDER_SERVICE_URL}/${clientId}/dinein/table`, { headers: { Authorization: `Bearer ${token}` } });
+      // REFRESH the orders from server and rebuild merged order exactly like fetchOrders does
+      // We'll call the same network used in fetchOrders: get all dinein table orders and then process the single order.
+      const res = await axios.get(`${import.meta.env.VITE_API_ORDER_SERVICE_URL}/${tenantClientId}/dinein/table`, { headers: { Authorization: `Bearer ${token}` } });
       const allOrders = res.data?.data || [];
       const updatedOrderFromBackend = allOrders.find(o => o.id === orderId);
 
       if (!updatedOrderFromBackend) {
+        // fallback: just refetch everything (the main polling fetch will update soon)
         return;
       }
 
@@ -1165,16 +1218,17 @@ const Summary_V1 = ({ clientId, token }) => {
       if (selectedOrder?.id === orderId) setSelectedOrder(processedOrder);
       clearNewItemsStorage(orderId);
       setCurrentBatchTimestamp(null);
-      
+
     } catch (err) {
       console.error('Save error', err);
+      toast.error('Failed to update items or total.');
     }
   };
 
   const confirmDeleteOrder = async () => {
     if (!orderToDelete) return;
     try {
-      await axios.delete(`${import.meta.env.VITE_API_ORDER_SERVICE_URL}/${clientId}/dinein/delete`, {
+      await axios.delete(`${import.meta.env.VITE_API_ORDER_SERVICE_URL}/${tenantClientId}/dinein/delete`, {
         params: { dinein_order_id: orderToDelete, client_id: clientId },
         headers: { Authorization: `Bearer ${token}` }
       });
@@ -1184,7 +1238,7 @@ const Summary_V1 = ({ clientId, token }) => {
 
       if (tableIdOfDeletedOrder) {
         const tableObj = tables.find(t => t.id === tableIdOfDeletedOrder);
-        await axios.post(`${import.meta.env.VITE_API_TABLE_SERVICE_URL}/${clientId}/tables/update`, {
+        await axios.post(`${import.meta.env.VITE_API_TABLE_SERVICE_URL}/${tenantClientId}/tables/update`, {
           id: tableIdOfDeletedOrder,
           client_id: clientId,
           name: tableObj?.name || '',
@@ -1197,9 +1251,10 @@ const Summary_V1 = ({ clientId, token }) => {
       setOrders(prev => prev.filter(o => o.id !== orderToDelete));
       setShowDeleteModal(false);
       setOrderToDelete(null);
+      toast.success('Order deleted and table marked vacant.');
       fetchTables();
     } catch (err) {
-        console.log("Delete order error" , err);
+      toast.error('❌ Failed to delete order');
     }
   };
 
@@ -1246,7 +1301,7 @@ const Summary_V1 = ({ clientId, token }) => {
     if (Number(order.table_id) === 500) return 'takeaway';
     return 'dinein';
   };
-  
+
 
   // Then filter by status
   switch (filterMode) {
@@ -1275,7 +1330,7 @@ const Summary_V1 = ({ clientId, token }) => {
 
 
   const handleGenerateBill = (order) => {
-    navigate(`/saas/${clientId}/billing`, {
+    navigate(`/saas/${tenantClientId}/billing`, {
       state: {
         orderId: order.id,
         tableId: order.table_id,
@@ -1401,8 +1456,8 @@ const Summary_V1 = ({ clientId, token }) => {
                   <div className="bg-action-primary px-4 py-3 text-text-black rounded-t-2xl">
                     <div className="flex justify-between">
                       <span className="inline-flex items-center gap-1 px-2 py-1 rounded-full text-[10px] font-semibold bg-bg-primary text-text-secondary border border-border-default">
-                        {order._fixedOrderMode=== 'dinein' ? <Users size={10} /> : <Package size={10} />}
-                        {order._fixedOrderMode=== 'dinein' ? 'Dine In' : 'Takeaway'}
+                        {order._fixedOrderMode === 'dinein' ? <Users size={10} /> : <Package size={10} />}
+                        {order._fixedOrderMode === 'dinein' ? 'Dine In' : 'Takeaway'}
                       </span>
 
 
@@ -1419,7 +1474,7 @@ const Summary_V1 = ({ clientId, token }) => {
 
                     <div className="flex items-center justify-between mt-2 gap-2">
                       <h3 className="text-lg font-bold text-text-white truncate">
-                        {order._fixedOrderMode  === 'takeaway'
+                        {order._fixedOrderMode === 'takeaway'
                           ? order.customer_name || 'Take Away'
                           : tablesMap[order.table_id] || order.table || order.table_id}
                       </h3>
@@ -1465,7 +1520,7 @@ const Summary_V1 = ({ clientId, token }) => {
                   <div className="sticky bottom-0 bg-white border-t border-gray-200 px-4 py-3 space-y-3">
                     {/* Existing buttons */}
                     <div className="flex items-center gap-3">
-                      <button
+                      {/* <button
                         onClick={() => {
                           setSelectedOrder(order);
                           setEditOrderId(order.id);
@@ -1475,14 +1530,15 @@ const Summary_V1 = ({ clientId, token }) => {
                         className="flex-1 px-4 py-2 rounded-lg bg-action-primary text-text-white text-sm font-semibold"
                       >
                         Edit Order
-                      </button>
+                      </button> */}
+                      <button onClick={() => handleBillFromCart(order.id)} className="py-2 px-4 rounded-lg text-sm font-semibold bg-green-600 text-white hover:bg-green-700 flex items-center justify-center gap-1"><FileText size={16} />Bill</button>
 
                       <button
                         onClick={() => status === 'ready' && handleStatusChange(order.id, 'served')}
                         disabled={status !== 'ready'}
-                        className={`flex-1 px-4 py-2 rounded-lg text-sm font-semibold transition-all ${status === 'ready'
-                            ? 'bg-action-success text-text-white hover:opacity-90'
-                            : 'bg-gray-300 text-gray-500 cursor-not-allowed'
+                        className={`flex-1 px-2 py-2 rounded-lg text-sm font-semibold transition-all ${status === 'ready'
+                          ? 'bg-action-success text-text-white hover:opacity-90'
+                          : 'bg-gray-300 text-gray-500 cursor-not-allowed'
                           }`}
                       >
                         Mark as Served
@@ -1777,7 +1833,24 @@ const Summary_V1 = ({ clientId, token }) => {
     background: var(--color-action-primary);
   }
 `}</style>
-
+      {invoiceModalOpen && invoiceOrderData && (
+        <InvoiceModal
+          clientId={tenantClientId}
+          token={token}
+          selectedOrder={invoiceOrderData}
+          tablesMap={tablesMap}
+          inventoryMap={inventoryMap}
+          onClose={() => {
+            setInvoiceModalOpen(false);
+            setInvoiceOrderData(null);
+            fetchTables();
+          }}
+          onSave={(id) => {
+            console.log('Invoice saved:', id);
+            fetchTables();
+          }}
+        />
+      )}
       <LineItemsModal
         isOpen={lineItemsModalOpen}
         onClose={() => setLineItemsModalOpen(false)}
@@ -1806,4 +1879,4 @@ const Summary_V1 = ({ clientId, token }) => {
   );
 };
 
-export default Summary_V1;
+export default Summary_Super_User;

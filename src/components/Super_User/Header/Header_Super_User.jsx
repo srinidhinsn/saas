@@ -2,24 +2,24 @@ import { APP_ROOT } from '../../config/pathConfig';
 import React, { useEffect, useState } from 'react';
 import { useNavigate, useParams, useLocation } from 'react-router-dom';
 
+
 export const navMap = {
-  customer: (clientId) => `/${APP_ROOT}/${clientId}/customer-data`,
-  home: (clientId) => `/${APP_ROOT}/${clientId}/home`,
-  counter: (clientId) => `/${APP_ROOT}/${clientId}/counter-manage`,
+  data: (clientId) => `/${APP_ROOT}/${clientId}/customer-data`,
+  table: (clientId) => `/${APP_ROOT}/${clientId}/managing-tables`,
   menu: (clientId) => `/${APP_ROOT}/${clientId}/menu`,
-  billing: (clientId) => `/${APP_ROOT}/${clientId}/billing`,
+  billing: (clientId) => `/${APP_ROOT}/${clientId}/billing-super-user`,
   users: (clientId) => `/${APP_ROOT}/${clientId}/users`,
   inventory: (clientId) => `/${APP_ROOT}/${clientId}/inventory`,
   role: (clientId) => `/${APP_ROOT}/${clientId}/role`,
-  order: (clientId) => `/${APP_ROOT}/${clientId}/order-manage`,
-  summary: (clientId) => `/${APP_ROOT}/${clientId}/summary-manage`,
-  kds: (clientId) => `/${APP_ROOT}/${clientId}/kds`,
+  order: (clientId) => `/${APP_ROOT}/${clientId}/order-place`,
+  summary: (clientId) => `/${APP_ROOT}/${clientId}/order-summary`,
+  kds: (clientId) => `/${APP_ROOT}/${clientId}/kds-super-user`,
   details: (clientId) => `/${APP_ROOT}/${clientId}/details`,
   documents: (clientId) => `/${APP_ROOT}/${clientId}/documents`,
   profile: (clientId) => `/${APP_ROOT}/${clientId}/user-profile`,
 };
 
-const Headers_V1 = ({ onLogout }) => {
+const Header_Super_User = ({ onLogout }) => {
   const navigate = useNavigate();
   const { clientId } = useParams();
   const location = useLocation();
@@ -69,7 +69,7 @@ const Headers_V1 = ({ onLogout }) => {
     const pair = Object.entries(navMap).find(([key, fn]) => {
       try { return fn(clientId) === path; } catch (e) { return false; }
     });
-    return pair ? pair[0] : (path.includes('/counter-manage') ? 'table' : (path.includes('/order') ? 'order' : (path.includes('/summary') ? 'summary' : 'home')));
+    return pair ? pair[0] : (path.includes('/managing-tables') ? 'table' : (path.includes('/order') ? 'order' : (path.includes('/summary') ? 'summary' : 'home')));
   };
 
   const active = deriveActive();
@@ -97,14 +97,14 @@ const Headers_V1 = ({ onLogout }) => {
   return (
     <header className="shadow-md sticky top-0 z-50 bg-bg-primary dark:bg-bg-primary-dark border-b border-border-default dark:border-border-default-dark transition-colors duration-300">
       <div className="mx-auto px-4 md:px-2 py-3 lg:py-4 flex items-center justify-between">
-        <div className="hidden lg:flex items-center space-x-8 md:space-x-2 text-text-primary">
-          <NavLink id="customer">Clients</NavLink>
-          <NavLink id="home">DashBoard</NavLink>
-          <NavLink id="counter">Counter</NavLink>
+        {/* <div className="hidden lg:flex items-center space-x-8 md:space-x-2 text-text-primary">
+          <NavLink id="data">Clients</NavLink>
+          <NavLink id="table">Table</NavLink>
           <NavLink id="menu">Menu</NavLink>
           <NavLink id="billing">Billing</NavLink>
+          <NavLink id="inventory">Inventory</NavLink>
 
-        </div>
+        </div> */}
 
         {/* ClientId with Theme Toggle - Click to change theme */}
         <button
@@ -121,9 +121,13 @@ const Headers_V1 = ({ onLogout }) => {
         </button>
 
         <div className="hidden lg:flex items-center space-x-8 text-text-primary">
-          <NavLink id="users">Users</NavLink>
+          <NavLink id="data">Clients</NavLink>
           <NavLink id="order">Order</NavLink>
           <NavLink id="summary">Summary</NavLink>
+          <NavLink id="kds">KDS</NavLink>
+          <NavLink id="billing">Billing</NavLink>
+          {/* <NavLink id="details">Details</NavLink>
+          <NavLink id="documents">Documents</NavLink> */}
 
           <div
             className="relative group"
@@ -152,14 +156,6 @@ const Headers_V1 = ({ onLogout }) => {
                     className="block px-4 py-2 hover:bg-bg-tertiary"
                   >
                     Profile
-                  </NavLink>
-                </li>
-                <li>
-                  <NavLink
-                    id="settings"
-                    className="block px-4 py-2 hover:bg-bg-tertiary"
-                  >
-                    Settings
                   </NavLink>
                 </li>
                 <li
@@ -204,7 +200,7 @@ const Headers_V1 = ({ onLogout }) => {
         aria-hidden={!mobileOpen}
       />
 
-     <nav
+      <nav
         className={`lg:hidden fixed right-0 top-0 z-50 w-full max-w-xs h-full shadow-lg transform transition-transform duration-300 bg-bg-primary dark:bg-bg-primary-dark ${mobileOpen ? 'translate-x-0' : 'translate-x-full'}`}
         aria-hidden={!mobileOpen}
       >
@@ -219,19 +215,21 @@ const Headers_V1 = ({ onLogout }) => {
         </div>
 
         <div className="p-4 space-y-3 h-full overflow-y-auto">
-          <div className="flex flex-col space-y-1">
-            <NavLink id="home">DashBoard</NavLink>
-            <NavLink id="counter">Counter</NavLink>
+          {/* <div className="flex flex-col space-y-1">
+            <NavLink id="data">Clients</NavLink>
+            <NavLink id="table">Table</NavLink>
             <NavLink id="menu">Menu</NavLink>
             <NavLink id="billing">Billing</NavLink>
             <NavLink id="users">Users</NavLink>
-          </div>
+          </div> */}
 
           <hr className="my-2 border-border-default dark:border-border-default-dark" />
 
           <div className="flex flex-col space-y-1">
+            {/* <NavLink id="inventory">Inventory</NavLink> */}
             <NavLink id="order">Order</NavLink>
             <NavLink id="summary">Summary</NavLink>
+            <NavLink id="kds">KDS</NavLink>
             <NavLink id="profile">Profile</NavLink>
             <button
               onClick={() => { onLogout?.(); setMobileOpen(false); }}
@@ -246,4 +244,11 @@ const Headers_V1 = ({ onLogout }) => {
   );
 };
 
-export default Headers_V1;
+export default Header_Super_User;
+
+
+// =========================================================   Working ========================================================== //
+// =========================================================   Working ========================================================== //
+// =========================================================   Working ========================================================== //
+// =========================================================   Working ========================================================== //
+// =========================================================   Working ========================================================== //

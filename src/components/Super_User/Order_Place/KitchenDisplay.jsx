@@ -1,48 +1,20 @@
-import React, { useEffect, useState, useCallback, useRef } from 'react';
+import React, { useEffect, useState, useCallback } from 'react';
 import axios from 'axios';
 import { useParams } from 'react-router-dom';
 import { toast } from 'react-toastify';
 import 'react-toastify/dist/ReactToastify.css';
 import { FaCheckCircle, FaClock, FaHourglassHalf } from 'react-icons/fa';
 import { Filter, Clock, Users, Package, Truck, Trash2 } from 'lucide-react';
-
+import { useTenant } from '../../../context/TenantContext';
 
 // ─── Constants ─────────────────────────────────────────────────────────────────
 
 
-// ─── Dynamic Configuration ─────────────────────────────────────────────────────
-
-const KDS_CONFIG = {
-  FILTERS: {
-    ALL: 'ALL',
-    DINEIN: 'DINEIN',
-    TAKEAWAY: 'TAKEAWAY',
-    DELIVERY: 'DELIVERY',
-  },
-
-  STATUS: {
-    PENDING: 'pending',
-    PREPARING: 'preparing',
-    SERVED: 'served',
-    READY: 'ready',
-  },
-
-  TAKEAWAY_TABLE_IDS: [500], // can support multiple IDs
-
-  POLL_INTERVAL_MS: 10000,
-
-  DATE_FORMAT: 'en-CA',
-
-  DEFAULT_TABLE_PREFIX: 'T-',
-
-  DEFAULT_UNKNOWN_LABEL: 'Unknown',
-};
-
 const ORDER_FILTER_OPTIONS = [
-  { key: KDS_CONFIG.FILTERS.ALL, label: 'All Orders', Icon: Filter },
-  { key: KDS_CONFIG.FILTERS.DINEIN, label: 'Dine-In', Icon: Users },
-  { key: KDS_CONFIG.FILTERS.TAKEAWAY, label: 'Takeaway', Icon: Package },
-  { key: KDS_CONFIG.FILTERS.DELIVERY, label: 'Delivery', Icon: Truck },
+  { key: 'ALL',      label: 'All Orders', Icon: Filter },
+  { key: 'DINEIN',   label: 'Dine-In',    Icon: Users  },
+  { key: 'TAKEAWAY', label: 'Takeaway',   Icon: Package },
+  { key: 'DELIVERY', label: 'Delivery',   Icon: Truck  },
 ];
 
 
@@ -57,31 +29,33 @@ const calculateElapsedTime = (createdAt) => {
       : createdAt;
 
   const diffMs = Date.now() - new Date(utcString).getTime();
-  if (diffMs < 0) return '0m';
+  if (diffMs < 0) return 'Just now';
 
   const totalSeconds = Math.floor(diffMs / 1000);
-  const totalMinutes = Math.floor(totalSeconds / 60);
-  const hours = Math.floor(totalMinutes / 60);
-  const minutes = totalMinutes % 60;
+  const minutes      = Math.floor(totalSeconds / 60);
+  const hours        = Math.floor(minutes / 60);
+  const days         = Math.floor(hours / 24);
 
-  if (totalSeconds < 60) return '< 1m';
-  if (hours > 0) return `${hours}h ${minutes}m`;
-  return `${totalMinutes}m`;
+  if (totalSeconds < 60) return 'Just now';
+  if (minutes === 1)     return '1 min ago';
+  if (minutes < 60)      return `${minutes} mins ago`;
+  if (hours === 1)       return '1 hr ago';
+  if (hours < 24)        return `${hours} hrs ago`;
+  if (days === 1)        return '1 day ago';
+  return `${days} days ago`;
 };
 
 
 // ─── Derive card-level status from its items ───────────────────────────────────
 
 const deriveStatus = (items) => {
-  const { PENDING, PREPARING, SERVED, READY } = KDS_CONFIG.STATUS;
-
-  if (!items?.length) return PENDING;
-  if (items.some((i) => i.status === PENDING)) return PENDING;
-  if (items.some((i) => i.status === PREPARING)) return PREPARING;
-  if (items.every((i) => i.status === SERVED)) return READY;
-
-  return PENDING;
+  if (!items?.length)                            return 'pending';
+  if (items.some((i) => i.status === 'pending')) return 'pending';
+  if (items.some((i) => i.status === 'preparing')) return 'preparing';
+  if (items.every((i) => i.status === 'served')) return 'ready';
+  return 'pending';
 };
+
 
 // ─── Delete item confirmation modal ───────────────────────────────────────────
 
@@ -167,7 +141,7 @@ const ItemStatusButton = ({ status, activeStatus, onClick, title, children }) =>
     className="p-2 rounded-md hover:bg-gray-100 transition-colors"
   >
     {React.cloneElement(children, {
-      size: 20,
+      size:      20,
       className: status === activeStatus ? children.props.activeClass : 'text-gray-500',
     })}
   </button>
@@ -185,13 +159,13 @@ const KitchenCard = ({
   const elapsedTime = card.created_at ? calculateElapsedTime(card.created_at) : null;
 
   const statusColorClass =
-    card.status === KDS_CONFIG.STATUS.PENDING
+    card.status === 'pending'
       ? 'text-blue-600'
-      : card.status === KDS_CONFIG.STATUS.PREPARING
-        ? 'text-orange-600'
-        : card.status === KDS_CONFIG.STATUS.READY
-          ? 'text-green-600'
-          : '';
+      : card.status === 'preparing'
+      ? 'text-orange-600'
+      : card.status === 'ready'
+      ? 'text-green-600'
+      : '';
 
   return (
     <div className="rounded-xl shadow-md overflow-hidden border border-gray-200 bg-white transition-transform transform hover:-translate-y-0.5 flex flex-col">
@@ -202,7 +176,7 @@ const KitchenCard = ({
 
           {/* Table name */}
           <span className="text-sm md:text-base font-semibold">
-            {tablesMap[card.table_id] || `${KDS_CONFIG.DEFAULT_TABLE_PREFIX}${card.table_id}`}
+            {tablesMap[card.table_id] || `T-${card.table_id}`}
           </span>
 
           {/* Elapsed timer */}
@@ -241,7 +215,7 @@ const KitchenCard = ({
             <div className="flex items-center gap-1 ml-3">
               <button
                 type="button"
-                onClick={() => onItemStatusChange(card.card_id, item.id, KDS_CONFIG.STATUS.PENDING)}
+                onClick={() => onItemStatusChange(card.card_id, item.id, 'pending')}
                 title="Mark as Pending"
                 className="p-2 rounded-md hover:bg-gray-100 transition-colors"
               >
@@ -253,7 +227,7 @@ const KitchenCard = ({
 
               <button
                 type="button"
-                onClick={() => onItemStatusChange(card.card_id, item.id, KDS_CONFIG.STATUS.PREPARING)}
+                onClick={() => onItemStatusChange(card.card_id, item.id, 'preparing')}
                 title="Mark as Preparing"
                 className="p-2 rounded-md hover:bg-gray-100 transition-colors"
               >
@@ -265,7 +239,7 @@ const KitchenCard = ({
 
               <button
                 type="button"
-                onClick={() => onItemStatusChange(card.card_id, item.id, KDS_CONFIG.STATUS.SERVED)}
+                onClick={() => onItemStatusChange(card.card_id, item.id, 'served')}
                 title="Mark as Ready"
                 className="p-2 rounded-md hover:bg-gray-100 transition-colors"
               >
@@ -302,28 +276,23 @@ const KitchenCard = ({
 
 // ─── Main KitchenDisplay component ────────────────────────────────────────────
 
-const KitchenDisplay = () => {
-  const { clientId } = useParams();
-  const token = localStorage.getItem('access_token');
+const KitchenDisplay_Super_User = () => {
+const { clientId } = useTenant();  const token = localStorage.getItem('access_token');
 
   // cards = array of { card_id, sub_order_id, dinein_order_id, table_id, status, created_at, items[] }
-  const [cards, setCards] = useState([]);
-  const [tablesMap, setTablesMap] = useState({});
+  const [cards, setCards]                   = useState([]);
+  const [tablesMap, setTablesMap]           = useState({});
   const [inventoryItems, setInventoryItems] = useState([]);
-  const [loading, setLoading] = useState(true);
-  const [orderFilter, setOrderFilter] = useState('ALL');
-
-  // Stores the canonical item order (array of item ids) per card_id.
-  // Persists across re-renders and poll ticks so item positions never shift.
-  const itemOrderRef = useRef({});
+  const [loading, setLoading]               = useState(true);
+  const [orderFilter, setOrderFilter]       = useState('ALL');
 
   // Delete order modal state
   const [showDeleteOrderModal, setShowDeleteOrderModal] = useState(false);
-  const [cardToDelete, setCardToDelete] = useState(null);
+  const [cardToDelete, setCardToDelete]                 = useState(null);
 
   // Delete item modal state
   const [showDeleteItemModal, setShowDeleteItemModal] = useState(false);
-  const [itemToDelete, setItemToDelete] = useState(null);  // { cardId, item }
+  const [itemToDelete, setItemToDelete]               = useState(null);  // { cardId, item }
 
 
   // ─── Fetch tables ────────────────────────────────────────────────────────────
@@ -370,7 +339,7 @@ const KitchenDisplay = () => {
   const parseIntoCards = (mergedOrder) => {
     const subOrders = mergedOrder.sub_orders || [];
 
-    // Group merged items by sub_order_id — preserve server-returned order
+    // Group merged items by sub_order_id
     const itemsBySubOrder = {};
     (mergedOrder.items || []).forEach((item) => {
       const sid = item.sub_order_id;
@@ -382,33 +351,38 @@ const KitchenDisplay = () => {
     if (subOrders.length === 0) {
       return [
         {
-          card_id: mergedOrder.id,
-          sub_order_id: mergedOrder.id,
-          dinein_order_id: mergedOrder.dinein_order_id,
+          card_id:              mergedOrder.id,
+          sub_order_id:         mergedOrder.id,
+          dinein_order_id:      mergedOrder.dinein_order_id,
           root_dinein_order_id: mergedOrder.dinein_order_id,
-          table_id: mergedOrder.table_id,
-          status: mergedOrder.status || 'pending',
-          created_at: mergedOrder.created_at,
-          items: mergedOrder.items || [],
-          is_sub_order: false,
+          table_id:             mergedOrder.table_id,
+          status:               mergedOrder.status || 'pending',
+          created_at:           mergedOrder.created_at,
+          items:                mergedOrder.items || [],
+          is_sub_order:         false,
         },
       ];
     }
 
-    // One card per sub-order: sort strictly by created_at ascending
+    // One card per sub-order: root first, then chronological sub-orders
     return subOrders
       .slice()
-      .sort((a, b) => new Date(a.created_at || 0) - new Date(b.created_at || 0))
+      .sort((a, b) => {
+        const aIsRoot = !String(a.dinein_order_id).includes('-');
+        const bIsRoot = !String(b.dinein_order_id).includes('-');
+        if (aIsRoot !== bIsRoot) return aIsRoot ? -1 : 1;
+        return new Date(a.created_at || 0) - new Date(b.created_at || 0);
+      })
       .map((subOrder) => ({
-        card_id: subOrder.id,
-        sub_order_id: subOrder.id,
-        dinein_order_id: subOrder.dinein_order_id,
+        card_id:              subOrder.id,
+        sub_order_id:         subOrder.id,
+        dinein_order_id:      subOrder.dinein_order_id,
         root_dinein_order_id: mergedOrder.dinein_order_id,
-        table_id: mergedOrder.table_id,
-        status: subOrder.status || 'pending',
-        created_at: subOrder.created_at,
-        items: itemsBySubOrder[subOrder.id] || [],
-        is_sub_order: String(subOrder.dinein_order_id).includes('-'),
+        table_id:             mergedOrder.table_id,
+        status:               subOrder.status || 'pending',
+        created_at:           subOrder.created_at,
+        items:                itemsBySubOrder[subOrder.id] || [],
+        is_sub_order:         String(subOrder.dinein_order_id).includes('-'),
       }));
   };
 
@@ -427,80 +401,31 @@ const KitchenDisplay = () => {
         { headers: { Authorization: `Bearer ${token}` } }
       );
 
-      const today = new Date().toLocaleDateString(KDS_CONFIG.DATE_FORMAT);
+      const today    = new Date().toLocaleDateString('en-CA');
       const allCards = [];
 
       (res.data?.data || []).forEach((mergedOrder) => {
         // Date filter using root created_at
-        if (mergedOrder.status === 'draft') return;
         const createdAt = mergedOrder.created_at;
         if (createdAt) {
           const utc = typeof createdAt === 'string'
             ? createdAt.replace(' ', 'T').split('.')[0] + 'Z'
             : createdAt;
-          const orderDate = new Date(utc).toLocaleDateString(KDS_CONFIG.DATE_FORMAT);
+          const orderDate = new Date(utc).toLocaleDateString('en-CA');
           if (orderDate !== today) return;
         }
 
         // Skip fully-served groups
-        if (mergedOrder.status === KDS_CONFIG.STATUS.SERVED) return;
+        if (mergedOrder.status === 'served') return;
 
         parseIntoCards(mergedOrder).forEach((card) => {
           // Skip cards where every item is already served
-          if (card.items.length > 0 && card.items.every((i) => i.status === KDS_CONFIG.STATUS.SERVED)) return;
+          if (card.items.length > 0 && card.items.every((i) => i.status === 'served')) return;
           allCards.push(card);
         });
       });
 
-      // Sort all cards by created_at ascending so newest orders appear last
-      allCards.sort((a, b) => new Date(a.created_at || 0) - new Date(b.created_at || 0));
-
-      // Stabilise item order using a ref so positions survive refresh + navigation.
-      // On first sight of a card, record item ids in server-arrival order.
-      // On subsequent polls, reorder items to match that recorded order.
-      const stableCards = allCards.map((incoming) => {
-        const cardId = incoming.card_id;
-        const incomingItemIds = incoming.items.map((i) => i.id);
-
-        if (!itemOrderRef.current[cardId]) {
-          // First time we see this card — lock in the server order as canonical
-          itemOrderRef.current[cardId] = incomingItemIds;
-        } else {
-          // Merge: keep known order, append any genuinely new items at the end
-          const lockedIds = itemOrderRef.current[cardId];
-          const lockedSet = new Set(lockedIds);
-          const incomingSet = new Set(incomingItemIds);
-
-          // Drop ids that no longer exist on the server (deleted items)
-          const prunedLocked = lockedIds.filter((id) => incomingSet.has(id));
-
-          // Append brand-new item ids not yet in our locked list
-          incomingItemIds.forEach((id) => {
-            if (!lockedSet.has(id)) prunedLocked.push(id);
-          });
-
-          itemOrderRef.current[cardId] = prunedLocked;
-        }
-
-        // Build a lookup map then re-order items by the locked id sequence
-        const itemById = {};
-        incoming.items.forEach((i) => { itemById[i.id] = i; });
-        const orderedItems = itemOrderRef.current[cardId]
-          .filter((id) => itemById[id]) // skip ids that vanished
-          .map((id) => itemById[id]);
-
-        return { ...incoming, items: orderedItems };
-      });
-
-      // Clean up ref entries for cards that are no longer active
-      const activeIds = new Set(allCards.map((c) => c.card_id));
-      Object.keys(itemOrderRef.current).forEach((id) => {
-        if (!activeIds.has(Number(id)) && !activeIds.has(id)) {
-          delete itemOrderRef.current[id];
-        }
-      });
-
-      setCards(stableCards);
+      setCards(allCards);
     } catch (err) {
       console.error('Error fetching orders:', err);
       toast.error('Failed to fetch orders');
@@ -511,7 +436,7 @@ const KitchenDisplay = () => {
 
   useEffect(() => {
     fetchOrders();
-    const interval = setInterval(fetchOrders, KDS_CONFIG.POLL_INTERVAL_MS);
+    const interval = setInterval(fetchOrders, 10_000);
     return () => clearInterval(interval);
   }, [fetchOrders]);
 
@@ -522,8 +447,7 @@ const KitchenDisplay = () => {
     const card = cards.find((c) => c.card_id === cardId);
     if (!card) return;
 
-    // Preserve original item order — only update the status of the changed item
-    const updatedItems = (card.items || []).map((i) =>
+    const updatedItems  = (card.items || []).map((i) =>
       String(i.id) === String(itemId) ? { ...i, status: newStatus } : i
     );
     const derivedStatus = deriveStatus(updatedItems);
@@ -531,17 +455,17 @@ const KitchenDisplay = () => {
     try {
       // Update all item statuses for this sub-order
       const payload = updatedItems.map((item) => ({
-        id: item.id,
-        item_id: item.item_id,
-        item_name: item.item_name,
-        quantity: item.quantity,
-        status: item.status,
-        note: item.note || '',
-        slug: item.slug || '',
-        unit_price: item.unit_price || 0,
-        line_total: (item.unit_price || 0) * (item.quantity || 1),
-        client_id: clientId,
-        order_id: card.sub_order_id,
+        id:                  item.id,
+        item_id:             item.item_id,
+        item_name:           item.item_name,
+        quantity:            item.quantity,
+        status:              item.status,
+        note:                item.note || '',
+        slug:                item.slug || '',
+        unit_price:          item.unit_price || 0,
+        line_total:          (item.unit_price || 0) * (item.quantity || 1),
+        client_id:           clientId,
+        order_id:            card.sub_order_id,
         frontend_unique_key: item.frontend_unique_key || null,
       }));
 
@@ -559,18 +483,18 @@ const KitchenDisplay = () => {
       );
 
       // Notify when order moves to ready
-      if (derivedStatus === KDS_CONFIG.STATUS.READY && card.status !== KDS_CONFIG.STATUS.READY) {
+      if (derivedStatus === 'ready' && card.status !== 'ready') {
         window.dispatchEvent(
           new CustomEvent('orderCollect', {
             detail: {
-              tableName: tablesMap[card.table_id] || KDS_CONFIG.DEFAULT_UNKNOWN_LABEL,
-              orderId: card.sub_order_id,
+              tableName: tablesMap[card.table_id] || 'Unknown',
+              orderId:   card.sub_order_id,
             },
           })
         );
       }
 
-      // Optimistic UI update — keep card position stable, only update items + status
+      // Optimistic UI update
       setCards((prev) =>
         prev.map((c) =>
           c.card_id !== cardId
@@ -618,7 +542,7 @@ const KitchenDisplay = () => {
       await axios.delete(
         `${import.meta.env.VITE_API_ORDER_SERVICE_URL}/${clientId}/order_item/delete`,
         {
-          params: { order_item_id: item.id },
+          params:  { order_item_id: item.id },
           headers: { Authorization: `Bearer ${token}` },
         }
       );
@@ -629,7 +553,7 @@ const KitchenDisplay = () => {
         await axios.delete(
           `${import.meta.env.VITE_API_ORDER_SERVICE_URL}/${clientId}/dinein/delete`,
           {
-            params: { dinein_order_id: card.sub_order_id, client_id: clientId },
+            params:  { dinein_order_id: card.sub_order_id, client_id: clientId },
             headers: { Authorization: `Bearer ${token}` },
           }
         );
@@ -670,7 +594,7 @@ const KitchenDisplay = () => {
       await axios.delete(
         `${import.meta.env.VITE_API_ORDER_SERVICE_URL}/${clientId}/dinein/delete`,
         {
-          params: { dinein_order_id: cardToDelete.sub_order_id, client_id: clientId },
+          params:  { dinein_order_id: cardToDelete.sub_order_id, client_id: clientId },
           headers: { Authorization: `Bearer ${token}` },
         }
       );
@@ -700,16 +624,16 @@ const KitchenDisplay = () => {
   };
 
 
-  // ─── Filter cards (sort already applied at fetch time) ───────────────────────
+  // ─── Filter + sort cards ──────────────────────────────────────────────────────
 
   const filteredCards = cards
     .filter((card) => {
-      if (orderFilter === KDS_CONFIG.FILTERS.ALL) return true;
-      const isTakeaway = KDS_CONFIG.TAKEAWAY_TABLE_IDS.includes(Number(card.table_id));
-      if (orderFilter === KDS_CONFIG.FILTERS.TAKEAWAY) return isTakeaway;
-      if (orderFilter === KDS_CONFIG.FILTERS.DINEIN) return !isTakeaway;
+      if (orderFilter === 'ALL') return true;
+      const isTakeaway = Number(card.table_id) === 500;
+      if (orderFilter === 'TAKEAWAY') return isTakeaway;
+      if (orderFilter === 'DINEIN')   return !isTakeaway;
       return true;
-    });
+    })
 
 
   // ─── Render ───────────────────────────────────────────────────────────────────
@@ -726,10 +650,11 @@ const KitchenDisplay = () => {
                 <button
                   key={key}
                   onClick={() => setOrderFilter(key)}
-                  className={`flex items-center gap-2 px-4 py-2 rounded-lg font-medium text-sm transition-all ${orderFilter === key
+                  className={`flex items-center gap-2 px-4 py-2 rounded-lg font-medium text-sm transition-all ${
+                    orderFilter === key
                       ? 'bg-action-primary text-text-white shadow-sm'
                       : 'bg-bg-tertiary text-text-secondary hover:text-text-primary border border-border-default'
-                    }`}
+                  }`}
                 >
                   <Icon size={16} />
                   {label}
@@ -786,4 +711,4 @@ const KitchenDisplay = () => {
   );
 };
 
-export default KitchenDisplay;
+export default KitchenDisplay_Super_User;

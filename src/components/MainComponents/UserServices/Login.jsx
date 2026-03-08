@@ -2,6 +2,13 @@ import React, { useState } from 'react';
 import { User, Lock, AlertCircle, CheckCircle } from 'lucide-react';
 import { useNavigate, useParams } from 'react-router-dom';
 import { APP_ROOT } from '../../config/pathConfig';
+
+const screenRouteMap = {
+  super_admin_v1: "customer-data",
+  default_user: "home",
+  ecommerce_user_v1:"home"
+};
+ 
 export default function LoginPage({ onLoginSuccess }) {
   const { clientId } = useParams()
   const [form, setForm] = useState({ username: '', password: '' });
@@ -57,12 +64,15 @@ export default function LoginPage({ onLoginSuccess }) {
 
       // Call the onLoginSuccess callback to update parent state
       if (onLoginSuccess) {
-        onLoginSuccess(token, screen_id);
+        onLoginSuccess(token, screen_id,clientId);
         setShowAnimation(true);
       }
+      const route = screenRouteMap[screen_id] || "home";
+
       setTimeout(() => {
-        navigate(`/${APP_ROOT}/${clientId}/home`, { replace: true });
-      }, 2000); // adjust timing for animation
+        navigate(`/${APP_ROOT}/${clientId}/${route}`, { replace: true });
+      }, 1000);
+      
     } catch (err) {
       console.error('Login failed:', err);
       setError(err.message || 'Login failed. Please try again.');
@@ -672,3 +682,12 @@ export default function LoginPage({ onLoginSuccess }) {
     </div>
   );
 }
+
+
+
+
+// =========================================================   Working ========================================================== //
+// =========================================================   Working ========================================================== //
+// =========================================================   Working ========================================================== //
+// =========================================================   Working ========================================================== //
+// =========================================================   Working ========================================================== //

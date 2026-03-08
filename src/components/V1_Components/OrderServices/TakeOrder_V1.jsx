@@ -1,1678 +1,1973 @@
-import React, { useState, useEffect, useRef } from 'react';
-import { ShoppingCart, Plus, Minus, X, Check, StickyNote, Search, Users, Package } from 'lucide-react';
+import React, { useState, useEffect, useRef, useCallback, useMemo } from 'react';
+import {
+  ShoppingCart, Plus, Minus, X, Check, Search,
+  Users, Package, Trash2, ArrowLeft, FileText,
+  Printer as PrinterIcon, Clock, Save,
+} from 'lucide-react';
+import { Eye, Lock, Printer } from 'lucide-react';
 import axios from 'axios';
+import { toast } from 'react-toastify';
 import CategoryTree from '../../MainComponents/InventoryServices/CategoryTree';
 import ImagePreview from '../../utils/ImagePreview';
-import { Eye, Lock, Printer } from 'lucide-react';
-import { useNavigate } from 'react-router-dom';
+import InvoiceModal from '../../MainComponents/BillingServices/InvoiceModal';
+import { getMenuConfig } from '../../utils/menuConfigResolver';
 
-const TABLE_STATUS_CONFIG = {
-    vacant: {
-        clickable: true,
-        bg: 'bg-action-success',
-        border: 'border-border-default',
-        badge: 'bg-green-100 text-action-success',
-        icon: null,
-    },
-    available: {
-        clickable: true,
-        bg: 'bg-action-success',
-        border: 'border-border-default',
-        badge: 'bg-green-100 text-green-700',
-        icon: null,
-    },
-    occupied: {
-        clickable: false,
-        bg: 'bg-action-primary',
-        border: 'border-action-primary',
-        badge: 'bg-red-100 text-action-primary',
-        icon: Eye,
-        viewable: true, // Add this flag
-    },
-    reserved: {
-        clickable: false,
-        bg: 'bg-yellow-50',
-        border: 'border-yellow-400',
-        badge: 'bg-yellow-100 text-yellow-700',
-        icon: Lock,
-    },
+// ─────────────────────────────────────────────────────────────────────────────
+// Constants
+// ─────────────────────────────────────────────────────────────────────────────
+
+const getEnvTableRoots = (envKey) => {
+  const value = import.meta.env[envKey];
+  if (!value) return [];
+  return value
+    .split(',')
+    .map(v => v.trim().toLowerCase())
+    .filter(Boolean);
+};
+// localStorage key prefix — drafts survive page refresh
+const DRAFT_STORAGE_KEY = 'takeorder_draft_';
+
+// ─────────────────────────────────────────────────────────────────────────────
+// Draft localStorage helpers
+// ─────────────────────────────────────────────────────────────────────────────
+
+function readDraft(tableId) {
+  try {
+    const raw = localStorage.getItem(DRAFT_STORAGE_KEY + tableId);
+    return raw ? JSON.parse(raw) : null;
+  } catch {
+    return null;
+  }
+}
+
+function writeDraft(tableId, data) {
+  try {
+    localStorage.setItem(DRAFT_STORAGE_KEY + tableId, JSON.stringify(data));
+  } catch {
+    // localStorage quota exceeded — fail silently
+  }
+}
+
+function deleteDraft(tableId) {
+  try {
+    localStorage.removeItem(DRAFT_STORAGE_KEY + tableId);
+  } catch {
+    // ignore
+  }
+}
+
+function getAllDraftTableIds() {
+  const ids = [];
+  try {
+    for (let i = 0; i < localStorage.length; i++) {
+      const key = localStorage.key(i);
+      if (key && key.startsWith(DRAFT_STORAGE_KEY)) {
+        ids.push(key.replace(DRAFT_STORAGE_KEY, ''));
+      }
+    }
+  } catch {
+    // ignore
+  }
+  return ids;
+}
+
+// ─────────────────────────────────────────────────────────────────────────────
+// ItemStatusBadge
+// ─────────────────────────────────────────────────────────────────────────────
+
+const ItemStatusBadge = ({ status }) => {
+  const cfg = {
+    pending: { bg: 'bg-blue-100', text: 'text-blue-700', label: 'Pending' },
+    preparing: { bg: 'bg-orange-100', text: 'text-orange-700', label: 'Preparing' },
+    ready: { bg: 'bg-green-100', text: 'text-green-700', label: 'Ready' },
+    served: { bg: 'bg-gray-100', text: 'text-gray-600', label: 'Served' },
+  }[status] || { bg: 'bg-gray-100', text: 'text-gray-500', label: status || '—' };
+
+  return (
+    <span className={`text-xs font-semibold px-2 py-0.5 rounded-full ${cfg.bg} ${cfg.text}`}>
+      {cfg.label}
+    </span>
+  );
 };
 
+// ─────────────────────────────────────────────────────────────────────────────
+// DeleteConfirmModal
+// ─────────────────────────────────────────────────────────────────────────────
 
-const NoteModal = ({ isOpen, onClose, itemName }) => {
-    if (!isOpen) return null;
-
-    return (
-        <div className="fixed inset-0 z-50 flex items-center justify-center p-4" style={{ backgroundColor: 'rgba(0,0,0,0.5)' }}>
-            <div className="rounded-lg max-w-md w-full p-6" style={{ backgroundColor: 'var(--color-bg-primary)' }}>
-                <h3 className="text-xl font-semibold mb-4" style={{ color: 'var(--color-text-primary)' }}>
-                    Add Note for {itemName}
-                </h3>
-
-                <div className="flex gap-3 mt-4">
-                    <button
-                        onClick={onClose}
-                        className="flex-1 px-4 py-2 border rounded-lg hover:bg-gray-50 transition-colors"
-                        style={{
-                            borderColor: 'var(--color-border-default)',
-                            backgroundColor: 'transparent',
-                            color: 'var(--color-text-primary)',
-                        }}
-                    >
-                        Cancel
-                    </button>
-                </div>
-            </div>
+const DeleteConfirmModal = ({ isOpen, onClose, onConfirm }) => {
+  if (!isOpen) return null;
+  return (
+    <div className="fixed inset-0 z-50 flex items-center justify-center p-4 bg-black/50">
+      <div className="rounded-lg w-full max-w-sm bg-white shadow-xl">
+        <div className="px-6 py-4 border-b flex justify-between items-center">
+          <h2 className="text-lg font-bold text-red-600">Delete Order</h2>
+          <button onClick={onClose} className="text-gray-500 hover:text-gray-700">
+            <X size={20} />
+          </button>
         </div>
-    );
-};
-
-// Line Items Modal Component
-const LineItemsModal = ({ isOpen, onClose, mainItem, lineItems, onAddWithLineItems, onAddMainOnly }) => {
-    if (!isOpen) return null;
-
-    return (
-        <div className="fixed inset-0 z-50 flex items-center justify-center p-4 bg-color-modalsbg" >
-            <div className="rounded-lg max-w-lg w-full p-6 bg-bg-primary">
-                <h3 className="text-xl font-semibold mb-2 text-text-primary">{mainItem?.name}</h3>
-                <p className="mb-4 text-text-secondary">Item add-ons : </p>
-
-                <div className="space-y-2 mb-6">
-                    {lineItems.map((item, index) => (
-                        <div key={item.id} className="flex justify-between items-center p-3 rounded-lg bg-bg-tertiary border-border-default">
-                            <span className='text-text-primary'>{index + 1}. {item.name}</span>
-                            <span className="font-semibold text-action-primary">Rs.{item.unit_price}</span>
-                        </div>
-                    ))}
-                </div>
-
-                <p className="text-text-secondary italic mb-4">
-                    Want add-ons?
-                </p>
-
-                <div className="flex gap-3">
-                    <button
-                        onClick={onClose}
-                        className="flex-1 px-4 py-2 rounded-lg transition-colors border-border-default bg-bg-tertiary text-text-primary">
-                        Cancel
-                    </button>
-                    <button
-                        onClick={onAddMainOnly}
-                        className="flex-1 px-4 py-2 rounded-lg transition-colors bg-action-primary text-text-white">
-                        Main Only
-                    </button>
-                    <button
-                        onClick={onAddWithLineItems}
-                        className="flex-1 px-4 py-2 rounded-lg transition-colors bg-action-primary text-text-white">
-                        With Add-ons
-                    </button>
-                </div>
-            </div>
+        <div className="px-6 py-5">
+          <p className="text-sm text-gray-700">Are you sure? This cannot be undone.</p>
         </div>
-    );
+        <div className="px-6 py-4 flex gap-3 bg-gray-50 rounded-b-lg">
+          <button
+            onClick={onClose}
+            className="flex-1 py-2.5 rounded-lg font-medium text-sm border border-gray-300 bg-white text-gray-700 hover:bg-gray-50"
+          >
+            Cancel
+          </button>
+          <button
+            onClick={() => { onConfirm(); onClose(); }}
+            className="flex-1 py-2.5 rounded-lg bg-red-600 text-white font-medium text-sm hover:bg-red-700"
+          >
+            Delete
+          </button>
+        </div>
+      </div>
+    </div>
+  );
 };
 
+// ─────────────────────────────────────────────────────────────────────────────
+// LineItemsModal
+// ─────────────────────────────────────────────────────────────────────────────
+
+const LineItemsModal = ({ isOpen, onClose, mainItem, lineItems, onAddWithSelectedAddons, onAddMainOnly }) => {
+  const [selectedAddons, setSelectedAddons] = useState([]);
+
+  useEffect(() => {
+    if (isOpen) setSelectedAddons([]);
+  }, [isOpen]);
+
+  const toggleAddon = (id) => {
+    setSelectedAddons(prev =>
+      prev.includes(id) ? prev.filter(x => x !== id) : [...prev, id]
+    );
+  };
+
+  if (!isOpen) return null;
+
+  return (
+    <div className="fixed inset-0 z-50 flex items-center justify-center p-4 bg-black/50">
+      <div className="rounded-lg max-w-lg w-full p-6 bg-bg-primary max-h-[80vh] overflow-y-auto">
+        <h3 className="text-xl font-semibold mb-2 text-text-primary">{mainItem?.name}</h3>
+        <p className="mb-4 text-text-secondary">Select add-ons:</p>
+
+        <div className="space-y-2 mb-6">
+          {lineItems.map(item => (
+            <div
+              key={item.id}
+              onClick={() => toggleAddon(item.id)}
+              className={`flex justify-between items-center p-3 rounded-lg cursor-pointer transition-all
+                ${selectedAddons.includes(item.id)
+                  ? 'bg-action-primary/10 border-2 border-action-primary'
+                  : 'bg-bg-tertiary border border-border-default hover:border-action-primary/50'}`}
+            >
+              <div className="flex items-center gap-3 flex-1">
+                <div
+                  className={`w-5 h-5 rounded border-2 flex items-center justify-center transition-all
+                    ${selectedAddons.includes(item.id)
+                      ? 'bg-action-primary border-action-primary'
+                      : 'border-gray-300'}`}
+                >
+                  {selectedAddons.includes(item.id) && <Check size={14} className="text-white" />}
+                </div>
+                <span className="text-text-primary font-medium">{item.name}</span>
+              </div>
+              <span className="font-semibold text-action-primary">₹{item.unit_price}</span>
+            </div>
+          ))}
+        </div>
+
+        <div className="flex gap-3">
+          <button
+            onClick={onClose}
+            className="flex-1 px-4 py-2 rounded-lg border border-border-default bg-bg-tertiary text-text-primary hover:bg-gray-100"
+          >
+            Cancel
+          </button>
+          <button
+            onClick={onAddMainOnly}
+            className="flex-1 px-4 py-2 rounded-lg bg-gray-600 text-white hover:bg-gray-700"
+          >
+            Main Only
+          </button>
+          <button
+            onClick={() => onAddWithSelectedAddons(selectedAddons)}
+            disabled={selectedAddons.length === 0}
+            className={`flex-1 px-4 py-2 rounded-lg transition-colors
+              ${selectedAddons.length > 0
+                ? 'bg-action-primary text-white hover:bg-action-danger'
+                : 'bg-gray-300 text-gray-500 cursor-not-allowed'}`}
+          >
+            Add ({selectedAddons.length})
+          </button>
+        </div>
+      </div>
+    </div>
+  );
+};
+
+// ─────────────────────────────────────────────────────────────────────────────
+// printKOT
+// Addons travel with their parent — never routed independently to any counter.
+// ─────────────────────────────────────────────────────────────────────────────
+
+const printKOT = ({ counterTree, categoriesFlat, itemsToPrint, meta }) => {
+  const getCategoryAncestors = (categoryId) => {
+    const ancestors = new Set();
+    let cur = categoryId;
+    const visited = new Set();
+    while (cur && !visited.has(cur)) {
+      visited.add(cur);
+      ancestors.add(cur);
+      const cat = categoriesFlat.find(c => c.id === cur);
+      cur = cat?.parentId || null;
+    }
+    return ancestors;
+  };
+
+  const counterCategoryMap = {};
+  counterTree.forEach(counter => {
+    counterCategoryMap[counter.id] = new Set(
+      (counter.subCategories || []).map(sc => sc.id)
+    );
+  });
+
+  const findCounterForItem = (item) => {
+    const ancestors = getCategoryAncestors(item.category_id || item.category);
+    for (const counter of counterTree) {
+      const assigned = counterCategoryMap[counter.id];
+      for (const catId of assigned) {
+        if (ancestors.has(catId)) return counter;
+      }
+    }
+    return null;
+  };
+
+  // Build addon map keyed by parent's frontend_unique_key
+  const addonsByParentKey = {};
+  itemsToPrint.forEach(item => {
+    if (item.is_addon && item.parent_item_key) {
+      if (!addonsByParentKey[item.parent_item_key]) {
+        addonsByParentKey[item.parent_item_key] = [];
+      }
+      addonsByParentKey[item.parent_item_key].push(item);
+    }
+  });
+
+  // Only route parent / standalone items to counters
+  const parentItems = itemsToPrint.filter(item => !item.is_addon);
+
+  const groups = {};
+  parentItems.forEach(item => {
+    const counter = findCounterForItem(item);
+    const key = counter ? counter.id : '__unassigned__';
+    const name = counter ? counter.name : 'General Kitchen';
+    if (!groups[key]) groups[key] = { counterName: name, items: [] };
+    groups[key].items.push({
+      ...item,
+      linkedAddons: addonsByParentKey[item.frontend_unique_key] || [],
+    });
+  });
+
+  const groupEntries = Object.entries(groups);
+  if (groupEntries.length === 0) {
+    toast.warn('No items to print KOT for.');
+    return;
+  }
+
+  const now = new Date();
+  const timeStr = now.toLocaleTimeString([], { hour: '2-digit', minute: '2-digit' });
+  const dateStr = now.toLocaleDateString();
+
+  const slipHtml = groupEntries.map(([, group]) => {
+    const rows = group.items.map(item => {
+      const mainRow = `
+        <tr>
+          <td style="padding:4px 2px;border-bottom:1px dashed #ccc;font-size:13px;font-weight:bold;">
+            ${item.name}
+          </td>
+          <td style="padding:4px 2px;border-bottom:1px dashed #ccc;font-size:13px;text-align:center;font-weight:bold;">
+            ${item.quantity}
+          </td>
+          ${item.note
+          ? `<td style="padding:4px 2px;border-bottom:1px dashed #ccc;font-size:11px;color:#555;font-style:italic;">${item.note}</td>`
+          : '<td></td>'}
+        </tr>
+      `;
+      const addonRows = (item.linkedAddons || []).map(addon => `
+        <tr>
+          <td style="padding:2px 2px 2px 16px;border-bottom:1px dashed #eee;font-size:11px;color:#555;">
+            ↳ ${addon.name}
+          </td>
+          <td style="padding:2px 2px;border-bottom:1px dashed #eee;font-size:11px;text-align:center;color:#555;">
+            ${addon.quantity}
+          </td>
+          <td></td>
+        </tr>
+      `).join('');
+      return mainRow + addonRows;
+    }).join('');
+
+    return `
+      <div class="kot-slip">
+        <div style="text-align:center;border-bottom:2px solid #000;padding-bottom:6px;margin-bottom:8px;">
+          <div style="font-size:16px;font-weight:bold;letter-spacing:1px;">KOT</div>
+          <div style="font-size:13px;font-weight:bold;margin-top:2px;">Counter: ${group.counterName}</div>
+        </div>
+        <div style="display:flex;justify-content:space-between;font-size:11px;margin-bottom:6px;">
+          <span>${meta.orderMode === 'takeaway' ? '🛍 Takeaway' : `Table: ${meta.tableNumber}`}</span>
+          <span>${dateStr} ${timeStr}</span>
+        </div>
+        ${meta.dineinOrderId
+        ? `<div style="font-size:11px;margin-bottom:6px;color:#555;">Order #${meta.dineinOrderId}</div>`
+        : ''}
+        <table style="width:100%;border-collapse:collapse;">
+          <thead>
+            <tr style="border-bottom:2px solid #000;">
+              <th style="text-align:left;font-size:12px;padding:3px 2px;">Item</th>
+              <th style="text-align:center;font-size:12px;padding:3px 2px;">Qty</th>
+              <th style="text-align:left;font-size:12px;padding:3px 2px;">Note</th>
+            </tr>
+          </thead>
+          <tbody>${rows}</tbody>
+        </table>
+        <div style="text-align:center;margin-top:10px;font-size:11px;color:#888;">— End of KOT —</div>
+      </div>
+    `;
+  }).join('<div class="page-break"></div>');
+
+  const printWindow = window.open('', '_blank', 'width=400,height=600');
+  if (!printWindow) {
+    toast.error('Popup blocked. Please allow popups to print KOT.');
+    return;
+  }
+  printWindow.document.write(`
+    <!DOCTYPE html><html><head><title>KOT</title>
+    <style>
+      * { margin: 0; padding: 0; box-sizing: border-box; }
+      body { font-family: 'Courier New', monospace; background: #fff; }
+      .kot-slip { width: 72mm; padding: 8px; margin: 0 auto; }
+      .page-break { page-break-after: always; }
+      @media print {
+        body { -webkit-print-color-adjust: exact; }
+        .kot-slip { page-break-inside: avoid; }
+        .page-break { page-break-after: always; height: 0; }
+      }
+    </style></head><body>
+    ${slipHtml}
+    <script>
+      window.onload = function() {
+        window.print();
+        window.onafterprint = function() { window.close(); };
+      };
+    <\/script>
+    </body></html>
+  `);
+  printWindow.document.close();
+};
+
+// ─────────────────────────────────────────────────────────────────────────────
+// OldItemRow — previously placed items (read-only in cart)
+// ─────────────────────────────────────────────────────────────────────────────
+
+const OldItemRow = ({ group, clientId, token, activeDineinOrderId }) => {
+  const { main, addons } = group;
+  return (
+    <div className="space-y-1">
+      <div className="flex items-start gap-2 p-3 rounded-xl border bg-white shadow-sm">
+        <div className="flex items-center gap-3 flex-1 min-w-0">
+          <div className="w-11 h-11 rounded-lg overflow-hidden border bg-white shrink-0">
+            <ImagePreview
+              clientId={clientId}
+              imageId={main.image_id}
+              token={token}
+              alt={main.name}
+              baseUrl={import.meta.env.VITE_API_DOCUMENT_SERVICE_URL}
+              urlBuilder={({ baseUrl, clientId, imageId }) =>
+                `${baseUrl}/${clientId}/document/download?doc_id=${imageId}`}
+              className="w-full h-full object-cover"
+            />
+          </div>
+          <div className="min-w-0 flex-1">
+            <h4 className="text-sm font-semibold truncate text-gray-800">{main.name}</h4>
+            <p className="text-xs font-bold text-action-primary">
+              ₹{(main.unit_price - (main.discount || 0)).toFixed(2)}
+            </p>
+            <div className="flex items-center gap-1.5 mt-1 flex-wrap">
+              {main.batch_label && main.batch_label !== activeDineinOrderId && (
+                <span className="text-xs text-orange-500 font-mono font-semibold">
+                  #{main.batch_label}
+                </span>
+              )}
+              {main.status && <ItemStatusBadge status={main.status} />}
+            </div>
+          </div>
+        </div>
+        <span className="text-sm font-semibold text-gray-500 self-center">×{main.quantity}</span>
+      </div>
+
+      {addons.map(addon => (
+        <div
+          key={addon.frontend_unique_key || addon.id}
+          className="flex items-center gap-2 p-2 pl-8 rounded-lg border border-dashed bg-blue-50/50"
+        >
+          <span className="text-xs text-blue-600">↳</span>
+          <span className="text-sm text-gray-700 truncate flex-1">{addon.name}</span>
+          <span className="text-xs font-semibold text-blue-600">
+            ₹{(addon.unit_price - (addon.discount || 0)).toFixed(2)}
+          </span>
+          <span className="text-xs text-gray-500 w-6 text-center">×{addon.quantity}</span>
+        </div>
+      ))}
+    </div>
+  );
+};
+
+// ─────────────────────────────────────────────────────────────────────────────
+// NewItemRow — newly added items (editable quantity / removable)
+// ─────────────────────────────────────────────────────────────────────────────
+
+const NewItemRow = ({ group, clientId, token, onUpdateQuantity, onRemove }) => {
+  const { main, addons } = group;
+  return (
+    <div className="space-y-1">
+      <div className="flex items-center gap-2 p-3 rounded-xl border bg-orange-50 shadow-sm">
+        <div className="flex items-center gap-3 flex-1 min-w-0">
+          <div className="w-11 h-11 rounded-lg overflow-hidden border bg-white shrink-0">
+            <ImagePreview
+              clientId={clientId}
+              imageId={main.image_id}
+              token={token}
+              alt={main.name}
+              baseUrl={import.meta.env.VITE_API_DOCUMENT_SERVICE_URL}
+              urlBuilder={({ baseUrl, clientId, imageId }) =>
+                `${baseUrl}/${clientId}/document/download?doc_id=${imageId}`}
+              className="w-full h-full object-cover"
+            />
+          </div>
+          <div className="min-w-0 flex-1">
+            <h4 className="text-sm font-semibold truncate text-gray-800">{main.name}</h4>
+            <p className="text-xs font-bold text-action-primary">
+              ₹{(main.unit_price - (main.discount || 0)).toFixed(2)}
+            </p>
+          </div>
+        </div>
+
+        <div className="flex items-center gap-1">
+          <button
+            onClick={() => onUpdateQuantity(main.id, -1, main.frontend_unique_key)}
+            className="w-7 h-7 flex items-center justify-center border rounded hover:bg-gray-100"
+          >
+            <Minus size={14} />
+          </button>
+          <span className="w-6 text-center text-sm font-semibold">{main.quantity}</span>
+          <button
+            onClick={() => onUpdateQuantity(main.id, 1, main.frontend_unique_key)}
+            className="w-7 h-7 flex items-center justify-center border rounded hover:bg-gray-100"
+          >
+            <Plus size={14} />
+          </button>
+        </div>
+
+        <button
+          onClick={() => onRemove(main.id, main.frontend_unique_key)}
+          className="text-action-primary hover:text-red-700"
+        >
+          <X size={16} />
+        </button>
+      </div>
+
+      {addons.map(addon => (
+        <div
+          key={addon.frontend_unique_key}
+          className="flex items-center gap-2 p-2 pl-8 rounded-lg border border-dashed bg-orange-100/50"
+        >
+          <span className="text-xs text-orange-600">↳</span>
+          <span className="text-sm text-gray-700 truncate flex-1">{addon.name}</span>
+          <span className="text-xs font-semibold text-orange-600">
+            ₹{(addon.unit_price - (addon.discount || 0)).toFixed(2)}
+          </span>
+          <span className="text-xs text-gray-500 w-6 text-center">×{addon.quantity}</span>
+        </div>
+      ))}
+    </div>
+  );
+};
+
+
+
+// ─────────────────────────────────────────────────────────────────────────────
+// TakeOrder — main component
+// ─────────────────────────────────────────────────────────────────────────────
 
 const TakeOrder_V1 = ({ clientId, token, onOrderUpdate, realm }) => {
-    const [searchOpen, setSearchOpen] = useState(false);
-    const [searchQuery, setSearchQuery] = useState('');
-    const searchInputRef = useRef(null);
-    const [selectedCategory, setSelectedCategory] = useState('All Categories');
-    const [selectedTable, setSelectedTable] = useState('');
-    const [cart, setCart] = useState([]);
-    const [showCart, setShowCart] = useState(true);
-    const [orderPlaced, setOrderPlaced] = useState(false);
-    const [tables, setTables] = useState([]);
-    const [categories, setCategories] = useState([]);
-    const [menuItems, setMenuItems] = useState([]);
-    const [loading, setLoading] = useState(true);
-    const [isPlacingOrder, setIsPlacingOrder] = useState(false);
-    const [noteModalOpen, setNoteModalOpen] = useState(false);
-    const [currentItemForNote, setCurrentItemForNote] = useState(null);
-    const [lineItemsModalOpen, setLineItemsModalOpen] = useState(false);
-    const [selectedMainItem, setSelectedMainItem] = useState(null);
-    const [lineItemsDetails, setLineItemsDetails] = useState([]);
-    const [orderMode, setOrderMode] = useState('takeaway');
-    const [currentView, setCurrentView] = useState('order');
-    const [tableModeMap, setTableModeMap] = useState({});
 
-    const isPlacingRef = useRef(false);
-    const isMobile = window.matchMedia('(max-width: 1024px)').matches;
-    const [showClearConfirm, setShowClearConfirm] = useState(false);
-    const [showOrderPage, setShowOrderPage] = useState(false);
-
-    const [activeOrderId, setActiveOrderId] = useState(null);
-    const [hasNewItems, setHasNewItems] = useState(false);
-    const [currentBatchTimestamp, setCurrentBatchTimestamp] = useState(null);
-    const [isOrderFormOpen, setIsOrderFormOpen] = useState(false);
-    const [tableOrders, setTableOrders] = useState({});
-    const navigate = useNavigate();
-    // ============ UTILITY FUNCTIONS ============
-    const flattenCategoryTree = (tree, level = 0, parentId = null) => {
-        let flatList = [];
-        tree.forEach(category => {
-            flatList.push({
-                id: category.id,
-                name: category.name,
-                level: level,
-                parentId: parentId,
-                hasChildren: category.subCategories && category.subCategories.length > 0,
-            });
-            if (category.subCategories && category.subCategories.length > 0) {
-                flatList = flatList.concat(
-                    flattenCategoryTree(category.subCategories, level + 1, category.id)
-                );
-            }
-        });
-        return flatList;
-    };
-
-    const generateSlug = (text) =>
-        "_" + text.trim().replace(/[^a-zA-Z0-9\s]/g, "").replace(/\s+/g, "_");
-
-    const getCategoryAndChildrenNames = (categories, targetName) => {
-        const result = new Set();
-        const traverse = (nodes, found = false) => {
-            for (const node of nodes) {
-                const isTarget = node.name === targetName;
-                if (isTarget || found) {
-                    result.add(node.name);
-                }
-                if (node.children && node.children.length > 0) {
-                    traverse(node.children, found || isTarget);
-                }
-            }
-        };
-        traverse(categories);
-        return Array.from(result);
-    };
-    const normalizeTableName = (value = "") =>
-        value
-          .toLowerCase()
-          .trim()
-          .replace(/[_\-()]/g, " ")     // replace _ - ( )
-          .replace(/[^a-z\s]/g, "")     // remove symbols/numbers
-          .replace(/\s+/g, " ");        // normalize spaces
-      
-      const fetchTables = async () => {
-        try {
-          const res = await axios.get(
-            `${import.meta.env.VITE_API_TABLE_SERVICE_URL}/${clientId}/tables/read`,
-            { headers: { Authorization: `Bearer ${token}` } }
-          );
-      
-          const tableList = Array.isArray(res.data?.data)
-            ? res.data.data.map(t => ({
-                ...t,
-                table_number: t.name || t.table_number || "-",
-              }))
-            : [];
-      
-          const modeMap = {};
-      
-          tableList.forEach(t => {
-            const normalized = normalizeTableName(t.name);
-      
-            if (normalized.includes("delivery")) {
-              modeMap[t.id] = "delivery";
-            }
-            else if (
-              normalized.includes("takeaway") ||
-              normalized.includes("take away") ||
-              normalized.includes("pickup") ||
-              normalized.includes("pick up")
-            ) {
-              modeMap[t.id] = "takeaway";
-            }
-            else {
-              modeMap[t.id] = "dinein";
-            }
-          });
-      
-          // Sort tables naturally
-          tableList.sort((a, b) =>
-            a.table_number.localeCompare(b.table_number, undefined, { numeric: true })
-          );
-      
-          setTables(tableList);
-          setTableModeMap(modeMap);
-      
-          // 🔍 Debug once (remove later)
-          console.table(
-            tableList.map(t => ({
-              id: t.id,
-              name: t.name,
-              normalized: normalizeTableName(t.name),
-              mode: modeMap[t.id],
-            }))
-          );
-      
-          await fetchTableOrders(tableList);
-      
-        } catch (error) {
-          console.error("❌ Error fetching tables:", error);
-        }
-      };
-      
-
-    const fetchTableOrders = async (tableList) => {
-        try {
-            const response = await axios.get(
-                `${import.meta.env.VITE_API_ORDER_SERVICE_URL}/${clientId}/dinein/table`,
-                { headers: { Authorization: `Bearer ${token}` } }
-            );
-
-            const allOrders = response.data?.data || [];
-            const ordersMap = {};
-
-            tableList.forEach(table => {
-                if (table.status?.toLowerCase() === 'active') {
-                    const tableOrder = allOrders
-                        .filter(o => o.table_id === table.id && o.status?.toLowerCase() !== 'served')
-                        .sort((a, b) => new Date(b.created_at) - new Date(a.created_at))[0];
-
-                    if (tableOrder) {
-                        ordersMap[table.id] = {
-                            id: tableOrder.id,
-                            status: tableOrder.status,
-                            order_mode: tableOrder.order_type || 'dinein',
-                            created_at: tableOrder.created_at,
-                        };
-                    }
-                }
-            });
-
-            setTableOrders(ordersMap);
-        } catch (err) {
-            console.error("Failed to fetch table orders:", err);
-        }
-    };
-
-    useEffect(() => {
-        setIsOrderFormOpen(showCart);
-    }, [showCart]);
-
-    useEffect(() => {
-        window.history.pushState({ view: 'floor' }, '');
-    }, []);
-    const getTableIdByMode = (mode) => {
-        if (!tables.length) return null;
-      
-        // 1️⃣ First: mode map (preferred)
-        const byMap = tables.find(t => tableModeMap[t.id] === mode);
-        if (byMap) return byMap.id;
-      
-        // 2️⃣ Fallback: normalize name
-        const fallback = tables.find(t => {
-          const name = (t.name || "").toLowerCase();
-          if (mode === "takeaway") {
-            return name.includes("takeaway") || name.includes("pickup");
-          }
-          if (mode === "delivery") {
-            return name.includes("delivery");
-          }
-          return false;
-        });
-      
-        return fallback?.id || null;
-      };
-      
-
-    useEffect(() => {
-        const fetchData = async () => {
-            if (!clientId || !token) {
-                setLoading(false);
-                return;
-            }
-
-            try {
-                setLoading(true);
-                await fetchTables();
-
-                const [catRes, itemRes] = await Promise.all([
-                    axios.get(
-                        `${import.meta.env.VITE_API_INVENTORY_SERVICE_URL}/${clientId}/menu/read_category?category_id=dietery`,
-                        { headers: { Authorization: `Bearer ${token}` } }
-                    ),
-                    axios.get(
-                        `${import.meta.env.VITE_API_INVENTORY_SERVICE_URL}/${clientId}/menu/read?realm=${realm}`,
-                        { headers: { Authorization: `Bearer ${token}` } }
-                    )
-                ]);
-
-                const fullTree = catRes.data.data.filter(
-                    c => c.name?.toLowerCase() !== "all"
-                );
-
-                const subcategoryIds = new Set();
-                fullTree.forEach(cat =>
-                    cat.subCategories?.forEach(sub => subcategoryIds.add(sub.id))
-                );
-
-                const topLevelCategories = fullTree.filter(
-                    cat => !subcategoryIds.has(cat.id)
-                );
-
-                const flatCategories = flattenCategoryTree(topLevelCategories);
-
-                const enrichedItems = itemRes.data.data.map(item => {
-                    const cat = flatCategories.find(c => c.id === item.category_id);
-                    return { ...item, category: cat?.name || "Uncategorized" };
-                });
-
-                setMenuItems(enrichedItems);
-
-                const buildCategoryTree = () => {
-                    const map = new Map();
-
-                    flatCategories.forEach(cat => {
-                        map.set(cat.id, {
-                            ...cat,
-                            count: enrichedItems.filter(i =>
-                                cat.name === "All Categories"
-                                    ? true
-                                    : i.category === cat.name
-                            ).length,
-                            children: []
-                        });
-                    });
-
-                    const tree = [];
-                    map.forEach(cat => {
-                        if (cat.parentId && map.has(cat.parentId)) {
-                            map.get(cat.parentId).children.push(cat);
-                        } else {
-                            tree.push(cat);
-                        }
-                    });
-
-                    return tree;
-                };
-
-                const tree = buildCategoryTree().map(cat => {
-                    if (cat.id === 'dietery' || cat.name?.toLowerCase() === 'dietery') {
-                        return {
-                            ...cat,
-                            name: 'All Categories',
-                            count: enrichedItems.length
-                        };
-                    }
-                    return cat;
-                });
-
-                setCategories(tree);
-
-            } catch (err) {
-                console.error("Fetch error:", err);
-            } finally {
-                setLoading(false);
-            }
-        };
-
-        fetchData();
-    }, [clientId, token, realm]);
-
-    useEffect(() => {
-        if (!activeOrderId || menuItems.length === 0 || cart.length === 0) return;
-
-        setCart(prev =>
-            prev.map(item => {
-                if (item.name !== 'Unnamed Item') return item;
-                const menuItem = menuItems.find(
-                    mi => Number(mi.id) === Number(item.id)
-                );
-
-                if (!menuItem) return item;
-
-                return {
-                    ...item,
-                    name: menuItem.name,
-                    unit_price: menuItem.unit_price,
-                    image_id: menuItem.image_id,
-                    discount: menuItem.discount || 0,
-                    slug: menuItem.slug,
-                    category: menuItem.category,
-                };
-            })
-        );
-    }, [menuItems, activeOrderId]);
-
-    useEffect(() => {
-        if (searchOpen && searchInputRef.current) {
-            const t = setTimeout(() => searchInputRef.current.focus(), 80);
-            return () => clearTimeout(t);
-        }
-    }, [searchOpen]);
-
-    useEffect(() => {
-        const onKey = (e) => {
-            if (e.key === 'Escape') {
-                setSearchOpen(false);
-            }
-        };
-        window.addEventListener('keydown', onKey);
-        return () => window.removeEventListener('keydown', onKey);
-    }, []);
-
-    const getFilteredItems = () => {
-        const q = (searchQuery || '').trim().toLowerCase();
-        let items = menuItems;
-
-        if (selectedCategory && selectedCategory !== 'All Categories') {
-            const allowedCategories = getCategoryAndChildrenNames(
-                categories,
-                selectedCategory
-            );
-            items = items.filter(item =>
-                allowedCategories.includes(item.category)
-            );
-        }
-
-        if (!q) return items;
-
-        return items.filter(item => {
-            const name = (item.name || '').toLowerCase();
-            const category = (item.category || '').toLowerCase();
-            const code = String(item.code || '').toLowerCase();
-
-            return (
-                name.includes(q) ||
-                category.includes(q) ||
-                code.includes(q)
-            );
-        });
-    };
-
-    const filteredItems = getFilteredItems();
-
-    const handleItemClick = (item) => {
-        if (item.line_item_id && Array.isArray(item.line_item_id) && item.line_item_id.length > 0) {
-            const lineItems = item.line_item_id
-                .map(id => menuItems.find(i => i.id === id))
-                .filter(Boolean);
-
-            setSelectedMainItem(item);
-            setLineItemsDetails(lineItems);
-            setLineItemsModalOpen(true);
-        } else {
-            addToCart(item);
-        }
-    };
-
-    // ✅ FIXED: Always create new cart entry when editing existing order
-    const addToCart = (item) => {
-        setHasNewItems(true);
-
-        const timestamp = Date.now() + Math.random();
-        const uniqueKey = `${item.id}_${timestamp}`;
-
-        let batchTimestamp = currentBatchTimestamp;
-
-        // Create new batch if not exists
-        if (!batchTimestamp) {
-            batchTimestamp = Date.now();
-            setCurrentBatchTimestamp(batchTimestamp);
-
-            if (activeOrderId) {
-                localStorage.setItem(
-                    `order_${activeOrderId}_batch_${batchTimestamp}`,
-                    JSON.stringify({
-                        timestamp: batchTimestamp,
-                        started_at: Date.now(),
-                    })
-                );
-            }
-        }
-
-        // ✅ KEY FIX: When editing existing order, ALWAYS create new cart entry
-        if (activeOrderId) {
-            // For existing orders, always add as new item with unique key
-            const cartItem = {
-                id: Number(item.id),
-                name: item.name,
-                unit_price: item.unit_price || 0,
-                image_id: item.image_id,
-                discount: item.discount || 0,
-                slug: item.slug,
-                category: item.category,
-                quantity: 1,
-                note: "",
-                frontend_unique_key: uniqueKey,
-                batch_timestamp: batchTimestamp,
-                is_new_item: true,
-            };
-
-            setCart(prev => [...prev, cartItem]);
-
-            // Save to localStorage
-            localStorage.setItem(
-                `order_${activeOrderId}_new_item_${uniqueKey}`,
-                JSON.stringify({
-                    item_id: item.id,
-                    unique_key: uniqueKey,
-                    added_at: timestamp,
-                    batch_timestamp: batchTimestamp,
-                    quantity: 1,
-                })
-            );
-        } else {
-            // For new orders, allow quantity increase
-            const existingItem = cart.find(i => i.id === item.id && !i.frontend_unique_key);
-
-            if (existingItem) {
-                setCart(cart.map(i =>
-                    i.id === item.id && !i.frontend_unique_key
-                        ? { ...i, quantity: i.quantity + 1 }
-                        : i
-                ));
-            } else {
-                const cartItem = {
-                    id: Number(item.id),
-                    name: item.name,
-                    unit_price: item.unit_price || 0,
-                    image_id: item.image_id,
-                    discount: item.discount || 0,
-                    slug: item.slug,
-                    category: item.category,
-                    quantity: 1,
-                    note: "",
-                };
-                setCart(prev => [...prev, cartItem]);
-            }
-        }
-
-        if (!isMobile) setShowCart(true);
-    };
-
-    const clearDraftForOrder = (orderId) => {
-        if (!orderId) return;
-        Object.keys(localStorage).forEach(key => {
-            if (
-                key.startsWith(`order_${orderId}_new_item_`) ||
-                key.startsWith(`order_${orderId}_batch_`)
-            ) {
-                localStorage.removeItem(key);
-            }
-        });
-    };
-
-    const handleAddMainItemWithLineItems = () => {
-        if (!selectedMainItem) return;
-
-        const mainItemCopy = { ...selectedMainItem };
-        const existingMainItem = cart.find(i => i.id === mainItemCopy.id);
-
-        if (existingMainItem) {
-            setCart(cart.map(i =>
-                i.id === mainItemCopy.id ? { ...i, quantity: i.quantity + 1 } : i
-            ));
-        } else {
-            setCart(prev => [...prev, { ...mainItemCopy, quantity: 1, note: "" }]);
-        }
-
-        lineItemsDetails.forEach(lineItem => {
-            const existingLineItem = cart.find(i => i.id === lineItem.id);
-
-            if (existingLineItem) {
-                setCart(prev =>
-                    prev.map(i =>
-                        i.id === lineItem.id
-                            ? { ...i, quantity: i.quantity + 1 }
-                            : i
-                    )
-                );
-            } else {
-                setCart(prev => [
-                    ...prev,
-                    {
-                        id: Number(lineItem.id),
-                        name: lineItem.name,
-                        unit_price: lineItem.unit_price,
-                        image_id: lineItem.image_id,
-                        discount: lineItem.discount || 0,
-                        slug: lineItem.slug,
-                        category: lineItem.category,
-                        quantity: 1,
-                        note: "",
-                    }
-                ]);
-            }
-        });
-
-        setLineItemsModalOpen(false);
-        setSelectedMainItem(null);
-        setLineItemsDetails([]);
-    };
-
-    const handleAddMainItemOnly = () => {
-        if (!selectedMainItem) return;
-
-        const mainItemCopy = { ...selectedMainItem };
-        const existingMainItem = cart.find(i => i.id === mainItemCopy.id);
-
-        if (existingMainItem) {
-            setCart(cart.map(i =>
-                i.id === mainItemCopy.id ? { ...i, quantity: i.quantity + 1 } : i
-            ));
-        } else {
-            setCart(prev => [
-                ...prev,
-                {
-                    id: Number(mainItemCopy.id),
-                    name: mainItemCopy.name || mainItemCopy.item_name || 'Unnamed Item',
-                    unit_price: mainItemCopy.unit_price || 0,
-                    image_id: mainItemCopy.image_id,
-                    discount: mainItemCopy.discount || 0,
-                    slug: mainItemCopy.slug,
-                    category: mainItemCopy.category,
-                    quantity: 1,
-                    note: "",
-                }
-            ]);
-        }
-
-        setLineItemsModalOpen(false);
-        setSelectedMainItem(null);
-        setLineItemsDetails([]);
-    };
-
-    const openNoteEditor = (item) => {
-        setCurrentItemForNote(item);
-        setNoteModalOpen(true);
-    };
-
-    const saveNoteToItem = (noteText) => {
-        setCart(cart.map(i =>
-            i.id === currentItemForNote.id ? { ...i, note: noteText } : i
-        ));
-    };
-
-    const removeFromCart = (itemId, uniqueKey = null) => {
-        setHasNewItems(true);
-
-        if (uniqueKey && activeOrderId) {
-            // 🔥 REMOVE FROM localStorage
-            localStorage.removeItem(`order_${activeOrderId}_new_item_${uniqueKey}`);
-
-            setCart(prev =>
-                prev.filter(i => i.frontend_unique_key !== uniqueKey)
-            );
-        } else {
-            setCart(prev => prev.filter(i => i.id !== itemId));
-        }
-    };
-
-
-    const updateQuantity = (itemId, change, uniqueKey = null) => {
-        setHasNewItems(true);
-
-        setCart(prev =>
-            prev
-                .map(item => {
-                    const isMatch = uniqueKey
-                        ? item.frontend_unique_key === uniqueKey
-                        : item.id === itemId && !item.frontend_unique_key;
-
-                    if (!isMatch) return item;
-
-                    const qty = item.quantity + change;
-                    if (qty <= 0) return null;
-
-                    // 🔥 UPDATE localStorage quantity
-                    if (uniqueKey && activeOrderId) {
-                        const key = `order_${activeOrderId}_new_item_${uniqueKey}`;
-                        const stored = JSON.parse(localStorage.getItem(key));
-                        if (stored) {
-                            localStorage.setItem(
-                                key,
-                                JSON.stringify({ ...stored, quantity: qty })
-                            );
-                        }
-                    }
-
-                    return { ...item, quantity: qty };
-                })
-                .filter(Boolean)
-        );
-    };
-
-
-    const getTotalPrice = () => {
-        return cart.reduce((total, item) =>
-            total + ((item.unit_price || 0) * item.quantity), 0
-        ).toFixed(2);
-    };
-
-    const handlePlaceOrder = async () => {
-        if (isPlacingRef.current || !canPlaceOrder) return;
-
-        isPlacingRef.current = true;
-        setIsPlacingOrder(true);
-
-        try {
-            const subtotal = cart.reduce(
-                (s, i) => s + (i.unit_price || 0) * i.quantity,
-                0
-            );
-
-        
-
-            const headers = { Authorization: `Bearer ${token}` };
-
-            if (activeOrderId) {
-                // Update existing order
-                await axios.post(
-                    `${import.meta.env.VITE_API_ORDER_SERVICE_URL}/${clientId}/order_items/update?order_id=${activeOrderId}`,
-                    cart.map(i => ({
-                        client_id: clientId,
-                        item_id: i.id,
-                        order_id: activeOrderId,
-                        item_name: i.name,
-                        quantity: i.quantity,
-                        unit_price: i.unit_price,
-                        line_total: i.unit_price * i.quantity,
-                        status: "ready",
-                    })),
-                    { headers }
-                );
-
-                await axios.post(
-                    `${import.meta.env.VITE_API_ORDER_SERVICE_URL}/${clientId}/dinein/update`,
-                    {
-                        id: activeOrderId,
-                        status: "ready",
-                        total_price: subtotal
-                      }
-                      ,
-                    { headers }
-                );
-            } else {
-                // Create new order - Get table ID
-                const tableId = getTableIdByMode(orderMode);
-
-                if (!tableId) {
-                    const availableTables = tables.map(t => `"${t.name}" (ID: ${t.id})`).join(', ');
-                    const errorMsg = `Cannot find table for "${orderMode}" mode.\n\n` +
-                        `Please ensure you have a table with:\n` +
-                        `- "delivery" in its name for Delivery orders\n` +
-                        `- "takeaway" or "pickup" in its name for Takeaway orders\n\n` +
-                        `Available tables: ${availableTables}`;
-
-                    alert(errorMsg);
-                    console.error('Table lookup failed:', {
-                        orderMode,
-                        tableModeMap,
-                        availableTables: tables
-                    });
-                    return;
-                }
-
-                console.log(`✅ Creating order for ${orderMode} using table ID: ${tableId}`);
-
-                // Create new order
-                await axios.post(
-                    `${import.meta.env.VITE_API_ORDER_SERVICE_URL}/${clientId}/dinein/create`,
-                    {
-                        table_id: Number(tableId),
-                        total_price: Number(subtotal),
-                        status: "ready",
-                        items: cart.map(i => ({
-                          item_id: Number(i.id),
-                          item_name: i.name,
-                          slug: i.name ? generateSlug(i.name) : `item_${i.id}`,
-                          quantity: Number(i.quantity || 1),
-                          unit_price: Number(i.unit_price || 0),
-                          line_total: Number((i.unit_price || 0) * (i.quantity || 1)),                         
-                            status: "ready",
-                            frontend_unique_key: i.frontend_unique_key ?? null,
-                        }))
-                    },
-                    { headers }
-                );
-            }
-
-            const tableToUpdate = tables.find(t => t.id.toString() === selectedTable);
-            if (tableToUpdate) {
-                await axios.post(
-                    `${import.meta.env.VITE_API_TABLE_SERVICE_URL}/${clientId}/tables/update`,
-                    {
-                        ...tableToUpdate,
-                        id: Number(selectedTable),
-                        status: "active",
-                        table_type: String(tableToUpdate.table_type ?? "1")
-                    },
-                    { headers }
-                );
-            }
-
-            await fetchTables();
-
-            // Clear batch tracking after successful order
-            if (activeOrderId && currentBatchTimestamp) {
-                Object.keys(localStorage).forEach(key => {
-                    if (key.startsWith(`order_${activeOrderId}_batch_${currentBatchTimestamp}`)) {
-                        localStorage.removeItem(key);
-                    }
-                });
-            }
-
-            setCart([]);
-            setActiveOrderId(null);
-            setShowCart(false);
-            setCurrentView("order");
-            setCurrentBatchTimestamp(null);
-            setHasNewItems(false);
-
-            console.log('✅ Order placed successfully!');
-
-        } catch (err) {
-            console.error("❌ ORDER ERROR:", err);
-            console.error("Error details:", err.response?.data || err.message);
-            alert(`Order failed: ${err.response?.data?.message || err.message}`);
-        } finally {
-            isPlacingRef.current = false;
-            setIsPlacingOrder(false);
-        }
-    };
-
-    const handleTableSelect = (table) => {
-        setSelectedTable(table.id.toString());
-        setCurrentView('order');
-        window.history.pushState({ view: 'order' }, '');
-    };
-
-    const handleClearCart = () => {
-        if (cart.length === 0) return;
-        setShowClearConfirm(true);
-    };
-
-    const confirmClearCart = () => {
-        setCart([]);
-        setSelectedTable('');
-        setShowOrderPage(false);
-        setCurrentView('order');
-        setShowCart(false);
-        setShowClearConfirm(false);
-        setActiveOrderId(null);
-        setCurrentBatchTimestamp(null);
-        setHasNewItems(false);
-    };
-
-    const handleViewOrder = async (table) => {
-        if (menuItems.length === 0) {
-            alert("Menu is still loading, please wait...");
-            return;
-        }
-
-        try {
-            setLoading(true);
-
-            const response = await axios.get(
-                `${import.meta.env.VITE_API_ORDER_SERVICE_URL}/${clientId}/dinein/table`,
-                { headers: { Authorization: `Bearer ${token}` } }
-            );
-
-            const allOrders = response.data?.data || [];
-            const tableOrders = allOrders.filter(
-                o => o.table_id === table.id && o.status?.toLowerCase() !== 'served'
-            );
-
-            if (tableOrders.length === 0) {
-                alert('No active order for this table');
-                return;
-            }
-
-            const activeOrder = tableOrders.sort(
-                (a, b) => new Date(b.created_at) - new Date(a.created_at)
-            )[0];
-
-            setActiveOrderId(activeOrder.id);
-            setCurrentBatchTimestamp(null);
-            setHasNewItems(false);
-            setCurrentBatchTimestamp(null);
-
-            // ✅ Group items by their batch timestamp
-            const batchGroups = {};
-
-            (activeOrder.items || []).forEach(item => {
-                const itemId = Number(item.item_id);
-                const menuItem = menuItems.find(mi => Number(mi.id) === itemId);
-                const frontendKey = item.frontend_unique_key;
-
-                // Determine batch timestamp
-                let batchTimestamp = null;
-                if (frontendKey) {
-                    // Extract timestamp from unique key (format: itemId_timestamp)
-                    const parts = frontendKey.split('_');
-                    batchTimestamp = parts[parts.length - 1];
-                }
-
-                const cartItem = {
-                    id: itemId,
-                    name: item.item_name || menuItem?.name || 'Unnamed Item',
-                    unit_price: item.unit_price || menuItem?.unit_price || 0,
-                    quantity: item.quantity || 1,
-                    note: item.note || '',
-                    image_id: menuItem?.image_id,
-                    discount: menuItem?.discount || 0,
-                    slug: item.slug || menuItem?.slug,
-                    category: menuItem?.category,
-                    frontend_unique_key: frontendKey,
-                    batch_timestamp: batchTimestamp,
-                };
-
-                // Group by batch or "original" for items without batch
-                const groupKey = batchTimestamp || 'original';
-                if (!batchGroups[groupKey]) {
-                    batchGroups[groupKey] = [];
-                }
-                batchGroups[groupKey].push(cartItem);
-            });
-
-            // Flatten groups back to cart array, maintaining batch order
-            const sortedBatches = Object.keys(batchGroups).sort((a, b) => {
-                if (a === 'original') return -1;
-                if (b === 'original') return 1;
-                return Number(a) - Number(b);
-            });
-
-            const reconstructedCart = [];
-            sortedBatches.forEach(batchKey => {
-                reconstructedCart.push(...batchGroups[batchKey]);
-            });
-
-            setCart(reconstructedCart);
-            setSelectedTable(table.id.toString());
-            const mode = tableModeMap[table.id] || 'dinein';
-            setOrderMode(mode);
-            setCurrentView('order');
-            setShowCart(true);
-
-            window.history.pushState({ view: 'order' }, '');
-        } catch (err) {
-            console.error(err);
-            alert('Failed to load order');
-        } finally {
-            setLoading(false);
-        }
-    };
-
-    // ✅ Group cart items by batch
-    const oldItems = cart.filter(i => !i.batch_timestamp);
-    const newItems = cart.filter(i => !!i.batch_timestamp);
-
-    const groupedNewItems = newItems.reduce((acc, item) => {
-        const batch = item.batch_timestamp || 'default';
-        if (!acc[batch]) acc[batch] = [];
-        acc[batch].push(item);
-        return acc;
-    }, {});
-
-    const batchTimestamps = Object.keys(groupedNewItems).sort();
-
-    const canPlaceOrder = cart.length > 0;
-    useEffect(() => {
-        if (tables.length > 0 && !orderMode) {
-          setOrderMode("takeaway");
-      
-          const id = getTableIdByMode("takeaway");
-          if (id) setSelectedTable(String(id));
-        }
-      }, [tables]);
-      
-
-
-    const handlePrintBill = (orderId, tableId) => {
-        // Navigate to billing page with the order ID
-        navigate(`/saas/${clientId}/billing?orderId=${orderId}`);
-    };
-    // ============ JSX RETURN ============
-    return (
-        <div className="bg-bg-primary p-0 h-[calc(100vh-4rem)] overflow-x-hidden overflow-y-auto">
-
-            {currentView === 'order' && (
-                <div className="mx-auto px-2 py-2">
-                    <div className="grid lg:grid-cols-4 gap-1">
-
-                        {/* CATEGORY SIDEBAR */}
-                        <div className="w-full lg:col-span-1">
-                            <div className="lg:h-[calc(98dvh-4rem)] lg:overflow-y-auto pr-1">
-                                <CategoryTree
-                                    categories={categories}
-                                    selectedCategory={selectedCategory}
-                                    onSelectCategory={setSelectedCategory}
-                                    defaultOpenAll
-                                />
-                            </div>
-                        </div>
-
-                        {/* MENU + ORDER PANEL */}
-                        <div className="lg:col-span-3 flex gap-2">
-
-                            {/* MENU */}
-                            <div className="transition-all duration-300 border-default border-border-default p-2 rounded-lg flex-1 overflow-y-auto h-[calc(98dvh-4rem)] lg:h-auto lg:max-h-[calc(98dvh-4rem)]">
-
-                                <div className="mb-2 flex items-center justify-between lg:flex-row flex-col gap-2">
-                                    <h2 className="text-xl lg:text-2xl font-semibold text-text-primary truncate">
-                                        {selectedCategory}
-                                        <span className="text-sm ml-2">({filteredItems.length})</span>
-                                    </h2>
-
-                                    <div className="relative w-64 max-w-full">
-                                        <Search
-                                            size={16}
-                                            className="absolute left-3 top-1/2 -translate-y-1/2 text-text-secondary"
-                                        />
-                                        <input
-                                            ref={searchInputRef}
-                                            value={searchQuery}
-                                            onChange={(e) => setSearchQuery(e.target.value)}
-                                            placeholder="Search items..."
-                                            className="w-full pl-9 pr-3 py-2 text-sm rounded-lg border border-border-default bg-bg-primary focus:outline-none focus:ring-2 focus:ring-action-primary"
-                                        />
-                                    </div>
-                                </div>
-
-                                <div className={`grid gap-2 grid-cols-2 md:grid-cols-4 ${isOrderFormOpen ? 'lg:grid-cols-3' : 'lg:grid-cols-4'}`}>
-                                    {filteredItems.map(item => {
-                                        const discountPercent =
-                                            item.discount &&
-                                                item.unit_price &&
-                                                Number(item.discount) > 0
-                                                ? ((Number(item.discount) * 100) / Number(item.unit_price))
-                                                    .toFixed(0)
-                                                : null;
-
-                                        return (
-                                            <div onClick={() => handleItemClick(item)}
-                                                key={item.id}
-                                                className="flex gap-2 items-center bg-bg-primary border-default border-border-default rounded-xl p-1 shadow-sm hover:shadow-md transition cursor-pointer"
-                                            >
-                                                <div className="w-14 h-16 rounded-lg overflow-hidden shrink-0 bg-gray-100">
-                                                    <ImagePreview
-                                                        clientId={clientId}
-                                                        imageId={item.image_id}
-                                                        token={token}
-                                                        alt={item.name}
-                                                        baseUrl={import.meta.env.VITE_API_DOCUMENT_SERVICE_URL}
-                                                        urlBuilder={({ baseUrl, clientId, imageId }) =>
-                                                            `${baseUrl}/${clientId}/document/download?doc_id=${imageId}`
-                                                        }
-                                                        className="w-full h-full object-cover"
-                                                    />
-                                                </div>
-
-                                                <div className="flex-1 min-w-0">
-                                                    <h3 className="text-sm font-semibold text-text-primary line-clamp-2">
-                                                        {item.name}
-                                                    </h3>
-
-                                                    {item.description && (
-                                                        <p className="text-xs text-text-secondary line-clamp-1 mt-0.5">
-                                                            {item.description}
-                                                        </p>
-                                                    )}
-
-                                                    <div className="flex items-center gap-2 mt-1">
-                                                        {discountPercent ? (
-                                                            <>
-                                                                <span className="text-sm font-bold text-action-primary">
-                                                                    ₹{(item.unit_price - item.discount).toFixed(0)}
-                                                                </span>
-                                                                <span className="text-xs line-through text-text-secondary">
-                                                                    ₹{item.unit_price}
-                                                                </span>
-                                                                <span className="text-xs text-action-danger font-semibold">
-                                                                    {discountPercent}% OFF
-                                                                </span>
-                                                            </>
-                                                        ) : (
-                                                            <span className="text-sm font-bold text-action-primary">
-                                                                ₹{item.unit_price}
-                                                            </span>
-                                                        )}
-                                                    </div>
-                                                </div>
-                                            </div>
-                                        );
-                                    })}
-                                </div>
-                            </div>
-
-                            {/* DESKTOP CART SIDEBAR */}
-                            {!isMobile && (
-                                <div className={`transition-all duration-300 ease-in-out ${showCart ? 'w-[22rem] opacity-100 z-30' : 'w-0 opacity-0'}`}>
-                                    <div className="border border-gray-300 rounded-xl bg-white">
-                                        <div className="shadow-xl rounded-xl lg:h-[calc(98dvh-4rem)] flex flex-col">
-                                            <div className="flex flex-col h-full p-4">
-
-                                                {/* ================= HEADER ================= */}
-                                                <div className="pb-3 border-b space-y-2">
-                                                    <div className="flex items-center justify-between">
-                                                        <h2 className="text-lg font-semibold text-gray-800">
-                                                            Your Order
-                                                        </h2>
-
-                                                        <span className="text-xs text-gray-500">
-                                                            {orderMode === 'takeaway' ? 'Takeaway Order' : 'Delivery Order'}
-                                                        </span>
-                                                    </div>
-                                                    <div className="flex gap-2 mt-2">
-                                                        <button
-                                                            onClick={() => {
-                                                                setOrderMode('takeaway');
-                                                                const id = getTableIdByMode('takeaway');
-                                                                if (id) setSelectedTable(String(id));
-                                                            }} className={`flex-1 py-1.5 rounded-lg text-sm font-semibold transition
-                                                                ${orderMode === 'takeaway'
-                                                                    ? 'bg-action-primary text-white'
-                                                                    : 'bg-gray-100 text-gray-600 hover:bg-gray-200'}
-                                                              `}
-                                                        >
-                                                            Takeaway
-                                                        </button>
-
-                                                        <button
-                                                            onClick={() => {
-                                                                setOrderMode('delivery');
-                                                                const id = getTableIdByMode('delivery');
-                                                                if (id) setSelectedTable(String(id));
-                                                            }} className={`flex-1 py-1.5 rounded-lg text-sm font-semibold transition
-                                                                ${orderMode === 'delivery'
-                                                                    ? 'bg-action-primary text-white'
-                                                                    : 'bg-gray-100 text-gray-600 hover:bg-gray-200'}
-                                                              `}
-                                                        >
-                                                            Delivery
-                                                        </button>
-
-                                                    </div>
-
-                                                    {/* Order Context */}
-                                                    <div className="flex items-center justify-between text-sm bg-gray-50 px-3 py-2 rounded-lg">
-                                                        <div className="flex flex-col">
-                                                            {orderMode === 'dinein' && selectedTable ? (
-                                                                <span className="font-semibold text-gray-700 text-base">
-                                                                    Table {tables.find(t => t.id.toString() === selectedTable)?.table_number}
-                                                                </span>
-                                                            ) : (
-                                                                <span className="font-semibold text-gray-700 text-base">
-                                                                    Takeaway Order
-                                                                </span>
-                                                            )}
-
-                                                            <span className="text-xs text-gray-500">
-                                                                Add items from the menu
-                                                            </span>
-                                                        </div>
-
-                                                        <span className="text-base font-bold text-red-600">
-                                                            ₹{getTotalPrice()}
-                                                        </span>
-                                                    </div>
-
-                                                    {/* Transfer */}
-                                                    {orderMode === 'dinein' && selectedTable && (
-                                                        <button
-                                                            onClick={() => {
-                                                                setOrderMode('dinein');
-                                                                setSelectedTable('');
-                                                                if (activeOrderId && hasNewItems) {
-                                                                    clearDraftForOrder(activeOrderId);
-                                                                }
-                                                                setActiveOrderId(null);
-                                                                setCurrentBatchTimestamp(null);
-                                                                setHasNewItems(false);
-                                                                setShowCart(false);
-                                                                setCurrentView('order');
-                                                            }}
-                                                            className="text-xs text-red-600 hover:underline self-start"
-                                                        >
-                                                            Transfer table
-                                                        </button>
-                                                    )}
-                                                </div>
-
-                                                {/* ================= CART CONTENT ================= */}
-                                                {cart.length === 0 ? (
-                                                    <div className="flex-1 flex flex-col items-center justify-center text-center px-6">
-                                                        <ShoppingCart size={44} className="text-gray-300 mb-3" />
-                                                        <p className="text-sm font-semibold text-gray-700">
-                                                            Order is empty
-                                                        </p>
-                                                        <p className="text-xs text-gray-500 mt-1">
-                                                            Click items from the menu to add them here
-                                                        </p>
-                                                        <p className="text-[11px] text-gray-400 mt-2 italic">
-                                                            You can add multiple items before placing the order
-                                                        </p>
-                                                    </div>
-                                                ) : (
-                                                    <>
-                                                        {/* ================= ITEMS ================= */}
-                                                        <div className="flex-1 overflow-y-auto mt-4 space-y-2">
-
-                                                            {/* OLD ITEMS */}
-                                                            {oldItems.map(item => (
-                                                                <div
-                                                                    key={`old-${item.id}`}
-                                                                    className="flex items-center gap-2 p-3 rounded-xl border bg-white shadow-sm hover:shadow transition"
-                                                                >
-                                                                    <div className="flex items-center gap-3 flex-1 min-w-0">
-                                                                        <div className="w-12 h-12 rounded-lg overflow-hidden border bg-white shrink-0">
-                                                                            <ImagePreview
-                                                                                clientId={clientId}
-                                                                                imageId={item.image_id}
-                                                                                token={token}
-                                                                                alt={item.name}
-                                                                                baseUrl={import.meta.env.VITE_API_DOCUMENT_SERVICE_URL}
-                                                                                urlBuilder={({ baseUrl, clientId, imageId }) =>
-                                                                                    `${baseUrl}/${clientId}/document/download?doc_id=${imageId}`
-                                                                                }
-                                                                                className="w-full h-full object-cover"
-                                                                            />
-                                                                        </div>
-
-                                                                        <div className="min-w-0">
-                                                                            <h4 className="text-sm font-semibold truncate text-gray-800">
-                                                                                {item.name}
-                                                                            </h4>
-                                                                            <p className="text-xs font-bold text-action-primary">
-                                                                                ₹{(item.unit_price - (item.discount || 0)).toFixed(2)}
-                                                                            </p>
-                                                                        </div>
-                                                                    </div>
-
-                                                                    <div className="flex items-center gap-1">
-                                                                        <button
-                                                                            onClick={() => updateQuantity(item.id, -1, null)}
-                                                                            className="w-7 h-7 flex items-center justify-center border rounded hover:bg-gray-100"
-                                                                        >
-                                                                            <Minus size={14} />
-                                                                        </button>
-
-                                                                        <span className="w-6 text-center text-sm font-semibold">
-                                                                            {item.quantity}
-                                                                        </span>
-
-                                                                        <button
-                                                                            onClick={() => updateQuantity(item.id, 1, null)}
-                                                                            className="w-7 h-7 flex items-center justify-center border rounded hover:bg-gray-100"
-                                                                        >
-                                                                            <Plus size={14} />
-                                                                        </button>
-                                                                    </div>
-
-                                                                    <button
-                                                                        onClick={() => removeFromCart(item.id, null)}
-                                                                        className="text-action-primary hover:text-red-700"
-                                                                    >
-                                                                        <X size={16} />
-                                                                    </button>
-                                                                </div>
-                                                            ))}
-
-                                                            {/* NEW ITEMS */}
-                                                            {activeOrderId && newItems.length > 0 && (
-                                                                <div className="flex items-center gap-2 my-2">
-                                                                    <div className="flex-1 h-px bg-gradient-to-r from-transparent via-orange-400 to-transparent"></div>
-                                                                    <span className="text-xs font-semibold text-orange-600 px-2">
-                                                                        NEW ITEMS
-                                                                    </span>
-                                                                    <div className="flex-1 h-px bg-gradient-to-r from-orange-400 via-transparent to-transparent"></div>
-                                                                </div>
-                                                            )}
-
-                                                            {batchTimestamps.map(timestamp =>
-                                                                groupedNewItems[timestamp].map(item => (
-                                                                    <div
-                                                                        key={item.frontend_unique_key}
-                                                                        className="flex items-center gap-2 p-3 rounded-xl border bg-orange-50 shadow-sm hover:shadow transition"
-                                                                    >
-                                                                        <div className="flex items-center gap-3 flex-1 min-w-0">
-                                                                            <div className="w-12 h-12 rounded-lg overflow-hidden border bg-white shrink-0">
-                                                                                <ImagePreview
-                                                                                    clientId={clientId}
-                                                                                    imageId={item.image_id}
-                                                                                    token={token}
-                                                                                    alt={item.name}
-                                                                                    baseUrl={import.meta.env.VITE_API_DOCUMENT_SERVICE_URL}
-                                                                                    urlBuilder={({ baseUrl, clientId, imageId }) =>
-                                                                                        `${baseUrl}/${clientId}/document/download?doc_id=${imageId}`
-                                                                                    }
-                                                                                    className="w-full h-full object-cover"
-                                                                                />
-                                                                            </div>
-
-                                                                            <div className="min-w-0">
-                                                                                <h4 className="text-sm font-semibold truncate text-gray-800">
-                                                                                    {item.name}
-                                                                                </h4>
-                                                                                <p className="text-xs font-bold text-action-primary">
-                                                                                    ₹{(item.unit_price - (item.discount || 0)).toFixed(2)}
-                                                                                </p>
-                                                                            </div>
-                                                                        </div>
-
-                                                                        <div className="flex items-center gap-1">
-                                                                            <button
-                                                                                onClick={() => updateQuantity(item.id, -1, item.frontend_unique_key)}
-                                                                                className="w-7 h-7 flex items-center justify-center border rounded hover:bg-gray-100"
-                                                                            >
-                                                                                <Minus size={14} />
-                                                                            </button>
-
-                                                                            <span className="w-6 text-center text-sm font-semibold">
-                                                                                {item.quantity}
-                                                                            </span>
-
-                                                                            <button
-                                                                                onClick={() => updateQuantity(item.id, 1, item.frontend_unique_key)}
-                                                                                className="w-7 h-7 flex items-center justify-center border rounded hover:bg-gray-100"
-                                                                            >
-                                                                                <Plus size={14} />
-                                                                            </button>
-                                                                        </div>
-
-                                                                        <button
-                                                                            onClick={() => removeFromCart(item.id, item.frontend_unique_key)}
-                                                                            className="text-action-primary hover:text-red-700"
-                                                                        >
-                                                                            <X size={16} />
-                                                                        </button>
-                                                                    </div>
-                                                                ))
-                                                            )}
-                                                        </div>
-
-                                                        {/* ================= ACTIONS ================= */}
-                                                        <div className="flex gap-2 mt-3">
-                                                            <button
-                                                                onClick={handlePlaceOrder}
-                                                                disabled={!canPlaceOrder || isPlacingOrder}
-                                                                className={`flex-1 py-2 rounded-lg text-sm font-semibold
-                ${canPlaceOrder && !isPlacingOrder
-                                                                        ? 'bg-action-primary text-text-white hover:bg-action-danger'
-                                                                        : 'bg-gray-300 cursor-not-allowed'
-                                                                    }`}
-                                                            >
-                                                                {isPlacingOrder ? 'Placing...' : 'Place Order'}
-                                                            </button>
-
-                                                            <button
-                                                                onClick={handleClearCart}
-                                                                className="flex-1 py-2 border rounded-lg text-sm hover:bg-gray-100"
-                                                            >
-                                                                Clear
-                                                            </button>
-                                                        </div>
-                                                    </>
-                                                )}
-                                            </div>
-                                        </div>
-                                    </div>
-
-                                </div>
-                            )}
-                        </div>
-                    </div>
-                </div>
-            )}
-
-            {/* MOBILE CART - Similar structure with batch grouping */}
-            {isMobile && showCart && (
-                <div className="fixed inset-0 z-50 flex justify-end bg-color-modalsbg animate-fade-in">
-                    <div className="w-full md:w-96 lg:w-[28rem] h-full overflow-y-auto bg-bg-primary animate-slide-in-right">
-                        <div className="p-4 lg:p-6">
-                            <div className="flex justify-between items-center mb-6">
-                                <h2 className="text-xl lg:text-2xl font-bold text-text-primary">Your Order</h2>
-                                <button onClick={() => setShowCart(false)} className="p-1.5 rounded-lg bg-action-primary text-text-white hover:opacity-90 transition-opacity">
-                                    <X className='h-5 w-5' />
-                                </button>
-                            </div>
-
-                            {orderPlaced ? (
-                                <div className="text-center py-12 animate-scale-in">
-                                    <div className="rounded-full w-20 h-20 flex items-center justify-center mx-auto mb-4 bg-action-success">
-                                        <Check size={40} className='text-bg-primary' />
-                                    </div>
-                                    <h3 className="text-xl font-semibold mb-2 text-action-success">Order Placed!</h3>
-                                    <p className='text-text-secondary'>Your order has been successfully placed.</p>
-                                </div>
-                            ) : (
-                                <>
-
-
-                                    {/* Mobile Cart Items with Batch Grouping */}
-                                    <div className="space-y-4 mb-6 max-h-[calc(100vh-4rem)] overflow-y-auto">
-                                        {/* OLD ITEMS */}
-                                        {oldItems.map(item => (
-                                            <div key={`mobile-old-${item.id}`} className="flex items-center space-x-3 p-3 lg:p-4 rounded-lg bg-bg-tertiary border-border-default animate-slide-up">
-                                                <div className="w-16 h-16 rounded-md overflow-hidden flex-shrink-0">
-                                                    <ImagePreview
-                                                        clientId={clientId}
-                                                        imageId={item.image_id}
-                                                        token={token}
-                                                        alt={item.name}
-                                                        baseUrl={import.meta.env.VITE_API_DOCUMENT_SERVICE_URL}
-                                                        urlBuilder={({ baseUrl, clientId, imageId }) =>
-                                                            `${baseUrl}/${clientId}/document/download?doc_id=${imageId}`
-                                                        }
-                                                        className="w-full h-full object-cover"
-                                                    />
-                                                </div>
-
-                                                <div className="flex-1 min-w-0">
-                                                    <h4 className="font-semibold text-sm lg:text-base truncate flex items-center gap-2 text-text-primary">
-                                                        {item.name}
-                                                        {item.note && (
-                                                            <button
-                                                                onClick={() => openNoteEditor(item)}
-                                                                title="Has note" className='text-action-primary hover:scale-110 transition-transform'>
-                                                                <StickyNote size={16} />
-                                                            </button>
-                                                        )}
-                                                    </h4>
-                                                    <p className='text-action-primary font-bold'>Rs.{item.unit_price?.toFixed(2)}</p>
-                                                    {!item.note && (
-                                                        <button
-                                                            onClick={() => openNoteEditor(item)}
-                                                            className="text-xs mt-1 text-text-secondary hover:text-action-primary transition-colors">
-                                                            + Add note
-                                                        </button>
-                                                    )}
-                                                </div>
-                                                <div className="flex items-center space-x-2">
-                                                    <button
-                                                        onClick={() => updateQuantity(item.id, -1, null)}
-                                                        className="p-1 rounded bg-bg-primary border-border-default hover:bg-bg-secondary transition-colors"
-                                                    >
-                                                        <Minus size={16} />
-                                                    </button>
-                                                    <span className="w-8 text-center font-semibold text-text-primary">{item.quantity}</span>
-                                                    <button
-                                                        onClick={() => updateQuantity(item.id, 1, null)}
-                                                        className="p-1 rounded bg-bg-primary border-border-default hover:bg-bg-secondary transition-colors">
-                                                        <Plus size={16} />
-                                                    </button>
-                                                </div>
-                                                <button
-                                                    onClick={() => removeFromCart(item.id, null)}
-                                                    title="Remove item" className='text-action-danger hover:scale-110 transition-transform'>
-                                                    <X size={20} />
-                                                </button>
-                                            </div>
-                                        ))}
-
-                                        {/* NEW ITEMS SEPARATOR */}
-                                        {activeOrderId && newItems.length > 0 && (
-                                            <div className="flex items-center gap-2 my-3">
-                                                <div className="flex-1 h-px bg-gradient-to-r from-transparent via-orange-500 to-transparent"></div>
-                                                <span className="text-sm font-bold text-orange-600 px-3">NEW ITEMS</span>
-                                                <div className="flex-1 h-px bg-gradient-to-r from-orange-500 via-transparent to-transparent"></div>
-                                            </div>
-                                        )}
-
-                                        {/* NEW ITEMS - GROUPED BY BATCH */}
-                                        {batchTimestamps.map((timestamp, batchIndex) => (
-                                            <React.Fragment key={`mobile-batch-${timestamp}`}>
-                                                {batchIndex > 0 && (
-                                                    <div className="flex items-center gap-2 my-3">
-                                                        <div className="flex-1 h-px bg-gradient-to-r from-transparent via-orange-500 to-transparent"></div>
-                                                        <span className="text-sm font-bold text-orange-600 px-3">NEW ITEMS</span>
-                                                        <div className="flex-1 h-px bg-gradient-to-r from-orange-500 via-transparent to-transparent"></div>
-                                                    </div>
-                                                )}
-
-                                                {groupedNewItems[timestamp].map(item => (
-                                                    <div key={item.frontend_unique_key || `mobile-new-${item.id}`} className="flex items-center space-x-3 p-3 lg:p-4 rounded-lg bg-orange-50 border border-orange-200 animate-slide-up">
-                                                        <div className="w-16 h-16 rounded-md overflow-hidden flex-shrink-0">
-                                                            <ImagePreview
-                                                                clientId={clientId}
-                                                                imageId={item.image_id}
-                                                                token={token}
-                                                                alt={item.name}
-                                                                baseUrl={import.meta.env.VITE_API_DOCUMENT_SERVICE_URL}
-                                                                urlBuilder={({ baseUrl, clientId, imageId }) =>
-                                                                    `${baseUrl}/${clientId}/document/download?doc_id=${imageId}`
-                                                                }
-                                                                className="w-full h-full object-cover"
-                                                            />
-                                                        </div>
-
-                                                        <div className="flex-1 min-w-0">
-                                                            <h4 className="font-semibold text-sm lg:text-base truncate flex items-center gap-2 text-text-primary">
-                                                                {item.name}
-                                                                {item.note && (
-                                                                    <button
-                                                                        onClick={() => openNoteEditor(item)}
-                                                                        title="Has note" className='text-action-primary hover:scale-110 transition-transform'>
-                                                                        <StickyNote size={16} />
-                                                                    </button>
-                                                                )}
-                                                            </h4>
-                                                            <p className='text-action-primary font-bold'>Rs.{item.unit_price?.toFixed(2)}</p>
-                                                            {!item.note && (
-                                                                <button
-                                                                    onClick={() => openNoteEditor(item)}
-                                                                    className="text-xs mt-1 text-text-secondary hover:text-action-primary transition-colors">
-                                                                    + Add note
-                                                                </button>
-                                                            )}
-                                                        </div>
-                                                        <div className="flex items-center space-x-2">
-                                                            <button
-                                                                onClick={() => updateQuantity(item.id, -1, item.frontend_unique_key)}
-                                                                className="p-1 rounded bg-bg-primary border-border-default hover:bg-bg-secondary transition-colors"
-                                                            >
-                                                                <Minus size={16} />
-                                                            </button>
-                                                            <span className="w-8 text-center font-semibold text-text-primary">{item.quantity}</span>
-                                                            <button
-                                                                onClick={() => updateQuantity(item.id, 1, item.frontend_unique_key)}
-                                                                className="p-1 rounded bg-bg-primary border-border-default hover:bg-bg-secondary transition-colors">
-                                                                <Plus size={16} />
-                                                            </button>
-                                                        </div>
-                                                        <button
-                                                            onClick={() => removeFromCart(item.id, item.frontend_unique_key)}
-                                                            title="Remove item" className='text-action-danger hover:scale-110 transition-transform'>
-                                                            <X size={20} />
-                                                        </button>
-                                                    </div>
-                                                ))}
-                                            </React.Fragment>
-                                        ))}
-                                    </div>
-
-                                    <div className="border-t pt-4 mb-6 border-border-default">
-                                        <div className="flex justify-between items-center text-xl font-bold">
-                                            <span className='text-text-primary'>Total:</span>
-                                            <span className='text-action-primary font-bold'>Rs.{getTotalPrice()}</span>
-                                        </div>
-                                    </div>
-
-                                    <button
-                                        onClick={handlePlaceOrder}
-                                        disabled={!canPlaceOrder || isPlacingOrder}
-                                        className={`w-full py-3 rounded-lg font-semibold transition-all
-                      ${canPlaceOrder && !isPlacingOrder
-                                                ? 'bg-action-primary text-text-white hover:shadow-lg'
-                                                : 'bg-border-default text-text-primary cursor-not-allowed'
-                                            }`}
-                                    >
-                                        {isPlacingOrder ? "Placing Order..." : "Place Order"}
-                                    </button>
-
-                                </>
-                            )}
-                        </div>
-                    </div>
-                </div>
-            )}
-
-            {/* MODALS & FLOATING BUTTON */}
-            {showClearConfirm && (
-                <div className="fixed inset-0 z-50 flex items-center justify-center bg-black/40">
-                    <div className="bg-white rounded-lg p-6 w-80 shadow-xl animate-scale-in">
-                        <h3 className="text-lg font-semibold mb-4 text-gray-800">
-                            Clear all items?
-                        </h3>
-                        <p className="text-sm text-gray-600 mb-5">
-                            This will remove all items from the order.
-                        </p>
-
-                        <div className="flex gap-3">
-                            <button
-                                onClick={() => setShowClearConfirm(false)}
-                                className="flex-1 py-2 border rounded-lg hover:bg-gray-100"
-                            >
-                                Cancel
-                            </button>
-
-                            <button
-                                onClick={confirmClearCart}
-                                className="flex-1 py-2 bg-action-primary text-white rounded-lg hover:bg-action-danger"
-                            >
-                                Clear
-                            </button>
-                        </div>
-                    </div>
-                </div>
-            )}
-
-            {cart.length > 0 && !showCart && (
-                <button
-                    onClick={() => setShowCart(true)}
-                    className="fixed bottom-6 right-6 bg-action-primary text-white p-4 rounded-full shadow-lg z-40"
-                >
-                    <ShoppingCart size={24} />
-                </button>
-            )}
-
-            <LineItemsModal
-                isOpen={lineItemsModalOpen}
-                onClose={() => {
-                    setLineItemsModalOpen(false);
-                    setSelectedMainItem(null);
-                    setLineItemsDetails([]);
-                }}
-                mainItem={selectedMainItem}
-                lineItems={lineItemsDetails}
-                onAddMainOnly={handleAddMainItemOnly}
-                onAddWithLineItems={handleAddMainItemWithLineItems}
-            />
-
-            <NoteModal
-                isOpen={noteModalOpen}
-                onClose={() => {
-                    setNoteModalOpen(false);
-                    setCurrentItemForNote(null);
-                }}
-                itemName={currentItemForNote?.name}
-            />
-        </div>
+  // ── View ──────────────────────────────────────────────────────────────────
+  const [currentView, setCurrentView] = useState('floor');
+  const [orderMode, setOrderMode] = useState('delivery');
+
+  // ── Remote data ───────────────────────────────────────────────────────────
+  const [tables, setTables] = useState([]);
+  const [tableOrders, setTableOrders] = useState({});
+  const [menuItems, setMenuItems] = useState([]);
+  const [categories, setCategories] = useState([]);
+  const [categoriesFlat, setCategoriesFlat] = useState([]);
+  const [dieterySubCategories, setDieterySubCategories] = useState([]);
+  const [sidebarCategories, setSidebarCategories] = useState([]);
+  const [counterTree, setCounterTree] = useState([]);
+  const [inventoryMap, setInventoryMap] = useState({});
+  const [loading, setLoading] = useState(true);
+
+  // ── Order context ─────────────────────────────────────────────────────────
+  const [selectedTable, setSelectedTable] = useState('');
+  const [takeawayTableId, setTakeawayTableId] = useState();
+  const [activeOrderId, setActiveOrderId] = useState(null);
+  const [activeDineinOrderId, setActiveDineinOrderId] = useState(null);
+
+  // ── Cart ──────────────────────────────────────────────────────────────────
+  const [cart, setCart] = useState([]);
+  const [showCart, setShowCart] = useState(false);
+  const [hasNewItems, setHasNewItems] = useState(false);
+  const [currentBatchTimestamp, setCurrentBatchTimestamp] = useState(null);
+  const [isPlacingOrder, setIsPlacingOrder] = useState(false);
+  const isPlacingRef = useRef(false);
+
+  // ── Drafts ────────────────────────────────────────────────────────────────
+  const [draftSavedAt, setDraftSavedAt] = useState(null);
+  const [draftTableIds, setDraftTableIds] = useState([]);   // for floor DRAFT badges
+
+  // ── UI state ──────────────────────────────────────────────────────────────
+  const [selectedCategoryId, setSelectedCategoryId] = useState(null);
+  const [searchQuery, setSearchQuery] = useState('');
+  const [showClearConfirm, setShowClearConfirm] = useState(false);
+  const [showDeleteConfirm, setShowDeleteConfirm] = useState(false);
+  const [orderToDelete, setOrderToDelete] = useState(null);
+  const [lineItemsModalOpen, setLineItemsModalOpen] = useState(false);
+  const [selectedMainItem, setSelectedMainItem] = useState(null);
+  const [lineItemsDetails, setLineItemsDetails] = useState([]);
+  const [invoiceModalOpen, setInvoiceModalOpen] = useState(false);
+  const [invoiceOrderData, setInvoiceOrderData] = useState(null);
+  const [deliveryTables, setDeliveryTables] = useState([]);
+  const [takeawayTables, setTakeawayTables] = useState([]);
+  const searchInputRef = useRef(null);
+  const isMobile = window.matchMedia('(max-width: 1024px)').matches;
+  const [deliveryTableId, setDeliveryTableId] = useState(null);
+  const menuConfig = useMemo(
+    () => (clientId ? getMenuConfig(clientId) : null),
+    [clientId]
+  );
+
+  // ─────────────────────────────────────────────────────────────────────────
+  // Draft helpers
+  // ─────────────────────────────────────────────────────────────────────────
+
+  const refreshDraftTableIds = useCallback(() => {
+    setDraftTableIds(getAllDraftTableIds());
+  }, []);
+
+  const handleSaveDraft = useCallback(() => {
+    if (!selectedTable || cart.length === 0) {
+      toast.warn('Nothing to save — cart is empty.');
+      return;
+    }
+    const now = Date.now();
+    writeDraft(selectedTable, {
+      cart,
+      savedAt: now,
+      orderMode,
+      activeOrderId,
+      activeDineinOrderId,
+      currentBatchTimestamp,
+      hasNewItems,
+    });
+    setDraftSavedAt(now);
+    refreshDraftTableIds();
+    toast.success('Draft saved! You can return to this table anytime.');
+  }, [
+    selectedTable, cart, orderMode,
+    activeOrderId, activeDineinOrderId,
+    currentBatchTimestamp, hasNewItems,
+    refreshDraftTableIds,
+  ]);
+
+  const restoreDraftForTable = useCallback((tableId) => {
+    const draft = readDraft(tableId);
+    if (!draft) return false;
+    setCart(draft.cart || []);
+    setOrderMode(draft.orderMode || 'delivery');
+    setActiveOrderId(draft.activeOrderId || null);
+    setActiveDineinOrderId(draft.activeDineinOrderId || null);
+    setCurrentBatchTimestamp(draft.currentBatchTimestamp || null);
+    setHasNewItems(draft.hasNewItems || false);
+    setDraftSavedAt(draft.savedAt || null);
+    setShowCart(true);   // always show cart when restoring a draft
+    return true;
+  }, []);
+
+  const clearDraftForTable = useCallback((tableId) => {
+    if (!tableId) return;
+    deleteDraft(tableId);
+    setDraftSavedAt(null);
+    refreshDraftTableIds();
+  }, [refreshDraftTableIds]);
+
+  // ─────────────────────────────────────────────────────────────────────────
+  // Category / tree utilities
+  // ─────────────────────────────────────────────────────────────────────────
+
+  const flattenCategoryTree = (tree, level = 0, parentId = null) => {
+    let flat = [];
+    tree.forEach(c => {
+      flat.push({
+        id: c.id,
+        name: c.name,
+        level,
+        parentId,
+        hasChildren: !!(c.subCategories?.length),
+      });
+      if (c.subCategories?.length) {
+        flat = flat.concat(flattenCategoryTree(c.subCategories, level + 1, c.id));
+      }
+    });
+    return flat;
+  };
+
+  const getAddonCategoryId = useCallback((itemCategoryId) => {
+    if (!menuConfig) return 'addons_ac';
+    const { addonCategoryAC, addonCategoryNonAC, addonNonACKeywords, addonACKeywords } = menuConfig;
+    if (!itemCategoryId || !categoriesFlat.length) return addonCategoryAC;
+
+    const pathNames = [];
+    let cur = itemCategoryId;
+    const visited = new Set();
+    while (cur && !visited.has(cur)) {
+      visited.add(cur);
+      const cat = categoriesFlat.find(c => c.id === cur);
+      if (!cat) break;
+      pathNames.push((cat.name || '').toLowerCase());
+      cur = cat.parentId || cat.parent_id;
+    }
+
+    const isNonAC = addonNonACKeywords.some(kw =>
+      pathNames.some(p => p === kw || p.includes(kw))
     );
+    if (isNonAC) return addonCategoryNonAC;
+
+    const isAC = addonACKeywords.some(kw =>
+      pathNames.some(p => p === kw || p.includes(kw))
+    );
+    if (isAC) return addonCategoryAC;
+
+    return addonCategoryAC;
+  }, [categoriesFlat, menuConfig]);
+
+  const getCategoryAndChildrenIds = (cats, targetId) => {
+    const result = new Set();
+    const traverse = (nodes, found = false) => {
+      for (const n of nodes) {
+        const isT = n.id === targetId;
+        if (isT || found) result.add(n.id);
+        if (n.children?.length) traverse(n.children, found || isT);
+      }
+    };
+    traverse(cats);
+    return Array.from(result);
+  };
+
+  const findCategoryNode = (tree, matcher) => {
+    for (const c of tree) {
+      if (
+        c.id?.toLowerCase() === matcher.toLowerCase() ||
+        c.name?.toLowerCase() === matcher.toLowerCase()
+      ) return c;
+      if (c.children?.length) {
+        const f = findCategoryNode(c.children, matcher);
+        if (f) return f;
+      }
+    }
+    return null;
+  };
+
+  const getCategoriesAtLevel = (node, tgt, cur = 0) => {
+    if (!node) return [];
+    if (cur === tgt) return [node];
+    let r = [];
+    for (const ch of node.children || []) {
+      r = r.concat(getCategoriesAtLevel(ch, tgt, cur + 1));
+    }
+    return r;
+  };
+
+  const findNodeAndChildren = (nodes, id) => {
+    for (const n of nodes) {
+      if (n.id === id) return n;
+      if (n.children?.length) {
+        const f = findNodeAndChildren(n.children, id);
+        if (f) return f;
+      }
+    }
+    return null;
+  };
+
+  // ─────────────────────────────────────────────────────────────────────────
+  // Data fetching
+  // ─────────────────────────────────────────────────────────────────────────
+
+  const fetchCounterTree = async () => {
+    try {
+      const res = await axios.get(
+        `${import.meta.env.VITE_API_INVENTORY_SERVICE_URL}/${clientId}/menu/read_category`,
+        {
+          params: { client_id: clientId, category_id: 'counter' },
+          headers: { Authorization: `Bearer ${token}` },
+        }
+      );
+      setCounterTree(res.data.data?.[0]?.subCategories || []);
+    } catch (err) {
+      console.error('Failed to fetch counter tree:', err);
+    }
+  };
+
+  const fetchTableOrders = async (tableList) => {
+    try {
+      const r = await axios.get(
+        `${import.meta.env.VITE_API_ORDER_SERVICE_URL}/${clientId}/dinein/table`,
+        { headers: { Authorization: `Bearer ${token}` } }
+      );
+      const allOrders = r.data?.data || [];
+      const map = {};
+      tableList.forEach(table => {
+        const s = table.status?.toLowerCase();
+        if (s === 'occupied' || s === 'served') {
+          const o = allOrders
+            .filter(o => o.table_id === table.id && o.status?.toLowerCase() !== 'completed')
+            .sort((a, b) => new Date(b.created_at) - new Date(a.created_at))[0];
+          if (o) {
+            map[table.id] = {
+              id: o.id,
+              dinein_order_id: o.dinein_order_id,
+              status: o.status,
+              created_at: o.created_at,
+              order_count: o.order_count || 1,
+              total_price: o.total_price || 0,
+            };
+          }
+        }
+      });
+      setTableOrders(map);
+    } catch (err) {
+      console.error('Failed to fetch table orders:', err);
+    }
+  };
+
+  const fetchTables = async () => {
+    const res = await axios.get(
+      `${import.meta.env.VITE_API_TABLE_SERVICE_URL}/${clientId}/tables/read`,
+      { headers: { Authorization: `Bearer ${token}` } }
+    );
+
+    const list = Array.isArray(res.data?.data)
+      ? res.data.data.map(t => ({
+        ...t,
+        table_number: t.name || t.table_number || '-',
+      }))
+      : [];
+
+    // 🔥 Read roots from .env
+    const deliveryRoots = getEnvTableRoots('VITE_EASYFOOD_DELIVERY_TABLE_DEFAULT_ROOT');
+    const takeawayRoots = getEnvTableRoots('VITE_EASYFOOD_TAKEAWAY_TABLE_DEFAULT_ROOT');
+
+    const deliveryTables = list.filter(t =>
+      deliveryRoots.includes((t.name || '').toLowerCase())
+    );
+
+    const takeawayTables = list.filter(t =>
+      takeawayRoots.includes((t.name || '').toLowerCase())
+    );
+
+    setDeliveryTables(deliveryTables);
+    setTakeawayTables(takeawayTables);
+
+    if (deliveryTables.length > 0) {
+      setDeliveryTableId(deliveryTables[0].id);
+
+      if (orderMode === "delivery") {
+        setSelectedTable(deliveryTables[0].id.toString());
+      }
+    }
+
+    if (takeawayTables.length > 0) {
+      setTakeawayTableId(takeawayTables[0].id);
+    }
+
+    list.sort((a, b) =>
+      a.table_number.localeCompare(b.table_number, undefined, { numeric: true })
+    );
+
+    setTables(list);
+    await fetchTableOrders(list);
+  };
+
+  // ─────────────────────────────────────────────────────────────────────────
+  // Initial data load
+  // ─────────────────────────────────────────────────────────────────────────
+
+  useEffect(() => {
+    const fetchData = async () => {
+      if (!clientId || !token || !menuConfig) return;
+      try {
+        setLoading(true);
+        await Promise.all([fetchTables(), fetchCounterTree()]);
+
+        const [catRes, itemRes, invRes] = await Promise.all([
+          axios.get(
+            `${import.meta.env.VITE_API_INVENTORY_SERVICE_URL}/${clientId}/menu/read_category?category_id=${menuConfig.root}`,
+            { headers: { Authorization: `Bearer ${token}` } }
+          ),
+          axios.get(
+            `${import.meta.env.VITE_API_INVENTORY_SERVICE_URL}/${clientId}/menu/read?inventory_id=${menuConfig.menuInventoryId}`,
+            { headers: { Authorization: `Bearer ${token}` } }
+          ),
+          axios.get(
+            `${import.meta.env.VITE_API_INVENTORY_SERVICE_URL}/${clientId}/inventory/read`,
+            { headers: { Authorization: `Bearer ${token}` } }
+          ),
+        ]);
+
+        const iMap = {};
+        (invRes.data?.data || []).forEach(i => (iMap[i.id] = i));
+        setInventoryMap(iMap);
+
+        const fullTree = catRes.data.data.filter(c => c.name?.toLowerCase() !== 'all');
+        const subIds = new Set();
+        fullTree.forEach(c => c.subCategories?.forEach(s => subIds.add(s.id)));
+        const topLevel = fullTree.filter(c => !subIds.has(c.id));
+        const flatCats = flattenCategoryTree(topLevel);
+        setCategoriesFlat(
+          flatCats.map(c => ({
+            id: c.id,
+            name: (c.name || '').trim(),
+            parentId: c.parentId ?? c.parent_id ?? null,
+          }))
+        );
+
+        const enrichedItems = itemRes.data.data.map(item => {
+          const cat = flatCats.find(c => c.id === item.category_id);
+          return { ...item, category_name: cat?.name || 'Uncategorized' };
+        });
+        setMenuItems(enrichedItems);
+
+        const buildTree = () => {
+          const map = new Map();
+          flatCats.forEach(c =>
+            map.set(c.id, {
+              ...c,
+              count: enrichedItems.filter(i => i.category_id === c.id).length,
+              children: [],
+            })
+          );
+          const tree = [];
+          map.forEach(c => {
+            if (c.parentId && map.has(c.parentId)) map.get(c.parentId).children.push(c);
+            else tree.push(c);
+          });
+          return tree;
+        };
+
+        const categoryTree = buildTree().map(c =>
+          c.id === menuConfig.root || c.name?.toLowerCase() === menuConfig.root.toLowerCase()
+            ? { ...c, name: 'All Categories', count: c.children.length }
+            : c
+        );
+        setCategories(categoryTree);
+        setSidebarCategories(categoryTree);
+
+        const rootNode = findCategoryNode(categoryTree, menuConfig.root);
+        let qc = [];
+        if (rootNode) {
+          let l = menuConfig.level;
+          while (l >= 0) {
+            qc = getCategoriesAtLevel(rootNode, l);
+            if (qc.length > 0) break;
+            l--;
+          }
+        }
+        setDieterySubCategories(qc);
+        refreshDraftTableIds();
+      } catch (err) {
+        console.error('Fetch error:', err);
+      } finally {
+        setLoading(false);
+      }
+    };
+    fetchData();
+    // eslint-disable-next-line react-hooks/exhaustive-deps
+  }, [clientId, token, realm, menuConfig]);
+
+  // ─────────────────────────────────────────────────────────────────────────
+  // Browser history (back button) — push initial floor state once
+  // ─────────────────────────────────────────────────────────────────────────
+
+  useEffect(() => {
+    window.history.replaceState({ view: 'floor' }, '');
+  }, []);
+
+  useEffect(() => {
+    const onBack = (e) => {
+      if (currentView === 'order') {
+        e.preventDefault();
+        goToFloor();
+      }
+    };
+    window.addEventListener('popstate', onBack);
+    return () => window.removeEventListener('popstate', onBack);
+    // eslint-disable-next-line react-hooks/exhaustive-deps
+  }, [currentView]);
+
+  // ─────────────────────────────────────────────────────────────────────────
+  // Navigation helpers
+  // ─────────────────────────────────────────────────────────────────────────
+
+  /**
+   * goToOrderView — switches to the order view and ensures the cart panel
+   * is always visible so the waiter sees items immediately.
+   */
+  const goToOrderView = () => {
+    setCurrentView('order');
+    setShowCart(true);
+    window.history.pushState({ view: 'order' }, '');
+  };
+
+  /**
+   * goToFloor — returns to the floor view WITHOUT clearing the cart or draft.
+   * The waiter can click back to the same table and pick up right where they left off.
+   */
+  const goToFloor = () => {
+    setCurrentView('floor');
+    setShowCart(false);
+    setSidebarCategories(categories);
+    setSelectedCategoryId(null);
+    setSearchQuery('');
+  };
+
+  // ─────────────────────────────────────────────────────────────────────────
+  // Table / order selection
+  // ─────────────────────────────────────────────────────────────────────────
+
+  const handleTableSelect = (table) => {
+    const tableIdStr = table.id.toString();
+
+    // Reset any previous active-order context
+    setActiveOrderId(null);
+    setActiveDineinOrderId(null);
+    setHasNewItems(false);
+    setCurrentBatchTimestamp(null);
+    setOrderMode('delivery');
+    setSelectedTable(tableIdStr);
+
+    // Try to restore a saved draft; if none, start fresh with an empty, visible cart
+    const restored = restoreDraftForTable(tableIdStr);
+    if (restored) {
+      toast.info('Draft restored for this table.', { autoClose: 2000 });
+    } else {
+      setCart([]);
+      setShowCart(true);
+    }
+
+    goToOrderView();
+  };
+
+  const handleTakeawaySelect = () => {
+    const tableIdStr = takeawayTableId.toString();
+    setOrderMode('takeaway');
+    setSelectedTable(tableIdStr);
+    setActiveOrderId(null);
+    setActiveDineinOrderId(null);
+
+    const restored = restoreDraftForTable(tableIdStr);
+    if (restored) {
+      toast.info('Draft restored.', { autoClose: 2000 });
+    } else {
+      setCart([]);
+      setShowCart(true);
+    }
+
+    goToOrderView();
+  };
+
+  const handleViewOrder = async (table) => {
+    if (menuItems.length === 0) {
+      alert('Menu still loading...');
+      return;
+    }
+    try {
+      setLoading(true);
+      const r = await axios.get(
+        `${import.meta.env.VITE_API_ORDER_SERVICE_URL}/${clientId}/dinein/table`,
+        { headers: { Authorization: `Bearer ${token}` } }
+      );
+      const allOrders = r.data?.data || [];
+      const tableGroups = allOrders.filter(
+        o => o.table_id === table.id && o.status?.toLowerCase() !== 'completed'
+      );
+      if (tableGroups.length === 0) {
+        alert('No active order');
+        return;
+      }
+      const activeOrder = tableGroups.sort(
+        (a, b) => new Date(b.created_at) - new Date(a.created_at)
+      )[0];
+
+      const reconstructedCart = (activeOrder.items || []).map(item => {
+        const menuItem = menuItems.find(mi => Number(mi.id) === Number(item.item_id));
+        return {
+          id: Number(item.item_id),
+          name: item.item_name || menuItem?.name || 'Unnamed Item',
+          unit_price: item.unit_price || menuItem?.unit_price || 0,
+          quantity: item.quantity || 1,
+          note: item.note || '',
+          image_id: menuItem?.image_id,
+          discount: menuItem?.discount || 0,
+          slug: item.slug || menuItem?.slug,
+          category: menuItem?.category_name,
+          category_id: menuItem?.category_id || null,
+          frontend_unique_key: item.frontend_unique_key,
+          batch_timestamp: null,
+          is_new_item: false,
+          saved_sub_order: true,
+          status: item.status || 'pending',
+          batch_label: item.batch_label,
+          sub_order_id: item.sub_order_id,
+        };
+      });
+
+      setCart(reconstructedCart);
+      setSelectedTable(table.id.toString());
+      setOrderMode('delivery');
+      setActiveOrderId(activeOrder.id);
+      setActiveDineinOrderId(activeOrder.dinein_order_id);
+      setHasNewItems(false);
+      setCurrentBatchTimestamp(null);
+      setDraftSavedAt(null);
+      goToOrderView();
+    } catch (err) {
+      console.error(err);
+      alert('Failed to load order');
+    } finally {
+      setLoading(false);
+    }
+  };
+
+  const handleBackToTables = () => {
+    // Leave cart & draft untouched — waiter can return to same table
+    goToFloor();
+  };
+
+  // ─────────────────────────────────────────────────────────────────────────
+  // Cart operations
+  // ─────────────────────────────────────────────────────────────────────────
+
+  const getGroupedCartItems = (items) => {
+    const grouped = [];
+    const processed = new Set();
+    items.forEach(item => {
+      const key = item.frontend_unique_key || item.id;
+      if (processed.has(key)) return;
+      if (!item.is_addon && !item.parent_item_key) {
+        const addons = items.filter(i => i.parent_item_key === item.frontend_unique_key);
+        grouped.push({ main: { ...item }, addons });
+        processed.add(key);
+        addons.forEach(a => processed.add(a.frontend_unique_key || a.id));
+      }
+    });
+    return grouped;
+  };
+
+  const getTotalPrice = () =>
+    cart.reduce((t, i) => t + (i.unit_price || 0) * i.quantity, 0).toFixed(2);
+
+  const buildCartItem = (item, extra = {}) => {
+    const ts = Date.now() + Math.random();
+    const key = `${item.id}_${ts}`;
+    return {
+      id: Number(item.id),
+      name: item.name,
+      unit_price: item.unit_price || 0,
+      image_id: item.image_id,
+      discount: item.discount || 0,
+      slug: item.slug,
+      category: item.category_name,
+      category_id: item.category_id || null,
+      quantity: 1,
+      note: '',
+      frontend_unique_key: key,
+      is_new_item: true,
+      saved_sub_order: false,
+      ...extra,
+    };
+  };
+
+  const addToCart = (item, parentItemKey = null) => {
+    setHasNewItems(true);
+    let batch = currentBatchTimestamp;
+    if (!batch) {
+      batch = Date.now();
+      setCurrentBatchTimestamp(batch);
+    }
+    const newItem = buildCartItem(item, {
+      batch_timestamp: batch,
+      parent_item_key: parentItemKey,
+      is_addon: !!parentItemKey,
+    });
+    setCart(prev => [...prev, newItem]);
+    if (!isMobile) setShowCart(true);
+    return newItem.frontend_unique_key;
+  };
+
+  const removeFromCart = (itemId, uniqueKey = null) => {
+    setHasNewItems(true);
+    if (uniqueKey) {
+      setCart(prev =>
+        prev.filter(i =>
+          i.frontend_unique_key !== uniqueKey && i.parent_item_key !== uniqueKey
+        )
+      );
+    } else {
+      setCart(prev => prev.filter(i => i.id !== itemId));
+    }
+  };
+
+  const updateQuantity = (itemId, change, uniqueKey = null) => {
+    setHasNewItems(true);
+    setCart(prev =>
+      prev.map(item => {
+        const match = uniqueKey
+          ? item.frontend_unique_key === uniqueKey
+          : item.id === itemId && !item.frontend_unique_key;
+        if (!match) return item;
+        const q = item.quantity + change;
+        return q > 0 ? { ...item, quantity: q } : null;
+      }).filter(Boolean)
+    );
+  };
+
+  // ─────────────────────────────────────────────────────────────────────────
+  // Item click — opens addon modal or directly adds to cart
+  // ─────────────────────────────────────────────────────────────────────────
+
+  const handleItemClick = (item) => {
+    const hasLineItems =
+      item.line_item_id &&
+      Array.isArray(item.line_item_id) &&
+      item.line_item_id.length > 0;
+
+    if (!hasLineItems) {
+      addToCart(item);
+      return;
+    }
+
+    const addonCatId = getAddonCategoryId(item.category_id);
+
+    const getAddonDescendantIds = (rootId) => {
+      const ids = new Set([rootId]);
+      const addChildren = (parentId) => {
+        categoriesFlat
+          .filter(c => c.parentId === parentId)
+          .forEach(c => { ids.add(c.id); addChildren(c.id); });
+      };
+      addChildren(rootId);
+      return ids;
+    };
+    const validAddonCategoryIds = getAddonDescendantIds(addonCatId);
+
+    const lineItems = item.line_item_id
+      .map(id => {
+        const ai = menuItems.find(i => i.id === id);
+        if (!ai) return null;
+        return validAddonCategoryIds.has(ai.category_id) ? ai : null;
+      })
+      .filter(Boolean);
+
+    if (lineItems.length > 0) {
+      setSelectedMainItem(item);
+      setLineItemsDetails(lineItems);
+      setLineItemsModalOpen(true);
+    } else {
+      addToCart(item);
+    }
+  };
+
+  const handleAddMainItemWithSelectedAddons = (selectedAddonIds) => {
+    if (!selectedMainItem) return;
+    let batch = currentBatchTimestamp;
+    if (!batch) {
+      batch = Date.now();
+      setCurrentBatchTimestamp(batch);
+    }
+
+    const mainKey = addToCart(selectedMainItem);
+
+    // Attach each selected addon to the main item via parent_item_key
+    lineItemsDetails
+      .filter(i => selectedAddonIds.includes(i.id))
+      .forEach(addon => {
+        const ts = Date.now() + Math.random();
+        const addonEntry = buildCartItem(addon, {
+          batch_timestamp: batch,
+          parent_item_key: mainKey,
+          is_addon: true,
+        });
+        setCart(prev => [...prev, addonEntry]);
+      });
+
+    setHasNewItems(true);
+    setLineItemsModalOpen(false);
+    setSelectedMainItem(null);
+    setLineItemsDetails([]);
+  };
+
+  const handleAddMainItemOnly = () => {
+    if (!selectedMainItem) return;
+    addToCart(selectedMainItem);
+    setLineItemsModalOpen(false);
+    setSelectedMainItem(null);
+    setLineItemsDetails([]);
+    if (!isMobile) setShowCart(true);
+  };
+
+  // ─────────────────────────────────────────────────────────────────────────
+  // Place order
+  // ─────────────────────────────────────────────────────────────────────────
+
+  const handlePlaceOrder = async () => {
+    if (isPlacingRef.current || !canPlaceOrder) return;
+    isPlacingRef.current = true;
+    setIsPlacingOrder(true);
+
+    try {
+      const headers = { Authorization: `Bearer ${token}` };
+
+      if (activeOrderId && activeDineinOrderId) {
+        // Append new items as a sub-order
+        const newOnly = cart.filter(i => i.is_new_item && !i.saved_sub_order);
+        if (newOnly.length > 0) {
+          const r = await axios.post(
+            `${import.meta.env.VITE_API_ORDER_SERVICE_URL}/${clientId}/dinein/create-sub-order`,
+            {
+              items: newOnly.map(i => ({
+                item_id: i.id,
+                item_name: i.name,
+                quantity: i.quantity,
+                unit_price: i.unit_price,
+                line_total: i.unit_price * i.quantity,
+                slug: i.slug,
+                frontend_unique_key: i.frontend_unique_key,
+              })),
+            },
+            { headers, params: { client_id: clientId, parent_dinein_order_id: activeDineinOrderId } }
+          );
+          toast.success(`Sub-order ${r.data.data.dinein_order_id} created!`);
+        }
+      } else {
+        // Create a brand-new order
+        const total = cart.reduce((s, i) => s + (i.unit_price || 0) * i.quantity, 0);
+        await axios.post(
+          `${import.meta.env.VITE_API_ORDER_SERVICE_URL}/${clientId}/dinein/create`,
+          {
+            client_id: clientId,
+            table_id: Number(selectedTable),
+            price: total,
+            gst: 0,
+            cst: 0,
+            total_price: total,
+            status: 'ready',
+            items: cart.map(i => ({
+              item_id: i.id,
+              item_name: i.name,
+              quantity: i.quantity,
+              unit_price: i.unit_price,
+              line_total: i.unit_price * i.quantity,
+              status: 'ready',
+              slug: i.slug,
+            })),
+          },
+          { headers }
+        );
+        const tableToUpdate = tables.find(t => t.id.toString() === selectedTable);
+        if (tableToUpdate) {
+          await axios.post(
+            `${import.meta.env.VITE_API_TABLE_SERVICE_URL}/${clientId}/tables/update`,
+            {
+              ...tableToUpdate,
+              id: Number(selectedTable),
+              status: 'Occupied',
+              table_type: tableToUpdate.table_type.toString(),
+            },
+            { headers }
+          );
+        }
+      }
+
+      // Clean up on success
+      clearDraftForTable(selectedTable);
+      await fetchTables();
+      setCart([]);
+      setActiveOrderId(null);
+      setActiveDineinOrderId(null);
+      setShowCart(false);
+      setCurrentView('floor');
+      setCurrentBatchTimestamp(null);
+      setHasNewItems(false);
+      toast.success('Order placed!');
+    } catch (err) {
+      console.error('ORDER ERROR:', err);
+      toast.error('Order failed');
+    } finally {
+      isPlacingRef.current = false;
+      setIsPlacingOrder(false);
+    }
+  };
+
+  // ─────────────────────────────────────────────────────────────────────────
+  // Clear cart
+  // ─────────────────────────────────────────────────────────────────────────
+
+  const handleClearCart = () => {
+    if (cart.length === 0) return;
+    setShowClearConfirm(true);
+  };
+
+  const confirmClearCart = () => {
+    clearDraftForTable(selectedTable);
+    setCart([]);
+    setSelectedTable('');
+    setCurrentView('floor');
+    setShowCart(false);
+    setShowClearConfirm(false);
+    setActiveOrderId(null);
+    setActiveDineinOrderId(null);
+    setCurrentBatchTimestamp(null);
+    setHasNewItems(false);
+  };
+
+  // ─────────────────────────────────────────────────────────────────────────
+  // Delete order
+  // ─────────────────────────────────────────────────────────────────────────
+
+  const handleDeleteOrder = async (orderId, tableId) => {
+    try {
+      await axios.delete(
+        `${import.meta.env.VITE_API_ORDER_SERVICE_URL}/${clientId}/dinein/delete`,
+        {
+          params: { dinein_order_id: orderId, client_id: clientId },
+          headers: { Authorization: `Bearer ${token}` },
+        }
+      );
+      const tableObj = tables.find(t => t.id === tableId);
+      if (tableObj) {
+        await axios.post(
+          `${import.meta.env.VITE_API_TABLE_SERVICE_URL}/${clientId}/tables/update`,
+          {
+            id: tableId,
+            client_id: clientId,
+            name: tableObj.name,
+            table_type: tableObj.table_type,
+            status: 'vacant',
+            location_zone: tableObj.location_zone,
+          },
+          { headers: { Authorization: `Bearer ${token}` } }
+        );
+      }
+      toast.success('Order deleted');
+      await fetchTables();
+      setShowDeleteConfirm(false);
+      setOrderToDelete(null);
+    } catch (err) {
+      console.error(err);
+      toast.error('Failed to delete order');
+    }
+  };
+
+  // ─────────────────────────────────────────────────────────────────────────
+  // Mark as served
+  // ─────────────────────────────────────────────────────────────────────────
+
+  const handleMarkAsServed = async (orderId, tableId) => {
+    try {
+      await axios.post(
+        `${import.meta.env.VITE_API_ORDER_SERVICE_URL}/${clientId}/dinein/update`,
+        { id: orderId, client_id: clientId, status: 'served' },
+        { headers: { Authorization: `Bearer ${token}` } }
+      );
+      toast.success('Order marked as served');
+      await fetchTables();
+    } catch (err) {
+      console.error(err);
+      toast.error('Failed to mark as served');
+    }
+  };
+
+  // ─────────────────────────────────────────────────────────────────────────
+  // Bill / Invoice
+  // ─────────────────────────────────────────────────────────────────────────
+
+  const combineDuplicateItems = (items) => {
+    const m = new Map();
+    items.forEach(item => {
+      const k = item.item_id.toString();
+      if (m.has(k)) m.get(k).quantity += item.quantity || 0;
+      else m.set(k, { ...item });
+    });
+    return Array.from(m.values());
+  };
+
+  const handlePrintBill = async (orderId) => {
+    try {
+      setLoading(true);
+      const r = await axios.get(
+        `${import.meta.env.VITE_API_ORDER_SERVICE_URL}/${clientId}/dinein/table`,
+        { headers: { Authorization: `Bearer ${token}` } }
+      );
+      const order = (r.data?.data || []).find(o => o.id === orderId);
+      if (!order) { toast.error('Order not found'); return; }
+      const enriched = (order.items || []).map(item => {
+        const inv = inventoryMap[item.item_id] || {};
+        return {
+          ...item,
+          unit_price: item.unit_price ?? inv.unit_price ?? 0,
+          name: item.item_name ?? inv.name ?? 'Unnamed Item',
+        };
+      });
+      setInvoiceOrderData({ ...order, items: combineDuplicateItems(enriched) });
+      setInvoiceModalOpen(true);
+    } catch (e) {
+      console.error(e);
+      toast.error('Failed to load order');
+    } finally {
+      setLoading(false);
+    }
+  };
+
+  const handleBillFromCart = async () => {
+    if (!activeOrderId) { toast.error('No active order'); return; }
+    try {
+      setLoading(true);
+      const r = await axios.get(
+        `${import.meta.env.VITE_API_ORDER_SERVICE_URL}/${clientId}/dinein/table`,
+        { headers: { Authorization: `Bearer ${token}` } }
+      );
+      const order = (r.data?.data || []).find(o => o.id === activeOrderId);
+      if (!order) { toast.error('Order not found'); return; }
+      const enriched = (order.items || []).map(item => {
+        const inv = inventoryMap[item.item_id] || {};
+        return {
+          ...item,
+          unit_price: item.unit_price ?? inv.unit_price ?? 0,
+          name: item.item_name ?? inv.name ?? 'Unnamed',
+        };
+      });
+      setInvoiceOrderData({ ...order, items: combineDuplicateItems(enriched) });
+      setInvoiceModalOpen(true);
+    } catch (e) {
+      console.error(e);
+      toast.error('Failed to load order');
+    } finally {
+      setLoading(false);
+    }
+  };
+
+  // ─────────────────────────────────────────────────────────────────────────
+  // KOT
+  // ─────────────────────────────────────────────────────────────────────────
+
+  const handlePrintKOT = () => {
+    const itemsToPrint = newItems.length > 0 ? newItems : cart;
+    if (itemsToPrint.length === 0) {
+      toast.warn('No items to print KOT for.');
+      return;
+    }
+    const enriched = itemsToPrint.map(ci => {
+      if (ci.category_id) return ci;
+      const mi = menuItems.find(m => Number(m.id) === Number(ci.id));
+      return { ...ci, category_id: mi?.category_id || null };
+    });
+    const tableObj = tables.find(t => t.id.toString() === selectedTable);
+    printKOT({
+      counterTree,
+      categoriesFlat,
+      itemsToPrint: enriched,
+      meta: {
+        tableNumber: tableObj?.table_number || selectedTable,
+        orderMode,
+        dineinOrderId: activeDineinOrderId,
+        timestamp: new Date(),
+      },
+    });
+  };
+
+  // ─────────────────────────────────────────────────────────────────────────
+  // Derived values
+  // ─────────────────────────────────────────────────────────────────────────
+
+  const filteredItems = useMemo(() => {
+    const q = (searchQuery || '').trim().toLowerCase();
+    let items = menuItems;
+    if (selectedCategoryId) {
+      const ids = getCategoryAndChildrenIds(categories, selectedCategoryId);
+      items = items.filter(i => ids.includes(i.category_id));
+    }
+    if (!q) return items;
+    return items.filter(i =>
+      (i.name || '').toLowerCase().includes(q) ||
+      (i.category_name || '').toLowerCase().includes(q) ||
+      String(i.code || '').toLowerCase().includes(q)
+    );
+    // eslint-disable-next-line react-hooks/exhaustive-deps
+  }, [menuItems, selectedCategoryId, searchQuery, categories]);
+
+  const oldItems = cart.filter(i => !i.is_new_item || i.saved_sub_order);
+  const newItems = cart.filter(i => i.is_new_item && !i.saved_sub_order);
+  const groupedNewItems = newItems.reduce((acc, item) => {
+    const b = item.batch_timestamp || 'default';
+    if (!acc[b]) acc[b] = [];
+    acc[b].push(item);
+    return acc;
+  }, {});
+  const batchTimestamps = Object.keys(groupedNewItems).sort();
+
+  const canPlaceOrder =
+    (orderMode === 'delivery' || orderMode === 'takeaway')
+      ? cart.length > 0
+      : activeOrderId
+        ? hasNewItems && newItems.length > 0
+        : selectedTable && cart.length > 0;
+
+  const selectedCategoryName =
+    categoriesFlat.find(c => c.id === selectedCategoryId)?.name || 'All Categories';
+
+  // ─────────────────────────────────────────────────────────────────────────
+  // Render
+  // ─────────────────────────────────────────────────────────────────────────
+
+  return (
+    <div className="bg-bg-primary p-0 h-[calc(100vh-4rem)] overflow-x-hidden overflow-y-auto">
+
+
+      <div className="mx-auto px-2 py-2">
+        <div className="grid lg:grid-cols-4 gap-1">
+
+          {/* ── Category sidebar ── */}
+          <div className="w-full lg:col-span-1">
+            <div className="lg:h-[calc(98dvh-4rem)] lg:overflow-y-auto pr-1">
+              <CategoryTree
+                categories={sidebarCategories}
+                selectedCategoryId={selectedCategoryId}
+                onSelectCategory={setSelectedCategoryId}
+                defaultOpenAll
+              />
+            </div>
+          </div>
+
+          {/* ── Menu panel + Cart panel ── */}
+          <div className="lg:col-span-3 flex gap-2">
+
+            {/* Menu panel */}
+            <div className="transition-all duration-300 border-default border-border-default p-2 rounded-lg flex-1 overflow-y-auto h-[calc(98dvh-4rem)] lg:h-auto lg:max-h-[calc(98dvh-4rem)]">
+
+              {/* Top controls */}
+              <div className="space-y-2 mb-2">
+
+                {/* Dietary quick-filters */}
+                <div className="flex gap-2 overflow-x-auto scrollbar-hide pb-2">
+                  {dieterySubCategories.map(cat => (
+                    <button
+                      key={cat.id}
+                      onClick={() => {
+                        setSelectedCategoryId(cat.id);
+                        const n = findNodeAndChildren(categories, cat.id);
+                        if (n) setSidebarCategories([n]);
+                      }}
+                      className={`px-3 py-1.5 rounded-lg text-sm font-semibold border whitespace-nowrap transition-all flex-shrink-0
+                          ${selectedCategoryId === cat.id
+                          ? 'bg-action-primary text-white border-action-primary'
+                          : 'bg-bg-tertiary text-text-primary hover:border-action-primary'}`}
+                    >
+                      {cat.name}
+                    </button>
+                  ))}
+                </div>
+
+                {/* Back button + Category name + Search */}
+                <div className="flex items-center justify-between lg:flex-row flex-col gap-2">
+                  <div className="flex items-center gap-2">
+                    <button
+                      onClick={handleBackToTables}
+                      className="p-2 rounded-lg bg-bg-tertiary border border-border-default hover:bg-bg-secondary"
+                    >
+                      <ArrowLeft size={20} />
+                    </button>
+                    <h2 className="text-xl font-semibold text-text-primary truncate">
+                      {selectedCategoryName}
+                      <span className="text-sm ml-2">({filteredItems.length})</span>
+                    </h2>
+                  </div>
+                  <div className="relative w-64 max-w-full">
+                    <Search size={16} className="absolute left-3 top-1/2 -translate-y-1/2 text-text-secondary" />
+                    <input
+                      ref={searchInputRef}
+                      value={searchQuery}
+                      onChange={e => setSearchQuery(e.target.value)}
+                      placeholder="Search items..."
+                      className="w-full pl-9 pr-3 py-2 text-sm rounded-lg border border-border-default bg-bg-primary focus:outline-none focus:ring-2 focus:ring-action-primary"
+                    />
+                  </div>
+                </div>
+              </div>
+
+              {/* Item grid */}
+              <div className={`grid gap-2 grid-cols-2 md:grid-cols-4 ${showCart ? 'lg:grid-cols-3' : 'lg:grid-cols-4'}`}>
+                {filteredItems.map(item => {
+                  const dp = item.discount && item.unit_price && Number(item.discount) > 0
+                    ? ((Number(item.discount) * 100) / Number(item.unit_price)).toFixed(0)
+                    : null;
+                  const ac = item.line_item_id?.length || 0;
+                  return (
+                    <div
+                      key={item.id}
+                      onClick={() => handleItemClick(item)}
+                      className="flex gap-2 items-center bg-bg-primary border-default border-border-default rounded-xl p-1 shadow-sm hover:shadow-md transition cursor-pointer"
+                    >
+                      <div className="w-14 h-16 rounded-lg overflow-hidden shrink-0 bg-gray-100">
+                        <ImagePreview
+                          clientId={clientId}
+                          imageId={item.image_id}
+                          token={token}
+                          alt={item.name}
+                          baseUrl={import.meta.env.VITE_API_DOCUMENT_SERVICE_URL}
+                          urlBuilder={({ baseUrl, clientId, imageId }) =>
+                            `${baseUrl}/${clientId}/document/download?doc_id=${imageId}`}
+                          className="w-full h-full object-cover"
+                        />
+                      </div>
+                      <div className="flex-1 min-w-0">
+                        <h3 className="text-sm font-semibold text-text-primary line-clamp-2">
+                          {item.name}
+                        </h3>
+                        <div className="flex items-center gap-2 mt-1">
+                          {dp ? (
+                            <>
+                              <span className="text-sm font-bold text-action-primary">
+                                ₹{(item.unit_price - item.discount).toFixed(0)}
+                              </span>
+                              <span className="text-xs line-through text-text-secondary">
+                                ₹{item.unit_price}
+                              </span>
+                              <span className="text-xs text-action-danger font-semibold">{dp}% OFF</span>
+                            </>
+                          ) : (
+                            <span className="text-sm font-bold text-action-primary">
+                              ₹{item.unit_price}
+                            </span>
+                          )}
+                        </div>
+                        {ac > 0 && (
+                          <span className="text-xs bg-blue-100 text-blue-700 px-2 py-0.5 rounded-full font-semibold">
+                            +{ac} addon{ac > 1 ? 's' : ''}
+                          </span>
+                        )}
+                      </div>
+                    </div>
+                  );
+                })}
+              </div>
+            </div>
+
+            {/* ── Cart panel (desktop only) ── */}
+            {!isMobile && (
+              <div
+                className={`transition-all duration-300 ease-in-out
+                    ${showCart ? 'w-[22rem] opacity-100 z-30' : 'w-0 opacity-0 pointer-events-none'}`}
+              >
+                <div className="border border-gray-300 rounded-xl bg-white shadow-xl lg:h-[calc(98dvh-4rem)] flex flex-col">
+                  <div className="flex flex-col h-full p-4">
+
+                    {/* Cart header */}
+                    <div className="pb-3 border-b space-y-2">
+                      <h2 className="text-lg font-semibold text-gray-800">Your Order</h2>
+
+                      <div className="flex items-center justify-between text-sm bg-gray-50 px-3 py-2 rounded-lg">
+                        <div className="flex items-center gap-2">
+                          {selectedTable && (
+                            <span className="font-semibold text-lg text-gray-700">
+                              {tables.find(t => t.id.toString() === selectedTable)?.table_number}
+                            </span>
+                          )}
+                        </div>
+                        <span className="text-base font-bold text-red-600">₹{getTotalPrice()}</span>
+                      </div>
+
+                      {/* Draft saved indicator */}
+                      {draftSavedAt && (
+                        <div className="flex items-center gap-1.5 text-xs text-green-700 bg-green-50 px-2 py-1 rounded-lg">
+                          <Save size={11} />
+                          <span>
+                            Draft saved ·{' '}
+                            {new Date(draftSavedAt).toLocaleTimeString([], {
+                              hour: '2-digit',
+                              minute: '2-digit',
+                            })}
+                          </span>
+                        </div>
+                      )}
+                    </div>
+
+                    {/* Dine-in / Takeaway toggle */}
+                    <div className="mt-3 space-y-2">
+
+                      <div className="flex bg-gray-100 rounded-lg p-1">
+                        <button
+                          onClick={() => setOrderMode('delivery')}
+                          className={`flex-1 py-2 rounded-md text-sm font-medium flex items-center justify-center gap-2
+      ${orderMode === 'delivery'
+                              ? 'bg-action-primary text-white shadow-sm'
+                              : 'text-gray-600 hover:text-gray-800'}`}
+                        >
+                          <Users size={16} /> Delivery
+                        </button>
+
+                        <button
+                          onClick={() => setOrderMode('takeaway')}
+                          className={`flex-1 py-2 rounded-md text-sm font-medium flex items-center justify-center gap-2
+      ${orderMode === 'takeaway'
+                              ? 'bg-action-primary text-white shadow-sm'
+                              : 'text-gray-600 hover:text-gray-800'}`}
+                        >
+                          <Package size={16} /> Takeaway
+                        </button>
+                      </div>
+
+                      {/* TABLE SELECTOR */}
+                      {(orderMode === "delivery" || orderMode === "takeaway") && (
+                        <select
+                          value={selectedTable || ""}
+                          onChange={(e) => setSelectedTable(e.target.value)}
+                          className="w-full border rounded-lg p-2 text-sm"
+                        >
+                          <option value="">Select Table</option>
+
+                          {(orderMode === "delivery" ? deliveryTables : takeawayTables).map(t => (
+                            <option key={t.id} value={t.id}>
+                              {t.name}
+                            </option>
+                          ))}
+                        </select>
+                      )}
+
+                    </div>
+
+                    {/* Cart body */}
+                    {cart.length === 0 ? (
+                      <div className="flex-1 flex items-center justify-center text-sm text-gray-400">
+                        No items added
+                      </div>
+                    ) : (
+                      <>
+                        <div className="flex-1 overflow-y-auto mt-4 space-y-2">
+
+                          {/* Old (previously placed) items */}
+                          {getGroupedCartItems(oldItems).map((group, idx) => (
+                            <OldItemRow
+                              key={`old-${idx}`}
+                              group={group}
+                              clientId={clientId}
+                              token={token}
+                              activeDineinOrderId={activeDineinOrderId}
+                            />
+                          ))}
+
+                          {/* Divider between old and new */}
+                          {activeOrderId && oldItems.length > 0 && newItems.length > 0 && (
+                            <div className="flex items-center gap-2 my-2">
+                              <div className="flex-1 h-px bg-gradient-to-r from-transparent via-orange-400 to-transparent" />
+                              <span className="text-xs font-semibold text-orange-600 px-2">NEW ITEMS</span>
+                              <div className="flex-1 h-px bg-gradient-to-r from-orange-400 via-transparent to-transparent" />
+                            </div>
+                          )}
+
+                          {/* New items (editable), grouped by batch */}
+                          {batchTimestamps.map((ts, bi) => (
+                            <React.Fragment key={ts}>
+                              {bi > 0 && (
+                                <div className="flex items-center gap-2 my-2">
+                                  <div className="flex-1 h-px bg-gradient-to-r from-transparent via-orange-400 to-transparent" />
+                                  <span className="text-xs font-semibold text-orange-600 px-2">
+                                    NEW ITEMS
+                                  </span>
+                                  <div className="flex-1 h-px bg-gradient-to-r from-orange-400 via-transparent to-transparent" />
+                                </div>
+                              )}
+                              {getGroupedCartItems(groupedNewItems[ts]).map((group, idx) => (
+                                <NewItemRow
+                                  key={`new-${ts}-${idx}`}
+                                  group={group}
+                                  clientId={clientId}
+                                  token={token}
+                                  onUpdateQuantity={updateQuantity}
+                                  onRemove={removeFromCart}
+                                />
+                              ))}
+                            </React.Fragment>
+                          ))}
+                        </div>
+
+                        {/* ── Action buttons ── */}
+                        <div className="grid grid-cols-2 gap-2 mt-3">
+
+                          {/* Place Order */}
+                          <button
+                            onClick={handlePlaceOrder}
+                            disabled={!canPlaceOrder || isPlacingOrder}
+                            className={`py-2 rounded-lg text-sm font-semibold
+                                ${canPlaceOrder && !isPlacingOrder
+                                ? 'bg-action-primary text-white hover:bg-action-danger'
+                                : 'bg-gray-300 cursor-not-allowed'}`}
+                          >
+                            {isPlacingOrder ? 'Placing...' : 'Place Order'}
+                          </button>
+
+                          {/* Bill */}
+                          <button
+                            onClick={handleBillFromCart}
+                            className="py-2 rounded-lg text-sm font-semibold bg-green-600 text-white hover:bg-green-700 flex items-center justify-center gap-1"
+                          >
+                            <FileText size={16} /> Bill
+                          </button>
+
+                          {/* Save Draft */}
+                          <button
+                            onClick={handleSaveDraft}
+                            disabled={cart.length === 0}
+                            title="Save draft — items will be here even after a page refresh"
+                            className={`py-2 border rounded-lg text-sm flex items-center justify-center gap-1 font-semibold transition-colors
+                                ${cart.length > 0
+                                ? 'bg-yellow-50 border-yellow-400 text-yellow-700 hover:bg-yellow-100'
+                                : 'opacity-40 cursor-not-allowed text-gray-400 border-gray-200'}`}
+                          >
+                            <Save size={15} /> Save
+                          </button>
+
+                          {/* Clear */}
+                          <button
+                            onClick={handleClearCart}
+                            className="py-2 border rounded-lg text-sm hover:bg-gray-100"
+                          >
+                            Clear
+                          </button>
+
+                          {/* Print KOT — spans both columns */}
+                          <button
+                            onClick={handlePrintKOT}
+                            disabled={cart.length === 0}
+                            className={`col-span-2 py-2 border rounded-lg text-sm flex items-center justify-center gap-1 transition-colors
+                                ${cart.length > 0
+                                ? 'hover:bg-gray-100 text-gray-700'
+                                : 'opacity-40 cursor-not-allowed text-gray-400'}`}
+                          >
+                            <PrinterIcon size={16} /> Print KOT
+                          </button>
+                        </div>
+                      </>
+                    )}
+                  </div>
+                </div>
+              </div>
+            )}
+          </div>
+        </div>
+      </div>
+
+
+      {/* ── Floating cart button (mobile) ── */}
+      {currentView === 'order' && cart.length > 0 && !showCart && (
+        <button
+          onClick={() => setShowCart(true)}
+          className="fixed bottom-6 right-6 bg-action-primary text-white p-4 rounded-full shadow-lg z-40"
+        >
+          <ShoppingCart size={24} />
+        </button>
+      )}
+
+      {/* ── Clear confirm dialog ── */}
+      {showClearConfirm && (
+        <div className="fixed inset-0 z-50 flex items-center justify-center bg-black/40">
+          <div className="bg-white rounded-lg p-6 w-80 shadow-xl">
+            <h3 className="text-lg font-semibold mb-2 text-gray-800">Clear all items?</h3>
+            <p className="text-sm text-gray-500 mb-4">
+              This will also discard the saved draft for this table.
+            </p>
+            <div className="flex gap-3">
+              <button
+                onClick={() => setShowClearConfirm(false)}
+                className="flex-1 py-2 border rounded-lg hover:bg-gray-100"
+              >
+                Cancel
+              </button>
+              <button
+                onClick={confirmClearCart}
+                className="flex-1 py-2 bg-action-primary text-white rounded-lg hover:bg-action-danger"
+              >
+                Clear
+              </button>
+            </div>
+          </div>
+        </div>
+      )}
+
+      {/* ── Modals ── */}
+      <LineItemsModal
+        isOpen={lineItemsModalOpen}
+        onClose={() => {
+          setLineItemsModalOpen(false);
+          setSelectedMainItem(null);
+          setLineItemsDetails([]);
+        }}
+        mainItem={selectedMainItem}
+        lineItems={lineItemsDetails}
+        onAddMainOnly={handleAddMainItemOnly}
+        onAddWithSelectedAddons={handleAddMainItemWithSelectedAddons}
+      />
+
+      <DeleteConfirmModal
+        isOpen={showDeleteConfirm}
+        onClose={() => { setShowDeleteConfirm(false); setOrderToDelete(null); }}
+        onConfirm={() => {
+          if (orderToDelete) {
+            handleDeleteOrder(orderToDelete.orderId, orderToDelete.tableId);
+          }
+        }}
+      />
+
+      {invoiceModalOpen && invoiceOrderData && (
+        <InvoiceModal
+          clientId={clientId}
+          token={token}
+          selectedOrder={invoiceOrderData}
+          tablesMap={tables.reduce((m, t) => { m[t.id] = t; return m; }, {})}
+          inventoryMap={inventoryMap}
+          onClose={() => {
+            setInvoiceModalOpen(false);
+            setInvoiceOrderData(null);
+            fetchTables();
+          }}
+          onSave={id => {
+            console.log('Invoice saved:', id);
+            fetchTables();
+          }}
+        />
+      )}
+    </div>
+  );
 };
 
 export default TakeOrder_V1;

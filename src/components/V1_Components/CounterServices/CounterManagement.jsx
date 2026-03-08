@@ -1,35 +1,23 @@
 import React, { useEffect, useState, useRef } from "react";
 import { FaEdit, FaTrash, FaCheck, FaTimes, FaSearch, FaUsers, FaClock, FaPlus } from "react-icons/fa";
 import axios from 'axios';
-import { toast } from "react-toastify";
-import UniversalAddModal_V1 from "../Modals/UniversalAddModal_V1";
-import UniversalEditModal_V1 from "../Modals/UniversalEditModal_V1";
+import UniversalAddModal from "../../utils/Modals/UniversalAddModal";
+import UniversalEditModal from "../../utils/Modals/UniversalEditModal";
 import UniversalBulkUpdateModal from "../../utils/Modals/UniversalBulkUpdateModal";
 import UniversalBulkDeleteModal from "../../utils/Modals/UniversalBulkDeleteModal";
 import AccessGuard from "../../utils/Interceptors/ProtectedRoute";
+import TableConfigModal from "../../utils/Modals/TableConfigModal";
 
 const statusConfig = {
-    Active: {
-        card: "border-action-primary",
-        icon: <FaCheck className="text-action-success text-xl" />,
-        label: "Active"
-    },
-    Busy: {
-        card: "border-yellow-400",
-        icon: <FaUsers className="text-yellow-600 text-xl" />,
-        label: "Busy"
-    },
-    Closed: {
-        card: "border-border-default",
-        icon: <FaTimes className="text-gray-600 text-xl" />,
-        label: "Closed"
-    }
+    Vacant: { card: "border-tableStatusBorder-vacant", icon: <FaCheck className="text-action-success text-xl" />, label: "Available" },
+    Occupied: { card: "border-tableStatusBorder-occupied", icon: <FaUsers className="text-action-danger text-xl" />, label: "Occupied" },
+    Reserved: { card: "border-tableStatusBorder-reserved", icon: <FaClock className="text-action-primary text-xl" />, label: "Reserved" }
 };
 
-
 const CounterManagement = ({ clientId, token, screenIds, userId }) => {
+
+    console.log("requesterId", userId)
     const [searchTerm, setSearchTerm] = useState("");
-    const [statusFilter, setStatusFilter] = useState("");
     const [tableRanges, setTableRanges] = useState([]);
     const [tables, setTables] = useState([]);
     const [originalTables, setOriginalTables] = useState([]);
@@ -63,8 +51,13 @@ const CounterManagement = ({ clientId, token, screenIds, userId }) => {
     const [showFirstDeleteConfirm, setShowFirstDeleteConfirm] = useState(false);
     const [showSecondDeleteConfirm, setShowSecondDeleteConfirm] = useState(false);
 
-    const [viewMode, setViewMode] = useState(false);
-    const [addItemsMode, setAddItemsMode] = useState(false);
+    const [zones, setZones] = useState([]);
+    const [sections, setSections] = useState([]);
+    const [showConfig, setShowConfig] = useState(false);
+    const [editTable, setEditTable] = useState(null);
+    const editRef = useRef(null);
+
+
     const getColumnsByScreen = () => {
         const width = window.innerWidth;
 
@@ -88,18 +81,142 @@ const CounterManagement = ({ clientId, token, screenIds, userId }) => {
         return () => window.removeEventListener("resize", onResize);
     }, []);
 
-    const getSortedTables = (items, COLS_PER_ROW) => {
-        const active = items.filter(t => t.status === "Active");
-        const busy = items.filter(t => t.status === "Busy");
-        const closed = items.filter(t => t.status === "Closed");
 
-        const sorted = [...active, ...busy, ...closed];
+    const getSortedTables = (tablesToSort, COLS_PER_ROW) => {
 
-        return sorted.sort((a, b) =>
-            a.name.localeCompare(b.name, undefined, { numeric: true })
+        const normalize = (s) => (s || "").toLowerCase();
+
+        const vacant = [];
+        const reserved = [];
+        const occupied = [];
+        const others = [];
+
+        tablesToSort.forEach(t => {
+            const s = normalize(t.status);
+
+            if (s === "vacant" || s === "available") vacant.push(t);
+            else if (s === "reserved") reserved.push(t);
+            else if (s === "occupied") occupied.push(t);
+            else others.push(t); // cleaning, billing, running etc
+        });
+
+        const sorter = (a, b) =>
+            a.name.localeCompare(b.name, undefined, { numeric: true });
+
+        vacant.sort(sorter);
+        reserved.sort(sorter);
+        occupied.sort(sorter);
+        others.sort(sorter);
+
+        const totalTables = tablesToSort.length;
+        const totalRows = Math.ceil(totalTables / COLS_PER_ROW);
+
+        const grid = Array.from({ length: totalRows }, () =>
+            Array(COLS_PER_ROW).fill(null)
         );
+
+        const canFill = (row, col) =>
+            row * COLS_PER_ROW + col < totalTables;
+
+        /* -------- RESERVED → RIGHT SIDE (TOP) -------- */      let filledCount = 0;
+        let resIndex = 0;
+        for (let col = COLS_PER_ROW - 1; col >= 0 && resIndex < reserved.length; col--) {
+            for (let row = 0; row < totalRows && resIndex < reserved.length; row++) {
+                if (!grid[row][col] && canFill(row, col)) {
+                    grid[row][col] = reserved[resIndex++];
+                    filledCount++;
+                }
+            }
+        }
+
+        /* ---------------- OCCUPIED (below reserved, right-side) ---------------- */
+        let occIndex = 0;
+        for (let col = COLS_PER_ROW - 1; col >= 0 && occIndex < occupied.length; col--) {
+            for (let row = 0; row < totalRows && occIndex < occupied.length; row++) {
+                if (!grid[row][col] && canFill(row, col)) {
+                    grid[row][col] = occupied[occIndex++];
+                    filledCount++;
+                }
+            }
+        }
+
+        /* ---------------- VACANT (everything else) ---------------- */
+        let vacIndex = 0;
+        for (let row = 0; row < totalRows && vacIndex < vacant.length; row++) {
+            for (let col = 0; col < COLS_PER_ROW && vacIndex < vacant.length; col++) {
+                if (!grid[row][col] && canFill(row, col)) {
+                    grid[row][col] = vacant[vacIndex++];
+                    filledCount++;
+                }
+            }
+        }
+
+        return grid.flat().filter(Boolean);
     };
 
+
+    // const getSortedTables = (tablesToSort, COLS_PER_ROW) => {
+
+
+    //     const occupied = tablesToSort
+    //         .filter(t => t.status === 'Occupied')
+    //         .sort((a, b) => a.name.localeCompare(b.name, undefined, { numeric: true }));
+
+    //     const reserved = tablesToSort
+    //         .filter(t => t.status === 'Reserved')
+    //         .sort((a, b) => a.name.localeCompare(b.name, undefined, { numeric: true }));
+
+    //     const vacant = tablesToSort
+    //         .filter(t => t.status === 'Vacant')
+    //         .sort((a, b) => a.name.localeCompare(b.name, undefined, { numeric: true }));
+
+    //     const totalTables = tablesToSort.length;
+    //     const totalRows = Math.ceil(totalTables / COLS_PER_ROW);
+
+    //     const grid = Array.from({ length: totalRows }, () =>
+    //         Array(COLS_PER_ROW).fill(null)
+    //     );
+
+    //     let filledCount = 0;
+
+    //     const canFill = (row, col) =>
+    //         row * COLS_PER_ROW + col < totalTables;
+
+    //     /* ---------------- RESERVED (right-most, top-down) ---------------- */
+    //     let resIndex = 0;
+    //     for (let col = COLS_PER_ROW - 1; col >= 0 && resIndex < reserved.length; col--) {
+    //         for (let row = 0; row < totalRows && resIndex < reserved.length; row++) {
+    //             if (!grid[row][col] && canFill(row, col)) {
+    //                 grid[row][col] = reserved[resIndex++];
+    //                 filledCount++;
+    //             }
+    //         }
+    //     }
+
+    //     /* ---------------- OCCUPIED (below reserved, right-side) ---------------- */
+    //     let occIndex = 0;
+    //     for (let col = COLS_PER_ROW - 1; col >= 0 && occIndex < occupied.length; col--) {
+    //         for (let row = 0; row < totalRows && occIndex < occupied.length; row++) {
+    //             if (!grid[row][col] && canFill(row, col)) {
+    //                 grid[row][col] = occupied[occIndex++];
+    //                 filledCount++;
+    //             }
+    //         }
+    //     }
+
+    //     /* ---------------- VACANT (everything else) ---------------- */
+    //     let vacIndex = 0;
+    //     for (let row = 0; row < totalRows && vacIndex < vacant.length; row++) {
+    //         for (let col = 0; col < COLS_PER_ROW && vacIndex < vacant.length; col++) {
+    //             if (!grid[row][col] && canFill(row, col)) {
+    //                 grid[row][col] = vacant[vacIndex++];
+    //                 filledCount++;
+    //             }
+    //         }
+    //     }
+
+    //     return grid.flat().filter(Boolean);
+    // };
 
 
     const fetchTables = async () => {
@@ -116,153 +233,407 @@ const CounterManagement = ({ clientId, token, screenIds, userId }) => {
 
             if (result.screen_id === "default_tables") {
                 const tableList = Array.isArray(result?.data) ? result.data : [];
+                setTables(tableList);
+                setOriginalTables(structuredClone(tableList));
 
-                // Exclude takeaway table
-                const filteredTables = tableList
-                .filter(table => table.id !== 500)
-                    .sort((a, b) =>
-                        a.name.localeCompare(b.name, undefined, { numeric: true })
-                    );
 
-                setTables(filteredTables);
-                setOriginalTables(filteredTables);
-            }console.log("ALL TABLES FROM API", result.data);
-            console.log("SCREEN ID", result.screen_id);
-            
+            }
         } catch (error) {
             console.error("Error fetching tables:", error);
         } finally {
             setLoading(false);
         }
     };
-    const validateCounterName = (name, existingCounters) => {
-        if (!name || !name.trim()) {
-            return "Counter name is required";
+    // const normalizeTableRangeStrict = (rangeStr) => {
+    //     const raw = rangeStr.trim().toUpperCase();
+
+    //     // Reject any unpadded numbers like B1, A3
+    //     if (/\b[A-Z]+\d\b/.test(raw)) {
+    //         throw new Error("Table numbers must be 2 digits. Use B01 instead of B1");
+    //     }
+
+    //     // Reject mixed digit width ranges like A01:A3
+    //     const parts = raw.split(",");
+    //     for (const part of parts) {
+    //         if (part.includes(":")) {
+    //             const [start, end] = part.split(":");
+
+    //             const startDigits = start.match(/\d+$/)?.[0]?.length;
+    //             const endDigits = end.match(/\d+$/)?.[0]?.length;
+
+    //             if (startDigits !== endDigits) {
+    //                 throw new Error("Mixed numbering not allowed. Use A01:A03");
+    //             }
+    //         }
+    //     }
+
+    //     return raw;
+    // };
+
+    // const validateTableRangeStrict = (rangeStr, existingTables) => {
+    //     let normalized;
+
+    //     try {
+    //         normalized = normalizeTableRangeStrict(rangeStr);
+    //     } catch (e) {
+    //         return e.message;
+    //     }
+
+    //     const validPattern =
+    //         /^[A-Z]{1,3}\d{2}(?::[A-Z]{1,3}\d{2})?(,\s*[A-Z]{1,3}\d{2}(?::[A-Z]{1,3}\d{2})?)*$/;
+
+    //     if (!validPattern.test(normalized)) {
+    //         return "Invalid format. Use A01 or A01:A10 or A01,B02";
+    //     }
+
+    //     const generated = parseTableRange(normalized);
+
+    //     // Duplicate check
+    //     const duplicates = generated.filter((v, i, a) => a.indexOf(v) !== i);
+    //     if (duplicates.length > 0) {
+    //         return `Duplicate table(s): ${duplicates.join(", ")}`;
+    //     }
+
+    //     // Existing table conflict
+    //     const existingNames = existingTables.map(t => t.name.toUpperCase());
+    //     const conflicts = generated.filter(t => existingNames.includes(t));
+    //     if (conflicts.length > 0) {
+    //         return `Table already exists: ${conflicts.join(", ")}`;
+    //     }
+
+    //     return null;
+    // };
+
+    const fetchMasterValues = async (categoryId, setter) => {
+        try {
+            const res = await axios.get(
+                `${import.meta.env.VITE_API_INVENTORY_SERVICE_URL}/${clientId}/inventory/masters`,
+                {
+                    params: { category_id: categoryId },
+                    headers: { Authorization: `Bearer ${token}` }
+                }
+            );
+
+            setter(res.data.data || []);
+
+        } catch (err) {
+            console.error(`Error fetching ${categoryId}:`, err);
+            setter([]);
         }
-
-        const normalized = name.trim().toLowerCase();
-
-        const existingNames = existingCounters.map(
-            c => c.name?.trim().toLowerCase()
-        );
-
-        if (existingNames.includes(normalized)) {
-            return `Counter "${name}" already exists`;
-        }
-
-        return null; // ✅ valid
     };
 
+
+
+    useEffect(() => {
+        if (!clientId || !token) return;
+
+        fetchMasterValues("zone", setZones);
+        fetchMasterValues("section", setSections);
+
+    }, [clientId, token]);
+
+
+
+    // const parseTableRange = (rangeStr) => {
+    //     const parts = rangeStr.split(",");
+    //     const tables = [];
+
+    //     for (let part of parts) {
+    //         part = part.trim();
+
+    //         if (part.includes(":")) {
+    //             const [start, end] = part.split(":");
+
+    //             const prefix = start.match(/^[A-Z]+/)[0];
+    //             const startNum = parseInt(start.match(/\d{2}$/)[0], 10);
+    //             const endNum = parseInt(end.match(/\d{2}$/)[0], 10);
+
+    //             for (let i = startNum; i <= endNum; i++) {
+    //                 tables.push(`${prefix}${i.toString().padStart(2, "0")}`);
+    //             }
+    //         } else {
+    //             tables.push(part);
+    //         }
+    //     }
+
+    //     return tables;
+    // };
+
+    const parseTableRangeFlexible = (input) => {
+        if (!input || !input.trim()) return [];
+    
+        const parts = input.split(",").map(p => p.trim()).filter(Boolean);
+        const tables = [];
+    
+        for (const part of parts) {
+    
+            // ---------- RANGE (r1:r5) ----------
+            if (part.includes(":")) {
+    
+                const [start, end] = part.split(":");
+    
+                // Extract prefix and numbers
+                const prefixStart = start.match(/[A-Za-z]+/)?.[0]?.toUpperCase() || "";
+                const prefixEnd = end.match(/[A-Za-z]+/)?.[0]?.toUpperCase() || "";
+    
+                const numStart = parseInt(start.match(/\d+/)?.[0]);
+                const numEnd = parseInt(end.match(/\d+/)?.[0]);
+    
+                if (!numStart || !numEnd || prefixStart !== prefixEnd) continue;
+    
+                // Always pad to 2 digits
+                for (let i = numStart; i <= numEnd; i++) {
+                    tables.push(prefixStart + String(i).padStart(2, "0"));
+                }
+            }
+    
+            // ---------- SINGLE NAME (shanmugam) ----------
+            else {
+                tables.push(part.trim().toUpperCase());
+            }
+        }
+    
+        return tables;
+    };
+    
+    
     const generateTables = async () => {
         if (generatingRef.current) return;
         generatingRef.current = true;
         setIsGenerating(true);
-
+    
         try {
-            const newErrors = tableRanges.map(row => ({
-                range: !row.range,
-                table_type: !row.table_type,
-                location_zone: !row.location_zone
-            }));
-
-            setFieldErrors(newErrors);
-
-            const validRows = tableRanges.filter((row, index) =>
-                !newErrors[index].range &&
-                !newErrors[index].table_type &&
-                !newErrors[index].location_zone
-            );
-
-            if (validRows.length === 0) {
-                toast.error('Fill the fields')
-                return;
-            }
-
-            const payload = [];
-            for (let row of validRows) {
-                payload.push({
-                    client_id: clientId,
-                    name: row.range.trim(),
-                    table_type: row.table_type.toString(),
-                    status: row.remark || "Active",
-                    location_zone: row.location_zone,
-                    slug: `${clientId}-${row.range.trim().toLowerCase().replace(/\s+/g, '-')}`
-                });
-
-            }
-
-
-            for (let data of payload) {
-                try {
+    
+            for (let row of tableRanges) {
+    
+                if (!row.range || !row.section || !row.location_zone || !row.table_type) {
+                    generatingRef.current = false;
+                    setIsGenerating(false);
+                    return;
+                }
+    
+                const tableNames = parseTableRangeFlexible(row.range);
+    
+                if (tableNames.length === 0) {
+                    generatingRef.current = false;
+                    setIsGenerating(false);
+                    return;
+                }
+    
+                for (const tableName of tableNames) {
+                    const alreadyExists = tables.some(
+                        t => t.name.toUpperCase() === tableName.toUpperCase()
+                    );
+                
+                    if (alreadyExists) {
+                        alert(`Table "${tableName}" already exists!!!`)
+                        continue;
+                    }
+                    const payload = {
+                        client_id: clientId,
+                        name: tableName.trim(),
+                        table_type: row.table_type.toString(),
+                        status: row.remark || "vacant",
+                        section: row.section,
+                        location_zone: row.location_zone,
+                        description: "",
+                        sort_order: null,
+                        is_active: true,
+                        qr_code_url: "",
+                        slug: `${clientId}-${tableName.replace(/\s+/g, '-').toLowerCase()}`
+                    };
+    
                     await axios.post(
                         `${import.meta.env.VITE_API_TABLE_SERVICE_URL}/${clientId}/tables/create`,
-                        data,
+                        payload,
                         { headers: { Authorization: `Bearer ${token}` } }
                     );
-                } catch (err) {
-                    if (err.response && err.response.status === 400) {
-                        alert(`Counter name "${data.name}" already exists!`);
-                    }
                 }
             }
-
+    
             await fetchTables();
             setShowAddTable(false);
             setTableRanges([]);
-            setFieldErrors([]);
-
+    
         } catch (err) {
-            console.error("Error generating tables", err);
+            console.error(err);
         } finally {
             generatingRef.current = false;
             setIsGenerating(false);
         }
     };
+    
+    // const generateTables = async () => {
+    //     if (generatingRef.current) return;
+    //     generatingRef.current = true;
+    //     setIsGenerating(true);
 
+    //     try {
+    //         const newErrors = tableRanges.map(row => ({
+    //             range: !row.range,
+    //             table_type: !row.table_type,
+    //             section: !row.section,
+    //             location_zone: !row.location_zone
+    //         }));
+
+    //         setFieldErrors(newErrors);
+
+    //         const validRows = tableRanges.filter((row, index) =>
+    //             !newErrors[index].range &&
+    //             !newErrors[index].table_type &&
+    //             !newErrors[index].section &&
+    //             !newErrors[index].location_zone
+    //         );
+
+    //         if (validRows.length === 0) {
+    //             toast.error('Fill the fields')
+    //             return;
+    //         }
+
+    //         const payload = [];
+    //         for (let row of validRows) {
+    //             const error = validateTableRangeStrict(row.range, originalTables);
+    //             if (error) {
+    //                 toast.error(error);
+    //                 return; // ⛔ STOP ENTIRE CREATION
+    //             }
+
+    //             const normalized = normalizeTableRangeStrict(row.range);
+    //             const tableNumbers = parseTableRange(normalized);
+
+    //             tableNumbers.forEach(num => {
+    //                 payload.push({
+    //                     client_id: clientId,
+    //                     name: num,
+    //                     table_type: row.table_type.toString(),
+    //                     status: row.remark || "Vacant",
+    //                     section: row.section,
+    //                     location_zone: row.location_zone,
+    //                     description: row.description || "",
+    //                     sort_order: row.sort_order ? parseInt(row.sort_order) : null,
+    //                     is_active: row.is_active || false,
+    //                     qr_code_url: row.qr_code_url || "",
+    //                     slug: `${clientId}-${num.toLowerCase()}`
+    //                 });
+
+    //             });
+    //         }
+
+
+    //         for (let data of payload) {
+    //             try {
+    //                 await axios.post(
+    //                     `${import.meta.env.VITE_API_TABLE_SERVICE_URL}/${clientId}/tables/create`,
+    //                     data,
+    //                     { headers: { Authorization: `Bearer ${token}` } }
+    //                 );
+    //             } catch (err) {
+    //                 if (err.response && err.response.status === 400) {
+    //                     alert(`Table "${data.name}" already exists!`);
+    //                 }
+    //             }
+    //         }
+
+    //         await fetchTables();
+    //         setShowAddTable(false);
+    //         setTableRanges([]);
+    //         setFieldErrors([]);
+
+    //     } catch (err) {
+    //         console.error("Error generating tables", err);
+    //     } finally {
+    //         generatingRef.current = false;
+    //         setIsGenerating(false);
+    //     }
+    // };
     const handleEditChange = (id, field, value) => {
-        setTables(prev =>
-            prev.map(table =>
-                table.id === id
-                    ? {
-                        ...table,
-                        [field]: field === "table_type" ? Math.max(1, Number(value) || 1) : value
-                    }
-                    : table
-            )
-        );
+        setEditTable(prev => {
+            const updated = {
+                ...prev,
+                [field]: field === "table_type"
+                    ? Math.max(1, Number(value) || 1)
+                    : value
+            };
+
+            editRef.current = updated;   // ⭐ IMPORTANT
+            return updated;
+        });
+
+
         setEditFieldErrors(prevErrors => ({ ...prevErrors, [field]: undefined }));
     };
 
-    const saveEdit = async (updatedTable) => {
-        // 1️⃣ Optimistic UI update
-        setTables(prev =>
-          prev.map(t =>
-            t.id === updatedTable.id ? { ...updatedTable } : t
-          )
-        );
-      
-        setEditRowId(null);
-      
-        try {
-          await axios.post(
-            `${import.meta.env.VITE_API_TABLE_SERVICE_URL}/${clientId}/tables/update`,
-            {
-              ...updatedTable,
-              table_type: updatedTable.table_type.toString()
-            },
-            { headers: { Authorization: `Bearer ${token}` } }
-          );
-      
-          // Optional: silent refetch to stay in sync
-          fetchTables();
-      
-        } catch (err) {
-          toast.error("Failed to update counter");
-          fetchTables(); // rollback safety
-        }
-      };
-      
 
+    const saveEdit = async () => {
+        const table = editRef.current;
+
+        // Validation
+        let errors = {};
+        if (Number(table.table_type) < 1) {
+            errors.table_type = 'Seating must be at least 1';
+        }
+        if (!table.table_type || table.table_type.toString().trim() === '') {
+            errors.table_type = 'Required';
+        }
+        // if (!table.section || table.section.trim() === '') {
+        //     errors.section = 'Required';
+        // }
+        if (!table.status || table.status.trim() === '') {
+            errors.status = 'Required';
+        }
+
+        if (Object.keys(errors).length > 0) {
+            setEditFieldErrors(errors);
+            return;
+        }
+
+        setEditFieldErrors({});
+
+        const original = originalTables.find(t => t.id === table.id);
+
+        const normalize = (v) => (v ?? "").toString().trim().toLowerCase();
+
+        const hasChanged =
+            normalize(original?.table_type) !== normalize(table.table_type) ||
+            normalize(original?.location_zone) !== normalize(table.location_zone) ||
+            normalize(original?.section) !== normalize(table.section) ||
+            normalize(original?.status) !== normalize(table.status);
+
+        if (!hasChanged) {
+            // Close modal
+            setEditTable(null);
+            setEditRowId(null);
+            setEditFieldErrors({});
+            return;
+        }
+
+        try {
+            const payload = {
+                ...table,
+                table_type: table.table_type.toString(),
+                status: table.status.trim()  // Keep exact casing from dropdown
+            };
+
+            console.log("Sending update payload:", payload);
+
+            await axios.post(
+                `${import.meta.env.VITE_API_TABLE_SERVICE_URL}/${clientId}/tables/update`,
+                payload,
+                { headers: { Authorization: `Bearer ${token}` } }
+            );
+
+            // Close modal BEFORE fetching to prevent stale data issues
+            setEditTable(null);
+            setEditRowId(null);
+            setEditFieldErrors({});
+
+            // Refresh table list
+            await fetchTables();
+
+        } catch (err) {
+            console.error("Error updating table", err);
+        }
+    };
     const confirmDelete = async () => {
         try {
             await axios.post(
@@ -376,7 +747,7 @@ const CounterManagement = ({ clientId, token, screenIds, userId }) => {
                 const updatedFields = {
                     ...table,
                     table_type: finalTableType.toString(),
-                    status: finalStatus,
+                    status: (finalStatus || "").toLowerCase().trim(),
                     location_zone: finalZone,
                     section: finalSection,
                 };
@@ -465,27 +836,35 @@ const CounterManagement = ({ clientId, token, screenIds, userId }) => {
             table.name.toLowerCase().includes(bulkDeleteSearch.toLowerCase())
         );
     };
+    const searchedTables = tables.filter(t => {
+        if (!searchTerm.trim()) return true;
 
-    
-    // const filteredTables = tables.filter(
-    //     table => Number(table.id) === 501 || Number(table.id) === 502
+        const text = searchTerm.toLowerCase();
+
+        return (
+            t.name?.toLowerCase().includes(text) ||
+            t.section?.toLowerCase().includes(text) ||
+            t.location_zone?.toLowerCase().includes(text) ||
+            t.status?.toLowerCase().includes(text)
+        );
+    });
+
+    // const filteredTables = getSortedTables(
+    //     tables.filter(table => {
+    //         const matchesSearch = table.name.toLowerCase().includes(searchTerm.toLowerCase());
+    //         const matchesStatus = !statusFilter || table.status === statusFilter;
+    //         return matchesSearch && matchesStatus;
+    //     }), colsPerRow
     // );
-    
-    
-    const filteredTables = getSortedTables(
-        tables.filter(table => {
-            const matchesSearch = table.name.toLowerCase().includes(searchTerm.toLowerCase());
-            const matchesStatus = !statusFilter || table.status === statusFilter;
-            return matchesSearch && matchesStatus;
-        }), colsPerRow
-    );
+    const filteredTables = getSortedTables(searchedTables, colsPerRow);
+
 
     if (loading) {
         return (
             <div className="min-h-screen bg-gray-50 flex items-center justify-center">
                 <div className="text-center">
                     <div className="animate-spin rounded-full h-16 w-16 border-b-4 border-orange-500 mx-auto mb-4"></div>
-                    <p className="text-gray-600 text-lg font-medium">Loading Counters...</p>
+                    <p className="text-gray-600 text-lg font-medium">Loading Tables...</p>
                 </div>
             </div>
         );
@@ -516,41 +895,41 @@ const CounterManagement = ({ clientId, token, screenIds, userId }) => {
                     <div className="rounded-xl p-2 mb-4">
                         <div className="flex flex-col lg:flex-row gap-3 lg:items-center lg:justify-between">
                             <div className="flex flex-col sm:flex-row gap-2 flex-1">
-                                <div className="relative ">
-                                    <FaSearch className="absolute left-3 top-1/2 transform -translate-y-1/2 text-text-secondary" />
+                                <div className="relative w-full sm:max-w-xs">
+                                    <FaSearch className="absolute left-3 top-1/2 -translate-y-1/2 text-text-secondary" />
                                     <input
                                         type="text"
                                         value={searchTerm}
                                         onChange={e => setSearchTerm(e.target.value)}
-                                        placeholder="Search counters..."
-                                        className="w-full pl-10 pr-3 py-2 border-default border-border-default rounded-lg focus:outline-none  focus:border-action-primary bg-bg-primary text-text-primary"
+                                        placeholder="Search table / section / zone / status..."
+                                        className="w-full pl-10 pr-3 py-2 border border-border-default rounded-lg focus:outline-none focus:border-action-primary bg-bg-primary text-text-primary"
                                     />
                                 </div>
-                                <select
-                                    value={statusFilter}
-                                    onChange={e => setStatusFilter(e.target.value)}
-                                    className="px-3 py-2 border-default border-border-default rounded-lg focus:outline-none focus:ring-2 focus:border-action-primary bg-bg-primary text-text-primary"
-                                >
-                                    <option value="">All Status</option>
-                                    <option value="Active">Active</option>
-                                    <option value="Busy">Busy</option>
-                                    <option value="Closed">Closed</option>
-                                </select>
                             </div>
 
-                            <div className="flex flex-wrap gap-2">
-                                {/* <button
+
+                            <div className="flex flex-wrap gap-2 justify-center">
+                                <button
+                                    className="flex items-center gap-2 px-4 py-2 bg-action-success text-text-white rounded-lg transition-colors font-semibold text-sm shadow-md"
+                                    onClick={() => setShowConfig(true)}
+                                >
+                                    <FaEdit />   <span className="hidden md:inline">Config</span>
+                                </button>
+
+                                <button
                                     className="flex items-center gap-2 px-4 py-2 bg-action-primary text-text-white rounded-lg hover:bg-bulkActionsHover-updateHover hover:text-text-primary transition-colors font-semibold text-sm shadow-md"
                                     onClick={openBulkUpdate}
                                 >
-                                    <FaEdit /> <span>Bulk Update</span>
+                                    <FaEdit />
+                                    <span className="hidden md:inline">Bulk Update</span>
                                 </button>
+
                                 <button
                                     className="flex items-center gap-2 px-4 py-2 bg-bulkActions-delete text-text-white rounded-lg hover:bg-bulkActionsHover-deleteHover hover:text-text-primary transition-colors font-semibold text-sm shadow-md"
                                     onClick={openBulkDelete}
                                 >
-                                    <FaTrash /> <span>Bulk Delete</span>
-                                </button> */}
+                                    <FaTrash /> <span className="hidden md:inline">Bulk Delete</span>
+                                </button>
                                 <button
                                     className="flex items-center gap-2 px-4 py-2 bg-bulkActions-adding text-text-white rounded-lg hover:bg-bulkActionsHover-addingHover hover:text-text-primary transition-colors font-semibold text-sm shadow-md"
                                     onClick={() => {
@@ -558,8 +937,9 @@ const CounterManagement = ({ clientId, token, screenIds, userId }) => {
                                         setTableRanges([{
                                             range: "",
                                             table_type: "",
+                                            section: "",
                                             location_zone: "",
-                                            remark: "Active",
+                                            remark: "vacant",
                                             is_active: false,
                                             description: "",
                                             slug: "",
@@ -570,70 +950,66 @@ const CounterManagement = ({ clientId, token, screenIds, userId }) => {
                                         setFieldErrors([{}]);
                                     }}
                                 >
-                                    <FaPlus /> <span>Add Counter</span>
+                                    <FaPlus /> <span className="hidden md:inline">Add Table</span>
                                 </button>
                             </div>
                         </div>
                     </div>
 
                     {/* Table Grid */}
-                    <div className="grid grid-cols-2 sm:grid-cols-3 lg:grid-cols-4 xl:grid-cols-4 2xl:grid-cols-6 gap-2 sm:gap-3">
-                        {filteredTables.map(counter => {
-                            const config = statusConfig[counter.status] || statusConfig.Active;
-
+                    <div className="grid grid-cols-2 sm:grid-cols-4 lg:grid-cols-6 xl:grid-cols-6 2xl:grid-cols-8 gap-2 sm:gap-3">
+                        {filteredTables.map(table => {
                             return (
                                 <div
-                                    key={counter.id}
-                                    className={`relative rounded-xl border-2 ${config.card}
-        bg-bg-primary shadow-sm hover:shadow-md transition-all duration-200`}
+                                    key={table.id}
+                                    className={`border-2 rounded-lg overflow-hidden shadow-sm hover:shadow-md transition
+    ${table.status === "vacant" ? "border-border-default" :
+                                            table.status === "Occupied" ? "border-red-400" :
+                                                "border-blue-400"}`}
                                 >
-                                    {/* STATUS BADGE */}
-                                    <div className="absolute top-2 right-2">
-                                        <span
-                                            className={`px-2.5 py-1 rounded-full text-xs font-semibold
-            ${counter.status === 'Active' && 'bg-green-100 text-green-700'}
-            ${counter.status === 'Busy' && 'bg-yellow-100 text-yellow-700'}
-            ${counter.status === 'Closed' && 'bg-gray-200 text-gray-700'}
-          `}
-                                        >
-                                            {counter.status}
-                                        </span>
+
+                                    {/* HEADER */}
+                                    <div className={`flex justify-between items-center px-3 py-2 text-sm font-bold
+    ${table.status === "vacant" ? "bg-action-primary text-white" :
+                                            table.status === "Occupied" ? "bg-action-primary text-white" :
+                                                "bg-action-primary text-white"}`}>
+
+                                        <span>{table.name}</span>
+
+                                        <div className="flex gap-3 items-center text-xs font-semibold">
+                                            <span>{table.section}</span>
+                                            <span className="capitalize font-semibold">
+                                                {table.status}
+                                            </span>
+
+                                        </div>
                                     </div>
 
                                     {/* BODY */}
-                                    <div className="p-4 space-y-3">
-                                        {/* COUNTER NAME */}
-                                        <div className="text-sm md:text-lg font-bold text-text-primary">
-                                            {counter.name}
-                                        </div>
-
-                                        {/* ZONE */}
-                                        <div className="inline-flex items-center px-2.5 py-1 rounded-md
-          bg-bg-tertiary text-xs font-medium text-text-secondary">
-                                           {counter.location_zone}
-                                        </div>
-
-                                        {/* TERMINALS */}
-                                        <div className="flex items-center gap-2 text-sm text-text-primary">
-                                            <FaUsers className="text-action-primary" />
-                                            <span>
-                                                Terminals:
-                                                <span className="font-bold ml-1">{counter.table_type}</span>
-                                            </span>
+                                    <div className="px-3 py-3 text-sm text-text-primary">
+                                        <div className="font-medium">{table.location_zone}</div>
+                                        <div className="text-xs text-text-secondary mt-1">
+                                            Seats: <span className="font-bold">{table.table_type}</span>
                                         </div>
                                     </div>
 
-                                    {/* FOOTER ACTIONS */}
+                                    {/* FOOTER */}
                                     <div className="grid grid-cols-2 border-t text-xs font-semibold">
                                         <button
-                                            onClick={() => setEditRowId(counter.id)}
+                                            onClick={() => {
+                                                const copy = structuredClone(table);
+                                                editRef.current = copy;   // ⭐ IMPORTANT
+                                                setEditTable(copy);
+                                                setEditRowId(copy.id);
+                                            }}
+
                                             className="py-2 hover:bg-bg-tertiary transition"
                                         >
                                             EDIT
                                         </button>
                                         <button
                                             onClick={() => {
-                                                setDeleteTableId(counter.id);
+                                                setDeleteTableId(table.id);
                                                 setShowConfirmDelete(true);
                                             }}
                                             className="py-2 text-action-danger hover:bg-red-50 transition border-l"
@@ -642,9 +1018,9 @@ const CounterManagement = ({ clientId, token, screenIds, userId }) => {
                                         </button>
                                     </div>
                                 </div>
+
                             );
                         })}
-
                     </div>
 
                     {filteredTables.length === 0 && (
@@ -652,16 +1028,19 @@ const CounterManagement = ({ clientId, token, screenIds, userId }) => {
                             <div className="text-text-secondary mb-3">
                                 <FaSearch className="text-5xl mx-auto" />
                             </div>
-                            <p className="text-text-secondary text-lg font-medium">No counters found</p>
+                            <p className="text-text-secondary text-lg font-medium">No tables found</p>
                             <p className="text-text-secondary text-sm mt-1">Try adjusting your search or filter criteria</p>
                         </div>
                     )}
 
-                    <UniversalAddModal_V1
+                    <UniversalAddModal
                         showModal={showAddTable}
                         setShowModal={setShowAddTable}
                         modalType="table"
-
+                        zones={zones}
+                        sections={sections}
+                        clientId={clientId}
+                        token={token}
                         // Table-specific props
                         tableRanges={tableRanges}
                         setTableRanges={setTableRanges}
@@ -670,15 +1049,23 @@ const CounterManagement = ({ clientId, token, screenIds, userId }) => {
                         isGenerating={isGenerating}
                         generateTables={generateTables}
                     />
-                    <UniversalEditModal_V1
-                        showModal={editRowId !== null}
-                        setShowModal={(show) => !show && setEditRowId(null)}
+                    <UniversalEditModal
+                        showModal={!!editTable}
+                        setShowModal={(show) => {
+                            if (!show) {
+                                setEditTable(null);
+                                setEditRowId(null);
+                                setEditFieldErrors({});
+                            }
+                        }}
                         modalType="table"
-
-                        // Table-specific props
+                        zones={zones}
+                        sections={sections}
+                        clientId={clientId}
+                        token={token}
                         editRowId={editRowId}
                         setEditRowId={setEditRowId}
-                        tables={tables}
+                        table={editTable}
                         handleEditChange={handleEditChange}
                         saveEdit={saveEdit}
                         editFieldErrors={editFieldErrors}
@@ -688,7 +1075,10 @@ const CounterManagement = ({ clientId, token, screenIds, userId }) => {
                         showModal={showBulkUpdate}
                         setShowModal={setShowBulkUpdate}
                         modalType="table"
-
+                        zones={zones}
+                        sections={sections}
+                        clientId={clientId}
+                        token={token}
                         // Table-specific props
                         tables={tables}
                         bulkUpdateSearch={bulkUpdateSearch}
@@ -719,6 +1109,16 @@ const CounterManagement = ({ clientId, token, screenIds, userId }) => {
                         setShowSecondDeleteConfirm={setShowSecondDeleteConfirm}
                         confirmBulkDelete={confirmBulkDelete}
                         getFilteredDeleteTables={getFilteredDeleteTables}
+                    />
+                    <TableConfigModal
+                        show={showConfig}
+                        onClose={() => setShowConfig(false)}
+                        clientId={clientId}
+                        token={token}
+                        refresh={() => {
+                            fetchMasterValues("zone", setZones);
+                            fetchMasterValues("section", setSections);
+                        }}
                     />
 
                     {/* First Delete Confirmation */}

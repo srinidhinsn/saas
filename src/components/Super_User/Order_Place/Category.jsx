@@ -1,12 +1,12 @@
 import { useState, useEffect, useCallback } from "react";
 import { createPortal } from "react-dom";
-import MenuTreeNode from "./TreeNode";
+import MenuTreeNode from "../../MainComponents/InventoryServices/Tree&CategoryManage/MenuTreeNode";
 import { Plus, X } from 'lucide-react';
 import axios from 'axios';
 import { v4 as uuidv4 } from 'uuid';
 import { jwtDecode } from 'jwt-decode';
 
-const CategoryTree = ({
+const Category = ({
   categories = [],
   selectedCategoryId,
   onSelectCategory,
@@ -86,7 +86,7 @@ const CategoryTree = ({
   };
 
   useEffect(() => {
-    if (!categories || !selectedCategoryId) return;
+    if (!categories || categories.length === 0) return;
 
     const findPathById = (nodes, targetId, path = []) => {
       for (const node of nodes) {
@@ -103,14 +103,13 @@ const CategoryTree = ({
       }
       return null;
     };
-
-    const path = findPathById(categories, selectedCategoryId);
-
-    if (path) {
-      setExpandedCategories(path); // opens parents automatically
-    }
-
-    buildParentMapFromCategories(categories);
+    const path = selectedCategoryId
+    ? findPathById(categories, selectedCategoryId)
+    : null;
+  
+  if (path) setExpandedCategories(path);
+  
+  buildParentMapFromCategories(categories);
 
   }, [selectedCategoryId, categories]);
 
@@ -367,7 +366,15 @@ const CategoryTree = ({
     setDeleteTarget(category);
     setShowDeleteModal(true);
   };
-
+  useEffect(() => {
+    if (!categories || categories.length === 0) return;
+  
+    // always select top parent
+    if (!selectedCategoryId) {
+      const topParent = categories[0]?.id;
+      if (topParent) onSelectCategory(topParent);
+    }
+  }, [categories]);
   const renderTree = (items, level = 0) => {
     return items.map((category) => {
       const isExpanded = expandedCategories.includes(category.id);
@@ -402,9 +409,9 @@ const CategoryTree = ({
     const traverse = (items) => {
       items.forEach(cat => {
         // Only include categories with items (count > 0)
-        if (cat.count > 0) {
-          flat.push(cat);
-        }
+        if (cat.count === undefined || cat.count > 0) {
+            flat.push(cat);
+          }
         if (cat.children && cat.children.length > 0) {
           traverse(cat.children);
         }
@@ -658,4 +665,4 @@ const CategoryTree = ({
   );
 };
 
-export default CategoryTree;
+export default Category;
