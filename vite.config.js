@@ -7,7 +7,7 @@ export default defineConfig({
   plugins: [react()],
   server: {
     host: '0.0.0.0',       // allow external connections
-    port: 5173,            // your chosen port
+    port: 8007,            // your chosen port
     allowedHosts: [
       'saas.networkspecialist.in'
     ],
