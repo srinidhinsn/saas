@@ -8,15 +8,8 @@ import UniversalBulkDeleteModal from "../../utils/Modals/UniversalBulkDeleteModa
 import AccessGuard from "../../utils/Interceptors/ProtectedRoute";
 import TableConfigModal from "../../utils/Modals/TableConfigModal";
 
-const statusConfig = {
-    Vacant: { card: "border-tableStatusBorder-vacant", icon: <FaCheck className="text-action-success text-xl" />, label: "Available" },
-    Occupied: { card: "border-tableStatusBorder-occupied", icon: <FaUsers className="text-action-danger text-xl" />, label: "Occupied" },
-    Reserved: { card: "border-tableStatusBorder-reserved", icon: <FaClock className="text-action-primary text-xl" />, label: "Reserved" }
-};
-
 const CounterManagement = ({ clientId, token, screenIds, userId }) => {
 
-    console.log("requesterId", userId)
     const [searchTerm, setSearchTerm] = useState("");
     const [tableRanges, setTableRanges] = useState([]);
     const [tables, setTables] = useState([]);
@@ -154,71 +147,6 @@ const CounterManagement = ({ clientId, token, screenIds, userId }) => {
         return grid.flat().filter(Boolean);
     };
 
-
-    // const getSortedTables = (tablesToSort, COLS_PER_ROW) => {
-
-
-    //     const occupied = tablesToSort
-    //         .filter(t => t.status === 'Occupied')
-    //         .sort((a, b) => a.name.localeCompare(b.name, undefined, { numeric: true }));
-
-    //     const reserved = tablesToSort
-    //         .filter(t => t.status === 'Reserved')
-    //         .sort((a, b) => a.name.localeCompare(b.name, undefined, { numeric: true }));
-
-    //     const vacant = tablesToSort
-    //         .filter(t => t.status === 'Vacant')
-    //         .sort((a, b) => a.name.localeCompare(b.name, undefined, { numeric: true }));
-
-    //     const totalTables = tablesToSort.length;
-    //     const totalRows = Math.ceil(totalTables / COLS_PER_ROW);
-
-    //     const grid = Array.from({ length: totalRows }, () =>
-    //         Array(COLS_PER_ROW).fill(null)
-    //     );
-
-    //     let filledCount = 0;
-
-    //     const canFill = (row, col) =>
-    //         row * COLS_PER_ROW + col < totalTables;
-
-    //     /* ---------------- RESERVED (right-most, top-down) ---------------- */
-    //     let resIndex = 0;
-    //     for (let col = COLS_PER_ROW - 1; col >= 0 && resIndex < reserved.length; col--) {
-    //         for (let row = 0; row < totalRows && resIndex < reserved.length; row++) {
-    //             if (!grid[row][col] && canFill(row, col)) {
-    //                 grid[row][col] = reserved[resIndex++];
-    //                 filledCount++;
-    //             }
-    //         }
-    //     }
-
-    //     /* ---------------- OCCUPIED (below reserved, right-side) ---------------- */
-    //     let occIndex = 0;
-    //     for (let col = COLS_PER_ROW - 1; col >= 0 && occIndex < occupied.length; col--) {
-    //         for (let row = 0; row < totalRows && occIndex < occupied.length; row++) {
-    //             if (!grid[row][col] && canFill(row, col)) {
-    //                 grid[row][col] = occupied[occIndex++];
-    //                 filledCount++;
-    //             }
-    //         }
-    //     }
-
-    //     /* ---------------- VACANT (everything else) ---------------- */
-    //     let vacIndex = 0;
-    //     for (let row = 0; row < totalRows && vacIndex < vacant.length; row++) {
-    //         for (let col = 0; col < COLS_PER_ROW && vacIndex < vacant.length; col++) {
-    //             if (!grid[row][col] && canFill(row, col)) {
-    //                 grid[row][col] = vacant[vacIndex++];
-    //                 filledCount++;
-    //             }
-    //         }
-    //     }
-
-    //     return grid.flat().filter(Boolean);
-    // };
-
-
     const fetchTables = async () => {
         if (!clientId) return;
         setLoading(true);
@@ -244,65 +172,6 @@ const CounterManagement = ({ clientId, token, screenIds, userId }) => {
             setLoading(false);
         }
     };
-    // const normalizeTableRangeStrict = (rangeStr) => {
-    //     const raw = rangeStr.trim().toUpperCase();
-
-    //     // Reject any unpadded numbers like B1, A3
-    //     if (/\b[A-Z]+\d\b/.test(raw)) {
-    //         throw new Error("Table numbers must be 2 digits. Use B01 instead of B1");
-    //     }
-
-    //     // Reject mixed digit width ranges like A01:A3
-    //     const parts = raw.split(",");
-    //     for (const part of parts) {
-    //         if (part.includes(":")) {
-    //             const [start, end] = part.split(":");
-
-    //             const startDigits = start.match(/\d+$/)?.[0]?.length;
-    //             const endDigits = end.match(/\d+$/)?.[0]?.length;
-
-    //             if (startDigits !== endDigits) {
-    //                 throw new Error("Mixed numbering not allowed. Use A01:A03");
-    //             }
-    //         }
-    //     }
-
-    //     return raw;
-    // };
-
-    // const validateTableRangeStrict = (rangeStr, existingTables) => {
-    //     let normalized;
-
-    //     try {
-    //         normalized = normalizeTableRangeStrict(rangeStr);
-    //     } catch (e) {
-    //         return e.message;
-    //     }
-
-    //     const validPattern =
-    //         /^[A-Z]{1,3}\d{2}(?::[A-Z]{1,3}\d{2})?(,\s*[A-Z]{1,3}\d{2}(?::[A-Z]{1,3}\d{2})?)*$/;
-
-    //     if (!validPattern.test(normalized)) {
-    //         return "Invalid format. Use A01 or A01:A10 or A01,B02";
-    //     }
-
-    //     const generated = parseTableRange(normalized);
-
-    //     // Duplicate check
-    //     const duplicates = generated.filter((v, i, a) => a.indexOf(v) !== i);
-    //     if (duplicates.length > 0) {
-    //         return `Duplicate table(s): ${duplicates.join(", ")}`;
-    //     }
-
-    //     // Existing table conflict
-    //     const existingNames = existingTables.map(t => t.name.toUpperCase());
-    //     const conflicts = generated.filter(t => existingNames.includes(t));
-    //     if (conflicts.length > 0) {
-    //         return `Table already exists: ${conflicts.join(", ")}`;
-    //     }
-
-    //     return null;
-    // };
 
     const fetchMasterValues = async (categoryId, setter) => {
         try {
@@ -332,99 +201,72 @@ const CounterManagement = ({ clientId, token, screenIds, userId }) => {
 
     }, [clientId, token]);
 
-
-
-    // const parseTableRange = (rangeStr) => {
-    //     const parts = rangeStr.split(",");
-    //     const tables = [];
-
-    //     for (let part of parts) {
-    //         part = part.trim();
-
-    //         if (part.includes(":")) {
-    //             const [start, end] = part.split(":");
-
-    //             const prefix = start.match(/^[A-Z]+/)[0];
-    //             const startNum = parseInt(start.match(/\d{2}$/)[0], 10);
-    //             const endNum = parseInt(end.match(/\d{2}$/)[0], 10);
-
-    //             for (let i = startNum; i <= endNum; i++) {
-    //                 tables.push(`${prefix}${i.toString().padStart(2, "0")}`);
-    //             }
-    //         } else {
-    //             tables.push(part);
-    //         }
-    //     }
-
-    //     return tables;
-    // };
-
     const parseTableRangeFlexible = (input) => {
         if (!input || !input.trim()) return [];
-    
+
         const parts = input.split(",").map(p => p.trim()).filter(Boolean);
         const tables = [];
-    
+
         for (const part of parts) {
-    
+
             // ---------- RANGE (r1:r5) ----------
             if (part.includes(":")) {
-    
+
                 const [start, end] = part.split(":");
-    
+
                 // Extract prefix and numbers
                 const prefixStart = start.match(/[A-Za-z]+/)?.[0]?.toUpperCase() || "";
                 const prefixEnd = end.match(/[A-Za-z]+/)?.[0]?.toUpperCase() || "";
-    
+
                 const numStart = parseInt(start.match(/\d+/)?.[0]);
                 const numEnd = parseInt(end.match(/\d+/)?.[0]);
-    
+
                 if (!numStart || !numEnd || prefixStart !== prefixEnd) continue;
-    
+
                 // Always pad to 2 digits
                 for (let i = numStart; i <= numEnd; i++) {
                     tables.push(prefixStart + String(i).padStart(2, "0"));
                 }
             }
-    
+
             // ---------- SINGLE NAME (shanmugam) ----------
             else {
                 tables.push(part.trim().toUpperCase());
             }
         }
-    
+
         return tables;
     };
-    
-    
+
+
     const generateTables = async () => {
         if (generatingRef.current) return;
         generatingRef.current = true;
         setIsGenerating(true);
-    
+
         try {
-    
+
             for (let row of tableRanges) {
-    
+
                 if (!row.range || !row.section || !row.location_zone || !row.table_type) {
                     generatingRef.current = false;
                     setIsGenerating(false);
                     return;
                 }
-    
+
                 const tableNames = parseTableRangeFlexible(row.range);
-    
+
                 if (tableNames.length === 0) {
                     generatingRef.current = false;
                     setIsGenerating(false);
                     return;
                 }
-    
+
                 for (const tableName of tableNames) {
                     const alreadyExists = tables.some(
                         t => t.name.toUpperCase() === tableName.toUpperCase()
                     );
-                
+
                     if (alreadyExists) {
                         alert(`Table "${tableName}" already exists!!!`)
                         continue;
@@ -442,7 +284,7 @@ const CounterManagement = ({ clientId, token, screenIds, userId }) => {
                         qr_code_url: "",
                         slug: `${clientId}-${tableName.replace(/\s+/g, '-').toLowerCase()}`
                     };
-    
+
                     await axios.post(
                         `${import.meta.env.VITE_API_TABLE_SERVICE_URL}/${clientId}/tables/create`,
                         payload,
@@ -450,11 +292,11 @@ const CounterManagement = ({ clientId, token, screenIds, userId }) => {
                     );
                 }
             }
-    
+
             await fetchTables();
             setShowAddTable(false);
             setTableRanges([]);
-    
+
         } catch (err) {
             console.error(err);
         } finally {
@@ -462,90 +304,7 @@ const CounterManagement = ({ clientId, token, screenIds, userId }) => {
             setIsGenerating(false);
         }
     };
-    
-    // const generateTables = async () => {
-    //     if (generatingRef.current) return;
-    //     generatingRef.current = true;
-    //     setIsGenerating(true);
 
-    //     try {
-    //         const newErrors = tableRanges.map(row => ({
-    //             range: !row.range,
-    //             table_type: !row.table_type,
-    //             section: !row.section,
-    //             location_zone: !row.location_zone
-    //         }));
-
-    //         setFieldErrors(newErrors);
-
-    //         const validRows = tableRanges.filter((row, index) =>
-    //             !newErrors[index].range &&
-    //             !newErrors[index].table_type &&
-    //             !newErrors[index].section &&
-    //             !newErrors[index].location_zone
-    //         );
-
-    //         if (validRows.length === 0) {
-    //             toast.error('Fill the fields')
-    //             return;
-    //         }
-
-    //         const payload = [];
-    //         for (let row of validRows) {
-    //             const error = validateTableRangeStrict(row.range, originalTables);
-    //             if (error) {
-    //                 toast.error(error);
-    //                 return; // ⛔ STOP ENTIRE CREATION
-    //             }
-
-    //             const normalized = normalizeTableRangeStrict(row.range);
-    //             const tableNumbers = parseTableRange(normalized);
-
-    //             tableNumbers.forEach(num => {
-    //                 payload.push({
-    //                     client_id: clientId,
-    //                     name: num,
-    //                     table_type: row.table_type.toString(),
-    //                     status: row.remark || "Vacant",
-    //                     section: row.section,
-    //                     location_zone: row.location_zone,
-    //                     description: row.description || "",
-    //                     sort_order: row.sort_order ? parseInt(row.sort_order) : null,
-    //                     is_active: row.is_active || false,
-    //                     qr_code_url: row.qr_code_url || "",
-    //                     slug: `${clientId}-${num.toLowerCase()}`
-    //                 });
-
-    //             });
-    //         }
-
-
-    //         for (let data of payload) {
-    //             try {
-    //                 await axios.post(
-    //                     `${import.meta.env.VITE_API_TABLE_SERVICE_URL}/${clientId}/tables/create`,
-    //                     data,
-    //                     { headers: { Authorization: `Bearer ${token}` } }
-    //                 );
-    //             } catch (err) {
-    //                 if (err.response && err.response.status === 400) {
-    //                     alert(`Table "${data.name}" already exists!`);
-    //                 }
-    //             }
-    //         }
-
-    //         await fetchTables();
-    //         setShowAddTable(false);
-    //         setTableRanges([]);
-    //         setFieldErrors([]);
-
-    //     } catch (err) {
-    //         console.error("Error generating tables", err);
-    //     } finally {
-    //         generatingRef.current = false;
-    //         setIsGenerating(false);
-    //     }
-    // };
     const handleEditChange = (id, field, value) => {
         setEditTable(prev => {
             const updated = {
@@ -849,13 +608,6 @@ const CounterManagement = ({ clientId, token, screenIds, userId }) => {
         );
     });
 
-    // const filteredTables = getSortedTables(
-    //     tables.filter(table => {
-    //         const matchesSearch = table.name.toLowerCase().includes(searchTerm.toLowerCase());
-    //         const matchesStatus = !statusFilter || table.status === statusFilter;
-    //         return matchesSearch && matchesStatus;
-    //     }), colsPerRow
-    // );
     const filteredTables = getSortedTables(searchedTables, colsPerRow);
 
 
@@ -977,7 +729,6 @@ const CounterManagement = ({ clientId, token, screenIds, userId }) => {
                                         <span>{table.name}</span>
 
                                         <div className="flex gap-3 items-center text-xs font-semibold">
-                                            <span>{table.section}</span>
                                             <span className="capitalize font-semibold">
                                                 {table.status}
                                             </span>
@@ -986,11 +737,16 @@ const CounterManagement = ({ clientId, token, screenIds, userId }) => {
                                     </div>
 
                                     {/* BODY */}
-                                    <div className="px-3 py-3 text-sm text-text-primary">
-                                        <div className="font-medium">{table.location_zone}</div>
-                                        <div className="text-xs text-text-secondary mt-1">
-                                            Seats: <span className="font-bold">{table.table_type}</span>
+                                    <div className="px-3 py-3 text-sm text-text-primary flex justify-between">
+                                        <div className=""> <div className="font-medium">{table.location_zone}</div>
+                                            <div className="text-xs text-text-secondary mt-1">
+                                                Seats: <span className="font-bold">{table.table_type}</span>
+                                            </div>
                                         </div>
+                                        <div className="">
+                                            <span className="text-md font-semibold">{table.section}</span>
+                                        </div>
+
                                     </div>
 
                                     {/* FOOTER */}
