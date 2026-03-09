@@ -11,7 +11,7 @@ from utils.auth import verify_token
 from models.saas_context import SaasContext
 from typing import Optional
 from entity.inventory_entity import InventoryEntity
-from services.order_service import _root_dinein_id, _order_row_to_flat, STATUS_PRIORITY, _merge_group
+from services.order_service import _root_dinein_id, _order_row_to_flat, STATUS_PRIORITY, _merge_group, _deduct_stock_for_order
 # from app.services.order_service import deduct_inventory_after_order
 from decimal import Decimal
 
@@ -24,7 +24,7 @@ def create_order(client_id: str, order: DineinOrderModel, context: SaasContext =
         client_id=client_id, table_id=order.table_id, status=order.status,
         price=order.price, gst=order.gst, cst=order.cst, discount=order.discount,
         invoice_status=order.invoice_status, total_price=order.total_price,
-        invoice_id=order.invoice_id, dinein_order_id=order.dinein_order_id,
+        invoice_id=order.invoice_id, dinein_order_id=None,
         handler_id=order.handler_id, created_by=order.created_by, updated_by=order.updated_by,
     )
     db.add(db_order)
@@ -54,7 +54,7 @@ def create_order(client_id: str, order: DineinOrderModel, context: SaasContext =
     dinein_model = DineinOrderModel(
         id=db_order.id, dinein_order_id=db_order.dinein_order_id, table_id=db_order.table_id,
         client_id=db_order.client_id, status=db_order.status, created_at=db_order.created_at,
-        items=order_items
+        items=order_items,
     )
     return ResponseModel(screen_id=context.screen_id, data=dinein_model)
 
@@ -228,9 +228,6 @@ def update_order_status(
     if body.total_price is not None:
         order.total_price = body.total_price
 
-    if body.table_id is not None:
-        order.table_id = body.table_id    
-
     db.commit()
     db.refresh(order)
 
@@ -241,6 +238,8 @@ def update_order_status(
             "new_status": order.status,
         },
     )
+
+
 
 @router.post("/order_items/update")
 def update_order_items(
@@ -257,28 +256,55 @@ def update_order_items(
     except:
         raise HTTPException(status_code=400, detail="Invalid order_id")
 
-    existing_items = db.query(Db_OrderItem_Entity).filter(Db_OrderItem_Entity.order_id == order_id).all()
+    existing_items = (
+        db.query(Db_OrderItem_Entity)
+        .filter(Db_OrderItem_Entity.order_id == order_id)
+        .all()
+    )
     existing_map = {(item.item_id, item.frontend_unique_key): item for item in existing_items}
+
+    # Snapshot before any writes — was the order already fully served?
+    was_all_served = bool(existing_items) and all(i.status == "served" for i in existing_items)
 
     for incoming in body:
         key = (incoming.item_id, incoming.frontend_unique_key)
         if key in existing_map:
             db_item = existing_map[key]
-            db_item.quantity = incoming.quantity
+            db_item.quantity   = incoming.quantity
             db_item.line_total = (incoming.unit_price or 0) * (incoming.quantity or 1)
-            db_item.status = incoming.status
+            db_item.status     = incoming.status
         else:
             db.add(Db_OrderItem_Entity(
-                client_id=client_id, order_id=order_id,
-                item_id=incoming.item_id, item_name=incoming.item_name,
-                quantity=incoming.quantity, unit_price=incoming.unit_price,
+                client_id=client_id,
+                order_id=order_id,
+                item_id=incoming.item_id,
+                item_name=incoming.item_name,
+                quantity=incoming.quantity,
+                unit_price=incoming.unit_price,
                 line_total=(incoming.unit_price or 0) * (incoming.quantity or 1),
-                status="pending", frontend_unique_key=incoming.frontend_unique_key,
+                status="pending",
+                frontend_unique_key=incoming.frontend_unique_key,
             ))
 
-    db.commit()
-    return ResponseModel(screen_id=context.screen_id, data={"message": "Order updated without resetting old statuses"})
+    # Flush so status changes are visible in the same session
+    db.flush()
 
+    all_items_now = (
+        db.query(Db_OrderItem_Entity)
+        .filter(Db_OrderItem_Entity.order_id == order_id)
+        .all()
+    )
+    is_all_served_now = bool(all_items_now) and all(i.status == "served" for i in all_items_now)
+
+    # Deduct exactly once — on the transition into fully-served
+    if is_all_served_now and not was_all_served:
+        _deduct_stock_for_order(db=db, client_id=client_id, order_id=order_id)
+
+    db.commit()
+    return ResponseModel(
+        screen_id=context.screen_id,
+        data={"message": "Order updated without resetting old statuses"},
+    )
 
 @router.post("/order_item/update")
 def update_order_item(client_id: str, order_id: Optional[int] = Query(None), order_item: Optional[OrderItemModel] = None, context: SaasContext = Depends(verify_token), db: Session = Depends(get_db)):
