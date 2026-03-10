@@ -242,7 +242,6 @@ export default function StockRecipeManager({ clientId: propClientId, token: prop
       ];
 
       setCategories(uniqueCategories);
-
     } catch (err) {
       console.error("fetchStocks failed:", err);
       setError("Failed to load inventory items");
@@ -332,6 +331,7 @@ export default function StockRecipeManager({ clientId: propClientId, token: prop
         subcategoryPayload,
         getAuthHeaders(token)
       );
+
       // Step 2: Fetch current inventory category to get existing subcategories
       const inventoryCategoryRes = await axios.get(
         `${API_CONFIG.baseMenu(clientId)}/read_category?client_id=${clientId}&category_id=inventory`,
@@ -348,11 +348,12 @@ export default function StockRecipeManager({ clientId: propClientId, token: prop
       } else if (inventoryData.subCategories) {
         currentSubcategories = inventoryData.subCategories;
       }
+
       // Step 3: Update inventory category's subcategories to include the new one
       const existingSubcategoryIds = currentSubcategories.map(sub => sub.id).filter(id => id !== categoryId);
       console.log("existing subcategories are", existingSubcategoryIds)
       const updatedSubcategoryIds = [...existingSubcategoryIds, categoryId];
-      console.log("updated subcategories are", updatedSubcategoryIds);
+      console.log("updated subcategories are", updatedSubcategoryIds)
 
       await axios.post(
         `${API_CONFIG.baseMenu(clientId)}/update_category?client_id=${clientId}`,
@@ -363,7 +364,6 @@ export default function StockRecipeManager({ clientId: propClientId, token: prop
         },
         getAuthHeaders(token)
       );
-
       setIsInventoryModalOpen(false);
       setInventoryForm({
         id: "",
@@ -414,6 +414,7 @@ export default function StockRecipeManager({ clientId: propClientId, token: prop
   const saveStock = async () => {
     if (!stockForm.name.trim()) return setError("Name is required");
     if (!stockForm.inventory_id) return setError("Please select an inventory");
+
     // FIX #2: Get the selected inventory category UUID and name
     const selectedInventory = inventoryCategories.find(inv => inv.id === stockForm.inventory_id);
     console.log("Inventory Id = ", selectedInventory)
@@ -436,6 +437,7 @@ export default function StockRecipeManager({ clientId: propClientId, token: prop
       await axios.post(url, payload, getAuthHeaders(token));
       setIsStockModalOpen(false);
       await fetchStocks();
+
       // Reset form
       setStockForm({
         id: null,
@@ -576,8 +578,8 @@ export default function StockRecipeManager({ clientId: propClientId, token: prop
   // FIX #3: Calculate dynamic overview based on active inventory
   const getCurrentInventoryOverview = useMemo(() => {
     const currentInventory = inventoryCategories.find(cat => cat.id === activeTab);
-    // Default overview when on Recipe tab
     if (!currentInventory) {
+      // Default overview when on Recipe tab
       return {
         stockCount: stocks.length,
         lowStockCount: enhancedStocks.filter((s) => s.isLow).length,
@@ -636,6 +638,7 @@ export default function StockRecipeManager({ clientId: propClientId, token: prop
           </div>
 
           <div className="flex gap-3 flex-wrap">
+            {/* Dynamic Inventory Tabs */}
             {inventoryCategories.map((category) => (
               <button
                 key={category.id}
@@ -675,6 +678,7 @@ export default function StockRecipeManager({ clientId: propClientId, token: prop
 
         <div className="grid lg:grid-cols-12 gap-6">
           <main className="lg:col-span-9 space-y-6">
+            {/* Dynamic Inventory Category Tabs */}
             {inventoryCategories.some(cat => cat.id === activeTab) && activeTab !== "menu" && (
               <InventoryCategoryTab
                 category={inventoryCategories.find(cat => cat.id === activeTab)}
@@ -692,6 +696,7 @@ export default function StockRecipeManager({ clientId: propClientId, token: prop
               />
             )}
 
+            {/* Menu Availability Tab */}
             {activeTab === "menu" && (
               <MenuAvailabilityTab
                 menuItems={menuItems}
@@ -1139,6 +1144,7 @@ function MenuAvailabilityTab({ menuItems, loading, onUpdateAvailability, allCate
     setEditForm({ availability: "", unit: "" });
   };
 
+  // FIX #1: Helper function to get category name from UUID
   const getCategoryName = (categoryId) => {
     if (!categoryId) return "—";
     const category = allCategories.find(cat => cat.id === categoryId);
@@ -1275,6 +1281,7 @@ function StockModal({
 }) {
   if (!isOpen) return null;
 
+  // Auto-populate category when inventory is selected
   const handleInventoryChange = (inventoryId) => {
     const selectedInventory = inventoryCategories.find(inv => inv.id === inventoryId);
     onChange((prev) => ({
