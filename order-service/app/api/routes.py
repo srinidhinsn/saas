@@ -11,7 +11,7 @@ from utils.auth import verify_token
 from models.saas_context import SaasContext
 from typing import Optional
 from entity.inventory_entity import InventoryEntity
-from services.order_service import _root_dinein_id, _order_row_to_flat, STATUS_PRIORITY, _merge_group, _deduct_stock_for_order
+from ..services.order_service import _root_dinein_id, _order_row_to_flat, STATUS_PRIORITY, _merge_group, _deduct_stock_for_order
 # from app.services.order_service import deduct_inventory_after_order
 from decimal import Decimal
 
@@ -256,11 +256,7 @@ def update_order_items(
     except:
         raise HTTPException(status_code=400, detail="Invalid order_id")
 
-    existing_items = (
-        db.query(Db_OrderItem_Entity)
-        .filter(Db_OrderItem_Entity.order_id == order_id)
-        .all()
-    )
+    existing_items = db.query(Db_OrderItem_Entity).filter(Db_OrderItem_Entity.order_id == order_id).all()
     existing_map = {(item.item_id, item.frontend_unique_key): item for item in existing_items}
 
     # Snapshot before any writes — was the order already fully served?
@@ -270,20 +266,16 @@ def update_order_items(
         key = (incoming.item_id, incoming.frontend_unique_key)
         if key in existing_map:
             db_item = existing_map[key]
-            db_item.quantity   = incoming.quantity
+            db_item.quantity = incoming.quantity
             db_item.line_total = (incoming.unit_price or 0) * (incoming.quantity or 1)
-            db_item.status     = incoming.status
+            db_item.status = incoming.status
         else:
             db.add(Db_OrderItem_Entity(
-                client_id=client_id,
-                order_id=order_id,
-                item_id=incoming.item_id,
-                item_name=incoming.item_name,
-                quantity=incoming.quantity,
-                unit_price=incoming.unit_price,
+                client_id=client_id, order_id=order_id,
+                item_id=incoming.item_id, item_name=incoming.item_name,
+                quantity=incoming.quantity, unit_price=incoming.unit_price,
                 line_total=(incoming.unit_price or 0) * (incoming.quantity or 1),
-                status="pending",
-                frontend_unique_key=incoming.frontend_unique_key,
+                status="pending", frontend_unique_key=incoming.frontend_unique_key,
             ))
 
     # Flush so status changes are visible in the same session
