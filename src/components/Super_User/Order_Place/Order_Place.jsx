@@ -170,12 +170,6 @@ function getDraftTableIdsFromOrders(allOrders) {
     .map(o => String(o.table_id));
 }
 
-
-
-// ─────────────────────────────────────────────────────────────────────────────
-// ItemStatusBadge
-// ─────────────────────────────────────────────────────────────────────────────
-
 const ItemStatusBadge = ({ status }) => {
   const cfg = {
     pending: { bg: 'bg-blue-100', text: 'text-blue-700', label: 'Pending' },
@@ -190,10 +184,6 @@ const ItemStatusBadge = ({ status }) => {
     </span>
   );
 };
-
-// ─────────────────────────────────────────────────────────────────────────────
-// DeleteConfirmModal
-// ─────────────────────────────────────────────────────────────────────────────
 
 const DeleteConfirmModal = ({ isOpen, onClose, onConfirm }) => {
   if (!isOpen) return null;
@@ -227,10 +217,6 @@ const DeleteConfirmModal = ({ isOpen, onClose, onConfirm }) => {
     </div>
   );
 };
-
-// ─────────────────────────────────────────────────────────────────────────────
-// LineItemsModal
-// ─────────────────────────────────────────────────────────────────────────────
 
 const LineItemsModal = ({ isOpen, onClose, mainItem, lineItems, onAddWithSelectedAddons, onAddMainOnly }) => {
   const [selectedAddons, setSelectedAddons] = useState([]);
@@ -525,10 +511,6 @@ const OldItemRow = ({ group, clientId, token, activeDineinOrderId }) => {
   );
 };
 
-// ─────────────────────────────────────────────────────────────────────────────
-// NewItemRow — newly added items (editable quantity / removable)
-// ─────────────────────────────────────────────────────────────────────────────
-
 const NewItemRow = ({ group, clientId, token, onUpdateQuantity, onRemove }) => {
   const { main, addons } = group;
   return (
@@ -570,7 +552,6 @@ const NewItemRow = ({ group, clientId, token, onUpdateQuantity, onRemove }) => {
             <Plus size={14} />
           </button>
         </div>
-
         <button
           onClick={() => onRemove(main.id, main.frontend_unique_key)}
           className="text-action-primary hover:text-red-700"
@@ -595,10 +576,6 @@ const NewItemRow = ({ group, clientId, token, onUpdateQuantity, onRemove }) => {
     </div>
   );
 };
-
-// ─────────────────────────────────────────────────────────────────────────────
-// TableReservation — floor view
-// ─────────────────────────────────────────────────────────────────────────────
 
 const TableReservation = ({
   tables = [],

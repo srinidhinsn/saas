@@ -203,24 +203,17 @@ const TableManagement = ({ clientId, token, screenIds, userId }) => {
 
     const parseTableRangeFlexible = (input) => {
         if (!input || !input.trim()) return [];
-
         const parts = input.split(",").map(p => p.trim()).filter(Boolean);
         const tables = [];
-
         for (const part of parts) {
-
             // ---------- RANGE (r1:r5) ----------
             if (part.includes(":")) {
-
                 const [start, end] = part.split(":");
-
                 // Extract prefix and numbers
                 const prefixStart = start.match(/[A-Za-z]+/)?.[0]?.toUpperCase() || "";
                 const prefixEnd = end.match(/[A-Za-z]+/)?.[0]?.toUpperCase() || "";
-
                 const numStart = parseInt(start.match(/\d+/)?.[0]);
                 const numEnd = parseInt(end.match(/\d+/)?.[0]);
-
                 if (!numStart || !numEnd || prefixStart !== prefixEnd) continue;
 
                 // Always pad to 2 digits
@@ -228,45 +221,34 @@ const TableManagement = ({ clientId, token, screenIds, userId }) => {
                     tables.push(prefixStart + String(i).padStart(2, "0"));
                 }
             }
-
             // ---------- SINGLE NAME (shanmugam) ----------
             else {
                 tables.push(part.trim().toUpperCase());
             }
         }
-
         return tables;
     };
-
-
     const generateTables = async () => {
         if (generatingRef.current) return;
         generatingRef.current = true;
         setIsGenerating(true);
-
         try {
-
             for (let row of tableRanges) {
-
                 if (!row.range || !row.section || !row.location_zone || !row.table_type) {
                     generatingRef.current = false;
                     setIsGenerating(false);
                     return;
                 }
-
                 const tableNames = parseTableRangeFlexible(row.range);
-
                 if (tableNames.length === 0) {
                     generatingRef.current = false;
                     setIsGenerating(false);
                     return;
                 }
-
                 for (const tableName of tableNames) {
                     const alreadyExists = tables.some(
                         t => t.name.toUpperCase() === tableName.toUpperCase()
                     );
-
                     if (alreadyExists) {
                         alert(`Table "${tableName}" already exists!!!`)
                         continue;
@@ -284,7 +266,6 @@ const TableManagement = ({ clientId, token, screenIds, userId }) => {
                         qr_code_url: "",
                         slug: `${clientId}-${tableName.replace(/\s+/g, '-').toLowerCase()}`
                     };
-
                     await axios.post(
                         `${import.meta.env.VITE_API_TABLE_SERVICE_URL}/${clientId}/tables/create`,
                         payload,
@@ -292,11 +273,9 @@ const TableManagement = ({ clientId, token, screenIds, userId }) => {
                     );
                 }
             }
-
             await fetchTables();
             setShowAddTable(false);
             setTableRanges([]);
-
         } catch (err) {
             console.error(err);
         } finally {
@@ -304,7 +283,6 @@ const TableManagement = ({ clientId, token, screenIds, userId }) => {
             setIsGenerating(false);
         }
     };
-
     const handleEditChange = (id, field, value) => {
         setEditTable(prev => {
             const updated = {
@@ -746,7 +724,6 @@ const TableManagement = ({ clientId, token, screenIds, userId }) => {
                                         <div className="">
                                             <span className="text-md font-semibold">{table.section}</span>
                                         </div>
-
                                     </div>
 
                                     {/* FOOTER */}
