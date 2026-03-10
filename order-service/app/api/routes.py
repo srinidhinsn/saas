@@ -228,6 +228,9 @@ def update_order_status(
     if body.total_price is not None:
         order.total_price = body.total_price
 
+    if body.table_id is not None:
+        order.table_id = body.table_id
+
     db.commit()
     db.refresh(order)
 
