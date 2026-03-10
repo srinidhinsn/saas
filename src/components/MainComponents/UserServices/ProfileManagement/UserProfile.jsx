@@ -1,11 +1,11 @@
 import React, { useState, useEffect } from "react";
-import { useParams, useNavigate } from "react-router-dom";
-import { User, Mail, Phone, Calendar, Lock, Key, Send, MapPin } from "lucide-react";
+import { useNavigate } from "react-router-dom";
+import { User, Phone, Calendar, Lock, Send } from "lucide-react";
 import { toast } from "react-toastify";
 import "react-toastify/dist/ReactToastify.css";
 import axios from 'axios';
 
-export default function UserProfile({clientId, token}) {
+export default function UserProfile({ clientId, token }) {
   const navigate = useNavigate();
 
   // Active tab state
@@ -18,6 +18,16 @@ export default function UserProfile({clientId, token}) {
     email: "",
     phone: "",
     dob: "",
+  });
+  const [addressForm, setAddressForm] = useState({
+    address_line1: "",
+    address_line2: "",
+    city: "",
+    state: "",
+    country: "",
+    pincode: "",
+    contact_name: "",
+    contact_number: ""
   });
   const [profileLoading, setProfileLoading] = useState(false);
   const [profileSaved, setProfileSaved] = useState(false);
@@ -34,77 +44,122 @@ export default function UserProfile({clientId, token}) {
   const [otpSent, setOtpSent] = useState(false);
   const [passwordLoading, setPasswordLoading] = useState(false);
   const [resetMethod, setResetMethod] = useState("otp");
-
+  const handleAddressChange = (e) => {
+    setAddressForm({ ...addressForm, [e.target.name]: e.target.value });
+  };
   // Fetch profile on mount
   useEffect(() => {
+
     const fetchProfile = async () => {
+  
       if (!clientId || !token) {
         setFetchingProfile(false);
         return;
       }
-
-      const apiUrl = `${import.meta.env.VITE_API_USER_SERVICE_URL}/${clientId}/users/person-details`;
-
+  
       try {
-        const res = await axios.get(apiUrl, { 
-          headers: { Authorization: `Bearer ${token}` } 
-        });
-        
-        if (res.data?.data?.person) {
-          const p = res.data.data.person;
+  
+        // GET PERSON
+        const personRes = await axios.get(
+          `${import.meta.env.VITE_API_USER_SERVICE_URL}/${clientId}/users/person-details`,
+          { headers: { Authorization: `Bearer ${token}` } }
+        );
+  
+        const p = personRes.data?.data?.person;
+  
+        if (p) {
           setProfileForm({
             first_name: p.first_name || "",
             last_name: p.last_name || "",
             email: p.email || "",
             phone: p.phone || "",
-            dob: p.dob || "",
+            dob: p.dob || ""
           });
         }
-      } catch (error) {
-        console.error("Profile fetch error:", error);
-        console.error("Error response:", error?.response);
-        
-        if (error?.response?.status === 403) {
-          toast.error("Access denied. Please check your permissions or re-login.");
-        } else if (error?.response?.status === 401) {
-          toast.error("Session expired. Please login again.");
-        } else {
-          toast.error(error?.response?.data?.detail || "Failed to fetch profile details");
+  
+        // GET ADDRESS
+        const addressRes = await axios.get(
+          `${import.meta.env.VITE_API_USER_SERVICE_URL}/${clientId}/users/address`,
+          { headers: { Authorization: `Bearer ${token}` } }
+        );
+  
+        const a = addressRes.data?.data?.addresses?.[0];
+  
+        if (a) {
+          setAddressForm({
+            address_line1: a.address_line1 || "",
+            address_line2: a.address_line2 || "",
+            city: a.city || "",
+            state: a.state || "",
+            country: a.country || "",
+            pincode: a.pincode || "",
+            contact_name: a.contact_name || "",
+            contact_number: a.contact_number || ""
+          });
         }
+  
+      } catch (error) {
+  
+        console.error("Profile fetch error:", error);
+  
+        if (error?.response?.status === 403) {
+          toast.error("Access denied. Please re-login.");
+        } else if (error?.response?.status === 401) {
+          toast.error("Session expired.");
+        } else {
+          toast.error("Failed to fetch profile");
+        }
+  
       } finally {
         setFetchingProfile(false);
       }
+  
     };
-
+  
     fetchProfile();
+  
   }, [clientId, token]);
-
   // Profile handlers
   const handleProfileChange = (e) => {
     setProfileForm({ ...profileForm, [e.target.name]: e.target.value });
   };
 
   const handleProfileSubmit = async () => {
+
     if (!clientId || !token) {
-      toast.error("Missing client ID or authentication token");
+      toast.error("Missing authentication");
       return;
     }
-
+  
     setProfileLoading(true);
+  
     try {
-      const res = await axios.post(
+  
+      await axios.post(
         `${import.meta.env.VITE_API_USER_SERVICE_URL}/${clientId}/users/person-details`,
         profileForm,
         { headers: { Authorization: `Bearer ${token}` } }
       );
-      toast.success(res.data.data?.message || "Profile saved successfully!");
-      setProfileSaved(true);
+  
+      // SAVE ADDRESS
+      await axios.post(
+        `${import.meta.env.VITE_API_USER_SERVICE_URL}/${clientId}/users/address`,
+        addressForm,
+        { headers: { Authorization: `Bearer ${token}` } }
+      );
+  
+      toast.success("Profile updated successfully");
+  
     } catch (error) {
-      toast.error(error?.response?.data?.detail || "Failed to save profile");
-      console.error("Profile save error:", error);
+  
+      toast.error(error?.response?.data?.detail || "Failed to save");
+  
     } finally {
+  
       setProfileLoading(false);
+  
     }
+  
   };
 
   // Password handlers
@@ -311,11 +366,10 @@ export default function UserProfile({clientId, token}) {
                 <div className="flex">
                   <button
                     onClick={() => setActiveTab("profile")}
-                    className={`flex-1 px-6 py-4 text-sm font-semibold transition-all relative ${
-                      activeTab === "profile"
+                    className={`flex-1 px-6 py-4 text-sm font-semibold transition-all relative ${activeTab === "profile"
                         ? "text-action-primary"
                         : "text-text-secondary hover:text-text-primary"
-                    }`}
+                      }`}
                   >
                     <div className="flex items-center justify-center">
                       <User className="w-4 h-4 mr-2" />
@@ -327,11 +381,10 @@ export default function UserProfile({clientId, token}) {
                   </button>
                   <button
                     onClick={() => setActiveTab("password")}
-                    className={`flex-1 px-6 py-4 text-sm font-semibold transition-all relative ${
-                      activeTab === "password"
+                    className={`flex-1 px-6 py-4 text-sm font-semibold transition-all relative ${activeTab === "password"
                         ? "text-action-primary"
                         : "text-text-secondary hover:text-text-primary"
-                    }`}
+                      }`}
                   >
                     <div className="flex items-center justify-center">
                       <Lock className="w-4 h-4 mr-2" />
@@ -378,7 +431,7 @@ export default function UserProfile({clientId, token}) {
                           value={profileForm.last_name}
                           onChange={handleProfileChange}
                           placeholder="Enter your last name"
-                          className="w-full px-3 py-2 border-default border-border-default rounded-lgoutline-none transition text-text-primary text-sm"
+                          className="w-full px-3 py-2 border-default border-border-default rounded-lg outline-none transition text-text-primary text-sm"
                         />
                       </div>
 
@@ -422,6 +475,76 @@ export default function UserProfile({clientId, token}) {
                           className="w-full px-3 py-2 border-default border-border-default rounded-lg outline-none transition text-text-primary text-sm"
                         />
                       </div>
+
+                      <div className="md:col-span-2 mt-6">
+                        <h3 className="text-lg font-semibold text-text-primary mb-3">
+                          Address Information
+                        </h3>
+                      </div>
+
+                      <input
+                        name="address_line1"
+                        placeholder="Address Line 1"
+                        value={addressForm.address_line1}
+                        onChange={handleAddressChange}
+                        className="w-full px-3 py-2 border rounded-lg"
+                      />
+
+                      <input
+                        name="address_line2"
+                        placeholder="Address Line 2"
+                        value={addressForm.address_line2}
+                        onChange={handleAddressChange}
+                        className="w-full px-3 py-2 border rounded-lg"
+                      />
+
+                      <input
+                        name="city"
+                        placeholder="City"
+                        value={addressForm.city}
+                        onChange={handleAddressChange}
+                        className="w-full px-3 py-2 border rounded-lg"
+                      />
+
+                      <input
+                        name="state"
+                        placeholder="State"
+                        value={addressForm.state}
+                        onChange={handleAddressChange}
+                        className="w-full px-3 py-2 border rounded-lg"
+                      />
+
+                      <input
+                        name="country"
+                        placeholder="Country"
+                        value={addressForm.country}
+                        onChange={handleAddressChange}
+                        className="w-full px-3 py-2 border rounded-lg"
+                      />
+
+                      <input
+                        name="pincode"
+                        placeholder="Pincode"
+                        value={addressForm.pincode}
+                        onChange={handleAddressChange}
+                        className="w-full px-3 py-2 border rounded-lg"
+                      />
+
+                      <input
+                        name="contact_name"
+                        placeholder="Contact Person"
+                        value={addressForm.contact_name}
+                        onChange={handleAddressChange}
+                        className="w-full px-3 py-2 border rounded-lg"
+                      />
+
+                      <input
+                        name="contact_number"
+                        placeholder="Contact Number"
+                        value={addressForm.contact_number}
+                        onChange={handleAddressChange}
+                        className="w-full px-3 py-2 border rounded-lg"
+                      />
                     </div>
 
                     <div className="flex justify-end pt-4 border-t-default border-border-default">
