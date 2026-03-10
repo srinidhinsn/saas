@@ -364,6 +364,8 @@ export default function StockRecipeManager({ clientId: propClientId, token: prop
         },
         getAuthHeaders(token)
       );
+
+
       setIsInventoryModalOpen(false);
       setInventoryForm({
         id: "",
@@ -575,9 +577,11 @@ export default function StockRecipeManager({ clientId: propClientId, token: prop
     if (inventoryId === "menu" || inventoryId === "recipe") return [];
     return filteredStocks.filter(stock => stock.inventory_id === inventoryId);
   };
+
   // FIX #3: Calculate dynamic overview based on active inventory
   const getCurrentInventoryOverview = useMemo(() => {
     const currentInventory = inventoryCategories.find(cat => cat.id === activeTab);
+
     if (!currentInventory) {
       // Default overview when on Recipe tab
       return {
@@ -587,6 +591,7 @@ export default function StockRecipeManager({ clientId: propClientId, token: prop
         inventoryCount: inventoryCategories.length,
       };
     }
+
     // Filter stocks for current inventory
     const currentStocks = stocks.filter(stock => stock.inventory_id === activeTab);
     const currentEnhancedStocks = currentStocks.map((stock) => {
@@ -638,6 +643,7 @@ export default function StockRecipeManager({ clientId: propClientId, token: prop
           </div>
 
           <div className="flex gap-3 flex-wrap">
+
             {/* Dynamic Inventory Tabs */}
             {inventoryCategories.map((category) => (
               <button
@@ -695,6 +701,7 @@ export default function StockRecipeManager({ clientId: propClientId, token: prop
                 allCategories={allCategories}
               />
             )}
+
 
             {/* Menu Availability Tab */}
             {activeTab === "menu" && (
