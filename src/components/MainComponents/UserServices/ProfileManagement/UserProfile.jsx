@@ -49,24 +49,19 @@ export default function UserProfile({ clientId, token }) {
   };
   // Fetch profile on mount
   useEffect(() => {
-
     const fetchProfile = async () => {
-  
       if (!clientId || !token) {
         setFetchingProfile(false);
         return;
       }
-  
       try {
-  
-        // GET PERSON
         const personRes = await axios.get(
           `${import.meta.env.VITE_API_USER_SERVICE_URL}/${clientId}/users/person-details`,
           { headers: { Authorization: `Bearer ${token}` } }
         );
-  
+
         const p = personRes.data?.data?.person;
-  
+
         if (p) {
           setProfileForm({
             first_name: p.first_name || "",
@@ -76,15 +71,14 @@ export default function UserProfile({ clientId, token }) {
             dob: p.dob || ""
           });
         }
-  
-        // GET ADDRESS
+
         const addressRes = await axios.get(
           `${import.meta.env.VITE_API_USER_SERVICE_URL}/${clientId}/users/address`,
           { headers: { Authorization: `Bearer ${token}` } }
         );
-  
+
         const a = addressRes.data?.data?.addresses?.[0];
-  
+
         if (a) {
           setAddressForm({
             address_line1: a.address_line1 || "",
@@ -97,11 +91,10 @@ export default function UserProfile({ clientId, token }) {
             contact_number: a.contact_number || ""
           });
         }
-  
+
       } catch (error) {
-  
+
         console.error("Profile fetch error:", error);
-  
         if (error?.response?.status === 403) {
           toast.error("Access denied. Please re-login.");
         } else if (error?.response?.status === 401) {
@@ -109,15 +102,12 @@ export default function UserProfile({ clientId, token }) {
         } else {
           toast.error("Failed to fetch profile");
         }
-  
+
       } finally {
         setFetchingProfile(false);
       }
-  
     };
-  
     fetchProfile();
-  
   }, [clientId, token]);
   // Profile handlers
   const handleProfileChange = (e) => {
@@ -125,41 +115,29 @@ export default function UserProfile({ clientId, token }) {
   };
 
   const handleProfileSubmit = async () => {
-
     if (!clientId || !token) {
       toast.error("Missing authentication");
       return;
     }
-  
     setProfileLoading(true);
-  
     try {
-  
       await axios.post(
         `${import.meta.env.VITE_API_USER_SERVICE_URL}/${clientId}/users/person-details`,
         profileForm,
         { headers: { Authorization: `Bearer ${token}` } }
       );
-  
-      // SAVE ADDRESS
+
       await axios.post(
         `${import.meta.env.VITE_API_USER_SERVICE_URL}/${clientId}/users/address`,
         addressForm,
         { headers: { Authorization: `Bearer ${token}` } }
       );
-  
       toast.success("Profile updated successfully");
-  
     } catch (error) {
-  
       toast.error(error?.response?.data?.detail || "Failed to save");
-  
     } finally {
-  
       setProfileLoading(false);
-  
     }
-  
   };
 
   // Password handlers
@@ -367,10 +345,8 @@ export default function UserProfile({ clientId, token }) {
                   <button
                     onClick={() => setActiveTab("profile")}
                     className={`flex-1 px-6 py-4 text-sm font-semibold transition-all relative ${activeTab === "profile"
-                        ? "text-action-primary"
-                        : "text-text-secondary hover:text-text-primary"
-                      }`}
-                  >
+                      ? "text-action-primary"
+                      : "text-text-secondary hover:text-text-primary"}`}>
                     <div className="flex items-center justify-center">
                       <User className="w-4 h-4 mr-2" />
                       Profile Information
@@ -382,8 +358,8 @@ export default function UserProfile({ clientId, token }) {
                   <button
                     onClick={() => setActiveTab("password")}
                     className={`flex-1 px-6 py-4 text-sm font-semibold transition-all relative ${activeTab === "password"
-                        ? "text-action-primary"
-                        : "text-text-secondary hover:text-text-primary"
+                      ? "text-action-primary"
+                      : "text-text-secondary hover:text-text-primary"
                       }`}
                   >
                     <div className="flex items-center justify-center">
