@@ -195,25 +195,35 @@ export default function StockRecipeManager({ clientId: propClientId, token: prop
     }
   }, [activeTab]);
 
-  // Fetch all stocks (no realm filter, will be filtered by inventory_id on frontend)
-  const fetchStocks = async () => {
-    try {
-      const res = await axios.get(
-        `${API_CONFIG.baseMenu(clientId)}/read?client_id=${clientId}`,
-        getAuthHeaders(token)
-      );
+ const fetchStocks = async () => {
+  try {
+    const res = await axios.get(
+      `${API_CONFIG.baseMenu(clientId)}/read?client_id=${clientId}`,
+      getAuthHeaders(token)
+    );
 
-      const allItems = res.data?.data || [];
-      setStocks(allItems);
+    const allItems = res.data?.data || [];
+    console.log("all items", allItems);
 
-      // Extract unique categories from all stock items
-      const uniqueCategories = [...new Set(allItems.map((s) => s.category || "").filter(Boolean))];
-      setCategories(uniqueCategories);
-    } catch (err) {
-      console.error("fetchStocks failed:", err);
-      setError("Failed to load inventory items");
-    }
-  };
+    const stockItems = allItems.filter(
+      (item) => item.inventory_id && item.inventory_id !== "menu"
+    );
+
+    console.log("stock items", stockItems);
+
+    setStocks(stockItems);
+
+    const uniqueCategories = [
+      ...new Set(stockItems.map((s) => s.category || "").filter(Boolean)),
+    ];
+
+    setCategories(uniqueCategories);
+
+  } catch (err) {
+    console.error("fetchStocks failed:", err);
+    setError("Failed to load inventory items");
+  }
+};
 
   // Fetch menu items based on inventory_id = 'menu' or realm
   const fetchMenuItems = async () => {
