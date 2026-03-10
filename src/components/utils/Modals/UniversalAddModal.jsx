@@ -985,7 +985,7 @@
 //                 <label className="block text-sm font-medium mb-2 text-text-primary">
 //                   Add-ons
 //                 </label>
-                
+
 //                 {/* Selected Addons Display */}
 //                 {newItem?.line_item_id && newItem.line_item_id.length > 0 && (
 //                   <div className="mb-3 flex flex-wrap gap-2">
@@ -1334,7 +1334,8 @@ const UniversalAddModal = ({
   fieldErrors,
   setFieldErrors,
   isGenerating,
-  generateTables
+  generateTables,
+  units
 }) => {
   const [dragActive, setDragActive] = useState(false);
   const [showAddonPopup, setShowAddonPopup] = useState(false); // ✅ Popup state
@@ -1357,7 +1358,7 @@ const UniversalAddModal = ({
     return result;
   }, []);
 
-  
+
 
   // Fetch master values for zones and sections
   const fetchMasterValues = async (categoryId, setter) => {
@@ -1488,13 +1489,13 @@ const UniversalAddModal = ({
                   value={newItem?.category_id || ''}
                   onChange={(e) => {
                     const selectedCatId = e.target.value;
-                  
+
                     setNewItem(prev => ({
                       ...(prev || {}),
                       category_id: selectedCatId
                     }));
                   }}
-                  
+
                   className="w-full px-4 py-2 rounded-lg bg-bg-tertiary border border-border-default text-text-primary focus:outline-none focus:ring-2 focus:ring-action-primary"
                   required
                 >
@@ -1587,29 +1588,8 @@ const UniversalAddModal = ({
 
               {/* Code & Unit */}
               <div className="grid grid-cols-2 gap-4">
-                <div>
-                  <label className="block text-sm font-medium mb-2 text-text-primary">Code *</label>
-                  <input
-                    type="text"
-                    value={newItem?.code ?? ''}
-                    onChange={(e) => setNewItem(prev => ({ ...(prev || {}), code: e.target.value }))}
-                    className="w-full px-4 py-2 rounded-lg bg-bg-tertiary border border-border-default text-text-primary focus:outline-none focus:ring-2 focus:ring-action-primary"
-                    placeholder="0"
-                  />
-                </div>
 
-                <div>
-                  <label className="block text-sm font-medium mb-2 text-text-primary">Unit</label>
-                  <input
-                    type="text"
-                    value={newItem?.unit ?? ''}
-                    onChange={(e) => setNewItem(prev => ({ ...(prev || {}), unit: e.target.value }))}
-                    className="w-full px-4 py-2 rounded-lg bg-bg-tertiary border border-border-default text-text-primary focus:outline-none focus:ring-2 focus:ring-action-primary"
-                    placeholder="kg, pcs, etc."
-                  />
-                </div>
-
-                <div>
+                 <div>
                   <label className="block text-sm font-medium mb-2 text-text-primary">Serving Quantity</label>
                   <input
                     type="number"
@@ -1622,15 +1602,73 @@ const UniversalAddModal = ({
 
                 <div>
                   <label className="block text-sm font-medium mb-2 text-text-primary">Serving Unit</label>
-                  <input
-                    type="text"
+                  <select
                     value={newItem?.serving_unit ?? ''}
                     onChange={(e) => setNewItem(prev => ({ ...(prev || {}), serving_unit: e.target.value }))}
                     className="w-full px-4 py-2 rounded-lg bg-bg-tertiary border border-border-default text-text-primary focus:outline-none focus:ring-2 focus:ring-action-primary"
-                    placeholder="kg, pcs, etc."
+                  >
+                    <option value="">Select unit</option>
+                    {(units || []).map((u) => (
+                      <option key={u} value={u}>{u}</option>
+                    ))}
+                  </select>
+                </div>
+
+                
+                <div>
+                  <label className="block text-sm font-medium mb-2 text-text-primary">Code *</label>
+                  <input
+                    type="text"
+                    value={newItem?.code ?? ''}
+                    onChange={(e) => setNewItem(prev => ({ ...(prev || {}), code: e.target.value }))}
+                    className="w-full px-4 py-2 rounded-lg bg-bg-tertiary border border-border-default text-text-primary focus:outline-none focus:ring-2 focus:ring-action-primary"
+                    placeholder="0"
                   />
                 </div>
+                {/* ✅ Add-ons with Popup */}
+                <div>
+                  <label className="block text-sm font-medium mb-2 text-text-primary">
+                    Add-ons
+                  </label>
+
+                  {/* Selected Addons Display */}
+                  {newItem?.line_item_id && newItem.line_item_id.length > 0 && (
+                    <div className="mb-3 flex flex-wrap gap-2">
+                      {newItem.line_item_id.map(addonId => (
+                        <div
+                          key={addonId}
+                          className="flex items-center gap-2 bg-blue-100 text-blue-700 px-3 py-1.5 rounded-lg text-sm"
+                        >
+                          <span>{getAddonNameById(addonId)}</span>
+                          <button
+                            type="button"
+                            onClick={() => removeAddon(addonId)}
+                            className="hover:bg-blue-200 rounded-full p-0.5 transition-colors"
+                          >
+                            <X size={14} />
+                          </button>
+                        </div>
+                      ))}
+                    </div>
+                  )}
+
+                  {/* Select Addons Button */}
+                  <button
+                    type="button"
+                    onClick={() => setShowAddonPopup(true)}
+                    className="w-full px-4 py-3 rounded-lg bg-bg-tertiary border-2 border-dashed border-border-default text-text-primary hover:border-action-primary hover:bg-bg-secondary transition-all flex items-center justify-center gap-2 font-medium"
+                  >
+                    <Plus size={18} />
+                    <span>
+                      {newItem?.line_item_id && newItem.line_item_id.length > 0
+                        ? `Manage Add-ons (${newItem.line_item_id.length} selected)`
+                        : 'Select Add-ons'}
+                    </span>
+                  </button>
+                </div>
               </div>
+
+
 
               {/* Item Image Upload */}
               <div>
@@ -1681,47 +1719,7 @@ const UniversalAddModal = ({
                 </div>
               </div>
 
-              {/* ✅ Add-ons with Popup */}
-              <div>
-                <label className="block text-sm font-medium mb-2 text-text-primary">
-                  Add-ons
-                </label>
-                
-                {/* Selected Addons Display */}
-                {newItem?.line_item_id && newItem.line_item_id.length > 0 && (
-                  <div className="mb-3 flex flex-wrap gap-2">
-                    {newItem.line_item_id.map(addonId => (
-                      <div
-                        key={addonId}
-                        className="flex items-center gap-2 bg-blue-100 text-blue-700 px-3 py-1.5 rounded-lg text-sm"
-                      >
-                        <span>{getAddonNameById(addonId)}</span>
-                        <button
-                          type="button"
-                          onClick={() => removeAddon(addonId)}
-                          className="hover:bg-blue-200 rounded-full p-0.5 transition-colors"
-                        >
-                          <X size={14} />
-                        </button>
-                      </div>
-                    ))}
-                  </div>
-                )}
 
-                {/* Select Addons Button */}
-                <button
-                  type="button"
-                  onClick={() => setShowAddonPopup(true)}
-                  className="w-full px-4 py-3 rounded-lg bg-bg-tertiary border-2 border-dashed border-border-default text-text-primary hover:border-action-primary hover:bg-bg-secondary transition-all flex items-center justify-center gap-2 font-medium"
-                >
-                  <Plus size={18} />
-                  <span>
-                    {newItem?.line_item_id && newItem.line_item_id.length > 0
-                      ? `Manage Add-ons (${newItem.line_item_id.length} selected)`
-                      : 'Select Add-ons'}
-                  </span>
-                </button>
-              </div>
 
               {/* Action Buttons */}
               <div className="flex gap-3 pt-4">

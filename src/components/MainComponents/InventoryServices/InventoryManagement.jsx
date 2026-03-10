@@ -20,6 +20,9 @@ export default function StockRecipeManager({ clientId: propClientId, token: prop
   const [loading, setLoading] = useState(false);
   const [error, setError] = useState("");
 
+  // Units fetched from category id=units
+  const [units, setUnits] = useState([]);
+
   // Inventory Categories (subcategories of id=inventory)
   const [inventoryCategories, setInventoryCategories] = useState([]);
   // All categories for lookup
@@ -139,6 +142,26 @@ export default function StockRecipeManager({ clientId: propClientId, token: prop
     }
   };
 
+  // Fetch units from category id=units
+  const fetchUnits = async () => {
+    try {
+      const res = await axios.get(
+        `${API_CONFIG.baseMenu(clientId)}/read_category?client_id=${clientId}&category_id=units`,
+        getAuthHeaders(token)
+      );
+      const data = res.data?.data || [];
+      const unitsNode = Array.isArray(data) ? data.find((d) => d.id === "units") : data;
+      const subCats = unitsNode?.subCategories || [];
+      // subCategories may be objects {id, name, ...} or plain strings
+      const unitList = subCats.map((u) => (typeof u === "string" ? u : u.id));
+      setUnits(unitList);
+    } catch (err) {
+      console.error("fetchUnits failed:", err);
+      // Fallback to standard units if API fails
+      setUnits(["g", "kg", "ml", "litre", "pcs"]);
+    }
+  };
+
   // Fetch inventory categories (subcategories of id=inventory)
   const fetchInventoryCategories = async () => {
     try {
@@ -147,7 +170,6 @@ export default function StockRecipeManager({ clientId: propClientId, token: prop
         getAuthHeaders(token)
       );
 
-      // Extract subcategories from the inventory category
       const inventoryData = res.data?.data || [];
 
       let subcategories = [];
@@ -161,7 +183,6 @@ export default function StockRecipeManager({ clientId: propClientId, token: prop
       console.log("Inventory Subcategories:", subcategories);
       setInventoryCategories(subcategories);
 
-      // Set first inventory as active tab if exists
       if (subcategories.length > 0 && activeTab === "recipe") {
         setActiveTab(subcategories[0].id);
       }
@@ -181,7 +202,8 @@ export default function StockRecipeManager({ clientId: propClientId, token: prop
         fetchAllCategories(),
         fetchInventoryCategories(),
         fetchStocks(),
-        fetchMenuItems()
+        fetchMenuItems(),
+        fetchUnits(),
       ]);
       setLoading(false);
     };
@@ -195,37 +217,36 @@ export default function StockRecipeManager({ clientId: propClientId, token: prop
     }
   }, [activeTab]);
 
- const fetchStocks = async () => {
-  try {
-    const res = await axios.get(
-      `${API_CONFIG.baseMenu(clientId)}/read?client_id=${clientId}`,
-      getAuthHeaders(token)
-    );
+  const fetchStocks = async () => {
+    try {
+      const res = await axios.get(
+        `${API_CONFIG.baseMenu(clientId)}/read?client_id=${clientId}`,
+        getAuthHeaders(token)
+      );
 
-    const allItems = res.data?.data || [];
-    console.log("all items", allItems);
+      const allItems = res.data?.data || [];
+      console.log("all items", allItems);
 
-    const stockItems = allItems.filter(
-      (item) => item.inventory_id && item.inventory_id !== "menu"
-    );
+      const stockItems = allItems.filter(
+        (item) => item.inventory_id && item.inventory_id !== "menu"
+      );
 
-    console.log("stock items", stockItems);
+      console.log("stock items", stockItems);
 
-    setStocks(stockItems);
+      setStocks(stockItems);
 
-    const uniqueCategories = [
-      ...new Set(stockItems.map((s) => s.category || "").filter(Boolean)),
-    ];
+      const uniqueCategories = [
+        ...new Set(stockItems.map((s) => s.category || "").filter(Boolean)),
+      ];
 
-    setCategories(uniqueCategories);
+      setCategories(uniqueCategories);
 
-  } catch (err) {
-    console.error("fetchStocks failed:", err);
-    setError("Failed to load inventory items");
-  }
-};
+    } catch (err) {
+      console.error("fetchStocks failed:", err);
+      setError("Failed to load inventory items");
+    }
+  };
 
-  // Fetch menu items based on inventory_id = 'menu' or realm
   const fetchMenuItems = async () => {
     try {
       const res = await axios.get(
@@ -290,7 +311,6 @@ export default function StockRecipeManager({ clientId: propClientId, token: prop
     }
 
     try {
-      // Step 1: Create the new subcategory
       const categoryId = inventoryForm.id || inventoryForm.name.toLowerCase().replace(/\s+/g, '_');
       const slug = inventoryForm.name.toLowerCase().replace(/\s+/g, '-');
 
@@ -309,7 +329,6 @@ export default function StockRecipeManager({ clientId: propClientId, token: prop
         getAuthHeaders(token)
       );
 
-      // Step 2: Fetch current inventory category to get existing subcategories
       const inventoryCategoryRes = await axios.get(
         `${API_CONFIG.baseMenu(clientId)}/read_category?client_id=${clientId}&category_id=inventory`,
         getAuthHeaders(token)
@@ -321,16 +340,15 @@ export default function StockRecipeManager({ clientId: propClientId, token: prop
       if (Array.isArray(inventoryData)) {
         const inventoryCategory = inventoryData.find(cat => cat.id === 'inventory');
         currentSubcategories = inventoryCategory?.subCategories || [];
-        console.log("Current subcategories are", currentSubcategories)
+        console.log("Current subcategories are", currentSubcategories);
       } else if (inventoryData.subCategories) {
         currentSubcategories = inventoryData.subCategories;
       }
 
-      // Step 3: Update inventory category's subcategories to include the new one
       const existingSubcategoryIds = currentSubcategories.map(sub => sub.id).filter(id => id !== categoryId);
-      console.log("existing subcategories are", existingSubcategoryIds)
+      console.log("existing subcategories are", existingSubcategoryIds);
       const updatedSubcategoryIds = [...existingSubcategoryIds, categoryId];
-      console.log("updated subcategories are", updatedSubcategoryIds)
+      console.log("updated subcategories are", updatedSubcategoryIds);
 
       await axios.post(
         `${API_CONFIG.baseMenu(clientId)}/update_category?client_id=${clientId}`,
@@ -341,7 +359,6 @@ export default function StockRecipeManager({ clientId: propClientId, token: prop
         },
         getAuthHeaders(token)
       );
-
 
       setIsInventoryModalOpen(false);
       setInventoryForm({
@@ -394,17 +411,16 @@ export default function StockRecipeManager({ clientId: propClientId, token: prop
     if (!stockForm.name.trim()) return setError("Name is required");
     if (!stockForm.inventory_id) return setError("Please select an inventory");
 
-    // FIX #2: Get the selected inventory category UUID and name
     const selectedInventory = inventoryCategories.find(inv => inv.id === stockForm.inventory_id);
-    console.log("Inventory Id = ", selectedInventory)
+    console.log("Inventory Id = ", selectedInventory);
     const categoryUUID = selectedInventory?.id || stockForm.inventory_id;
-    console.log("category Id = ", categoryUUID)
+    console.log("category Id = ", categoryUUID);
 
     const payload = {
       ...stockForm,
       realm: realm,
-      category_id: categoryUUID, // FIX #2: Send UUID to backend
-      inventory_id: categoryUUID, // FIX #2: Also ensure inventory_id is the UUID
+      category_id: categoryUUID,
+      inventory_id: categoryUUID,
       client_id: clientId,
     };
 
@@ -417,7 +433,6 @@ export default function StockRecipeManager({ clientId: propClientId, token: prop
       setIsStockModalOpen(false);
       await fetchStocks();
 
-      // Reset form
       setStockForm({
         id: null,
         name: "",
@@ -555,12 +570,10 @@ export default function StockRecipeManager({ clientId: propClientId, token: prop
     return filteredStocks.filter(stock => stock.inventory_id === inventoryId);
   };
 
-  // FIX #3: Calculate dynamic overview based on active inventory
   const getCurrentInventoryOverview = useMemo(() => {
     const currentInventory = inventoryCategories.find(cat => cat.id === activeTab);
 
     if (!currentInventory) {
-      // Default overview when on Recipe tab
       return {
         stockCount: stocks.length,
         lowStockCount: enhancedStocks.filter((s) => s.isLow).length,
@@ -569,7 +582,6 @@ export default function StockRecipeManager({ clientId: propClientId, token: prop
       };
     }
 
-    // Filter stocks for current inventory
     const currentStocks = stocks.filter(stock => stock.inventory_id === activeTab);
     const currentEnhancedStocks = currentStocks.map((stock) => {
       const consumption = recipe.reduce((sum, r) => {
@@ -620,8 +632,6 @@ export default function StockRecipeManager({ clientId: propClientId, token: prop
           </div>
 
           <div className="flex gap-3 flex-wrap">
-
-            {/* Dynamic Inventory Tabs */}
             {inventoryCategories.map((category) => (
               <button
                 key={category.id}
@@ -661,7 +671,6 @@ export default function StockRecipeManager({ clientId: propClientId, token: prop
 
         <div className="grid lg:grid-cols-12 gap-6">
           <main className="lg:col-span-9 space-y-6">
-            {/* Dynamic Inventory Category Tabs */}
             {inventoryCategories.some(cat => cat.id === activeTab) && activeTab !== "menu" && (
               <InventoryCategoryTab
                 category={inventoryCategories.find(cat => cat.id === activeTab)}
@@ -679,17 +688,15 @@ export default function StockRecipeManager({ clientId: propClientId, token: prop
               />
             )}
 
-
-            {/* Menu Availability Tab */}
             {activeTab === "menu" && (
               <MenuAvailabilityTab
                 menuItems={menuItems}
                 loading={loading}
                 onUpdateAvailability={updateMenuAvailability}
                 allCategories={allCategories}
+                units={units}
               />
             )}
-
 
             {activeTab === "recipe" && (
               <RecipeTab
@@ -703,6 +710,7 @@ export default function StockRecipeManager({ clientId: propClientId, token: prop
                 onAddIngredient={addIngredient}
                 onUpdateIngredient={updateIngredient}
                 onDeleteIngredient={deleteIngredient}
+                units={units}
               />
             )}
           </main>
@@ -740,7 +748,6 @@ export default function StockRecipeManager({ clientId: propClientId, token: prop
               </div>
             )}
 
-            {/* FIX #3: Dynamic Overview */}
             <div className="bg-bg-primary rounded-xl border border-gray-100 shadow p-6">
               <h3 className="text-lg font-semibold text-gray-800 mb-4">
                 {getCurrentInventoryOverview.inventoryName ? `${getCurrentInventoryOverview.inventoryName} Overview` : 'Overview'}
@@ -780,6 +787,7 @@ export default function StockRecipeManager({ clientId: propClientId, token: prop
           form={stockForm}
           categories={categories}
           inventoryCategories={inventoryCategories}
+          units={units}
           onChange={setStockForm}
           onSave={saveStock}
           onClose={() => {
@@ -947,6 +955,7 @@ function RecipeTab({
   onAddIngredient,
   onUpdateIngredient,
   onDeleteIngredient,
+  units,
 }) {
   return (
     <div className="bg-bg-primary rounded-xl shadow border border-gray-100">
@@ -1009,12 +1018,16 @@ function RecipeTab({
                           />
                         </td>
                         <td className="px-6 py-4">
-                          <input
+                          <select
                             value={ing.unit || ""}
                             onChange={(e) => onUpdateIngredient(index, "unit", e.target.value)}
-                            className="w-24 px-2 py-1 border border-gray-300 rounded focus:ring-indigo-500 focus:border-indigo-500"
-                            placeholder="g/ml/pcs"
-                          />
+                            className="w-28 px-2 py-1 border border-gray-300 rounded focus:ring-indigo-500 focus:border-indigo-500"
+                          >
+                            <option value="">Unit</option>
+                            {units.map((u) => (
+                              <option key={u} value={u}>{u}</option>
+                            ))}
+                          </select>
                         </td>
                         <td className="px-6 py-4 text-right">
                           <button
@@ -1061,12 +1074,16 @@ function RecipeTab({
               </div>
 
               <div>
-                <input
-                  placeholder="Unit (g/ml/pcs)"
+                <select
                   value={newIngredient.unit}
                   onChange={(e) => setNewIngredient((prev) => ({ ...prev, unit: e.target.value }))}
                   className="w-full px-4 py-2 border border-gray-300 rounded-lg focus:ring-indigo-500 focus:border-indigo-500"
-                />
+                >
+                  <option value="">Select unit</option>
+                  {units.map((u) => (
+                    <option key={u} value={u}>{u}</option>
+                  ))}
+                </select>
               </div>
 
               <div className="flex gap-3">
@@ -1095,8 +1112,7 @@ function RecipeTab({
   );
 }
 
-// FIX #1: Updated MenuAvailabilityTab to display category name instead of UUID
-function MenuAvailabilityTab({ menuItems, loading, onUpdateAvailability, allCategories }) {
+function MenuAvailabilityTab({ menuItems, loading, onUpdateAvailability, allCategories, units }) {
   const [editingItem, setEditingItem] = useState(null);
   const [editForm, setEditForm] = useState({ availability: "", unit: "" });
 
@@ -1119,7 +1135,6 @@ function MenuAvailabilityTab({ menuItems, loading, onUpdateAvailability, allCate
     setEditForm({ availability: "", unit: "" });
   };
 
-  // FIX #1: Helper function to get category name from UUID
   const getCategoryName = (categoryId) => {
     if (!categoryId) return "—";
     const category = allCategories.find(cat => cat.id === categoryId);
@@ -1192,15 +1207,18 @@ function MenuAvailabilityTab({ menuItems, loading, onUpdateAvailability, allCate
                   </td>
                   <td className="px-6 py-4 whitespace-nowrap">
                     {editingItem === item.id ? (
-                      <input
-                        type="text"
+                      <select
                         value={editForm.unit}
                         onChange={(e) =>
                           setEditForm((prev) => ({ ...prev, unit: e.target.value }))
                         }
-                        className="w-24 px-3 py-2 border border-gray-300 rounded-lg focus:ring-2 focus:ring-indigo-500 focus:border-indigo-500"
-                        placeholder="kg, pcs"
-                      />
+                        className="w-28 px-3 py-2 border border-gray-300 rounded-lg focus:ring-2 focus:ring-indigo-500 focus:border-indigo-500"
+                      >
+                        <option value="">Select unit</option>
+                        {units.map((u) => (
+                          <option key={u} value={u}>{u}</option>
+                        ))}
+                      </select>
                     ) : (
                       <span className="text-sm text-gray-900">{item.unit || "—"}</span>
                     )}
@@ -1246,13 +1264,13 @@ function StockModal({
   form,
   categories,
   inventoryCategories,
+  units,
   onChange,
   onSave,
   onClose
 }) {
   if (!isOpen) return null;
 
-  // Auto-populate category when inventory is selected
   const handleInventoryChange = (inventoryId) => {
     const selectedInventory = inventoryCategories.find(inv => inv.id === inventoryId);
     onChange((prev) => ({
@@ -1329,12 +1347,16 @@ function StockModal({
 
           <div>
             <label className="block text-sm font-medium text-gray-700 mb-1">Unit</label>
-            <input
+            <select
               value={form.unit}
               onChange={(e) => onChange((prev) => ({ ...prev, unit: e.target.value }))}
-              placeholder="g / ml / pcs / kg"
               className="w-full px-4 py-2 border border-gray-300 rounded-lg focus:ring-2 focus:ring-indigo-500 focus:border-indigo-500"
-            />
+            >
+              <option value="">Select unit</option>
+              {units.map((u) => (
+                <option key={u} value={u}>{u}</option>
+              ))}
+            </select>
           </div>
 
           <div className="sm:col-span-2">

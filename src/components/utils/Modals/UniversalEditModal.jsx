@@ -597,8 +597,6 @@
 
 
 
-
-
 import React, { useState, useEffect } from 'react';
 import { X, Upload, Plus } from 'lucide-react';
 import MenuImagePreview from '../../MainComponents/InventoryServices/Tree&CategoryManage/MenuImagePreview';
@@ -615,8 +613,8 @@ const UniversalEditModal = ({
   editingItem,
   setEditingItem,
   categories,
-  addonSubcategories, // ✅ Addon subcategories
-  allAddonItems, // ✅ All addon items
+  addonSubcategories,
+  allAddonItems,
   editItemImage,
   setEditItemImage,
   editItemImageUrl,
@@ -625,6 +623,7 @@ const UniversalEditModal = ({
   clientId,
   token,
   inventoryIds,
+  units, // ← units list from parent
 
   // Table-specific props
   editRowId,
@@ -635,13 +634,12 @@ const UniversalEditModal = ({
   editFieldErrors
 }) => {
   const [dragActive, setDragActive] = useState(false);
-  const [showAddonPopup, setShowAddonPopup] = useState(false); // ✅ Popup state
+  const [showAddonPopup, setShowAddonPopup] = useState(false);
   const [zoneOptions, setZoneOptions] = useState([]);
   const [sectionOptions, setSectionOptions] = useState([]);
   const [loadingMasters, setLoadingMasters] = useState(false);
   const [statusOptions, setStatusOptions] = useState([]);
 
-  // Fetch master values for zones, sections, and status
   const fetchMasterValues = async (categoryId, setter) => {
     try {
       const res = await axios.get(
@@ -658,7 +656,6 @@ const UniversalEditModal = ({
     }
   };
 
-  // Load master data for table modal
   useEffect(() => {
     if (!showModal || modalType !== "table") return;
     if (!clientId || !token) return;
@@ -676,25 +673,18 @@ const UniversalEditModal = ({
     loadMasters();
   }, [showModal, modalType, clientId, token]);
 
-  // Menu Modal Functions
   const handleEditDrag = (e) => {
     e.preventDefault();
     e.stopPropagation();
-    if (e.type === "dragenter" || e.type === "dragover") {
-      setDragActive(true);
-    } else if (e.type === "dragleave") {
-      setDragActive(false);
-    }
+    if (e.type === "dragenter" || e.type === "dragover") setDragActive(true);
+    else if (e.type === "dragleave") setDragActive(false);
   };
 
   const handleEditDrop = (e) => {
     e.preventDefault();
     e.stopPropagation();
     setDragActive(false);
-
-    if (e.dataTransfer.files && e.dataTransfer.files[0]) {
-      handleEditImageFile(e.dataTransfer.files[0]);
-    }
+    if (e.dataTransfer.files && e.dataTransfer.files[0]) handleEditImageFile(e.dataTransfer.files[0]);
   };
 
   const handleEditImageFile = (file) => {
@@ -711,21 +701,17 @@ const UniversalEditModal = ({
     items.forEach(item => {
       if (item.id !== 'all') {
         result.push({ ...item, level });
-        if (item.children) {
-          result = result.concat(flattenCategories(item.children, level + 1));
-        }
+        if (item.children) result = result.concat(flattenCategories(item.children, level + 1));
       }
     });
     return result;
   };
 
-  // ✅ Get addon name by ID
   const getAddonNameById = (id) => {
     const addon = allAddonItems?.find(item => item.id === id);
     return addon?.name || 'Unknown';
   };
 
-  // ✅ Remove individual addon
   const removeAddon = (addonId) => {
     setEditingItem(prev => ({
       ...prev,
@@ -746,7 +732,7 @@ const UniversalEditModal = ({
 
   if (!showModal) return null;
 
-  // Render Menu Edit Modal
+  // ─── MENU EDIT MODAL ───────────────────────────────────────────────────────
   if (modalType === 'menu' && editingItem) {
     return (
       <>
@@ -757,8 +743,9 @@ const UniversalEditModal = ({
             <div className="px-6 py-4 border-b border-gray-200 flex justify-between items-center">
               <h2 className="text-xl font-semibold text-gray-900">Edit Menu Item</h2>
               <button
-                onClick={handleClose} 
-                className="p-1.5 rounded-lg bg-action-primary text-text-white hover:opacity-90 transition-opacity">
+                onClick={handleClose}
+                className="p-1.5 rounded-lg bg-action-primary text-text-white hover:opacity-90 transition-opacity"
+              >
                 <X className="w-5 h-5" />
               </button>
             </div>
@@ -766,6 +753,7 @@ const UniversalEditModal = ({
             {/* Content */}
             <div className="flex-1 overflow-y-auto px-6 py-4">
               <div className="space-y-4">
+
                 {/* Category Selector */}
                 <div>
                   <label className="block text-sm font-medium mb-1 text-gray-700">
@@ -791,21 +779,13 @@ const UniversalEditModal = ({
                   <label className="block text-sm font-medium mb-1 text-gray-700">
                     Inventory ID <span className="text-red-600">*</span>
                   </label>
-
                   <select
                     value={editingItem.inventory_id || ""}
-                    onChange={(e) =>
-                      setEditingItem({
-                        ...editingItem,
-                        inventory_id: e.target.value
-                      })
-                    }
-                    className="w-full px-3 py-2 rounded-md border border-gray-300 text-gray-900
-                 focus:outline-none focus:ring-2 focus:ring-action-primary"
+                    onChange={(e) => setEditingItem({ ...editingItem, inventory_id: e.target.value })}
+                    className="w-full px-3 py-2 rounded-md border border-gray-300 text-gray-900 focus:outline-none focus:ring-2 focus:ring-action-primary"
                     required
                   >
                     <option value="">Select Inventory ID</option>
-
                     {(inventoryIds || []).map((inv) => (
                       <option key={inv.id} value={inv.id}>
                         {inv.inventory_id} - {inv.name}
@@ -853,7 +833,6 @@ const UniversalEditModal = ({
                       required
                     />
                   </div>
-
                   <div>
                     <label className="block text-sm font-medium mb-1 text-gray-700">Discount</label>
                     <input
@@ -874,26 +853,51 @@ const UniversalEditModal = ({
                     <input
                       type="text"
                       value={editingItem.code ?? ''}
-                      onChange={(e) =>
-                        setEditingItem({
-                          ...editingItem,
-                          code: e.target.value
-                        })
-                      }
-                      className="w-full px-3 py-2 rounded-md border border-gray-300 text-gray-900
-                        focus:outline-none focus:ring-2 focus:ring-action-primary"
+                      onChange={(e) => setEditingItem({ ...editingItem, code: e.target.value })}
+                      className="w-full px-3 py-2 rounded-md border border-gray-300 text-gray-900 focus:outline-none focus:ring-2 focus:ring-action-primary"
                       placeholder="Item Code"
                       required
                     />
                   </div>
                   <div>
                     <label className="block text-sm font-medium mb-1 text-gray-700">Unit</label>
-                    <input
-                      type="text"
-                      value={editingItem.unit}
+                    <select
+                      value={editingItem.unit ?? ''}
                       onChange={(e) => setEditingItem({ ...editingItem, unit: e.target.value })}
                       className="w-full px-3 py-2 rounded-md border border-gray-300 text-gray-900 focus:outline-none focus:ring-2 focus:ring-blue-500 focus:border-transparent"
+                    >
+                      <option value="">Select unit</option>
+                      {(units || []).map((u) => (
+                        <option key={u} value={u}>{u}</option>
+                      ))}
+                    </select>
+                  </div>
+                </div>
+
+                {/* Serving Quantity & Serving Unit */}
+                <div className="grid grid-cols-2 gap-4">
+                  <div>
+                    <label className="block text-sm font-medium mb-1 text-gray-700">Serving Quantity</label>
+                    <input
+                      type="number"
+                      value={editingItem.serving_quantity ?? ''}
+                      onChange={(e) => setEditingItem({ ...editingItem, serving_quantity: e.target.value })}
+                      className="w-full px-3 py-2 rounded-md border border-gray-300 text-gray-900 focus:outline-none focus:ring-2 focus:ring-blue-500 focus:border-transparent"
+                      placeholder="0"
                     />
+                  </div>
+                  <div>
+                    <label className="block text-sm font-medium mb-1 text-gray-700">Serving Unit</label>
+                    <select
+                      value={editingItem.serving_unit ?? ''}
+                      onChange={(e) => setEditingItem({ ...editingItem, serving_unit: e.target.value })}
+                      className="w-full px-3 py-2 rounded-md border border-gray-300 text-gray-900 focus:outline-none focus:ring-2 focus:ring-blue-500 focus:border-transparent"
+                    >
+                      <option value="">Select unit</option>
+                      {(units || []).map((u) => (
+                        <option key={u} value={u}>{u}</option>
+                      ))}
+                    </select>
                   </div>
                 </div>
 
@@ -913,10 +917,7 @@ const UniversalEditModal = ({
                           />
                           <button
                             type="button"
-                            onClick={() => {
-                              setEditItemImage(null);
-                              setEditItemImageUrl('');
-                            }}
+                            onClick={() => { setEditItemImage(null); setEditItemImageUrl(''); }}
                             className="absolute top-2 right-2 bg-red-600 text-white p-1.5 rounded-full hover:bg-red-700"
                           >
                             <X className="w-4 h-4" />
@@ -939,8 +940,7 @@ const UniversalEditModal = ({
                   ) : null}
 
                   <div
-                    className={`relative border-2 border-dashed rounded-md p-6 transition-colors ${dragActive ? 'border-blue-500 bg-blue-50' : 'border-gray-300 bg-gray-50'
-                      }`}
+                    className={`relative border-2 border-dashed rounded-md p-6 transition-colors ${dragActive ? 'border-blue-500 bg-blue-50' : 'border-gray-300 bg-gray-50'}`}
                     onDragEnter={handleEditDrag}
                     onDragLeave={handleEditDrag}
                     onDragOver={handleEditDrag}
@@ -968,13 +968,10 @@ const UniversalEditModal = ({
                   </div>
                 </div>
 
-                {/* ✅ Add-ons with Popup */}
+                {/* Add-ons with Popup */}
                 <div>
-                  <label className="block text-sm font-medium mb-2 text-gray-700">
-                    Add-ons
-                  </label>
-                  
-                  {/* Selected Addons Display */}
+                  <label className="block text-sm font-medium mb-2 text-gray-700">Add-ons</label>
+
                   {editingItem.line_item_id && editingItem.line_item_id.length > 0 && (
                     <div className="mb-3 flex flex-wrap gap-2">
                       {editingItem.line_item_id.map(addonId => (
@@ -995,7 +992,6 @@ const UniversalEditModal = ({
                     </div>
                   )}
 
-                  {/* Select Addons Button */}
                   <button
                     type="button"
                     onClick={() => setShowAddonPopup(true)}
@@ -1009,6 +1005,7 @@ const UniversalEditModal = ({
                     </span>
                   </button>
                 </div>
+
               </div>
             </div>
 
@@ -1030,7 +1027,7 @@ const UniversalEditModal = ({
           </div>
         </div>
 
-        {/* ✅ Addon Selection Popup */}
+        {/* Addon Selection Popup */}
         <AddonSelectionPopup
           isOpen={showAddonPopup}
           onClose={() => setShowAddonPopup(false)}
@@ -1046,7 +1043,7 @@ const UniversalEditModal = ({
     );
   }
 
-  // Render Table Edit Modal
+  // ─── TABLE EDIT MODAL ──────────────────────────────────────────────────────
   if (modalType === 'table' && table) {
     return (
       <div className="fixed inset-0 bg-black bg-opacity-50 z-50 flex items-center justify-center p-4">
@@ -1065,7 +1062,6 @@ const UniversalEditModal = ({
 
           {/* Content */}
           <div className="px-6 py-4">
-            {/* Table Name Display */}
             <div className="bg-gray-50 border border-gray-200 rounded-md p-4 mb-4 text-center">
               <p className="text-xs font-medium text-gray-600 uppercase tracking-wide mb-1">Table Name</p>
               <p className="text-2xl font-bold text-gray-900">{table.name}</p>
@@ -1075,8 +1071,6 @@ const UniversalEditModal = ({
               {/* No of Seating */}
               <div>
                 <label className="block text-sm font-medium mb-1 text-gray-700">No of Seating</label>
-
-                {/* Desktop */}
                 <input
                   type="number"
                   min="1"
@@ -1085,99 +1079,43 @@ const UniversalEditModal = ({
                     const value = Math.max(1, Number(e.target.value) || 1);
                     handleEditChange(table.id, "table_type", value);
                   }}
-                  className={`hidden md:block w-full px-3 py-2 rounded-md border focus:outline-none focus:ring-2 focus:ring-blue-500 focus:border-transparent ${editFieldErrors?.table_type ? 'border-red-500 bg-red-50' : 'border-gray-300'
-                    }`}
+                  className={`hidden md:block w-full px-3 py-2 rounded-md border focus:outline-none focus:ring-2 focus:ring-blue-500 focus:border-transparent ${editFieldErrors?.table_type ? 'border-red-500 bg-red-50' : 'border-gray-300'}`}
                 />
-
-                {/* Mobile */}
-                <div className={`md:hidden flex items-center gap-2 border rounded-md ${editFieldErrors?.table_type ? 'border-red-500 bg-red-50' : 'border-gray-300'
-                  }`}>
-                  <button
-                    type="button"
-                    onClick={() => {
-                      const newValue = Math.max(1, (Number(table.table_type) || 1) - 1);
-                      handleEditChange(table.id, "table_type", newValue);
-                    }}
-                    className="px-4 py-2 text-lg font-bold text-gray-700 hover:bg-gray-100 transition-colors"
-                  >
-                    −
-                  </button>
-                  <input
-                    type="number"
-                    min="1"
-                    value={table.table_type}
-                    onChange={(e) => {
-                      const value = Math.max(1, Number(e.target.value) || 1);
-                      handleEditChange(table.id, "table_type", value);
-                    }}
-                    className="flex-1 text-center py-2 border-x border-gray-300 focus:outline-none bg-transparent font-bold"
-                  />
-                  <button
-                    type="button"
-                    onClick={() => {
-                      const newValue = (Number(table.table_type) || 1) + 1;
-                      handleEditChange(table.id, "table_type", newValue);
-                    }}
-                    className="px-4 py-2 text-lg font-bold text-gray-700 hover:bg-gray-100 transition-colors"
-                  >
-                    +
-                  </button>
+                <div className={`md:hidden flex items-center gap-2 border rounded-md ${editFieldErrors?.table_type ? 'border-red-500 bg-red-50' : 'border-gray-300'}`}>
+                  <button type="button" onClick={() => handleEditChange(table.id, "table_type", Math.max(1, (Number(table.table_type) || 1) - 1))} className="px-4 py-2 text-lg font-bold text-gray-700 hover:bg-gray-100">−</button>
+                  <input type="number" min="1" value={table.table_type} onChange={(e) => handleEditChange(table.id, "table_type", Math.max(1, Number(e.target.value) || 1))} className="flex-1 text-center py-2 border-x border-gray-300 focus:outline-none bg-transparent font-bold" />
+                  <button type="button" onClick={() => handleEditChange(table.id, "table_type", (Number(table.table_type) || 1) + 1)} className="px-4 py-2 text-lg font-bold text-gray-700 hover:bg-gray-100">+</button>
                 </div>
-
-                {editFieldErrors?.table_type && (
-                  <p className="text-red-600 text-xs mt-1">{editFieldErrors.table_type}</p>
-                )}
+                {editFieldErrors?.table_type && <p className="text-red-600 text-xs mt-1">{editFieldErrors.table_type}</p>}
               </div>
 
               {/* Section */}
               <div>
-                <label className="block text-sm font-medium mb-1 text-gray-700">
-                  Section
-                </label>
+                <label className="block text-sm font-medium mb-1 text-gray-700">Section</label>
                 <select
                   value={table.section || ""}
-                  onChange={(e) =>
-                    handleEditChange(table.id, "section", e.target.value)
-                  }
+                  onChange={(e) => handleEditChange(table.id, "section", e.target.value)}
                   className="w-full px-3 py-2 rounded-md border border-gray-300 focus:ring-2 focus:ring-blue-500"
                 >
                   <option value="">Select Section</option>
-
-                  {loadingMasters ? (
-                    <option disabled>Loading...</option>
-                  ) : sectionOptions.length === 0 ? (
-                    <option disabled>No Sections Configured</option>
-                  ) : (
-                    sectionOptions.map((sec, i) => (
-                      <option key={i} value={sec}>{sec}</option>
-                    ))
-                  )}
+                  {loadingMasters ? <option disabled>Loading...</option>
+                    : sectionOptions.length === 0 ? <option disabled>No Sections Configured</option>
+                    : sectionOptions.map((sec, i) => <option key={i} value={sec}>{sec}</option>)}
                 </select>
               </div>
 
               {/* Zone */}
               <div>
-                <label className="block text-sm font-medium mb-1 text-gray-700">
-                  Zone
-                </label>
+                <label className="block text-sm font-medium mb-1 text-gray-700">Zone</label>
                 <select
                   value={table.location_zone || ""}
-                  onChange={(e) =>
-                    handleEditChange(table.id, "location_zone", e.target.value)
-                  }
+                  onChange={(e) => handleEditChange(table.id, "location_zone", e.target.value)}
                   className="w-full px-3 py-2 rounded-md border border-gray-300 focus:ring-2 focus:ring-blue-500"
                 >
                   <option value="">Select Zone</option>
-
-                  {loadingMasters ? (
-                    <option disabled>Loading...</option>
-                  ) : zoneOptions.length === 0 ? (
-                    <option disabled>No Zones Configured</option>
-                  ) : (
-                    zoneOptions.map((zone, i) => (
-                      <option key={i} value={zone}>{zone}</option>
-                    ))
-                  )}
+                  {loadingMasters ? <option disabled>Loading...</option>
+                    : zoneOptions.length === 0 ? <option disabled>No Zones Configured</option>
+                    : zoneOptions.map((zone, i) => <option key={i} value={zone}>{zone}</option>)}
                 </select>
               </div>
 
@@ -1187,43 +1125,22 @@ const UniversalEditModal = ({
                 <select
                   value={table.status || ""}
                   onChange={(e) => handleEditChange(table.id, "status", e.target.value)}
-                  className={`w-full px-3 py-2 rounded-md border focus:outline-none focus:ring-2 focus:ring-blue-500 ${editFieldErrors?.status ? 'border-red-500 bg-red-50' : 'border-gray-300'
-                    }`}
+                  className={`w-full px-3 py-2 rounded-md border focus:outline-none focus:ring-2 focus:ring-blue-500 ${editFieldErrors?.status ? 'border-red-500 bg-red-50' : 'border-gray-300'}`}
                 >
                   <option value="">Select Status</option>
-
-                  {loadingMasters ? (
-                    <option disabled>Loading...</option>
-                  ) : statusOptions.length === 0 ? (
-                    <option disabled>No Status Configured</option>
-                  ) : (
-                    statusOptions.map((status, i) => (
-                      <option key={i} value={status}>{status}</option>
-                    ))
-                  )}
+                  {loadingMasters ? <option disabled>Loading...</option>
+                    : statusOptions.length === 0 ? <option disabled>No Status Configured</option>
+                    : statusOptions.map((status, i) => <option key={i} value={status}>{status}</option>)}
                 </select>
-
-                {editFieldErrors?.status && (
-                  <p className="text-red-600 text-xs mt-1">{editFieldErrors.status}</p>
-                )}
+                {editFieldErrors?.status && <p className="text-red-600 text-xs mt-1">{editFieldErrors.status}</p>}
               </div>
             </div>
           </div>
 
           {/* Footer */}
           <div className="px-6 py-4 border-t border-gray-200 bg-gray-50 flex gap-3 justify-end">
-            <button
-              className="px-6 py-2 rounded-md bg-white text-gray-700 border border-gray-300 hover:bg-gray-50 font-medium"
-              onClick={handleClose}
-            >
-              Cancel
-            </button>
-            <button
-              className="px-6 py-2 rounded-md bg-action-primary text-text-white hover:bg-blue-700 font-medium"
-              onClick={saveEdit}
-            >
-              Save
-            </button>
+            <button onClick={handleClose} className="px-6 py-2 rounded-md bg-white text-gray-700 border border-gray-300 hover:bg-gray-50 font-medium">Cancel</button>
+            <button onClick={saveEdit} className="px-6 py-2 rounded-md bg-action-primary text-text-white hover:bg-blue-700 font-medium">Save</button>
           </div>
         </div>
       </div>

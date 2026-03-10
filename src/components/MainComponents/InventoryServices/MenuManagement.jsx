@@ -39,6 +39,7 @@ const MenuManagement = ({ clientId, token, realm }) => {
   const [showEditModal, setShowEditModal] = useState(false);
   const [showDeleteModal, setShowDeleteModal] = useState(false);
   const [showBulkModal, setShowBulkModal] = useState(false);
+  const [units, setUnits] = useState([]);
 
   const [newItemImage, setNewItemImage] = useState(null);
   const [newItemImageUrl, setNewItemImageUrl] = useState('');
@@ -260,6 +261,28 @@ const MenuManagement = ({ clientId, token, realm }) => {
     }
     return result;
   };
+
+ // ✅ FIXED — uses the same axios pattern as the rest of MenuManagement
+const fetchUnits = useCallback(async () => {
+  try {
+    const res = await axios.get(
+      `${import.meta.env.VITE_API_INVENTORY_SERVICE_URL}/${clientId}/menu/read_category?category_id=units`,
+      { headers: { Authorization: `Bearer ${token}` } }
+    );
+    const data = res.data?.data || [];
+    const unitsNode = Array.isArray(data) ? data.find((d) => d.id === "units") : data;
+    const subCats = unitsNode?.subCategories || [];
+    const unitList = subCats.map((u) => (typeof u === "string" ? u : u.id));
+    setUnits(unitList.length > 0 ? unitList : ["g", "kg", "ml", "litre", "pcs"]);
+  } catch (err) {
+    console.error("fetchUnits failed:", err);
+    setUnits(["g", "kg", "ml", "litre", "pcs"]);
+  }
+}, [clientId, token]);
+
+useEffect(() => {
+  fetchUnits();
+}, [fetchUnits]);
 
   const getCategoryIdByName = (categoryName) => {
     if (!categoryName || categoryName === 'All Categories' || categoryName === 'All') return null;
@@ -1004,6 +1027,7 @@ const MenuManagement = ({ clientId, token, realm }) => {
         handleAddItem={handleAddItem} getCategoryIdByName={getCategoryIdByName}
         inventoryIds={inventoryIds} getAddonCategoryId={getAddonCategoryId}
         fetchAddonData={fetchAddonData} setAddonSubcategories={setAddonSubcategories} setAllAddonItems={setAllAddonItems}
+        units={units}
       />
 
       <UniversalEditModal
@@ -1015,6 +1039,8 @@ const MenuManagement = ({ clientId, token, realm }) => {
         handleEditItem={handleEditItem} clientId={clientId} token={token}
         inventoryIds={inventoryIds} getAddonCategoryId={getAddonCategoryId}
         fetchAddonData={fetchAddonData} setAddonSubcategories={setAddonSubcategories} setAllAddonItems={setAllAddonItems}
+        units={units}
+
       />
 
       <UniversalBulkUpdateModal
