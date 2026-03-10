@@ -829,3 +829,22 @@ INSERT INTO category (id, client_id, name, description, sub_categories, slug, cr
 UPDATE category
 SET sub_categories = array_cat(sub_categories, ARRAY['razorpay','verify'])
 WHERE id = 'invoice' AND client_id = 'saas';
+
+CREATE TABLE address (
+    id bigint NOT NULL,
+    address_line1 text,
+    address_line2 text,
+    city text,
+    name text,
+    country text,
+    state text,
+    pincode text,
+    contact_name text,
+    contact_number text,
+    created_at timestamp without time zone DEFAULT CURRENT_TIMESTAMP,
+    updated_at timestamp without time zone DEFAULT CURRENT_TIMESTAMP
+);
+
+UPDATE category
+SET sub_categories = array_cat(sub_categories, ARRAY['address'])
+WHERE id = 'users' AND client_id = 'saas';
