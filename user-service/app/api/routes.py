@@ -2,7 +2,7 @@ from fastapi import Depends, HTTPException, APIRouter, Request
 from sqlalchemy.orm import Session
 from database.postgres import get_db
 from entity.user_entity import User, Person, PageDefinition
-from entity.client_entity import Client
+from entity.client_entity import Client, Address
 from utils.auth import hash_password, verify_password, create_access_token, verify_token, SECRET_KEY, ALGORITHM
 from models.saas_context import SaasContext
 from models.user_model import UserModel, ResetpasswordRequest, LoginRequest, PersonModel
@@ -19,9 +19,8 @@ from services.add_users import create_user_and_person, getting_screen_id, get_us
 from jose import jwt
 import uuid
 from sqlalchemy import func
-
+from models.client_model import AddressModel 
 router = APIRouter()
-
 # ================== ADD USER ==================
 @router.post("/add")
 async def add_user(client_id: str, userReq: UserModel, context: SaasContext = Depends(verify_token), db: Session = Depends(get_db)):
@@ -625,3 +624,47 @@ def save_role_config(client_id: str, role: str, payload: dict, context: SaasCont
 
     db.commit()
     return ResponseModel(screen_id=context.screen_id, message="Role configuration saved")
+
+@router.post("/address")
+async def add_address(client_id: str,add: AddressModel,context: SaasContext = Depends(verify_token),db: Session = Depends(get_db)):
+    try:
+        user_uuid = uuid.UUID(str(context.user_id))
+    except ValueError:
+        raise HTTPException(status_code=400, detail="Invalid user id")
+    person = db.query(Person).filter(Person.id == user_uuid).first()
+    if not person:
+        raise HTTPException(status_code=404, detail="Person not found")
+    # create address
+    new_address = Address(
+        address_line1=add.address_line1,
+        address_line2=add.address_line2,
+        city=add.city,
+        state=add.state,
+        country=add.country,
+        pincode=add.pincode,
+        contact_name=add.contact_name,
+        contact_number=add.contact_number
+    )
+
+    db.add(new_address)
+    db.flush()
+    # update saved address ids
+    if not person.saved_address_ids:
+        person.saved_address_ids = []
+    person.saved_address_ids.append(new_address.id)
+    db.commit()
+
+    return ResponseModel( screen_id=context.screen_id,
+        data={"message": "Address added successfully","address_id": str(new_address.id)})
+
+@router.get("/address")
+async def get_addresses(client_id: str, context: SaasContext = Depends(verify_token), db: Session = Depends(get_db)):
+    person = db.query(Person).filter(Person.id == context.user_id).first()
+
+    if not person or not person.saved_address_ids:
+        return ResponseModel(screen_id=context.screen_id, data={"addresses": []})
+
+    addresses = db.query(Address).filter(Address.id.in_(person.saved_address_ids)).all()
+    address_models = [Address.copyToModel(a) for a in addresses]
+
+    return ResponseModel(screen_id=context.screen_id,data={"addresses": address_models})
