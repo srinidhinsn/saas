@@ -170,6 +170,7 @@ export default function StockRecipeManager({ clientId: propClientId, token: prop
         getAuthHeaders(token)
       );
 
+      // Extract subcategories from the inventory category
       const inventoryData = res.data?.data || [];
 
       let subcategories = [];
@@ -179,10 +180,10 @@ export default function StockRecipeManager({ clientId: propClientId, token: prop
       } else if (inventoryData.subCategories) {
         subcategories = inventoryData.subCategories;
       }
-
       console.log("Inventory Subcategories:", subcategories);
       setInventoryCategories(subcategories);
 
+      // Set first inventory as active tab if exists
       if (subcategories.length > 0 && activeTab === "recipe") {
         setActiveTab(subcategories[0].id);
       }
@@ -217,6 +218,7 @@ export default function StockRecipeManager({ clientId: propClientId, token: prop
     }
   }, [activeTab]);
 
+  // Fetch all stocks (no realm filter, will be filtered by inventory_id on frontend)
   const fetchStocks = async () => {
     try {
       const res = await axios.get(
@@ -247,6 +249,7 @@ export default function StockRecipeManager({ clientId: propClientId, token: prop
     }
   };
 
+  // Fetch menu items based on inventory_id = 'menu' or realm
   const fetchMenuItems = async () => {
     try {
       const res = await axios.get(
@@ -311,6 +314,7 @@ export default function StockRecipeManager({ clientId: propClientId, token: prop
     }
 
     try {
+      // Step 1: Create the new subcategory
       const categoryId = inventoryForm.id || inventoryForm.name.toLowerCase().replace(/\s+/g, '_');
       const slug = inventoryForm.name.toLowerCase().replace(/\s+/g, '-');
 
@@ -328,7 +332,7 @@ export default function StockRecipeManager({ clientId: propClientId, token: prop
         subcategoryPayload,
         getAuthHeaders(token)
       );
-
+      // Step 2: Fetch current inventory category to get existing subcategories
       const inventoryCategoryRes = await axios.get(
         `${API_CONFIG.baseMenu(clientId)}/read_category?client_id=${clientId}&category_id=inventory`,
         getAuthHeaders(token)
@@ -340,13 +344,13 @@ export default function StockRecipeManager({ clientId: propClientId, token: prop
       if (Array.isArray(inventoryData)) {
         const inventoryCategory = inventoryData.find(cat => cat.id === 'inventory');
         currentSubcategories = inventoryCategory?.subCategories || [];
-        console.log("Current subcategories are", currentSubcategories);
+        console.log("Current subcategories are", currentSubcategories)
       } else if (inventoryData.subCategories) {
         currentSubcategories = inventoryData.subCategories;
       }
-
+      // Step 3: Update inventory category's subcategories to include the new one
       const existingSubcategoryIds = currentSubcategories.map(sub => sub.id).filter(id => id !== categoryId);
-      console.log("existing subcategories are", existingSubcategoryIds);
+      console.log("existing subcategories are", existingSubcategoryIds)
       const updatedSubcategoryIds = [...existingSubcategoryIds, categoryId];
       console.log("updated subcategories are", updatedSubcategoryIds);
 
@@ -410,17 +414,17 @@ export default function StockRecipeManager({ clientId: propClientId, token: prop
   const saveStock = async () => {
     if (!stockForm.name.trim()) return setError("Name is required");
     if (!stockForm.inventory_id) return setError("Please select an inventory");
-
+    // FIX #2: Get the selected inventory category UUID and name
     const selectedInventory = inventoryCategories.find(inv => inv.id === stockForm.inventory_id);
-    console.log("Inventory Id = ", selectedInventory);
+    console.log("Inventory Id = ", selectedInventory)
     const categoryUUID = selectedInventory?.id || stockForm.inventory_id;
-    console.log("category Id = ", categoryUUID);
+    console.log("category Id = ", categoryUUID)
 
     const payload = {
       ...stockForm,
       realm: realm,
-      category_id: categoryUUID,
-      inventory_id: categoryUUID,
+      category_id: categoryUUID, // FIX #2: Send UUID to backend
+      inventory_id: categoryUUID, // FIX #2: Also ensure inventory_id is the UUID
       client_id: clientId,
     };
 
@@ -432,7 +436,7 @@ export default function StockRecipeManager({ clientId: propClientId, token: prop
       await axios.post(url, payload, getAuthHeaders(token));
       setIsStockModalOpen(false);
       await fetchStocks();
-
+      // Reset form
       setStockForm({
         id: null,
         name: "",
@@ -569,10 +573,10 @@ export default function StockRecipeManager({ clientId: propClientId, token: prop
     if (inventoryId === "menu" || inventoryId === "recipe") return [];
     return filteredStocks.filter(stock => stock.inventory_id === inventoryId);
   };
-
+  // FIX #3: Calculate dynamic overview based on active inventory
   const getCurrentInventoryOverview = useMemo(() => {
     const currentInventory = inventoryCategories.find(cat => cat.id === activeTab);
-
+    // Default overview when on Recipe tab
     if (!currentInventory) {
       return {
         stockCount: stocks.length,
@@ -581,7 +585,7 @@ export default function StockRecipeManager({ clientId: propClientId, token: prop
         inventoryCount: inventoryCategories.length,
       };
     }
-
+    // Filter stocks for current inventory
     const currentStocks = stocks.filter(stock => stock.inventory_id === activeTab);
     const currentEnhancedStocks = currentStocks.map((stock) => {
       const consumption = recipe.reduce((sum, r) => {
