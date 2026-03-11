@@ -20,6 +20,9 @@ export default function StockRecipeManager({ clientId: propClientId, token: prop
   const [loading, setLoading] = useState(false);
   const [error, setError] = useState("");
 
+  // Units fetched from category id=units
+  const [units, setUnits] = useState([]);
+
   // Inventory Categories (subcategories of id=inventory)
   const [inventoryCategories, setInventoryCategories] = useState([]);
   // All categories for lookup
@@ -139,6 +142,26 @@ export default function StockRecipeManager({ clientId: propClientId, token: prop
     }
   };
 
+  // Fetch units from category id=units
+  const fetchUnits = async () => {
+    try {
+      const res = await axios.get(
+        `${API_CONFIG.baseMenu(clientId)}/read_category?client_id=${clientId}&category_id=units`,
+        getAuthHeaders(token)
+      );
+      const data = res.data?.data || [];
+      const unitsNode = Array.isArray(data) ? data.find((d) => d.id === "units") : data;
+      const subCats = unitsNode?.subCategories || [];
+      // subCategories may be objects {id, name, ...} or plain strings
+      const unitList = subCats.map((u) => (typeof u === "string" ? u : u.id));
+      setUnits(unitList);
+    } catch (err) {
+      console.error("fetchUnits failed:", err);
+      // Fallback to standard units if API fails
+      setUnits(["g", "kg", "ml", "litre", "pcs"]);
+    }
+  };
+
   // Fetch inventory categories (subcategories of id=inventory)
   const fetchInventoryCategories = async () => {
     try {
@@ -157,7 +180,6 @@ export default function StockRecipeManager({ clientId: propClientId, token: prop
       } else if (inventoryData.subCategories) {
         subcategories = inventoryData.subCategories;
       }
-
       console.log("Inventory Subcategories:", subcategories);
       setInventoryCategories(subcategories);
 
@@ -181,7 +203,8 @@ export default function StockRecipeManager({ clientId: propClientId, token: prop
         fetchAllCategories(),
         fetchInventoryCategories(),
         fetchStocks(),
-        fetchMenuItems()
+        fetchMenuItems(),
+        fetchUnits(),
       ]);
       setLoading(false);
     };
@@ -204,10 +227,20 @@ export default function StockRecipeManager({ clientId: propClientId, token: prop
       );
 
       const allItems = res.data?.data || [];
-      setStocks(allItems);
+      console.log("all items", allItems);
 
-      // Extract unique categories from all stock items
-      const uniqueCategories = [...new Set(allItems.map((s) => s.category || "").filter(Boolean))];
+      const stockItems = allItems.filter(
+        (item) => item.inventory_id && item.inventory_id !== "menu"
+      );
+
+      console.log("stock items", stockItems);
+
+      setStocks(stockItems);
+
+      const uniqueCategories = [
+        ...new Set(stockItems.map((s) => s.category || "").filter(Boolean)),
+      ];
+
       setCategories(uniqueCategories);
     } catch (err) {
       console.error("fetchStocks failed:", err);
@@ -677,9 +710,9 @@ export default function StockRecipeManager({ clientId: propClientId, token: prop
                 loading={loading}
                 onUpdateAvailability={updateMenuAvailability}
                 allCategories={allCategories}
+                units={units}
               />
             )}
-
 
             {activeTab === "recipe" && (
               <RecipeTab
@@ -693,6 +726,7 @@ export default function StockRecipeManager({ clientId: propClientId, token: prop
                 onAddIngredient={addIngredient}
                 onUpdateIngredient={updateIngredient}
                 onDeleteIngredient={deleteIngredient}
+                units={units}
               />
             )}
           </main>
@@ -730,7 +764,6 @@ export default function StockRecipeManager({ clientId: propClientId, token: prop
               </div>
             )}
 
-            {/* FIX #3: Dynamic Overview */}
             <div className="bg-bg-primary rounded-xl border border-gray-100 shadow p-6">
               <h3 className="text-lg font-semibold text-gray-800 mb-4">
                 {getCurrentInventoryOverview.inventoryName ? `${getCurrentInventoryOverview.inventoryName} Overview` : 'Overview'}
@@ -770,6 +803,7 @@ export default function StockRecipeManager({ clientId: propClientId, token: prop
           form={stockForm}
           categories={categories}
           inventoryCategories={inventoryCategories}
+          units={units}
           onChange={setStockForm}
           onSave={saveStock}
           onClose={() => {
@@ -937,6 +971,7 @@ function RecipeTab({
   onAddIngredient,
   onUpdateIngredient,
   onDeleteIngredient,
+  units,
 }) {
   return (
     <div className="bg-bg-primary rounded-xl shadow border border-gray-100">
@@ -999,12 +1034,16 @@ function RecipeTab({
                           />
                         </td>
                         <td className="px-6 py-4">
-                          <input
+                          <select
                             value={ing.unit || ""}
                             onChange={(e) => onUpdateIngredient(index, "unit", e.target.value)}
-                            className="w-24 px-2 py-1 border border-gray-300 rounded focus:ring-indigo-500 focus:border-indigo-500"
-                            placeholder="g/ml/pcs"
-                          />
+                            className="w-28 px-2 py-1 border border-gray-300 rounded focus:ring-indigo-500 focus:border-indigo-500"
+                          >
+                            <option value="">Unit</option>
+                            {units.map((u) => (
+                              <option key={u} value={u}>{u}</option>
+                            ))}
+                          </select>
                         </td>
                         <td className="px-6 py-4 text-right">
                           <button
@@ -1051,12 +1090,16 @@ function RecipeTab({
               </div>
 
               <div>
-                <input
-                  placeholder="Unit (g/ml/pcs)"
+                <select
                   value={newIngredient.unit}
                   onChange={(e) => setNewIngredient((prev) => ({ ...prev, unit: e.target.value }))}
                   className="w-full px-4 py-2 border border-gray-300 rounded-lg focus:ring-indigo-500 focus:border-indigo-500"
-                />
+                >
+                  <option value="">Select unit</option>
+                  {units.map((u) => (
+                    <option key={u} value={u}>{u}</option>
+                  ))}
+                </select>
               </div>
 
               <div className="flex gap-3">
@@ -1085,8 +1128,7 @@ function RecipeTab({
   );
 }
 
-// FIX #1: Updated MenuAvailabilityTab to display category name instead of UUID
-function MenuAvailabilityTab({ menuItems, loading, onUpdateAvailability, allCategories }) {
+function MenuAvailabilityTab({ menuItems, loading, onUpdateAvailability, allCategories, units }) {
   const [editingItem, setEditingItem] = useState(null);
   const [editForm, setEditForm] = useState({ availability: "", unit: "" });
 
@@ -1182,15 +1224,18 @@ function MenuAvailabilityTab({ menuItems, loading, onUpdateAvailability, allCate
                   </td>
                   <td className="px-6 py-4 whitespace-nowrap">
                     {editingItem === item.id ? (
-                      <input
-                        type="text"
+                      <select
                         value={editForm.unit}
                         onChange={(e) =>
                           setEditForm((prev) => ({ ...prev, unit: e.target.value }))
                         }
-                        className="w-24 px-3 py-2 border border-gray-300 rounded-lg focus:ring-2 focus:ring-indigo-500 focus:border-indigo-500"
-                        placeholder="kg, pcs"
-                      />
+                        className="w-28 px-3 py-2 border border-gray-300 rounded-lg focus:ring-2 focus:ring-indigo-500 focus:border-indigo-500"
+                      >
+                        <option value="">Select unit</option>
+                        {units.map((u) => (
+                          <option key={u} value={u}>{u}</option>
+                        ))}
+                      </select>
                     ) : (
                       <span className="text-sm text-gray-900">{item.unit || "—"}</span>
                     )}
@@ -1236,6 +1281,7 @@ function StockModal({
   form,
   categories,
   inventoryCategories,
+  units,
   onChange,
   onSave,
   onClose
@@ -1319,12 +1365,16 @@ function StockModal({
 
           <div>
             <label className="block text-sm font-medium text-gray-700 mb-1">Unit</label>
-            <input
+            <select
               value={form.unit}
               onChange={(e) => onChange((prev) => ({ ...prev, unit: e.target.value }))}
-              placeholder="g / ml / pcs / kg"
               className="w-full px-4 py-2 border border-gray-300 rounded-lg focus:ring-2 focus:ring-indigo-500 focus:border-indigo-500"
-            />
+            >
+              <option value="">Select unit</option>
+              {units.map((u) => (
+                <option key={u} value={u}>{u}</option>
+              ))}
+            </select>
           </div>
 
           <div className="sm:col-span-2">

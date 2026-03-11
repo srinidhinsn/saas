@@ -597,8 +597,6 @@
 
 
 
-
-
 import React, { useState, useEffect } from 'react';
 import { X, Upload, Plus } from 'lucide-react';
 import MenuImagePreview from '../../MainComponents/InventoryServices/Tree&CategoryManage/MenuImagePreview';
@@ -625,6 +623,7 @@ const UniversalEditModal = ({
   clientId,
   token,
   inventoryIds,
+  units, // ← units list from parent
 
   // Table-specific props
   editRowId,
@@ -635,8 +634,7 @@ const UniversalEditModal = ({
   editFieldErrors
 }) => {
   const [dragActive, setDragActive] = useState(false);
-  const [showAddonPopup, setShowAddonPopup] = useState(false); // ✅ Popup state
-  const [zoneOptions, setZoneOptions] = useState([]);
+  const [showAddonPopup, setShowAddonPopup] = useState(false); // ✅ Popup state  const [zoneOptions, setZoneOptions] = useState([]);
   const [sectionOptions, setSectionOptions] = useState([]);
   const [loadingMasters, setLoadingMasters] = useState(false);
   const [statusOptions, setStatusOptions] = useState([]);
@@ -676,25 +674,18 @@ const UniversalEditModal = ({
     loadMasters();
   }, [showModal, modalType, clientId, token]);
 
-  // Menu Modal Functions
   const handleEditDrag = (e) => {
     e.preventDefault();
     e.stopPropagation();
-    if (e.type === "dragenter" || e.type === "dragover") {
-      setDragActive(true);
-    } else if (e.type === "dragleave") {
-      setDragActive(false);
-    }
+    if (e.type === "dragenter" || e.type === "dragover") setDragActive(true);
+    else if (e.type === "dragleave") setDragActive(false);
   };
 
   const handleEditDrop = (e) => {
     e.preventDefault();
     e.stopPropagation();
     setDragActive(false);
-
-    if (e.dataTransfer.files && e.dataTransfer.files[0]) {
-      handleEditImageFile(e.dataTransfer.files[0]);
-    }
+    if (e.dataTransfer.files && e.dataTransfer.files[0]) handleEditImageFile(e.dataTransfer.files[0]);
   };
 
   const handleEditImageFile = (file) => {
@@ -711,9 +702,7 @@ const UniversalEditModal = ({
     items.forEach(item => {
       if (item.id !== 'all') {
         result.push({ ...item, level });
-        if (item.children) {
-          result = result.concat(flattenCategories(item.children, level + 1));
-        }
+        if (item.children) result = result.concat(flattenCategories(item.children, level + 1));
       }
     });
     return result;
@@ -757,7 +746,7 @@ const UniversalEditModal = ({
             <div className="px-6 py-4 border-b border-gray-200 flex justify-between items-center">
               <h2 className="text-xl font-semibold text-gray-900">Edit Menu Item</h2>
               <button
-                onClick={handleClose} 
+                onClick={handleClose}
                 className="p-1.5 rounded-lg bg-action-primary text-text-white hover:opacity-90 transition-opacity">
                 <X className="w-5 h-5" />
               </button>
@@ -815,6 +804,7 @@ const UniversalEditModal = ({
                 </div>
 
                 {/* Item Name */}
+
                 <div>
                   <label className="block text-sm font-medium mb-1 text-gray-700">
                     Item Name <span className="text-red-600">*</span>
@@ -853,7 +843,6 @@ const UniversalEditModal = ({
                       required
                     />
                   </div>
-
                   <div>
                     <label className="block text-sm font-medium mb-1 text-gray-700">Discount</label>
                     <input
@@ -888,12 +877,43 @@ const UniversalEditModal = ({
                   </div>
                   <div>
                     <label className="block text-sm font-medium mb-1 text-gray-700">Unit</label>
-                    <input
-                      type="text"
-                      value={editingItem.unit}
+                    <select
+                      value={editingItem.unit ?? ''}
                       onChange={(e) => setEditingItem({ ...editingItem, unit: e.target.value })}
                       className="w-full px-3 py-2 rounded-md border border-gray-300 text-gray-900 focus:outline-none focus:ring-2 focus:ring-blue-500 focus:border-transparent"
+                    >
+                      <option value="">Select unit</option>
+                      {(units || []).map((u) => (
+                        <option key={u} value={u}>{u}</option>
+                      ))}
+                    </select>
+                  </div>
+                </div>
+
+                {/* Serving Quantity & Serving Unit */}
+                <div className="grid grid-cols-2 gap-4">
+                  <div>
+                    <label className="block text-sm font-medium mb-1 text-gray-700">Serving Quantity</label>
+                    <input
+                      type="number"
+                      value={editingItem.serving_quantity ?? ''}
+                      onChange={(e) => setEditingItem({ ...editingItem, serving_quantity: e.target.value })}
+                      className="w-full px-3 py-2 rounded-md border border-gray-300 text-gray-900 focus:outline-none focus:ring-2 focus:ring-blue-500 focus:border-transparent"
+                      placeholder="0"
                     />
+                  </div>
+                  <div>
+                    <label className="block text-sm font-medium mb-1 text-gray-700">Serving Unit</label>
+                    <select
+                      value={editingItem.serving_unit ?? ''}
+                      onChange={(e) => setEditingItem({ ...editingItem, serving_unit: e.target.value })}
+                      className="w-full px-3 py-2 rounded-md border border-gray-300 text-gray-900 focus:outline-none focus:ring-2 focus:ring-blue-500 focus:border-transparent"
+                    >
+                      <option value="">Select unit</option>
+                      {(units || []).map((u) => (
+                        <option key={u} value={u}>{u}</option>
+                      ))}
+                    </select>
                   </div>
                 </div>
 
@@ -916,8 +936,7 @@ const UniversalEditModal = ({
                             onClick={() => {
                               setEditItemImage(null);
                               setEditItemImageUrl('');
-                            }}
-                            className="absolute top-2 right-2 bg-red-600 text-white p-1.5 rounded-full hover:bg-red-700"
+                            }} className="absolute top-2 right-2 bg-red-600 text-white p-1.5 rounded-full hover:bg-red-700"
                           >
                             <X className="w-4 h-4" />
                           </button>
@@ -940,8 +959,7 @@ const UniversalEditModal = ({
 
                   <div
                     className={`relative border-2 border-dashed rounded-md p-6 transition-colors ${dragActive ? 'border-blue-500 bg-blue-50' : 'border-gray-300 bg-gray-50'
-                      }`}
-                    onDragEnter={handleEditDrag}
+                      }`} onDragEnter={handleEditDrag}
                     onDragLeave={handleEditDrag}
                     onDragOver={handleEditDrag}
                     onDrop={handleEditDrop}
@@ -973,8 +991,8 @@ const UniversalEditModal = ({
                   <label className="block text-sm font-medium mb-2 text-gray-700">
                     Add-ons
                   </label>
-                  
-                  {/* Selected Addons Display */}
+
+                  {/* Select Addons Button */}
                   {editingItem.line_item_id && editingItem.line_item_id.length > 0 && (
                     <div className="mb-3 flex flex-wrap gap-2">
                       {editingItem.line_item_id.map(addonId => (
@@ -995,7 +1013,6 @@ const UniversalEditModal = ({
                     </div>
                   )}
 
-                  {/* Select Addons Button */}
                   <button
                     type="button"
                     onClick={() => setShowAddonPopup(true)}
@@ -1009,6 +1026,7 @@ const UniversalEditModal = ({
                     </span>
                   </button>
                 </div>
+
               </div>
             </div>
 
@@ -1123,7 +1141,6 @@ const UniversalEditModal = ({
                     +
                   </button>
                 </div>
-
                 {editFieldErrors?.table_type && (
                   <p className="text-red-600 text-xs mt-1">{editFieldErrors.table_type}</p>
                 )}
@@ -1133,16 +1150,13 @@ const UniversalEditModal = ({
               <div>
                 <label className="block text-sm font-medium mb-1 text-gray-700">
                   Section
-                </label>
-                <select
+                </label>                <select
                   value={table.section || ""}
                   onChange={(e) =>
                     handleEditChange(table.id, "section", e.target.value)
-                  }
-                  className="w-full px-3 py-2 rounded-md border border-gray-300 focus:ring-2 focus:ring-blue-500"
+                  } className="w-full px-3 py-2 rounded-md border border-gray-300 focus:ring-2 focus:ring-blue-500"
                 >
                   <option value="">Select Section</option>
-
                   {loadingMasters ? (
                     <option disabled>Loading...</option>
                   ) : sectionOptions.length === 0 ? (
@@ -1159,16 +1173,13 @@ const UniversalEditModal = ({
               <div>
                 <label className="block text-sm font-medium mb-1 text-gray-700">
                   Zone
-                </label>
-                <select
+                </label>                <select
                   value={table.location_zone || ""}
                   onChange={(e) =>
                     handleEditChange(table.id, "location_zone", e.target.value)
-                  }
-                  className="w-full px-3 py-2 rounded-md border border-gray-300 focus:ring-2 focus:ring-blue-500"
+                  } className="w-full px-3 py-2 rounded-md border border-gray-300 focus:ring-2 focus:ring-blue-500"
                 >
                   <option value="">Select Zone</option>
-
                   {loadingMasters ? (
                     <option disabled>Loading...</option>
                   ) : zoneOptions.length === 0 ? (
@@ -1188,10 +1199,8 @@ const UniversalEditModal = ({
                   value={table.status || ""}
                   onChange={(e) => handleEditChange(table.id, "status", e.target.value)}
                   className={`w-full px-3 py-2 rounded-md border focus:outline-none focus:ring-2 focus:ring-blue-500 ${editFieldErrors?.status ? 'border-red-500 bg-red-50' : 'border-gray-300'
-                    }`}
-                >
+                    }`}                >
                   <option value="">Select Status</option>
-
                   {loadingMasters ? (
                     <option disabled>Loading...</option>
                   ) : statusOptions.length === 0 ? (
@@ -1202,11 +1211,9 @@ const UniversalEditModal = ({
                     ))
                   )}
                 </select>
-
                 {editFieldErrors?.status && (
                   <p className="text-red-600 text-xs mt-1">{editFieldErrors.status}</p>
-                )}
-              </div>
+                )}              </div>
             </div>
           </div>
 
