@@ -625,8 +625,9 @@ def save_role_config(client_id: str, role: str, payload: dict, context: SaasCont
     db.commit()
     return ResponseModel(screen_id=context.screen_id, message="Role configuration saved")
 
+
 @router.post("/address")
-async def add_address(client_id: str,add: AddressModel,context: SaasContext = Depends(verify_token),db: Session = Depends(get_db)):
+async def save_address(client_id: str,add: AddressModel,context: SaasContext = Depends(verify_token),db: Session = Depends(get_db)):
     try:
         user_uuid = uuid.UUID(str(context.user_id))
     except ValueError:
@@ -634,7 +635,28 @@ async def add_address(client_id: str,add: AddressModel,context: SaasContext = De
     person = db.query(Person).filter(Person.id == user_uuid).first()
     if not person:
         raise HTTPException(status_code=404, detail="Person not found")
-    # create address
+    # If user already has address → UPDATE
+    if person.saved_address_ids and len(person.saved_address_ids) > 0:
+        address = db.query(Address).filter(
+            Address.id == person.saved_address_ids[0]
+        ).first()
+        
+        if address:
+            address.address_line1 = add.address_line1
+            address.address_line2 = add.address_line2
+            address.city = add.city
+            address.state = add.state
+            address.country = add.country
+            address.pincode = add.pincode
+            address.contact_name = add.contact_name
+            address.contact_number = add.contact_number
+
+            db.commit()
+
+            return ResponseModel(screen_id=context.screen_id,
+                data={"message": "Address updated successfully","address_id": address.id})
+
+    # Otherwise CREATE
     new_address = Address(
         address_line1=add.address_line1,
         address_line2=add.address_line2,
@@ -648,14 +670,14 @@ async def add_address(client_id: str,add: AddressModel,context: SaasContext = De
 
     db.add(new_address)
     db.flush()
-    # update saved address ids
+
     if not person.saved_address_ids:
         person.saved_address_ids = []
     person.saved_address_ids.append(new_address.id)
     db.commit()
-
-    return ResponseModel( screen_id=context.screen_id,
-        data={"message": "Address added successfully","address_id": str(new_address.id)})
+    return ResponseModel(screen_id=context.screen_id,
+    data={"message": "Address added successfully","address_id": new_address.id}
+    )
 
 @router.get("/address")
 async def get_addresses(client_id: str, context: SaasContext = Depends(verify_token), db: Session = Depends(get_db)):
