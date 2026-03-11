@@ -2,6 +2,8 @@ from typing import List, Dict, Any
 from sqlalchemy.orm import Session
 from entity.order_entity import DineinOrder as DBOrder, OrderItem as DBOrderItem
 from entity.order_entity import DineinOrder as Db_Order_Entity, OrderItem as Db_OrderItem_Entity
+from entity.inventory_entity import InventoryEntity
+
 
 # # from .billing_client import push_order_to_billing
 # from billing_client import push_order_to_billing_public
@@ -164,3 +166,106 @@ def _merge_group(orders: list) -> dict:
     }
 
 # ───────────────────────────────────────────────────────────────────────────
+
+
+UNIT_TO_BASE = {
+    "g":     1,
+    "kg":    1000,
+    "ml":    1,
+    "litre": 1000,
+    "pcs":   1,
+}
+
+WEIGHT_UNITS  = {"g", "kg"}
+VOLUME_UNITS  = {"ml", "litre"}
+COUNT_UNITS   = {"pcs"}
+
+
+def _convert(recipe_qty: float, recipe_unit: str, stock_unit: str) -> float:
+    """
+    Convert recipe_qty from recipe_unit into stock_unit.
+
+    Examples:
+      30g   → kg  : (30 * 1) / 1000  = 0.03
+      500ml → litre: (500 * 1) / 1000 = 0.5
+      2kg   → g   : (2 * 1000) / 1    = 2000
+      5pcs  → pcs : 5
+    """
+    ru, su = recipe_unit.strip(), stock_unit.strip()
+
+    if ru == su:
+        return recipe_qty
+
+    # Both units must be known and in the same dimension
+    if ru not in UNIT_TO_BASE or su not in UNIT_TO_BASE:
+        raise ValueError(f"Unknown unit: recipe='{ru}', stock='{su}'")
+
+    for group in (WEIGHT_UNITS, VOLUME_UNITS, COUNT_UNITS):
+        if ru in group and su in group:
+            return (recipe_qty * UNIT_TO_BASE[ru]) / UNIT_TO_BASE[su]
+
+    raise ValueError(f"Incompatible unit dimensions: recipe='{ru}', stock='{su}'")
+
+
+# -------------------- STOCK DEDUCTION --------------------
+
+def _deduct_stock_for_order(db: Session, client_id: str, order_id: int) -> None:
+    """
+    Called exactly once when the whole order transitions to 'served'.
+    For every order item → recipe JSONB → convert units → deduct stock.
+    """
+    order_items = (
+        db.query(Db_OrderItem_Entity)
+        .filter(
+            Db_OrderItem_Entity.order_id == order_id,
+            Db_OrderItem_Entity.client_id == client_id,
+        )
+        .all()
+    )
+
+    for order_item in order_items:
+        menu_item = (
+            db.query(InventoryEntity)
+            .filter(
+                InventoryEntity.id == order_item.item_id,
+                InventoryEntity.client_id == client_id,
+            )
+            .first()
+        )
+
+        if not menu_item or not menu_item.recipe:
+            continue
+
+        ordered_qty = order_item.quantity or 1
+
+        for ingredient in menu_item.recipe:
+            # recipe JSONB shape: {stock_item_id, quantity_required, unit}
+            stock_item_id = ingredient.get("stock_item_id")
+            recipe_qty    = float(ingredient.get("quantity_required") or 0)
+            recipe_unit   = (ingredient.get("unit") or "").strip()
+
+            if not stock_item_id or recipe_qty <= 0:
+                continue
+
+            stock_item = (
+                db.query(InventoryEntity)
+                .filter(
+                    InventoryEntity.id == int(stock_item_id),
+                    InventoryEntity.client_id == client_id,
+                )
+                .first()
+            )
+
+            if not stock_item:
+                continue
+
+            stock_unit = (stock_item.unit or "").strip()
+
+            try:
+                deduction = _convert(recipe_qty, recipe_unit, stock_unit) * ordered_qty
+            except ValueError as e:
+                print(f"[WARN] Skipping deduction for stock_item_id={stock_item_id}: {e}")
+                continue
+
+            current = float(stock_item.availability or 0)
+            stock_item.availability = round(max(current - deduction, 0), 4)
