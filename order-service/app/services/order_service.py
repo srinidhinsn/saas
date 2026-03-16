@@ -1,8 +1,10 @@
-from typing import List, Dict, Any
+from typing import List, Dict, Any, Optional
 from sqlalchemy.orm import Session
 from entity.order_entity import DineinOrder as DBOrder, OrderItem as DBOrderItem
 from entity.order_entity import DineinOrder as Db_Order_Entity, OrderItem as Db_OrderItem_Entity
-from entity.inventory_entity import InventoryEntity
+from entity.inventory_entity import InventoryEntity, InventoryTransactionEntity
+from decimal import Decimal
+import uuid
 
 
 # # from .billing_client import push_order_to_billing
@@ -209,6 +211,45 @@ def _convert(recipe_qty: float, recipe_unit: str, stock_unit: str) -> float:
 
 # -------------------- STOCK DEDUCTION --------------------
 
+def _record_transaction(
+    db: Session,
+    *,
+    client_id: str,
+    stock_item_id: int,
+    inventory_id: Optional[str],
+    name: Optional[str],
+    transaction_type: str,
+    movement_type: str,
+    quantity: Decimal,
+    unit: Optional[str],
+    before_stock: Decimal,
+    after_stock: Decimal,
+    reference_id: Optional[str] = None,
+    reference_type: Optional[str] = None,
+    created_by: Optional[str] = None,
+    remarks: Optional[str] = None,
+) -> InventoryTransactionEntity:
+    tx = InventoryTransactionEntity(
+        transaction_id=str(uuid.uuid4()),
+        client_id=client_id,
+        stock_item_id=stock_item_id,
+        inventory_id=inventory_id,
+        name=name,
+        transaction_type=transaction_type,
+        movement_type=movement_type,
+        quantity=quantity,
+        unit=unit,
+        before_stock=before_stock,
+        after_stock=after_stock,
+        reference_id=reference_id,
+        reference_type=reference_type,
+        created_by=created_by,
+        remarks=remarks,
+    )
+    db.add(tx)
+    return tx
+ 
+
 def _deduct_stock_for_order(db: Session, client_id: str, order_id: int) -> None:
     """
     Called exactly once when the whole order transitions to 'served'.
@@ -267,5 +308,25 @@ def _deduct_stock_for_order(db: Session, client_id: str, order_id: int) -> None:
                 print(f"[WARN] Skipping deduction for stock_item_id={stock_item_id}: {e}")
                 continue
 
-            current = float(stock_item.availability or 0)
-            stock_item.availability = round(max(current - deduction, 0), 4)
+            deduction_decimal = Decimal(str(round(deduction, 6)))
+            before_stock = Decimal(str(stock_item.availability or 0))
+            after_stock = max(before_stock - deduction_decimal, Decimal("0"))
+
+            _record_transaction(
+                db,
+                client_id=client_id,
+                stock_item_id=stock_item.id,
+                inventory_id=stock_item.inventory_id,
+                name=stock_item.name,
+                transaction_type="ORDER_DEDUCTION",
+                movement_type="OUT",
+                quantity=deduction_decimal,
+                unit=stock_unit,
+                before_stock=before_stock,
+                after_stock=after_stock,
+                reference_id=str(order_id),
+                reference_type="order",
+                remarks=f"Order #{order_id} served — {order_item.item_name} x{ordered_qty}",
+            )
+
+            stock_item.availability = after_stock
