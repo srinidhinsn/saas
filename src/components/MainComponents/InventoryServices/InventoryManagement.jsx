@@ -104,7 +104,7 @@ const [addStockForm, setAddStockForm] = useState({
         totalCost: effective * Number(stock.unit_price || 0),
       };
     });
-  }, [stocks, recipe]); 
+  }, [stocks, recipe]);
 
   const filteredStocks = useMemo(() => {
     let result = enhancedStocks;
@@ -1626,4 +1626,4 @@ function AddStockModal({ isOpen, form, units, onChange, onSave, onClose }) {
       </div>
     </div>
   );
-}
+} 
