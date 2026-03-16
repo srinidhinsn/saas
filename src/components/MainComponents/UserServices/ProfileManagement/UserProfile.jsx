@@ -59,7 +59,7 @@ export default function UserProfile({ clientId, token }) {
   const [saved, setSaved] = useState({ 1: false, 2: false, 3: false });
 
   const [profileForm, setProfileForm] = useState({ first_name: "", last_name: "", email: "", phone: "", dob: "" });
-  const [addressForm, setAddressForm] = useState({ address_line1: "", address_line2: "", city: "", state: "", country: "", pincode: "", contact_name: "", contact_number: "" });
+  const [addressForm, setAddressForm] = useState({ address_line1: "", address_line2: "",name:"", city: "", state: "", country: "", pincode: "", contact_name: "", contact_number: "" });
   const [profileLoading, setProfileLoading] = useState(false);
   const [fetchingProfile, setFetchingProfile] = useState(true);
 
@@ -88,7 +88,7 @@ export default function UserProfile({ clientId, token }) {
           { headers: { Authorization: `Bearer ${token}` } }
         );
         const a = aRes.data?.data?.addresses?.[0];
-        if (a) setAddressForm({ address_line1: a.address_line1 || "", address_line2: a.address_line2 || "", city: a.city || "", state: a.state || "", country: a.country || "", pincode: a.pincode || "", contact_name: a.contact_name || "", contact_number: a.contact_number || "" });
+        if (a) setAddressForm({ address_line1: a.address_line1 || "", address_line2: a.address_line2 || "",name:a.name||"", city: a.city || "", state: a.state || "", country: a.country || "", pincode: a.pincode || "", contact_name: a.contact_name || "", contact_number: a.contact_number || "" });
       } catch (err) {
         const s = err?.response?.status;
         if (s === 403) toast.error("Access denied. Please re-login.");
@@ -433,6 +433,10 @@ export default function UserProfile({ clientId, token }) {
                     <Field label="Address Line 2" icon={<Home size={11} />} full>
                       <input className={inp} name="address_line2" value={addressForm.address_line2}
                         onChange={e => setAddressForm({ ...addressForm, address_line2: e.target.value })} placeholder="Apt, suite, floor (optional)" />
+                    </Field>
+                    <Field label="Address Name" icon={<Home size={11} />} full>
+                      <input className={inp} name="name" value={addressForm.name}
+                        onChange={e => setAddressForm({ ...addressForm, name: e.target.value })} placeholder="Work or Office" />
                     </Field>
                     <Field label="City" icon={<MapPin size={11} />}>
                       <input className={inp} name="city" value={addressForm.city}
