@@ -15,6 +15,7 @@ class InventoryEntity(Base):
     name = Column(Text, nullable=True)
     description = Column(Text, nullable=True)
     category_id = Column(Text, nullable=True)
+    zone_config_id = Column(BigInteger, nullable=True)
     realm = Column(Text, nullable=True)
     serving_quantity = Column(Float, nullable=True)
     serving_unit = Column(Text, nullable=True)
