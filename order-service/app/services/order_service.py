@@ -253,9 +253,8 @@ def _record_transaction(
 
 def _deduct_stock_for_order(db: Session, client_id: str, order_id: int) -> None:
     """
-    Called when the whole dine-in is marked served/completed.
-    Skips any order_item that already has an ORDER_DEDUCTION transaction,
-    so re-orders within the same dine-in are never double-deducted.
+    Called exactly once when the whole order transitions to 'served'.
+    For every order item → recipe JSONB → convert units → deduct stock.
     """
     order_items = (
         db.query(Db_OrderItem_Entity)

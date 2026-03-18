@@ -11,7 +11,7 @@ from utils.auth import verify_token
 from models.saas_context import SaasContext
 from typing import Optional
 from entity.inventory_entity import InventoryEntity
-from ..services.order_service import _root_dinein_id, _order_row_to_flat, STATUS_PRIORITY, _merge_group, _deduct_stock_for_order
+from services.order_service import _root_dinein_id, _order_row_to_flat, STATUS_PRIORITY, _merge_group, _deduct_stock_for_order
 # from app.services.order_service import deduct_inventory_after_order
 from decimal import Decimal
 
@@ -192,7 +192,10 @@ def update_order_status(
     )
 
     if not order:
-        raise HTTPException(status_code=404, detail=f"Order {body.id} not found")
+        raise HTTPException(
+            status_code=404,
+            detail=f"Order {body.id} not found"
+        )
 
     if body.status in [OrderStatusEnum.served, OrderStatusEnum.completed]:
 
@@ -235,7 +238,10 @@ def update_order_status(
 
     return ResponseModel(
         screen_id=context.screen_id,
-        data={"message": "Status updated", "new_status": order.status},
+        data={
+            "message": "Status updated",
+            "new_status": order.status,
+        },
     )
 
 

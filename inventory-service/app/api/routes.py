@@ -8,8 +8,8 @@ from entity.inventory_entity import InventoryEntity, CategoryEntity, InventoryTr
 from models.response_model import ResponseModel
 from models.saas_context import SaasContext
 from utils.auth import verify_token
-from ..services import service
-from ..services.service import _compute_current_stock, _record_transaction, _convert
+from services import service
+from services.service import _compute_current_stock, _record_transaction, _convert
 
 # -------------------- CONFIG --------------------
 router = APIRouter()
@@ -185,26 +185,18 @@ def delete_category(client_id: str, category: Category, context: SaasContext = D
 # -------------------- STOCK ROUTES --------------------
 
 @router.get("/stock", response_model=ResponseModel)
-def get_stock_items(
-    client_id: str,
-    inventory_id: Optional[str] = Query(None),
-    context: SaasContext = Depends(verify_token),
-    db: Session = Depends(get_db),
-):
-    query = db.query(InventoryEntity).filter(InventoryEntity.client_id == client_id)
+def get_stock_items(client_id: str,inventory_id: Optional[str] = Query(None),context: SaasContext = Depends(verify_token),db: Session = Depends(get_db),):
+    query = db.query(InventoryEntity).filter(
+        InventoryEntity.client_id == client_id
+    )
  
     if inventory_id:
         query = query.filter(InventoryEntity.inventory_id == inventory_id)
- 
+
     records = query.all()
     models = InventoryEntity.copyToModels(records)
  
-    return ResponseModel(
-        screen_id=context.screen_id,
-        status="success",
-        message="Fetched stock items",
-        data=models,
-    )
+    return ResponseModel(screen_id=context.screen_id, status="success", message="Fetched stock items", data=models)
  
  
 @router.post("/stock/create", response_model=ResponseModel)
@@ -518,7 +510,7 @@ def update_stock_item(
         InventoryEntity.id == updates.id,
         InventoryEntity.client_id == client_id,
     ).first()
- 
+
     if not record:
         raise HTTPException(status_code=404, detail="Stock item not found")
  
@@ -560,35 +552,22 @@ def update_stock_item(
     db.refresh(record)
     model = InventoryEntity.copyToModel(record)
  
-    return ResponseModel(
-        screen_id=context.screen_id,
-        status="success",
-        message="Stock item updated",
-        data=model,
-    )
+    return ResponseModel(screen_id=context.screen_id, status="success", message="Stock item updated", data=model)
  
  
 @router.delete("/stock/delete_by_inventory")
-async def delete_inventory_records(
-    client_id: str,
-    inventory_id: str,
-    db: Session = Depends(get_db),
-):
+async def delete_inventory_records(client_id: str, inventory_id: str,db: Session = Depends(get_db)):
     deleted_count = (
         db.query(InventoryEntity)
         .filter(
             InventoryEntity.client_id == client_id,
-            InventoryEntity.inventory_id == inventory_id,
+            InventoryEntity.inventory_id == inventory_id
         )
         .delete(synchronize_session=False)
     )
     db.commit()
  
-    return {
-        "status": "success",
-        "deleted": deleted_count,
-        "message": f"Deleted {deleted_count} records for inventory_id='{inventory_id}'",
-    }
+    return { "status": "success", "deleted": deleted_count, "message": f"Deleted {deleted_count} records for inventory_id='{inventory_id}'"}
  
  
 # -------------------- TRANSACTION ROUTES --------------------
