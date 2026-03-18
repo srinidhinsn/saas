@@ -41,17 +41,27 @@ export default function StockRecipeManager({ clientId: propClientId, token: prop
     unit_price: "",
     inventory_id: "",
   });
+
+  const [isDeductModalOpen, setIsDeductModalOpen] = useState(false);
+  const [deductForm, setDeductForm] = useState({
+    stock_item_id: null,
+    stock_name: "",
+    quantity: "",
+    unit: "",
+    transaction_type: "RETURN",
+    remarks: "",
+  });
   const [isStockModalOpen, setIsStockModalOpen] = useState(false);
   const [isEditingStock, setIsEditingStock] = useState(false);
 
   const [isAddStockModalOpen, setIsAddStockModalOpen] = useState(false);
-const [addStockForm, setAddStockForm] = useState({
-  stock_item_id: null,
-  stock_name: "",
-  quantity: "",
-  unit: "",
-  remarks: "",
-});
+  const [addStockForm, setAddStockForm] = useState({
+    stock_item_id: null,
+    stock_name: "",
+    quantity: "",
+    unit: "",
+    remarks: "",
+  });
 
   // Add Inventory Modal
   const [isInventoryModalOpen, setIsInventoryModalOpen] = useState(false);
@@ -422,74 +432,122 @@ const [addStockForm, setAddStockForm] = useState({
     setIsStockModalOpen(true);
   };
 
-const saveStock = async () => {
-  if (!stockForm.name.trim()) return setError("Name is required");
-  if (!stockForm.inventory_id) return setError("Please select an inventory");
+  const saveStock = async () => {
+    if (!stockForm.name.trim()) return setError("Name is required");
+    if (!stockForm.inventory_id) return setError("Please select an inventory");
 
-  const selectedInventory = inventoryCategories.find(inv => inv.id === stockForm.inventory_id);
-  const categoryUUID = selectedInventory?.id || stockForm.inventory_id;
+    const selectedInventory = inventoryCategories.find(inv => inv.id === stockForm.inventory_id);
+    const categoryUUID = selectedInventory?.id || stockForm.inventory_id;
 
-  const payload = {
-    ...stockForm,
-    realm,
-    category_id: categoryUUID,
-    inventory_id: categoryUUID,
-    client_id: clientId,
+    const payload = {
+      ...stockForm,
+      realm,
+      category_id: categoryUUID,
+      inventory_id: categoryUUID,
+      client_id: clientId,
+    };
+
+    try {
+      if (isEditingStock) {
+        const { availability, ...metaPayload } = payload;
+        await axios.post(`${API_CONFIG.baseMenu(clientId)}/stock/update`, metaPayload, getAuthHeaders(token));
+      } else {
+        await axios.post(`${API_CONFIG.baseMenu(clientId)}/stock/create?client_id=${clientId}`, payload, getAuthHeaders(token));
+      }
+      setIsStockModalOpen(false);
+      await fetchStocks();
+      setStockForm({ id: null, name: "", description: "", category: "", availability: "", unit: "", unit_price: "", inventory_id: "" });
+    } catch (err) {
+      console.error("saveStock failed:", err);
+      setError("Failed to save stock item");
+    }
   };
 
-  try {
-    if (isEditingStock) {
-      const { availability, ...metaPayload } = payload;
-      await axios.post(`${API_CONFIG.baseMenu(clientId)}/stock/update`, metaPayload, getAuthHeaders(token));
-    } else {
-      await axios.post(`${API_CONFIG.baseMenu(clientId)}/stock/create?client_id=${clientId}`, payload, getAuthHeaders(token));
+  const openAddStockModal = (stock) => {
+    setAddStockForm({
+      stock_item_id: stock.id,
+      stock_name: stock.name,
+      quantity: "",
+      unit: stock.unit || "",
+      remarks: "",
+    });
+    setIsAddStockModalOpen(true);
+  };
+
+  const submitAddStock = async () => {
+    if (!addStockForm.quantity || Number(addStockForm.quantity) <= 0)
+      return setError("Please enter a valid quantity greater than 0");
+    try {
+      await axios.post(
+        `${API_CONFIG.baseMenu(clientId)}/stock/add`,
+        null,
+        {
+          ...getAuthHeaders(token),
+          params: {
+            client_id: clientId,
+            stock_item_id: addStockForm.stock_item_id,
+            quantity: addStockForm.quantity,
+            unit: addStockForm.unit || undefined,
+            remarks: addStockForm.remarks || undefined,
+          },
+        }
+      );
+      setIsAddStockModalOpen(false);
+      setAddStockForm({ stock_item_id: null, stock_name: "", quantity: "", unit: "", remarks: "" });
+      await fetchStocks();
+    } catch (err) {
+      console.error("submitAddStock failed:", err);
+      setError(err.response?.data?.detail || "Failed to add stock quantity");
     }
-    setIsStockModalOpen(false);
-    await fetchStocks();
-    setStockForm({ id: null, name: "", description: "", category: "", availability: "", unit: "", unit_price: "", inventory_id: "" });
-  } catch (err) {
-    console.error("saveStock failed:", err);
-    setError("Failed to save stock item");
-  }
-};
+  };
 
-const openAddStockModal = (stock) => {
-  setAddStockForm({
-    stock_item_id: stock.id,
-    stock_name: stock.name,
-    quantity: "",
-    unit: stock.unit || "",
-    remarks: "",
-  });
-  setIsAddStockModalOpen(true);
-};
+  const openDeductModal = (stock) => {
+    setDeductForm({
+      stock_item_id: stock.id,
+      stock_name: stock.name,
+      quantity: "",
+      unit: stock.unit || "",
+      transaction_type: "RETURN",
+      remarks: "",
+    });
+    setIsDeductModalOpen(true);
+  };
 
-const submitAddStock = async () => {
-  if (!addStockForm.quantity || Number(addStockForm.quantity) <= 0)
-    return setError("Please enter a valid quantity greater than 0");
-  try {
-    await axios.post(
-      `${API_CONFIG.baseMenu(clientId)}/stock/add`,
-      null,
-      {
-        ...getAuthHeaders(token),
-        params: {
-          client_id: clientId,
-          stock_item_id: addStockForm.stock_item_id,
-          quantity: addStockForm.quantity,
-          unit: addStockForm.unit || undefined,
-          remarks: addStockForm.remarks || undefined,
-        },
-      }
-    );
-    setIsAddStockModalOpen(false);
-    setAddStockForm({ stock_item_id: null, stock_name: "", quantity: "", unit: "", remarks: "" });
-    await fetchStocks();
-  } catch (err) {
-    console.error("submitAddStock failed:", err);
-    setError(err.response?.data?.detail || "Failed to add stock quantity");
-  }
-};
+  const submitDeductStock = async () => {
+    if (!deductForm.quantity || Number(deductForm.quantity) <= 0)
+      return setError("Please enter a valid quantity greater than 0");
+
+    try {
+      await axios.post(
+        `${API_CONFIG.baseMenu(clientId)}/stock/manual-deduct`,
+        null,
+        {
+          ...getAuthHeaders(token),
+          params: {
+            client_id: clientId,
+            stock_item_id: deductForm.stock_item_id,
+            quantity: deductForm.quantity,
+            unit: deductForm.unit || undefined,
+            transaction_type: deductForm.transaction_type,
+            remarks: deductForm.remarks || undefined,
+          },
+        }
+      );
+      setIsDeductModalOpen(false);
+      setDeductForm({
+        stock_item_id: null,
+        stock_name: "",
+        quantity: "",
+        unit: "",
+        transaction_type: "RETURN",
+        remarks: "",
+      });
+      await fetchStocks();
+    } catch (err) {
+      console.error("submitDeductStock failed:", err);
+      setError(err.response?.data?.detail || "Failed to deduct stock quantity");
+    }
+  };
 
   const deleteStock = async (id) => {
     if (!window.confirm("Delete this stock item?")) return;
@@ -734,6 +792,7 @@ const submitAddStock = async () => {
                 onDelete={deleteStock}
                 allCategories={allCategories}
                 onAddQty={openAddStockModal}
+                onDeduct={openDeductModal}
               />
             )}
 
@@ -876,18 +935,39 @@ const submitAddStock = async () => {
       )}
 
       {isAddStockModalOpen && (
-  <AddStockModal
-    isOpen={isAddStockModalOpen}
-    form={addStockForm}
-    units={units}
-    onChange={setAddStockForm}
-    onSave={submitAddStock}
-    onClose={() => {
-      setIsAddStockModalOpen(false);
-      setAddStockForm({ stock_item_id: null, stock_name: "", quantity: "", unit: "", remarks: "" });
-    }}
-  />
-)}
+        <AddStockModal
+          isOpen={isAddStockModalOpen}
+          form={addStockForm}
+          units={units}
+          onChange={setAddStockForm}
+          onSave={submitAddStock}
+          onClose={() => {
+            setIsAddStockModalOpen(false);
+            setAddStockForm({ stock_item_id: null, stock_name: "", quantity: "", unit: "", remarks: "" });
+          }}
+        />
+      )}
+
+      {isDeductModalOpen && (
+        <DeductStockModal
+          isOpen={isDeductModalOpen}
+          form={deductForm}
+          units={units}
+          onChange={setDeductForm}
+          onSave={submitDeductStock}
+          onClose={() => {
+            setIsDeductModalOpen(false);
+            setDeductForm({
+              stock_item_id: null,
+              stock_name: "",
+              quantity: "",
+              unit: "",
+              transaction_type: "RETURN",
+              remarks: "",
+            });
+          }}
+        />
+      )}
     </div>
   );
 }
@@ -902,7 +982,8 @@ function InventoryCategoryTab({
   onEdit,
   onDelete,
   allCategories,
-  onAddQty
+  onAddQty,
+  onDeduct
 }) {
 
   const getCategoryName = (categoryId) => {
@@ -987,11 +1068,17 @@ function InventoryCategoryTab({
                   <td className="px-6 py-4 whitespace-nowrap text-right">
                     <div className="flex justify-end gap-4">
                       <button
-  onClick={() => onAddQty(item)}
-  className="text-green-700 hover:text-green-900 border border-green-300 px-4 py-2 rounded-lg font-medium text-sm transition-all"
->
-  + Add Qty
-</button>
+                        onClick={() => onAddQty(item)}
+                        className="text-green-700 hover:text-green-900 border border-green-300 px-4 py-2 rounded-lg font-medium text-sm transition-all"
+                      >
+                        + Add Qty
+                      </button>
+                      <button
+                        onClick={() => onDeduct(item)}
+                        className="text-red-700 hover:text-red-900 border border-red-300 px-4 py-2 rounded-lg font-medium text-sm transition-all"
+                      >
+                        Deduct
+                      </button>
                       <button
                         onClick={() => onEdit(item)}
                         className="text-action-primary hover:text-action-primary mr-4 border gap-2 px-4 py-2 rounded-lg font-medium text-sm transition-all"
@@ -1627,3 +1714,100 @@ function AddStockModal({ isOpen, form, units, onChange, onSave, onClose }) {
     </div>
   );
 } 
+
+function DeductStockModal({ isOpen, form, units, onChange, onSave, onClose }) {
+  if (!isOpen) return null;
+
+  return (
+    <div className="fixed inset-0 z-50 flex items-center justify-center p-4">
+      <div className="absolute inset-0 bg-black/40" onClick={onClose} />
+      <div className="relative bg-bg-primary rounded-2xl shadow-2xl max-w-md w-full p-6">
+        <h3 className="text-xl font-semibold text-gray-900 mb-1">Deduct Stock</h3>
+        <p className="text-sm text-gray-500 mb-6">
+          Deducting from:{" "}
+          <span className="font-medium text-gray-800">{form.stock_name}</span>
+        </p>
+
+        <div className="space-y-5">
+          <div>
+            <label className="block text-sm font-medium text-gray-700 mb-1">
+              Quantity to Deduct *
+            </label>
+            <input
+              type="number"
+              step="0.01"
+              min="0.01"
+              autoFocus
+              value={form.quantity}
+              onChange={(e) => onChange((prev) => ({ ...prev, quantity: e.target.value }))}
+              placeholder="e.g. 10"
+              className="w-full px-4 py-2 border border-gray-300 rounded-lg focus:ring-2 focus:ring-red-400 focus:border-red-400"
+            />
+          </div>
+
+          <div>
+            <label className="block text-sm font-medium text-gray-700 mb-1">Unit</label>
+            <select
+              value={form.unit}
+              onChange={(e) => onChange((prev) => ({ ...prev, unit: e.target.value }))}
+              className="w-full px-4 py-2 border border-gray-300 rounded-lg focus:ring-2 focus:ring-red-400 focus:border-red-400"
+            >
+              <option value="">Select unit</option>
+              {units.map((u) => (
+                <option key={u} value={u}>{u}</option>
+              ))}
+            </select>
+          </div>
+
+          <div>
+            <label className="block text-sm font-medium text-gray-700 mb-1">
+              Transaction Type *
+            </label>
+            <select
+              value={form.transaction_type}
+              onChange={(e) => onChange((prev) => ({ ...prev, transaction_type: e.target.value }))}
+              className="w-full px-4 py-2 border border-gray-300 rounded-lg focus:ring-2 focus:ring-red-400 focus:border-red-400"
+            >
+              <option value="RETURN">Return</option>
+              <option value="CANCELLATION">Cancellation</option>
+            </select>
+          </div>
+
+          <div>
+            <label className="block text-sm font-medium text-gray-700 mb-1">
+              Reason
+            </label>
+            <input
+              type="text"
+              value={form.remarks}
+              onChange={(e) => onChange((prev) => ({ ...prev, remarks: e.target.value }))}
+              placeholder="e.g. Customer returned item, Order cancelled"
+              className="w-full px-4 py-2 border border-gray-300 rounded-lg focus:ring-2 focus:ring-red-400 focus:border-red-400"
+            />
+          </div>
+
+          <div className="bg-red-50 border border-red-200 rounded-lg p-3 text-sm text-red-800">
+            This records an <strong>OUT transaction</strong> and reduces the live
+            stock level. This action cannot be undone automatically.
+          </div>
+        </div>
+
+        <div className="mt-8 flex justify-end gap-4">
+          <button
+            type="button"
+            onClick={onClose}
+            className="px-5 py-2.5 border border-gray-300 rounded-lg hover:bg-gray-50 transition-colors"
+          >
+            Cancel
+          </button>
+          <button
+            onClick={onSave}
+            className="px-6 py-2.5 bg-red-600 hover:bg-red-700 text-white rounded-lg transition-colors"
+          >
+            Deduct Stock
+          </button>
+        </div>
+      </div>
+    </div>
+  );
+}
