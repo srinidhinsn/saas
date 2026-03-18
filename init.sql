@@ -866,7 +866,7 @@ CREATE TABLE IF NOT EXISTS inventory_transactions (
     inventory_id     TEXT,
     name             TEXT,
     transaction_type TEXT        NOT NULL,
-    movement_type    TEXT        NOT NULL,   -- IN | OUT
+    movement_type    TEXT        NOT NULL,
     quantity         NUMERIC(18,6) NOT NULL,
 	unit             TEXT,
     before_stock     NUMERIC(18,6) NOT NULL,

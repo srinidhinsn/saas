@@ -9,7 +9,7 @@ from models.response_model import ResponseModel
 from models.saas_context import SaasContext
 from utils.auth import verify_token
 from ..services import service
-from ..services.service import _compute_current_stock, _record_transaction
+from ..services.service import _compute_current_stock, _record_transaction, _convert
 
 # -------------------- CONFIG --------------------
 router = APIRouter()
@@ -404,7 +404,101 @@ def deduct_stock_quantity(
         data=model,
     )
  
- 
+
+@router.post("/stock/manual-deduct", response_model=ResponseModel)
+def manual_deduct_stock(
+    client_id: str,
+    stock_item_id: int,
+    quantity: Decimal,
+    transaction_type: str,
+    unit: Optional[str] = None,
+    remarks: Optional[str] = None,
+    context: SaasContext = Depends(verify_token),
+    db: Session = Depends(get_db),
+):
+    allowed_types = {"RETURN", "CANCELLATION"}
+    if transaction_type.upper() not in allowed_types:
+        raise HTTPException(
+            status_code=400,
+            detail=f"transaction_type must be one of: {', '.join(allowed_types)}"
+        )
+
+    record = db.query(InventoryEntity).filter(
+        InventoryEntity.id == stock_item_id,
+        InventoryEntity.client_id == client_id,
+    ).first()
+
+    if not record:
+        raise HTTPException(status_code=404, detail="Stock item not found")
+
+    qty = Decimal(str(quantity))
+    if qty <= 0:
+        raise HTTPException(status_code=400, detail="Quantity must be greater than 0")
+
+    # ── Unit conversion (same logic as _deduct_stock_for_order) ──────────────
+    input_unit = (unit or record.unit or "").strip()   # unit user typed in modal
+    stock_unit = (record.unit or "").strip()           # unit the stock is stored in
+
+    if input_unit and stock_unit and input_unit != stock_unit:
+        # e.g. user enters 20ml but stock is in litre → converts to 0.02
+        try:
+            converted_qty = Decimal(str(_convert(float(qty), input_unit, stock_unit)))
+        except ValueError as e:
+            raise HTTPException(
+                status_code=400,
+                detail=f"Unit conversion failed: {e}"
+            )
+    else:
+        # Same unit or no unit provided — use as-is
+        converted_qty = qty
+    # ─────────────────────────────────────────────────────────────────────────
+
+    before_stock = _compute_current_stock(db, client_id, stock_item_id)
+    after_stock = before_stock - converted_qty
+
+    if after_stock < Decimal("0"):
+        raise HTTPException(
+            status_code=400,
+            detail=(
+                f"Insufficient stock. "
+                f"Available: {before_stock} {stock_unit}, "
+                f"Requested: {qty} {input_unit}"
+                + (f" = {converted_qty} {stock_unit}" if input_unit != stock_unit else "")
+            ),
+        )
+
+    _record_transaction(
+        db,
+        client_id=client_id,
+        stock_item_id=stock_item_id,
+        inventory_id=record.inventory_id,
+        name=record.name,
+        transaction_type=transaction_type.upper(),
+        movement_type="OUT",
+        quantity=converted_qty,          # store in stock's native unit
+        unit=stock_unit,                 # always store native unit in transaction
+        before_stock=before_stock,
+        after_stock=after_stock,
+        created_by=getattr(context, "user_id", None),
+        remarks=remarks or None,
+    )
+
+    record.availability = after_stock
+    db.commit()
+    db.refresh(record)
+    model = InventoryEntity.copyToModel(record)
+
+    return ResponseModel(
+        screen_id=context.screen_id,
+        status="success",
+        message=(
+            f"Deducted {qty} {input_unit}"
+            + (f" ({converted_qty} {stock_unit})" if input_unit != stock_unit else "")
+            + f" from {record.name}"
+        ),
+        data=model,
+    )
+
 @router.post("/stock/update", response_model=ResponseModel)
 def update_stock_item(
     updates: Inventory,

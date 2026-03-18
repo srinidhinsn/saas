@@ -250,10 +250,12 @@ def _record_transaction(
     return tx
  
 
+
 def _deduct_stock_for_order(db: Session, client_id: str, order_id: int) -> None:
     """
-    Called exactly once when the whole order transitions to 'served'.
-    For every order item → recipe JSONB → convert units → deduct stock.
+    Called when the whole dine-in is marked served/completed.
+    Skips any order_item that already has an ORDER_DEDUCTION transaction,
+    so re-orders within the same dine-in are never double-deducted.
     """
     order_items = (
         db.query(Db_OrderItem_Entity)
@@ -262,6 +264,19 @@ def _deduct_stock_for_order(db: Session, client_id: str, order_id: int) -> None:
             Db_OrderItem_Entity.client_id == client_id,
         )
         .all()
+    )
+
+    # Fetch all item-level transaction keys already recorded for this order
+    # Key: (stock_item_id, remarks) — we use frontend_unique_key as the
+    # per-item deduplication anchor stored in remarks.
+    already_deducted_keys: set[str] = set(
+        row.remarks
+        for row in db.query(InventoryTransactionEntity.remarks).filter(
+            InventoryTransactionEntity.reference_id == str(order_id),
+            InventoryTransactionEntity.reference_type == "order",
+            InventoryTransactionEntity.transaction_type == "ORDER_DEDUCTION",
+        ).all()
+        if row.remarks
     )
 
     for order_item in order_items:
@@ -280,12 +295,21 @@ def _deduct_stock_for_order(db: Session, client_id: str, order_id: int) -> None:
         ordered_qty = order_item.quantity or 1
 
         for ingredient in menu_item.recipe:
-            # recipe JSONB shape: {stock_item_id, quantity_required, unit}
             stock_item_id = ingredient.get("stock_item_id")
             recipe_qty    = float(ingredient.get("quantity_required") or 0)
             recipe_unit   = (ingredient.get("unit") or "").strip()
 
             if not stock_item_id or recipe_qty <= 0:
+                continue
+
+            # ✅ Idempotency guard — skip if this exact item+ingredient was
+            #    already deducted for this order (handles sub-order re-serves)
+            dedup_key = (
+                f"Order #{order_id} served — "
+                f"{order_item.item_name} x{ordered_qty} "
+                f"[key={order_item.frontend_unique_key}]"
+            )
+            if dedup_key in already_deducted_keys:
                 continue
 
             stock_item = (
@@ -326,7 +350,8 @@ def _deduct_stock_for_order(db: Session, client_id: str, order_id: int) -> None:
                 after_stock=after_stock,
                 reference_id=str(order_id),
                 reference_type="order",
-                remarks=f"Order #{order_id} served — {order_item.item_name} x{ordered_qty}",
+                # ✅ remarks now includes frontend_unique_key for dedup
+                remarks=dedup_key,
             )
 
             stock_item.availability = after_stock
