@@ -1339,59 +1339,52 @@ const UniversalAddModal = ({
 }) => {
   const [dragActive, setDragActive] = useState(false);
   const [showAddonPopup, setShowAddonPopup] = useState(false); // ✅ Popup state
-  const [zoneOptions, setZoneOptions] = useState([]);
-  const [sectionOptions, setSectionOptions] = useState([]);
-  const [loadingMasters, setLoadingMasters] = useState(false);
-
+  const [configs, setConfigs] = useState([]);
+  const [loadingConfigs, setLoadingConfigs] = useState(false);
   // Memoize helpers so they're stable across renders (prevents unnecessary effect runs)
   const flattenCategories = useCallback((items = [], level = 0) => {
     let result = [];
+  
     items.forEach(item => {
       if (!item) return;
+  
+      const children = item.children || item.subCategories || [];
+  
       if (item.id !== 'all') {
         result.push({ ...item, level });
-        if (item.children) {
-          result = result.concat(flattenCategories(item.children, level + 1));
+  
+        if (children.length) {
+          result = result.concat(flattenCategories(children, level + 1));
         }
       }
     });
+  
     return result;
   }, []);
 
-
-
-  // Fetch master values for zones and sections
-  const fetchMasterValues = async (categoryId, setter) => {
+  const fetchConfigs = async () => {
     try {
+      setLoadingConfigs(true);
       const res = await axios.get(
-        `${import.meta.env.VITE_API_INVENTORY_SERVICE_URL}/${clientId}/inventory/masters`,
+        `${import.meta.env.VITE_API_TABLE_SERVICE_URL}/${clientId}/tables/config`,
         {
-          params: { category_id: categoryId },
+          params: { client_id: clientId },
           headers: { Authorization: `Bearer ${token}` }
         }
       );
-      setter(res?.data?.data || []);
+      setConfigs(res.data || []);
     } catch (err) {
-      console.error("Master fetch error:", categoryId, err);
-      setter([]);
+      console.error("Config fetch error:", err);
+      setConfigs([]);
+    } finally {
+      setLoadingConfigs(false);
     }
   };
-
-  // Load master data for table modal
   useEffect(() => {
-    if (!showModal || modalType !== "table") return;
+    if (!showModal) return;
     if (!clientId || !token) return;
 
-    const loadMasters = async () => {
-      setLoadingMasters(true);
-      await Promise.all([
-        fetchMasterValues("zone", setZoneOptions),
-        fetchMasterValues("section", setSectionOptions)
-      ]);
-      setLoadingMasters(false);
-    };
-
-    loadMasters();
+    fetchConfigs();
   }, [showModal, modalType, clientId, token]);
 
   // Drag handlers
@@ -1559,7 +1552,30 @@ const UniversalAddModal = ({
                   rows="3"
                 />
               </div>
+              <div>
+                <label className="block text-sm font-medium mb-2 text-text-primary">
+                  Zone & Section *
+                </label>
 
+                <select
+                  value={newItem?.zone_config_id || ""}
+                  onChange={(e) =>
+                    setNewItem(prev => ({
+                      ...prev,
+                      zone_config_id: Number(e.target.value) || null
+                    }))
+                  }
+                  className="w-full px-4 py-2 rounded-lg bg-bg-tertiary border border-border-default"
+                >
+                  <option value="">Base Price (All Zones)</option>
+
+                  {configs.map((c) => (
+                    <option key={c.id} value={c.id}>
+                      {c.section} - {c.zone}
+                    </option>
+                  ))}
+                </select>
+              </div>
               {/* Unit Price & Discount */}
               <div className="grid grid-cols-2 gap-4">
                 <div>
@@ -1589,7 +1605,7 @@ const UniversalAddModal = ({
               {/* Code & Unit */}
               <div className="grid grid-cols-2 gap-4">
 
-                 <div>
+                <div>
                   <label className="block text-sm font-medium mb-2 text-text-primary">Serving Quantity</label>
                   <input
                     type="number"
@@ -1614,7 +1630,7 @@ const UniversalAddModal = ({
                   </select>
                 </div>
 
-                
+
                 <div>
                   <label className="block text-sm font-medium mb-2 text-text-primary">Code *</label>
                   <input
@@ -1858,53 +1874,27 @@ const UniversalAddModal = ({
                 </div>
 
                 <div>
-                  <label className="block text-sm font-semibold mb-2">Section *</label>
-                  <select
-                    value={row?.section ?? ""}
-                    onChange={(e) => handleRangeChange(index, "section", e.target.value)}
-                    className="w-full px-3 py-2 border rounded-lg"
-                  >
-                    <option value="">Select Section</option>
-                    {loadingMasters ? (
-                      <option disabled>Loading...</option>
-                    ) : sectionOptions.length === 0 ? (
-                      <option disabled>No Sections Configured</option>
-                    ) : (
-                      sectionOptions.map((sec, i) => (
-                        <option key={i} value={sec}>{sec}</option>
-                      ))
-                    )}
-                  </select>
-                  {fieldErrors?.[index]?.section && (
-                    <div className="text-action-danger text-xs mt-1 font-medium">
-                      Select section
-                    </div>
-                  )}
-                </div>
+                  <label className="block text-sm font-semibold mb-2">Table Config *</label>
 
-                <div>
-                  <label className="block text-sm font-semibold mb-2">Zone *</label>
                   <select
-                    value={row?.location_zone ?? ""}
-                    onChange={(e) => handleRangeChange(index, "location_zone", e.target.value)}
+                    value={row?.config_id ?? ""}
+                    onChange={(e) => handleRangeChange(index, "config_id", Number(e.target.value))}
                     className="w-full px-3 py-2 border rounded-lg"
                   >
-                    <option value="">Select Zone</option>
-                    {loadingMasters ? (
+                    <option value="">Select Config</option>
+
+                    {loadingConfigs ? (
                       <option disabled>Loading...</option>
-                    ) : zoneOptions.length === 0 ? (
-                      <option disabled>No Zones Configured</option>
+                    ) : configs.length === 0 ? (
+                      <option disabled>No Config Available</option>
                     ) : (
-                      zoneOptions.map((zone, i) => (
-                        <option key={i} value={zone}>{zone}</option>
+                      configs.map((c) => (
+                        <option key={c.id} value={c.id}>
+                          {c.section} - {c.zone}
+                        </option>
                       ))
                     )}
                   </select>
-                  {fieldErrors?.[index]?.location_zone && (
-                    <div className="text-action-danger text-xs mt-1 font-medium">
-                      Select zone
-                    </div>
-                  )}
                 </div>
 
                 <div>

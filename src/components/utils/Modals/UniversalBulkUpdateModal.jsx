@@ -859,7 +859,7 @@
 
 
 
-import React from 'react';
+import React, { useState, useEffect } from 'react';
 import { X, Edit, Trash2, Search, Plus } from 'lucide-react';
 import AddonSelectionPopup from './AddonSelection';
 import axios from 'axios';
@@ -903,14 +903,33 @@ const UniversalBulkUpdateModal = ({
   // ✅ State for global add-ons popup
   const [showGlobalAddonPopup, setShowGlobalAddonPopup] = React.useState(false);
   const [globalAddons, setGlobalAddons] = React.useState([]);
-  const [zoneOptions, setZoneOptions] = React.useState([]);
-  const [sectionOptions, setSectionOptions] = React.useState([]);
-  const [loadingMasters, setLoadingMasters] = React.useState(false);
+  const [configs, setConfigs] = useState([]);
 
   // ✅ State for individual item addon popup
   const [showItemAddonPopup, setShowItemAddonPopup] = React.useState(false);
   const [currentEditingItemId, setCurrentEditingItemId] = React.useState(null);
+  const [loadingConfigs, setLoadingConfigs] = useState(false);
 
+  const fetchConfigs = async () => {
+    try {
+      setLoadingConfigs(true);
+
+      const res = await axios.get(
+        `${import.meta.env.VITE_API_TABLE_SERVICE_URL}/${clientId}/tables/config`,
+        {
+          params: { client_id: clientId },
+          headers: { Authorization: `Bearer ${token}` }
+        }
+      );
+
+      setConfigs(res.data || []);
+    } catch (err) {
+      console.error("Config fetch error:", err);
+      setConfigs([]);
+    } finally {
+      setLoadingConfigs(false);
+    }
+  };
   // ✅ Get addon name by ID
   const getAddonNameById = (id) => {
     const addon = allAddonItems?.find(item => item.id === id);
@@ -921,7 +940,7 @@ const UniversalBulkUpdateModal = ({
   const handleGlobalAddonSave = (selectedAddons) => {
     setGlobalAddons(selectedAddons);
     setShowGlobalAddonPopup(false);
-    
+
     // If items are already selected, apply immediately
     if (selectedRows.length > 0) {
       const updatedBulkData = { ...bulkEditData };
@@ -934,7 +953,7 @@ const UniversalBulkUpdateModal = ({
       });
 
       setBulkEditData(updatedBulkData);
-      
+
       if (selectedAddons.length > 0) {
         alert(`Applied ${selectedAddons.length} add-on(s) to ${selectedRows.length} selected item(s)`);
       }
@@ -942,7 +961,12 @@ const UniversalBulkUpdateModal = ({
       // Addons selected but no items yet - just store them
     }
   };
+  useEffect(() => {
+    if (!showModal || modalType !== "table") return;
+    if (!clientId || !token) return;
 
+    fetchConfigs();
+  }, [showModal, modalType, clientId, token]);
   // ✅ Clear global add-ons for all selected items
   const clearGlobalAddons = () => {
     if (selectedRows.length === 0) {
@@ -978,8 +1002,8 @@ const UniversalBulkUpdateModal = ({
       selectedRows.forEach(itemId => {
         // Only apply if this item doesn't already have the global addons set
         const currentAddons = updatedBulkData[itemId]?.line_item_id;
-        const addonsMatch = currentAddons && 
-          currentAddons.length === globalAddons.length && 
+        const addonsMatch = currentAddons &&
+          currentAddons.length === globalAddons.length &&
           currentAddons.every(id => globalAddons.includes(id));
 
         if (!addonsMatch) {
@@ -996,38 +1020,6 @@ const UniversalBulkUpdateModal = ({
       }
     }
   }, [selectedRows, globalAddons, modalType]);
-
-  const fetchMasterValues = async (categoryId, setter) => {
-    try {
-      const res = await axios.get(
-        `${import.meta.env.VITE_API_INVENTORY_SERVICE_URL}/${clientId}/inventory/masters`,
-        {
-          params: { category_id: categoryId },
-          headers: { Authorization: `Bearer ${token}` }
-        }
-      );
-      setter(res?.data?.data || []);
-    } catch (err) {
-      console.error("Master fetch error:", categoryId, err);
-      setter([]);
-    }
-  };
-
-  React.useEffect(() => {
-    if (!showModal || modalType !== "table") return;
-    if (!clientId || !token) return;
-
-    const loadMasters = async () => {
-      setLoadingMasters(true);
-      await Promise.all([
-        fetchMasterValues("zone", setZoneOptions),
-        fetchMasterValues("section", setSectionOptions)
-      ]);
-      setLoadingMasters(false);
-    };
-
-    loadMasters();
-  }, [showModal, modalType, clientId, token]);
 
   // Menu: Toggle all selection
   const toggleSelectAll = () => {
@@ -1096,8 +1088,7 @@ const UniversalBulkUpdateModal = ({
       setBulkUpdateGlobal({
         table_type: "",
         status: "",
-        section: "",
-        location_zone: ""
+        config_id: ""
       });
     }
   };
@@ -1135,8 +1126,8 @@ const UniversalBulkUpdateModal = ({
                       className="px-4 py-2 rounded-md bg-blue-600 text-white hover:bg-blue-700 transition-colors font-medium text-sm whitespace-nowrap flex items-center gap-2"
                     >
                       <Plus size={16} />
-                      {globalAddons.length > 0 
-                        ? `Selected: ${globalAddons.length} add-on(s)` 
+                      {globalAddons.length > 0
+                        ? `Selected: ${globalAddons.length} add-on(s)`
                         : 'Select Add-ons'}
                     </button>
                     <button
@@ -1162,9 +1153,9 @@ const UniversalBulkUpdateModal = ({
                     )}
                   </div>
                   <p className="text-xs text-gray-600 mt-2">
-                    💡 {selectedRows.length > 0 
+                    💡 {selectedRows.length > 0
                       ? `${globalAddons.length > 0 ? 'Add-ons applied to' : 'Select add-ons to apply to'} ${selectedRows.length} selected item(s)`
-                      : globalAddons.length > 0 
+                      : globalAddons.length > 0
                         ? `${globalAddons.length} add-on(s) selected. Now select items to apply them.`
                         : 'Select add-ons first, then select items - or vice versa!'}
                   </p>
@@ -1517,58 +1508,35 @@ const UniversalBulkUpdateModal = ({
                   <option value="Reserved">Reserved</option>
                 </select>
               </div>
+              <div className="">
+                <label className="block text-xs font-semibold mb-1.5 text-text-secondary">Section & Zone :</label>
 
-              {/* Section */}
-              <div>
-                <label className="block text-xs font-semibold mb-1.5 text-text-secondary">
-                  Section
-                </label>
                 <select
-                  value={bulkUpdateGlobal.section || ""}
-                  onChange={e =>
-                    setBulkUpdateGlobal(prev => ({ ...prev, section: e.target.value }))
-                  }
-                  className="w-full px-3 py-1.5 border border-border-default rounded-lg text-sm bg-bg-primary text-text-primary"
+                  value={bulkUpdateGlobal.config_id || ""} className="w-full px-3 py-1.5 border border-border-default rounded-lg focus:outline-none focus:ring-2 focus:ring-action-primary focus:border-transparent text-sm bg-bg-primary text-text-primary"
+
+                  onChange={e => {
+                    const value = Number(e.target.value);
+
+                    setBulkUpdateGlobal(prev => ({
+                      ...prev,
+                      config_id: value
+                    }));
+
+                    selectedUpdateTables.forEach(id => {
+                      handleBulkUpdateChange(id, "config_id", value);
+                    });
+                  }}
                 >
                   <option value="">No change</option>
 
-                  {loadingMasters ? (
-                    <option disabled>Loading...</option>
-                  ) : sectionOptions.length === 0 ? (
-                    <option disabled>No Sections Configured</option>
-                  ) : (
-                    sectionOptions.map((sec, i) => (
-                      <option key={i} value={sec}>{sec}</option>
-                    ))
-                  )}
+                  {configs.map(c => (
+                    <option key={c.id} value={c.id}>
+                      {c.section} - {c.zone}
+                    </option>
+                  ))}
                 </select>
               </div>
 
-              {/* Zone */}
-              <div>
-                <label className="block text-xs font-semibold mb-1.5 text-text-secondary">
-                  Zone
-                </label>
-                <select
-                  value={bulkUpdateGlobal.location_zone || ""}
-                  onChange={e =>
-                    setBulkUpdateGlobal(prev => ({ ...prev, location_zone: e.target.value }))
-                  }
-                  className="w-full px-3 py-1.5 border border-border-default rounded-lg text-sm bg-bg-primary text-text-primary"
-                >
-                  <option value="">No change</option>
-
-                  {loadingMasters ? (
-                    <option disabled>Loading...</option>
-                  ) : zoneOptions.length === 0 ? (
-                    <option disabled>No Zones Configured</option>
-                  ) : (
-                    zoneOptions.map((zone, i) => (
-                      <option key={i} value={zone}>{zone}</option>
-                    ))
-                  )}
-                </select>
-              </div>
             </div>
           </div>
 
@@ -1613,55 +1581,33 @@ const UniversalBulkUpdateModal = ({
                   <p className="text-text-secondary">No tables found</p>
                 </div>
               ) : (
-                filteredTables.map(table => (
-                  <div
-                    key={table.id}
-                    className={`border rounded-xl p-3 transition-all ${selectedUpdateTables.includes(table.id)
-                      ? 'border-action-primary bg-action-primary/5 shadow-sm'
-                      : 'border-border-default bg-bg-primary'
-                      }`}
-                  >
-                    <div className="flex items-center gap-2 mb-2">
-                      <input
-                        type="checkbox"
-                        checked={selectedUpdateTables.includes(table.id)}
-                        onChange={() => toggleUpdateTableSelection(table.id)}
-                        className="w-4 h-4 text-action-primary border-border-default rounded focus:ring-action-primary cursor-pointer"
-                      />
-                      <span className="font-bold text-sm text-text-primary">{table.name}</span>
-                    </div>
+                filteredTables.map(table => {
+                  const config = configs.find(c => c.id === table.config_id);
+                  return (
 
-                    {selectedUpdateTables.includes(table.id) ? (
-                      <div className="grid grid-cols-1 sm:grid-cols-3 gap-2 pt-2 border-t border-border-default">
-                        <div>
-                          <label className="block text-xs font-semibold mb-1.5 text-text-secondary">Seating</label>
+                    <div
+                      key={table.id}
+                      className={`border rounded-xl p-3 transition-all ${selectedUpdateTables.includes(table.id)
+                        ? 'border-action-primary bg-action-primary/5 shadow-sm'
+                        : 'border-border-default bg-bg-primary'
+                        }`}
+                    >
+                      <div className="flex items-center gap-2 mb-2">
+                        <input
+                          type="checkbox"
+                          checked={selectedUpdateTables.includes(table.id)}
+                          onChange={() => toggleUpdateTableSelection(table.id)}
+                          className="w-4 h-4 text-action-primary border-border-default rounded focus:ring-action-primary cursor-pointer"
+                        />
+                        <span className="font-bold text-sm text-text-primary">{table.name}</span>
+                      </div>
 
-                          {/* Desktop */}
-                          <input
-                            type="number"
-                            min="1"
-                            value={bulkUpdateData[table.id]?.table_type ?? table.table_type ?? ""}
-                            onChange={e => {
-                              const value = e.target.value ? Math.max(1, Number(e.target.value)) : "";
-                              handleBulkUpdateChange(table.id, "table_type", value);
-                            }}
-                            placeholder={bulkUpdateGlobal.table_type ? `Global: ${bulkUpdateGlobal.table_type}` : "Seating"}
-                            className="hidden sm:block w-full px-3 py-1.5 border border-border-default rounded-lg text-sm focus:outline-none focus:ring-2 focus:ring-action-primary focus:border-transparent bg-bg-primary text-text-primary"
-                          />
+                      {selectedUpdateTables.includes(table.id) ? (
+                        <div className="grid grid-cols-1 sm:grid-cols-3 gap-2 pt-2 border-t border-border-default">
+                          <div>
+                            <label className="block text-xs font-semibold mb-1.5 text-text-secondary">Seating</label>
 
-                          {/* Mobile with +/- buttons */}
-                          <div className="sm:hidden flex items-center border border-border-default rounded-lg overflow-hidden bg-bg-primary">
-                            <button
-                              type="button"
-                              onClick={() => {
-                                const current = Number(bulkUpdateData[table.id]?.table_type ?? table.table_type) || 1;
-                                const value = Math.max(1, current - 1);
-                                handleBulkUpdateChange(table.id, "table_type", value);
-                              }}
-                              className="px-3 py-1.5 text-text-primary hover:bg-bg-tertiary font-bold transition-colors"
-                            >
-                              −
-                            </button>
+                            {/* Desktop */}
                             <input
                               type="number"
                               min="1"
@@ -1670,106 +1616,109 @@ const UniversalBulkUpdateModal = ({
                                 const value = e.target.value ? Math.max(1, Number(e.target.value)) : "";
                                 handleBulkUpdateChange(table.id, "table_type", value);
                               }}
-                              placeholder={bulkUpdateGlobal.table_type ? `${bulkUpdateGlobal.table_type}` : ""}
-                              className="flex-1 text-center py-1.5 border-x border-border-default focus:outline-none text-sm bg-transparent text-text-primary"
+                              placeholder={bulkUpdateGlobal.table_type ? `Global: ${bulkUpdateGlobal.table_type}` : "Seating"}
+                              className="hidden sm:block w-full px-3 py-1.5 border border-border-default rounded-lg text-sm focus:outline-none focus:ring-2 focus:ring-action-primary focus:border-transparent bg-bg-primary text-text-primary"
                             />
-                            <button
-                              type="button"
-                              onClick={() => {
-                                const current = Number(bulkUpdateData[table.id]?.table_type ?? table.table_type) || 0;
-                                handleBulkUpdateChange(table.id, "table_type", current + 1);
-                              }}
-                              className="px-3 py-1.5 text-text-primary hover:bg-bg-tertiary font-bold transition-colors"
+
+                            {/* Mobile with +/- buttons */}
+                            <div className="sm:hidden flex items-center border border-border-default rounded-lg overflow-hidden bg-bg-primary">
+                              <button
+                                type="button"
+                                onClick={() => {
+                                  const current = Number(bulkUpdateData[table.id]?.table_type ?? table.table_type) || 1;
+                                  const value = Math.max(1, current - 1);
+                                  handleBulkUpdateChange(table.id, "table_type", value);
+                                }}
+                                className="px-3 py-1.5 text-text-primary hover:bg-bg-tertiary font-bold transition-colors"
+                              >
+                                −
+                              </button>
+                              <input
+                                type="number"
+                                min="1"
+                                value={bulkUpdateData[table.id]?.table_type ?? table.table_type ?? ""}
+                                onChange={e => {
+                                  const value = e.target.value ? Math.max(1, Number(e.target.value)) : "";
+                                  handleBulkUpdateChange(table.id, "table_type", value);
+                                }}
+                                placeholder={bulkUpdateGlobal.table_type ? `${bulkUpdateGlobal.table_type}` : ""}
+                                className="flex-1 text-center py-1.5 border-x border-border-default focus:outline-none text-sm bg-transparent text-text-primary"
+                              />
+                              <button
+                                type="button"
+                                onClick={() => {
+                                  const current = Number(bulkUpdateData[table.id]?.table_type ?? table.table_type) || 0;
+                                  handleBulkUpdateChange(table.id, "table_type", current + 1);
+                                }}
+                                className="px-3 py-1.5 text-text-primary hover:bg-bg-tertiary font-bold transition-colors"
+                              >
+                                +
+                              </button>
+                            </div>
+                          </div>
+
+                          <div>
+                            <label className="block text-xs font-semibold mb-1.5 text-text-secondary">Status</label>
+                            <select
+                              value={bulkUpdateData[table.id]?.status ?? table.status}
+                              onChange={e => handleBulkUpdateChange(table.id, 'status', e.target.value)}
+                              className="w-full px-3 py-1.5 border border-border-default rounded-lg text-sm focus:outline-none focus:ring-2 focus:ring-action-primary focus:border-transparent bg-bg-primary text-text-primary"
                             >
-                              +
-                            </button>
+                              <option value="Vacant">Vacant</option>
+                              <option value="Reserved">Reserved</option>
+                            </select>
                           </div>
-                        </div>
+                          <div className="">
+                          <label className="block text-xs font-semibold mb-1.5 text-text-secondary">Section & Zone :</label>
+                            <select
+                              value={bulkUpdateData[table.id]?.config_id ?? table.config_id ?? ""}
+                              className="w-full px-3 py-1.5 border border-border-default rounded-lg text-sm focus:outline-none focus:ring-2 focus:ring-action-primary focus:border-transparent bg-bg-primary text-text-primary"
+                              onChange={e =>
+                                handleBulkUpdateChange(
+                                  table.id,
+                                  "config_id",
+                                  Number(e.target.value)
+                                )
+                              }
+                            >
+                              <option value="">No change</option>
 
-                        <div>
-                          <label className="block text-xs font-semibold mb-1.5 text-text-secondary">Status</label>
-                          <select
-                            value={bulkUpdateData[table.id]?.status ?? table.status}
-                            onChange={e => handleBulkUpdateChange(table.id, 'status', e.target.value)}
-                            className="w-full px-3 py-1.5 border border-border-default rounded-lg text-sm focus:outline-none focus:ring-2 focus:ring-action-primary focus:border-transparent bg-bg-primary text-text-primary"
-                          >
-                            <option value="Vacant">Vacant</option>
-                            <option value="Reserved">Reserved</option>
-                          </select>
-                        </div>
+                              {configs.map(c => (
+                                <option key={c.id} value={c.id}>
+                                  {c.section} - {c.zone}
+                                </option>
+                              ))}
+                            </select>
+                          </div>
 
-                        {/* Section */}
-                        <div>
-                          <label className="block text-xs font-semibold mb-1.5 text-text-secondary">
-                            Section
-                          </label>
-                          <select
-                            value={bulkUpdateData[table.id]?.section ?? table.section ?? ""}
-                            onChange={e =>
-                              handleBulkUpdateChange(table.id, "section", e.target.value)
-                            }
-                            className="w-full px-3 py-1.5 border border-border-default rounded-lg text-sm bg-bg-primary text-text-primary"
-                          >
-                            {loadingMasters ? (
-                              <option disabled>Loading...</option>
-                            ) : sectionOptions.length === 0 ? (
-                              <option disabled>No Sections Configured</option>
-                            ) : (
-                              sectionOptions.map((sec, i) => (
-                                <option key={i} value={sec}>{sec}</option>
-                              ))
-                            )}
-                          </select>
                         </div>
-
-                        {/* Zone */}
-                        <div>
-                          <label className="block text-xs font-semibold mb-1.5 text-text-secondary">
-                            Zone
-                          </label>
-                          <select
-                            value={bulkUpdateData[table.id]?.location_zone ?? table.location_zone}
-                            onChange={e =>
-                              handleBulkUpdateChange(table.id, "location_zone", e.target.value)
-                            }
-                            className="w-full px-3 py-1.5 border border-border-default rounded-lg text-sm bg-bg-primary text-text-primary"
-                          >
-                            {loadingMasters ? (
-                              <option disabled>Loading...</option>
-                            ) : zoneOptions.length === 0 ? (
-                              <option disabled>No Zones Configured</option>
-                            ) : (
-                              zoneOptions.map((zone, i) => (
-                                <option key={i} value={zone}>{zone}</option>
-                              ))
-                            )}
-                          </select>
-                        </div>
-                      </div>
-                    ) : (
-                      <div className="pt-2 border-t border-border-default">
-                        <div className="grid grid-cols-4 gap-2 text-xs">
-                          <div>
-                            <span className="text-text-secondary">Seating:</span>
-                            <span className="ml-1 text-text-primary font-semibold">{table.table_type}</span>
-                          </div>
-                          <div>
-                            <span className="text-text-secondary">Status:</span>
-                            <span className="ml-1 text-text-primary font-semibold">{table.status}</span>
-                          </div>
-                          <div>
-                            <span className="text-text-secondary">Section:</span>
-                            <span className="ml-1 text-text-primary font-semibold">{table.section}</span>
-                          </div>
-                          <div>
-                            <span className="text-text-secondary">Zone:</span>
-                            <span className="ml-1 text-text-primary font-semibold">{table.location_zone}</span>
+                      ) : (
+                        <div className="pt-2 border-t border-border-default">
+                          <div className="grid grid-cols-4 gap-2 text-xs">
+                            <div>
+                              <span className="text-text-secondary">Seating:</span>
+                              <span className="ml-1 text-text-primary font-semibold">{table.table_type}</span>
+                            </div>
+                            <div>
+                              <span className="text-text-secondary">Status:</span>
+                              <span className="ml-1 text-text-primary font-semibold">{table.status}</span>
+                            </div>
+                            <div>
+                              <span className="text-text-secondary">Section & Zone :</span>
+                              <span className="ml-1 text-text-primary font-semibold">
+                                {config ? `${config.section} - ${config.zone}` : "-"}
+                              </span>
+                            </div>
+                            {/* <div>
+                              <span className="text-text-secondary">Zone:</span>
+                              <span className="ml-1 text-text-primary font-semibold">{config?.zone || "-"}</span>
+                            </div> */}
                           </div>
                         </div>
-                      </div>
-                    )}
-                  </div>
-                ))
+                      )}
+                    </div>
+                  )
+                })
               )}
             </div>
           </div>

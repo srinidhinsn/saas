@@ -1090,7 +1090,7 @@ const TableManagement = ({ clientId, token, screenIds, userId }) => {
     const [bulkUpdateGlobal, setBulkUpdateGlobal] = useState({
         table_type: "",
         status: "",
-        location_zone: ""
+        config_id: ""
     });
 
     // Bulk Delete States
@@ -1099,9 +1099,9 @@ const TableManagement = ({ clientId, token, screenIds, userId }) => {
     const [selectedDeleteTables, setSelectedDeleteTables] = useState([]);
     const [showFirstDeleteConfirm, setShowFirstDeleteConfirm] = useState(false);
     const [showSecondDeleteConfirm, setShowSecondDeleteConfirm] = useState(false);
-
-    const [zones, setZones] = useState([]);
-    const [sections, setSections] = useState([]);
+    const [configs, setConfigs] = useState([]);
+    const zones = [...new Set(configs.map(c => c.zone))];
+    const sections = [...new Set(configs.map(c => c.section))];
     const [showConfig, setShowConfig] = useState(false);
     const [editTable, setEditTable] = useState(null);
     const editRef = useRef(null);
@@ -1117,8 +1117,10 @@ const TableManagement = ({ clientId, token, screenIds, userId }) => {
         return 2;                    // mobile
     };
     useEffect(() => {
-        if (clientId) fetchTables();
-    }, [clientId]);
+        if (!clientId) return;
+
+        fetchTables();
+    }, [clientId, configs]);
     const [colsPerRow, setColsPerRow] = useState(getColumnsByScreen());
 
     useEffect(() => {
@@ -1217,9 +1219,21 @@ const TableManagement = ({ clientId, token, screenIds, userId }) => {
 
             if (result.screen_id === "default_tables") {
                 const tableList = Array.isArray(result?.data) ? result.data : [];
-                setTables(tableList);
-                setOriginalTables(structuredClone(tableList));
+                const enrichedTables = tableList.map(t => {
+                    const matchedConfig = configs.find(
+                        c =>
+                            c.section?.trim().toLowerCase() === t.section?.trim().toLowerCase() &&
+                            c.zone?.trim().toLowerCase() === t.location_zone?.trim().toLowerCase()
+                    );
 
+                    return {
+                        ...t,
+                        config_id: matchedConfig?.id || null
+                    };
+                });
+
+                setTables(enrichedTables);
+                setOriginalTables(structuredClone(enrichedTables));
 
             }
         } catch (error) {
@@ -1228,7 +1242,22 @@ const TableManagement = ({ clientId, token, screenIds, userId }) => {
             setLoading(false);
         }
     };
+    const fetchConfigs = async () => {
+        try {
+            const res = await axios.get(
+                `${import.meta.env.VITE_API_TABLE_SERVICE_URL}/${clientId}/tables/config`,
+                {
+                    params: { client_id: clientId },
+                    headers: { Authorization: `Bearer ${token}` }
+                }
+            );
 
+            setConfigs(res.data || []);
+        } catch (err) {
+            console.error("Error fetching configs", err);
+            setConfigs([]);
+        }
+    };
     const fetchMasterValues = async (categoryId, setter) => {
         try {
             const res = await axios.get(
@@ -1248,13 +1277,10 @@ const TableManagement = ({ clientId, token, screenIds, userId }) => {
     };
 
 
-
     useEffect(() => {
         if (!clientId || !token) return;
 
-        fetchMasterValues("zone", setZones);
-        fetchMasterValues("section", setSections);
-
+        fetchConfigs();
     }, [clientId, token]);
 
     const parseTableRangeFlexible = (input) => {
@@ -1290,7 +1316,7 @@ const TableManagement = ({ clientId, token, screenIds, userId }) => {
         setIsGenerating(true);
         try {
             for (let row of tableRanges) {
-                if (!row.range || !row.section || !row.location_zone || !row.table_type) {
+                if (!row.range || !row.config_id || !row.table_type) {
                     generatingRef.current = false;
                     setIsGenerating(false);
                     return;
@@ -1309,13 +1335,14 @@ const TableManagement = ({ clientId, token, screenIds, userId }) => {
                         alert(`Table "${tableName}" already exists!!!`)
                         continue;
                     }
+                    const config = configs.find(c => Number(c.id) === Number(row?.config_id));
                     const payload = {
                         client_id: clientId,
                         name: tableName.trim(),
                         table_type: row.table_type.toString(),
                         status: row.remark || "vacant",
-                        section: row.section,
-                        location_zone: row.location_zone,
+                        section: config?.section,
+                        location_zone: config?.zone,
                         description: "",
                         sort_order: null,
                         is_active: true,
@@ -1388,8 +1415,7 @@ const TableManagement = ({ clientId, token, screenIds, userId }) => {
 
         const hasChanged =
             normalize(original?.table_type) !== normalize(table.table_type) ||
-            normalize(original?.location_zone) !== normalize(table.location_zone) ||
-            normalize(original?.section) !== normalize(table.section) ||
+            normalize(original?.config_id) !== normalize(table.config_id) ||
             normalize(original?.status) !== normalize(table.status);
 
         if (!hasChanged) {
@@ -1401,10 +1427,16 @@ const TableManagement = ({ clientId, token, screenIds, userId }) => {
         }
 
         try {
+            // 🔥 map config_id → section + zone
+            const config = configs.find(c => Number(c.id) === Number(table?.config_id));
+
             const payload = {
                 ...table,
                 table_type: table.table_type.toString(),
-                status: table.status.trim()  // Keep exact casing from dropdown
+                status: table.status.trim(),
+
+                section: config?.section || table.section,
+                location_zone: config?.zone || table.location_zone
             };
 
             console.log("Sending update payload:", payload);
@@ -1460,14 +1492,14 @@ const TableManagement = ({ clientId, token, screenIds, userId }) => {
         setBulkUpdateGlobal({
             table_type: "",
             status: "",
-            location_zone: ""
+            config_id: ""
         });
 
         const initialData = {};
         tables.forEach(table => {
             initialData[table.id] = {
                 table_type: table.table_type,
-                location_zone: table.location_zone,
+                config_id: table.config_id,
                 status: table.status
             };
         });
@@ -1524,25 +1556,25 @@ const TableManagement = ({ clientId, token, screenIds, userId }) => {
                     finalStatus = bulkUpdateGlobal.status;
                 }
 
-                let finalZone = table.location_zone;
-                if (tableUpdates.location_zone && tableUpdates.location_zone !== table.location_zone) {
-                    finalZone = tableUpdates.location_zone;
-                } else if (bulkUpdateGlobal.location_zone) {
-                    finalZone = bulkUpdateGlobal.location_zone;
-                }
-                let finalSection = table.section;
-                if (tableUpdates.section && tableUpdates.section !== table.section) {
-                    finalSection = tableUpdates.section;
-                } else if (bulkUpdateGlobal.section) {
-                    finalSection = bulkUpdateGlobal.section;
+                // ✅ NEW CONFIG LOGIC
+                let finalConfigId = table.config_id;
+
+                if (tableUpdates.config_id && tableUpdates.config_id !== table.config_id) {
+                    finalConfigId = tableUpdates.config_id;
+                } else if (bulkUpdateGlobal.config_id) {
+                    finalConfigId = bulkUpdateGlobal.config_id;
                 }
 
+                // 🔥 find config
+                const config = configs.find(c => Number(c.id) === Number(finalConfigId));
                 const updatedFields = {
                     ...table,
                     table_type: finalTableType.toString(),
                     status: (finalStatus || "").toLowerCase().trim(),
-                    location_zone: finalZone,
-                    section: finalSection,
+
+                    // ✅ send what backend expects
+                    section: config?.section || table.section,
+                    location_zone: config?.zone || table.location_zone
                 };
 
                 await axios.post(
@@ -1561,7 +1593,7 @@ const TableManagement = ({ clientId, token, screenIds, userId }) => {
             setBulkUpdateGlobal({
                 table_type: "",
                 status: "",
-                location_zone: "",
+                config_id: ""
             });
 
             await fetchTables();
@@ -1610,7 +1642,6 @@ const TableManagement = ({ clientId, token, screenIds, userId }) => {
                     client_id: clientId,
                     name: "",
                     table_type: "",
-                    location_zone: "",
                 }, { headers: { Authorization: `Bearer ${token}` } });
             }
             await fetchTables();
@@ -1745,6 +1776,7 @@ const TableManagement = ({ clientId, token, screenIds, userId }) => {
                     {/* Table Grid */}
                     <div className="grid grid-cols-2 sm:grid-cols-4 lg:grid-cols-6 xl:grid-cols-6 2xl:grid-cols-8 gap-2 sm:gap-3">
                         {filteredTables.map(table => {
+                           const config = configs.find(c => Number(c.id) === Number(table?.config_id));
                             return (
                                 <div
                                     key={table.id}
@@ -1772,14 +1804,19 @@ const TableManagement = ({ clientId, token, screenIds, userId }) => {
 
                                     {/* BODY */}
                                     <div className="px-3 py-3 text-sm text-text-primary flex justify-between">
-                                        <div className=""> <div className="font-medium">{table.location_zone}</div>
-                                            <div className="text-xs text-text-secondary mt-1">
+                                        <div className="">
+                                            <div className="text-xs text-text-secondary mt-1"><div className="font-medium">
+                                                {config?.zone || "-"}
+                                            </div>
+
                                                 Seats: <span className="font-bold">{table.table_type}</span>
                                             </div>
-                                        </div>
-                                        <div className="">
+                                        </div><span className="text-md font-semibold">
+                                            {config?.section || "-"}
+                                        </span>
+                                        {/* <div className="">
                                             <span className="text-md font-semibold">{table.section}</span>
-                                        </div>
+                                        </div> */}
                                     </div>
 
                                     {/* FOOTER */}
@@ -1904,10 +1941,7 @@ const TableManagement = ({ clientId, token, screenIds, userId }) => {
                         onClose={() => setShowConfig(false)}
                         clientId={clientId}
                         token={token}
-                        refresh={() => {
-                            fetchMasterValues("zone", setZones);
-                            fetchMasterValues("section", setSections);
-                        }}
+                        refresh={() => {  fetchConfigs();  }}
                     />
 
                     {/* First Delete Confirmation */}

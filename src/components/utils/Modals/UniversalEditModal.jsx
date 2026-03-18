@@ -636,45 +636,37 @@ const UniversalEditModal = ({
 }) => {
   const [dragActive, setDragActive] = useState(false);
   const [showAddonPopup, setShowAddonPopup] = useState(false); // ✅ Popup state
-  const [zoneOptions, setZoneOptions] = useState([]);
-  const [sectionOptions, setSectionOptions] = useState([]);
-  const [loadingMasters, setLoadingMasters] = useState(false);
+  const [configs, setConfigs] = useState([]);
   const [statusOptions, setStatusOptions] = useState([]);
+  const [loadingConfigs, setLoadingConfigs] = useState(false);
 
-  // Fetch master values for zones, sections, and status
-  const fetchMasterValues = async (categoryId, setter) => {
+  const fetchConfigs = async () => {
     try {
+      setLoadingConfigs(true);
+
       const res = await axios.get(
-        `${import.meta.env.VITE_API_INVENTORY_SERVICE_URL}/${clientId}/inventory/masters`,
+        `${import.meta.env.VITE_API_TABLE_SERVICE_URL}/${clientId}/tables/config`,
         {
-          params: { category_id: categoryId },
+          params: { client_id: clientId },
           headers: { Authorization: `Bearer ${token}` }
         }
       );
-      setter(res?.data?.data || []);
+
+      setConfigs(res.data || []);
     } catch (err) {
-      console.error("Master fetch error:", categoryId, err);
-      setter([]);
+      console.error("Config fetch error:", err);
+      setConfigs([]);
+    } finally {
+      setLoadingConfigs(false);
     }
   };
 
-  // Load master data for table modal
   useEffect(() => {
-    if (!showModal || modalType !== "table") return;
+    if (!showModal) return;
     if (!clientId || !token) return;
 
-    const loadMasters = async () => {
-      setLoadingMasters(true);
-      await Promise.all([
-        fetchMasterValues("zone", setZoneOptions),
-        fetchMasterValues("section", setSectionOptions),
-        fetchMasterValues("status", setStatusOptions)
-      ]);
-      setLoadingMasters(false);
-    };
-
-    loadMasters();
-  }, [showModal, modalType, clientId, token]);
+    fetchConfigs();
+  }, [showModal, clientId, token]);
 
   // Menu Modal Functions
   const handleEditDrag = (e) => {
@@ -757,7 +749,7 @@ const UniversalEditModal = ({
             <div className="px-6 py-4 border-b border-gray-200 flex justify-between items-center">
               <h2 className="text-xl font-semibold text-gray-900">Edit Menu Item</h2>
               <button
-                onClick={handleClose} 
+                onClick={handleClose}
                 className="p-1.5 rounded-lg bg-action-primary text-text-white hover:opacity-90 transition-opacity">
                 <X className="w-5 h-5" />
               </button>
@@ -838,7 +830,28 @@ const UniversalEditModal = ({
                     rows="3"
                   />
                 </div>
-
+                <div className="">
+                  <label className="block text-sm font-medium mb-2 text-text-primary">
+                    Zone & Section *
+                  </label>
+                  <select
+                   value={editingItem.zone_config_id || ""}
+                   onChange={(e) =>
+                     setEditingItem({
+                       ...editingItem,
+                       zone_config_id: e.target.value
+                     })
+                   }
+                    className="w-full px-4 py-2 rounded-lg bg-bg-tertiary border border-border-default"
+                  >
+                    <option value="">Base Price</option>
+                    {configs.map(c => (
+                      <option key={c.id} value={c.id}>
+                        {c.section} - {c.zone}
+                      </option>
+                    ))}
+                  </select>
+                </div>
                 {/* Unit Price & Discount */}
                 <div className="grid grid-cols-2 gap-4">
                   <div>
@@ -973,7 +986,7 @@ const UniversalEditModal = ({
                   <label className="block text-sm font-medium mb-2 text-gray-700">
                     Add-ons
                   </label>
-                  
+
                   {/* Selected Addons Display */}
                   {editingItem.line_item_id && editingItem.line_item_id.length > 0 && (
                     <div className="mb-3 flex flex-wrap gap-2">
@@ -1128,54 +1141,27 @@ const UniversalEditModal = ({
                   <p className="text-red-600 text-xs mt-1">{editFieldErrors.table_type}</p>
                 )}
               </div>
+              <div className="">
+                <label className="block text-sm font-medium mb-1 text-gray-700">Section & Zone :</label>
 
-              {/* Section */}
-              <div>
-                <label className="block text-sm font-medium mb-1 text-gray-700">
-                  Section
-                </label>
                 <select
-                  value={table.section || ""}
+                  value={table.config_id || ""}
                   onChange={(e) =>
-                    handleEditChange(table.id, "section", e.target.value)
+                    handleEditChange(table.id, "config_id", Number(e.target.value))
                   }
-                  className="w-full px-3 py-2 rounded-md border border-gray-300 focus:ring-2 focus:ring-blue-500"
+                  className="w-full px-3 py-2 border rounded-md"
                 >
-                  <option value="">Select Section</option>
+                  <option value="">Select Config</option>
 
-                  {loadingMasters ? (
+                  {loadingConfigs ? (
                     <option disabled>Loading...</option>
-                  ) : sectionOptions.length === 0 ? (
-                    <option disabled>No Sections Configured</option>
+                  ) : configs.length === 0 ? (
+                    <option disabled>No Config Available</option>
                   ) : (
-                    sectionOptions.map((sec, i) => (
-                      <option key={i} value={sec}>{sec}</option>
-                    ))
-                  )}
-                </select>
-              </div>
-
-              {/* Zone */}
-              <div>
-                <label className="block text-sm font-medium mb-1 text-gray-700">
-                  Zone
-                </label>
-                <select
-                  value={table.location_zone || ""}
-                  onChange={(e) =>
-                    handleEditChange(table.id, "location_zone", e.target.value)
-                  }
-                  className="w-full px-3 py-2 rounded-md border border-gray-300 focus:ring-2 focus:ring-blue-500"
-                >
-                  <option value="">Select Zone</option>
-
-                  {loadingMasters ? (
-                    <option disabled>Loading...</option>
-                  ) : zoneOptions.length === 0 ? (
-                    <option disabled>No Zones Configured</option>
-                  ) : (
-                    zoneOptions.map((zone, i) => (
-                      <option key={i} value={zone}>{zone}</option>
+                    configs.map(c => (
+                      <option key={c.id} value={c.id}>
+                        {c.section} - {c.zone}
+                      </option>
                     ))
                   )}
                 </select>
@@ -1191,16 +1177,9 @@ const UniversalEditModal = ({
                     }`}
                 >
                   <option value="">Select Status</option>
-
-                  {loadingMasters ? (
-                    <option disabled>Loading...</option>
-                  ) : statusOptions.length === 0 ? (
-                    <option disabled>No Status Configured</option>
-                  ) : (
-                    statusOptions.map((status, i) => (
-                      <option key={i} value={status}>{status}</option>
-                    ))
-                  )}
+                  <option value="vacant">Vacant</option>
+                  <option value="reserved">Reserved</option>
+                  <option value="occupied">Occupied</option>
                 </select>
 
                 {editFieldErrors?.status && (

@@ -44,70 +44,75 @@ const MenuCategoryTree = ({
   const [editDescription, setEditDescription] = useState("");
   const [editNewSubcategoryName, setEditNewSubcategoryName] = useState("");
   const [deleteTarget, setDeleteTarget] = useState(null);
-
   const getDisplayCategories = () => {
-    if (!categories?.length || !menuConfig) return [];
+    if (!categories?.length) return [];
 
-    const { root } = menuConfig;
-
-    // find actual configured root node
-    const findRoot = (nodes) => {
-      for (const node of nodes) {
-        if (
-          String(node.id).toLowerCase() === String(root).toLowerCase() ||
-          String(node.name).toLowerCase() === String(root).toLowerCase()
-        ) {
-          return node;
-        }
-        if (node.children?.length) {
-          const found = findRoot(node.children);
-          if (found) return found;
-        }
-      }
-      return null;
-    };
-
-    const rootNode = findRoot(categories);
-    if (!rootNode) return categories;
-
-    const visibleChildren = [];
-
-    for (const level1 of rootNode.children || []) {
-      for (const level2 of level1.children || []) {
-        visibleChildren.push(level2); // keep SAME object reference
-      }
-    }
-
-    return [
-      {
-        id: "__virtual_root__",
-        name: "All Categories",
-        isVirtualRoot: true,
-        children: visibleChildren
-      }
-    ];
+    // 🔥 No filtering, return full tree
+    return categories;
   };
+  // const getDisplayCategories = () => {
+  //   if (!categories?.length || !menuConfig) return [];
+
+  //   const { root } = menuConfig;
+
+  //   // find actual configured root node
+  //   const findRoot = (nodes) => {
+  //     for (const node of nodes) {
+  //       if (
+  //         String(node.id).toLowerCase() === String(root).toLowerCase() ||
+  //         String(node.name).toLowerCase() === String(root).toLowerCase()
+  //       ) {
+  //         return node;
+  //       }
+  //       if (node.children?.length) {
+  //         const found = findRoot(node.children);
+  //         if (found) return found;
+  //       }
+  //     }
+  //     return null;
+  //   };
+
+  //   const rootNode = findRoot(categories);
+  //   if (!rootNode) return categories;
+
+  //   const visibleChildren = [];
+
+  //   for (const level1 of rootNode.children || []) {
+  //     for (const level2 of level1.children || []) {
+  //       visibleChildren.push(level2); // keep SAME object reference
+  //     }
+  //   }
+
+  //   return [
+  //     {
+  //       id: "__virtual_root__",
+  //       name: "All Categories",
+  //       isVirtualRoot: true,
+  //       children: visibleChildren
+  //     }
+  //   ];
+  // };
 
   const displayCategories = useMemo(() => getDisplayCategories(), [categories, menuConfig]);
 
-const normalizeIdPart = (value) => {
-  return value
-    ?.toLowerCase()
-    .trim()
-    .replace(/\s+/g, "_")
-    .replace(/[^a-z0-9_]/g, "")
-    .replace(/_+/g, "_")
-    .replace(/^_|_$/g, "");
-};
+  const normalizeIdPart = (value) => {
+    return value
+      ?.toLowerCase()
+      .trim()
+      .replace(/\s+/g, "_")
+      .replace(/[^a-z0-9_]/g, "")
+      .replace(/_+/g, "_")
+      .replace(/^_|_$/g, "");
+  };
 
-const generateCategoryId = (name, parentName) => {
-  const normalizedName = normalizeIdPart(name);
-  const normalizedParentName = normalizeIdPart(parentName);
+  const generateCategoryId = (name, parentName) => {
+    const normalizedName = normalizeIdPart(name);
+    const normalizedParentName = normalizeIdPart(parentName);
 
-  if (!normalizedParentName) return normalizedName;
+    if (!normalizedParentName) return normalizedName;
 
-  return `${normalizedName}_${normalizedParentName}`;
-};
+    return `${normalizedName}_${normalizedParentName}`;
+  };
 
   const getCategoriesAtLevel = (nodes, targetLevel, level = 1) => {
     let result = [];
@@ -142,39 +147,54 @@ const generateCategoryId = (name, parentName) => {
     }
     return null;
   };
-
-  useEffect(() => {
-    if (!selectedCategoryId || !displayCategories.length) return;
-
-    const expandParents = (nodes, targetId, parents = []) => {
-      for (const node of nodes) {
-        if (node.id === targetId) return parents;
-
-        if (node.children?.length) {
-          const found = expandParents(node.children, targetId, [...parents, node.id]);
-          if (found) return found;
-        }
-      }
-      return null;
-    };
-
-    const parents = expandParents(displayCategories, selectedCategoryId);
-
-    setExpandedCategories(prev => {
-      const same =
-        prev.length === (parents?.length || 0) &&
-        prev.every((v, i) => v === parents[i]);
-
-      return same ? prev : parents || [];
-    });
-
-  }, [selectedCategoryId, displayCategories]);
-
   useEffect(() => {
     if (!displayCategories.length) return;
 
-    setExpandedCategories([displayCategories[0].id]);
+    const expandAll = (nodes) => {
+      let ids = [];
+
+      nodes.forEach(node => {
+        ids.push(node.id);
+
+        if (node.children?.length) {
+          ids = ids.concat(expandAll(node.children));
+        }
+      });
+
+      return ids;
+    };
+
+    setExpandedCategories(expandAll(displayCategories));
+
   }, [displayCategories]);
+  // useEffect(() => {
+  //   if (!selectedCategoryId || !displayCategories.length) return;
+
+  //   const expandParents = (nodes, targetId, parents = []) => {
+  //     for (const node of nodes) {
+  //       if (node.id === targetId) return parents;
+
+  //       if (node.children?.length) {
+  //         const found = expandParents(node.children, targetId, [...parents, node.id]);
+  //         if (found) return found;
+  //       }
+  //     }
+  //     return null;
+  //   };
+
+  //   const parents = expandParents(displayCategories, selectedCategoryId);
+
+  //   setExpandedCategories(prev => {
+  //     const same =
+  //       prev.length === (parents?.length || 0) &&
+  //       prev.every((v, i) => v === parents[i]);
+
+  //     return same ? prev : parents || [];
+  //   });
+
+  // }, [selectedCategoryId, displayCategories]);
+
+
 
   const buildLocalParentMap = (cats) => {
     const map = {};
@@ -574,22 +594,22 @@ const generateCategoryId = (name, parentName) => {
       userId = jwtDecode(token)?.user_id || userId;
     } catch { }
 
-  // Decide parent
-const rootNode = categories.find(
-  cat =>
-    String(cat.id).toLowerCase() === String(menuConfig.root).toLowerCase() ||
-    String(cat.name).toLowerCase() === String(menuConfig.root).toLowerCase()
-);
+    // Decide parent
+    const rootNode = categories.find(
+      cat =>
+        String(cat.id).toLowerCase() === String(menuConfig.root).toLowerCase() ||
+        String(cat.name).toLowerCase() === String(menuConfig.root).toLowerCase()
+    );
 
-let parent = rootNode;
+    let parent = rootNode;
 
-// If root has children, attach to first child
-if (rootNode?.children?.length) {
-  parent = rootNode.children[0];
-}
+    // If root has children, attach to first child
+    if (rootNode?.children?.length) {
+      parent = rootNode.children[0];
+    }
 
-// 🔥 Generate ID using parent.name (NOT parent.id)
-const newId = generateCategoryId(newCategoryName, parent?.name);
+    // 🔥 Generate ID using parent.name (NOT parent.id)
+    const newId = generateCategoryId(newCategoryName, parent?.name);
     try {
       // 1️⃣ Create the new category
       await axios.post(
@@ -682,10 +702,10 @@ const newId = generateCategoryId(newCategoryName, parent?.name);
       let finalSubs = editingCategory.children?.map(c => c.id) || [];
 
       if (editNewSubcategoryName.trim()) {
-      const newSubId = generateCategoryId(
-  editNewSubcategoryName,
-  editingCategory.name
-);
+        const newSubId = generateCategoryId(
+          editNewSubcategoryName,
+          editingCategory.name
+        );
         await axios.post(
           `${import.meta.env.VITE_API_INVENTORY_SERVICE_URL}/${clientId}/menu/create_category`,
           {
