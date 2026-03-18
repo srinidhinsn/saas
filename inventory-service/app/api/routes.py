@@ -19,6 +19,7 @@ getcontext().prec = 18  # increase decimal precision
 def read_inventory(
     client_id: str,
     inventory_id: str | None = Query(default=None),
+    zone_config_id: Optional[str] = Query(default=None),
     context: SaasContext = Depends(verify_token),
     db: Session = Depends(get_db),
 ):
@@ -26,7 +27,8 @@ def read_inventory(
 
     if inventory_id:
         query = query.filter(InventoryEntity.inventory_id == inventory_id)
-
+    if zone_config_id:
+        query = query.filter(InventoryEntity.zone_config_id == zone_config_id)
     records = query.all()
     models = InventoryEntity.copyToModels(records)
 
