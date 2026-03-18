@@ -14,6 +14,7 @@ class Inventory(BaseModel):
     name: Optional[str] = None
     description: Optional[str] = None
     category_id: Optional[str] = None
+    zone_config_id: Optional[int] = None
     realm: Optional[str] = None 
     serving_quantity: Optional[float] = None
     serving_unit: Optional[str] = None
