@@ -962,11 +962,14 @@ const UniversalBulkUpdateModal = ({
     }
   };
   useEffect(() => {
-    if (!showModal || modalType !== "table") return;
+    if (!showModal) return;
     if (!clientId || !token) return;
 
-    fetchConfigs();
-  }, [showModal, modalType, clientId, token]);
+    fetchConfigs();   // ✅ always fetch (not only table)
+  }, [showModal, clientId, token]);
+  useEffect(() => {
+    console.log("CONFIGS:", configs);
+  }, [configs]);
   // ✅ Clear global add-ons for all selected items
   const clearGlobalAddons = () => {
     if (selectedRows.length === 0) {
@@ -1114,7 +1117,7 @@ const UniversalBulkUpdateModal = ({
             </div>
 
             {/* ✅ Global Add-ons Section */}
-            <div className="px-6 py-4 bg-blue-50 border-b border-blue-200">
+            <div className="px-6 py-4 flex justify-between bg-blue-50 border-b border-blue-200">
               <div className="flex items-start gap-4">
                 <div className="flex-1">
                   <label className="block text-sm font-semibold mb-2 text-gray-700">
@@ -1161,8 +1164,40 @@ const UniversalBulkUpdateModal = ({
                   </p>
                 </div>
               </div>
-            </div>
+              <div className="px-6 py-3 bg-bg-primary">
+              <label className="block text-sm font-semibold mb-2 text-gray-700">
+                Apply Zone & Section
+              </label>
 
+              <select
+                className="px-3 py-2 border rounded-md text-sm outline-none"
+                onChange={(e) => {
+                  const value = Number(e.target.value);
+                  if (!value) return;
+
+                  const updated = { ...bulkEditData };
+
+                  selectedRows.forEach(id => {
+                    updated[id] = {
+                      ...(updated[id] || {}),
+                      zone_config_id: value
+                    };
+                  });
+
+                  setBulkEditData(updated);
+                }}
+              >
+                <option value="">Select Zone</option>
+
+                {configs.map(c => (
+                  <option key={c.id} value={c.id}>
+                    {c.zone} - {c.section}
+                  </option>
+                ))}
+              </select>
+            </div>
+            </div>
+        
             {/* Action Bar */}
             <div className="flex justify-between items-center gap-4 px-6 py-3 border-b border-gray-200 bg-gray-50">
               <div className="flex items-center gap-4">
@@ -1220,6 +1255,9 @@ const UniversalBulkUpdateModal = ({
                       <th className="px-4 py-3 text-left text-sm font-semibold text-gray-700 bg-gray-50">Discount</th>
                       <th className="px-4 py-3 text-left text-sm font-semibold text-gray-700 bg-gray-50">Code</th>
                       <th className="px-4 py-3 text-left text-sm font-semibold text-gray-700 bg-gray-50">Add-ons</th>
+                      <th className="px-4 py-3 text-left text-sm font-semibold text-gray-700 bg-gray-50">
+                        Zone
+                      </th>
                     </tr>
                   </thead>
                   <tbody>
@@ -1349,6 +1387,36 @@ const UniversalBulkUpdateModal = ({
                                 {Array.isArray(item.line_item_id) && item.line_item_id.length > 0
                                   ? `${item.line_item_id.length} add-on(s)`
                                   : '-'}
+                              </span>
+                            )}
+                          </td>
+                          <td className="px-4 py-3">
+                            {isSelected ? (
+                              <select
+                                value={
+                                  editData.zone_config_id !== undefined
+                                    ? editData.zone_config_id
+                                    : item.zone_config_id || ""
+                                }
+                                onChange={(e) =>
+                                  updateBulkEditData(item.id, "zone_config_id", Number(e.target.value))
+                                }
+                                className="w-full px-2 py-1 border rounded text-sm"
+                              >
+                                <option value="">Select</option>
+
+                                {configs.map(c => (
+                                  <option key={c.id} value={c.id}>
+                                    {c.zone} - {c.section}
+                                  </option>
+                                ))}
+                              </select>
+                            ) : (
+                              <span className="text-sm text-gray-900">
+                                {(() => {
+                                  const c = configs.find(x => x.id === item.zone_config_id);
+                                  return c ? `${c.zone} - ${c.section}` : "-";
+                                })()}
                               </span>
                             )}
                           </td>
@@ -1669,7 +1737,7 @@ const UniversalBulkUpdateModal = ({
                             </select>
                           </div>
                           <div className="">
-                          <label className="block text-xs font-semibold mb-1.5 text-text-secondary">Section & Zone :</label>
+                            <label className="block text-xs font-semibold mb-1.5 text-text-secondary">Section & Zone :</label>
                             <select
                               value={bulkUpdateData[table.id]?.config_id ?? table.config_id ?? ""}
                               className="w-full px-3 py-1.5 border border-border-default rounded-lg text-sm focus:outline-none focus:ring-2 focus:ring-action-primary focus:border-transparent bg-bg-primary text-text-primary"

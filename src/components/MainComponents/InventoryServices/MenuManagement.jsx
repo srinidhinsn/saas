@@ -998,7 +998,6 @@ const MenuManagement = ({ clientId, token, realm }) => {
             </div> */}
           <div className="mb-3 flex flex-wrap gap-2">
 
-{/* ✅ ALL OPTION */}
 <button
   onClick={() => setZoneConfigId(null)}
   className={`px-3 py-1 rounded-full text-sm border transition
@@ -1010,7 +1009,6 @@ const MenuManagement = ({ clientId, token, realm }) => {
   All
 </button>
 
-{/* ✅ ZONE OPTIONS */}
 {sections.map((s) => (
   <button
     key={s.id}
@@ -1176,7 +1174,8 @@ const MenuManagement = ({ clientId, token, realm }) => {
 
       />
 
-      <UniversalBulkUpdateModal
+      <UniversalBulkUpdateModal clientId={clientId}
+        token={token}
         showModal={showBulkModal} setShowModal={setShowBulkModal} modalType="menu"
         filteredItems={filteredItems} selectedRows={selectedRows} setSelectedRows={setSelectedRows}
         selectAllChecked={selectAllChecked} setSelectAllChecked={setSelectAllChecked}
