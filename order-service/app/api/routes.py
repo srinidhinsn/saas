@@ -173,6 +173,7 @@ def get_orders_for_table(client_id: str, table_id: Optional[str] = None, context
     result = [_merge_group(group) for group in groups.values()]
     return ResponseModel(screen_id=context.screen_id, data=result)
 
+
 @router.post("/dinein/update")
 def update_order_status(
     client_id: str,
@@ -196,9 +197,6 @@ def update_order_status(
             detail=f"Order {body.id} not found"
         )
 
-    previous_status = order.status
-
-    # 🔥 NEW LOGIC: If marking as served → update root + all sub-orders
     if body.status in [OrderStatusEnum.served, OrderStatusEnum.completed]:
 
         root_id = _root_dinein_id(order.dinein_order_id)
@@ -209,7 +207,13 @@ def update_order_status(
         ).all()
 
         for o in related_orders:
-           o.status = body.status
+            o.status = body.status
+
+        db.flush()  # write status changes before deduction
+
+        # Deduct stock for ALL related orders, skipping already-deducted items
+        for o in related_orders:
+            _deduct_stock_for_order(db=db, client_id=client_id, order_id=o.id)
 
         db.commit()
 
@@ -224,12 +228,10 @@ def update_order_status(
     # ✅ Normal single order update (for other statuses)
     if body.status is not None:
         order.status = body.status
-
     if body.total_price is not None:
         order.total_price = body.total_price
-
     if body.table_id is not None:
-        order.table_id = body.table_id    
+        order.table_id = body.table_id
 
     db.commit()
     db.refresh(order)
@@ -241,7 +243,6 @@ def update_order_status(
             "new_status": order.status,
         },
     )
-
 
 
 @router.post("/order_items/update")
@@ -262,9 +263,6 @@ def update_order_items(
     existing_items = db.query(Db_OrderItem_Entity).filter(Db_OrderItem_Entity.order_id == order_id).all()
     existing_map = {(item.item_id, item.frontend_unique_key): item for item in existing_items}
 
-    # Snapshot before any writes — was the order already fully served?
-    was_all_served = bool(existing_items) and all(i.status == "served" for i in existing_items)
-
     for incoming in body:
         key = (incoming.item_id, incoming.frontend_unique_key)
         if key in existing_map:
@@ -280,20 +278,6 @@ def update_order_items(
                 line_total=(incoming.unit_price or 0) * (incoming.quantity or 1),
                 status="pending", frontend_unique_key=incoming.frontend_unique_key,
             ))
-
-    # Flush so status changes are visible in the same session
-    db.flush()
-
-    all_items_now = (
-        db.query(Db_OrderItem_Entity)
-        .filter(Db_OrderItem_Entity.order_id == order_id)
-        .all()
-    )
-    is_all_served_now = bool(all_items_now) and all(i.status == "served" for i in all_items_now)
-
-    # Deduct exactly once — on the transition into fully-served
-    if is_all_served_now and not was_all_served:
-        _deduct_stock_for_order(db=db, client_id=client_id, order_id=order_id)
 
     db.commit()
     return ResponseModel(

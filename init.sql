@@ -855,3 +855,25 @@ CREATE TABLE address (
 UPDATE category
 SET sub_categories = array_cat(sub_categories, ARRAY['address'])
 WHERE id = 'users' AND client_id = 'saas';
+
+
+
+CREATE TABLE IF NOT EXISTS inventory_transactions (
+    id               BIGSERIAL PRIMARY KEY,
+    transaction_id   TEXT,
+    client_id        TEXT        NOT NULL,
+    stock_item_id    BIGINT      NOT NULL,
+    inventory_id     TEXT,
+    name             TEXT,
+    transaction_type TEXT        NOT NULL,
+    movement_type    TEXT        NOT NULL,
+    quantity         NUMERIC(18,6) NOT NULL,
+	unit             TEXT,
+    before_stock     NUMERIC(18,6) NOT NULL,
+    after_stock      NUMERIC(18,6) NOT NULL,
+    reference_id     TEXT,
+    reference_type   TEXT,
+    created_by       TEXT,
+    created_at       TIMESTAMP   DEFAULT NOW(),
+    remarks          TEXT
+);
