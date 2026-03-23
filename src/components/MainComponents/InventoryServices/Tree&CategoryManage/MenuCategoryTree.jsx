@@ -95,15 +95,15 @@ const MenuCategoryTree = ({
 
   const displayCategories = useMemo(() => getDisplayCategories(), [categories, menuConfig]);
 
-  const normalizeIdPart = (value) => {
-    return value
-      ?.toLowerCase()
-      .trim()
-      .replace(/\s+/g, "_")
-      .replace(/[^a-z0-9_]/g, "")
-      .replace(/_+/g, "_")
-      .replace(/^_|_$/g, "");
-  };
+const normalizeIdPart = (value) => {
+  return value
+    ?.toLowerCase()
+    .trim()
+    .replace(/\s+/g, "_")
+    .replace(/[^a-z0-9_]/g, "")
+    .replace(/_+/g, "_")
+    .replace(/^_|_$/g, "");
+};
 
   const generateCategoryId = (name, parentName) => {
     const normalizedName = normalizeIdPart(name);
