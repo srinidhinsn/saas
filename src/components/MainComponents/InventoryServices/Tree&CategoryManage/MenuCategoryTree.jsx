@@ -105,14 +105,14 @@ const normalizeIdPart = (value) => {
     .replace(/^_|_$/g, "");
 };
 
-  const generateCategoryId = (name, parentName) => {
-    const normalizedName = normalizeIdPart(name);
-    const normalizedParentName = normalizeIdPart(parentName);
+const generateCategoryId = (name, parentName) => {
+  const normalizedName = normalizeIdPart(name);
+  const normalizedParentName = normalizeIdPart(parentName);
 
-    if (!normalizedParentName) return normalizedName;
+  if (!normalizedParentName) return normalizedName;
 
-    return `${normalizedName}_${normalizedParentName}`;
-  };
+  return `${normalizedName}_${normalizedParentName}`;
+};
 
   const getCategoriesAtLevel = (nodes, targetLevel, level = 1) => {
     let result = [];
@@ -594,19 +594,19 @@ const normalizeIdPart = (value) => {
       userId = jwtDecode(token)?.user_id || userId;
     } catch { }
 
-    // Decide parent
-    const rootNode = categories.find(
-      cat =>
-        String(cat.id).toLowerCase() === String(menuConfig.root).toLowerCase() ||
+  // Decide parent
+const rootNode = categories.find(
+  cat =>
+    String(cat.id).toLowerCase() === String(menuConfig.root).toLowerCase() ||
         String(cat.name).toLowerCase() === String(menuConfig.root).toLowerCase()
-    );
+);
 
-    let parent = rootNode;
+let parent = rootNode;
 
-    // If root has children, attach to first child
-    if (rootNode?.children?.length) {
-      parent = rootNode.children[0];
-    }
+// If root has children, attach to first child
+if (rootNode?.children?.length) {
+  parent = rootNode.children[0];
+}
 
     // 🔥 Generate ID using parent.name (NOT parent.id)
     const newId = generateCategoryId(newCategoryName, parent?.name);
@@ -702,10 +702,10 @@ const normalizeIdPart = (value) => {
       let finalSubs = editingCategory.children?.map(c => c.id) || [];
 
       if (editNewSubcategoryName.trim()) {
-        const newSubId = generateCategoryId(
-          editNewSubcategoryName,
-          editingCategory.name
-        );
+      const newSubId = generateCategoryId(
+  editNewSubcategoryName,
+  editingCategory.name
+ );
         await axios.post(
           `${import.meta.env.VITE_API_INVENTORY_SERVICE_URL}/${clientId}/menu/create_category`,
           {
