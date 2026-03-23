@@ -11,7 +11,7 @@ from utils.auth import verify_token
 from models.saas_context import SaasContext
 from typing import Optional
 from entity.inventory_entity import InventoryEntity
-from ..services.order_service import _root_dinein_id, _order_row_to_flat, STATUS_PRIORITY, _merge_group
+from services.order_service import _root_dinein_id, _order_row_to_flat, STATUS_PRIORITY, _merge_group, _deduct_stock_for_order
 # from app.services.order_service import deduct_inventory_after_order
 from decimal import Decimal
 
@@ -24,7 +24,7 @@ def create_order(client_id: str, order: DineinOrderModel, context: SaasContext =
         client_id=client_id, table_id=order.table_id, status=order.status,
         price=order.price, gst=order.gst, cst=order.cst, discount=order.discount,
         invoice_status=order.invoice_status, total_price=order.total_price,
-        invoice_id=order.invoice_id, dinein_order_id=order.dinein_order_id,
+        invoice_id=order.invoice_id, dinein_order_id=None,
         handler_id=order.handler_id, created_by=order.created_by, updated_by=order.updated_by,
     )
     db.add(db_order)
@@ -54,7 +54,7 @@ def create_order(client_id: str, order: DineinOrderModel, context: SaasContext =
     dinein_model = DineinOrderModel(
         id=db_order.id, dinein_order_id=db_order.dinein_order_id, table_id=db_order.table_id,
         client_id=db_order.client_id, status=db_order.status, created_at=db_order.created_at,
-        items=order_items
+        items=order_items,
     )
     return ResponseModel(screen_id=context.screen_id, data=dinein_model)
 
@@ -173,6 +173,7 @@ def get_orders_for_table(client_id: str, table_id: Optional[str] = None, context
     result = [_merge_group(group) for group in groups.values()]
     return ResponseModel(screen_id=context.screen_id, data=result)
 
+
 @router.post("/dinein/update")
 def update_order_status(
     client_id: str,
@@ -196,9 +197,6 @@ def update_order_status(
             detail=f"Order {body.id} not found"
         )
 
-    previous_status = order.status
-
-    # 🔥 NEW LOGIC: If marking as served → update root + all sub-orders
     if body.status in [OrderStatusEnum.served, OrderStatusEnum.completed]:
 
         root_id = _root_dinein_id(order.dinein_order_id)
@@ -209,7 +207,13 @@ def update_order_status(
         ).all()
 
         for o in related_orders:
-           o.status = body.status
+            o.status = body.status
+
+        db.flush()  # write status changes before deduction
+
+        # Deduct stock for ALL related orders, skipping already-deducted items
+        for o in related_orders:
+            _deduct_stock_for_order(db=db, client_id=client_id, order_id=o.id)
 
         db.commit()
 
@@ -224,12 +228,10 @@ def update_order_status(
     # ✅ Normal single order update (for other statuses)
     if body.status is not None:
         order.status = body.status
-
     if body.total_price is not None:
         order.total_price = body.total_price
-
     if body.table_id is not None:
-        order.table_id = body.table_id    
+        order.table_id = body.table_id
 
     db.commit()
     db.refresh(order)
@@ -241,6 +243,7 @@ def update_order_status(
             "new_status": order.status,
         },
     )
+
 
 @router.post("/order_items/update")
 def update_order_items(
@@ -277,8 +280,10 @@ def update_order_items(
             ))
 
     db.commit()
-    return ResponseModel(screen_id=context.screen_id, data={"message": "Order updated without resetting old statuses"})
-
+    return ResponseModel(
+        screen_id=context.screen_id,
+        data={"message": "Order updated without resetting old statuses"},
+    )
 
 @router.post("/order_item/update")
 def update_order_item(client_id: str, order_id: Optional[int] = Query(None), order_item: Optional[OrderItemModel] = None, context: SaasContext = Depends(verify_token), db: Session = Depends(get_db)):

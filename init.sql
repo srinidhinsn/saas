@@ -803,6 +803,13 @@ INSERT INTO category (id, client_id, name, description, sub_categories, slug, cr
 INSERT INTO category (id, client_id, name, description, sub_categories, slug, created_by, updated_by, created_at, updated_at) VALUES ('ration_inventory', 'easyfood', 'Ration/Stock', 'stock items', NULL, '_Inventory_Ration/stock', '1000', '1000', '2025-08-19 12:47:01.377214', '2025-08-19 12:47:01.377214');
 
 
+INSERT INTO category (id, client_id, name, description, sub_categories, slug, created_by, updated_by, created_at, updated_at) VALUES ('units', 'easyfood', 'Units', 'Units Selection', '{kg, g, litre, ml, pcs}', '_Units', '1000', '1000', '2025-08-19 12:47:01.377214', '2025-08-19 12:47:01.377214');
+INSERT INTO category (id, client_id, name, description, sub_categories, slug, created_by, updated_by, created_at, updated_at) VALUES ('kg', 'easyfood', 'Kg', 'Kg Selection', '{}', '_Kg', '1000', '1000', '2025-08-19 12:47:01.377214', '2025-08-19 12:47:01.377214');
+INSERT INTO category (id, client_id, name, description, sub_categories, slug, created_by, updated_by, created_at, updated_at) VALUES ('g', 'easyfood', 'Gram', 'gram Selection', '{}', '_G', '1000', '1000', '2025-08-19 12:47:01.377214', '2025-08-19 12:47:01.377214');
+INSERT INTO category (id, client_id, name, description, sub_categories, slug, created_by, updated_by, created_at, updated_at) VALUES ('litre', 'easyfood', 'Litre', 'Litre Selection', '{}', '_Litre', '1000', '1000', '2025-08-19 12:47:01.377214', '2025-08-19 12:47:01.377214');
+INSERT INTO category (id, client_id, name, description, sub_categories, slug, created_by, updated_by, created_at, updated_at) VALUES ('ml', 'easyfood', 'ML', 'Mililitre Selection', '{}', '_Ml', '1000', '1000', '2025-08-19 12:47:01.377214', '2025-08-19 12:47:01.377214');
+INSERT INTO category (id, client_id, name, description, sub_categories, slug, created_by, updated_by, created_at, updated_at) VALUES ('pcs', 'easyfood', 'Pieces', 'Pieces Selection', '{}', '_Pieces', '1000', '1000', '2025-08-19 12:47:01.377214', '2025-08-19 12:47:01.377214');
+
 INSERT INTO category (id, client_id, name, description, sub_categories, slug, created_by, updated_by, created_at, updated_at) VALUES ('counter', 'easyfood', 'Counters', 'Kitchen Counters', '{}', '_Counter', '1000', '1000', '2025-08-19 12:47:01.377214', '2025-08-19 12:47:01.377214');
 
 UPDATE category
@@ -850,3 +857,24 @@ INSERT INTO category (id, client_id, name, description, sub_categories, slug, cr
 INSERT INTO category (id, client_id, name, description, sub_categories, slug, created_by, updated_by, created_at, updated_at) VALUES ('waiter', 'easyfood', 'Waiter', 'admin', NULL, '_Roles_Waiter', '1000', '1000', '2025-08-19 12:47:01.377214', '2025-08-19 12:47:01.377214');
 INSERT INTO category (id, client_id, name, description, sub_categories, slug, created_by, updated_by, created_at, updated_at) VALUES ('receptionist', 'easyfood', 'Receptionist', 'admin', NULL, '_Roles_Receptionist', '1000', '1000', '2025-08-19 12:47:01.377214', '2025-08-19 12:47:01.377214');
 INSERT INTO category (id, client_id, name, description, sub_categories, slug, created_by, updated_by, created_at, updated_at) VALUES ('status', 'easyfood', 'Status', 'Status Selection', '{Vacant,Occupied,Reserved}', '_Status', '1000', '1000', '2025-08-19 12:47:01.377214', '2025-08-19 12:47:01.377214');
+
+
+CREATE TABLE IF NOT EXISTS inventory_transactions (
+    id               BIGSERIAL PRIMARY KEY,
+    transaction_id   TEXT,
+    client_id        TEXT        NOT NULL,
+    stock_item_id    BIGINT      NOT NULL,
+    inventory_id     TEXT,
+    name             TEXT,
+    transaction_type TEXT        NOT NULL,
+    movement_type    TEXT        NOT NULL,
+    quantity         NUMERIC(18,6) NOT NULL,
+	unit             TEXT,
+    before_stock     NUMERIC(18,6) NOT NULL,
+    after_stock      NUMERIC(18,6) NOT NULL,
+    reference_id     TEXT,
+    reference_type   TEXT,
+    created_by       TEXT,
+    created_at       TIMESTAMP   DEFAULT NOW(),
+    remarks          TEXT
+);
