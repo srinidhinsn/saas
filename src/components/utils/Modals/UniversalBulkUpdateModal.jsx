@@ -871,7 +871,7 @@ const UniversalBulkUpdateModal = ({
   modalType, // 'menu' or 'table'
   clientId,
   token,
-
+  menuItems,
   // Menu-specific props (Bulk Update)
   filteredItems,
   selectedRows,
@@ -1164,42 +1164,10 @@ const UniversalBulkUpdateModal = ({
                   </p>
                 </div>
               </div>
-              <div className="px-6 py-3 bg-bg-primary">
-              <label className="block text-sm font-semibold mb-2 text-gray-700">
-                Apply Zone & Section
-              </label>
-
-              <select
-                className="px-3 py-2 border rounded-md text-sm outline-none"
-                onChange={(e) => {
-                  const value = Number(e.target.value);
-                  if (!value) return;
-
-                  const updated = { ...bulkEditData };
-
-                  selectedRows.forEach(id => {
-                    updated[id] = {
-                      ...(updated[id] || {}),
-                      zone_config_id: value
-                    };
-                  });
-
-                  setBulkEditData(updated);
-                }}
-              >
-                <option value="">Select Zone</option>
-
-                {configs.map(c => (
-                  <option key={c.id} value={c.id}>
-                    {c.zone} - {c.section}
-                  </option>
-                ))}
-              </select>
             </div>
-            </div>
-        
+
             {/* Action Bar */}
-            <div className="flex justify-between items-center gap-4 px-6 py-3 border-b border-gray-200 bg-gray-50">
+            <div className="flex flex-col sm:flex-row sm:justify-between sm:items-center gap-3 px-4 sm:px-6 py-3 border-b border-gray-200 bg-gray-50 shrink-0">
               <div className="flex items-center gap-4">
                 <label className="flex items-center gap-2 cursor-pointer">
                   <input
@@ -1215,11 +1183,11 @@ const UniversalBulkUpdateModal = ({
                 </span>
               </div>
 
-              <div className="flex gap-3">
+              <div className="flex gap-2 w-full sm:w-auto">
                 <button
                   onClick={handleBulkUpdate}
                   disabled={selectedRows.length === 0}
-                  className="flex items-center gap-2 px-4 py-2 rounded-md bg-blue-600 text-white hover:bg-blue-700 transition-colors disabled:bg-gray-300 disabled:cursor-not-allowed font-medium text-sm"
+                  className="flex-1 sm:flex-none flex items-center justify-center gap-2 px-4 py-2 rounded-lg bg-blue-600 text-white hover:bg-blue-700 transition-colors disabled:bg-gray-300 disabled:cursor-not-allowed font-medium text-sm"
                 >
                   <Edit className="w-4 h-4" />
                   Update Selected
@@ -1227,17 +1195,18 @@ const UniversalBulkUpdateModal = ({
                 <button
                   onClick={handleBulkDelete}
                   disabled={selectedRows.length === 0}
-                  className="flex items-center gap-2 px-4 py-2 rounded-md bg-red-600 text-white hover:bg-red-700 transition-colors disabled:bg-gray-300 disabled:cursor-not-allowed font-medium text-sm"
+                  className="flex-1 sm:flex-none flex items-center justify-center gap-2 px-4 py-2 rounded-lg bg-red-600 text-white hover:bg-red-700 transition-colors disabled:bg-gray-300 disabled:cursor-not-allowed font-medium text-sm"
                 >
                   <Trash2 className="w-4 h-4" />
-                  Delete Selected
+                  Delete
                 </button>
               </div>
             </div>
 
             {/* Table Container */}
             <div className="flex-1 overflow-auto px-4 py-4">
-              <div className="min-w-[1000px]">
+              {/* Desktop table */}
+              <div className="hidden md:block min-w-[900px]">
                 <table className="w-full border-collapse">
                   <thead className="sticky top-0 bg-white z-10">
                     <tr className="border-b border-gray-200">
@@ -1256,7 +1225,7 @@ const UniversalBulkUpdateModal = ({
                       <th className="px-4 py-3 text-left text-sm font-semibold text-gray-700 bg-gray-50">Code</th>
                       <th className="px-4 py-3 text-left text-sm font-semibold text-gray-700 bg-gray-50">Add-ons</th>
                       <th className="px-4 py-3 text-left text-sm font-semibold text-gray-700 bg-gray-50">
-                        Zone
+                        Zone Prices
                       </th>
                     </tr>
                   </thead>
@@ -1339,13 +1308,57 @@ const UniversalBulkUpdateModal = ({
                                 step="0.01"
                                 value={editData.discount !== undefined ? editData.discount : item.discount}
                                 onChange={(e) => updateBulkEditData(item.id, 'discount', e.target.value)}
-                                className="w-full px-3 py-2 rounded-md border border-gray-300 text-sm focus:outline-none focus:ring-2 focus:ring-blue-500 focus:border-transparent"
+                                className="w-full px-3 py-2 rounded-md border border-gray-300 text-sm focus:outline-none focus:ring-2 focus:ring-blue-500"
                                 placeholder="0.00"
                               />
                             ) : (
                               <span className="text-sm text-gray-900">
                                 ₹{typeof item.discount === 'number' ? item.discount.toFixed(2) : (item.discount || 0)}
                               </span>
+                            )}
+                          </td>
+                          <td className="px-4 py-3 min-w-[200px]">
+                            {isSelected ? (
+                              <div className="space-y-1.5">
+                                {configs.map(c => (
+                                  <div key={c.id} className="flex items-center gap-2">
+                                    <span className="text-xs text-gray-600 font-medium w-24 truncate shrink-0">
+                                      {c.section}-{c.zone}
+                                    </span>
+                                    <span className="text-xs text-gray-400">₹</span>
+                                    <input
+                                      type="number"
+                                      min="0"
+                                      placeholder={item.unit_price || "0.00"}
+                                      value={editData.zonePrices?.[c.id] ?? ''}
+                                      onChange={e => updateBulkEditData(item.id, 'zonePrices', {
+                                        ...(editData.zonePrices || {}),
+                                        [c.id]: e.target.value
+                                      })}
+                                      className="w-20 px-2 py-1 border border-gray-200 rounded-lg text-xs text-right focus:outline-none focus:ring-2 focus:ring-blue-400 bg-white"
+                                    />
+                                  </div>
+                                ))}
+                              </div>
+                            ) : (
+                              <div className="space-y-0.5">
+                                {(() => {
+                                  if (!menuItems) return <span className="text-xs text-gray-400">-</span>;
+                                  const siblings = menuItems.filter(
+                                    m => (m.name || '').trim().toLowerCase() === (item.name || '').trim().toLowerCase()
+                                      && m.zone_config_id !== null
+                                  );
+                                  if (!siblings.length) return <span className="text-xs text-gray-400">-</span>;
+                                  return siblings.map(s => {
+                                    const c = configs.find(x => x.id === s.zone_config_id);
+                                    return c ? (
+                                      <div key={s.id} className="text-[11px] text-gray-500">
+                                        <span className="font-medium text-blue-600">{c.section}-{c.zone}</span>: ₹{s.unit_price}
+                                      </div>
+                                    ) : null;
+                                  });
+                                })()}
+                              </div>
                             )}
                           </td>
                           <td className="px-4 py-3">
@@ -1390,41 +1403,139 @@ const UniversalBulkUpdateModal = ({
                               </span>
                             )}
                           </td>
-                          <td className="px-4 py-3">
-                            {isSelected ? (
-                              <select
-                                value={
-                                  editData.zone_config_id !== undefined
-                                    ? editData.zone_config_id
-                                    : item.zone_config_id || ""
-                                }
-                                onChange={(e) =>
-                                  updateBulkEditData(item.id, "zone_config_id", Number(e.target.value))
-                                }
-                                className="w-full px-2 py-1 border rounded text-sm"
-                              >
-                                <option value="">Select</option>
 
-                                {configs.map(c => (
-                                  <option key={c.id} value={c.id}>
-                                    {c.zone} - {c.section}
-                                  </option>
-                                ))}
-                              </select>
-                            ) : (
-                              <span className="text-sm text-gray-900">
-                                {(() => {
-                                  const c = configs.find(x => x.id === item.zone_config_id);
-                                  return c ? `${c.zone} - ${c.section}` : "-";
-                                })()}
-                              </span>
-                            )}
-                          </td>
                         </tr>
                       );
                     })}
                   </tbody>
                 </table>
+                <div className="md:hidden space-y-3">
+                  {filteredItems.map((item) => {
+                    const isSelected = selectedRows.includes(item.id);
+                    const editData = bulkEditData[item.id] || {};
+                    const currentAddons = editData.line_item_id !== undefined
+                      ? editData.line_item_id
+                      : Array.isArray(item.line_item_id) ? item.line_item_id : [];
+                    const siblings = menuItems?.filter(
+                      m => (m.name || '').trim().toLowerCase() === (item.name || '').trim().toLowerCase()
+                        && m.zone_config_id !== null
+                    ) || [];
+
+                    return (
+                      <div key={item.id}
+                        className={`rounded-xl border-2 overflow-hidden transition-all ${isSelected ? 'border-blue-400 bg-blue-50/40' : 'border-gray-200 bg-white'
+                          }`}
+                      >
+                        {/* Card header row */}
+                        <div className="flex items-center gap-3 px-3 py-3">
+                          <input type="checkbox" checked={isSelected}
+                            onChange={() => toggleRowSelection(item.id)}
+                            className="w-4 h-4 text-blue-600 border-gray-300 rounded" />
+                          <div className="flex-1 min-w-0">
+                            <p className="font-semibold text-gray-900 text-sm truncate">{item.name}</p>
+                            <p className="text-xs text-gray-400 truncate">{item.description || '—'}</p>
+                          </div>
+                          <span className="text-sm font-bold text-blue-600">₹{item.unit_price}</span>
+                        </div>
+
+                        {/* Existing zone prices (unselected) */}
+                        {!isSelected && siblings.length > 0 && (
+                          <div className="px-3 pb-2 flex flex-wrap gap-1.5">
+                            {siblings.map(s => {
+                              const c = configs.find(x => x.id === s.zone_config_id);
+                              return c ? (
+                                <span key={s.id} className="text-[11px] bg-blue-100 text-blue-700 px-2 py-0.5 rounded-full">
+                                  {c.section}-{c.zone}: ₹{s.unit_price}
+                                </span>
+                              ) : null;
+                            })}
+                          </div>
+                        )}
+
+                        {/* Edit fields (selected) */}
+                        {isSelected && (
+                          <div className="px-3 pb-3 space-y-3 border-t border-blue-100 pt-3">
+                            {/* Name */}
+                            <div>
+                              <label className="text-[11px] font-semibold text-gray-500 uppercase tracking-wide">Name</label>
+                              <input type="text"
+                                value={editData.name !== undefined ? editData.name : item.name}
+                                onChange={e => updateBulkEditData(item.id, 'name', e.target.value)}
+                                className="mt-1 w-full px-3 py-2 border border-gray-300 rounded-lg text-sm focus:outline-none focus:ring-2 focus:ring-blue-400"
+                              />
+                            </div>
+
+                            {/* Base Price + Discount */}
+                            <div className="grid grid-cols-2 gap-2">
+                              <div>
+                                <label className="text-[11px] font-semibold text-gray-500 uppercase tracking-wide">Base Price</label>
+                                <input type="number" step="0.01"
+                                  value={editData.unit_price !== undefined ? editData.unit_price : item.unit_price}
+                                  onChange={e => updateBulkEditData(item.id, 'unit_price', e.target.value)}
+                                  className="mt-1 w-full px-3 py-2 border border-gray-300 rounded-lg text-sm focus:outline-none focus:ring-2 focus:ring-blue-400"
+                                  placeholder="0.00"
+                                />
+                              </div>
+                              <div>
+                                <label className="text-[11px] font-semibold text-gray-500 uppercase tracking-wide">Discount</label>
+                                <input type="number" step="0.01"
+                                  value={editData.discount !== undefined ? editData.discount : item.discount}
+                                  onChange={e => updateBulkEditData(item.id, 'discount', e.target.value)}
+                                  className="mt-1 w-full px-3 py-2 border border-gray-300 rounded-lg text-sm focus:outline-none focus:ring-2 focus:ring-blue-400"
+                                  placeholder="0.00"
+                                />
+                              </div>
+                            </div>
+
+                            {/* Code */}
+                            <div>
+                              <label className="text-[11px] font-semibold text-gray-500 uppercase tracking-wide">Code</label>
+                              <input type="text"
+                                value={editData.code !== undefined ? editData.code : item.code ?? ''}
+                                onChange={e => updateBulkEditData(item.id, 'code', e.target.value)}
+                                className="mt-1 w-full px-3 py-2 border border-gray-300 rounded-lg text-sm focus:outline-none focus:ring-2 focus:ring-blue-400"
+                                placeholder="Item code"
+                              />
+                            </div>
+
+                            {/* Zone Prices */}
+                            {configs.length > 0 && (
+                              <div>
+                                <label className="text-[11px] font-semibold text-gray-500 uppercase tracking-wide block mb-1.5">Zone Prices</label>
+                                <div className="space-y-2">
+                                  {configs.map(c => (
+                                    <div key={c.id} className="flex items-center gap-2 bg-white border border-gray-200 rounded-lg px-3 py-1.5">
+                                      <span className="text-xs font-medium text-blue-700 flex-1">{c.section} — {c.zone}</span>
+                                      <span className="text-xs text-gray-400">₹</span>
+                                      <input type="number" min="0"
+                                        placeholder={item.unit_price || "0.00"}
+                                        value={editData.zonePrices?.[c.id] ?? ''}
+                                        onChange={e => updateBulkEditData(item.id, 'zonePrices', {
+                                          ...(editData.zonePrices || {}), [c.id]: e.target.value
+                                        })}
+                                        className="w-20 px-2 py-1 border border-gray-200 rounded-lg text-sm text-right focus:outline-none focus:ring-2 focus:ring-blue-400"
+                                      />
+                                    </div>
+                                  ))}
+                                </div>
+                              </div>
+                            )}
+
+                            {/* Add-ons */}
+                            <div>
+                              <label className="text-[11px] font-semibold text-gray-500 uppercase tracking-wide block mb-1.5">Add-ons</label>
+                              <button type="button" onClick={() => openItemAddonPopup(item.id)}
+                                className="w-full px-3 py-2 rounded-lg bg-gray-50 border-2 border-dashed border-gray-300 text-gray-600 hover:border-blue-400 hover:bg-blue-50 transition-all text-sm font-medium flex items-center justify-center gap-2">
+                                <Plus size={14} />
+                                {currentAddons.length > 0 ? `${currentAddons.length} add-on(s) selected` : 'Select Add-ons'}
+                              </button>
+                            </div>
+                          </div>
+                        )}
+                      </div>
+                    );
+                  })}
+                </div>
 
                 {filteredItems.length === 0 && (
                   <div className="text-center py-16 mt-4">

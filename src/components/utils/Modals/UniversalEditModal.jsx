@@ -778,34 +778,6 @@ const UniversalEditModal = ({
                   </select>
                 </div>
 
-                {/* Inventory ID Dropdown */}
-                <div>
-                  <label className="block text-sm font-medium mb-1 text-gray-700">
-                    Inventory ID <span className="text-red-600">*</span>
-                  </label>
-
-                  <select
-                    value={editingItem.inventory_id || ""}
-                    onChange={(e) =>
-                      setEditingItem({
-                        ...editingItem,
-                        inventory_id: e.target.value
-                      })
-                    }
-                    className="w-full px-3 py-2 rounded-md border border-gray-300 text-gray-900
-                 focus:outline-none focus:ring-2 focus:ring-action-primary"
-                    required
-                  >
-                    <option value="">Select Inventory ID</option>
-
-                    {(inventoryIds || []).map((inv) => (
-                      <option key={inv.id} value={inv.id}>
-                        {inv.inventory_id} - {inv.name}
-                      </option>
-                    ))}
-                  </select>
-                </div>
-
                 {/* Item Name */}
                 <div>
                   <label className="block text-sm font-medium mb-1 text-gray-700">
@@ -830,33 +802,12 @@ const UniversalEditModal = ({
                     rows="3"
                   />
                 </div>
-                <div className="">
-                  <label className="block text-sm font-medium mb-2 text-text-primary">
-                    Zone & Section *
-                  </label>
-                  <select
-                   value={editingItem.zone_config_id || ""}
-                   onChange={(e) =>
-                     setEditingItem({
-                       ...editingItem,
-                       zone_config_id: e.target.value
-                     })
-                   }
-                    className="w-full px-4 py-2 rounded-lg bg-bg-tertiary border border-border-default"
-                  >
-                    <option value="">Base Price</option>
-                    {configs.map(c => (
-                      <option key={c.id} value={c.id}>
-                        {c.section} - {c.zone}
-                      </option>
-                    ))}
-                  </select>
-                </div>
+
                 {/* Unit Price & Discount */}
                 <div className="grid grid-cols-2 gap-4">
                   <div>
                     <label className="block text-sm font-medium mb-1 text-gray-700">
-                      Unit Price <span className="text-red-600">*</span>
+                      Base Price (All Zones) <span className="text-red-600">*</span>
                     </label>
                     <input
                       type="number"
@@ -877,7 +828,40 @@ const UniversalEditModal = ({
                     />
                   </div>
                 </div>
-
+                {/* Zone-wise pricing */}
+                {configs.length > 0 && (
+                  <div>
+                    <label className="block text-sm font-medium mb-1 text-gray-700">
+                      Zone-wise Pricing
+                    </label>
+                    {configs.map(c => (
+                      <div
+                        key={c.id}
+                        className="flex items-center justify-between gap-3 px-3 py-2 mb-1 rounded-xl border border-gray-200 bg-gray-50"
+                      >
+                        <span className="text-sm font-medium text-gray-700">
+                          <span className="font-semibold text-blue-600">{c.section}</span>
+                          <span className="text-gray-400 mx-1">—</span>
+                          <span>{c.zone}</span>
+                        </span>
+                        <div className="flex items-center gap-1">
+                          <span className="text-xs text-gray-400">₹</span>
+                          <input
+                            type="number"
+                            min="0"
+                            placeholder={editingItem?.unit_price || "base price"}
+                            value={editingItem?.zonePrices?.[c.id] ?? ''}
+                            onChange={e => setEditingItem(prev => ({
+                              ...prev,
+                              zonePrices: { ...(prev.zonePrices || {}), [c.id]: e.target.value }
+                            }))}
+                            className="w-24 px-2 py-1 rounded-lg border border-gray-300 bg-white text-sm text-right focus:outline-none focus:ring-2 focus:ring-blue-500"
+                          />
+                        </div>
+                      </div>
+                    ))}
+                  </div>
+                )}
                 {/* Code & Unit */}
                 <div className="grid grid-cols-2 gap-4">
                   <div>
@@ -889,7 +873,8 @@ const UniversalEditModal = ({
                       value={editingItem.code ?? ''}
                       onChange={(e) =>
                         setEditingItem({
-                          ...editingItem,
+                          ...editingItem, 
+                          inventory_id: baseRecord.inventory_id || 'menu',
                           code: e.target.value
                         })
                       }

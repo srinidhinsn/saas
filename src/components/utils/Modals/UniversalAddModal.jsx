@@ -1344,21 +1344,21 @@ const UniversalAddModal = ({
   // Memoize helpers so they're stable across renders (prevents unnecessary effect runs)
   const flattenCategories = useCallback((items = [], level = 0) => {
     let result = [];
-  
+
     items.forEach(item => {
       if (!item) return;
-  
+
       const children = item.children || item.subCategories || [];
-  
+
       if (item.id !== 'all') {
         result.push({ ...item, level });
-  
+
         if (children.length) {
           result = result.concat(flattenCategories(children, level + 1));
         }
       }
     });
-  
+
     return result;
   }, []);
 
@@ -1449,7 +1449,7 @@ const UniversalAddModal = ({
         code: '',
         unit: '',
         line_item_id: [],
-        inventory_id: ''
+        inventory_id: 'menu'
       });
 
       setNewItemImage?.(null);
@@ -1501,32 +1501,7 @@ const UniversalAddModal = ({
                 </select>
               </div>
 
-              {/* Inventory Selector */}
-              <div>
-                <label className="block text-sm font-medium mb-2 text-text-primary">
-                  Inventory Category *
-                </label>
-
-                <select
-                  value={newItem?.inventory_id ?? ""}
-                  onChange={(e) =>
-                    setNewItem((prev) => ({
-                      ...(prev || {}),
-                      inventory_id: e.target.value
-                    }))
-                  }
-                  className="w-full px-4 py-2 rounded-lg bg-bg-tertiary border border-border-default text-text-primary focus:outline-none focus:ring-2 focus:ring-action-primary"
-                  required
-                >
-                  <option value="">Select Inventory</option>
-
-                  {(inventoryIds || []).map((inv) => (
-                    <option key={inv.id} value={inv.id}>
-                      {inv.name}
-                    </option>
-                  ))}
-                </select>
-              </div>
+            
 
               {/* Item Name */}
               <div>
@@ -1552,30 +1527,7 @@ const UniversalAddModal = ({
                   rows="3"
                 />
               </div>
-              <div>
-                <label className="block text-sm font-medium mb-2 text-text-primary">
-                  Zone & Section *
-                </label>
-
-                <select
-                  value={newItem?.zone_config_id || ""}
-                  onChange={(e) =>
-                    setNewItem(prev => ({
-                      ...prev,
-                      zone_config_id: Number(e.target.value) || null
-                    }))
-                  }
-                  className="w-full px-4 py-2 rounded-lg bg-bg-tertiary border border-border-default"
-                >
-                  <option value="">Base Price (All Zones)</option>
-
-                  {configs.map((c) => (
-                    <option key={c.id} value={c.id}>
-                      {c.section} - {c.zone}
-                    </option>
-                  ))}
-                </select>
-              </div>
+             
               {/* Unit Price & Discount */}
               <div className="grid grid-cols-2 gap-4">
                 <div>
@@ -1601,7 +1553,40 @@ const UniversalAddModal = ({
                   />
                 </div>
               </div>
+              <div>
+                <label className="block text-sm font-medium mb-2 text-text-primary">
+                  Pricing by Zone & Section
+                </label>
+                <p className="text-xs text-gray-400 mb-2">
+                  Leave blank to skip. Filled prices create separate zone records.
+                </p>
 
+                {/* Base price row — already exists above, just keep it */}
+
+                {configs.map(c => (
+                  <div key={c.id} className="flex items-center justify-between gap-3 px-3 py-2 mb-1 rounded-xl border border-border-default bg-bg-tertiary">
+                    <span className="text-sm font-medium text-text-primary">
+                      <span className="font-semibold text-blue-600">{c.section}</span>
+                      <span className="text-gray-400 mx-1">—</span>
+                      <span>{c.zone}</span>
+                    </span>
+                    <div className="flex items-center gap-1">
+                      <span className="text-xs text-gray-400">₹</span>
+                      <input
+                        type="number"
+                        min="0"
+                        placeholder={newItem?.unit_price || "0.00"}
+                        value={newItem?.zonePrices?.[c.id] ?? ''}
+                        onChange={e => setNewItem(prev => ({
+                          ...prev,
+                          zonePrices: { ...(prev.zonePrices || {}), [c.id]: e.target.value }
+                        }))}
+                        className="w-24 px-2 py-1 rounded-lg border border-border-default bg-bg-primary text-sm text-right focus:outline-none focus:ring-2 focus:ring-action-primary"
+                      />
+                    </div>
+                  </div>
+                ))}
+              </div>
               {/* Code & Unit */}
               <div className="grid grid-cols-2 gap-4">
 
