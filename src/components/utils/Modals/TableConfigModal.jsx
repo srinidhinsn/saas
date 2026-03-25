@@ -5,13 +5,6 @@ import { FaTimes, FaPlus } from "react-icons/fa";
 const BASE_URL = import.meta.env.VITE_API_TABLE_SERVICE_URL;
 const INV_URL  = import.meta.env.VITE_API_INVENTORY_SERVICE_URL;
 
-/* ─────────────────────────────────────────────────────────────────
-   normalize: trim → split on space/underscore → Title Case → join
-   "first floor"  → "First Floor"
-   "first_floor"  → "First Floor"
-   "GROUND"       → "Ground"
-   "non_AC_zone"  → "Non Ac Zone"
-───────────────────────────────────────────────────────────────────*/
 const normalize = (str = "") =>
     str
         .trim()
@@ -20,12 +13,8 @@ const normalize = (str = "") =>
         .map(w => w.charAt(0).toUpperCase() + w.slice(1).toLowerCase())
         .join(" ");
 
-/* case/space/underscore-insensitive equality */
 const isSame = (a, b) => normalize(a) === normalize(b);
 
-/* ─────────────────────────────────────────────
-   Popup
-───────────────────────────────────────────── */
 const Popup = ({ popup, closePopup }) => {
     if (!popup.show) return null;
     const color =
@@ -346,7 +335,7 @@ const TableConfigModal = ({ show, onClose, clientId, token, refresh }) => {
                                         disabled={noSections}
                                     >
                                         <option value="">-- Select Section --</option>
-                                        {sectionOptions.map(s => <option key={s} value={s}>{s}</option>)}
+                                        {sectionOptions.map(s => <option key={s} value={s}>{s.toUpperCase()}</option>)}
                                     </select>
                                 </div>
 
@@ -359,7 +348,7 @@ const TableConfigModal = ({ show, onClose, clientId, token, refresh }) => {
                                         disabled={noZones}
                                     >
                                         <option value="">-- Select Zone --</option>
-                                        {zoneOptions.map(z => <option key={z} value={z}>{z}</option>)}
+                                        {zoneOptions.map(z => <option key={z} value={z}>{z.toUpperCase()}</option>)}
                                     </select>
                                 </div>
 
@@ -391,9 +380,9 @@ const TableConfigModal = ({ show, onClose, clientId, token, refresh }) => {
                                         <div key={c.id}
                                             className="flex items-center gap-2 bg-gray-100 border border-gray-200 px-3 py-1.5 rounded-full text-sm"
                                         >
-                                            <span className="font-medium">{c.section}</span>
+                                            <span className="font-medium">{c.section.toUpperCase()}</span>
                                             <span className="text-gray-400">×</span>
-                                            <span>{c.zone}</span>
+                                            <span>{c.zone.toUpperCase()}</span>
                                             <button
                                                 onClick={() => deleteConfig(c)}
                                                 className="text-red-400 hover:text-red-600 transition ml-1"
