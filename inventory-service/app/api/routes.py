@@ -121,7 +121,43 @@ def update_inventory(
     db.refresh(record)
     return ResponseModel(screen_id=context.screen_id,status="success",message="Inventory updated",data=InventoryEntity.copyToModel(record))
 
+@router.post("/delete", response_model=ResponseModel[Inventory])
+def delete_inventory(client_id: str, item: Inventory, context: SaasContext = Depends(verify_token), db: Session = Depends(get_db)):
+    zone_id = item.zone_config_id if item.zone_config_id is not None else 0
+    record = db.query(InventoryEntity).filter(
+        InventoryEntity.id == item.id,
+        InventoryEntity.zone_config_id == zone_id,
+        InventoryEntity.client_id == client_id
+    ).first()
 
+    if not record:
+        raise HTTPException(status_code=404, detail="Inventory item not found")
+
+    model = InventoryEntity.copyToModel(record)
+    db.delete(record)
+    db.commit()
+
+    return ResponseModel[Inventory](screen_id=context.screen_id,status="success",message="Inventory item deleted",data=model)
+
+@router.delete("/delete_all", response_model=ResponseModel[str])
+def delete_all_inventory( client_id: str, context: SaasContext = Depends(verify_token), db: Session = Depends(get_db)):
+    records = db.query(InventoryEntity).filter(
+        InventoryEntity.client_id == client_id
+    ).all()
+
+    if not records:
+        return ResponseModel[str](
+            screen_id=context.screen_id,
+            status="success",
+            message="No inventory items found — nothing to delete",
+            data="No records to delete"
+        )
+
+    for record in records:
+        db.delete(record)
+    db.commit()
+
+    return ResponseModel[str]( screen_id=context.screen_id, status="success", message="All inventory items deleted", data="All inventory items deleted successfully")
 # -------------------- CATEGORY ROUTES --------------------
 
 @router.get("/read_category", response_model=ResponseModel)
