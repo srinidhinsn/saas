@@ -43,70 +43,83 @@ def read_inventory(
 
 @router.post("/create", response_model=ResponseModel[Inventory])
 def create_inventory(item: Inventory, client_id: str, context: SaasContext = Depends(verify_token), db: Session = Depends(get_db)):
-    db_item = InventoryEntity(**item.dict())
+    payload = item.dict()
+    payload["client_id"] = client_id
+
+    if not payload.get("id"):
+        result = db.execute(text("SELECT nextval('inventory_id_seq')"))
+        payload["id"] = result.scalar()
+    zone_id = payload.get("zone_config_id")
+    if zone_id in [None, "", "null"] or str(zone_id) == "nan":
+        payload["zone_config_id"] = 0
+
+    db_item = InventoryEntity(**payload)
     db.add(db_item)
     db.commit()
-    db.refresh(db_item)
-    model = InventoryEntity.copyToModel(db_item)
-    return ResponseModel[Inventory](screen_id=context.screen_id, status="success", message="Inventory item created", data=model)
+
+    saved = db.query(InventoryEntity).filter(
+        InventoryEntity.id == db_item.id,
+        InventoryEntity.zone_config_id == db_item.zone_config_id,
+        InventoryEntity.client_id == client_id
+    ).first()
+
+    model = InventoryEntity.copyToModel(saved)
+    return ResponseModel[Inventory](screen_id=context.screen_id,status="success",message="Inventory item created",data=model)
 
 @router.post("/update", response_model=ResponseModel[Inventory])
-def update_inventory(client_id: str, updates: Inventory, context: SaasContext = Depends(verify_token), db: Session = Depends(get_db)):
+def update_inventory(
+    client_id: str,
+    updates: Inventory,
+    context: SaasContext = Depends(verify_token),
+    db: Session = Depends(get_db)
+):
     if not updates.id:
         raise HTTPException(status_code=400, detail="Missing item ID")
-    
-    record = db.query(InventoryEntity).filter(
-        InventoryEntity.id == updates.id, 
-        InventoryEntity.client_id == client_id
-    ).first()
-    
-    if not record:
-        raise HTTPException(status_code=404, detail="Inventory item not found")
-    
-    for key, value in updates.dict(exclude_unset=True).items():
-        setattr(record, key, value)
-    
-    db.commit()
-    db.refresh(record)
-    model = InventoryEntity.copyToModel(record)
-    
-    return ResponseModel[Inventory](screen_id=context.screen_id, status="success", message="Inventory item updated", data=model)
 
-@router.post("/delete", response_model=ResponseModel[Inventory])
-def delete_inventory(client_id: str, item: Inventory, context: SaasContext = Depends(verify_token), db: Session = Depends(get_db)):
-    record = db.query(InventoryEntity).filter(
-        InventoryEntity.id == item.id, 
-        InventoryEntity.client_id == client_id
-    ).first()
-    
-    if not record:
-        raise HTTPException(status_code=404, detail="Inventory item not found")
-    
-    db.delete(record)
-    db.commit()
-    model = InventoryEntity.copyToModel(record)
-    
-    return ResponseModel[Inventory](screen_id=context.screen_id, status="success", message="Inventory item deleted", data=model)
+    payload = updates.dict(exclude_unset=True)
+    payload["client_id"] = client_id
 
-@router.delete("/delete_all", response_model=ResponseModel[str])
-def delete_all_inventory( client_id: str, context: SaasContext = Depends(verify_token), db: Session = Depends(get_db)):
-    records = db.query(InventoryEntity).filter(
-        InventoryEntity.client_id == client_id
-    ).all()
+    zone_id = payload.get("zone_config_id")
+    if zone_id in [None, "", "null"] or str(zone_id) == "nan":
+        zone_id = 0
+    else:
+        zone_id = int(zone_id)
 
-    if not records:
-        return ResponseModel[str](
+    payload["zone_config_id"] = zone_id
+    if "image_id" in payload and payload["image_id"]:
+        records = db.query(InventoryEntity).filter(
+            InventoryEntity.id == updates.id,
+            InventoryEntity.client_id == client_id
+        ).all()
+
+        for record in records:
+            record.image_id = payload["image_id"]
+
+        db.commit()
+
+        return ResponseModel(
             screen_id=context.screen_id,
             status="success",
-            message="No inventory items found — nothing to delete",
-            data="No records to delete"
+            message="Image updated for all zones",
+            data=InventoryEntity.copyToModel(records[0])
         )
 
-    for record in records:
-        db.delete(record)
-    db.commit()
+    record = db.query(InventoryEntity).filter(
+        InventoryEntity.id == updates.id,
+        InventoryEntity.zone_config_id == zone_id,
+        InventoryEntity.client_id == client_id
+    ).first()
 
-    return ResponseModel[str]( screen_id=context.screen_id, status="success", message="All inventory items deleted", data="All inventory items deleted successfully")
+    if record:
+        for key, value in payload.items():
+            setattr(record, key, value)
+    else:
+        record = InventoryEntity(**payload)
+        db.add(record)
+
+    db.commit()
+    db.refresh(record)
+    return ResponseModel(screen_id=context.screen_id,status="success",message="Inventory updated",data=InventoryEntity.copyToModel(record))
 
 
 # -------------------- CATEGORY ROUTES --------------------
