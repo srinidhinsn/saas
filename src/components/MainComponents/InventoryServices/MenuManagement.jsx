@@ -353,18 +353,23 @@ const MenuManagement = ({ clientId, token, realm }) => {
     fetchUnits();
   }, [fetchUnits]);
 
-  // This is used internally for lookups — should return id
   const getCategoryIdByName = (categoryName) => {
-    if (!categoryName || categoryName === 'All Categories' || categoryName === 'All') return null;
-    return categoriesFlat.find(c => c.name.toLowerCase() === categoryName.trim().toLowerCase())?.id ?? null;
+    if (!categoryName) return null;
+  
+    return categoriesFlat.find(
+      c => c.name.toLowerCase() === categoryName.toLowerCase()
+    )?.id || null;
   };
-
-  // Separate helper used only at save time to get name for storage
+  
   const getCategoryNameById = (categoryId) => {
     if (!categoryId) return null;
-    return categoriesFlat.find(c => c.id === categoryId)?.name ?? null;
+  
+    const found = categoriesFlat.find(
+      c => c.id === categoryId || c.name === categoryId
+    );
+  
+    return found?.name || categoryId;
   };
-
   // Uses inventoryCategoryRoot from config — not hardcoded "inventory"
   const fetchInventoryIds = useCallback(async () => {
     if (!menuConfig) return;
@@ -404,8 +409,16 @@ const MenuManagement = ({ clientId, token, realm }) => {
       let imageId = null;
       if (newItemImage) imageId = await uploadImageToDocumentService(newItemImage);
 
-      const selectedCat = categoriesFlat.find(c => c.id === newItem?.category_id);
-      const finalCategoryId = selectedCat?.name || newItem?.category_id || null;
+      const selectedCat = categoriesFlat.find(
+        c => c.id === newItem?.category_id
+      );
+      
+      const finalCategoryId =
+        selectedCat?.name ||
+        categoriesFlat.find(
+          c => c.name.toLowerCase() === (newItem?.category_id || '').toLowerCase()
+        )?.name ||
+        newItem?.category_id;
       if (!finalCategoryId) return;
 
       const slug = generateSlug(finalCategoryId, newItem.name);
@@ -471,9 +484,16 @@ const MenuManagement = ({ clientId, token, realm }) => {
       let imageId = editingItem.image_id;
       if (editItemImage) imageId = await uploadImageToDocumentService(editItemImage);
 
-      // ✅ Resolve category id → name for storage
-      const selectedCat = categoriesFlat.find(c => c.id === editingItem?.category_id);
-      const finalCategoryId = selectedCat?.name || editingItem?.category_id || null;
+      const selectedCat = categoriesFlat.find(
+        c => c.id === newItem?.category_id
+      );
+      
+      const finalCategoryId =
+        selectedCat?.name ||
+        categoriesFlat.find(
+          c => c.name.toLowerCase() === (newItem?.category_id || '').toLowerCase()
+        )?.name ||
+        newItem?.category_id;
 
       const slug = generateSlug(editingItem.category_id, editingItem.name); // use id for slug generation
       const { dietary_type, zonePrices: zp, ...cleanEditingItem } = editingItem;
@@ -590,7 +610,11 @@ const MenuManagement = ({ clientId, token, realm }) => {
       setCategoriesFlat(normalizedFlat);
 
       const enrichedItems = (itemRes.data.data || []).map(item => {
-        const cat = flatCategories.find(c => c.id === item.category_id);
+        const cat = flatCategories.find(
+          c =>
+            c.id === item.category_id ||
+            c.name.toLowerCase() === (item.category_id || '').toLowerCase()
+        );
         return { ...item, category: cat?.name ?? "Uncategorized" };
       });
       setMenuItems(enrichedItems);
