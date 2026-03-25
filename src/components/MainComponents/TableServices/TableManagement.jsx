@@ -1806,13 +1806,13 @@ const TableManagement = ({ clientId, token, screenIds, userId }) => {
                                     <div className="px-3 py-3 text-sm text-text-primary flex justify-between">
                                         <div className="">
                                             <div className="text-xs text-text-secondary mt-1"><div className="font-medium">
-                                                {config?.zone || "-"}
+                                                {config?.zone.toUpperCase() || "-"}
                                             </div>
 
                                                 Seats: <span className="font-bold">{table.table_type}</span>
                                             </div>
                                         </div><span className="text-md font-semibold">
-                                            {config?.section || "-"}
+                                            {config?.section.toUpperCase() || "-"}
                                         </span>
                                         {/* <div className="">
                                             <span className="text-md font-semibold">{table.section}</span>
