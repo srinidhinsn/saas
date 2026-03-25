@@ -1,7 +1,7 @@
 from sqlalchemy import Column, Integer, BigInteger, Text, DateTime, Float, func, ARRAY, Numeric
 from sqlalchemy.dialects.postgresql import JSONB
 from database.base import Base
-from models.inventory_model import Inventory, Category
+from models.inventory_model import Inventory, Category, InventoryTransaction
 from typing import List
 
 
@@ -20,7 +20,7 @@ class InventoryEntity(Base):
     realm = Column(Text, nullable=True)
     serving_quantity = Column(Float, nullable=True)
     serving_unit = Column(Text, nullable=True)
-    availability = Column(Numeric(18,6), default=0)
+    availability = Column(Numeric(18, 6), default=0)
     unit = Column(Text, nullable=True)
     code = Column(Text, nullable=True, index=True)
     image_id = Column(Text, nullable=True)
@@ -76,6 +76,40 @@ class CategoryEntity(Base):
     @staticmethod
     def copyToModels(rows):
         models = [Category(**row.__dict__) for row in rows]
+        for m in models:
+            m.__dict__.pop("_sa_instance_state", None)
+        return models
+
+class InventoryTransactionEntity(Base):
+    __tablename__ = "inventory_transactions"
+ 
+    id = Column(BigInteger, primary_key=True, autoincrement=True)
+    transaction_id = Column(Text, nullable=True)
+    client_id = Column(Text, nullable=False)
+    stock_item_id = Column(BigInteger, nullable=False)
+    inventory_id = Column(Text, nullable=True)
+    name = Column(Text, nullable=True)
+    transaction_type = Column(Text, nullable=False)   # e.g. STOCK_IN, ORDER_DEDUCTION, ADJUSTMENT
+    movement_type = Column(Text, nullable=False)       # IN | OUT
+    quantity = Column(Numeric(18, 6), nullable=False)
+    unit = Column(Text, nullable=True)
+    before_stock = Column(Numeric(18, 6), nullable=False)
+    after_stock = Column(Numeric(18, 6), nullable=False)
+    reference_id = Column(Text, nullable=True)
+    reference_type = Column(Text, nullable=True)
+    created_by = Column(Text, nullable=True)
+    created_at = Column(DateTime, default=func.now())
+    remarks = Column(Text, nullable=True)
+ 
+    @staticmethod
+    def copyToModel(row) -> "InventoryTransaction":
+        model = InventoryTransaction(**row.__dict__)
+        model.__dict__.pop("_sa_instance_state", None)
+        return model
+ 
+    @staticmethod
+    def copyToModels(rows) -> List["InventoryTransaction"]:
+        models = [InventoryTransaction(**row.__dict__) for row in rows]
         for m in models:
             m.__dict__.pop("_sa_instance_state", None)
         return models
