@@ -904,11 +904,28 @@ const UniversalBulkUpdateModal = ({
   const [showGlobalAddonPopup, setShowGlobalAddonPopup] = React.useState(false);
   const [globalAddons, setGlobalAddons] = React.useState([]);
   const [configs, setConfigs] = useState([]);
+  const [statusOptions, setStatusOptions] = useState([]);
 
   // ✅ State for individual item addon popup
   const [showItemAddonPopup, setShowItemAddonPopup] = React.useState(false);
   const [currentEditingItemId, setCurrentEditingItemId] = React.useState(null);
   const [loadingConfigs, setLoadingConfigs] = useState(false);
+
+  const fetchStatuses = async () => {
+    try {
+      const res = await axios.get(
+        `${import.meta.env.VITE_API_INVENTORY_SERVICE_URL}/${clientId}/inventory/masters`,
+        {
+          params: { category_id: "status" },
+          headers: { Authorization: `Bearer ${token}` }
+        }
+      );
+      setStatusOptions(res.data?.data || []);
+    } catch (err) {
+      console.error("Status fetch error:", err);
+      setStatusOptions([]);
+    }
+  };
 
   const fetchConfigs = async () => {
     try {
@@ -965,7 +982,8 @@ const UniversalBulkUpdateModal = ({
     if (!showModal) return;
     if (!clientId || !token) return;
 
-    fetchConfigs();   // ✅ always fetch (not only table)
+    fetchConfigs();
+    fetchStatuses();
   }, [showModal, clientId, token]);
   useEffect(() => {
     console.log("CONFIGS:", configs);
@@ -1618,13 +1636,11 @@ const UniversalBulkUpdateModal = ({
               <X className="w-4 h-4 " />
             </button>
           </div>
-
           {/* Global Update Section */}
           <div className="px-4 sm:px-6 py-3 bg-bg-tertiary border-b border-border-default flex-shrink-0">
-            <div className="grid grid-cols-1 sm:grid-cols-4 gap-2">
+            <div className="grid grid-cols-1 sm:grid-cols-3 gap-2">
               <div>
                 <label className="block text-xs font-semibold mb-1.5 text-text-secondary">Seating</label>
-
                 {/* Desktop */}
                 <input
                   type="number"
@@ -1637,7 +1653,6 @@ const UniversalBulkUpdateModal = ({
                   placeholder="No change"
                   className="hidden sm:block w-full px-3 py-1.5 border border-border-default rounded-lg focus:outline-none focus:ring-2 focus:ring-action-primary focus:border-transparent text-sm bg-bg-primary text-text-primary"
                 />
-
                 {/* Mobile with +/- buttons */}
                 <div className="sm:hidden flex items-center border border-border-default rounded-lg overflow-hidden bg-bg-primary">
                   <button
@@ -1648,9 +1663,7 @@ const UniversalBulkUpdateModal = ({
                       setBulkUpdateGlobal(prev => ({ ...prev, table_type: value }));
                     }}
                     className="px-3 py-1.5 text-text-primary hover:bg-bg-tertiary font-bold transition-colors"
-                  >
-                    −
-                  </button>
+                  >−</button>
                   <input
                     type="number"
                     min="1"
@@ -1669,9 +1682,7 @@ const UniversalBulkUpdateModal = ({
                       setBulkUpdateGlobal(prev => ({ ...prev, table_type: current + 1 }));
                     }}
                     className="px-3 py-1.5 text-text-primary hover:bg-bg-tertiary font-bold transition-colors"
-                  >
-                    +
-                  </button>
+                  >+</button>
                 </div>
               </div>
 
@@ -1680,34 +1691,37 @@ const UniversalBulkUpdateModal = ({
                 <select
                   value={bulkUpdateGlobal.status}
                   onChange={e => setBulkUpdateGlobal(prev => ({ ...prev, status: e.target.value }))}
-                  className="w-full px-3 py-1.5 border border-border-default rounded-lg focus:outline-none focus:ring-2 focus:ring-action-primary focus:border-transparent text-sm bg-bg-primary text-text-primary"
+                  className="w-full px-3 py-1.5 border border-border-default rounded-lg focus:outline-none focus:ring-2 focus:ring-action-primary text-sm bg-bg-primary text-text-primary"
                 >
                   <option value="">No change</option>
-                  <option value="Vacant">Vacant</option>
-                  <option value="Reserved">Reserved</option>
+                  {statusOptions.length > 0
+                    ? statusOptions.map(s => (
+                      <option key={s} value={s}>{s}</option>
+                    ))
+                    : (
+                      <>
+                        <option value="Vacant">Vacant</option>
+                        <option value="Reserved">Reserved</option>
+                      </>
+                    )
+                  }
                 </select>
               </div>
-              <div className="">
-                <label className="block text-xs font-semibold mb-1.5 text-text-secondary">Section & Zone :</label>
 
+              <div>
+                <label className="block text-xs font-semibold mb-1.5 text-text-secondary">Section & Zone</label>
                 <select
-                  value={bulkUpdateGlobal.config_id || ""} className="w-full px-3 py-1.5 border border-border-default rounded-lg focus:outline-none focus:ring-2 focus:ring-action-primary focus:border-transparent text-sm bg-bg-primary text-text-primary"
-
+                  value={bulkUpdateGlobal.config_id || ""}
+                  className="w-full px-3 py-1.5 border border-border-default rounded-lg focus:outline-none focus:ring-2 focus:ring-action-primary focus:border-transparent text-sm bg-bg-primary text-text-primary"
                   onChange={e => {
                     const value = Number(e.target.value);
-
-                    setBulkUpdateGlobal(prev => ({
-                      ...prev,
-                      config_id: value
-                    }));
-
+                    setBulkUpdateGlobal(prev => ({ ...prev, config_id: value }));
                     selectedUpdateTables.forEach(id => {
                       handleBulkUpdateChange(id, "config_id", value);
                     });
                   }}
                 >
                   <option value="">No change</option>
-
                   {configs.map(c => (
                     <option key={c.id} value={c.id}>
                       {c.section} - {c.zone}
@@ -1715,7 +1729,6 @@ const UniversalBulkUpdateModal = ({
                   ))}
                 </select>
               </div>
-
             </div>
           </div>
 
@@ -1843,8 +1856,17 @@ const UniversalBulkUpdateModal = ({
                               onChange={e => handleBulkUpdateChange(table.id, 'status', e.target.value)}
                               className="w-full px-3 py-1.5 border border-border-default rounded-lg text-sm focus:outline-none focus:ring-2 focus:ring-action-primary focus:border-transparent bg-bg-primary text-text-primary"
                             >
-                              <option value="Vacant">Vacant</option>
-                              <option value="Reserved">Reserved</option>
+                              {statusOptions.length > 0
+                                ? statusOptions.map(s => (
+                                  <option key={s} value={s}>{s}</option>
+                                ))
+                                : (
+                                  <>
+                                    <option value="Vacant">Vacant</option>
+                                    <option value="Reserved">Reserved</option>
+                                  </>
+                                )
+                              }
                             </select>
                           </div>
                           <div className="">

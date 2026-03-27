@@ -404,7 +404,10 @@ const MenuManagement = ({ clientId, token, realm }) => {
   const handleAddItem = async () => {
     try {
       let imageId = null;
-      if (newItemImage) imageId = await uploadImageToDocumentService(newItemImage);
+
+      if (newItemImage) {
+        imageId = await uploadImageToDocumentService(newItemImage);
+      }
 
       const selectedCat = categoriesFlat.find(
         c => c.id === newItem?.category_id
@@ -416,64 +419,100 @@ const MenuManagement = ({ clientId, token, realm }) => {
           c => c.name.toLowerCase() === (newItem?.category_id || '').toLowerCase()
         )?.name ||
         newItem?.category_id;
+
       if (!finalCategoryId) return;
 
       const slug = generateSlug(finalCategoryId, newItem.name);
-      const created_by = currentUserId || localStorage.getItem('user_id') || 'system';
+
+      const created_by =
+        currentUserId || localStorage.getItem("user_id") || "system";
+
       const { dietary_type, ...cleanNewItem } = newItem;
+
+      const basePrice = parseFloat(newItem.unit_price) || 0;
+      const zonePrices = newItem.zonePrices || {};
 
       const basePayload = {
         ...cleanNewItem,
         client_id: clientId,
         category_id: finalCategoryId,
         image_id: imageId,
-        realm: realm || newItem.realm || '',
+        realm: realm || newItem.realm || "",
         slug,
-        unit_price: parseFloat(newItem.unit_price) || 0,
+        unit_price: basePrice,
         discount: parseFloat(newItem.discount) || 0,
         code: newItem.code ? String(newItem.code).trim() : null,
-        serving_quantity: newItem.serving_quantity ? parseFloat(newItem.serving_quantity) : null,
+        serving_quantity: newItem.serving_quantity
+          ? parseFloat(newItem.serving_quantity)
+          : null,
         serving_unit: newItem.serving_unit || null,
-        created_by, updated_by: created_by,
+        created_by,
+        updated_by: created_by,
         inventory_id: newItem.inventory_id,
-        zone_config_id: 0,   // base record
-        // no id — backend will generate from sequence
+        zone_config_id: 0,
       };
 
-      // ✅ Step 1: Create the base record, capture the generated id
+      // STEP 1: Create base record (zone_config_id = 0)
       const baseRes = await axios.post(
         `${import.meta.env.VITE_API_INVENTORY_SERVICE_URL}/${clientId}/menu/create`,
         basePayload,
-        { headers: { Authorization: `Bearer ${token}`, 'Content-Type': 'application/json' } }
-      );
-
-      const sharedId = baseRes.data.data.id;  // ← this id is reused for all zone variants
-
-      // ✅ Step 2: Create zone variants with the SAME id
-      const filledZonePrices = Object.entries(newItem.zonePrices || {}).filter(
-        ([, price]) => price !== '' && price !== null && price !== undefined
-      );
-
-      for (const [configId, price] of filledZonePrices) {
-        await axios.post(
-          `${import.meta.env.VITE_API_INVENTORY_SERVICE_URL}/${clientId}/menu/create`,
-          {
-            ...basePayload,
-            id: sharedId,                        // ← same id as base
-            unit_price: parseFloat(price),
-            zone_config_id: configId ? Number(configId) : 0,    // ← only this differs
+        {
+          headers: {
+            Authorization: `Bearer ${token}`,
+            "Content-Type": "application/json",
           },
-          { headers: { Authorization: `Bearer ${token}`, 'Content-Type': 'application/json' } }
-        );
+        }
+      );
+
+      const sharedId = baseRes.data.data.id;
+
+      // STEP 2: Always create records for ALL sections,
+      // using entered zone price if provided, otherwise falling back to base price
+      if (sections && sections.length > 0) {
+        for (const section of sections) {
+          const configId = Number(section.id);
+          const enteredPrice = zonePrices[configId];
+          const finalPrice =
+            enteredPrice !== "" && enteredPrice !== null && enteredPrice !== undefined
+              ? parseFloat(enteredPrice)
+              : basePrice;
+
+          await axios.post(
+            `${import.meta.env.VITE_API_INVENTORY_SERVICE_URL}/${clientId}/menu/create`,
+            {
+              ...basePayload,
+              id: sharedId,
+              unit_price: finalPrice,
+              zone_config_id: configId,
+            },
+            { headers: { Authorization: `Bearer ${token}` } }
+          );
+        }
+      } else {
+        console.warn("No sections found → skipping zone creation");
       }
 
+      // Refresh UI
       await fetchData({ silent: true });
+
+      // Reset form
       setShowAddModal(false);
-      setNewItem({ name: '', description: '', category_id: '', unit_price: '', discount: '', code: '', unit: '', line_item_id: [], zonePrices: {} });
+      setNewItem({
+        name: "",
+        description: "",
+        category_id: "",
+        unit_price: "",
+        discount: "",
+        code: "",
+        unit: "",
+        line_item_id: [],
+        zonePrices: {},
+      });
       setNewItemImage(null);
-      setNewItemImageUrl('');
+      setNewItemImageUrl("");
+
     } catch (error) {
-      console.error('Error adding item:', error);
+      console.error("Error adding item:", error);
     }
   };
   const handleEditItem = async () => {
@@ -880,10 +919,16 @@ const MenuManagement = ({ clientId, token, realm }) => {
 
   const handleExportToExcel = () => {
     try {
-      const catNameById = (id) => {
-        if (!id) return "Uncategorized";
-        const found = categoriesFlat.find(c => c?.id === id);
-        return found ? found.name : "Unknown";
+      const catNameById = (idOrName) => {
+        if (!idOrName) return "Uncategorized";
+
+        const found = categoriesFlat.find(
+          c =>
+            c.id === idOrName ||
+            c.name?.toLowerCase() === String(idOrName).toLowerCase()
+        );
+
+        return found?.name || idOrName || "Unknown";
       };
 
       // Build a label for each section: "Zone-Section"

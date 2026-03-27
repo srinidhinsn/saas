@@ -1340,7 +1340,7 @@ const UniversalAddModal = ({
   const [dragActive, setDragActive] = useState(false);
   const [showAddonPopup, setShowAddonPopup] = useState(false); // ✅ Popup state
   const [configs, setConfigs] = useState([]);
-  const [loadingConfigs, setLoadingConfigs] = useState(false);
+  const [loadingConfigs, setLoadingConfigs] = useState(false); const [statusOptions, setStatusOptions] = useState([]);
   // Memoize helpers so they're stable across renders (prevents unnecessary effect runs)
   const flattenCategories = useCallback((items = [], level = 0) => {
     let result = [];
@@ -1361,6 +1361,22 @@ const UniversalAddModal = ({
 
     return result;
   }, []);
+
+  const fetchStatuses = async () => {
+    try {
+      const res = await axios.get(
+        `${import.meta.env.VITE_API_INVENTORY_SERVICE_URL}/${clientId}/inventory/masters`,
+        {
+          params: { category_id: "status" },
+          headers: { Authorization: `Bearer ${token}` }
+        }
+      );
+      setStatusOptions(res.data?.data || []);
+    } catch (err) {
+      console.error("Status fetch error:", err);
+      setStatusOptions([]);
+    }
+  };
 
   const fetchConfigs = async () => {
     try {
@@ -1385,6 +1401,7 @@ const UniversalAddModal = ({
     if (!clientId || !token) return;
 
     fetchConfigs();
+    fetchStatuses();
   }, [showModal, modalType, clientId, token]);
 
   // Drag handlers
@@ -1501,7 +1518,7 @@ const UniversalAddModal = ({
                 </select>
               </div>
 
-            
+
 
               {/* Item Name */}
               <div>
@@ -1527,7 +1544,7 @@ const UniversalAddModal = ({
                   rows="3"
                 />
               </div>
-             
+
               {/* Unit Price & Discount */}
               <div className="grid grid-cols-2 gap-4">
                 <div>
@@ -1885,12 +1902,23 @@ const UniversalAddModal = ({
                 <div>
                   <label className="block text-sm font-semibold mb-2 text-text-primary">Remark</label>
                   <select
-                    value={row?.remark ?? 'vacant'}
+                    value={row?.remark ?? ''}
                     onChange={(e) => handleRangeChange(index, 'remark', e.target.value)}
                     className="w-full px-3 py-2 border-default border-border-default rounded-lg focus:outline-none focus:ring-2 focus:ring-action-primary"
                   >
-                    <option value="vacant">Vacant</option>
-                    <option value="reserved">Reserved</option>
+                    <option value="">Select status</option>
+                    {statusOptions.length > 0
+                      ? statusOptions.map(s => (
+                        <option key={s} value={s.toLowerCase()}>{s}</option>
+                      ))
+                      : (
+                        // fallback if masters API has nothing yet
+                        <>
+                          <option value="vacant">Vacant</option>
+                          <option value="reserved">Reserved</option>
+                        </>
+                      )
+                    }
                   </select>
                 </div>
               </div>

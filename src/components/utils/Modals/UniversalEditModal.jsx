@@ -639,7 +639,21 @@ const UniversalEditModal = ({
   const [configs, setConfigs] = useState([]);
   const [statusOptions, setStatusOptions] = useState([]);
   const [loadingConfigs, setLoadingConfigs] = useState(false);
-
+  const fetchStatuses = async () => {
+    try {
+      const res = await axios.get(
+        `${import.meta.env.VITE_API_INVENTORY_SERVICE_URL}/${clientId}/inventory/masters`,
+        {
+          params: { category_id: "status" },
+          headers: { Authorization: `Bearer ${token}` }
+        }
+      );
+      setStatusOptions(res.data?.data || []);
+    } catch (err) {
+      console.error("Status fetch error:", err);
+      setStatusOptions([]);
+    }
+  };
   const fetchConfigs = async () => {
     try {
       setLoadingConfigs(true);
@@ -666,6 +680,7 @@ const UniversalEditModal = ({
     if (!clientId || !token) return;
 
     fetchConfigs();
+    fetchStatuses();
   }, [showModal, clientId, token]);
 
   // Menu Modal Functions
@@ -873,7 +888,7 @@ const UniversalEditModal = ({
                       value={editingItem.code ?? ''}
                       onChange={(e) =>
                         setEditingItem({
-                          ...editingItem, 
+                          ...editingItem,
                           inventory_id: baseRecord.inventory_id || 'menu',
                           code: e.target.value
                         })
@@ -1162,11 +1177,10 @@ const UniversalEditModal = ({
                     }`}
                 >
                   <option value="">Select Status</option>
-                  <option value="vacant">Vacant</option>
-                  <option value="reserved">Reserved</option>
-                  <option value="occupied">Occupied</option>
+                  {statusOptions.map(s => (
+                    <option key={s} value={s}>{s}</option>
+                  ))}
                 </select>
-
                 {editFieldErrors?.status && (
                   <p className="text-red-600 text-xs mt-1">{editFieldErrors.status}</p>
                 )}

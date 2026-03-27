@@ -380,9 +380,9 @@ const TableConfigModal = ({ show, onClose, clientId, token, refresh }) => {
                                         <div key={c.id}
                                             className="flex items-center gap-2 bg-gray-100 border border-gray-200 px-3 py-1.5 rounded-full text-sm"
                                         >
-                                            <span className="font-medium">{c.section.toUpperCase()}</span>
+                                            <span className="font-medium">{c.section}</span>
                                             <span className="text-gray-400">×</span>
-                                            <span>{c.zone.toUpperCase()}</span>
+                                            <span>{c.zone}</span>
                                             <button
                                                 onClick={() => deleteConfig(c)}
                                                 className="text-red-400 hover:text-red-600 transition ml-1"
