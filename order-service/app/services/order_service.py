@@ -254,7 +254,11 @@ def _record_transaction(
 def _deduct_stock_for_order(db: Session, client_id: str, order_id: int) -> None:
     """
     Called exactly once when the whole order transitions to 'served'.
-    For every order item → recipe JSONB → convert units → deduct stock.
+    Two deductions per order item:
+      1. Menu item itself  → deduct (serving_quantity in serving_unit → converted to stock unit) × ordered_qty
+                             from the menu item's own availability in InventoryEntity
+      2. Ingredients       → deduct (recipe qty converted × ordered_qty) from each linked stock item
+    Both are idempotent via remarks-based dedup keys.
     """
     order_items = (
         db.query(Db_OrderItem_Entity)
@@ -265,15 +269,16 @@ def _deduct_stock_for_order(db: Session, client_id: str, order_id: int) -> None:
         .all()
     )
 
-    # Fetch all item-level transaction keys already recorded for this order
-    # Key: (stock_item_id, remarks) — we use frontend_unique_key as the
-    # per-item deduplication anchor stored in remarks.
+    # Fetch all dedup keys already recorded for this order (both deduction types)
     already_deducted_keys: set[str] = set(
         row.remarks
         for row in db.query(InventoryTransactionEntity.remarks).filter(
             InventoryTransactionEntity.reference_id == str(order_id),
             InventoryTransactionEntity.reference_type == "order",
-            InventoryTransactionEntity.transaction_type == "ORDER_DEDUCTION",
+            InventoryTransactionEntity.transaction_type.in_([
+                "ORDER_DEDUCTION",
+                "MENU_ITEM_DEDUCTION",
+            ]),
         ).all()
         if row.remarks
     )
@@ -288,10 +293,71 @@ def _deduct_stock_for_order(db: Session, client_id: str, order_id: int) -> None:
             .first()
         )
 
-        if not menu_item or not menu_item.recipe:
+        if not menu_item:
             continue
 
         ordered_qty = order_item.quantity or 1
+
+        # ------------------------------------------------------------------ #
+        # 1. MENU ITEM SELF-DEDUCTION                                         #
+        #    serving_quantity (in serving_unit) → convert to stock unit       #
+        #    then × ordered_qty → deduct from menu_item.availability          #
+        # ------------------------------------------------------------------ #
+        serving_qty  = float(menu_item.serving_quantity or 0)
+        serving_unit = (menu_item.serving_unit or "").strip()
+        stock_unit   = (menu_item.unit or "").strip()
+
+        if serving_qty > 0 and serving_unit and stock_unit:
+            menu_dedup_key = (
+                f"Menu item deduction Order #{order_id} — "
+                f"{order_item.item_name} x{ordered_qty} "
+                f"[key={order_item.frontend_unique_key}]"
+            )
+
+            if menu_dedup_key not in already_deducted_keys:
+                try:
+                    converted_serving = _convert(serving_qty, serving_unit, stock_unit)
+                except ValueError as e:
+                    print(f"[WARN] Skipping menu item deduction for item_id={menu_item.id}: {e}")
+                    converted_serving = None
+
+                if converted_serving is not None:
+                    total_menu_deduction = Decimal(str(round(converted_serving * ordered_qty, 6)))
+                    before_stock = Decimal(str(menu_item.availability or 0))
+                    after_stock  = max(before_stock - total_menu_deduction, Decimal("0"))
+
+                    _record_transaction(
+                        db,
+                        client_id=client_id,
+                        stock_item_id=menu_item.id,
+                        inventory_id=menu_item.inventory_id,
+                        name=menu_item.name,
+                        transaction_type="MENU_ITEM_DEDUCTION",
+                        movement_type="OUT",
+                        quantity=total_menu_deduction,
+                        unit=stock_unit,
+                        before_stock=before_stock,
+                        after_stock=after_stock,
+                        reference_id=str(order_id),
+                        reference_type="order",
+                        remarks=menu_dedup_key,
+                    )
+
+                    menu_item.availability = after_stock
+                    already_deducted_keys.add(menu_dedup_key)  # in-session guard
+
+        elif serving_qty > 0:
+            # serving_unit or stock_unit is missing — log and skip safely
+            print(
+                f"[WARN] Skipping menu item deduction for item_id={menu_item.id} "
+                f"'{menu_item.name}': serving_unit='{serving_unit}' stock_unit='{stock_unit}'"
+            )
+
+        # ------------------------------------------------------------------ #
+        # 2. INGREDIENT DEDUCTION (existing logic, unchanged)                 #
+        # ------------------------------------------------------------------ #
+        if not menu_item.recipe:
+            continue
 
         for ingredient in menu_item.recipe:
             stock_item_id = ingredient.get("stock_item_id")
@@ -301,12 +367,11 @@ def _deduct_stock_for_order(db: Session, client_id: str, order_id: int) -> None:
             if not stock_item_id or recipe_qty <= 0:
                 continue
 
-            # ✅ Idempotency guard — skip if this exact item+ingredient was
-            #    already deducted for this order (handles sub-order re-serves)
             dedup_key = (
-                f"Order #{order_id} served — "
-                f"{order_item.item_name} x{ordered_qty} "
-                f"[key={order_item.frontend_unique_key}]"
+              f"order={order_id}|"
+              f"item={order_item.item_id}|"
+              f"ingredient={stock_item_id}|"
+              f"fkey={order_item.frontend_unique_key}"
             )
             if dedup_key in already_deducted_keys:
                 continue
@@ -328,12 +393,12 @@ def _deduct_stock_for_order(db: Session, client_id: str, order_id: int) -> None:
             try:
                 deduction = _convert(recipe_qty, recipe_unit, stock_unit) * ordered_qty
             except ValueError as e:
-                print(f"[WARN] Skipping deduction for stock_item_id={stock_item_id}: {e}")
+                print(f"[WARN] Skipping ingredient deduction for stock_item_id={stock_item_id}: {e}")
                 continue
 
             deduction_decimal = Decimal(str(round(deduction, 6)))
             before_stock = Decimal(str(stock_item.availability or 0))
-            after_stock = max(before_stock - deduction_decimal, Decimal("0"))
+            after_stock  = max(before_stock - deduction_decimal, Decimal("0"))
 
             _record_transaction(
                 db,
@@ -349,8 +414,126 @@ def _deduct_stock_for_order(db: Session, client_id: str, order_id: int) -> None:
                 after_stock=after_stock,
                 reference_id=str(order_id),
                 reference_type="order",
-                # ✅ remarks now includes frontend_unique_key for dedup
                 remarks=dedup_key,
             )
 
             stock_item.availability = after_stock
+            already_deducted_keys.add(dedup_key)  # in-session guard
+     
+
+
+def _record_partial_transaction(
+    db,
+    client_id,
+    item,
+    remove_qty,
+    transaction_type,
+    reason,
+    order_id,
+):
+    from entity.inventory_entity import InventoryEntity
+
+    menu_item = db.query(InventoryEntity).filter(
+        InventoryEntity.id == item.item_id,
+        InventoryEntity.client_id == client_id,
+    ).first()
+    if not menu_item:
+        return
+
+    base_remarks = (
+        f"{reason or transaction_type} | "
+        f"{item.item_name} x{remove_qty} (partial) | "
+        f"[key={item.frontend_unique_key}]"
+    )
+    stock_unit   = (menu_item.unit or "").strip()
+    serving_qty  = float(menu_item.serving_quantity or 0)
+    serving_unit = (menu_item.serving_unit or "").strip()
+
+    if transaction_type == "ITEM_CANCELLED":
+        _record_transaction(
+            db,
+            client_id=client_id,
+            stock_item_id=menu_item.id,
+            inventory_id=menu_item.inventory_id,
+            name=menu_item.name,
+            transaction_type="ITEM_CANCELLED",
+            movement_type="NONE",
+            quantity=Decimal(str(remove_qty)),
+            unit=stock_unit or "pcs",
+            before_stock=Decimal(str(menu_item.availability or 0)),
+            after_stock=Decimal(str(menu_item.availability or 0)),
+            reference_id=str(order_id),
+            reference_type="order",
+            remarks=f"[ITEM_CANCELLED_PARTIAL] Order #{order_id} — {base_remarks}",
+        )
+
+    elif transaction_type == "WASTAGE":
+        if serving_qty > 0 and serving_unit and stock_unit:
+            try:
+                converted = _convert(serving_qty, serving_unit, stock_unit)
+                reversal  = Decimal(str(round(converted * remove_qty, 6)))
+                before    = Decimal(str(menu_item.availability or 0))
+                after     = before + reversal
+                _record_transaction(
+                    db,
+                    client_id=client_id,
+                    stock_item_id=menu_item.id,
+                    inventory_id=menu_item.inventory_id,
+                    name=menu_item.name,
+                    transaction_type="WASTAGE",
+                    movement_type="REVERSAL",
+                    quantity=reversal,
+                    unit=stock_unit,
+                    before_stock=before,
+                    after_stock=after,
+                    reference_id=str(order_id),
+                    reference_type="order",
+                    remarks=f"[WASTAGE_PARTIAL] Order #{order_id} — {base_remarks}",
+                )
+                menu_item.availability = after
+            except ValueError:
+                pass
+
+        if menu_item.recipe:
+            for ingredient in menu_item.recipe:
+                stock_item_id_raw = ingredient.get("stock_item_id")
+                recipe_qty        = float(ingredient.get("quantity_required") or 0)
+                recipe_unit       = (ingredient.get("unit") or "").strip()
+
+                if not stock_item_id_raw or recipe_qty <= 0:
+                    continue
+
+                stock_item = db.query(InventoryEntity).filter(
+                    InventoryEntity.id == int(stock_item_id_raw),
+                    InventoryEntity.client_id == client_id,
+                ).first()
+                if not stock_item:
+                    continue
+
+                ing_stock_unit = (stock_item.unit or "").strip()
+                try:
+                    reversal = _convert(recipe_qty, recipe_unit, ing_stock_unit) * remove_qty
+                except ValueError:
+                    continue
+
+                reversal_decimal = Decimal(str(round(reversal, 6)))
+                before_ing       = Decimal(str(stock_item.availability or 0))
+                after_ing        = before_ing + reversal_decimal
+
+                _record_transaction(
+                    db,
+                    client_id=client_id,
+                    stock_item_id=stock_item.id,
+                    inventory_id=stock_item.inventory_id,
+                    name=stock_item.name,
+                    transaction_type="WASTAGE",
+                    movement_type="REVERSAL",
+                    quantity=reversal_decimal,
+                    unit=ing_stock_unit,
+                    before_stock=before_ing,
+                    after_stock=after_ing,
+                    reference_id=str(order_id),
+                    reference_type="order",
+                    remarks=f"[INGREDIENT_REVERSAL_PARTIAL] Order #{order_id} — {base_remarks}",
+                )
+                stock_item.availability = after_ing
