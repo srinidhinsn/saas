@@ -634,7 +634,8 @@ const UniversalEditModal = ({
   editFieldErrors
 }) => {
   const [dragActive, setDragActive] = useState(false);
-  const [showAddonPopup, setShowAddonPopup] = useState(false); // ✅ Popup state  const [zoneOptions, setZoneOptions] = useState([]);
+  const [showAddonPopup, setShowAddonPopup] = useState(false); // ✅ Popup state  
+  const [zoneOptions, setZoneOptions] = useState([]);
   const [sectionOptions, setSectionOptions] = useState([]);
   const [loadingMasters, setLoadingMasters] = useState(false);
   const [statusOptions, setStatusOptions] = useState([]);

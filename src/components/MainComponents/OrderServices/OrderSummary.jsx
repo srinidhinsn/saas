@@ -4,7 +4,7 @@ import { toast } from "react-toastify";
 import Modal from "react-modal";
 import {
   X, Trash2, Filter, ShoppingBag, Clock,
-  Users, Package, Truck, Eye, ChevronDown, ChevronUp,
+  Users, Package, Truck, Eye, ChevronDown, ChevronUp, AlertTriangle,
 } from 'lucide-react';
 import { useNavigate } from "react-router-dom";
 
@@ -49,6 +49,138 @@ const SimpleDeleteConfirm = ({
             className="flex-1 py-2.5 rounded-lg bg-action-danger text-text-white font-medium text-sm"
           >
             Delete
+          </button>
+        </div>
+      </div>
+    </div>
+  );
+};
+
+// ─────────────────────────────────────────────────────────────────────────────
+// DeleteServedItemModal — asks reason when deleting a served/prepared item
+// Records as wastage. Shows a clear warning that stock will be reversed.
+// ─────────────────────────────────────────────────────────────────────────────
+
+const WASTAGE_REASONS = [
+  'Customer returned / rejected',
+  'Wrong item served',
+  'Quality issue',
+  'Overcooked / spoiled',
+  'Spillage / damage',
+  'Other',
+];
+
+const DeleteServedItemModal = ({ isOpen, onClose, onConfirm, item, isServed }) => {
+  const [selectedReason, setSelectedReason] = useState('');
+  const [customReason, setCustomReason] = useState('');
+  const [loading, setLoading] = useState(false);
+
+  // reset on open
+  useEffect(() => {
+    if (isOpen) {
+      setSelectedReason('');
+      setCustomReason('');
+    }
+  }, [isOpen]);
+
+  if (!isOpen || !item) return null;
+
+  const finalReason = selectedReason === 'Other' ? customReason.trim() : selectedReason;
+  const canSubmit = finalReason.length > 0;
+
+  const handleConfirm = async () => {
+    if (!canSubmit) return;
+    setLoading(true);
+    await onConfirm(finalReason);
+    setLoading(false);
+    onClose();
+  };
+
+  return (
+    <div className="fixed inset-0 z-[60] flex items-center justify-center p-4 bg-color-modalsbg">
+      <div className="rounded-xl w-full max-w-md bg-bg-primary border border-border-default shadow-card">
+        {/* Header */}
+        <div className="px-6 py-4 border-b border-border-default flex justify-between items-center bg-action-danger/5 rounded-t-xl">
+          <div className="flex items-center gap-2">
+            <AlertTriangle size={18} className="text-action-danger" />
+            <h2 className="text-base font-bold text-action-danger">
+              {isServed ? 'Delete Served Item — Record Wastage' : 'Delete Item'}
+            </h2>
+          </div>
+          <button onClick={onClose} className="text-text-secondary hover:text-text-primary transition-colors">
+            <X size={18} />
+          </button>
+        </div>
+
+        {/* Item info */}
+        <div className="px-6 pt-4 pb-2">
+          <div className="flex items-center justify-between px-4 py-3 rounded-lg bg-bg-tertiary border border-border-default mb-1">
+            <span className="font-semibold text-sm text-text-primary">{item.item_name || 'Item'}</span>
+            <span className="text-xs font-bold text-text-secondary">Qty: {item.quantity || 1}</span>
+          </div>
+
+          {isServed && (
+            <p className="text-xs text-action-danger/80 mt-2 px-1">
+              ⚠️ This item is already <strong>served</strong>. Deleting it will record a wastage
+              transaction and reverse the stock deduction.
+            </p>
+          )}
+          {!isServed && (
+            <p className="text-xs text-text-secondary mt-2 px-1">
+              This item is <strong>{item.status || 'pending'}</strong>. Only a deletion record will
+              be saved — no stock reversal needed.
+            </p>
+          )}
+        </div>
+
+        {/* Reason selection */}
+        <div className="px-6 py-3">
+          <p className="text-sm font-semibold text-text-primary mb-2">
+            Reason for deletion <span className="text-action-danger">*</span>
+          </p>
+          <div className="grid grid-cols-2 gap-2">
+            {WASTAGE_REASONS.map(r => (
+              <button
+                key={r}
+                onClick={() => setSelectedReason(r)}
+                className={`text-left px-3 py-2.5 rounded-lg text-xs font-medium border transition-all
+                  ${selectedReason === r
+                    ? 'bg-action-danger text-text-white border-action-danger shadow-sm'
+                    : 'bg-bg-tertiary text-text-secondary border-border-default hover:border-action-danger/40'}`}
+              >
+                {r}
+              </button>
+            ))}
+          </div>
+
+          {selectedReason === 'Other' && (
+            <textarea
+              className="mt-3 w-full px-3 py-2 rounded-lg border border-border-default bg-bg-primary text-text-primary text-sm resize-none focus:outline-none focus:border-action-primary"
+              rows={2}
+              placeholder="Describe the reason..."
+              value={customReason}
+              onChange={e => setCustomReason(e.target.value)}
+            />
+          )}
+        </div>
+
+        {/* Footer */}
+        <div className="px-6 py-4 rounded-b-xl flex gap-3 bg-bg-tertiary border-t border-border-default">
+          <button
+            onClick={onClose}
+            className="flex-1 py-2.5 rounded-lg font-medium text-sm bg-bg-primary border border-border-default text-text-primary"
+          >
+            Cancel
+          </button>
+          <button
+            onClick={handleConfirm}
+            disabled={!canSubmit || loading}
+            className={`flex-1 py-2.5 rounded-lg font-medium text-sm transition-all
+              ${canSubmit && !loading
+                ? 'bg-action-danger text-text-white hover:opacity-90'
+                : 'bg-action-danger/30 text-text-white/50 cursor-not-allowed'}`}
+          >
+            {loading ? 'Deleting…' : isServed ? 'Delete & Record Wastage' : 'Delete Item'}
           </button>
         </div>
       </div>
@@ -123,10 +255,16 @@ const LineItemsModal = ({
 };
 
 // ─────────────────────────────────────────────────────────────────────────────
-// OrderItemsViewModal — read-only view of all items for an order
+// OrderItemsViewModal — read-only view + per-item deletion for ALL statuses
 // ─────────────────────────────────────────────────────────────────────────────
 
-const OrderItemsViewModal = ({ isOpen, onClose, order, inventoryMap }) => {
+const OrderItemsViewModal = ({
+  isOpen,
+  onClose,
+  order,
+  inventoryMap,
+  onDeleteItem,           // (item, isServed) => void — opens reason modal
+}) => {
   if (!isOpen || !order) return null;
 
   const getItemStatusStyle = (status) => {
@@ -192,24 +330,13 @@ const OrderItemsViewModal = ({ isOpen, onClose, order, inventoryMap }) => {
           <table className="w-full text-sm">
             <thead className="sticky top-0 bg-bg-tertiary border-b border-border-default z-10">
               <tr>
-                <th className="text-left px-5 py-3 text-text-secondary font-semibold text-xs uppercase tracking-wider">
-                  #
-                </th>
-                <th className="text-left px-4 py-3 text-text-secondary font-semibold text-xs uppercase tracking-wider">
-                  Item
-                </th>
-                <th className="text-center px-4 py-3 text-text-secondary font-semibold text-xs uppercase tracking-wider">
-                  Qty
-                </th>
-                <th className="text-right px-4 py-3 text-text-secondary font-semibold text-xs uppercase tracking-wider">
-                  Unit Price
-                </th>
-                <th className="text-right px-4 py-3 text-text-secondary font-semibold text-xs uppercase tracking-wider">
-                  Total
-                </th>
-                <th className="text-center px-4 py-3 text-text-secondary font-semibold text-xs uppercase tracking-wider">
-                  Status
-                </th>
+                <th className="text-left px-5 py-3 text-text-secondary font-semibold text-xs uppercase tracking-wider">#</th>
+                <th className="text-left px-4 py-3 text-text-secondary font-semibold text-xs uppercase tracking-wider">Item</th>
+                <th className="text-center px-4 py-3 text-text-secondary font-semibold text-xs uppercase tracking-wider">Qty</th>
+                <th className="text-right px-4 py-3 text-text-secondary font-semibold text-xs uppercase tracking-wider">Unit Price</th>
+                <th className="text-right px-4 py-3 text-text-secondary font-semibold text-xs uppercase tracking-wider">Total</th>
+                <th className="text-center px-4 py-3 text-text-secondary font-semibold text-xs uppercase tracking-wider">Status</th>
+                <th className="text-center px-4 py-3 text-text-secondary font-semibold text-xs uppercase tracking-wider">Action</th>
               </tr>
             </thead>
             <tbody className="divide-y divide-border-default">
@@ -220,13 +347,14 @@ const OrderItemsViewModal = ({ isOpen, onClose, order, inventoryMap }) => {
                   item.price ??
                   0;
                 const lineTotal = unitPrice * (item.quantity || 1);
+                const itemStatus = item.status?.toLowerCase();
+                const isServedItem = itemStatus === 'served';
 
                 return (
                   <React.Fragment key={item.id || idx}>
-                    {/* Batch divider for new items */}
                     {item._isBatchStart && (
                       <tr>
-                        <td colSpan={6} className="px-4 py-2">
+                        <td colSpan={7} className="px-4 py-2">
                           <div className="flex items-center gap-2">
                             <div className="flex-1 h-px bg-gradient-to-r from-transparent via-action-primary to-transparent" />
                             <span className="text-xs font-bold text-action-primary px-3 py-1 rounded-full bg-action-primary/10 border border-action-primary/20">
@@ -257,11 +385,22 @@ const OrderItemsViewModal = ({ isOpen, onClose, order, inventoryMap }) => {
                         ₹{lineTotal.toFixed(2)}
                       </td>
                       <td className="px-4 py-3 text-center">
-                        <span
-                          className={`text-xs font-semibold px-2.5 py-1 rounded-full ${getItemStatusStyle(item.status)}`}
-                        >
+                        <span className={`text-xs font-semibold px-2.5 py-1 rounded-full ${getItemStatusStyle(item.status)}`}>
                           {item.status || 'pending'}
                         </span>
+                      </td>
+                      {/* ── Per-item delete — always visible ── */}
+                      <td className="px-4 py-3 text-center">
+                        <button
+                          onClick={() => onDeleteItem(item, isServedItem)}
+                          className={`p-1.5 rounded-lg transition-colors
+                            ${isServedItem
+                              ? 'bg-orange-100 text-orange-600 hover:bg-orange-500 hover:text-white'
+                              : 'bg-action-danger/10 text-action-danger hover:bg-action-danger hover:text-text-white'}`}
+                          title={isServedItem ? 'Delete served item (records wastage)' : 'Delete item'}
+                        >
+                          <Trash2 size={14} />
+                        </button>
                       </td>
                     </tr>
                   </React.Fragment>
@@ -336,20 +475,27 @@ const OrderSummaryVisible = ({ clientId, token }) => {
   const todayDate = new Date().toISOString().split('T')[0];
   const [selectedDate, setSelectedDate] = useState(todayDate);
   const [filterMode, setFilterMode] = useState(0);
-  // Single order-mode selection — NOT multi-select
   const [selectedOrderMode, setSelectedOrderMode] = useState('all');
 
   // ── View modal ────────────────────────────────────────────────────────────
   const [viewOrder, setViewOrder] = useState(null);
   const [showViewModal, setShowViewModal] = useState(false);
 
-  // ── Delete ────────────────────────────────────────────────────────────────
+  // ── Delete (order-level) ──────────────────────────────────────────────────
   const [showDeleteModal, setShowDeleteModal] = useState(false);
   const [orderToDelete, setOrderToDelete] = useState(null);
   const [showDeleteModals, setShowDeleteModals] = useState(false);
   const [deleteTarget, setDeleteTarget] = useState({ orderId: null, itemBackendId: null });
 
-  // ── Order detail / edit modal (kept from original) ────────────────────────
+  // ── Delete served item with reason ────────────────────────────────────────
+  const [showServedDeleteModal, setShowServedDeleteModal] = useState(false);
+  const [servedDeleteTarget, setServedDeleteTarget] = useState({
+    orderId: null,
+    item: null,
+    isServed: false,
+  });
+
+  // ── Order detail / edit modal ─────────────────────────────────────────────
   const [showOrderDetailModal, setShowOrderDetailModal] = useState(false);
   const [selectedOrder, setSelectedOrder] = useState(null);
   const [editOrderId, setEditOrderId] = useState(null);
@@ -562,7 +708,6 @@ const OrderSummaryVisible = ({ clientId, token }) => {
 
   // ─────────────────────────────────────────────────────────────────────────
   // processOrder — merge backend items with localStorage batches
-  // (preserved exactly from original)
   // ─────────────────────────────────────────────────────────────────────────
 
   const processOrder = (order) => {
@@ -748,7 +893,7 @@ const OrderSummaryVisible = ({ clientId, token }) => {
   }, [clientId, token, inventoryMap]);
 
   // ─────────────────────────────────────────────────────────────────────────
-  // Actions (preserved from original)
+  // Actions
   // ─────────────────────────────────────────────────────────────────────────
 
   const handleStatusChange = async (orderId, newStatus) => {
@@ -796,11 +941,24 @@ const OrderSummaryVisible = ({ clientId, token }) => {
     }
   };
 
-  const cancelItem = async (orderId, itemBackendId) => {
+  // ── cancelItem — drop-in replacement ────────────────────────────────────────
+  //
+  // Now passes `reason` and `transaction_type` as query params to the existing
+  // DELETE /order_item/delete endpoint instead of a separate transaction call.
+  //
+  // transaction_type values:
+  //   "WASTAGE"        → item was served; stock reversal recorded
+  //   "ITEM_CANCELLED" → item was pending/preparing/ready; audit record only
+  //   (omitted)        → old behaviour — delete only, no transaction
+  // ─────────────────────────────────────────────────────────────────────────
+
+  const cancelItem = async (orderId, itemBackendId, reason = null, isServed = false) => {
     const order = orders.find(o => o.id === orderId);
     const item = order?.items.find(i => i.id === itemBackendId);
     if (!item) return;
+
     try {
+      // 1. Remove local-only (temp) items that haven't hit the backend yet
       if (
         typeof itemBackendId === 'string' &&
         (itemBackendId.startsWith('temp_') || !itemBackendId.includes('_'))
@@ -813,33 +971,94 @@ const OrderSummaryVisible = ({ clientId, token }) => {
         });
         setOrders(updated);
         if (selectedOrder?.id === orderId) setSelectedOrder(updated.find(o => o.id === orderId));
+        if (viewOrder?.id === orderId) setViewOrder(updated.find(o => o.id === orderId) || null);
         toast.success('Item removed');
         return;
       }
+
+      // 2. Build query params — transaction_type only sent when a reason is provided
+      const params = { order_item_id: itemBackendId, client_id: clientId };
+      if (reason) {
+        params.reason = reason;
+        params.transaction_type = isServed ? 'WASTAGE' : 'ITEM_CANCELLED';
+      }
+
+      // 3. Single DELETE call — backend handles both deletion + transaction recording
       await axios.delete(
         `${import.meta.env.VITE_API_ORDER_SERVICE_URL}/${clientId}/order_item/delete`,
         {
-          params: { order_item_id: itemBackendId, client_id: clientId },
+          params,
           headers: { Authorization: `Bearer ${token}` },
         }
       );
+
+      // 4. Clean up localStorage if it was a new item
       if (item.is_new_item && item.frontend_unique_key) {
         localStorage.removeItem(`order_${orderId}_new_item_${item.frontend_unique_key}`);
       }
-      const updated = orders.map(o => {
+
+      // 5. Update local state
+      const updateOrder = (o) => {
         if (o.id !== orderId) return o;
         const updatedItems = o.items.filter(i => i.id !== itemBackendId);
         const newTotal = updatedItems.reduce((sum, it) => {
           const price = inventoryMap[it.item_id]?.unit_price || it.price || 0;
           return sum + (it.quantity || 1) * price;
         }, 0);
-        return { ...o, items: updatedItems, total_price: newTotal, has_new_items: updatedItems.some(i => i.is_new_item) };
-      });
-      setOrders(updated);
-      if (selectedOrder?.id === orderId) setSelectedOrder(updated.find(o => o.id === orderId));
-      toast.success('Item cancelled');
+        return {
+          ...o,
+          items: updatedItems,
+          total_price: newTotal,
+          has_new_items: updatedItems.some(i => i.is_new_item),
+        };
+      };
+
+      const updatedOrders = orders.map(updateOrder);
+      setOrders(updatedOrders);
+
+      if (selectedOrder?.id === orderId)
+        setSelectedOrder(updatedOrders.find(o => o.id === orderId) || null);
+
+      // Keep viewOrder in sync if the view modal is still open
+      if (viewOrder?.id === orderId)
+        setViewOrder(updatedOrders.find(o => o.id === orderId) || null);
+
+      toast.success(isServed ? 'Served item deleted & wastage recorded' : 'Item cancelled');
+
     } catch {
       toast.error('Failed to cancel item.');
+    }
+  };
+
+  // ── Handler called from OrderItemsViewModal ───────────────────────────────
+  // Opens the reason modal for served items; falls through to direct delete for others.
+
+  const handleViewModalDeleteItem = (item, isServedItem) => {
+    if (!viewOrder) return;
+
+    if (isServedItem) {
+      // Needs a reason — open the served-item delete modal
+      setServedDeleteTarget({ orderId: viewOrder.id, item, isServed: true });
+      setShowServedDeleteModal(true);
+    } else {
+      // Non-served item: open the simple confirm modal
+      setDeleteTarget({ orderId: viewOrder.id, itemBackendId: item.id });
+      setShowDeleteModals(true);
+    }
+  };
+
+  // ── Handler called from the edit modal's item list ────────────────────────
+
+  const handleEditModalDeleteItem = (item) => {
+    if (!selectedOrder) return;
+    const isServedItem = item.status?.toLowerCase() === 'served';
+
+    if (isServedItem) {
+      setServedDeleteTarget({ orderId: selectedOrder.id, item, isServed: true });
+      setShowServedDeleteModal(true);
+    } else {
+      setDeleteTarget({ orderId: selectedOrder.id, itemBackendId: item.id });
+      setShowDeleteModals(true);
     }
   };
 
@@ -1179,7 +1398,6 @@ const OrderSummaryVisible = ({ clientId, token }) => {
     })
     : orders;
 
-  // Single mode selection (not multi)
   if (selectedOrderMode !== 'all') {
     filteredOrders = filteredOrders.filter(o => o._fixedOrderMode === selectedOrderMode);
   }
@@ -1299,437 +1517,398 @@ const OrderSummaryVisible = ({ clientId, token }) => {
               {filteredOrders.length} order{filteredOrders.length !== 1 ? 's' : ''}
             </div>
           </div>
-          </div>
-
-          {/* ── Orders table ── */}
-          {loading ? (
-            <div className="flex items-center justify-center py-24">
-              <div className="w-8 h-8 border-2 border-action-primary border-t-transparent rounded-full animate-spin" />
-            </div>
-          ) : filteredOrders.length === 0 ? (
-            <div className="rounded-xl p-16 text-center bg-bg-primary border border-border-default shadow-card">
-              <ShoppingBag
-                size={40}
-                className="mx-auto mb-3 text-text-secondary opacity-40"
-              />
-              <p className="text-text-secondary text-base font-medium">No orders found</p>
-            </div>
-          ) : (
-            <div className="rounded-xl overflow-hidden border border-border-default shadow-card bg-bg-primary">
-              <table className="w-full">
-
-                {/* Table head */}
-                <thead className="bg-bg-tertiary border-b border-border-default">
-                  <tr>
-                    <th className="px-6 py-4 text-left text-xs font-bold text-text-primary uppercase tracking-wider">
-                      Order #
-                    </th>
-                    <th className="px-6 py-4 text-left text-xs font-bold text-text-primary uppercase tracking-wider">
-                      Table / Customer
-                    </th>
-                    <th className="px-6 py-4 text-left text-xs font-bold text-text-primary uppercase tracking-wider">
-                      Mode
-                    </th>
-                    <th className="px-6 py-4 text-left text-xs font-bold text-text-primary uppercase tracking-wider">
-                      Items
-                    </th>
-                    <th className="px-6 py-4 text-left text-xs font-bold text-text-primary uppercase tracking-wider">
-                      Total Price
-                    </th>
-                    <th className="px-6 py-4 text-left text-xs font-bold text-text-primary uppercase tracking-wider">
-                      Status
-                    </th>
-                    <th className="px-6 py-4 text-left text-xs font-bold text-text-primary uppercase tracking-wider">
-                      Actions
-                    </th>
-                  </tr>
-                </thead>
-
-                {/* Table body */}
-                <tbody className="divide-y divide-border-default">
-                  {filteredOrders.map((order, rowIdx) => {
-                    const status = order.status?.toLowerCase();
-                    const orderTotal = getOrderTotal(order);
-                    const isEven = rowIdx % 2 === 0;
-
-                    return (
-                      <tr
-                        key={order.id}
-                        className={`hover:bg-bg-tertiary transition-colors
-                        ${isEven ? 'bg-bg-primary' : 'bg-bg-tertiary'}`}
-                      >
-                        {/* Order # */}
-                        <td className="px-6 py-4 whitespace-nowrap">
-                          <div className="flex items-center gap-1.5">
-                            <span className="font-bold text-action-primary">#{order.id}</span>
-                            {order.has_new_items && (
-                              <span className="text-[9px] font-bold text-text-white bg-action-primary px-1.5 py-0.5 rounded-full uppercase">
-                                New
-                              </span>
-                            )}
-                          </div>
-                        </td>
-
-                        {/* Table / Customer */}
-                        <td className="px-6 py-4 whitespace-nowrap">
-                          {order._fixedOrderMode === 'takeaway'
-                            ? order.customer_name || 'Takeaway'
-                            : tablesMap[order.table_id] ||
-                            order.table ||
-                            String(order.table_id)}
-                        </td>
-
-                        {/* Mode */}
-                        <td className="px-6 py-4 whitespace-nowrap">
-                          <span className="inline-flex items-center gap-1 px-2.5 py-1 rounded-full text-xs font-semibold bg-bg-tertiary text-text-secondary border border-border-default">
-                            {getOrderModeIcon(order._fixedOrderMode)}
-                            {getOrderModeLabel(order._fixedOrderMode)}
-                          </span>
-                        </td>
-
-                        {/* Items count */}
-                        <td className="px-6 py-4 whitespace-nowrap">
-                          {order.items.length}
-                        </td>
-
-                        {/* Total price — computed from backend items via inventoryMap */}
-                        <td className="px-6 py-4 whitespace-nowrap">
-                          ₹{orderTotal.toFixed(2)}
-                        </td>
-
-                        {/* Status */}
-                        <td className="px-6 py-4 whitespace-nowrap">
-                          <StatusBadge status={order.status} />
-                        </td>
-
-                        {/* Actions */}
-                        <td className="px-6 py-4 whitespace-nowrap">
-                          <div className="flex items-center justify-center gap-4 flex-wrap">
-
-                            {/* View items */}
-                            <button
-                              onClick={() => {
-                                setViewOrder({
-                                  ...order,
-                                  _tableName:
-                                    tablesMap[order.table_id] ||
-                                    order.table ||
-                                    String(order.table_id),
-                                });
-                                setShowViewModal(true);
-                              }}
-                              className="p-1.5 rounded-lg bg-action-primary/10 text-action-primary hover:bg-action-primary hover:text-text-white transition-colors"
-                              title="View items"
-                            >
-                              <Eye size={15} />
-                            </button>
-
-                            {/* Mark as Served */}
-                            {status === 'ready' && (
-                              <button
-                                onClick={() => handleStatusChange(order.id, 'served')}
-                                className="px-2.5 py-1 rounded-lg bg-action-success text-text-white text-xs font-semibold hover:opacity-90 transition-colors whitespace-nowrap"
-                              >
-                                Mark As Served
-                              </button>
-                            )}
-
-                            {/* Generate Bill */}
-                            {status === 'served' && (
-                              <button
-                                onClick={() => handleGenerateBill(order)}
-                                className="px-2.5 py-1 rounded-lg bg-green-700 text-text-white text-xs font-semibold hover:bg-green-800 transition-colors whitespace-nowrap"
-                              >
-                                Generate Bill
-                              </button>
-                            )}
-
-                            {/* Delete */}
-                            <button
-                              onClick={() => {
-                                setOrderToDelete(order.id);
-                                setShowDeleteModal(true);
-                              }}
-                              className="p-1.5 rounded-lg bg-action-danger/10 text-action-danger hover:bg-action-danger hover:text-text-white transition-colors"
-                              title="Delete order"
-                            >
-                              <Trash2 size={15} />
-                            </button>
-                          </div>
-                        </td>
-                      </tr>
-                    );
-                  })}
-                </tbody>
-              </table>
-            </div>
-          )}
         </div>
 
-        {/* ── Order detail / edit modal (preserved from original) ── */}
-        {showOrderDetailModal && selectedOrder && (
+        {/* ── Orders table ── */}
+        {loading ? (
+          <div className="flex items-center justify-center py-24">
+            <div className="w-8 h-8 border-2 border-action-primary border-t-transparent rounded-full animate-spin" />
+          </div>
+        ) : filteredOrders.length === 0 ? (
+          <div className="rounded-xl p-16 text-center bg-bg-primary border border-border-default shadow-card">
+            <ShoppingBag size={40} className="mx-auto mb-3 text-text-secondary opacity-40" />
+            <p className="text-text-secondary text-base font-medium">No orders found</p>
+          </div>
+        ) : (
+          <div className="rounded-xl overflow-hidden border border-border-default shadow-card bg-bg-primary">
+            <table className="w-full">
+              <thead className="bg-bg-tertiary border-b border-border-default">
+                <tr>
+                  <th className="px-6 py-4 text-left text-xs font-bold text-text-primary uppercase tracking-wider">Order #</th>
+                  <th className="px-6 py-4 text-left text-xs font-bold text-text-primary uppercase tracking-wider">Table / Customer</th>
+                  <th className="px-6 py-4 text-left text-xs font-bold text-text-primary uppercase tracking-wider">Mode</th>
+                  <th className="px-6 py-4 text-left text-xs font-bold text-text-primary uppercase tracking-wider">Items</th>
+                  <th className="px-6 py-4 text-left text-xs font-bold text-text-primary uppercase tracking-wider">Total Price</th>
+                  <th className="px-6 py-4 text-left text-xs font-bold text-text-primary uppercase tracking-wider">Status</th>
+                  <th className="px-6 py-4 text-left text-xs font-bold text-text-primary uppercase tracking-wider">Actions</th>
+                </tr>
+              </thead>
+              <tbody className="divide-y divide-border-default">
+                {filteredOrders.map((order, rowIdx) => {
+                  const status = order.status?.toLowerCase();
+                  const orderTotal = getOrderTotal(order);
+                  const isEven = rowIdx % 2 === 0;
+
+                  return (
+                    <tr
+                      key={order.id}
+                      className={`hover:bg-bg-tertiary transition-colors ${isEven ? 'bg-bg-primary' : 'bg-bg-tertiary'}`}
+                    >
+                      <td className="px-6 py-4 whitespace-nowrap">
+                        <div className="flex items-center gap-1.5">
+                          <span className="font-bold text-action-primary">#{order.id}</span>
+                          {order.has_new_items && (
+                            <span className="text-[9px] font-bold text-text-white bg-action-primary px-1.5 py-0.5 rounded-full uppercase">
+                              New
+                            </span>
+                          )}
+                        </div>
+                      </td>
+                      <td className="px-6 py-4 whitespace-nowrap">
+                        {order._fixedOrderMode === 'takeaway'
+                          ? order.customer_name || 'Takeaway'
+                          : tablesMap[order.table_id] || order.table || String(order.table_id)}
+                      </td>
+                      <td className="px-6 py-4 whitespace-nowrap">
+                        <span className="inline-flex items-center gap-1 px-2.5 py-1 rounded-full text-xs font-semibold bg-bg-tertiary text-text-secondary border border-border-default">
+                          {getOrderModeIcon(order._fixedOrderMode)}
+                          {getOrderModeLabel(order._fixedOrderMode)}
+                        </span>
+                      </td>
+                      <td className="px-6 py-4 whitespace-nowrap">{order.items.length}</td>
+                      <td className="px-6 py-4 whitespace-nowrap">₹{orderTotal.toFixed(2)}</td>
+                      <td className="px-6 py-4 whitespace-nowrap">
+                        <StatusBadge status={order.status} />
+                      </td>
+                      <td className="px-6 py-4 whitespace-nowrap">
+                        <div className="flex items-center justify-center gap-4 flex-wrap">
+                          <button
+                            onClick={() => {
+                              setViewOrder({
+                                ...order,
+                                _tableName: tablesMap[order.table_id] || order.table || String(order.table_id),
+                              });
+                              setShowViewModal(true);
+                            }}
+                            className="p-1.5 rounded-lg bg-action-primary/10 text-action-primary hover:bg-action-primary hover:text-text-white transition-colors"
+                            title="View items"
+                          >
+                            <Eye size={15} />
+                          </button>
+                          {status === 'ready' && (
+                            <button
+                              onClick={() => handleStatusChange(order.id, 'served')}
+                              className="px-2.5 py-1 rounded-lg bg-action-success text-text-white text-xs font-semibold hover:opacity-90 transition-colors whitespace-nowrap"
+                            >
+                              Mark As Served
+                            </button>
+                          )}
+                          {status === 'served' && (
+                            <button
+                              onClick={() => handleGenerateBill(order)}
+                              className="px-2.5 py-1 rounded-lg bg-green-700 text-text-white text-xs font-semibold hover:bg-green-800 transition-colors whitespace-nowrap"
+                            >
+                              Generate Bill
+                            </button>
+                          )}
+                          <button
+                            onClick={() => {
+                              setOrderToDelete(order.id);
+                              setShowDeleteModal(true);
+                            }}
+                            className="p-1.5 rounded-lg bg-action-danger/10 text-action-danger hover:bg-action-danger hover:text-text-white transition-colors"
+                            title="Delete order"
+                          >
+                            <Trash2 size={15} />
+                          </button>
+                        </div>
+                      </td>
+                    </tr>
+                  );
+                })}
+              </tbody>
+            </table>
+          </div>
+        )}
+      </div>
+
+      {/* ── Order detail / edit modal ── */}
+      {showOrderDetailModal && selectedOrder && (
+        <div
+          className="fixed inset-0 z-50 flex items-center justify-center p-4 bg-color-modalsbg backdrop-blur-sm"
+          onClick={() => {
+            setShowOrderDetailModal(false);
+            setEditOrderId(null);
+            setActiveTab('items');
+          }}
+        >
           <div
-            className="fixed inset-0 z-50 flex items-center justify-center p-4 bg-color-modalsbg backdrop-blur-sm"
-            onClick={() => {
-              setShowOrderDetailModal(false);
-              setEditOrderId(null);
-              setActiveTab('items');
-            }}
+            className="rounded-xl w-full max-w-3xl max-h-[90vh] flex flex-col bg-bg-primary shadow-card border border-border-default"
+            onClick={e => e.stopPropagation()}
           >
-            <div
-              className="rounded-xl w-full max-w-3xl max-h-[90vh] flex flex-col bg-bg-primary shadow-card border border-border-default"
-              onClick={e => e.stopPropagation()}
-            >
-              {/* Header */}
-              <div className="px-4 sm:px-6 py-4 border-b border-border-default bg-bg-tertiary rounded-t-xl">
-                <div className="flex items-center justify-between gap-4">
-                  <div>
-                    <h3 className="text-lg sm:text-xl font-bold text-text-primary">
-                      {tablesMap[selectedOrder.table_id] ||
-                        selectedOrder.table ||
-                        selectedOrder.table_id}
-                    </h3>
-                    <span className="text-2xl font-extrabold text-text-primary">
-                      {selectedOrder.items.length} items
-                    </span>
-                  </div>
-                  <div className="flex items-center gap-3">
-                    <div className="text-right bg-action-primary/10 px-4 py-2 rounded-xl border border-action-primary/20">
-                      <div className="text-xs font-semibold text-text-secondary uppercase">Total</div>
-                      <div className="text-xl font-bold text-action-primary">
-                        ₹{selectedOrder.items
-                          .reduce(
-                            (sum, item) =>
-                              sum +
-                              ((inventoryMap[item.item_id]?.unit_price ||
-                                item.unit_price ||
-                                item.price ||
-                                0) *
-                                (item.quantity || 1)),
-                            0
-                          )
-                          .toFixed(2)}
-                      </div>
+            <div className="px-4 sm:px-6 py-4 border-b border-border-default bg-bg-tertiary rounded-t-xl">
+              <div className="flex items-center justify-between gap-4">
+                <div>
+                  <h3 className="text-lg sm:text-xl font-bold text-text-primary">
+                    {tablesMap[selectedOrder.table_id] || selectedOrder.table || selectedOrder.table_id}
+                  </h3>
+                  <span className="text-2xl font-extrabold text-text-primary">
+                    {selectedOrder.items.length} items
+                  </span>
+                </div>
+                <div className="flex items-center gap-3">
+                  <div className="text-right bg-action-primary/10 px-4 py-2 rounded-xl border border-action-primary/20">
+                    <div className="text-xs font-semibold text-text-secondary uppercase">Total</div>
+                    <div className="text-xl font-bold text-action-primary">
+                      ₹{selectedOrder.items
+                        .reduce(
+                          (sum, item) =>
+                            sum +
+                            ((inventoryMap[item.item_id]?.unit_price || item.unit_price || item.price || 0) *
+                              (item.quantity || 1)),
+                          0
+                        )
+                        .toFixed(2)}
                     </div>
-                    <button
-                      className="p-2 rounded-xl hover:bg-bg-tertiary"
+                  </div>
+                  <button
+                    className="p-2 rounded-xl hover:bg-bg-tertiary"
+                    onClick={() => {
+                      setShowOrderDetailModal(false);
+                      setEditOrderId(null);
+                      setActiveTab('items');
+                    }}
+                  >
+                    <X size={20} />
+                  </button>
+                </div>
+              </div>
+            </div>
+
+            <div className="lg:hidden border-b border-border-default bg-bg-tertiary">
+              <div className="flex">
+                <button
+                  className={`flex-1 py-3 text-sm font-semibold ${activeTab === 'items' ? 'text-action-primary border-b-2 border-action-primary bg-bg-primary' : 'text-text-secondary'}`}
+                  onClick={() => setActiveTab('items')}
+                >
+                  Items
+                </button>
+                <button
+                  className={`flex-1 py-3 text-sm font-semibold ${activeTab === 'available' ? 'text-action-primary border-b-2 border-action-primary bg-bg-primary' : 'text-text-secondary'}`}
+                  onClick={() => setActiveTab('available')}
+                >
+                  Add Items
+                </button>
+              </div>
+            </div>
+
+            <div className="flex-1 flex flex-col lg:flex-row overflow-hidden">
+              <div className={`w-full lg:w-2/5 border-r border-border-default bg-bg-tertiary flex flex-col ${activeTab === 'available' ? 'block' : 'hidden lg:flex'}`}>
+                <div className="p-4 border-b border-border-default bg-bg-primary shrink-0">
+                  <input
+                    type="text"
+                    className="w-full px-4 py-2 rounded-xl border border-border-default bg-bg-primary text-text-primary"
+                    placeholder="Search items..."
+                    value={itemSearchQuery}
+                    onChange={e => setItemSearchQuery(e.target.value)}
+                  />
+                </div>
+                <div className="flex-1 overflow-y-auto p-4 space-y-2">
+                  {(itemSearchResults.length > 0 ? itemSearchResults : allInventoryItems).map(item => (
+                    <div
+                      key={item.id}
+                      className="p-3 rounded-xl bg-bg-primary border border-border-default cursor-pointer hover:border-action-primary transition-colors"
                       onClick={() => {
-                        setShowOrderDetailModal(false);
-                        setEditOrderId(null);
+                        handleItemSelection(selectedOrder.id, item);
                         setActiveTab('items');
                       }}
                     >
-                      <X size={20} />
-                    </button>
-                  </div>
+                      <div className="font-semibold text-text-primary">{item.name}</div>
+                      <div className="text-sm font-bold text-action-primary">₹{item.unit_price}</div>
+                    </div>
+                  ))}
                 </div>
               </div>
 
-              {/* Mobile tabs */}
-              <div className="lg:hidden border-b border-border-default bg-bg-tertiary">
-                <div className="flex">
-                  <button
-                    className={`flex-1 py-3 text-sm font-semibold
-                    ${activeTab === 'items'
-                        ? 'text-action-primary border-b-2 border-action-primary bg-bg-primary'
-                        : 'text-text-secondary'}`}
-                    onClick={() => setActiveTab('items')}
-                  >
-                    Items
-                  </button>
-                  <button
-                    className={`flex-1 py-3 text-sm font-semibold
-                    ${activeTab === 'available'
-                        ? 'text-action-primary border-b-2 border-action-primary bg-bg-primary'
-                        : 'text-text-secondary'}`}
-                    onClick={() => setActiveTab('available')}
-                  >
-                    Add Items
-                  </button>
-                </div>
-              </div>
+              <div className={`w-full lg:w-3/5 bg-bg-primary ${activeTab === 'items' ? 'block' : 'hidden lg:block'}`}>
+                <div className="p-4 space-y-2 overflow-y-auto max-h-[calc(90vh-200px)]">
+                  {selectedOrder.items.map((item, idx) => {
+                    const prev = selectedOrder.items[idx - 1];
+                    const showDivider =
+                      item._isBatchStart ||
+                      (item.is_new_item &&
+                        (!prev || (prev.batch_timestamp || null) !== (item.batch_timestamp || null)));
+                    const isServedItem = item.status?.toLowerCase() === 'served';
 
-              {/* Content */}
-              <div className="flex-1 flex flex-col lg:flex-row overflow-hidden">
-
-                {/* Available items (add) */}
-                <div
-                  className={`w-full lg:w-2/5 border-r border-border-default bg-bg-tertiary flex flex-col
-                  ${activeTab === 'available' ? 'block' : 'hidden lg:flex'}`}
-                >
-                  <div className="p-4 border-b border-border-default bg-bg-primary shrink-0">
-                    <input
-                      type="text"
-                      className="w-full px-4 py-2 rounded-xl border border-border-default bg-bg-primary text-text-primary"
-                      placeholder="Search items..."
-                      value={itemSearchQuery}
-                      onChange={e => setItemSearchQuery(e.target.value)}
-                    />
-                  </div>
-                  <div className="flex-1 overflow-y-auto p-4 space-y-2">
-                    {(itemSearchResults.length > 0 ? itemSearchResults : allInventoryItems).map(item => (
-                      <div
-                        key={item.id}
-                        className="p-3 rounded-xl bg-bg-primary border border-border-default cursor-pointer hover:border-action-primary transition-colors"
-                        onClick={() => {
-                          handleItemSelection(selectedOrder.id, item);
-                          setActiveTab('items');
-                        }}
-                      >
-                        <div className="font-semibold text-text-primary">{item.name}</div>
-                        <div className="text-sm font-bold text-action-primary">₹{item.unit_price}</div>
-                      </div>
-                    ))}
-                  </div>
-                </div>
-
-                {/* Order items */}
-                <div
-                  className={`w-full lg:w-3/5 bg-bg-primary
-                  ${activeTab === 'items' ? 'block' : 'hidden lg:block'}`}
-                >
-                  <div className="p-4 space-y-2 overflow-y-auto max-h-[calc(90vh-200px)]">
-                    {selectedOrder.items.map((item, idx) => {
-                      const prev = selectedOrder.items[idx - 1];
-                      const showDivider =
-                        item._isBatchStart ||
-                        (item.is_new_item &&
-                          (!prev ||
-                            (prev.batch_timestamp || null) !== (item.batch_timestamp || null)));
-
-                      return (
-                        <div key={item.id || idx}>
-                          {showDivider && (
-                            <div className="flex items-center my-4">
-                              <div className="flex-1 h-px bg-gradient-to-r from-transparent via-action-primary to-transparent" />
-                              <span className="px-3 py-1.5 text-action-primary bg-action-primary/10 text-xs font-bold rounded-full mx-3 border border-action-primary/30">
-                                New Items
-                              </span>
-                              <div className="flex-1 h-px bg-gradient-to-r from-transparent via-action-primary to-transparent" />
-                            </div>
-                          )}
-                          <div className="flex items-center justify-between p-3 rounded-xl bg-bg-tertiary border border-border-default">
+                    return (
+                      <div key={item.id || idx}>
+                        {showDivider && (
+                          <div className="flex items-center my-4">
+                            <div className="flex-1 h-px bg-gradient-to-r from-transparent via-action-primary to-transparent" />
+                            <span className="px-3 py-1.5 text-action-primary bg-action-primary/10 text-xs font-bold rounded-full mx-3 border border-action-primary/30">
+                              New Items
+                            </span>
+                            <div className="flex-1 h-px bg-gradient-to-r from-transparent via-action-primary to-transparent" />
+                          </div>
+                        )}
+                        <div className={`flex items-center justify-between p-3 rounded-xl border ${isServedItem ? 'bg-gray-50 border-gray-200' : 'bg-bg-tertiary border-border-default'}`}>
+                          <div>
                             <div className="font-semibold text-sm text-text-primary">
                               {item.item_name || item.item_id}
                             </div>
-                            <div className="flex items-center gap-2">
-                              <button
-                                onClick={() =>
-                                  updateItemQuantity(
-                                    selectedOrder.id,
-                                    item.id || item.frontend_unique_key,
-                                    Math.max(1, item.quantity - 1)
-                                  )
-                                }
-                                className="px-3 py-1 rounded-lg border border-border-default bg-bg-primary text-text-primary"
-                              >
-                                −
-                              </button>
-                              <span className="px-3 font-bold text-text-primary">{item.quantity}</span>
-                              <button
-                                onClick={() =>
-                                  updateItemQuantity(
-                                    selectedOrder.id,
-                                    item.id || item.frontend_unique_key,
-                                    item.quantity + 1
-                                  )
-                                }
-                                className="px-3 py-1 rounded-lg border border-border-default bg-bg-primary text-text-primary"
-                              >
-                                +
-                              </button>
-                              <button
-                                className="p-2 rounded-lg bg-action-danger/10 text-action-danger"
-                                onClick={() => {
-                                  setDeleteTarget({
-                                    orderId: selectedOrder.id,
-                                    itemBackendId: item.id,
-                                  });
-                                  setShowDeleteModals(true);
-                                }}
-                              >
-                                <Trash2 size={16} />
-                              </button>
-                            </div>
+                            {isServedItem && (
+                              <span className="text-[10px] font-semibold text-gray-500 bg-gray-100 px-1.5 py-0.5 rounded-full mt-0.5 inline-block">
+                                served
+                              </span>
+                            )}
+                          </div>
+                          <div className="flex items-center gap-2">
+                            {!isServedItem && (
+                              <>
+                                <button
+                                  onClick={() =>
+                                    updateItemQuantity(
+                                      selectedOrder.id,
+                                      item.id || item.frontend_unique_key,
+                                      Math.max(1, item.quantity - 1)
+                                    )
+                                  }
+                                  className="px-3 py-1 rounded-lg border border-border-default bg-bg-primary text-text-primary"
+                                >
+                                  −
+                                </button>
+                                <span className="px-3 font-bold text-text-primary">{item.quantity}</span>
+                                <button
+                                  onClick={() =>
+                                    updateItemQuantity(
+                                      selectedOrder.id,
+                                      item.id || item.frontend_unique_key,
+                                      item.quantity + 1
+                                    )
+                                  }
+                                  className="px-3 py-1 rounded-lg border border-border-default bg-bg-primary text-text-primary"
+                                >
+                                  +
+                                </button>
+                              </>
+                            )}
+                            {/* Delete button — always shown, amber tint for served items */}
+                            <button
+                              className={`p-2 rounded-lg transition-colors
+                                ${isServedItem
+                                  ? 'bg-orange-100 text-orange-600 hover:bg-orange-500 hover:text-white'
+                                  : 'bg-action-danger/10 text-action-danger hover:bg-action-danger hover:text-text-white'}`}
+                              title={isServedItem ? 'Delete served item (records wastage)' : 'Delete item'}
+                              onClick={() => handleEditModalDeleteItem(item)}
+                            >
+                              <Trash2 size={16} />
+                            </button>
                           </div>
                         </div>
-                      );
-                    })}
-                  </div>
+                      </div>
+                    );
+                  })}
                 </div>
               </div>
+            </div>
 
-              {/* Footer */}
-              <div className="p-4 border-t border-border-default bg-bg-tertiary flex gap-3 rounded-b-xl">
-                <button
-                  className="flex-1 bg-action-primary text-text-white py-3 rounded-xl font-semibold"
-                  onClick={() => {
-                    updateOrderItems(selectedOrder.id, selectedOrder.items);
-                    setShowOrderDetailModal(false);
-                    setEditOrderId(null);
-                  }}
-                >
-                  Save Changes
-                </button>
-                <button
-                  className="flex-1 bg-bg-primary border border-border-default py-3 rounded-xl font-semibold text-text-primary"
-                  onClick={() => {
-                    setShowOrderDetailModal(false);
-                    setEditOrderId(null);
-                    setActiveTab('items');
-                  }}
-                >
-                  Cancel
-                </button>
-              </div>
+            <div className="p-4 border-t border-border-default bg-bg-tertiary flex gap-3 rounded-b-xl">
+              <button
+                className="flex-1 bg-action-primary text-text-white py-3 rounded-xl font-semibold"
+                onClick={() => {
+                  updateOrderItems(selectedOrder.id, selectedOrder.items);
+                  setShowOrderDetailModal(false);
+                  setEditOrderId(null);
+                }}
+              >
+                Save Changes
+              </button>
+              <button
+                className="flex-1 bg-bg-primary border border-border-default py-3 rounded-xl font-semibold text-text-primary"
+                onClick={() => {
+                  setShowOrderDetailModal(false);
+                  setEditOrderId(null);
+                  setActiveTab('items');
+                }}
+              >
+                Cancel
+              </button>
             </div>
           </div>
-        )}
+        </div>
+      )}
 
-        {/* ── Modals ── */}
-        <OrderItemsViewModal
-          isOpen={showViewModal}
-          onClose={() => { setShowViewModal(false); setViewOrder(null); }}
-          order={viewOrder}
-          inventoryMap={inventoryMap}
-        />
+      {/* ── Modals ── */}
+      <OrderItemsViewModal
+        isOpen={showViewModal}
+        onClose={() => { setShowViewModal(false); setViewOrder(null); }}
+        order={viewOrder}
+        inventoryMap={inventoryMap}
+        onDeleteItem={handleViewModalDeleteItem}
+      />
 
-        <LineItemsModal
-          isOpen={lineItemsModalOpen}
-          onClose={() => setLineItemsModalOpen(false)}
-          mainItem={selectedMainItem}
-          lineItems={lineItemsDetails}
-          onAddMainOnly={handleAddMainItemOnly}
-          onAddWithAddons={handleAddMainItemWithLineItems}
-        />
+      <LineItemsModal
+        isOpen={lineItemsModalOpen}
+        onClose={() => setLineItemsModalOpen(false)}
+        mainItem={selectedMainItem}
+        lineItems={lineItemsDetails}
+        onAddMainOnly={handleAddMainItemOnly}
+        onAddWithAddons={handleAddMainItemWithLineItems}
+      />
 
-        <SimpleDeleteConfirm
-          isOpen={showDeleteModal}
-          onClose={() => setShowDeleteModal(false)}
-          onConfirm={confirmDeleteOrder}
-          title="Delete Order"
-          message="Want to delete this order?"
-        />
+      {/* Order-level delete */}
+      <SimpleDeleteConfirm
+        isOpen={showDeleteModal}
+        onClose={() => setShowDeleteModal(false)}
+        onConfirm={confirmDeleteOrder}
+        title="Delete Order"
+        message="Want to delete this order?"
+      />
 
-        <SimpleDeleteConfirm
-          isOpen={showDeleteModals}
-          onClose={() => setShowDeleteModals(false)}
-          onConfirm={() => {
-            cancelItem(deleteTarget.orderId, deleteTarget.itemBackendId);
-            setShowDeleteModals(false);
-          }}
-          title="Delete Item"
-          message="Are you sure you want to delete this item?"
-        />
+      {/* Non-served item delete (simple confirm) */}
+      <SimpleDeleteConfirm
+        isOpen={showDeleteModals}
+        onClose={() => setShowDeleteModals(false)}
+        onConfirm={() => {
+          cancelItem(
+            deleteTarget.orderId,
+            deleteTarget.itemBackendId,
+            'Item cancelled before serving',
+            false
+          );
+          setShowDeleteModals(false);
+        }}
+        title="Delete Item"
+        message="Are you sure you want to delete this item?"
+      />
 
-        <style>{`
+      {/* Served item delete — requires reason, records wastage */}
+      <DeleteServedItemModal
+        isOpen={showServedDeleteModal}
+        onClose={() => {
+          setShowServedDeleteModal(false);
+          setServedDeleteTarget({ orderId: null, item: null, isServed: false });
+        }}
+        onConfirm={async (reason) => {
+          await cancelItem(
+            servedDeleteTarget.orderId,
+            servedDeleteTarget.item?.id,
+            reason,
+            servedDeleteTarget.isServed
+          );
+        }}
+        item={servedDeleteTarget.item}
+        isServed={servedDeleteTarget.isServed}
+      />
+
+      <style>{`
         .custom-scrollbar::-webkit-scrollbar { width: 8px; }
         .custom-scrollbar::-webkit-scrollbar-track { background: var(--color-bg-tertiary); border-radius: 10px; }
         .custom-scrollbar::-webkit-scrollbar-thumb { background: var(--color-border-default); border-radius: 10px; }
         .custom-scrollbar::-webkit-scrollbar-thumb:hover { background: var(--color-action-primary); }
       `}</style>
-      </div>
-      );
+    </div>
+  );
 };
 
-      export default OrderSummaryVisible;
+export default OrderSummaryVisible;
