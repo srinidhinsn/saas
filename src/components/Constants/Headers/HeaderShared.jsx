@@ -179,7 +179,7 @@ import { Sun, Moon } from 'lucide-react';
 
 export const navMap = {
   home: (clientId) => `/${APP_ROOT}/${clientId}/home`,
-  table: (clientId) => `/${APP_ROOT}/${clientId}/managing-tables`,
+  table: (clientId) => `/${APP_ROOT}/${clientId}/sub-tables`,
   menu: (clientId) => `/${APP_ROOT}/${clientId}/menu`,
   billing: (clientId) => `/${APP_ROOT}/${clientId}/billing`,
   users: (clientId) => `/${APP_ROOT}/${clientId}/users`,

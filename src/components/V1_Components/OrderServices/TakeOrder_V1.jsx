@@ -561,7 +561,15 @@ const TakeOrder_V1 = ({ clientId, token, onOrderUpdate, realm }) => {
   // ─────────────────────────────────────────────────────────────────────────
   // Draft helpers
   // ─────────────────────────────────────────────────────────────────────────
-
+  const getSelectedTableName = () => {
+    if (!selectedTable) return '';
+  
+    const table = tables.find(t => String(t.id) === String(selectedTable));
+  
+    if (!table) return '';
+  
+    return table.name || table.table_number || `Table ${table.id}`;
+  };
   const refreshDraftTableIds = useCallback(() => {
     setDraftTableIds(getAllDraftTableIds());
   }, []);
@@ -1700,7 +1708,7 @@ const TakeOrder_V1 = ({ clientId, token, onOrderUpdate, realm }) => {
                         <div className="flex items-center gap-2">
                           {selectedTable && (
                             <span className="font-semibold text-lg text-gray-700">
-                              {tables.find(t => t.id.toString() === selectedTable)?.table_number}
+                              {getSelectedTableName()}
                             </span>
                           )}
                         </div>
@@ -1752,7 +1760,7 @@ const TakeOrder_V1 = ({ clientId, token, onOrderUpdate, realm }) => {
                         <select
                           value={selectedTable || ""}
                           onChange={(e) => setSelectedTable(e.target.value)}
-                          className="w-full border rounded-lg p-2 text-sm"
+                          className="w-full border outline-none rounded-lg p-2 text-sm"
                         >
                           <option value="">Select Table</option>
 

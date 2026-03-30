@@ -1339,59 +1339,69 @@ const UniversalAddModal = ({
 }) => {
   const [dragActive, setDragActive] = useState(false);
   const [showAddonPopup, setShowAddonPopup] = useState(false); // ✅ Popup state
-  const [zoneOptions, setZoneOptions] = useState([]);
-  const [sectionOptions, setSectionOptions] = useState([]);
-  const [loadingMasters, setLoadingMasters] = useState(false);
-
+  const [configs, setConfigs] = useState([]);
+  const [loadingConfigs, setLoadingConfigs] = useState(false); const [statusOptions, setStatusOptions] = useState([]);
   // Memoize helpers so they're stable across renders (prevents unnecessary effect runs)
   const flattenCategories = useCallback((items = [], level = 0) => {
     let result = [];
+
     items.forEach(item => {
       if (!item) return;
+
+      const children = item.children || item.subCategories || [];
+
       if (item.id !== 'all') {
         result.push({ ...item, level });
-        if (item.children) {
-          result = result.concat(flattenCategories(item.children, level + 1));
+
+        if (children.length) {
+          result = result.concat(flattenCategories(children, level + 1));
         }
       }
     });
+
     return result;
   }, []);
 
-
-
-  // Fetch master values for zones and sections
-  const fetchMasterValues = async (categoryId, setter) => {
+  const fetchStatuses = async () => {
     try {
       const res = await axios.get(
         `${import.meta.env.VITE_API_INVENTORY_SERVICE_URL}/${clientId}/inventory/masters`,
         {
-          params: { category_id: categoryId },
+          params: { category_id: "status" },
           headers: { Authorization: `Bearer ${token}` }
         }
       );
-      setter(res?.data?.data || []);
+      setStatusOptions(res.data?.data || []);
     } catch (err) {
-      console.error("Master fetch error:", categoryId, err);
-      setter([]);
+      console.error("Status fetch error:", err);
+      setStatusOptions([]);
     }
   };
 
-  // Load master data for table modal
+  const fetchConfigs = async () => {
+    try {
+      setLoadingConfigs(true);
+      const res = await axios.get(
+        `${import.meta.env.VITE_API_TABLE_SERVICE_URL}/${clientId}/tables/config`,
+        {
+          params: { client_id: clientId },
+          headers: { Authorization: `Bearer ${token}` }
+        }
+      );
+      setConfigs(res.data || []);
+    } catch (err) {
+      console.error("Config fetch error:", err);
+      setConfigs([]);
+    } finally {
+      setLoadingConfigs(false);
+    }
+  };
   useEffect(() => {
-    if (!showModal || modalType !== "table") return;
+    if (!showModal) return;
     if (!clientId || !token) return;
 
-    const loadMasters = async () => {
-      setLoadingMasters(true);
-      await Promise.all([
-        fetchMasterValues("zone", setZoneOptions),
-        fetchMasterValues("section", setSectionOptions)
-      ]);
-      setLoadingMasters(false);
-    };
-
-    loadMasters();
+    fetchConfigs();
+    fetchStatuses();
   }, [showModal, modalType, clientId, token]);
 
   // Drag handlers
@@ -1456,7 +1466,7 @@ const UniversalAddModal = ({
         code: '',
         unit: '',
         line_item_id: [],
-        inventory_id: ''
+        inventory_id: 'menu'
       });
 
       setNewItemImage?.(null);
@@ -1508,32 +1518,7 @@ const UniversalAddModal = ({
                 </select>
               </div>
 
-              {/* Inventory Selector */}
-              <div>
-                <label className="block text-sm font-medium mb-2 text-text-primary">
-                  Inventory Category *
-                </label>
 
-                <select
-                  value={newItem?.inventory_id ?? ""}
-                  onChange={(e) =>
-                    setNewItem((prev) => ({
-                      ...(prev || {}),
-                      inventory_id: e.target.value
-                    }))
-                  }
-                  className="w-full px-4 py-2 rounded-lg bg-bg-tertiary border border-border-default text-text-primary focus:outline-none focus:ring-2 focus:ring-action-primary"
-                  required
-                >
-                  <option value="">Select Inventory</option>
-
-                  {(inventoryIds || []).map((inv) => (
-                    <option key={inv.id} value={inv.id}>
-                      {inv.name}
-                    </option>
-                  ))}
-                </select>
-              </div>
 
               {/* Item Name */}
               <div>
@@ -1585,11 +1570,44 @@ const UniversalAddModal = ({
                   />
                 </div>
               </div>
+              <div>
+                <label className="block text-sm font-medium mb-2 text-text-primary">
+                  Pricing by Zone & Section
+                </label>
+                <p className="text-xs text-gray-400 mb-2">
+                  Leave blank to skip. Filled prices create separate zone records.
+                </p>
 
+                {/* Base price row — already exists above, just keep it */}
+
+                {configs.map(c => (
+                  <div key={c.id} className="flex items-center justify-between gap-3 px-3 py-2 mb-1 rounded-xl border border-border-default bg-bg-tertiary">
+                    <span className="text-sm font-medium text-text-primary">
+                      <span className="font-semibold text-blue-600">{c.section}</span>
+                      <span className="text-gray-400 mx-1">—</span>
+                      <span>{c.zone}</span>
+                    </span>
+                    <div className="flex items-center gap-1">
+                      <span className="text-xs text-gray-400">₹</span>
+                      <input
+                        type="number"
+                        min="0"
+                        placeholder={newItem?.unit_price || "0.00"}
+                        value={newItem?.zonePrices?.[c.id] ?? ''}
+                        onChange={e => setNewItem(prev => ({
+                          ...prev,
+                          zonePrices: { ...(prev.zonePrices || {}), [c.id]: e.target.value }
+                        }))}
+                        className="w-24 px-2 py-1 rounded-lg border border-border-default bg-bg-primary text-sm text-right focus:outline-none focus:ring-2 focus:ring-action-primary"
+                      />
+                    </div>
+                  </div>
+                ))}
+              </div>
               {/* Code & Unit */}
               <div className="grid grid-cols-2 gap-4">
 
-                 <div>
+                <div>
                   <label className="block text-sm font-medium mb-2 text-text-primary">Serving Quantity</label>
                   <input
                     type="number"
@@ -1614,7 +1632,7 @@ const UniversalAddModal = ({
                   </select>
                 </div>
 
-                
+
                 <div>
                   <label className="block text-sm font-medium mb-2 text-text-primary">Code *</label>
                   <input
@@ -1858,64 +1876,49 @@ const UniversalAddModal = ({
                 </div>
 
                 <div>
-                  <label className="block text-sm font-semibold mb-2">Section *</label>
-                  <select
-                    value={row?.section ?? ""}
-                    onChange={(e) => handleRangeChange(index, "section", e.target.value)}
-                    className="w-full px-3 py-2 border rounded-lg"
-                  >
-                    <option value="">Select Section</option>
-                    {loadingMasters ? (
-                      <option disabled>Loading...</option>
-                    ) : sectionOptions.length === 0 ? (
-                      <option disabled>No Sections Configured</option>
-                    ) : (
-                      sectionOptions.map((sec, i) => (
-                        <option key={i} value={sec}>{sec}</option>
-                      ))
-                    )}
-                  </select>
-                  {fieldErrors?.[index]?.section && (
-                    <div className="text-action-danger text-xs mt-1 font-medium">
-                      Select section
-                    </div>
-                  )}
-                </div>
+                  <label className="block text-sm font-semibold mb-2">Table Config *</label>
 
-                <div>
-                  <label className="block text-sm font-semibold mb-2">Zone *</label>
                   <select
-                    value={row?.location_zone ?? ""}
-                    onChange={(e) => handleRangeChange(index, "location_zone", e.target.value)}
+                    value={row?.config_id ?? ""}
+                    onChange={(e) => handleRangeChange(index, "config_id", Number(e.target.value))}
                     className="w-full px-3 py-2 border rounded-lg"
                   >
-                    <option value="">Select Zone</option>
-                    {loadingMasters ? (
+                    <option value="">Select Config</option>
+
+                    {loadingConfigs ? (
                       <option disabled>Loading...</option>
-                    ) : zoneOptions.length === 0 ? (
-                      <option disabled>No Zones Configured</option>
+                    ) : configs.length === 0 ? (
+                      <option disabled>No Config Available</option>
                     ) : (
-                      zoneOptions.map((zone, i) => (
-                        <option key={i} value={zone}>{zone}</option>
+                      configs.map((c) => (
+                        <option key={c.id} value={c.id}>
+                          {c.section} - {c.zone}
+                        </option>
                       ))
                     )}
                   </select>
-                  {fieldErrors?.[index]?.location_zone && (
-                    <div className="text-action-danger text-xs mt-1 font-medium">
-                      Select zone
-                    </div>
-                  )}
                 </div>
 
                 <div>
                   <label className="block text-sm font-semibold mb-2 text-text-primary">Remark</label>
                   <select
-                    value={row?.remark ?? 'vacant'}
+                    value={row?.remark ?? ''}
                     onChange={(e) => handleRangeChange(index, 'remark', e.target.value)}
                     className="w-full px-3 py-2 border-default border-border-default rounded-lg focus:outline-none focus:ring-2 focus:ring-action-primary"
                   >
-                    <option value="vacant">Vacant</option>
-                    <option value="reserved">Reserved</option>
+                    <option value="">Select status</option>
+                    {statusOptions.length > 0
+                      ? statusOptions.map(s => (
+                        <option key={s} value={s.toLowerCase()}>{s}</option>
+                      ))
+                      : (
+                        // fallback if masters API has nothing yet
+                        <>
+                          <option value="vacant">Vacant</option>
+                          <option value="reserved">Reserved</option>
+                        </>
+                      )
+                    }
                   </select>
                 </div>
               </div>
