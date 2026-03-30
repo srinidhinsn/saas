@@ -15,6 +15,7 @@ class AddressModel(BaseModel):
     id: Optional[int] = None
     address_line1: Optional[str]=None
     address_line2: Optional[str]=None
+    name: Optional[str] = None
     city: Optional[str]=None
     country: Optional[str]=None
     state: Optional[str]=None
