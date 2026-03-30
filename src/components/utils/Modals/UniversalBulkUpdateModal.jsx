@@ -859,7 +859,7 @@
 
 
 
-import React from 'react';
+import React, { useState, useEffect } from 'react';
 import { X, Edit, Trash2, Search, Plus } from 'lucide-react';
 import AddonSelectionPopup from './AddonSelection';
 import axios from 'axios';
@@ -871,7 +871,7 @@ const UniversalBulkUpdateModal = ({
   modalType, // 'menu' or 'table'
   clientId,
   token,
-
+  menuItems,
   // Menu-specific props (Bulk Update)
   filteredItems,
   selectedRows,
@@ -903,14 +903,50 @@ const UniversalBulkUpdateModal = ({
   // ✅ State for global add-ons popup
   const [showGlobalAddonPopup, setShowGlobalAddonPopup] = React.useState(false);
   const [globalAddons, setGlobalAddons] = React.useState([]);
-  const [zoneOptions, setZoneOptions] = React.useState([]);
-  const [sectionOptions, setSectionOptions] = React.useState([]);
-  const [loadingMasters, setLoadingMasters] = React.useState(false);
+  const [configs, setConfigs] = useState([]);
+  const [statusOptions, setStatusOptions] = useState([]);
 
   // ✅ State for individual item addon popup
   const [showItemAddonPopup, setShowItemAddonPopup] = React.useState(false);
   const [currentEditingItemId, setCurrentEditingItemId] = React.useState(null);
+  const [loadingConfigs, setLoadingConfigs] = useState(false);
 
+  const fetchStatuses = async () => {
+    try {
+      const res = await axios.get(
+        `${import.meta.env.VITE_API_INVENTORY_SERVICE_URL}/${clientId}/inventory/masters`,
+        {
+          params: { category_id: "status" },
+          headers: { Authorization: `Bearer ${token}` }
+        }
+      );
+      setStatusOptions(res.data?.data || []);
+    } catch (err) {
+      console.error("Status fetch error:", err);
+      setStatusOptions([]);
+    }
+  };
+
+  const fetchConfigs = async () => {
+    try {
+      setLoadingConfigs(true);
+
+      const res = await axios.get(
+        `${import.meta.env.VITE_API_TABLE_SERVICE_URL}/${clientId}/tables/config`,
+        {
+          params: { client_id: clientId },
+          headers: { Authorization: `Bearer ${token}` }
+        }
+      );
+
+      setConfigs(res.data || []);
+    } catch (err) {
+      console.error("Config fetch error:", err);
+      setConfigs([]);
+    } finally {
+      setLoadingConfigs(false);
+    }
+  };
   // ✅ Get addon name by ID
   const getAddonNameById = (id) => {
     const addon = allAddonItems?.find(item => item.id === id);
@@ -921,7 +957,7 @@ const UniversalBulkUpdateModal = ({
   const handleGlobalAddonSave = (selectedAddons) => {
     setGlobalAddons(selectedAddons);
     setShowGlobalAddonPopup(false);
-    
+
     // If items are already selected, apply immediately
     if (selectedRows.length > 0) {
       const updatedBulkData = { ...bulkEditData };
@@ -934,7 +970,7 @@ const UniversalBulkUpdateModal = ({
       });
 
       setBulkEditData(updatedBulkData);
-      
+
       if (selectedAddons.length > 0) {
         alert(`Applied ${selectedAddons.length} add-on(s) to ${selectedRows.length} selected item(s)`);
       }
@@ -942,7 +978,16 @@ const UniversalBulkUpdateModal = ({
       // Addons selected but no items yet - just store them
     }
   };
+  useEffect(() => {
+    if (!showModal) return;
+    if (!clientId || !token) return;
 
+    fetchConfigs();
+    fetchStatuses();
+  }, [showModal, clientId, token]);
+  useEffect(() => {
+    console.log("CONFIGS:", configs);
+  }, [configs]);
   // ✅ Clear global add-ons for all selected items
   const clearGlobalAddons = () => {
     if (selectedRows.length === 0) {
@@ -978,8 +1023,8 @@ const UniversalBulkUpdateModal = ({
       selectedRows.forEach(itemId => {
         // Only apply if this item doesn't already have the global addons set
         const currentAddons = updatedBulkData[itemId]?.line_item_id;
-        const addonsMatch = currentAddons && 
-          currentAddons.length === globalAddons.length && 
+        const addonsMatch = currentAddons &&
+          currentAddons.length === globalAddons.length &&
           currentAddons.every(id => globalAddons.includes(id));
 
         if (!addonsMatch) {
@@ -996,38 +1041,6 @@ const UniversalBulkUpdateModal = ({
       }
     }
   }, [selectedRows, globalAddons, modalType]);
-
-  const fetchMasterValues = async (categoryId, setter) => {
-    try {
-      const res = await axios.get(
-        `${import.meta.env.VITE_API_INVENTORY_SERVICE_URL}/${clientId}/inventory/masters`,
-        {
-          params: { category_id: categoryId },
-          headers: { Authorization: `Bearer ${token}` }
-        }
-      );
-      setter(res?.data?.data || []);
-    } catch (err) {
-      console.error("Master fetch error:", categoryId, err);
-      setter([]);
-    }
-  };
-
-  React.useEffect(() => {
-    if (!showModal || modalType !== "table") return;
-    if (!clientId || !token) return;
-
-    const loadMasters = async () => {
-      setLoadingMasters(true);
-      await Promise.all([
-        fetchMasterValues("zone", setZoneOptions),
-        fetchMasterValues("section", setSectionOptions)
-      ]);
-      setLoadingMasters(false);
-    };
-
-    loadMasters();
-  }, [showModal, modalType, clientId, token]);
 
   // Menu: Toggle all selection
   const toggleSelectAll = () => {
@@ -1096,8 +1109,7 @@ const UniversalBulkUpdateModal = ({
       setBulkUpdateGlobal({
         table_type: "",
         status: "",
-        section: "",
-        location_zone: ""
+        config_id: ""
       });
     }
   };
@@ -1123,7 +1135,7 @@ const UniversalBulkUpdateModal = ({
             </div>
 
             {/* ✅ Global Add-ons Section */}
-            <div className="px-6 py-4 bg-blue-50 border-b border-blue-200">
+            <div className="px-6 py-4 flex justify-between bg-blue-50 border-b border-blue-200">
               <div className="flex items-start gap-4">
                 <div className="flex-1">
                   <label className="block text-sm font-semibold mb-2 text-gray-700">
@@ -1135,8 +1147,8 @@ const UniversalBulkUpdateModal = ({
                       className="px-4 py-2 rounded-md bg-blue-600 text-white hover:bg-blue-700 transition-colors font-medium text-sm whitespace-nowrap flex items-center gap-2"
                     >
                       <Plus size={16} />
-                      {globalAddons.length > 0 
-                        ? `Selected: ${globalAddons.length} add-on(s)` 
+                      {globalAddons.length > 0
+                        ? `Selected: ${globalAddons.length} add-on(s)`
                         : 'Select Add-ons'}
                     </button>
                     <button
@@ -1162,9 +1174,9 @@ const UniversalBulkUpdateModal = ({
                     )}
                   </div>
                   <p className="text-xs text-gray-600 mt-2">
-                    💡 {selectedRows.length > 0 
+                    💡 {selectedRows.length > 0
                       ? `${globalAddons.length > 0 ? 'Add-ons applied to' : 'Select add-ons to apply to'} ${selectedRows.length} selected item(s)`
-                      : globalAddons.length > 0 
+                      : globalAddons.length > 0
                         ? `${globalAddons.length} add-on(s) selected. Now select items to apply them.`
                         : 'Select add-ons first, then select items - or vice versa!'}
                   </p>
@@ -1173,7 +1185,7 @@ const UniversalBulkUpdateModal = ({
             </div>
 
             {/* Action Bar */}
-            <div className="flex justify-between items-center gap-4 px-6 py-3 border-b border-gray-200 bg-gray-50">
+            <div className="flex flex-col sm:flex-row sm:justify-between sm:items-center gap-3 px-4 sm:px-6 py-3 border-b border-gray-200 bg-gray-50 shrink-0">
               <div className="flex items-center gap-4">
                 <label className="flex items-center gap-2 cursor-pointer">
                   <input
@@ -1189,11 +1201,11 @@ const UniversalBulkUpdateModal = ({
                 </span>
               </div>
 
-              <div className="flex gap-3">
+              <div className="flex gap-2 w-full sm:w-auto">
                 <button
                   onClick={handleBulkUpdate}
                   disabled={selectedRows.length === 0}
-                  className="flex items-center gap-2 px-4 py-2 rounded-md bg-blue-600 text-white hover:bg-blue-700 transition-colors disabled:bg-gray-300 disabled:cursor-not-allowed font-medium text-sm"
+                  className="flex-1 sm:flex-none flex items-center justify-center gap-2 px-4 py-2 rounded-lg bg-blue-600 text-white hover:bg-blue-700 transition-colors disabled:bg-gray-300 disabled:cursor-not-allowed font-medium text-sm"
                 >
                   <Edit className="w-4 h-4" />
                   Update Selected
@@ -1201,17 +1213,18 @@ const UniversalBulkUpdateModal = ({
                 <button
                   onClick={handleBulkDelete}
                   disabled={selectedRows.length === 0}
-                  className="flex items-center gap-2 px-4 py-2 rounded-md bg-red-600 text-white hover:bg-red-700 transition-colors disabled:bg-gray-300 disabled:cursor-not-allowed font-medium text-sm"
+                  className="flex-1 sm:flex-none flex items-center justify-center gap-2 px-4 py-2 rounded-lg bg-red-600 text-white hover:bg-red-700 transition-colors disabled:bg-gray-300 disabled:cursor-not-allowed font-medium text-sm"
                 >
                   <Trash2 className="w-4 h-4" />
-                  Delete Selected
+                  Delete
                 </button>
               </div>
             </div>
 
             {/* Table Container */}
             <div className="flex-1 overflow-auto px-4 py-4">
-              <div className="min-w-[1000px]">
+              {/* Desktop table */}
+              <div className="hidden md:block min-w-[900px]">
                 <table className="w-full border-collapse">
                   <thead className="sticky top-0 bg-white z-10">
                     <tr className="border-b border-gray-200">
@@ -1229,6 +1242,9 @@ const UniversalBulkUpdateModal = ({
                       <th className="px-4 py-3 text-left text-sm font-semibold text-gray-700 bg-gray-50">Discount</th>
                       <th className="px-4 py-3 text-left text-sm font-semibold text-gray-700 bg-gray-50">Code</th>
                       <th className="px-4 py-3 text-left text-sm font-semibold text-gray-700 bg-gray-50">Add-ons</th>
+                      <th className="px-4 py-3 text-left text-sm font-semibold text-gray-700 bg-gray-50">
+                        Zone Prices
+                      </th>
                     </tr>
                   </thead>
                   <tbody>
@@ -1310,13 +1326,57 @@ const UniversalBulkUpdateModal = ({
                                 step="0.01"
                                 value={editData.discount !== undefined ? editData.discount : item.discount}
                                 onChange={(e) => updateBulkEditData(item.id, 'discount', e.target.value)}
-                                className="w-full px-3 py-2 rounded-md border border-gray-300 text-sm focus:outline-none focus:ring-2 focus:ring-blue-500 focus:border-transparent"
+                                className="w-full px-3 py-2 rounded-md border border-gray-300 text-sm focus:outline-none focus:ring-2 focus:ring-blue-500"
                                 placeholder="0.00"
                               />
                             ) : (
                               <span className="text-sm text-gray-900">
                                 ₹{typeof item.discount === 'number' ? item.discount.toFixed(2) : (item.discount || 0)}
                               </span>
+                            )}
+                          </td>
+                          <td className="px-4 py-3 min-w-[200px]">
+                            {isSelected ? (
+                              <div className="space-y-1.5">
+                                {configs.map(c => (
+                                  <div key={c.id} className="flex items-center gap-2">
+                                    <span className="text-xs text-gray-600 font-medium w-24 truncate shrink-0">
+                                      {c.section}-{c.zone}
+                                    </span>
+                                    <span className="text-xs text-gray-400">₹</span>
+                                    <input
+                                      type="number"
+                                      min="0"
+                                      placeholder={item.unit_price || "0.00"}
+                                      value={editData.zonePrices?.[c.id] ?? ''}
+                                      onChange={e => updateBulkEditData(item.id, 'zonePrices', {
+                                        ...(editData.zonePrices || {}),
+                                        [c.id]: e.target.value
+                                      })}
+                                      className="w-20 px-2 py-1 border border-gray-200 rounded-lg text-xs text-right focus:outline-none focus:ring-2 focus:ring-blue-400 bg-white"
+                                    />
+                                  </div>
+                                ))}
+                              </div>
+                            ) : (
+                              <div className="space-y-0.5">
+                                {(() => {
+                                  if (!menuItems) return <span className="text-xs text-gray-400">-</span>;
+                                  const siblings = menuItems.filter(
+                                    m => (m.name || '').trim().toLowerCase() === (item.name || '').trim().toLowerCase()
+                                      && m.zone_config_id !== null
+                                  );
+                                  if (!siblings.length) return <span className="text-xs text-gray-400">-</span>;
+                                  return siblings.map(s => {
+                                    const c = configs.find(x => x.id === s.zone_config_id);
+                                    return c ? (
+                                      <div key={s.id} className="text-[11px] text-gray-500">
+                                        <span className="font-medium text-blue-600">{c.section}-{c.zone}</span>: ₹{s.unit_price}
+                                      </div>
+                                    ) : null;
+                                  });
+                                })()}
+                              </div>
                             )}
                           </td>
                           <td className="px-4 py-3">
@@ -1361,11 +1421,139 @@ const UniversalBulkUpdateModal = ({
                               </span>
                             )}
                           </td>
+
                         </tr>
                       );
                     })}
                   </tbody>
                 </table>
+                <div className="md:hidden space-y-3">
+                  {filteredItems.map((item) => {
+                    const isSelected = selectedRows.includes(item.id);
+                    const editData = bulkEditData[item.id] || {};
+                    const currentAddons = editData.line_item_id !== undefined
+                      ? editData.line_item_id
+                      : Array.isArray(item.line_item_id) ? item.line_item_id : [];
+                    const siblings = menuItems?.filter(
+                      m => (m.name || '').trim().toLowerCase() === (item.name || '').trim().toLowerCase()
+                        && m.zone_config_id !== null
+                    ) || [];
+
+                    return (
+                      <div key={item.id}
+                        className={`rounded-xl border-2 overflow-hidden transition-all ${isSelected ? 'border-blue-400 bg-blue-50/40' : 'border-gray-200 bg-white'
+                          }`}
+                      >
+                        {/* Card header row */}
+                        <div className="flex items-center gap-3 px-3 py-3">
+                          <input type="checkbox" checked={isSelected}
+                            onChange={() => toggleRowSelection(item.id)}
+                            className="w-4 h-4 text-blue-600 border-gray-300 rounded" />
+                          <div className="flex-1 min-w-0">
+                            <p className="font-semibold text-gray-900 text-sm truncate">{item.name}</p>
+                            <p className="text-xs text-gray-400 truncate">{item.description || '—'}</p>
+                          </div>
+                          <span className="text-sm font-bold text-blue-600">₹{item.unit_price}</span>
+                        </div>
+
+                        {/* Existing zone prices (unselected) */}
+                        {!isSelected && siblings.length > 0 && (
+                          <div className="px-3 pb-2 flex flex-wrap gap-1.5">
+                            {siblings.map(s => {
+                              const c = configs.find(x => x.id === s.zone_config_id);
+                              return c ? (
+                                <span key={s.id} className="text-[11px] bg-blue-100 text-blue-700 px-2 py-0.5 rounded-full">
+                                  {c.section}-{c.zone}: ₹{s.unit_price}
+                                </span>
+                              ) : null;
+                            })}
+                          </div>
+                        )}
+
+                        {/* Edit fields (selected) */}
+                        {isSelected && (
+                          <div className="px-3 pb-3 space-y-3 border-t border-blue-100 pt-3">
+                            {/* Name */}
+                            <div>
+                              <label className="text-[11px] font-semibold text-gray-500 uppercase tracking-wide">Name</label>
+                              <input type="text"
+                                value={editData.name !== undefined ? editData.name : item.name}
+                                onChange={e => updateBulkEditData(item.id, 'name', e.target.value)}
+                                className="mt-1 w-full px-3 py-2 border border-gray-300 rounded-lg text-sm focus:outline-none focus:ring-2 focus:ring-blue-400"
+                              />
+                            </div>
+
+                            {/* Base Price + Discount */}
+                            <div className="grid grid-cols-2 gap-2">
+                              <div>
+                                <label className="text-[11px] font-semibold text-gray-500 uppercase tracking-wide">Base Price</label>
+                                <input type="number" step="0.01"
+                                  value={editData.unit_price !== undefined ? editData.unit_price : item.unit_price}
+                                  onChange={e => updateBulkEditData(item.id, 'unit_price', e.target.value)}
+                                  className="mt-1 w-full px-3 py-2 border border-gray-300 rounded-lg text-sm focus:outline-none focus:ring-2 focus:ring-blue-400"
+                                  placeholder="0.00"
+                                />
+                              </div>
+                              <div>
+                                <label className="text-[11px] font-semibold text-gray-500 uppercase tracking-wide">Discount</label>
+                                <input type="number" step="0.01"
+                                  value={editData.discount !== undefined ? editData.discount : item.discount}
+                                  onChange={e => updateBulkEditData(item.id, 'discount', e.target.value)}
+                                  className="mt-1 w-full px-3 py-2 border border-gray-300 rounded-lg text-sm focus:outline-none focus:ring-2 focus:ring-blue-400"
+                                  placeholder="0.00"
+                                />
+                              </div>
+                            </div>
+
+                            {/* Code */}
+                            <div>
+                              <label className="text-[11px] font-semibold text-gray-500 uppercase tracking-wide">Code</label>
+                              <input type="text"
+                                value={editData.code !== undefined ? editData.code : item.code ?? ''}
+                                onChange={e => updateBulkEditData(item.id, 'code', e.target.value)}
+                                className="mt-1 w-full px-3 py-2 border border-gray-300 rounded-lg text-sm focus:outline-none focus:ring-2 focus:ring-blue-400"
+                                placeholder="Item code"
+                              />
+                            </div>
+
+                            {/* Zone Prices */}
+                            {configs.length > 0 && (
+                              <div>
+                                <label className="text-[11px] font-semibold text-gray-500 uppercase tracking-wide block mb-1.5">Zone Prices</label>
+                                <div className="space-y-2">
+                                  {configs.map(c => (
+                                    <div key={c.id} className="flex items-center gap-2 bg-white border border-gray-200 rounded-lg px-3 py-1.5">
+                                      <span className="text-xs font-medium text-blue-700 flex-1">{c.section} — {c.zone}</span>
+                                      <span className="text-xs text-gray-400">₹</span>
+                                      <input type="number" min="0"
+                                        placeholder={item.unit_price || "0.00"}
+                                        value={editData.zonePrices?.[c.id] ?? ''}
+                                        onChange={e => updateBulkEditData(item.id, 'zonePrices', {
+                                          ...(editData.zonePrices || {}), [c.id]: e.target.value
+                                        })}
+                                        className="w-20 px-2 py-1 border border-gray-200 rounded-lg text-sm text-right focus:outline-none focus:ring-2 focus:ring-blue-400"
+                                      />
+                                    </div>
+                                  ))}
+                                </div>
+                              </div>
+                            )}
+
+                            {/* Add-ons */}
+                            <div>
+                              <label className="text-[11px] font-semibold text-gray-500 uppercase tracking-wide block mb-1.5">Add-ons</label>
+                              <button type="button" onClick={() => openItemAddonPopup(item.id)}
+                                className="w-full px-3 py-2 rounded-lg bg-gray-50 border-2 border-dashed border-gray-300 text-gray-600 hover:border-blue-400 hover:bg-blue-50 transition-all text-sm font-medium flex items-center justify-center gap-2">
+                                <Plus size={14} />
+                                {currentAddons.length > 0 ? `${currentAddons.length} add-on(s) selected` : 'Select Add-ons'}
+                              </button>
+                            </div>
+                          </div>
+                        )}
+                      </div>
+                    );
+                  })}
+                </div>
 
                 {filteredItems.length === 0 && (
                   <div className="text-center py-16 mt-4">
@@ -1448,13 +1636,11 @@ const UniversalBulkUpdateModal = ({
               <X className="w-4 h-4 " />
             </button>
           </div>
-
           {/* Global Update Section */}
           <div className="px-4 sm:px-6 py-3 bg-bg-tertiary border-b border-border-default flex-shrink-0">
-            <div className="grid grid-cols-1 sm:grid-cols-4 gap-2">
+            <div className="grid grid-cols-1 sm:grid-cols-3 gap-2">
               <div>
                 <label className="block text-xs font-semibold mb-1.5 text-text-secondary">Seating</label>
-
                 {/* Desktop */}
                 <input
                   type="number"
@@ -1467,7 +1653,6 @@ const UniversalBulkUpdateModal = ({
                   placeholder="No change"
                   className="hidden sm:block w-full px-3 py-1.5 border border-border-default rounded-lg focus:outline-none focus:ring-2 focus:ring-action-primary focus:border-transparent text-sm bg-bg-primary text-text-primary"
                 />
-
                 {/* Mobile with +/- buttons */}
                 <div className="sm:hidden flex items-center border border-border-default rounded-lg overflow-hidden bg-bg-primary">
                   <button
@@ -1478,9 +1663,7 @@ const UniversalBulkUpdateModal = ({
                       setBulkUpdateGlobal(prev => ({ ...prev, table_type: value }));
                     }}
                     className="px-3 py-1.5 text-text-primary hover:bg-bg-tertiary font-bold transition-colors"
-                  >
-                    −
-                  </button>
+                  >−</button>
                   <input
                     type="number"
                     min="1"
@@ -1499,9 +1682,7 @@ const UniversalBulkUpdateModal = ({
                       setBulkUpdateGlobal(prev => ({ ...prev, table_type: current + 1 }));
                     }}
                     className="px-3 py-1.5 text-text-primary hover:bg-bg-tertiary font-bold transition-colors"
-                  >
-                    +
-                  </button>
+                  >+</button>
                 </div>
               </div>
 
@@ -1510,63 +1691,42 @@ const UniversalBulkUpdateModal = ({
                 <select
                   value={bulkUpdateGlobal.status}
                   onChange={e => setBulkUpdateGlobal(prev => ({ ...prev, status: e.target.value }))}
+                  className="w-full px-3 py-1.5 border border-border-default rounded-lg focus:outline-none focus:ring-2 focus:ring-action-primary text-sm bg-bg-primary text-text-primary"
+                >
+                  <option value="">No change</option>
+                  {statusOptions.length > 0
+                    ? statusOptions.map(s => (
+                      <option key={s} value={s}>{s}</option>
+                    ))
+                    : (
+                      <>
+                        <option value="Vacant">Vacant</option>
+                        <option value="Reserved">Reserved</option>
+                      </>
+                    )
+                  }
+                </select>
+              </div>
+
+              <div>
+                <label className="block text-xs font-semibold mb-1.5 text-text-secondary">Section & Zone</label>
+                <select
+                  value={bulkUpdateGlobal.config_id || ""}
                   className="w-full px-3 py-1.5 border border-border-default rounded-lg focus:outline-none focus:ring-2 focus:ring-action-primary focus:border-transparent text-sm bg-bg-primary text-text-primary"
+                  onChange={e => {
+                    const value = Number(e.target.value);
+                    setBulkUpdateGlobal(prev => ({ ...prev, config_id: value }));
+                    selectedUpdateTables.forEach(id => {
+                      handleBulkUpdateChange(id, "config_id", value);
+                    });
+                  }}
                 >
                   <option value="">No change</option>
-                  <option value="Vacant">Vacant</option>
-                  <option value="Reserved">Reserved</option>
-                </select>
-              </div>
-
-              {/* Section */}
-              <div>
-                <label className="block text-xs font-semibold mb-1.5 text-text-secondary">
-                  Section
-                </label>
-                <select
-                  value={bulkUpdateGlobal.section || ""}
-                  onChange={e =>
-                    setBulkUpdateGlobal(prev => ({ ...prev, section: e.target.value }))
-                  }
-                  className="w-full px-3 py-1.5 border border-border-default rounded-lg text-sm bg-bg-primary text-text-primary"
-                >
-                  <option value="">No change</option>
-
-                  {loadingMasters ? (
-                    <option disabled>Loading...</option>
-                  ) : sectionOptions.length === 0 ? (
-                    <option disabled>No Sections Configured</option>
-                  ) : (
-                    sectionOptions.map((sec, i) => (
-                      <option key={i} value={sec}>{sec}</option>
-                    ))
-                  )}
-                </select>
-              </div>
-
-              {/* Zone */}
-              <div>
-                <label className="block text-xs font-semibold mb-1.5 text-text-secondary">
-                  Zone
-                </label>
-                <select
-                  value={bulkUpdateGlobal.location_zone || ""}
-                  onChange={e =>
-                    setBulkUpdateGlobal(prev => ({ ...prev, location_zone: e.target.value }))
-                  }
-                  className="w-full px-3 py-1.5 border border-border-default rounded-lg text-sm bg-bg-primary text-text-primary"
-                >
-                  <option value="">No change</option>
-
-                  {loadingMasters ? (
-                    <option disabled>Loading...</option>
-                  ) : zoneOptions.length === 0 ? (
-                    <option disabled>No Zones Configured</option>
-                  ) : (
-                    zoneOptions.map((zone, i) => (
-                      <option key={i} value={zone}>{zone}</option>
-                    ))
-                  )}
+                  {configs.map(c => (
+                    <option key={c.id} value={c.id}>
+                      {c.section} - {c.zone}
+                    </option>
+                  ))}
                 </select>
               </div>
             </div>
@@ -1613,55 +1773,33 @@ const UniversalBulkUpdateModal = ({
                   <p className="text-text-secondary">No tables found</p>
                 </div>
               ) : (
-                filteredTables.map(table => (
-                  <div
-                    key={table.id}
-                    className={`border rounded-xl p-3 transition-all ${selectedUpdateTables.includes(table.id)
-                      ? 'border-action-primary bg-action-primary/5 shadow-sm'
-                      : 'border-border-default bg-bg-primary'
-                      }`}
-                  >
-                    <div className="flex items-center gap-2 mb-2">
-                      <input
-                        type="checkbox"
-                        checked={selectedUpdateTables.includes(table.id)}
-                        onChange={() => toggleUpdateTableSelection(table.id)}
-                        className="w-4 h-4 text-action-primary border-border-default rounded focus:ring-action-primary cursor-pointer"
-                      />
-                      <span className="font-bold text-sm text-text-primary">{table.name}</span>
-                    </div>
+                filteredTables.map(table => {
+                  const config = configs.find(c => c.id === table.config_id);
+                  return (
 
-                    {selectedUpdateTables.includes(table.id) ? (
-                      <div className="grid grid-cols-1 sm:grid-cols-3 gap-2 pt-2 border-t border-border-default">
-                        <div>
-                          <label className="block text-xs font-semibold mb-1.5 text-text-secondary">Seating</label>
+                    <div
+                      key={table.id}
+                      className={`border rounded-xl p-3 transition-all ${selectedUpdateTables.includes(table.id)
+                        ? 'border-action-primary bg-action-primary/5 shadow-sm'
+                        : 'border-border-default bg-bg-primary'
+                        }`}
+                    >
+                      <div className="flex items-center gap-2 mb-2">
+                        <input
+                          type="checkbox"
+                          checked={selectedUpdateTables.includes(table.id)}
+                          onChange={() => toggleUpdateTableSelection(table.id)}
+                          className="w-4 h-4 text-action-primary border-border-default rounded focus:ring-action-primary cursor-pointer"
+                        />
+                        <span className="font-bold text-sm text-text-primary">{table.name}</span>
+                      </div>
 
-                          {/* Desktop */}
-                          <input
-                            type="number"
-                            min="1"
-                            value={bulkUpdateData[table.id]?.table_type ?? table.table_type ?? ""}
-                            onChange={e => {
-                              const value = e.target.value ? Math.max(1, Number(e.target.value)) : "";
-                              handleBulkUpdateChange(table.id, "table_type", value);
-                            }}
-                            placeholder={bulkUpdateGlobal.table_type ? `Global: ${bulkUpdateGlobal.table_type}` : "Seating"}
-                            className="hidden sm:block w-full px-3 py-1.5 border border-border-default rounded-lg text-sm focus:outline-none focus:ring-2 focus:ring-action-primary focus:border-transparent bg-bg-primary text-text-primary"
-                          />
+                      {selectedUpdateTables.includes(table.id) ? (
+                        <div className="grid grid-cols-1 sm:grid-cols-3 gap-2 pt-2 border-t border-border-default">
+                          <div>
+                            <label className="block text-xs font-semibold mb-1.5 text-text-secondary">Seating</label>
 
-                          {/* Mobile with +/- buttons */}
-                          <div className="sm:hidden flex items-center border border-border-default rounded-lg overflow-hidden bg-bg-primary">
-                            <button
-                              type="button"
-                              onClick={() => {
-                                const current = Number(bulkUpdateData[table.id]?.table_type ?? table.table_type) || 1;
-                                const value = Math.max(1, current - 1);
-                                handleBulkUpdateChange(table.id, "table_type", value);
-                              }}
-                              className="px-3 py-1.5 text-text-primary hover:bg-bg-tertiary font-bold transition-colors"
-                            >
-                              −
-                            </button>
+                            {/* Desktop */}
                             <input
                               type="number"
                               min="1"
@@ -1670,106 +1808,118 @@ const UniversalBulkUpdateModal = ({
                                 const value = e.target.value ? Math.max(1, Number(e.target.value)) : "";
                                 handleBulkUpdateChange(table.id, "table_type", value);
                               }}
-                              placeholder={bulkUpdateGlobal.table_type ? `${bulkUpdateGlobal.table_type}` : ""}
-                              className="flex-1 text-center py-1.5 border-x border-border-default focus:outline-none text-sm bg-transparent text-text-primary"
+                              placeholder={bulkUpdateGlobal.table_type ? `Global: ${bulkUpdateGlobal.table_type}` : "Seating"}
+                              className="hidden sm:block w-full px-3 py-1.5 border border-border-default rounded-lg text-sm focus:outline-none focus:ring-2 focus:ring-action-primary focus:border-transparent bg-bg-primary text-text-primary"
                             />
-                            <button
-                              type="button"
-                              onClick={() => {
-                                const current = Number(bulkUpdateData[table.id]?.table_type ?? table.table_type) || 0;
-                                handleBulkUpdateChange(table.id, "table_type", current + 1);
-                              }}
-                              className="px-3 py-1.5 text-text-primary hover:bg-bg-tertiary font-bold transition-colors"
+
+                            {/* Mobile with +/- buttons */}
+                            <div className="sm:hidden flex items-center border border-border-default rounded-lg overflow-hidden bg-bg-primary">
+                              <button
+                                type="button"
+                                onClick={() => {
+                                  const current = Number(bulkUpdateData[table.id]?.table_type ?? table.table_type) || 1;
+                                  const value = Math.max(1, current - 1);
+                                  handleBulkUpdateChange(table.id, "table_type", value);
+                                }}
+                                className="px-3 py-1.5 text-text-primary hover:bg-bg-tertiary font-bold transition-colors"
+                              >
+                                −
+                              </button>
+                              <input
+                                type="number"
+                                min="1"
+                                value={bulkUpdateData[table.id]?.table_type ?? table.table_type ?? ""}
+                                onChange={e => {
+                                  const value = e.target.value ? Math.max(1, Number(e.target.value)) : "";
+                                  handleBulkUpdateChange(table.id, "table_type", value);
+                                }}
+                                placeholder={bulkUpdateGlobal.table_type ? `${bulkUpdateGlobal.table_type}` : ""}
+                                className="flex-1 text-center py-1.5 border-x border-border-default focus:outline-none text-sm bg-transparent text-text-primary"
+                              />
+                              <button
+                                type="button"
+                                onClick={() => {
+                                  const current = Number(bulkUpdateData[table.id]?.table_type ?? table.table_type) || 0;
+                                  handleBulkUpdateChange(table.id, "table_type", current + 1);
+                                }}
+                                className="px-3 py-1.5 text-text-primary hover:bg-bg-tertiary font-bold transition-colors"
+                              >
+                                +
+                              </button>
+                            </div>
+                          </div>
+
+                          <div>
+                            <label className="block text-xs font-semibold mb-1.5 text-text-secondary">Status</label>
+                            <select
+                              value={bulkUpdateData[table.id]?.status ?? table.status}
+                              onChange={e => handleBulkUpdateChange(table.id, 'status', e.target.value)}
+                              className="w-full px-3 py-1.5 border border-border-default rounded-lg text-sm focus:outline-none focus:ring-2 focus:ring-action-primary focus:border-transparent bg-bg-primary text-text-primary"
                             >
-                              +
-                            </button>
+                              {statusOptions.length > 0
+                                ? statusOptions.map(s => (
+                                  <option key={s} value={s}>{s}</option>
+                                ))
+                                : (
+                                  <>
+                                    <option value="Vacant">Vacant</option>
+                                    <option value="Reserved">Reserved</option>
+                                  </>
+                                )
+                              }
+                            </select>
                           </div>
-                        </div>
+                          <div className="">
+                            <label className="block text-xs font-semibold mb-1.5 text-text-secondary">Section & Zone :</label>
+                            <select
+                              value={bulkUpdateData[table.id]?.config_id ?? table.config_id ?? ""}
+                              className="w-full px-3 py-1.5 border border-border-default rounded-lg text-sm focus:outline-none focus:ring-2 focus:ring-action-primary focus:border-transparent bg-bg-primary text-text-primary"
+                              onChange={e =>
+                                handleBulkUpdateChange(
+                                  table.id,
+                                  "config_id",
+                                  Number(e.target.value)
+                                )
+                              }
+                            >
+                              <option value="">No change</option>
 
-                        <div>
-                          <label className="block text-xs font-semibold mb-1.5 text-text-secondary">Status</label>
-                          <select
-                            value={bulkUpdateData[table.id]?.status ?? table.status}
-                            onChange={e => handleBulkUpdateChange(table.id, 'status', e.target.value)}
-                            className="w-full px-3 py-1.5 border border-border-default rounded-lg text-sm focus:outline-none focus:ring-2 focus:ring-action-primary focus:border-transparent bg-bg-primary text-text-primary"
-                          >
-                            <option value="Vacant">Vacant</option>
-                            <option value="Reserved">Reserved</option>
-                          </select>
-                        </div>
+                              {configs.map(c => (
+                                <option key={c.id} value={c.id}>
+                                  {c.section} - {c.zone}
+                                </option>
+                              ))}
+                            </select>
+                          </div>
 
-                        {/* Section */}
-                        <div>
-                          <label className="block text-xs font-semibold mb-1.5 text-text-secondary">
-                            Section
-                          </label>
-                          <select
-                            value={bulkUpdateData[table.id]?.section ?? table.section ?? ""}
-                            onChange={e =>
-                              handleBulkUpdateChange(table.id, "section", e.target.value)
-                            }
-                            className="w-full px-3 py-1.5 border border-border-default rounded-lg text-sm bg-bg-primary text-text-primary"
-                          >
-                            {loadingMasters ? (
-                              <option disabled>Loading...</option>
-                            ) : sectionOptions.length === 0 ? (
-                              <option disabled>No Sections Configured</option>
-                            ) : (
-                              sectionOptions.map((sec, i) => (
-                                <option key={i} value={sec}>{sec}</option>
-                              ))
-                            )}
-                          </select>
                         </div>
-
-                        {/* Zone */}
-                        <div>
-                          <label className="block text-xs font-semibold mb-1.5 text-text-secondary">
-                            Zone
-                          </label>
-                          <select
-                            value={bulkUpdateData[table.id]?.location_zone ?? table.location_zone}
-                            onChange={e =>
-                              handleBulkUpdateChange(table.id, "location_zone", e.target.value)
-                            }
-                            className="w-full px-3 py-1.5 border border-border-default rounded-lg text-sm bg-bg-primary text-text-primary"
-                          >
-                            {loadingMasters ? (
-                              <option disabled>Loading...</option>
-                            ) : zoneOptions.length === 0 ? (
-                              <option disabled>No Zones Configured</option>
-                            ) : (
-                              zoneOptions.map((zone, i) => (
-                                <option key={i} value={zone}>{zone}</option>
-                              ))
-                            )}
-                          </select>
-                        </div>
-                      </div>
-                    ) : (
-                      <div className="pt-2 border-t border-border-default">
-                        <div className="grid grid-cols-4 gap-2 text-xs">
-                          <div>
-                            <span className="text-text-secondary">Seating:</span>
-                            <span className="ml-1 text-text-primary font-semibold">{table.table_type}</span>
-                          </div>
-                          <div>
-                            <span className="text-text-secondary">Status:</span>
-                            <span className="ml-1 text-text-primary font-semibold">{table.status}</span>
-                          </div>
-                          <div>
-                            <span className="text-text-secondary">Section:</span>
-                            <span className="ml-1 text-text-primary font-semibold">{table.section}</span>
-                          </div>
-                          <div>
-                            <span className="text-text-secondary">Zone:</span>
-                            <span className="ml-1 text-text-primary font-semibold">{table.location_zone}</span>
+                      ) : (
+                        <div className="pt-2 border-t border-border-default">
+                          <div className="grid grid-cols-4 gap-2 text-xs">
+                            <div>
+                              <span className="text-text-secondary">Seating:</span>
+                              <span className="ml-1 text-text-primary font-semibold">{table.table_type}</span>
+                            </div>
+                            <div>
+                              <span className="text-text-secondary">Status:</span>
+                              <span className="ml-1 text-text-primary font-semibold">{table.status}</span>
+                            </div>
+                            <div>
+                              <span className="text-text-secondary">Section & Zone :</span>
+                              <span className="ml-1 text-text-primary font-semibold">
+                                {config ? `${config.section} - ${config.zone}` : "-"}
+                              </span>
+                            </div>
+                            {/* <div>
+                              <span className="text-text-secondary">Zone:</span>
+                              <span className="ml-1 text-text-primary font-semibold">{config?.zone || "-"}</span>
+                            </div> */}
                           </div>
                         </div>
-                      </div>
-                    )}
-                  </div>
-                ))
+                      )}
+                    </div>
+                  )
+                })
               )}
             </div>
           </div>

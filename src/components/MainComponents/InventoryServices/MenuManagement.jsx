@@ -59,7 +59,11 @@ const MenuManagement = ({ clientId, token, realm }) => {
   const [selectAllChecked, setSelectAllChecked] = useState(false);
   const [bulkEditData, setBulkEditData] = useState({});
   const quickCatRef = useRef(null);
-
+  const [zones, setZones] = useState([]);
+  const [sections, setSections] = useState([]);
+  const [selectedZone, setSelectedZone] = useState("");
+  const [selectedSection, setSelectedSection] = useState("");
+  const [zoneConfigId, setZoneConfigId] = useState(null);
   const [currentUserId, setCurrentUserId] = useState(null);
   useEffect(() => {
     try {
@@ -82,7 +86,43 @@ const MenuManagement = ({ clientId, token, realm }) => {
     }
     return pathNames; // nearest-first: [leafName, parentName, grandparentName, ...]
   }, []);
+  const fetchZoneConfig = useCallback(async () => {
+    try {
+      const res = await axios.get(
+        `${import.meta.env.VITE_API_TABLE_SERVICE_URL}/${clientId}/tables/config`,
+        { headers: { Authorization: `Bearer ${token}` } }
+      );
 
+      const data = res.data || [];
+
+      setSections(data);
+
+      const uniqueZones = [...new Set(data.map(d => d.zone))];
+      setZones(uniqueZones);
+
+    } catch (err) {
+      console.error("Zone config fetch failed", err);
+    }
+  }, [clientId, token]);
+
+  useEffect(() => {
+    fetchZoneConfig();
+  }, [fetchZoneConfig]);
+  const filteredSections = sections.filter(
+    s => s.zone === selectedZone
+  );
+
+  useEffect(() => {
+    if (!selectedZone || !selectedSection) return;
+
+    const found = sections.find(
+      s => s.zone === selectedZone && s.section === selectedSection
+    );
+
+    if (found) {
+      setZoneConfigId(found.id);
+    }
+  }, [selectedZone, selectedSection, sections]);
 
   // ─── Get top-level section name dynamically ─────────────────────────
   const getTopLevelSection = useCallback((categoryId) => {
@@ -119,10 +159,10 @@ const MenuManagement = ({ clientId, token, realm }) => {
 
     // convert to slug format
     const slug = sectionName
-  .trim()
-  .toLowerCase()
-  .replace(/[\s-]+/g, "")
-  .replace(/[^a-z0-9]/g, "");
+      .trim()
+      .toLowerCase()
+      .replace(/[\s-]+/g, "")
+      .replace(/[^a-z0-9]/g, "");
     console.log("Slug =", slug)
     return `addons_${slug}`;
   }, [getTopLevelSection]);
@@ -141,8 +181,14 @@ const MenuManagement = ({ clientId, token, realm }) => {
           { headers: { Authorization: `Bearer ${token}` } }
         ),
         axios.get(
-          `${import.meta.env.VITE_API_INVENTORY_SERVICE_URL}/${clientId}/menu/read?inventory_id=${menuConfig.menuInventoryId}`,
-          { headers: { Authorization: `Bearer ${token}` } }
+          `${import.meta.env.VITE_API_INVENTORY_SERVICE_URL}/${clientId}/menu/read`,
+          {
+            headers: { Authorization: `Bearer ${token}` },
+            params: {
+              inventory_id: menuConfig.menuInventoryId,
+              ...(zoneConfigId && { zone_config_id: zoneConfigId })
+            }
+          }
         )
       ]);
 
@@ -169,9 +215,13 @@ const MenuManagement = ({ clientId, token, realm }) => {
       console.warn(`Addon category not found: ${addonCategoryId}`);
       return { subcategories: [], items: [] };
     }
-  }, [clientId, token, menuConfig]);
+  }, [clientId, token, menuConfig, zoneConfigId]);
 
-
+  useEffect(() => {
+    if (zoneConfigId) {
+      fetchData();
+    }
+  }, [zoneConfigId]);
 
   useEffect(() => {
     if (!selectedCategoryId) return;
@@ -221,15 +271,34 @@ const MenuManagement = ({ clientId, token, realm }) => {
     setNewItem({
       name: '', description: '', category_id: selectedCategoryId || '',
       unit_price: '', discount: '', code: '', unit: '',
-      serving_quantity: "", serving_unit: "", line_item_id: [], inventory_id: ''
+      serving_quantity: "", serving_unit: "", line_item_id: [], inventory_id: 'menu', zone_config_id: zoneConfigId || null
     });
     setNewItemImage(null);
     setNewItemImageUrl('');
     setShowAddModal(true);
   };
 
-  const handleItemClick = (item) => { setEditingItem(item); setShowEditModal(true); };
+  const handleItemClick = (item) => {
+    const allSiblings = menuItems.filter(m => m.id === item.id);
+    const baseRecord = allSiblings.find(m => m.zone_config_id === 0) || item;
 
+    const zonePrices = {};
+    allSiblings
+      .filter(m => m.zone_config_id !== 0)
+      .forEach(m => { zonePrices[m.zone_config_id] = m.unit_price; });
+
+    // ✅ category_id in DB is now a name — resolve back to actual id for modal dropdown
+    const resolvedCategoryId = categoriesFlat.find(
+      c => c.name.toLowerCase() === (baseRecord.category_id || '').toLowerCase()
+    )?.id || baseRecord.category_id;
+
+    setEditingItem({
+      ...baseRecord,
+      category_id: resolvedCategoryId,  // id for modal
+      zonePrices,
+    });
+    setShowEditModal(true);
+  };
   const flattenCategoryTree = (tree, level = 0, parentId = null) => {
     let flatList = [];
     tree.forEach(category => {
@@ -262,33 +331,42 @@ const MenuManagement = ({ clientId, token, realm }) => {
     return result;
   };
 
- // ✅ FIXED — uses the same axios pattern as the rest of MenuManagement
-const fetchUnits = useCallback(async () => {
-  try {
-    const res = await axios.get(
-      `${import.meta.env.VITE_API_INVENTORY_SERVICE_URL}/${clientId}/menu/read_category?category_id=units`,
-      { headers: { Authorization: `Bearer ${token}` } }
-    );
-    const data = res.data?.data || [];
-    const unitsNode = Array.isArray(data) ? data.find((d) => d.id === "units") : data;
-    const subCats = unitsNode?.subCategories || [];
-    const unitList = subCats.map((u) => (typeof u === "string" ? u : u.id));
-    setUnits(unitList.length > 0 ? unitList : ["g", "kg", "ml", "litre", "pcs"]);
-  } catch (err) {
-    console.error("fetchUnits failed:", err);
-    setUnits(["g", "kg", "ml", "litre", "pcs"]);
-  }
-}, [clientId, token]);
+  // ✅ FIXED — uses the same axios pattern as the rest of MenuManagement
+  const fetchUnits = useCallback(async () => {
+    try {
+      const res = await axios.get(
+        `${import.meta.env.VITE_API_INVENTORY_SERVICE_URL}/${clientId}/menu/read_category?category_id=units`,
+        { headers: { Authorization: `Bearer ${token}` } }
+      );
+      const data = res.data?.data || [];
+      const unitsNode = Array.isArray(data) ? data.find((d) => d.id === "units") : data;
+      const subCats = unitsNode?.subCategories || [];
+      const unitList = subCats.map((u) => (typeof u === "string" ? u : u.id));
+      setUnits(unitList.length > 0 ? unitList : ["g", "kg", "ml", "litre", "pcs"]);
+    } catch (err) {
+      console.error("fetchUnits failed:", err);
+      setUnits(["g", "kg", "ml", "litre", "pcs"]);
+    }
+  }, [clientId, token]);
 
-useEffect(() => {
-  fetchUnits();
-}, [fetchUnits]);
+  useEffect(() => {
+    fetchUnits();
+  }, [fetchUnits]);
 
   const getCategoryIdByName = (categoryName) => {
-    if (!categoryName || categoryName === 'All Categories' || categoryName === 'All') return null;
-    return categoriesFlat.find(c => c.name.toLowerCase() === categoryName.trim().toLowerCase())?.id ?? null;
+    if (!categoryName) return null;
+    return categoriesFlat.find(
+      c => c.name.trim().toLowerCase() === categoryName.trim().toLowerCase()
+    )?.id || null;
   };
 
+  const getCategoryNameById = (categoryId) => {
+    if (!categoryId) return null;
+    const found = categoriesFlat.find(
+      c => c.id === categoryId || c.name?.toLowerCase() === String(categoryId).toLowerCase()
+    );
+    return found?.name || null;
+  };
   // Uses inventoryCategoryRoot from config — not hardcoded "inventory"
   const fetchInventoryIds = useCallback(async () => {
     if (!menuConfig) return;
@@ -326,85 +404,192 @@ useEffect(() => {
   const handleAddItem = async () => {
     try {
       let imageId = null;
-      if (newItemImage) imageId = await uploadImageToDocumentService(newItemImage);
 
-      const finalCategoryId = newItem?.category_id || null;
+      if (newItemImage) {
+        imageId = await uploadImageToDocumentService(newItemImage);
+      }
+
+      const selectedCat = categoriesFlat.find(
+        c => c.id === newItem?.category_id
+      );
+
+      const finalCategoryId =
+        selectedCat?.name ||
+        categoriesFlat.find(
+          c => c.name.toLowerCase() === (newItem?.category_id || '').toLowerCase()
+        )?.name ||
+        newItem?.category_id;
+
       if (!finalCategoryId) return;
 
       const slug = generateSlug(finalCategoryId, newItem.name);
-      const created_by = currentUserId || localStorage.getItem('user_id') || 'system';
+
+      const created_by =
+        currentUserId || localStorage.getItem("user_id") || "system";
+
       const { dietary_type, ...cleanNewItem } = newItem;
 
-      const payload = {
-        ...cleanNewItem, client_id: clientId, category_id: finalCategoryId, image_id: imageId,
-        realm: realm || newItem.realm || '', slug,
-        unit_price: parseFloat(newItem.unit_price) || 0,
+      const basePrice = parseFloat(newItem.unit_price) || 0;
+      const zonePrices = newItem.zonePrices || {};
+
+      const basePayload = {
+        ...cleanNewItem,
+        client_id: clientId,
+        category_id: finalCategoryId,
+        image_id: imageId,
+        realm: realm || newItem.realm || "",
+        slug,
+        unit_price: basePrice,
         discount: parseFloat(newItem.discount) || 0,
         code: newItem.code ? String(newItem.code).trim() : null,
-        serving_quantity: newItem.serving_quantity ? parseFloat(newItem.serving_quantity) : null,
+        serving_quantity: newItem.serving_quantity
+          ? parseFloat(newItem.serving_quantity)
+          : null,
         serving_unit: newItem.serving_unit || null,
-        created_by, updated_by: created_by, inventory_id: newItem.inventory_id
+        created_by,
+        updated_by: created_by,
+        inventory_id: newItem.inventory_id,
+        zone_config_id: 0,
       };
 
-      await axios.post(
+      // STEP 1: Create base record (zone_config_id = 0)
+      const baseRes = await axios.post(
         `${import.meta.env.VITE_API_INVENTORY_SERVICE_URL}/${clientId}/menu/create`,
-        payload, { headers: { Authorization: `Bearer ${token}`, "Content-Type": "application/json" } }
+        basePayload,
+        {
+          headers: {
+            Authorization: `Bearer ${token}`,
+            "Content-Type": "application/json",
+          },
+        }
       );
+
+      const sharedId = baseRes.data.data.id;
+
+      // STEP 2: Always create records for ALL sections,
+      // using entered zone price if provided, otherwise falling back to base price
+      if (sections && sections.length > 0) {
+        for (const section of sections) {
+          const configId = Number(section.id);
+          const enteredPrice = zonePrices[configId];
+          const finalPrice =
+            enteredPrice !== "" && enteredPrice !== null && enteredPrice !== undefined
+              ? parseFloat(enteredPrice)
+              : basePrice;
+
+          await axios.post(
+            `${import.meta.env.VITE_API_INVENTORY_SERVICE_URL}/${clientId}/menu/create`,
+            {
+              ...basePayload,
+              id: sharedId,
+              unit_price: finalPrice,
+              zone_config_id: configId,
+            },
+            { headers: { Authorization: `Bearer ${token}` } }
+          );
+        }
+      } else {
+        console.warn("No sections found → skipping zone creation");
+      }
+
+      // Refresh UI
       await fetchData({ silent: true });
 
-      const addonCatId = getAddonCategoryId(finalCategoryId);
-      const { subcategories, items } = await fetchAddonData(addonCatId);
-      setAddonSubcategories(subcategories);
-      setAllAddonItems(items);
-
+      // Reset form
       setShowAddModal(false);
-      setNewItem({ name: '', description: '', category_id: '', unit_price: '', discount: '', code: '', unit: '', line_item_id: [] });
+      setNewItem({
+        name: "",
+        description: "",
+        category_id: "",
+        unit_price: "",
+        discount: "",
+        code: "",
+        unit: "",
+        line_item_id: [],
+        zonePrices: {},
+      });
       setNewItemImage(null);
-      setNewItemImageUrl('');
+      setNewItemImageUrl("");
+
     } catch (error) {
-      console.error('Error adding item:', error);
-      let errorMsg = 'Failed to add item\n\n';
-      if (error.response?.data?.detail) {
-        errorMsg += Array.isArray(error.response.data.detail)
-          ? error.response.data.detail.map(e => `Field: ${e.loc?.join('.')}\nError: ${e.msg}`).join('\n\n')
-          : error.response.data.detail;
-      } else { errorMsg += error.message; }
-      alert(errorMsg);
+      console.error("Error adding item:", error);
     }
   };
-
   const handleEditItem = async () => {
     try {
       let imageId = editingItem.image_id;
       if (editItemImage) imageId = await uploadImageToDocumentService(editItemImage);
 
-      const finalCategoryId = editingItem.category_id || null;
-      const slug = generateSlug(finalCategoryId, editingItem.name);
-      const updated_by = currentUserId || localStorage.getItem('user_id') || 'system';
-      const { dietary_type, ...cleanEditingItem } = editingItem;
+      // ✅ FIXED: was incorrectly reading from newItem — must use editingItem
+      const resolvedCat = categoriesFlat.find(c => c.id === editingItem?.category_id);
+      const finalCategoryId =
+        resolvedCat?.name ||
+        categoriesFlat.find(
+          c => c.name.toLowerCase() === (editingItem?.category_id || '').toLowerCase()
+        )?.name ||
+        editingItem?.category_id;
 
-      const payload = {
-        id: Number(editingItem.id), ...cleanEditingItem,
+      if (!finalCategoryId) {
+        console.error("Edit failed: could not resolve category");
+        return;
+      }
+
+      const slug = generateSlug(editingItem.category_id, editingItem.name);
+      const { dietary_type, zonePrices: zp, ...cleanEditingItem } = editingItem;
+
+      const basePayload = {
+        name: editingItem.name,
+        description: editingItem.description || null,
+        category_id: finalCategoryId,
+        image_id: imageId || null,
+        discount: Number(editingItem.discount) || 0,
         code: editingItem.code ? String(editingItem.code).trim() : null,
-        client_id: clientId, category_id: finalCategoryId, image_id: imageId,
-        realm: editingItem.realm || realm || '', slug,
-        unit_price: parseFloat(editingItem.unit_price) || 0,
-        discount: parseFloat(editingItem.discount) || 0,
-        serving_quantity: editingItem.serving_quantity ? parseFloat(editingItem.serving_quantity) : null,
-        serving_unit: editingItem.serving_unit || null, updated_by
+        unit: editingItem.unit || null,
+        serving_quantity: editingItem.serving_quantity ? Number(editingItem.serving_quantity) : null,
+        serving_unit: editingItem.serving_unit || null,
+        line_item_id: Array.isArray(editingItem.line_item_id) && editingItem.line_item_id.length > 0
+          ? editingItem.line_item_id : null,
+        realm: editingItem.realm || 'restaurant',
+        updated_by: currentUserId,
+        slug,
+        client_id: clientId,
+        inventory_id: editingItem.inventory_id,
+        id: Number(editingItem.id),
       };
 
+      // Always update base record (zone_config_id = 0)
       await axios.post(
         `${import.meta.env.VITE_API_INVENTORY_SERVICE_URL}/${clientId}/menu/update`,
-        payload, { headers: { Authorization: `Bearer ${token}` } }
+        { ...basePayload, unit_price: Number(editingItem.unit_price) || 0, zone_config_id: 0 },
+        { headers: { Authorization: `Bearer ${token}` } }
       );
+
+      // Upsert zone variants
+      const filledZonePrices = Object.entries(zp || {}).filter(
+        ([, price]) => price !== '' && price !== null && price !== undefined
+      );
+
+      for (const [configId, price] of filledZonePrices) {
+        const existingZoneRecord = menuItems.find(
+          m => m.id === editingItem.id && m.zone_config_id === Number(configId)
+        );
+
+        if (existingZoneRecord) {
+          await axios.post(
+            `${import.meta.env.VITE_API_INVENTORY_SERVICE_URL}/${clientId}/menu/update`,
+            { ...basePayload, unit_price: parseFloat(price), zone_config_id: Number(configId) },
+            { headers: { Authorization: `Bearer ${token}` } }
+          );
+        } else {
+          await axios.post(
+            `${import.meta.env.VITE_API_INVENTORY_SERVICE_URL}/${clientId}/menu/create`,
+            { ...basePayload, unit_price: parseFloat(price), zone_config_id: Number(configId) },
+            { headers: { Authorization: `Bearer ${token}` } }
+          );
+        }
+      }
+
       await fetchData({ silent: true });
-
-      const addonCatId = getAddonCategoryId(finalCategoryId);
-      const { subcategories, items } = await fetchAddonData(addonCatId);
-      setAddonSubcategories(subcategories);
-      setAllAddonItems(items);
-
       setShowEditModal(false);
       setEditingItem(null);
       setEditItemImage(null);
@@ -439,8 +624,14 @@ useEffect(() => {
           { headers: { Authorization: `Bearer ${token}` } }
         ),
         axios.get(
-          `${import.meta.env.VITE_API_INVENTORY_SERVICE_URL}/${clientId}/menu/read?inventory_id=${menuConfig.menuInventoryId}`,
-          { headers: { Authorization: `Bearer ${token}` } }
+          `${import.meta.env.VITE_API_INVENTORY_SERVICE_URL}/${clientId}/menu/read`,
+          {
+            headers: { Authorization: `Bearer ${token}` },
+            params: {
+              inventory_id: menuConfig.menuInventoryId,
+              ...(zoneConfigId && { zone_config_id: zoneConfigId })
+            }
+          }
         )
       ]);
 
@@ -457,7 +648,11 @@ useEffect(() => {
       setCategoriesFlat(normalizedFlat);
 
       const enrichedItems = (itemRes.data.data || []).map(item => {
-        const cat = flatCategories.find(c => c.id === item.category_id);
+        const cat = flatCategories.find(
+          c =>
+            c.id === item.category_id ||
+            c.name.toLowerCase() === (item.category_id || '').toLowerCase()
+        );
         return { ...item, category: cat?.name ?? "Uncategorized" };
       });
       setMenuItems(enrichedItems);
@@ -500,7 +695,7 @@ useEffect(() => {
     } finally {
       if (!silent) setLoading(false);
     }
-  }, [clientId, token, realm, menuConfig]);
+  }, [clientId, token, realm, menuConfig, zoneConfigId]);
 
   useEffect(() => { fetchData(); }, [fetchData]);
 
@@ -525,7 +720,9 @@ useEffect(() => {
   const getFilteredItems = () => {
     if (!menuItems.length) return [];
     const q = (searchQuery || '').trim().toLowerCase();
+
     let items = menuItems;
+
     if (q.length > 0) {
       items = items.filter(item =>
         (item.name || '').toLowerCase().includes(q) ||
@@ -533,9 +730,41 @@ useEffect(() => {
         String(item.code || '').toLowerCase().includes(q)
       );
     }
-    if (!selectedCategoryId) return items;
-    const allowedCategoryIds = getAllDescendantCategoryIds(selectedCategoryId, categories);
-    return items.filter(item => allowedCategoryIds.includes(item.category_id));
+
+    if (selectedCategoryId) {
+      // selectedCategoryId is still the actual id from the tree click
+      // so we need to collect allowed names instead of ids
+      const allowedCategoryIds = getAllDescendantCategoryIds(selectedCategoryId, categories);
+      const allowedNames = allowedCategoryIds
+        .map(id => categoriesFlat.find(c => c.id === id)?.name)
+        .filter(Boolean)
+        .map(n => n.toLowerCase());
+
+      items = items.filter(item =>
+        allowedNames.includes((item.category_id || '').toLowerCase())
+      );
+    }
+
+    // If a specific zone is selected, show only that zone's records
+    if (zoneConfigId !== null) {
+      return items.filter(item => item.zone_config_id === zoneConfigId);
+    }
+
+    // "All" view — deduplicate by name, always prefer base record (zone_config_id === 0)
+    const seen = new Map();
+    items.forEach(item => {
+      const key = (item.name || '').trim().toLowerCase();
+      if (!seen.has(key)) {
+        seen.set(key, item);
+      } else {
+        const existing = seen.get(key);
+        if ((item.zone_config_id === 0 || item.zone_config_id === null) &&
+          existing.zone_config_id !== 0 && existing.zone_config_id !== null) {
+          seen.set(key, item);
+        }
+      }
+    });
+    return Array.from(seen.values());
   };
 
   const handleEditImageFile = (file) => {
@@ -567,12 +796,18 @@ useEffect(() => {
   const handleDeleteItem = async () => {
     try {
       const deletedItemId = deleteTarget.id;
+
+      // ✅ Send zone_config_id: 0 — backend will now delete ALL variants for this id
       await axios.post(
         `${import.meta.env.VITE_API_INVENTORY_SERVICE_URL}/${clientId}/menu/delete`,
-        { id: deletedItemId }, { headers: { Authorization: `Bearer ${token}` } }
+        { id: deletedItemId, zone_config_id: 0 },
+        { headers: { Authorization: `Bearer ${token}` } }
       );
 
-      const itemsToUpdate = menuItems.filter(item => Array.isArray(item.line_item_id) && item.line_item_id.includes(deletedItemId));
+      // Clean up line_item_id references in other items
+      const itemsToUpdate = menuItems.filter(
+        item => Array.isArray(item.line_item_id) && item.line_item_id.includes(deletedItemId)
+      );
       if (itemsToUpdate.length > 0) {
         await Promise.all(itemsToUpdate.map(item => axios.post(
           `${import.meta.env.VITE_API_INVENTORY_SERVICE_URL}/${clientId}/menu/update`,
@@ -590,7 +825,9 @@ useEffect(() => {
 
       setShowDeleteModal(false);
       setDeleteTarget(null);
-    } catch (error) { console.error('Error deleting item:', error); }
+    } catch (error) {
+      console.error('Error deleting item:', error);
+    }
   };
 
   const handleBulkDelete = async () => {
@@ -598,13 +835,16 @@ useEffect(() => {
     if (!window.confirm(`Delete ${selectedRows.length} selected items?`)) return;
 
     try {
+      // ✅ Backend now deletes all zone variants — just send id + zone_config_id: 0
       await Promise.all(selectedRows.map(id => axios.post(
         `${import.meta.env.VITE_API_INVENTORY_SERVICE_URL}/${clientId}/menu/delete`,
-        { id }, { headers: { Authorization: `Bearer ${token}` } }
+        { id, zone_config_id: 0 },
+        { headers: { Authorization: `Bearer ${token}` } }
       )));
 
       const itemsToUpdate = menuItems.filter(item =>
-        Array.isArray(item.line_item_id) && item.line_item_id.some(addonId => selectedRows.includes(addonId))
+        Array.isArray(item.line_item_id) &&
+        item.line_item_id.some(addonId => selectedRows.includes(addonId))
       );
       if (itemsToUpdate.length > 0) {
         await Promise.all(itemsToUpdate.map(item => axios.post(
@@ -615,24 +855,60 @@ useEffect(() => {
       }
 
       await fetchData({ silent: true });
-      // addon re-fetch is handled by the selectedCategoryId useEffect
       setSelectedRows([]);
       setSelectAllChecked(false);
-    } catch (error) { console.error('Error deleting items:', error); }
+    } catch (error) {
+      console.error('Error deleting items:', error);
+    }
   };
 
   const handleBulkUpdate = async () => {
     if (selectedRows.length === 0) return;
     try {
-      await Promise.all(selectedRows.map(id => {
-        const { dietary_type: ed, ...cleanEditedData } = bulkEditData[id] || {};
+      for (const id of selectedRows) {
+        const { dietary_type: ed, zonePrices: zp, ...cleanEditedData } = bulkEditData[id] || {};
         const { dietary_type: od, ...cleanOriginalItem } = menuItems.find(item => item.id === id);
-        return axios.post(
+        const mergedItem = { ...cleanOriginalItem, ...cleanEditedData, client_id: clientId };
+
+        // Update the main record
+        await axios.post(
           `${import.meta.env.VITE_API_INVENTORY_SERVICE_URL}/${clientId}/menu/update`,
-          { ...cleanOriginalItem, ...cleanEditedData, client_id: clientId },
+          mergedItem,
           { headers: { Authorization: `Bearer ${token}` } }
         );
-      }));
+
+        // Upsert zone price records
+        const filledZonePrices = Object.entries(zp || {}).filter(
+          ([, price]) => price !== '' && price !== null && price !== undefined
+        );
+
+        if (filledZonePrices.length > 0) {
+          const siblings = menuItems.filter(
+            m => (m.name || '').trim().toLowerCase() === (cleanOriginalItem.name || '').trim().toLowerCase()
+          );
+
+          for (const [configId, price] of filledZonePrices) {
+            const existingZoneRecord = siblings.find(
+              m => m.zone_config_id === Number(configId) && m.id !== id
+            );
+
+            if (existingZoneRecord) {
+              await axios.post(
+                `${import.meta.env.VITE_API_INVENTORY_SERVICE_URL}/${clientId}/menu/update`,
+                { ...mergedItem, id: Number(existingZoneRecord.id), unit_price: parseFloat(price), zone_config_id: configId ? Number(configId) : 0 },
+                { headers: { Authorization: `Bearer ${token}` } }
+              );
+            } else {
+              await axios.post(
+                `${import.meta.env.VITE_API_INVENTORY_SERVICE_URL}/${clientId}/menu/create`,
+                { ...mergedItem, id: undefined, unit_price: parseFloat(price), zone_config_id: configId ? Number(configId) : 0 },
+                { headers: { Authorization: `Bearer ${token}` } }
+              );
+            }
+          }
+        }
+      }
+
       await fetchData({ silent: true });
       setShowBulkModal(false);
       setSelectedRows([]);
@@ -643,113 +919,306 @@ useEffect(() => {
 
   const handleExportToExcel = () => {
     try {
-      const catNameById = (id) => {
-        if (!id) return "Uncategorized";
-        const found = categoriesFlat.find(c => c?.id === id);
-        return found ? found.name : (typeof id === 'string' && id.startsWith('cat_') ? id : "Unknown");
+      const catNameById = (idOrName) => {
+        if (!idOrName) return "Uncategorized";
+
+        const found = categoriesFlat.find(
+          c =>
+            c.id === idOrName ||
+            c.name?.toLowerCase() === String(idOrName).toLowerCase()
+        );
+
+        return found?.name || idOrName || "Unknown";
       };
 
-      const exportData = filteredItems.map(item => {
-        let lineItemStr = Array.isArray(item.line_item_id) ? item.line_item_id.join(", ")
-          : typeof item.line_item_id === "string" ? item.line_item_id : item.line_item_id == null ? ""
-            : (() => { try { return JSON.stringify(item.line_item_id); } catch { return String(item.line_item_id); } })();
+      // Build a label for each section: "Zone-Section"
+      const sectionLabel = (s) => `${s.zone}-${s.section}`;
 
-        return {
-          ID: item.id ?? item.inventory_id ?? "", Inventory_Id: item.inventory_id,
-          Name: item.name ?? "", Description: item.description ?? "",
-          Category: catNameById(item.category_id) || item.category || "Unknown",
-          Image: item.image_id, Unit: item.unit ?? "",
-          Unit_Price: Number(item.unit_price) || 0, Unit_CST: Number(item.unit_cst) || 0,
-          Unit_GST: Number(item.unit_gst) || 0, Total_Unit_Price: Number(item.unit_total_price) || 0,
-          Total_Price: Number(item.total_price) || 0, CST: Number(item.cst) || 0,
-          GST: Number(item.gst) || 0, Discount: Number(item.discount) || 0,
+      // Group all menu items by slug (deduplication key)
+      const grouped = {};
+      menuItems.forEach(item => {
+        const key = item.slug || item.name;
+        if (!grouped[key]) {
+          grouped[key] = { baseItem: item, zonePrices: {} };
+        }
+        // Store price keyed by zone-section label
+        if (item.zone_config_id) {
+          const sec = sections.find(s => s.id === item.zone_config_id);
+          if (sec) {
+            grouped[key].zonePrices[sectionLabel(sec)] = item.unit_price;
+          }
+        } else {
+          // No zone = base price
+          grouped[key].zonePrices["Base"] = item.unit_price;
+        }
+      });
+
+      // All unique zone-section column names
+      const zoneColumns = sections.map(sectionLabel);
+
+      const exportData = Object.values(grouped).map(({ baseItem: item, zonePrices }) => {
+        const row = {
+          ID: item.id ?? "",
+          Inventory_Id: item.inventory_id,
+          Name: item.name ?? "",
+          Description: item.description ?? "",
+          Category: catNameById(item.category_id) || "Unknown",
+          Image: item.image_id,
+          Unit: item.unit ?? "",
+          Unit_Price: Number(item.unit_price) || 0,
+          Discount: Number(item.discount) || 0,
           Code: item.code != null ? String(item.code) : "",
-          Serving_Quantity: item.serving_quantity, Serving_Unit: item.serving_unit,
-          Realm: item.realm ?? realm ?? "", Slug: item.slug ?? "",
-          Line_Item_IDs: lineItemStr, Recipe: item.recipe ? JSON.stringify(item.recipe, null, 2) : "",
+          Serving_Quantity: item.serving_quantity,
+          Serving_Unit: item.serving_unit,
+          Realm: item.realm ?? realm ?? "",
+          Slug: item.slug ?? "",
+          Line_Item_IDs: Array.isArray(item.line_item_id)
+            ? item.line_item_id.join(", ") : "",
         };
+
+        // Add one column per zone-section
+        zoneColumns.forEach(col => {
+          row[`Price_${col}`] = zonePrices[col] ?? "";
+        });
+
+        return row;
       });
 
-      const worksheet = XLSX.utils.json_to_sheet(exportData, {
-        header: ["ID", "Inventory_Id", "Name", "Description", "Category", "Image", "Unit",
-          "Unit_Price", "Unit_CST", "Unit_GST", "Total_Unit_Price", "Total_Price",
-          "CST", "GST", "Discount", "Code", "Serving_Quantity", "Serving_Unit",
-          "Realm", "Slug", "Line_Item_IDs", "Recipe"]
-      });
+      const headers = [
+        "ID", "Inventory_Id", "Name", "Description", "Category", "Image",
+        "Unit", "Unit_Price", "Discount", "Code", "Serving_Quantity",
+        "Serving_Unit", "Realm", "Slug", "Line_Item_IDs",
+        ...zoneColumns.map(c => `Price_${c}`)
+      ];
+
+      const worksheet = XLSX.utils.json_to_sheet(exportData, { header: headers });
       const workbook = XLSX.utils.book_new();
       XLSX.utils.book_append_sheet(workbook, worksheet, "MenuItems");
       XLSX.writeFile(workbook, `menu_items_${new Date().toISOString().slice(0, 10)}.xlsx`);
-    } catch (err) { console.error("Export failed:", err); }
+    } catch (err) {
+      console.error("Export failed:", err);
+    }
   };
-
   const clean = (v) => (v === "" || v === undefined || v === null || (typeof v === "number" && isNaN(v)) ? null : v);
   const num = (v) => { if (v === "" || v === undefined || v === null || (typeof v === "number" && isNaN(v))) return 0; const n = Number(v); return isNaN(n) ? 0 : n; };
 
-  const handleImportFromExcel = (e) => {
-    if (!categoriesFlat.length) { e.target.value = ""; return; }
+  const handleImportFromExcel = async (e) => {
     const file = e.target.files[0];
     if (!file) return;
 
     let created_by = "system", updated_by = "system";
-    try { const decoded = jwtDecode(token); created_by = decoded?.user_id || created_by; updated_by = created_by; }
-    catch { console.warn("JWT decode failed"); }
+    try {
+      const decoded = jwtDecode(token);
+      created_by = decoded?.user_id || created_by;
+      updated_by = created_by;
+    } catch { }
+
+    const sectionLabel = (s) => `${s.zone}-${s.section}`;
+
+    const currentCategoriesFlat = [...categoriesFlat];
+    const currentSelectedCategoryId = selectedCategoryId;
+    const currentSections = [...sections];
+
+    // Fetch ALL items with no zone filter
+    let allMenuItems = [];
+    try {
+      const res = await axios.get(
+        `${import.meta.env.VITE_API_INVENTORY_SERVICE_URL}/${clientId}/menu/read`,
+        {
+          headers: { Authorization: `Bearer ${token}` },
+          params: { inventory_id: menuConfig.menuInventoryId }
+        }
+      );
+      allMenuItems = res.data.data || [];
+    } catch (err) {
+      console.error("Failed to fetch full menu:", err);
+      return;
+    }
+
+    // ✅ Normalize ALL zone_config_ids to numbers right after fetch
+    // This is the root cause — API may return strings, null, or numbers inconsistently
+    allMenuItems = allMenuItems.map(item => ({
+      ...item,
+      zone_config_id: item.zone_config_id === null || item.zone_config_id === undefined
+        ? 0
+        : Number(item.zone_config_id)
+    }));
 
     const reader = new FileReader();
     reader.onload = async (evt) => {
       try {
         const workbook = XLSX.read(evt.target.result, { type: "binary" });
-        const parsedData = XLSX.utils.sheet_to_json(workbook.Sheets[workbook.SheetNames[0]], { defval: "" });
+        const parsedData = XLSX.utils.sheet_to_json(
+          workbook.Sheets[workbook.SheetNames[0]],
+          { defval: "" }
+        );
+
         if (!parsedData.length) return;
 
-        const validationErrors = [];
-        parsedData.forEach((row, i) => {
-          if (!row.Name) validationErrors.push(`Row ${i + 2}: Name missing`);
-          if (!getCategoryIdByName(row.Category)) validationErrors.push(`Row ${i + 2}: Invalid category "${row.Category}"`);
-        });
-        if (validationErrors.length) return;
+        const allColumns = Object.keys(parsedData[0]);
+        const priceColumns = allColumns.filter(col => col.startsWith("Price_"));
 
-        if (!window.confirm(`This will replace ${filteredItems.length} items in "${getSelectedCategoryNameById()}" category.\nOther categories will NOT be affected.`)) {
-          e.target.value = ""; return;
+        if (!window.confirm(`Import ${parsedData.length} items?`)) {
+          e.target.value = "";
+          return;
         }
 
-        await Promise.all(filteredItems.map(item => axios.post(
-          `${import.meta.env.VITE_API_INVENTORY_SERVICE_URL}/${clientId}/menu/delete`,
-          { id: item.id }, { headers: { Authorization: `Bearer ${token}` } }
-        )));
+        for (const row of parsedData) {
+          if (!row.Name?.trim()) continue;
 
-        for (const [, row] of parsedData.entries()) {
-          try {
-            let recipe = null;
-            if (row.Recipe) { try { recipe = JSON.parse(row.Recipe); } catch { recipe = null; } }
-            if (!selectedCategoryId) throw new Error("Invalid category");
+          // ✅ Match by name from normalized full data
+          const existingRecords = allMenuItems.filter(
+            item => item.name?.trim().toLowerCase() === row.Name?.trim().toLowerCase()
+          );
 
+          console.log(`[Import] "${row.Name}" — found ${existingRecords.length} existing records`);
+          console.log(`[Import] zone_config_ids:`, existingRecords.map(r => r.zone_config_id));
+
+          // ✅ Use snapshot of categoriesFlat
+          const categoryId = currentCategoriesFlat.find(
+            c => c.name.trim().toLowerCase() === (row.Category || '').trim().toLowerCase()
+          )?.id || currentSelectedCategoryId;
+
+          const categoryName = currentCategoriesFlat.find(
+            c => c.id === categoryId
+          )?.name || null;
+
+          if (!categoryName) {
+            console.warn(`[Import] Skipping "${row.Name}" — category not found: "${row.Category}"`);
+            continue;
+          }
+
+          // ✅ Inline slug using snapshot
+          const slug = (() => {
+            const parts = [];
+            let currentId = categoryId;
+            const visited = new Set();
+            while (currentId && !visited.has(currentId)) {
+              visited.add(currentId);
+              const cat = currentCategoriesFlat.find(c => c.id === currentId);
+              if (!cat) break;
+              parts.unshift((cat.name || '').trim().replace(/\s+/g, '_'));
+              currentId = cat.parentId ?? cat.parent_id ?? null;
+            }
+            const itemPart = (row.Name || '').trim().replace(/\s+/g, '_').replace(/[^a-zA-Z0-9_]/g, '');
+            if (itemPart) parts.push(itemPart);
+            return parts.filter(Boolean).join('_');
+          })();
+
+          const basePayload = {
+            client_id: clientId,
+            inventory_id: row.Inventory_Id || null,
+            name: row.Name?.trim(),
+            description: row.Description || null,
+            category_id: categoryName,
+            realm: row.Realm || realm || null,
+            code: row.Code ? String(row.Code) : null,
+            serving_quantity: row.Serving_Quantity || null,
+            serving_unit: row.Serving_Unit || null,
+            unit: row.Unit || null,
+            // ✅ Only include image_id if it's actually a real value
+            ...(row.Image && String(row.Image).trim() !== "" && { image_id: String(row.Image).trim() }),
+            discount: Number(row.Discount) || 0,
+            slug,
+            line_item_id: row.Line_Item_IDs
+              ? row.Line_Item_IDs.split(",").map(v => parseInt(v.trim(), 10)).filter(v => !isNaN(v))
+              : null,
+            created_by,
+            updated_by,
+          };
+
+          // ================= BASE RECORD =================
+          let sharedId;
+
+          // ✅ zone_config_id is now guaranteed to be a number after normalization above
+          const existingBase = existingRecords.find(item => item.zone_config_id === 0);
+
+          if (existingBase) {
+            sharedId = existingBase.id;
+            console.log(`[Import] Updating base record id=${sharedId} price=${row.Unit_Price}`);
             await axios.post(
+              `${import.meta.env.VITE_API_INVENTORY_SERVICE_URL}/${clientId}/menu/update`,
+              {
+                ...basePayload,
+                id: Number(sharedId),
+                unit_price: Number(row.Unit_Price) || 0,
+                zone_config_id: 0
+              },
+              { headers: { Authorization: `Bearer ${token}` } }
+            );
+          } else {
+            console.log(`[Import] Creating new base record for "${row.Name}"`);
+            const res = await axios.post(
               `${import.meta.env.VITE_API_INVENTORY_SERVICE_URL}/${clientId}/menu/create`,
               {
-                client_id: clientId, inventory_id: clean(row.Inventory_Id),
-                name: row.Name?.trim(), description: clean(row.Description),
-                category_id: selectedCategoryId, realm: clean(row.Realm) || realm || null,
-                code: row.Code != null && !isNaN(row.Code) ? String(row.Code) : clean(row.Code),
-                serving_quantity: clean(row.Serving_Quantity), serving_unit: clean(row.Serving_Unit),
-                unit: clean(row.Unit), image_id: clean(row.Image),
-                unit_price: num(row.Unit_Price), unit_cst: num(row.Unit_CST), unit_gst: num(row.Unit_GST),
-                unit_total_price: num(row.Total_Unit_Price), cst: num(row.CST), gst: num(row.GST),
-                discount: num(row.Discount), total_price: num(row.Total_Price),
-                slug: generateSlug(selectedCategoryId, row.Name),
-                line_item_id: row.Line_Item_IDs ? row.Line_Item_IDs.split(",").map(v => parseInt(v.trim(), 10)).filter(v => !isNaN(v)) : null,
-                recipe: recipe && typeof recipe === "object" && !Array.isArray(recipe) ? recipe : null,
-                created_by, updated_by
+                ...basePayload,
+                unit_price: Number(row.Unit_Price) || 0,
+                zone_config_id: 0
               },
-              { headers: { Authorization: `Bearer ${token}`, "Content-Type": "application/json" } }
+              { headers: { Authorization: `Bearer ${token}` } }
             );
-          } catch (err) { console.error("Row import error:", err); }
+            sharedId = res.data.data.id;
+          }
+
+          // ================= ZONE RECORDS =================
+          for (const col of priceColumns) {
+            const priceVal = row[col];
+            if (priceVal === "" || priceVal === null || priceVal === undefined) continue;
+
+            const label = col.replace("Price_", "");
+            const matchedSection = currentSections.find(s => sectionLabel(s) === label);
+            if (!matchedSection) {
+              console.warn(`[Import] No section matched for column: ${col}`);
+              continue;
+            }
+
+            // ✅ Always a number, no shadowing
+            const matchedZoneConfigId = Number(matchedSection.id);
+
+            // ✅ zone_config_id on existingRecords is also normalized to number — strict === works
+            const existingZone = existingRecords.find(
+              item => item.zone_config_id === matchedZoneConfigId
+            );
+
+            if (existingZone) {
+              console.log(`[Import] Updating zone record id=${existingZone.id} zone=${matchedZoneConfigId} price=${priceVal}`);
+              await axios.post(
+                `${import.meta.env.VITE_API_INVENTORY_SERVICE_URL}/${clientId}/menu/update`,
+                {
+                  ...basePayload,
+                  id: Number(existingZone.id),
+                  unit_price: Number(priceVal),
+                  zone_config_id: matchedZoneConfigId
+                },
+                { headers: { Authorization: `Bearer ${token}` } }
+              );
+            } else {
+              console.log(`[Import] Creating zone record zone=${matchedZoneConfigId} price=${priceVal}`);
+              await axios.post(
+                `${import.meta.env.VITE_API_INVENTORY_SERVICE_URL}/${clientId}/menu/create`,
+                {
+                  ...basePayload,
+                  id: sharedId,
+                  unit_price: Number(priceVal),
+                  zone_config_id: matchedZoneConfigId
+                },
+                { headers: { Authorization: `Bearer ${token}` } }
+              );
+            }
+          }
         }
 
-        await fetchData({ silent: true });
-        // addon re-fetch handled by selectedCategoryId useEffect
+        await fetchData({ silent: false });
+        alert("Import complete!");
         e.target.value = "";
-      } catch (err) { console.error("Import Error:", err); e.target.value = ""; }
+
+      } catch (err) {
+        console.error("Import Error:", err);
+        alert(`Import failed: ${err.message}`);
+        e.target.value = "";
+      }
     };
+
     reader.readAsBinaryString(file);
   };
 
@@ -850,7 +1319,7 @@ useEffect(() => {
           <div className="lg:col-span-1">
             <div className="lg:sticky lg:top-2">
               <MenuCategoryTree
-                categories={sidebarCategories}
+                categories={categories}
                 selectedCategoryId={selectedCategoryId}
                 onSelectCategory={(id) => {
                   setSelectedCategoryId(id);
@@ -867,7 +1336,7 @@ useEffect(() => {
           {/* Main Content */}
           <div className="lg:col-span-3 border-default border-border-default p-3 rounded-lg h-[88.5vh] flex flex-col">
             {/* Quick category pills */}
-            <div className="flex gap-2 overflow-x-auto scrollbar-hide lg:overflow-visible pb-2">
+            {/* <div className="flex gap-2 overflow-x-auto scrollbar-hide lg:overflow-visible pb-2">
               {dieterySubCategories.map(cat => (
                 <button
                   key={cat.id}
@@ -891,8 +1360,34 @@ useEffect(() => {
                   })()}
                 </button>
               ))}
-            </div>
+            </div> */}
+            <div className="mb-3 flex flex-wrap gap-2">
 
+              <button
+                onClick={() => setZoneConfigId(null)}
+                className={`px-3 py-1 rounded-full text-sm border transition
+    ${zoneConfigId === null
+                    ? "bg-black text-white border-black"
+                    : "bg-gray-100 text-gray-700 hover:bg-gray-200"
+                  }`}
+              >
+                All
+              </button>
+
+              {sections.map((s) => (
+                <button
+                  key={s.id}
+                  onClick={() => setZoneConfigId(s.id)}
+                  className={`px-3 py-1 rounded-full text-sm border transition
+      ${zoneConfigId === s.id
+                      ? "bg-blue-600 text-white border-blue-600"
+                      : "bg-gray-100 text-gray-700 hover:bg-gray-200"
+                    }`}
+                >
+                  {s.zone} - {s.section}
+                </button>
+              ))}
+            </div>
             {/* Header */}
             <div className="flex flex-col gap-3 lg:flex-row lg:items-center lg:justify-between mb-4">
               <div className="flex-shrink-0">
@@ -985,7 +1480,7 @@ useEffect(() => {
 
                       <div className="absolute top-1 right-1 flex gap-1 opacity-0 group-hover:opacity-100 transition-opacity duration-200 z-20">
                         <button className="bg-action-primary text-white p-1 rounded-full hover:scale-110"
-                          onClick={(e) => { e.stopPropagation(); setEditingItem(item); setShowEditModal(true); }}>
+                          onClick={(e) => { e.stopPropagation(); handleItemClick(item); }}>
                           <Edit size={10} />
                         </button>
                         <button className="bg-action-danger text-white p-1 rounded-full hover:scale-110"
@@ -1018,10 +1513,11 @@ useEffect(() => {
         </div>
       )}
 
-      <UniversalAddModal
+      <UniversalAddModal clientId={clientId}
+        token={token}
         showModal={showAddModal} setShowModal={setShowAddModal} modalType="menu"
         newItem={newItem} setNewItem={setNewItem} selectedCategoryId={selectedCategoryId}
-        categories={getModalCategories()} addonSubcategories={addonSubcategories} allAddonItems={allAddonItems}
+        categories={categories} addonSubcategories={addonSubcategories} allAddonItems={allAddonItems}
         newItemImage={newItemImage} setNewItemImage={setNewItemImage}
         newItemImageUrl={newItemImageUrl} setNewItemImageUrl={setNewItemImageUrl}
         handleAddItem={handleAddItem} getCategoryIdByName={getCategoryIdByName}
@@ -1043,7 +1539,8 @@ useEffect(() => {
 
       />
 
-      <UniversalBulkUpdateModal
+      <UniversalBulkUpdateModal clientId={clientId}
+        token={token} menuItems={menuItems}
         showModal={showBulkModal} setShowModal={setShowBulkModal} modalType="menu"
         filteredItems={filteredItems} selectedRows={selectedRows} setSelectedRows={setSelectedRows}
         selectAllChecked={selectAllChecked} setSelectAllChecked={setSelectAllChecked}

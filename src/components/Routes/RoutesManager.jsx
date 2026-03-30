@@ -23,6 +23,7 @@ import Order_Place from '../Super_User/Order_Place/Order_Place';
 import Summary_Super_User from '../Super_User/Order_Place/Summary_Super_User';
 import BillingPage_Super_User from '../Super_User/Billing/Billing_Super_User';
 import KitchenDisplay_Super_User from '../Super_User/Order_Place/KitchenDisplay';
+import TableManagement_sub from '../MainComponents/TableServices/TableManagement_sub';
 
 const RoutesManager = () => {
   const { clientId } = useParams();
@@ -142,6 +143,10 @@ const RoutesManager = () => {
       <Route path="kds-super-user" element={
         <KitchenDisplay_Super_User clientId={clientId} token={token} realm={realm} screenIds={screenIds} />
       } />
+      <Route
+        path="sub-tables"
+        element={<TableManagement_sub clientId={clientId} token={token} userId={userId} realm={realm} screenIds={screenIds} />}
+      />
       <Route path="*" element={<Navigate to="home" replace />} />
       <Route path='user-profile' element={<UserProfile token={token} clientId={clientId} />} />
       <Route path='counter' element={<Counters token={token} clientId={clientId} />} />
