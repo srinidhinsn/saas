@@ -1574,12 +1574,7 @@ const UniversalAddModal = ({
                 <label className="block text-sm font-medium mb-2 text-text-primary">
                   Pricing by Zone & Section
                 </label>
-                <p className="text-xs text-gray-400 mb-2">
-                  Leave blank to skip. Filled prices create separate zone records.
-                </p>
-
                 {/* Base price row — already exists above, just keep it */}
-
                 {configs.map(c => (
                   <div key={c.id} className="flex items-center justify-between gap-3 px-3 py-2 mb-1 rounded-xl border border-border-default bg-bg-tertiary">
                     <span className="text-sm font-medium text-text-primary">
@@ -1606,7 +1601,6 @@ const UniversalAddModal = ({
               </div>
               {/* Code & Unit */}
               <div className="grid grid-cols-2 gap-4">
-
                 <div>
                   <label className="block text-sm font-medium mb-2 text-text-primary">Serving Quantity</label>
                   <input
@@ -1617,7 +1611,24 @@ const UniversalAddModal = ({
                     placeholder="0"
                   />
                 </div>
-
+                <div>
+                  <label className="block text-sm font-medium mb-2 text-text-primary">
+                    Availability
+                  </label>
+                  <input
+                    type="number"
+                    step="0.01"
+                    value={newItem?.availability ?? ''}
+                    onChange={(e) =>
+                      setNewItem(prev => ({
+                        ...(prev || {}),
+                        availability: e.target.value
+                      }))
+                    }
+                    className="w-full px-4 py-2 rounded-lg bg-bg-tertiary border border-border-default"
+                    placeholder="Enter stock / quantity"
+                  />
+                </div>
                 <div>
                   <label className="block text-sm font-medium mb-2 text-text-primary">Serving Unit</label>
                   <select

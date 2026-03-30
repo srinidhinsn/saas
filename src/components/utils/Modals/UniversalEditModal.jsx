@@ -900,6 +900,21 @@ const UniversalEditModal = ({
                     />
                   </div>
                   <div>
+                    <label className="block text-sm font-medium mb-1 text-gray-700">
+                      Availability  <span className="text-red-600">*</span>
+                    </label>
+                    <input
+                      type="number"
+                      value={editingItem.availability ?? ''}
+                      onChange={(e) =>
+                        setEditingItem({
+                          ...editingItem,
+                          availability: e.target.value
+                        })
+                      } className="w-full px-3 py-2 rounded-md border border-gray-300 text-gray-900 focus:outline-none focus:ring-2 focus:ring-blue-500 focus:border-transparent"
+                    />
+                  </div>
+                  <div>
                     <label className="block text-sm font-medium mb-1 text-gray-700">Unit</label>
                     <input
                       type="text"

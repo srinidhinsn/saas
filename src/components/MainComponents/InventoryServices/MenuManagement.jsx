@@ -445,7 +445,7 @@ const MenuManagement = ({ clientId, token, realm }) => {
         serving_quantity: newItem.serving_quantity
           ? parseFloat(newItem.serving_quantity)
           : null,
-        serving_unit: newItem.serving_unit || null,
+        serving_unit: newItem.serving_unit || null,  availability: parseFloat(newItem.availability) || 0,
         created_by,
         updated_by: created_by,
         inventory_id: newItem.inventory_id,
@@ -549,7 +549,7 @@ const MenuManagement = ({ clientId, token, realm }) => {
         serving_unit: editingItem.serving_unit || null,
         line_item_id: Array.isArray(editingItem.line_item_id) && editingItem.line_item_id.length > 0
           ? editingItem.line_item_id : null,
-        realm: editingItem.realm || 'restaurant',
+        realm: editingItem.realm || 'restaurant',availability: Number(editingItem.availability) || 0,
         updated_by: currentUserId,
         slug,
         client_id: clientId,
