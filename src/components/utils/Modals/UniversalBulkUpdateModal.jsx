@@ -927,7 +927,10 @@ const UniversalBulkUpdateModal = ({
     }
   };
 
+  // In UniversalBulkUpdateModal — replace the fetchConfigs function and its useEffect
+
   const fetchConfigs = async () => {
+    if (loadingConfigs) return; // ✅ Guard against concurrent calls
     try {
       setLoadingConfigs(true);
 
@@ -939,7 +942,16 @@ const UniversalBulkUpdateModal = ({
         }
       );
 
-      setConfigs(res.data || []);
+      // ✅ Ensure it's always a clean array, deduplicated by id
+      const raw = Array.isArray(res.data) ? res.data : (res.data?.data || []);
+      const seen = new Set();
+      const unique = raw.filter(c => {
+        if (seen.has(c.id)) return false;
+        seen.add(c.id);
+        return true;
+      });
+
+      setConfigs(unique);
     } catch (err) {
       console.error("Config fetch error:", err);
       setConfigs([]);
@@ -947,6 +959,19 @@ const UniversalBulkUpdateModal = ({
       setLoadingConfigs(false);
     }
   };
+
+  // ✅ Replace the useEffect — only fetch ONCE when modal opens, not on every change
+  useEffect(() => {
+    if (!showModal) {
+      // Reset configs when modal closes so stale data doesn't bleed into next open
+      setConfigs([]);
+      return;
+    }
+    if (!clientId || !token) return;
+
+    fetchConfigs();
+    fetchStatuses();
+  }, [showModal]); // ✅ Only depend on showModal — clientId/token won't change mid-session
   // ✅ Get addon name by ID
   const getAddonNameById = (id) => {
     const addon = allAddonItems?.find(item => item.id === id);
@@ -978,13 +1003,7 @@ const UniversalBulkUpdateModal = ({
       // Addons selected but no items yet - just store them
     }
   };
-  useEffect(() => {
-    if (!showModal) return;
-    if (!clientId || !token) return;
 
-    fetchConfigs();
-    fetchStatuses();
-  }, [showModal, clientId, token]);
   useEffect(() => {
     console.log("CONFIGS:", configs);
   }, [configs]);
@@ -1240,6 +1259,7 @@ const UniversalBulkUpdateModal = ({
                       <th className="px-4 py-3 text-left text-sm font-semibold text-gray-700 bg-gray-50">Description</th>
                       <th className="px-4 py-3 text-left text-sm font-semibold text-gray-700 bg-gray-50">Price</th>
                       <th className="px-4 py-3 text-left text-sm font-semibold text-gray-700 bg-gray-50">Discount</th>
+                      <th className="px-4 py-3 text-left text-sm font-semibold text-gray-700 bg-gray-50">Zone Price :</th>
                       <th className="px-4 py-3 text-left text-sm font-semibold text-gray-700 bg-gray-50">Code</th>
                       <th className="px-4 py-3 text-left text-sm font-semibold text-gray-700 bg-gray-50">Add-ons</th>
                       <th className="px-4 py-3 text-left text-sm font-semibold text-gray-700 bg-gray-50">
@@ -1335,6 +1355,7 @@ const UniversalBulkUpdateModal = ({
                               </span>
                             )}
                           </td>
+
                           <td className="px-4 py-3 min-w-[200px]">
                             {isSelected ? (
                               <div className="space-y-1.5">
@@ -1361,16 +1382,21 @@ const UniversalBulkUpdateModal = ({
                             ) : (
                               <div className="space-y-0.5">
                                 {(() => {
-                                  if (!menuItems) return <span className="text-xs text-gray-400">-</span>;
-                                  const siblings = menuItems.filter(
-                                    m => (m.name || '').trim().toLowerCase() === (item.name || '').trim().toLowerCase()
-                                      && m.zone_config_id !== null
+                                  if (!menuItems || !configs.length) return <span className="text-xs text-gray-400">-</span>;
+
+                                  // ✅ Match by BOTH id AND non-zero zone_config_id — not by name
+                                  const zoneVariants = menuItems.filter(
+                                    m => m.id === item.id &&
+                                      m.zone_config_id !== null &&
+                                      m.zone_config_id !== 0
                                   );
-                                  if (!siblings.length) return <span className="text-xs text-gray-400">-</span>;
-                                  return siblings.map(s => {
+
+                                  if (!zoneVariants.length) return <span className="text-xs text-gray-400">-</span>;
+
+                                  return zoneVariants.map(s => {
                                     const c = configs.find(x => x.id === s.zone_config_id);
                                     return c ? (
-                                      <div key={s.id} className="text-[11px] text-gray-500">
+                                      <div key={`${s.id}-${s.zone_config_id}`} className="text-[11px] text-gray-500">
                                         <span className="font-medium text-blue-600">{c.section}-{c.zone}</span>: ₹{s.unit_price}
                                       </div>
                                     ) : null;
@@ -1434,9 +1460,10 @@ const UniversalBulkUpdateModal = ({
                     const currentAddons = editData.line_item_id !== undefined
                       ? editData.line_item_id
                       : Array.isArray(item.line_item_id) ? item.line_item_id : [];
-                    const siblings = menuItems?.filter(
-                      m => (m.name || '').trim().toLowerCase() === (item.name || '').trim().toLowerCase()
-                        && m.zone_config_id !== null
+                    const zoneVariants = menuItems?.filter(
+                      m => m.id === item.id &&
+                        m.zone_config_id !== null &&
+                        m.zone_config_id !== 0
                     ) || [];
 
                     return (
@@ -1457,12 +1484,12 @@ const UniversalBulkUpdateModal = ({
                         </div>
 
                         {/* Existing zone prices (unselected) */}
-                        {!isSelected && siblings.length > 0 && (
+                        {!isSelected && zoneVariants.length > 0 && (
                           <div className="px-3 pb-2 flex flex-wrap gap-1.5">
-                            {siblings.map(s => {
+                            {zoneVariants.map(s => {
                               const c = configs.find(x => x.id === s.zone_config_id);
                               return c ? (
-                                <span key={s.id} className="text-[11px] bg-blue-100 text-blue-700 px-2 py-0.5 rounded-full">
+                                <span key={`${s.id}-${s.zone_config_id}`} className="text-[11px] bg-blue-100 text-blue-700 px-2 py-0.5 rounded-full">
                                   {c.section}-{c.zone}: ₹{s.unit_price}
                                 </span>
                               ) : null;

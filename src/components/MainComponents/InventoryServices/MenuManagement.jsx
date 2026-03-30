@@ -445,7 +445,7 @@ const MenuManagement = ({ clientId, token, realm }) => {
         serving_quantity: newItem.serving_quantity
           ? parseFloat(newItem.serving_quantity)
           : null,
-        serving_unit: newItem.serving_unit || null,
+        serving_unit: newItem.serving_unit || null, availability: parseFloat(newItem.availability) || 0,
         created_by,
         updated_by: created_by,
         inventory_id: newItem.inventory_id,
@@ -549,7 +549,7 @@ const MenuManagement = ({ clientId, token, realm }) => {
         serving_unit: editingItem.serving_unit || null,
         line_item_id: Array.isArray(editingItem.line_item_id) && editingItem.line_item_id.length > 0
           ? editingItem.line_item_id : null,
-        realm: editingItem.realm || 'restaurant',
+        realm: editingItem.realm || 'restaurant', availability: Number(editingItem.availability) || 0,
         updated_by: currentUserId,
         slug,
         client_id: clientId,
@@ -867,13 +867,15 @@ const MenuManagement = ({ clientId, token, realm }) => {
     try {
       for (const id of selectedRows) {
         const { dietary_type: ed, zonePrices: zp, ...cleanEditedData } = bulkEditData[id] || {};
-        const { dietary_type: od, ...cleanOriginalItem } = menuItems.find(item => item.id === id);
+        const { dietary_type: od, ...cleanOriginalItem } = menuItems.find(item => item.id === id && (item.zone_config_id === 0 || item.zone_config_id === null));
+        // ^^^ Always grab the BASE record (zone_config_id=0) as the merge source
+
         const mergedItem = { ...cleanOriginalItem, ...cleanEditedData, client_id: clientId };
 
-        // Update the main record
+        // Update the base record
         await axios.post(
           `${import.meta.env.VITE_API_INVENTORY_SERVICE_URL}/${clientId}/menu/update`,
-          mergedItem,
+          { ...mergedItem, zone_config_id: 0 },
           { headers: { Authorization: `Bearer ${token}` } }
         );
 
@@ -883,25 +885,39 @@ const MenuManagement = ({ clientId, token, realm }) => {
         );
 
         if (filledZonePrices.length > 0) {
-          const siblings = menuItems.filter(
-            m => (m.name || '').trim().toLowerCase() === (cleanOriginalItem.name || '').trim().toLowerCase()
+          // Find ALL zone variants for this item id (they share the same id)
+          const zoneVariants = menuItems.filter(
+            m => m.id === id && m.zone_config_id !== 0 && m.zone_config_id !== null
           );
 
           for (const [configId, price] of filledZonePrices) {
-            const existingZoneRecord = siblings.find(
-              m => m.zone_config_id === Number(configId) && m.id !== id
+            // ✅ Match by id + zone_config_id directly — no name matching needed
+            const existingZoneRecord = zoneVariants.find(
+              m => m.zone_config_id === Number(configId)
             );
 
             if (existingZoneRecord) {
+              // Update existing zone variant
               await axios.post(
                 `${import.meta.env.VITE_API_INVENTORY_SERVICE_URL}/${clientId}/menu/update`,
-                { ...mergedItem, id: Number(existingZoneRecord.id), unit_price: parseFloat(price), zone_config_id: configId ? Number(configId) : 0 },
+                {
+                  ...mergedItem,
+                  id: Number(existingZoneRecord.id),
+                  unit_price: parseFloat(price),
+                  zone_config_id: Number(configId)
+                },
                 { headers: { Authorization: `Bearer ${token}` } }
               );
             } else {
+              // Create missing zone variant
               await axios.post(
                 `${import.meta.env.VITE_API_INVENTORY_SERVICE_URL}/${clientId}/menu/create`,
-                { ...mergedItem, id: undefined, unit_price: parseFloat(price), zone_config_id: configId ? Number(configId) : 0 },
+                {
+                  ...mergedItem,
+                  id: Number(id),           // ✅ preserve shared id
+                  unit_price: parseFloat(price),
+                  zone_config_id: Number(configId)
+                },
                 { headers: { Authorization: `Bearer ${token}` } }
               );
             }
@@ -914,7 +930,9 @@ const MenuManagement = ({ clientId, token, realm }) => {
       setSelectedRows([]);
       setBulkEditData({});
       setSelectAllChecked(false);
-    } catch (error) { console.error('Error updating items:', error); }
+    } catch (error) {
+      console.error('Error updating items:', error);
+    }
   };
 
   const handleExportToExcel = () => {
@@ -959,7 +977,6 @@ const MenuManagement = ({ clientId, token, realm }) => {
       const exportData = Object.values(grouped).map(({ baseItem: item, zonePrices }) => {
         const row = {
           ID: item.id ?? "",
-          Inventory_Id: item.inventory_id,
           Name: item.name ?? "",
           Description: item.description ?? "",
           Category: catNameById(item.category_id) || "Unknown",
@@ -967,6 +984,7 @@ const MenuManagement = ({ clientId, token, realm }) => {
           Unit: item.unit ?? "",
           Unit_Price: Number(item.unit_price) || 0,
           Discount: Number(item.discount) || 0,
+          Availability: Number(item.availability) || 0,  // ✅ added
           Code: item.code != null ? String(item.code) : "",
           Serving_Quantity: item.serving_quantity,
           Serving_Unit: item.serving_unit,
@@ -985,8 +1003,8 @@ const MenuManagement = ({ clientId, token, realm }) => {
       });
 
       const headers = [
-        "ID", "Inventory_Id", "Name", "Description", "Category", "Image",
-        "Unit", "Unit_Price", "Discount", "Code", "Serving_Quantity",
+        "ID", "Name", "Description", "Category", "Image",
+        "Unit", "Unit_Price", "Discount", "Availability", "Code", "Serving_Quantity",
         "Serving_Unit", "Realm", "Slug", "Line_Item_IDs",
         ...zoneColumns.map(c => `Price_${c}`)
       ];
@@ -1107,7 +1125,7 @@ const MenuManagement = ({ clientId, token, realm }) => {
 
           const basePayload = {
             client_id: clientId,
-            inventory_id: row.Inventory_Id || null,
+            inventory_id: "menu",
             name: row.Name?.trim(),
             description: row.Description || null,
             category_id: categoryName,
@@ -1116,9 +1134,9 @@ const MenuManagement = ({ clientId, token, realm }) => {
             serving_quantity: row.Serving_Quantity || null,
             serving_unit: row.Serving_Unit || null,
             unit: row.Unit || null,
-            // ✅ Only include image_id if it's actually a real value
             ...(row.Image && String(row.Image).trim() !== "" && { image_id: String(row.Image).trim() }),
             discount: Number(row.Discount) || 0,
+            availability: Number(row.Availability) || 0,
             slug,
             line_item_id: row.Line_Item_IDs
               ? row.Line_Item_IDs.split(",").map(v => parseInt(v.trim(), 10)).filter(v => !isNaN(v))
