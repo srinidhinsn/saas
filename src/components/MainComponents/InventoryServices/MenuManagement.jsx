@@ -867,54 +867,72 @@ const MenuManagement = ({ clientId, token, realm }) => {
     try {
       for (const id of selectedRows) {
         const { dietary_type: ed, zonePrices: zp, ...cleanEditedData } = bulkEditData[id] || {};
-        const { dietary_type: od, ...cleanOriginalItem } = menuItems.find(item => item.id === id);
+        const { dietary_type: od, ...cleanOriginalItem } = menuItems.find(item => item.id === id && (item.zone_config_id === 0 || item.zone_config_id === null));
+        // ^^^ Always grab the BASE record (zone_config_id=0) as the merge source
+  
         const mergedItem = { ...cleanOriginalItem, ...cleanEditedData, client_id: clientId };
-
-        // Update the main record
+  
+        // Update the base record
         await axios.post(
           `${import.meta.env.VITE_API_INVENTORY_SERVICE_URL}/${clientId}/menu/update`,
-          mergedItem,
+          { ...mergedItem, zone_config_id: 0 },
           { headers: { Authorization: `Bearer ${token}` } }
         );
-
+  
         // Upsert zone price records
         const filledZonePrices = Object.entries(zp || {}).filter(
           ([, price]) => price !== '' && price !== null && price !== undefined
         );
-
+  
         if (filledZonePrices.length > 0) {
-          const siblings = menuItems.filter(
-            m => (m.name || '').trim().toLowerCase() === (cleanOriginalItem.name || '').trim().toLowerCase()
+          // Find ALL zone variants for this item id (they share the same id)
+          const zoneVariants = menuItems.filter(
+            m => m.id === id && m.zone_config_id !== 0 && m.zone_config_id !== null
           );
-
+  
           for (const [configId, price] of filledZonePrices) {
-            const existingZoneRecord = siblings.find(
-              m => m.zone_config_id === Number(configId) && m.id !== id
+            // ✅ Match by id + zone_config_id directly — no name matching needed
+            const existingZoneRecord = zoneVariants.find(
+              m => m.zone_config_id === Number(configId)
             );
-
+  
             if (existingZoneRecord) {
+              // Update existing zone variant
               await axios.post(
                 `${import.meta.env.VITE_API_INVENTORY_SERVICE_URL}/${clientId}/menu/update`,
-                { ...mergedItem, id: Number(existingZoneRecord.id), unit_price: parseFloat(price), zone_config_id: configId ? Number(configId) : 0 },
+                {
+                  ...mergedItem,
+                  id: Number(existingZoneRecord.id),
+                  unit_price: parseFloat(price),
+                  zone_config_id: Number(configId)
+                },
                 { headers: { Authorization: `Bearer ${token}` } }
               );
             } else {
+              // Create missing zone variant
               await axios.post(
                 `${import.meta.env.VITE_API_INVENTORY_SERVICE_URL}/${clientId}/menu/create`,
-                { ...mergedItem, id: undefined, unit_price: parseFloat(price), zone_config_id: configId ? Number(configId) : 0 },
+                {
+                  ...mergedItem,
+                  id: Number(id),           // ✅ preserve shared id
+                  unit_price: parseFloat(price),
+                  zone_config_id: Number(configId)
+                },
                 { headers: { Authorization: `Bearer ${token}` } }
               );
             }
           }
         }
       }
-
+  
       await fetchData({ silent: true });
       setShowBulkModal(false);
       setSelectedRows([]);
       setBulkEditData({});
       setSelectAllChecked(false);
-    } catch (error) { console.error('Error updating items:', error); }
+    } catch (error) {
+      console.error('Error updating items:', error);
+    }
   };
 
   const handleExportToExcel = () => {
