@@ -431,7 +431,6 @@ def _record_partial_transaction(
     reason,
     order_id,
 ):
-    from entity.inventory_entity import InventoryEntity
 
     menu_item = db.query(InventoryEntity).filter(
         InventoryEntity.id == item.item_id,

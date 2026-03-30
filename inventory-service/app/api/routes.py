@@ -8,8 +8,8 @@ from entity.inventory_entity import InventoryEntity, CategoryEntity, InventoryTr
 from models.response_model import ResponseModel
 from models.saas_context import SaasContext
 from utils.auth import verify_token
-from services import service
-from services.service import _compute_current_stock, _record_transaction, _convert
+from ..services import service
+from ..services.service import _compute_current_stock, _record_transaction, _convert
 
 # -------------------- CONFIG --------------------
 router = APIRouter()
@@ -70,7 +70,75 @@ def update_inventory(client_id: str, updates: Inventory, context: SaasContext = 
     
     return ResponseModel[Inventory](screen_id=context.screen_id, status="success", message="Inventory item updated", data=model)
 
+@router.post("/update/avail", response_model=ResponseModel[Inventory])
+def update_inventory_availability(
+    client_id: str,
+    updates: Inventory,
+    context: SaasContext = Depends(verify_token),
+    db: Session = Depends(get_db),
+):
+    """
+    Update a menu item's availability and record it as an ADJUSTMENT transaction
+    in inventory_transactions for full audit history.
+    """
+    if not updates.id:
+        raise HTTPException(status_code=400, detail="Missing item ID")
+
+    record = db.query(InventoryEntity).filter(
+        InventoryEntity.id == updates.id,
+        InventoryEntity.client_id == client_id,
+    ).first()
+
+    if not record:
+        raise HTTPException(status_code=404, detail="Inventory item not found")
+
+    update_data = updates.dict(exclude_unset=True)
+    new_availability = update_data.pop("availability", None)
+
+    # Apply any other metadata fields that came along in the payload
+    for key, value in update_data.items():
+        if key != "client_id":
+            setattr(record, key, value)
+
+    # Only record a transaction if availability is actually being changed
+    if new_availability is not None:
+        new_qty = Decimal(str(new_availability))
+        before_stock = Decimal(str(record.availability or 0))
+        delta = new_qty - before_stock
+
+        if delta != Decimal("0"):
+            movement = "IN" if delta > 0 else "OUT"
+
+            _record_transaction(
+                db,
+                client_id=client_id,
+                stock_item_id=record.id,
+                inventory_id=record.inventory_id,
+                name=record.name,
+                transaction_type="MENU_AVAILABILITY_ADJUSTMENT",
+                movement_type=movement,
+                quantity=abs(delta),
+                unit=record.serving_unit or record.unit,   # use serving_unit for menu items
+                before_stock=before_stock,
+                after_stock=new_qty,
+                created_by=getattr(context, "user_id", None),
+                remarks=f"Manual availability update for menu item '{record.name}'",
+            )
+
+        record.availability = new_qty
+
+    db.commit()
+    db.refresh(record)
+    model = InventoryEntity.copyToModel(record)
+
+    return ResponseModel[Inventory](
+        screen_id=context.screen_id,
+        status="success",
+        message="Inventory availability updated",
+        data=model,
+    )
 @router.post("/delete", response_model=ResponseModel[Inventory])
+
 def delete_inventory(client_id: str, item: Inventory, context: SaasContext = Depends(verify_token), db: Session = Depends(get_db)):
     record = db.query(InventoryEntity).filter(
         InventoryEntity.id == item.id, 
