@@ -10,7 +10,7 @@ from models.saas_context import SaasContext
 from utils.auth import verify_token
 from services import service
 from services.service import _compute_current_stock, _record_transaction, _convert
-
+from sqlalchemy import text
 # -------------------- CONFIG --------------------
 router = APIRouter()
 getcontext().prec = 18  # increase decimal precision
