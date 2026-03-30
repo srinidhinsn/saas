@@ -86,14 +86,24 @@ def update_inventory(
         zone_id = int(zone_id)
 
     payload["zone_config_id"] = zone_id
-    if "image_id" in payload and payload["image_id"]:
+
+    # ✅ Image-only path: ONLY when image_id is real AND unit_price is truly absent
+    # unit_price=0 is a valid price — must NOT trigger image-only path
+    image_id_val = payload.get("image_id")
+    has_real_image = image_id_val and str(image_id_val).strip() not in ("", "null", "None")
+    has_unit_price = "unit_price" in payload  # key present = price update intended
+
+    if has_real_image and not has_unit_price:
         records = db.query(InventoryEntity).filter(
             InventoryEntity.id == updates.id,
             InventoryEntity.client_id == client_id
         ).all()
 
+        if not records:
+            raise HTTPException(status_code=404, detail="Inventory item not found")
+
         for record in records:
-            record.image_id = payload["image_id"]
+            record.image_id = image_id_val
 
         db.commit()
 
@@ -104,6 +114,7 @@ def update_inventory(
             data=InventoryEntity.copyToModel(records[0])
         )
 
+    # Normal update path — find the specific zone record
     record = db.query(InventoryEntity).filter(
         InventoryEntity.id == updates.id,
         InventoryEntity.zone_config_id == zone_id,
@@ -119,25 +130,51 @@ def update_inventory(
 
     db.commit()
     db.refresh(record)
-    return ResponseModel(screen_id=context.screen_id,status="success",message="Inventory updated",data=InventoryEntity.copyToModel(record))
 
+    return ResponseModel(
+        screen_id=context.screen_id,
+        status="success",
+        message="Inventory updated",
+        data=InventoryEntity.copyToModel(record)
+    )
 @router.post("/delete", response_model=ResponseModel[Inventory])
-def delete_inventory(client_id: str, item: Inventory, context: SaasContext = Depends(verify_token), db: Session = Depends(get_db)):
-    zone_id = item.zone_config_id if item.zone_config_id is not None else 0
-    record = db.query(InventoryEntity).filter(
-        InventoryEntity.id == item.id,
-        InventoryEntity.zone_config_id == zone_id,
-        InventoryEntity.client_id == client_id
-    ).first()
+def delete_inventory(
+    client_id: str,
+    item: Inventory,
+    context: SaasContext = Depends(verify_token),
+    db: Session = Depends(get_db)
+):
+    if not item.id:
+        raise HTTPException(status_code=400, detail="Missing item ID")
 
-    if not record:
+    # ✅ Fetch ALL records with this id (base + all zone variants)
+    records = db.query(InventoryEntity).filter(
+        InventoryEntity.id == item.id,
+        InventoryEntity.client_id == client_id
+    ).all()
+
+    if not records:
         raise HTTPException(status_code=404, detail="Inventory item not found")
 
-    model = InventoryEntity.copyToModel(record)
-    db.delete(record)
+    # Return the base record as the response model
+    base_record = next(
+        (r for r in records if r.zone_config_id == 0 or r.zone_config_id is None),
+        records[0]
+    )
+    model = InventoryEntity.copyToModel(base_record)
+
+    # ✅ Delete ALL zone variants together
+    for record in records:
+        db.delete(record)
+
     db.commit()
 
-    return ResponseModel[Inventory](screen_id=context.screen_id,status="success",message="Inventory item deleted",data=model)
+    return ResponseModel[Inventory](
+        screen_id=context.screen_id,
+        status="success",
+        message="Inventory item and all zone variants deleted",
+        data=model
+    )
 
 @router.delete("/delete_all", response_model=ResponseModel[str])
 def delete_all_inventory( client_id: str, context: SaasContext = Depends(verify_token), db: Session = Depends(get_db)):
