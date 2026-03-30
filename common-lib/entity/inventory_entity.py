@@ -4,10 +4,11 @@ from database.base import Base
 from models.inventory_model import Inventory, Category, InventoryTransaction
 from typing import List
 
+
 class InventoryEntity(Base):
     __tablename__ = "inventory"
 
-    id = Column(BigInteger, primary_key=True, autoincrement=True)
+    id = Column(BigInteger, primary_key=True, autoincrement=False)
     client_id = Column(Text, nullable=False)
     inventory_id = Column(Text, nullable=True)
     line_item_id = Column(ARRAY(BigInteger), nullable=True)
@@ -15,6 +16,7 @@ class InventoryEntity(Base):
     name = Column(Text, nullable=True)
     description = Column(Text, nullable=True)
     category_id = Column(Text, nullable=True)
+    zone_config_id = Column(BigInteger,primary_key=True , default=0)
     realm = Column(Text, nullable=True)
     serving_quantity = Column(Float, nullable=True)
     serving_unit = Column(Text, nullable=True)
@@ -77,8 +79,6 @@ class CategoryEntity(Base):
         for m in models:
             m.__dict__.pop("_sa_instance_state", None)
         return models
-
-
 
 class InventoryTransactionEntity(Base):
     __tablename__ = "inventory_transactions"

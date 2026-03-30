@@ -644,6 +644,7 @@ async def save_address(client_id: str,add: AddressModel,context: SaasContext = D
         if address:
             address.address_line1 = add.address_line1
             address.address_line2 = add.address_line2
+            address.name = add.name
             address.city = add.city
             address.state = add.state
             address.country = add.country
@@ -660,6 +661,7 @@ async def save_address(client_id: str,add: AddressModel,context: SaasContext = D
     new_address = Address(
         address_line1=add.address_line1,
         address_line2=add.address_line2,
+        name=add.name,
         city=add.city,
         state=add.state,
         country=add.country,

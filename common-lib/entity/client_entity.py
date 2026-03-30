@@ -31,6 +31,7 @@ class Address(Base):
     id = Column(BigInteger, primary_key=True, autoincrement=True)
     address_line1 = Column(String, nullable=False)  
     address_line2 = Column(String, nullable=False)  
+    name = Column(Text, nullable=False)
     city = Column(String, nullable=False)  
     country = Column(String, nullable=False)  
     state = Column(String, nullable=False)  

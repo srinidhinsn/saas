@@ -3,8 +3,8 @@ from sqlalchemy.orm import Session
 from typing import List
 from uuid import UUID
 from database.postgres import get_db
-from models.table_model import Table
-from entity.table_entity import DiningTable
+from models.table_model import Table , TablesModel
+from entity.table_entity import DiningTable , Tables
 from models.response_model import ResponseModel 
 from models.saas_context import SaasContext
 from utils.auth import verify_token
@@ -76,4 +76,42 @@ def delete_table(client_id: str, table: Table, context: SaasContext = Depends(ve
     return response
 
 
+@router.post("/config")
+def create_config(data: TablesModel, db: Session = Depends(get_db)):
+
+    existing = db.query(Tables).filter(
+        Tables.client_id == data.client_id,
+        Tables.section == data.section,
+        Tables.zone == data.zone
+    ).first()
+
+    if existing:
+        raise HTTPException(status_code=409, detail="Already exists")
+
+    new_config = Tables(**data.dict())
+    db.add(new_config)
+    db.commit()
+    db.refresh(new_config)
+
+    return new_config
+
+@router.get("/config")
+def get_configs(client_id: str, db: Session = Depends(get_db)):
+    return db.query(Tables).filter(Tables.client_id == client_id).all()
+
+@router.delete("/config/{id}")
+def delete_config(id: int, client_id: str, db: Session = Depends(get_db)):
+
+    config = db.query(Tables).filter(
+        Tables.id == id,
+        Tables.client_id == client_id
+    ).first()
+
+    if not config:
+        raise HTTPException(404, "Not found")
+
+    db.delete(config)
+    db.commit()
+
+    return {"message": "Deleted"}
 
