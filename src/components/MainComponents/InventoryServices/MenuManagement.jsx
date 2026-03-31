@@ -9,6 +9,7 @@ import UniversalEditModal from '../../utils/Modals/UniversalEditModal';
 import UniversalBulkUpdateModal from '../../utils/Modals/UniversalBulkUpdateModal';
 import { jwtDecode } from "jwt-decode";
 import { getMenuConfig } from '../../utils/menuConfigResolver';
+import MenuConfigModal from '../../utils/Modals/MenuConfigModal';
 
 const MenuManagement = ({ clientId, token, realm }) => {
   const [searchOpen, setSearchOpen] = useState(false);
@@ -27,7 +28,10 @@ const MenuManagement = ({ clientId, token, realm }) => {
   const [sidebarCategories, setSidebarCategories] = useState([]);
 
   const savedCategoryRef = useRef(localStorage.getItem("menu_selected_category"));
-
+  const [dietaryColorMap, setDietaryColorMap] = useState({});
+  const [dietaryOptions, setDietaryOptions] = useState([]);
+  const [showMenuConfig, setShowMenuConfig] = useState(false);
+  const [timeTick, setTimeTick] = useState(Date.now());
   // All IDs and keywords come from menuConfigResolver — nothing hardcoded here
   const menuConfig = React.useMemo(() => {
     if (!clientId) return null;
@@ -65,6 +69,8 @@ const MenuManagement = ({ clientId, token, realm }) => {
   const [selectedSection, setSelectedSection] = useState("");
   const [zoneConfigId, setZoneConfigId] = useState(null);
   const [currentUserId, setCurrentUserId] = useState(null);
+  const [selectedDietary, setSelectedDietary] = useState(null);
+  const [timingOptions, setTimingOptions] = useState([]);
   useEffect(() => {
     try {
       const decoded = jwtDecode(token);
@@ -72,6 +78,43 @@ const MenuManagement = ({ clientId, token, realm }) => {
     } catch { console.warn("JWT decode failed"); }
   }, [token]);
 
+  const dietaryStyles = {
+    veg: { label: "Veg", color: "bg-green-500" },
+    nonveg: { label: "Non Veg", color: "bg-red-500" },
+    egg: { label: "Egg", color: "bg-yellow-400" },
+    chinese: { label: "Chinese", color: "bg-orange-500" }
+  };
+  const dietaryBorderStyles = {
+    veg: "border-green-500",
+    nonveg: "border-red-500",
+    egg: "border-yellow-400",
+    chinese: "border-orange-500"
+  };
+  const fetchTimings = async () => {
+    try {
+      const res = await axios.get(
+        `${import.meta.env.VITE_API_INVENTORY_SERVICE_URL}/${clientId}/inventory/masters`,
+        {
+          params: { category_id: "available_timings" },
+          headers: { Authorization: `Bearer ${token}` }
+        }
+      );
+
+      setTimingOptions(res.data?.data || []);
+    } catch (err) {
+      console.error("Timing fetch error:", err);
+    }
+  };
+  useEffect(() => {
+    fetchTimings();
+  }, [clientId]);
+  useEffect(() => {
+    const interval = setInterval(() => {
+      setTimeTick(Date.now()); // triggers re-render
+    }, 60000); // every 1 minute
+
+    return () => clearInterval(interval);
+  }, []);
   // ─── Walk up the categoriesFlat tree and collect all ancestor name segments ─
   const buildPathNames = useCallback((categoryId, flatList) => {
     const pathNames = [];
@@ -167,7 +210,25 @@ const MenuManagement = ({ clientId, token, realm }) => {
     return `addons_${slug}`;
   }, [getTopLevelSection]);
 
+  const fetchDietaryTypes = useCallback(async () => {
+    try {
+      const res = await axios.get(
+        `${import.meta.env.VITE_API_INVENTORY_SERVICE_URL}/${clientId}/inventory/masters`,
+        {
+          params: { category_id: "dietary_type" },
+          headers: { Authorization: `Bearer ${token}` }
+        }
+      );
 
+      setDietaryOptions(res.data?.data || []);
+    } catch (err) {
+      console.error("Dietary fetch error:", err);
+      setDietaryOptions([]);
+    }
+  }, [clientId, token]);
+  useEffect(() => {
+    fetchDietaryTypes();
+  }, [fetchDietaryTypes]);
 
   const fetchAddonData = useCallback(async (addonCategoryId) => {
     if (!menuConfig || !addonCategoryId) {
@@ -256,15 +317,12 @@ const MenuManagement = ({ clientId, token, realm }) => {
     return path;
   };
 
-  const generateSlug = (categoryIdOrObjOrName, itemName) => {
-    let catId = null;
-    if (!categoryIdOrObjOrName) { catId = null; }
-    else if (typeof categoryIdOrObjOrName === 'object' && categoryIdOrObjOrName.id) { catId = categoryIdOrObjOrName.id; }
-    else { catId = categoryIdOrObjOrName; }
-    const parts = buildCategoryPath(catId);
-    const itemPart = (itemName || '').trim().replace(/\s+/g, '_').replace(/[^a-zA-Z0-9_]/g, '');
-    if (itemPart) parts.push(itemPart);
-    return parts.filter(Boolean).join('_');
+  const generateSlug = (itemName, dietaryType, timing) => {
+    const itemPart = itemName?.trim().replace(/\s+/g, "_").replace(/[^a-zA-Z0-9_]/g, '') || "";
+    // Always encode defaults so slug always has 3 parts: name_dietary_timing
+    const dietaryPart = (dietaryType || "veg").charAt(0).toUpperCase() + (dietaryType || "veg").slice(1);
+    const timingPart = (timing || "allday").charAt(0).toUpperCase() + (timing || "allday").slice(1);
+    return [itemPart, dietaryPart, timingPart].filter(Boolean).join("_");
   };
 
   const openAddModal = () => {
@@ -287,15 +345,25 @@ const MenuManagement = ({ clientId, token, realm }) => {
       .filter(m => m.zone_config_id !== 0)
       .forEach(m => { zonePrices[m.zone_config_id] = m.unit_price; });
 
-    // ✅ category_id in DB is now a name — resolve back to actual id for modal dropdown
+    const slugParts = (baseRecord.slug || "").split("_");
+    // slug format: ItemName_Dietary_Timing (always 3+ parts after fix)
+    const timingFromSlug = slugParts.length >= 3
+      ? slugParts[slugParts.length - 1]?.toLowerCase()
+      : "allday";
+    const dietaryFromSlug = slugParts.length >= 3
+      ? slugParts[slugParts.length - 2]?.toLowerCase()
+      : "veg";
+
     const resolvedCategoryId = categoriesFlat.find(
       c => c.name.toLowerCase() === (baseRecord.category_id || '').toLowerCase()
     )?.id || baseRecord.category_id;
 
     setEditingItem({
       ...baseRecord,
-      category_id: resolvedCategoryId,  // id for modal
+      category_id: resolvedCategoryId,
       zonePrices,
+      availability_time: timingFromSlug,
+      dietary_type: dietaryFromSlug,  // ← now correctly pre-fills edit modal
     });
     setShowEditModal(true);
   };
@@ -421,13 +489,17 @@ const MenuManagement = ({ clientId, token, realm }) => {
         newItem?.category_id;
 
       if (!finalCategoryId) return;
-
-      const slug = generateSlug(finalCategoryId, newItem.name);
+      const slug = generateSlug(
+        newItem.name,
+        newItem.dietary_type,
+        newItem.availability_time
+      );
+      const { dietary_type, ...cleanNewItem } = newItem;
 
       const created_by =
         currentUserId || localStorage.getItem("user_id") || "system";
 
-      const { dietary_type, ...cleanNewItem } = newItem;
+
 
       const basePrice = parseFloat(newItem.unit_price) || 0;
       const zonePrices = newItem.zonePrices || {};
@@ -534,7 +606,11 @@ const MenuManagement = ({ clientId, token, realm }) => {
         return;
       }
 
-      const slug = generateSlug(editingItem.category_id, editingItem.name);
+      const slug = generateSlug(
+        editingItem.name,
+        editingItem.dietary_type,
+        editingItem.availability_time
+      );
       const { dietary_type, zonePrices: zp, ...cleanEditingItem } = editingItem;
 
       const basePayload = {
@@ -722,7 +798,12 @@ const MenuManagement = ({ clientId, token, realm }) => {
     const q = (searchQuery || '').trim().toLowerCase();
 
     let items = menuItems;
-
+    if (selectedDietary) {
+      items = items.filter(item => {
+        const dietary = getDietaryFromSlug(item.slug);
+        return dietary === selectedDietary;
+      });
+    }
     if (q.length > 0) {
       items = items.filter(item =>
         (item.name || '').toLowerCase().includes(q) ||
@@ -766,14 +847,39 @@ const MenuManagement = ({ clientId, token, realm }) => {
     });
     return Array.from(seen.values());
   };
-
+  const isItemActive = (slug, timingOptions) => {
+    if (!slug) return true;
+    const parts = slug.split("_");
+    if (parts.length < 3) return true; // old format slug = always active
+    const timing = parts[parts.length - 1]?.toLowerCase();
+    if (!timing || timing === "allday") return true; // default = always active
+    const timingData = timingOptions.find(t => t.toLowerCase().startsWith(timing));
+    if (!timingData) return true;
+    const [, start, end] = timingData.split("|");
+    const now = new Date();
+    const currentMinutes = now.getHours() * 60 + now.getMinutes();
+    const [sh, sm] = start.split(":").map(Number);
+    const [eh, em] = end.split(":").map(Number);
+    return currentMinutes >= (sh * 60 + sm) && currentMinutes <= (eh * 60 + em);
+  };
+  const getDietaryFromSlug = (slug) => {
+    if (!slug) return "veg"; // default
+    const parts = slug.split("_");
+    if (parts.length < 3) return "veg"; // default if old slug format
+    return parts[parts.length - 2].toLowerCase();
+  };
   const handleEditImageFile = (file) => {
     if (file?.type.startsWith('image/')) { setEditItemImage(file); setEditItemImageUrl(URL.createObjectURL(file)); }
     else { alert('Please upload a valid image file'); }
   };
 
   const filteredItems = getFilteredItems();
+  const sortedItems = [...filteredItems].sort((a, b) => {
+    const aActive = isItemActive(a.slug, timingOptions);
+    const bActive = isItemActive(b.slug, timingOptions);
 
+    return bActive - aActive; // active first
+  });
   const uploadImageToDocumentService = async (imageFile) => {
     const formData = new FormData();
     formData.append("file", imageFile);
@@ -1414,7 +1520,27 @@ const MenuManagement = ({ clientId, token, realm }) => {
                   <span className="text-sm ml-2 text-text-secondary">({filteredItems.length})</span>
                 </h2>
               </div>
+              <div className="flex gap-2 mb-3">
+                {["veg", "nonveg", "egg", "chinese"].map(type => (
+                  <button
+                    key={type}
+                    onClick={() => setSelectedDietary(type)}
+                    className={`px-3 py-1 rounded-full text-sm ${selectedDietary === type
+                      ? "bg-black text-white"
+                      : "bg-gray-100"
+                      }`}
+                  >
+                    {type}
+                  </button>
+                ))}
 
+                <button
+                  onClick={() => setSelectedDietary(null)}
+                  className="px-3 py-1 rounded-full text-sm bg-gray-200"
+                >
+                  All
+                </button>
+              </div>
               <div className="flex flex-col gap-2 sm:flex-row sm:items-center sm:justify-end lg:flex-nowrap lg:gap-2">
                 <div className="relative w-full sm:w-56">
                   <Search size={16} className="absolute left-3 top-1/2 -translate-y-1/2 text-text-secondary" />
@@ -1429,6 +1555,9 @@ const MenuManagement = ({ clientId, token, realm }) => {
                 </div>
 
                 <div className="flex gap-2 flex-wrap justify-end">
+                  <button onClick={() => setShowMenuConfig(true)} className="h-9 px-3 flex items-center gap-2 rounded-lg bg-action-success text-white text-sm font-semibold shadow-sm hover:opacity-90">
+                    <span>Config</span>
+                  </button>
                   <button onClick={openAddModal} className="h-9 px-3 flex items-center gap-2 rounded-lg bg-action-primary text-white text-sm font-semibold shadow-sm hover:opacity-90">
                     <Plus size={14} /><span>Add Item</span>
                   </button>
@@ -1456,20 +1585,33 @@ const MenuManagement = ({ clientId, token, realm }) => {
             {/* Items Grid */}
             <div className="flex-1 overflow-y-auto">
               <div className="grid gap-2 grid-cols-2 md:grid-cols-3 lg:grid-cols-3 xl:grid-cols-4">
-                {filteredItems.map((item) => {
+                {sortedItems.map((item) => {
                   const discountPercent = item.discount && item.unit_price && Number(item.discount) > 0
                     ? ((Number(item.discount) * 100) / Number(item.unit_price)).toFixed(0) : null;
-
+                  const dietary = getDietaryFromSlug(item.slug);
+                  const active = isItemActive(item.slug, timingOptions);
                   return (
-                    <div key={item.id} className="relative flex gap-2 items-center bg-bg-primary border border-border-default rounded-xl p-1 shadow-sm hover:shadow-md transition group overflow-hidden">
-                      <div className="absolute inset-0 bg-black/40 backdrop-blur-[2px] opacity-0 pointer-events-none z-10 group-hover:animate-overlayFade" />
+                    <div key={item.id}
+                      className={`relative flex gap-2 items-center bg-bg-primary border rounded-xl p-1 shadow-sm transition group overflow-hidden
+                      ${active ? "" : "opacity-40 grayscale"}
+                    `}                    >
+
+                      <div
+                        className={`w-[3px] h-full rounded-l-xl
+    ${dietary === "veg" ? "bg-green-500" :
+                            dietary === "nonveg" ? "bg-red-500" :
+                              dietary === "egg" ? "bg-yellow-400" :
+                                dietary === "chinese" ? "bg-orange-500" :
+                                  "bg-transparent"
+                          }
+  `}
+                      /> <div className="absolute inset-0 bg-black/40 backdrop-blur-[2px] opacity-0 pointer-events-none z-10 group-hover:animate-overlayFade" />
 
                       {item.line_item_id?.length > 0 && (
                         <div className="absolute bottom-2 right-2 bg-orange-500 text-white text-[7px] p-1 rounded-md z-10 shadow-md flex items-center gap-1">
                           <Plus size={10} /><span>{item.line_item_id.length} add-ons</span>
                         </div>
                       )}
-
                       <div className="relative w-10 h-12 md:h-16 md:w-14 rounded-lg overflow-hidden shrink-0 bg-gray-100">
                         {discountPercent && (
                           <div className="absolute top-1 left-1 bg-action-danger text-white text-[7px] md:text-[10px] px-1 rounded z-10">
@@ -1483,6 +1625,11 @@ const MenuManagement = ({ clientId, token, realm }) => {
 
                       <div className="flex-1 min-w-0 cursor-pointer" onClick={() => handleItemClick(item)}>
                         <h3 className="text-[10px] md:text-[16px] font-semibold text-text-primary">{item.name}</h3>
+                        {/* {!active && (
+                          <p className="text-[10px] text-red-500">
+                            Not available now
+                          </p>
+                        )} */}
                         {item.description && <p className="text-[8px] md:text-[13px] text-text-secondary line-clamp-1">{item.description}</p>}
                         <div className="flex items-center gap-2 mt-1">
                           {discountPercent ? (
@@ -1565,6 +1712,12 @@ const MenuManagement = ({ clientId, token, realm }) => {
         bulkEditData={bulkEditData} setBulkEditData={setBulkEditData}
         handleBulkUpdate={handleBulkUpdate} handleBulkDelete={handleBulkDelete}
         addonSubcategories={addonSubcategories} allAddonItems={allAddonItems}
+      />
+      <MenuConfigModal
+        show={showMenuConfig}
+        onClose={() => setShowMenuConfig(false)}
+        clientId={clientId}
+        token={token}
       />
     </div>
   );
