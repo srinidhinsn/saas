@@ -11,7 +11,7 @@ const UniversalAddModal = ({
   modalType, // 'menu' or 'table'
   clientId,
   token,
-
+  isRestaurant,
   // Menu-specific props
   newItem,
   setNewItem,
@@ -137,9 +137,11 @@ const UniversalAddModal = ({
 
     fetchConfigs();
     fetchStatuses();
-    fetchDietaryTypes();
-    fetchTimings();
-  }, [showModal, modalType, clientId, token]);
+    if (isRestaurant) {
+      fetchDietaryTypes();
+      fetchTimings();
+    }
+  }, [showModal, modalType, clientId, token,isRestaurant]);
 
   // Drag handlers
   const handleDrag = (e) => {
@@ -281,34 +283,29 @@ const UniversalAddModal = ({
                   rows="3"
                 />
               </div>
-              <div>
-                <label className="block text-sm font-medium mb-2">
-                  Availability Timing
-                </label>
-
-                <select
-                  value={newItem?.availability_time || ""}
-                  onChange={(e) =>
-                    setNewItem(prev => ({
-                      ...prev,
-                      availability_time: e.target.value
-                    }))
-                  }
-                  className="w-full px-4 py-2 rounded-lg border"
-                >
-                  <option value="">Select timing</option>
-
-                  {timingOptions.map((t) => {
-                    const [name, start, end] = t.split("|");
-
-                    return (
-                      <option key={t} value={name}>
-                        {name} ({start} - {end})
-                      </option>
-                    );
-                  })}
-                </select>
-              </div>
+              {/* WRAP Availability Timing select */}
+              {isRestaurant && (
+                <div>
+                  <label className="block text-sm font-medium mb-2">
+                    Availability Timing
+                  </label>
+                  <select
+                    value={newItem?.availability_time || ""}
+                    onChange={(e) => setNewItem(prev => ({ ...prev, availability_time: e.target.value }))}
+                    className="w-full px-4 py-2 rounded-lg border"
+                  >
+                    <option value="">Select timing</option>
+                    {timingOptions.map((t) => {
+                      const [name, start, end] = t.split("|");
+                      return (
+                        <option key={t} value={name}>
+                          {name} ({start} - {end})
+                        </option>
+                      );
+                    })}
+                  </select>
+                </div>
+              )}
               {/* Unit Price & Discount */}
               <div className="grid grid-cols-2 gap-4">
                 <div>
@@ -458,29 +455,6 @@ const UniversalAddModal = ({
                         : 'Select Add-ons'}
                     </span>
                   </button>
-                </div>
-                <div>
-                  <label className="block text-sm font-medium mb-2 text-text-primary">
-                    Dietary Type
-                  </label>
-                  <select
-                    value={newItem?.dietary_type || ""}
-                    onChange={(e) =>
-                      setNewItem(prev => ({
-                        ...prev,
-                        dietary_type: e.target.value
-                      }))
-                    }
-                    className="w-full px-4 py-2 rounded-lg border border-border-default"
-                  >
-                    <option value="">Select type</option>
-
-                    {dietaryOptions.map((opt) => (
-                      <option key={opt} value={opt}>
-                        {opt.charAt(0).toUpperCase() + opt.slice(1)}
-                      </option>
-                    ))}
-                  </select>
                 </div>
               </div>
 

@@ -9,7 +9,7 @@ const UniversalEditModal = ({
   showModal,
   setShowModal,
   modalType, // 'menu' or 'table'
-
+  isRestaurant,
   // Menu-specific props
   editingItem,
   setEditingItem,
@@ -113,9 +113,11 @@ const UniversalEditModal = ({
 
     fetchConfigs();
     fetchStatuses();
-    fetchDietaryTypes();
-    fetchTimings();
-  }, [showModal, clientId, token]);
+    if (isRestaurant) {
+      fetchDietaryTypes();
+      fetchTimings();
+    }
+  }, [showModal, clientId, token,isRestaurant]);
 
   // Menu Modal Functions
   const handleEditDrag = (e) => {
@@ -251,35 +253,29 @@ const UniversalEditModal = ({
                     rows="3"
                   />
                 </div>
-                {/* Availability Timing */}
-                <div>
-                  <label className="block text-sm font-medium mb-1 text-gray-700">
-                    Availability Timing
-                  </label>
+                {isRestaurant && (
+                  <div>
+                    <label className="block text-sm font-medium mb-1 text-gray-700">
+                      Availability Timing
+                    </label>
+                    <select
+                      value={editingItem?.availability_time || ""}
+                      onChange={(e) => setEditingItem({ ...editingItem, availability_time: e.target.value })}
+                      className="w-full px-3 py-2 rounded-md border border-gray-300 text-gray-900 focus:outline-none focus:ring-2 focus:ring-blue-500"
+                    >
+                      <option value="">Select timing</option>
+                      {timingOptions.map((t) => {
+                        const [name, start, end] = t.split("|");
+                        return (
+                          <option key={t} value={name}>
+                            {name} ({start} - {end})
+                          </option>
+                        );
+                      })}
+                    </select>
+                  </div>
+                )}
 
-                  <select
-                    value={editingItem?.availability_time || ""}
-                    onChange={(e) =>
-                      setEditingItem({
-                        ...editingItem,
-                        availability_time: e.target.value
-                      })
-                    }
-                    className="w-full px-3 py-2 rounded-md border border-gray-300 text-gray-900 focus:outline-none focus:ring-2 focus:ring-blue-500"
-                  >
-                    <option value="">Select timing</option>
-
-                    {timingOptions.map((t) => {
-                      const [name, start, end] = t.split("|");
-
-                      return (
-                        <option key={t} value={name}>
-                          {name} ({start} - {end})
-                        </option>
-                      );
-                    })}
-                  </select>
-                </div>
                 {/* Unit Price & Discount */}
                 <div className="grid grid-cols-2 gap-4">
                   <div>
@@ -351,7 +347,7 @@ const UniversalEditModal = ({
                       onChange={(e) =>
                         setEditingItem({
                           ...editingItem,
-                       
+
                           code: e.target.value
                         })
                       }
@@ -385,23 +381,6 @@ const UniversalEditModal = ({
                       className="w-full px-3 py-2 rounded-md border border-gray-300 text-gray-900 focus:outline-none focus:ring-2 focus:ring-blue-500 focus:border-transparent"
                     />
                   </div>
-                  <select
-                    className="w-full px-3 py-2 rounded-md border border-gray-300 text-gray-900 focus:outline-none focus:ring-2 focus:ring-blue-500 focus:border-transparent"
-                    value={editingItem?.dietary_type || ""}
-                    onChange={(e) =>
-                      setEditingItem({
-                        ...editingItem,
-                        dietary_type: e.target.value
-                      })
-                    }
-                  >
-                    <option value="">Select type</option>
-                    {dietaryOptions.map(opt => (
-                      <option key={opt} value={opt}>
-                        {opt.charAt(0).toUpperCase() + opt.slice(1)}
-                      </option>
-                    ))}
-                  </select>
                 </div>
 
                 {/* Item Image Upload */}

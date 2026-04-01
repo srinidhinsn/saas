@@ -91,7 +91,7 @@ const MenuConfigModal = ({ show, onClose, clientId, token }) => {
 
   return (
     <div className="fixed inset-0 bg-black/40 flex items-center justify-center z-50">
-      <div className="bg-white rounded-xl p-6 w-[550px] shadow-xl">
+      <div className="bg-bg-primary rounded-xl p-6 w-[450px] shadow-xl">
 
         {/* HEADER */}
         <div className="flex justify-between mb-4">
@@ -166,8 +166,6 @@ const MenuConfigModal = ({ show, onClose, clientId, token }) => {
               <h4 className="font-semibold mb-2">
                 Availability Timings (24hr)
               </h4>
-
-              {/* 🔹 INPUT */}
               <div className="flex gap-2 mb-3">
                 <input
                   value={timeInput}
@@ -210,7 +208,6 @@ const MenuConfigModal = ({ show, onClose, clientId, token }) => {
                 </button>
               </div>
 
-              {/* 🔹 AVAILABLE TIMINGS (ONLY FROM DB) */}
               <div>
                 <p className="text-xs text-gray-500 mb-1">
                   Available Timings

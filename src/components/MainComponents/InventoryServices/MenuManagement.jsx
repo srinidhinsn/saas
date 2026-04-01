@@ -37,7 +37,7 @@ const MenuManagement = ({ clientId, token, realm }) => {
     if (!clientId) return null;
     return getMenuConfig(clientId);
   }, [clientId]);
-
+  const isRestaurant = (realm || '').toLowerCase() === 'restaurant';
   // Modal states
   const [showAddModal, setShowAddModal] = useState(false);
   const [showEditModal, setShowEditModal] = useState(false);
@@ -71,6 +71,27 @@ const MenuManagement = ({ clientId, token, realm }) => {
   const [currentUserId, setCurrentUserId] = useState(null);
   const [selectedDietary, setSelectedDietary] = useState(null);
   const [timingOptions, setTimingOptions] = useState([]);
+  // Stable color palette — assigned positionally to whatever dietary_type IDs come from API
+  // No hardcoded type names, just positional colors
+  const DIETARY_COLORS = [
+    'bg-green-500',   // first dietary type gets green
+    'bg-red-500',     // second gets red
+    'bg-yellow-400',  // third gets yellow
+    'bg-orange-500',  // fourth gets orange
+    'bg-purple-500',  // fifth gets purple (if you add more)
+    'bg-blue-500',
+  ];
+
+  useEffect(() => {
+    if (!dietaryOptions.length) return;
+    const map = {};
+    dietaryOptions.forEach((opt, idx) => {
+      // Key is normalized (no hyphens/spaces/underscores, lowercase)
+      const key = opt.toLowerCase().replace(/[-_\s]/g, '');
+      map[key] = DIETARY_COLORS[idx % DIETARY_COLORS.length];
+    });
+    setDietaryColorMap(map);
+  }, [dietaryOptions]);
   useEffect(() => {
     try {
       const decoded = jwtDecode(token);
@@ -106,8 +127,8 @@ const MenuManagement = ({ clientId, token, realm }) => {
     }
   };
   useEffect(() => {
-    fetchTimings();
-  }, [clientId]);
+    if (isRestaurant) fetchTimings();
+  }, [clientId, isRestaurant]);
   useEffect(() => {
     const interval = setInterval(() => {
       setTimeTick(Date.now()); // triggers re-render
@@ -227,8 +248,8 @@ const MenuManagement = ({ clientId, token, realm }) => {
     }
   }, [clientId, token]);
   useEffect(() => {
-    fetchDietaryTypes();
-  }, [fetchDietaryTypes]);
+    if (isRestaurant) fetchDietaryTypes();
+  }, [fetchDietaryTypes, isRestaurant]);
 
   const fetchAddonData = useCallback(async (addonCategoryId) => {
     if (!menuConfig || !addonCategoryId) {
@@ -317,12 +338,25 @@ const MenuManagement = ({ clientId, token, realm }) => {
     return path;
   };
 
-  const generateSlug = (itemName, dietaryType, timing) => {
-    const itemPart = itemName?.trim().replace(/\s+/g, "_").replace(/[^a-zA-Z0-9_]/g, '') || "";
-    // Always encode defaults so slug always has 3 parts: name_dietary_timing
-    const dietaryPart = (dietaryType || "veg").charAt(0).toUpperCase() + (dietaryType || "veg").slice(1);
-    const timingPart = (timing || "allday").charAt(0).toUpperCase() + (timing || "allday").slice(1);
-    return [itemPart, dietaryPart, timingPart].filter(Boolean).join("_");
+  // NEW
+  const generateSlug = (itemName, categoryId, timing, flatList = categoriesFlat) => {
+    // Build category hierarchy path e.g. ["Dieter", "Veg", "Breakfast"]
+    const pathParts = [];
+    let currentId = categoryId;
+    const visited = new Set();
+    while (currentId && !visited.has(currentId)) {
+      visited.add(currentId);
+      const cat = flatList.find(c => c.id === currentId);
+      if (!cat) break;
+      pathParts.unshift((cat.name || '').trim().replace(/\s+/g, '_').replace(/[^a-zA-Z0-9_]/g, ''));
+      currentId = cat.parentId ?? cat.parent_id ?? null;
+    }
+
+    const itemPart = (itemName || '').trim().replace(/\s+/g, '_').replace(/[^a-zA-Z0-9_]/g, '');
+    const timingPart = (timing || 'allday').charAt(0).toUpperCase() + (timing || 'allday').slice(1);
+
+    // e.g. "Dieter_Veg_Breakfast_Poori__Morning"
+    return [...pathParts, itemPart].filter(Boolean).join('_') + '__' + timingPart;
   };
 
   const openAddModal = () => {
@@ -336,6 +370,8 @@ const MenuManagement = ({ clientId, token, realm }) => {
     setShowAddModal(true);
   };
 
+  // REPLACE the entire handleItemClick function
+
   const handleItemClick = (item) => {
     const allSiblings = menuItems.filter(m => m.id === item.id);
     const baseRecord = allSiblings.find(m => m.zone_config_id === 0) || item;
@@ -345,25 +381,27 @@ const MenuManagement = ({ clientId, token, realm }) => {
       .filter(m => m.zone_config_id !== 0)
       .forEach(m => { zonePrices[m.zone_config_id] = m.unit_price; });
 
-    const slugParts = (baseRecord.slug || "").split("_");
-    // slug format: ItemName_Dietary_Timing (always 3+ parts after fix)
-    const timingFromSlug = slugParts.length >= 3
-      ? slugParts[slugParts.length - 1]?.toLowerCase()
-      : "allday";
-    const dietaryFromSlug = slugParts.length >= 3
-      ? slugParts[slugParts.length - 2]?.toLowerCase()
-      : "veg";
-
+    // ✅ Resolve category FIRST before anything else uses it
     const resolvedCategoryId = categoriesFlat.find(
       c => c.name.toLowerCase() === (baseRecord.category_id || '').toLowerCase()
     )?.id || baseRecord.category_id;
+
+    // Extract timing from new slug format (after __)
+    const slug = baseRecord.slug || '';
+    const doubleUnderIdx = slug.lastIndexOf('__');
+    const timingFromSlug = doubleUnderIdx !== -1
+      ? slug.slice(doubleUnderIdx + 2).toLowerCase()
+      : (slug.split('_').pop()?.toLowerCase() || 'allday');
+
+    // Derive dietary from category ID path (not name)
+    const dietaryFromSlug = getDietaryFromSlug({ ...baseRecord, category_id: resolvedCategoryId });
 
     setEditingItem({
       ...baseRecord,
       category_id: resolvedCategoryId,
       zonePrices,
       availability_time: timingFromSlug,
-      dietary_type: dietaryFromSlug,  // ← now correctly pre-fills edit modal
+      dietary_type: dietaryFromSlug,
     });
     setShowEditModal(true);
   };
@@ -482,20 +520,13 @@ const MenuManagement = ({ clientId, token, realm }) => {
       );
 
       const finalCategoryId =
-        selectedCat?.name ||
-        categoriesFlat.find(
-          c => c.name.toLowerCase() === (newItem?.category_id || '').toLowerCase()
-        )?.name ||
+        categoriesFlat.find(c => c.id === newItem?.category_id)?.name ||
         newItem?.category_id;
 
       if (!finalCategoryId) return;
-      const slug = generateSlug(
-        newItem.name,
-        newItem.dietary_type,
-        newItem.availability_time
-      );
+      // NEW — pass category_id instead of dietary_type
+      const slug = generateSlug(newItem.name, newItem.category_id, newItem.availability_time);
       const { dietary_type, ...cleanNewItem } = newItem;
-
       const created_by =
         currentUserId || localStorage.getItem("user_id") || "system";
 
@@ -595,24 +626,16 @@ const MenuManagement = ({ clientId, token, realm }) => {
       // ✅ FIXED: was incorrectly reading from newItem — must use editingItem
       const resolvedCat = categoriesFlat.find(c => c.id === editingItem?.category_id);
       const finalCategoryId =
-        resolvedCat?.name ||
-        categoriesFlat.find(
-          c => c.name.toLowerCase() === (editingItem?.category_id || '').toLowerCase()
-        )?.name ||
+        categoriesFlat.find(c => c.id === editingItem?.category_id)?.name ||
         editingItem?.category_id;
 
       if (!finalCategoryId) {
         console.error("Edit failed: could not resolve category");
         return;
       }
-
-      const slug = generateSlug(
-        editingItem.name,
-        editingItem.dietary_type,
-        editingItem.availability_time
-      );
+      // NEW
+      const slug = generateSlug(editingItem.name, editingItem.category_id, editingItem.availability_time);
       const { dietary_type, zonePrices: zp, ...cleanEditingItem } = editingItem;
-
       const basePayload = {
         name: editingItem.name,
         description: editingItem.description || null,
@@ -795,15 +818,21 @@ const MenuManagement = ({ clientId, token, realm }) => {
 
   const getFilteredItems = () => {
     if (!menuItems.length) return [];
+
+    const normalize = (str) => (str || '').toLowerCase().replace(/[-_\s]/g, '');
     const q = (searchQuery || '').trim().toLowerCase();
 
     let items = menuItems;
+
+    // ── 1. Dietary filter — uses getDietaryFromSlug (slug-segment based) ──
     if (selectedDietary) {
       items = items.filter(item => {
-        const dietary = getDietaryFromSlug(item.slug);
-        return dietary === selectedDietary;
+        const dietary = getDietaryFromSlug(item);
+        return dietary !== null && normalize(dietary) === normalize(selectedDietary);
       });
     }
+
+    // ── 2. Search filter ──
     if (q.length > 0) {
       items = items.filter(item =>
         (item.name || '').toLowerCase().includes(q) ||
@@ -812,26 +841,28 @@ const MenuManagement = ({ clientId, token, realm }) => {
       );
     }
 
+    // ── 3. Category tree filter ──
     if (selectedCategoryId) {
-      // selectedCategoryId is still the actual id from the tree click
-      // so we need to collect allowed names instead of ids
       const allowedCategoryIds = getAllDescendantCategoryIds(selectedCategoryId, categories);
-      const allowedNames = allowedCategoryIds
-        .map(id => categoriesFlat.find(c => c.id === id)?.name)
-        .filter(Boolean)
-        .map(n => n.toLowerCase());
 
-      items = items.filter(item =>
-        allowedNames.includes((item.category_id || '').toLowerCase())
-      );
+      items = items.filter(item => {
+        // item.category_id from API can be a name string or an id — resolve both
+        const resolvedId = categoriesFlat.find(
+          c =>
+            c.id === item.category_id ||
+            c.name.toLowerCase() === String(item.category_id || '').toLowerCase()
+        )?.id;
+
+        return resolvedId ? allowedCategoryIds.includes(resolvedId) : false;
+      });
     }
 
-    // If a specific zone is selected, show only that zone's records
+    // ── 4. Zone filter ──
     if (zoneConfigId !== null) {
       return items.filter(item => item.zone_config_id === zoneConfigId);
     }
 
-    // "All" view — deduplicate by name, always prefer base record (zone_config_id === 0)
+    // ── 5. "All zones" dedup — prefer base record (zone_config_id === 0) ──
     const seen = new Map();
     items.forEach(item => {
       const key = (item.name || '').trim().toLowerCase();
@@ -839,34 +870,56 @@ const MenuManagement = ({ clientId, token, realm }) => {
         seen.set(key, item);
       } else {
         const existing = seen.get(key);
-        if ((item.zone_config_id === 0 || item.zone_config_id === null) &&
-          existing.zone_config_id !== 0 && existing.zone_config_id !== null) {
+        if (
+          (item.zone_config_id === 0 || item.zone_config_id === null) &&
+          existing.zone_config_id !== 0 && existing.zone_config_id !== null
+        ) {
           seen.set(key, item);
         }
       }
     });
     return Array.from(seen.values());
   };
+  // NEW — timing is after the __ separator
   const isItemActive = (slug, timingOptions) => {
     if (!slug) return true;
-    const parts = slug.split("_");
-    if (parts.length < 3) return true; // old format slug = always active
-    const timing = parts[parts.length - 1]?.toLowerCase();
-    if (!timing || timing === "allday") return true; // default = always active
+
+    // New format: "CategoryHierarchy_ItemName__Timing"
+    // Old format: "ItemName_Dietary_Timing" — still supported via fallback
+    const doubleUnderIdx = slug.lastIndexOf('__');
+    const timing = doubleUnderIdx !== -1
+      ? slug.slice(doubleUnderIdx + 2).toLowerCase()
+      : slug.split('_').pop()?.toLowerCase(); // backward compat
+
+    if (!timing || timing === 'allday') return true;
+
     const timingData = timingOptions.find(t => t.toLowerCase().startsWith(timing));
     if (!timingData) return true;
-    const [, start, end] = timingData.split("|");
+
+    const [, start, end] = timingData.split('|');
     const now = new Date();
     const currentMinutes = now.getHours() * 60 + now.getMinutes();
-    const [sh, sm] = start.split(":").map(Number);
-    const [eh, em] = end.split(":").map(Number);
+    const [sh, sm] = start.split(':').map(Number);
+    const [eh, em] = end.split(':').map(Number);
     return currentMinutes >= (sh * 60 + sm) && currentMinutes <= (eh * 60 + em);
   };
-  const getDietaryFromSlug = (slug) => {
-    if (!slug) return "veg"; // default
-    const parts = slug.split("_");
-    if (parts.length < 3) return "veg"; // default if old slug format
-    return parts[parts.length - 2].toLowerCase();
+  const getDietaryFromSlug = (item) => {
+    if (!item || !dietaryOptions.length) return null;
+
+    const normalize = (str) => (str || '').toLowerCase().replace(/[-_\s]/g, '');
+
+    // Split slug on __ to drop timing suffix, then split on _ for segments
+    const [mainPart = ''] = (item.slug || '').split('__');
+    const slugSegments = mainPart.split('_').filter(Boolean);
+
+    for (const segment of slugSegments) {
+      const normalizedSegment = normalize(segment);
+      // Compare normalized segment against each normalized dietaryOption id
+      const match = dietaryOptions.find(d => normalize(d) === normalizedSegment);
+      if (match) return normalize(match); // return as normalized key e.g. "nonveg"
+    }
+
+    return null;
   };
   const handleEditImageFile = (file) => {
     if (file?.type.startsWith('image/')) { setEditItemImage(file); setEditItemImageUrl(URL.createObjectURL(file)); }
@@ -1224,9 +1277,8 @@ const MenuManagement = ({ clientId, token, realm }) => {
               parts.unshift((cat.name || '').trim().replace(/\s+/g, '_'));
               currentId = cat.parentId ?? cat.parent_id ?? null;
             }
-            const itemPart = (row.Name || '').trim().replace(/\s+/g, '_').replace(/[^a-zA-Z0-9_]/g, '');
-            if (itemPart) parts.push(itemPart);
-            return parts.filter(Boolean).join('_');
+            // NEW — uses generateSlug directly (which now accepts flatList as param)
+            return generateSlug(row.Name, categoryId, row.Slug?.split('__')[1] || 'allday', currentCategoriesFlat);
           })();
 
           const basePayload = {
@@ -1520,27 +1572,32 @@ const MenuManagement = ({ clientId, token, realm }) => {
                   <span className="text-sm ml-2 text-text-secondary">({filteredItems.length})</span>
                 </h2>
               </div>
-              <div className="flex gap-2 mb-3">
-                {["veg", "nonveg", "egg", "chinese"].map(type => (
+              {isRestaurant && (
+                <div className="flex gap-2 mb-3 flex-wrap">
+                  {dietaryOptions.map(type => {
+                    const key = type.toLowerCase().replace(/[-_\s]/g, '');
+                    return (
+                      <button
+                        key={key}
+                        onClick={() => setSelectedDietary(key)}
+                        className={`px-3 py-1 rounded-full text-sm flex items-center gap-1 ${selectedDietary === key ? "bg-black text-white" : "bg-gray-100"
+                          }`}
+                      >
+                        {dietaryColorMap[key] && (
+                          <span className={`inline-block w-2 h-2 rounded-full ${dietaryColorMap[key]}`} />
+                        )}
+                        {type}
+                      </button>
+                    );
+                  })}
                   <button
-                    key={type}
-                    onClick={() => setSelectedDietary(type)}
-                    className={`px-3 py-1 rounded-full text-sm ${selectedDietary === type
-                      ? "bg-black text-white"
-                      : "bg-gray-100"
-                      }`}
+                    onClick={() => setSelectedDietary(null)}
+                    className="px-3 py-1 rounded-full text-sm bg-gray-200"
                   >
-                    {type}
+                    All
                   </button>
-                ))}
-
-                <button
-                  onClick={() => setSelectedDietary(null)}
-                  className="px-3 py-1 rounded-full text-sm bg-gray-200"
-                >
-                  All
-                </button>
-              </div>
+                </div>
+              )}
               <div className="flex flex-col gap-2 sm:flex-row sm:items-center sm:justify-end lg:flex-nowrap lg:gap-2">
                 <div className="relative w-full sm:w-56">
                   <Search size={16} className="absolute left-3 top-1/2 -translate-y-1/2 text-text-secondary" />
@@ -1555,9 +1612,11 @@ const MenuManagement = ({ clientId, token, realm }) => {
                 </div>
 
                 <div className="flex gap-2 flex-wrap justify-end">
-                  <button onClick={() => setShowMenuConfig(true)} className="h-9 px-3 flex items-center gap-2 rounded-lg bg-action-success text-white text-sm font-semibold shadow-sm hover:opacity-90">
-                    <span>Config</span>
-                  </button>
+
+                  {isRestaurant &&
+                    <button onClick={() => setShowMenuConfig(true)} className="h-9 px-3 flex items-center gap-2 rounded-lg bg-action-success text-white text-sm font-semibold shadow-sm hover:opacity-90">
+                      <span>Config</span>
+                    </button>}
                   <button onClick={openAddModal} className="h-9 px-3 flex items-center gap-2 rounded-lg bg-action-primary text-white text-sm font-semibold shadow-sm hover:opacity-90">
                     <Plus size={14} /><span>Add Item</span>
                   </button>
@@ -1588,7 +1647,8 @@ const MenuManagement = ({ clientId, token, realm }) => {
                 {sortedItems.map((item) => {
                   const discountPercent = item.discount && item.unit_price && Number(item.discount) > 0
                     ? ((Number(item.discount) * 100) / Number(item.unit_price)).toFixed(0) : null;
-                  const dietary = getDietaryFromSlug(item.slug);
+                  const dietary = getDietaryFromSlug(item);
+                  const dietaryColor = dietary ? (dietaryColorMap[dietary] || 'bg-transparent') : 'bg-transparent';
                   const active = isItemActive(item.slug, timingOptions);
                   return (
                     <div key={item.id}
@@ -1596,16 +1656,8 @@ const MenuManagement = ({ clientId, token, realm }) => {
                       ${active ? "" : "opacity-40 grayscale"}
                     `}                    >
 
-                      <div
-                        className={`w-[3px] h-full rounded-l-xl
-    ${dietary === "veg" ? "bg-green-500" :
-                            dietary === "nonveg" ? "bg-red-500" :
-                              dietary === "egg" ? "bg-yellow-400" :
-                                dietary === "chinese" ? "bg-orange-500" :
-                                  "bg-transparent"
-                          }
-  `}
-                      /> <div className="absolute inset-0 bg-black/40 backdrop-blur-[2px] opacity-0 pointer-events-none z-10 group-hover:animate-overlayFade" />
+
+                      <div className={`w-[3px] h-full rounded-l-xl ${dietaryColor}`} /> <div className="absolute inset-0 bg-black/40 backdrop-blur-[2px] opacity-0 pointer-events-none z-10 group-hover:animate-overlayFade" />
 
                       {item.line_item_id?.length > 0 && (
                         <div className="absolute bottom-2 right-2 bg-orange-500 text-white text-[7px] p-1 rounded-md z-10 shadow-md flex items-center gap-1">
@@ -1688,7 +1740,7 @@ const MenuManagement = ({ clientId, token, realm }) => {
         handleAddItem={handleAddItem} getCategoryIdByName={getCategoryIdByName}
         inventoryIds={inventoryIds} getAddonCategoryId={getAddonCategoryId}
         fetchAddonData={fetchAddonData} setAddonSubcategories={setAddonSubcategories} setAllAddonItems={setAllAddonItems}
-        units={units}
+        units={units} isRestaurant={isRestaurant}
       />
 
       <UniversalEditModal
@@ -1700,7 +1752,7 @@ const MenuManagement = ({ clientId, token, realm }) => {
         handleEditItem={handleEditItem} clientId={clientId} token={token}
         inventoryIds={inventoryIds} getAddonCategoryId={getAddonCategoryId}
         fetchAddonData={fetchAddonData} setAddonSubcategories={setAddonSubcategories} setAllAddonItems={setAllAddonItems}
-        units={units}
+        units={units} isRestaurant={isRestaurant}
 
       />
 
