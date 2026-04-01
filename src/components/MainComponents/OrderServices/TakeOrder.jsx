@@ -2276,46 +2276,23 @@ const TakeOrder = ({ clientId, token, onOrderUpdate, realm }) => {
   // Updates order status to "cancelled" and frees the table.
   // ─────────────────────────────────────────────────────────────────────────
 
-  const handleCancelOrder = async (orderId, tableId, reason) => {
-    try {
-      const headers = { Authorization: `Bearer ${token}` };
+const handleCancelOrder = async (orderId, tableId, reason) => {
+  try {
+    const headers = { Authorization: `Bearer ${token}` };
 
-      // Soft cancel: update order status to "cancelled" instead of deleting the row
-      await axios.post(
-        `${import.meta.env.VITE_API_ORDER_SERVICE_URL}/${clientId}/dinein/update`,
-        {
-          id: orderId,
-          status: 'cancelled',
-          // Pass cancellation reason as a note; backend can store it if the model supports it
-          cancellation_reason: reason || '',
-        },
-        { headers }
-      );
+    await axios.post(
+      `${import.meta.env.VITE_API_ORDER_SERVICE_URL}/${clientId}/dinein/cancel?order_id=${orderId}&reason=${encodeURIComponent(reason || '')}`,
+      {},
+      { headers }
+    );
 
-      // Free the table
-      const tableObj = tables.find(t => t.id === tableId);
-      if (tableObj) {
-        await axios.post(
-          `${import.meta.env.VITE_API_TABLE_SERVICE_URL}/${clientId}/tables/update`,
-          {
-            id: tableId,
-            client_id: clientId,
-            name: tableObj.name,
-            table_type: tableObj.table_type,
-            status: 'vacant',
-            location_zone: tableObj.location_zone,
-          },
-          { headers }
-        );
-      }
-
-      toast.success('Order cancelled and table freed.');
-      await fetchTables();
-    } catch (err) {
-      console.error('[handleCancelOrder]', err);
-      toast.error('Failed to cancel order');
-    }
-  };
+    toast.success('Order cancelled and transaction recorded.');
+    await fetchTables();
+  } catch (err) {
+    console.error('[handleCancelOrder]', err);
+    toast.error('Failed to cancel order');
+  }
+};
 
   // ─────────────────────────────────────────────────────────────────────────
   // Mark as served
