@@ -1,3 +1,651 @@
+# from fastapi import APIRouter, Depends, HTTPException, Query, Request
+# from fastapi.responses import FileResponse
+# from sqlalchemy.orm import Session
+# from typing import List
+# from database.postgres import get_db
+# from models.response_model import ResponseModel
+# from entity.table_entity import DiningTable
+# from entity.order_entity import DineinOrder as Db_Order_Entity, OrderItem as Db_OrderItem_Entity
+# from models.order_model import DineinOrderModel, OrderItemModel, OrderStatusEnum
+# from utils.auth import verify_token
+# from models.saas_context import SaasContext
+# from typing import Optional
+# from entity.inventory_entity import InventoryEntity
+# from ..services.order_service import _root_dinein_id, _order_row_to_flat, STATUS_PRIORITY, _merge_group, _deduct_stock_for_order, _convert, _record_transaction,_record_partial_transaction
+# # from app.services.order_service import deduct_inventory_after_order
+# from decimal import Decimal
+
+
+# router = APIRouter()
+
+# @router.post("/dinein/create", response_model=ResponseModel[DineinOrderModel])
+# def create_order(client_id: str, order: DineinOrderModel, context: SaasContext = Depends(verify_token), db: Session = Depends(get_db)):
+#     db_order = Db_Order_Entity(
+#         client_id=client_id, table_id=order.table_id, status=order.status,
+#         price=order.price, gst=order.gst, cst=order.cst, discount=order.discount,
+#         invoice_status=order.invoice_status, total_price=order.total_price,
+#         invoice_id=order.invoice_id, dinein_order_id=None,
+#         handler_id=order.handler_id, created_by=order.created_by, updated_by=order.updated_by,
+#     )
+#     db.add(db_order)
+#     db.flush()
+
+#     # dinein_order_id for a fresh order = its own PK
+#     db_order.dinein_order_id = str(db_order.id)
+
+#     for item in order.items:
+#         db_item = Db_OrderItem_Entity(
+#             order_id=db_order.id, client_id=client_id, item_id=item.item_id,
+#             item_name=item.item_name, slug=item.slug, quantity=item.quantity,
+#             unit_price=item.unit_price, line_total=item.line_total, status=item.status,
+#         )
+#         db.add(db_item)
+#     db.commit()
+#     db.refresh(db_order)
+
+#     db_items = db.query(Db_OrderItem_Entity).filter(Db_OrderItem_Entity.order_id == db_order.id).all()
+#     order_items = [
+#         OrderItemModel(
+#             client_id=i.client_id, id=i.id, item_id=i.item_id, order_id=i.order_id,
+#             quantity=i.quantity, status=i.status, unit_price=i.unit_price,
+#             line_total=i.line_total, item_name=i.item_name, slug=i.slug,
+#         ) for i in db_items
+#     ]
+#     dinein_model = DineinOrderModel(
+#         id=db_order.id, dinein_order_id=db_order.dinein_order_id, table_id=db_order.table_id,
+#         client_id=db_order.client_id, status=db_order.status, created_at=db_order.created_at,
+#         items=order_items,
+#     )
+#     return ResponseModel(screen_id=context.screen_id, data=dinein_model)
+
+
+# @router.post("/dinein/create-sub-order", response_model=ResponseModel[DineinOrderModel])
+# def create_sub_order(
+#     client_id: str,
+#     parent_dinein_order_id: str,   # e.g. "1001"
+#     order: DineinOrderModel,
+#     context: SaasContext = Depends(verify_token),
+#     db: Session = Depends(get_db),
+# ):
+#     root_order = db.query(Db_Order_Entity).filter(
+#         Db_Order_Entity.client_id == client_id,
+#         Db_Order_Entity.dinein_order_id == parent_dinein_order_id,
+#     ).first()
+#     if not root_order:
+#         raise HTTPException(status_code=404, detail=f"Parent order '{parent_dinein_order_id}' not found")
+
+#     existing_sub_count = db.query(Db_Order_Entity).filter(
+#         Db_Order_Entity.client_id == client_id,
+#         Db_Order_Entity.dinein_order_id.like(f"{parent_dinein_order_id}-%"),
+#     ).count()
+#     sub_dinein_order_id = f"{parent_dinein_order_id}-{existing_sub_count + 1}"
+
+#     # Total price = sum of items' unit_price * quantity (no GST/CST)
+#     total_price = sum(
+#         (item.unit_price or 0) * (item.quantity or 1)
+#         for item in order.items
+#     )
+
+#     db_sub_order = Db_Order_Entity(
+#         client_id=client_id,
+#         dinein_order_id=sub_dinein_order_id,
+#         table_id=root_order.table_id,
+#         status=OrderStatusEnum.pending,
+#         price=total_price, gst=0, cst=0, total_price=total_price,
+#         created_by=order.created_by, invoice_id=None, invoice_status=None,
+#     )
+#     db.add(db_sub_order)
+#     db.flush()
+
+#     for item in order.items:
+#         db_item = Db_OrderItem_Entity(
+#             order_id=db_sub_order.id, client_id=client_id,
+#             item_id=item.item_id, item_name=item.item_name, slug=item.slug,
+#             quantity=item.quantity, unit_price=item.unit_price,
+#             line_total=(item.unit_price or 0) * (item.quantity or 1),
+#             status=OrderStatusEnum.pending,
+#             frontend_unique_key=item.frontend_unique_key,
+#         )
+#         db.add(db_item)
+
+#     db.commit()
+#     db.refresh(db_sub_order)
+
+#     order_items = [
+#         OrderItemModel(
+#             id=i.id, order_id=i.order_id, client_id=i.client_id,
+#             item_id=i.item_id, item_name=i.item_name, slug=i.slug,
+#             quantity=i.quantity, unit_price=i.unit_price, line_total=i.line_total,
+#             status=i.status, frontend_unique_key=i.frontend_unique_key,
+#         )
+#         for i in db_sub_order.items
+#     ]
+#     sub_order_model = DineinOrderModel(
+#         id=db_sub_order.id, dinein_order_id=db_sub_order.dinein_order_id,
+#         table_id=db_sub_order.table_id, client_id=db_sub_order.client_id,
+#         status=db_sub_order.status, total_price=db_sub_order.total_price,
+#         created_at=db_sub_order.created_at, items=order_items,
+#     )
+#     return ResponseModel(
+#         screen_id=context.screen_id, data=sub_order_model,
+#         message=f"Sub-order {sub_dinein_order_id} created successfully",
+#     )
+
+
+# @router.get("/dinein/order")
+# def get_orders_for_order_id(client_id: str, order_id: Optional[str] = None, context: SaasContext = Depends(verify_token), db: Session = Depends(get_db)):
+#     order = db.query(Db_Order_Entity).filter(
+#         Db_Order_Entity.client_id == client_id,
+#         Db_Order_Entity.id == order_id,
+#     ).first()
+#     if not order:
+#         return ResponseModel(screen_id=context.screen_id, data=None, status="not_found")
+
+#     db_items = db.query(Db_OrderItem_Entity).filter(Db_OrderItem_Entity.order_id == order.id).all()
+#     item_models = [Db_OrderItem_Entity.copyToModel(item) for item in db_items]
+#     result = {
+#         "id": order.id, "dinein_order_id": order.dinein_order_id,
+#         "table_id": order.table_id, "client_id": order.client_id,
+#         "status": order.status, "created_at": order.created_at,
+#         "items": [i.dict() for i in item_models], "total_price": order.total_price,
+#     }
+#     return ResponseModel(screen_id=context.screen_id, data=result)
+
+
+# @router.get("/dinein/table")
+# def get_orders_for_table(client_id: str, table_id: Optional[str] = None, context: SaasContext = Depends(verify_token), db: Session = Depends(get_db)):
+#     if table_id:
+#         orders = db.query(Db_Order_Entity).filter(
+#             Db_Order_Entity.client_id == client_id,
+#             Db_Order_Entity.table_id == table_id,
+#         ).all()
+#     else:
+#         orders = db.query(Db_Order_Entity).filter(
+#             Db_Order_Entity.client_id == client_id,
+#         ).all()
+
+#     # Group root + sub-orders, return one merged entry per table group
+#     groups: dict = {}
+#     for order in orders:
+#         root = _root_dinein_id(order.dinein_order_id or str(order.id))
+#         groups.setdefault(root, []).append(order)
+
+#     result = [_merge_group(group) for group in groups.values()]
+#     return ResponseModel(screen_id=context.screen_id, data=result)
+
+
+# @router.post("/dinein/update")
+# def update_order_status(
+#     client_id: str,
+#     body: DineinOrderModel,
+#     request: Request,
+#     context: SaasContext = Depends(verify_token),
+#     db: Session = Depends(get_db),
+# ):
+#     order = (
+#         db.query(Db_Order_Entity)
+#         .filter(
+#             Db_Order_Entity.id == body.id,
+#             Db_Order_Entity.client_id == client_id
+#         )
+#         .first()
+#     )
+
+#     if not order:
+#         raise HTTPException(
+#             status_code=404,
+#             detail=f"Order {body.id} not found"
+#         )
+
+#     if body.status in [OrderStatusEnum.served, OrderStatusEnum.completed]:
+
+#         root_id = _root_dinein_id(order.dinein_order_id)
+
+#         related_orders = db.query(Db_Order_Entity).filter(
+#             Db_Order_Entity.client_id == client_id,
+#             Db_Order_Entity.dinein_order_id.like(f"{root_id}%")
+#         ).all()
+
+#         for o in related_orders:
+#             o.status = body.status
+
+#         db.flush()  # write status changes before deduction
+
+#         # Deduct stock for ALL related orders, skipping already-deducted items
+#         for o in related_orders:
+#             _deduct_stock_for_order(db=db, client_id=client_id, order_id=o.id)
+
+#         db.commit()
+
+#         return ResponseModel(
+#             screen_id=context.screen_id,
+#             data={
+#                 "message": "All related orders marked as served",
+#                 "updated_count": len(related_orders),
+#             },
+#         )
+
+#     # ✅ Normal single order update (for other statuses)
+#     if body.status is not None:
+#         order.status = body.status
+#     if body.total_price is not None:
+#         order.total_price = body.total_price
+#     if body.table_id is not None:
+#         order.table_id = body.table_id
+
+#     db.commit()
+#     db.refresh(order)
+
+#     return ResponseModel(
+#         screen_id=context.screen_id,
+#         data={
+#             "message": "Status updated",
+#             "new_status": order.status,
+#         },
+#     )
+
+# @router.post("/order_items/update")
+# def update_order_items(
+#     client_id: str,
+#     order_id: Optional[int] = Query(None),
+#     body: Optional[List[OrderItemModel]] = None,
+#     context: SaasContext = Depends(verify_token),
+#     db: Session = Depends(get_db),
+# ):
+#     if not order_id:
+#         raise HTTPException(status_code=400, detail="Missing order_id")
+#     try:
+#         order_id = int(order_id)
+#     except Exception:
+#         raise HTTPException(status_code=400, detail="Invalid order_id")
+
+#     existing_items = db.query(Db_OrderItem_Entity).filter(
+#         Db_OrderItem_Entity.order_id == order_id
+#     ).all()
+
+#     # Two lookup maps — prefer frontend_unique_key, fall back to item_id
+#     existing_by_fkey    = {
+#         item.frontend_unique_key: item
+#         for item in existing_items
+#         if item.frontend_unique_key
+#     }
+#     existing_by_item_id = {}
+#     for item in existing_items:
+#         existing_by_item_id.setdefault(item.item_id, []).append(item)
+
+#     # Track which DB rows have been matched so we never double-assign
+#     matched_ids = set()
+
+#     for incoming in body:
+#         db_item = None
+
+#         # 1. Try exact frontend_unique_key match first
+#         fkey = incoming.frontend_unique_key
+#         if fkey and fkey in existing_by_fkey:
+#             candidate = existing_by_fkey[fkey]
+#             if candidate.id not in matched_ids:
+#                 db_item = candidate
+#                 matched_ids.add(candidate.id)
+
+#         # 2. Fall back to item_id when fkey is absent or unmatched
+#         if db_item is None and incoming.item_id in existing_by_item_id:
+#             for candidate in existing_by_item_id[incoming.item_id]:
+#                 if candidate.id not in matched_ids:
+#                     db_item = candidate
+#                     matched_ids.add(candidate.id)
+#                     break
+
+#         if db_item:
+#             db_item.quantity   = incoming.quantity
+#             db_item.line_total = (incoming.unit_price or 0) * (incoming.quantity or 1)
+#             db_item.status     = incoming.status
+#         else:
+#             db.add(Db_OrderItem_Entity(
+#                 client_id=client_id,
+#                 order_id=order_id,
+#                 item_id=incoming.item_id,
+#                 item_name=incoming.item_name,
+#                 quantity=incoming.quantity,
+#                 unit_price=incoming.unit_price,
+#                 line_total=(incoming.unit_price or 0) * (incoming.quantity or 1),
+#                 status="pending",
+#                 frontend_unique_key=incoming.frontend_unique_key,
+#             ))
+
+#     db.commit()
+#     return ResponseModel(
+#         screen_id=context.screen_id,
+#         data={"message": "Order updated without resetting old statuses"},
+#     )
+
+# @router.post("/order_item/update")
+# def update_order_item(client_id: str, order_id: Optional[int] = Query(None), order_item: Optional[OrderItemModel] = None, context: SaasContext = Depends(verify_token), db: Session = Depends(get_db)):
+#     if not order_id or not order_item or not order_item.id:
+#         raise HTTPException(status_code=400, detail="Missing order_id or order_item_id")
+#     existing_item = db.query(Db_OrderItem_Entity).filter(
+#         Db_OrderItem_Entity.id == order_item.id, Db_OrderItem_Entity.order_id == order_id,
+#     ).first()
+#     updated_item = Db_OrderItem_Entity.copyFromModel(order_item)
+#     for attr, value in updated_item.__dict__.items():
+#         if attr != "_sa_instance_state":
+#             setattr(existing_item, attr, value)
+#     db.commit()
+#     return ResponseModel(screen_id=context.screen_id, data={"message": "Order items updated successfully"})
+
+
+# @router.delete("/order_item/delete")
+# def delete_order_items(
+#     client_id: str,
+#     order_item_id: Optional[str] = Query(None),
+#     quantity: Optional[int] = Query(None),
+#     reason: Optional[str] = Query(None),
+#     transaction_type: Optional[str] = Query(None),
+#     context: SaasContext = Depends(verify_token),
+#     db: Session = Depends(get_db),
+# ):
+#     if not order_item_id:
+#         raise HTTPException(status_code=400, detail="Missing order_item_id")
+#     try:
+#         oid = int(str(order_item_id).strip())
+#     except Exception:
+#         raise HTTPException(status_code=400, detail="Invalid order_item_id format")
+
+#     item = db.query(Db_OrderItem_Entity).filter(
+#         Db_OrderItem_Entity.id == oid,
+#         Db_OrderItem_Entity.client_id == client_id,
+#     ).first()
+#     if not item:
+#         raise HTTPException(status_code=404, detail="Order item not found")
+
+#     order_id            = item.order_id
+#     ordered_qty         = item.quantity or 1
+#     item_name           = item.item_name or ""
+#     frontend_unique_key = item.frontend_unique_key or ""
+#     inventory_item_id   = item.item_id
+
+#     # ── PARTIAL REMOVE: quantity param supplied and less than full qty ─────────
+#     remove_qty = quantity if (quantity and 0 < quantity < ordered_qty) else None
+
+#     if remove_qty:
+#         new_qty = ordered_qty - remove_qty
+
+#         if transaction_type in ("WASTAGE", "ITEM_CANCELLED"):
+#             _record_partial_transaction(
+#                 db,
+#                 client_id=client_id,
+#                 item=item,
+#                 remove_qty=remove_qty,
+#                 transaction_type=transaction_type,
+#                 reason=reason,
+#                 order_id=order_id,
+#             )
+
+#         item.quantity  = new_qty
+#         item.line_total = (item.unit_price or 0) * new_qty
+
+#         order_row = db.query(Db_Order_Entity).filter(
+#             Db_Order_Entity.id == order_id,
+#             Db_Order_Entity.client_id == client_id,
+#         ).first()
+#         if order_row:
+#             all_items = db.query(Db_OrderItem_Entity).filter(
+#                 Db_OrderItem_Entity.order_id == order_id,
+#                 Db_OrderItem_Entity.client_id == client_id,
+#             ).all()
+#             order_row.total_price = sum(
+#                 (i.unit_price or 0) * (new_qty if i.id == item.id else (i.quantity or 1))
+#                 for i in all_items
+#             )
+
+#         db.commit()
+#         return ResponseModel(
+#             screen_id=context.screen_id,
+#             data={"message": f"Reduced qty by {remove_qty}, now {new_qty}"},
+#         )
+
+#     # ── FULL DELETE: original logic below ─────────────────────────────────────
+
+#     db.delete(item)
+#     db.flush()
+
+#     if transaction_type in ("WASTAGE", "ITEM_CANCELLED"):
+
+#         menu_item = db.query(InventoryEntity).filter(
+#             InventoryEntity.id == inventory_item_id,
+#             InventoryEntity.client_id == client_id,
+#         ).first()
+
+#         effective_reason = reason or (
+#             "Wastage — served item deleted" if transaction_type == "WASTAGE"
+#             else "Item cancelled before serving"
+#         )
+
+#         base_remarks = (
+#             f"{effective_reason} | "
+#             f"{item_name} x{ordered_qty} | "
+#             f"[key={frontend_unique_key}]"
+#         )
+
+#         if menu_item:
+#             if transaction_type == "ITEM_CANCELLED":
+#                 _record_transaction(
+#                     db,
+#                     client_id=client_id,
+#                     stock_item_id=menu_item.id,
+#                     inventory_id=menu_item.inventory_id,
+#                     name=menu_item.name,
+#                     transaction_type="ITEM_CANCELLED",
+#                     movement_type="NONE",
+#                     quantity=Decimal(str(ordered_qty)),
+#                     unit=menu_item.unit or "",
+#                     before_stock=Decimal(str(menu_item.availability or 0)),
+#                     after_stock=Decimal(str(menu_item.availability or 0)),
+#                     reference_id=str(order_id),
+#                     reference_type="order",
+#                     remarks=f"[ITEM_CANCELLED] Order #{order_id} — {base_remarks}",
+#                 )
+
+#             elif transaction_type == "WASTAGE":
+#                 serving_qty  = float(menu_item.serving_quantity or 0)
+#                 serving_unit = (menu_item.serving_unit or "").strip()
+#                 stock_unit   = (menu_item.unit or "").strip()
+
+#                 if serving_qty > 0 and serving_unit and stock_unit:
+#                     try:
+#                         converted_serving = _convert(serving_qty, serving_unit, stock_unit)
+#                         reversal_qty      = Decimal(str(round(converted_serving * ordered_qty, 6)))
+#                         before_stock      = Decimal(str(menu_item.availability or 0))
+#                         after_stock       = before_stock + reversal_qty
+
+#                         _record_transaction(
+#                             db,
+#                             client_id=client_id,
+#                             stock_item_id=menu_item.id,
+#                             inventory_id=menu_item.inventory_id,
+#                             name=menu_item.name,
+#                             transaction_type="WASTAGE",
+#                             movement_type="REVERSAL",
+#                             quantity=reversal_qty,
+#                             unit=stock_unit,
+#                             before_stock=before_stock,
+#                             after_stock=after_stock,
+#                             reference_id=str(order_id),
+#                             reference_type="order",
+#                             remarks=f"[MENU_ITEM_REVERSAL] Order #{order_id} — {base_remarks}",
+#                         )
+#                         menu_item.availability = after_stock
+
+#                     except ValueError as exc:
+#                         print(f"[WARN] Skipping menu item reversal for item_id={menu_item.id}: {exc}")
+#                 else:
+#                     _record_transaction(
+#                         db,
+#                         client_id=client_id,
+#                         stock_item_id=menu_item.id,
+#                         inventory_id=menu_item.inventory_id,
+#                         name=menu_item.name,
+#                         transaction_type="WASTAGE",
+#                         movement_type="REVERSAL",
+#                         quantity=Decimal(str(ordered_qty)),
+#                         unit=stock_unit or "pcs",
+#                         before_stock=Decimal(str(menu_item.availability or 0)),
+#                         after_stock=Decimal(str(menu_item.availability or 0)),
+#                         reference_id=str(order_id),
+#                         reference_type="order",
+#                         remarks=f"[WASTAGE_NO_SERVING_QTY] Order #{order_id} — {base_remarks}",
+#                     )
+
+#                 if menu_item.recipe:
+#                     for ingredient in menu_item.recipe:
+#                         stock_item_id_raw = ingredient.get("stock_item_id")
+#                         recipe_qty        = float(ingredient.get("quantity_required") or 0)
+#                         recipe_unit       = (ingredient.get("unit") or "").strip()
+
+#                         if not stock_item_id_raw or recipe_qty <= 0:
+#                             continue
+
+#                         stock_item = db.query(InventoryEntity).filter(
+#                             InventoryEntity.id == int(stock_item_id_raw),
+#                             InventoryEntity.client_id == client_id,
+#                         ).first()
+#                         if not stock_item:
+#                             continue
+
+#                         ing_stock_unit = (stock_item.unit or "").strip()
+#                         try:
+#                             reversal = _convert(recipe_qty, recipe_unit, ing_stock_unit) * ordered_qty
+#                         except ValueError as exc:
+#                             print(f"[WARN] Skipping ingredient reversal for stock_item_id={stock_item_id_raw}: {exc}")
+#                             continue
+
+#                         reversal_decimal = Decimal(str(round(reversal, 6)))
+#                         before_ing       = Decimal(str(stock_item.availability or 0))
+#                         after_ing        = before_ing + reversal_decimal
+
+#                         _record_transaction(
+#                             db,
+#                             client_id=client_id,
+#                             stock_item_id=stock_item.id,
+#                             inventory_id=stock_item.inventory_id,
+#                             name=stock_item.name,
+#                             transaction_type="WASTAGE",
+#                             movement_type="REVERSAL",
+#                             quantity=reversal_decimal,
+#                             unit=ing_stock_unit,
+#                             before_stock=before_ing,
+#                             after_ing=after_ing,
+#                             reference_id=str(order_id),
+#                             reference_type="order",
+#                             remarks=f"[INGREDIENT_REVERSAL] Order #{order_id} — {base_remarks}",
+#                         )
+#                         stock_item.availability = after_ing
+
+#     remaining_items = (
+#         db.query(Db_OrderItem_Entity)
+#         .filter(
+#             Db_OrderItem_Entity.order_id == order_id,
+#             Db_OrderItem_Entity.client_id == client_id,
+#         )
+#         .all()
+#     )
+
+#     order_row = db.query(Db_Order_Entity).filter(
+#         Db_Order_Entity.id == order_id,
+#         Db_Order_Entity.client_id == client_id,
+#     ).first()
+
+#     if not remaining_items:
+#         if order_row:
+#             table_id = order_row.table_id
+
+#             root_dinein_id = _root_dinein_id(order_row.dinein_order_id or str(order_row.id))
+#             sub_orders = db.query(Db_Order_Entity).filter(
+#                 Db_Order_Entity.client_id == client_id,
+#                 Db_Order_Entity.dinein_order_id.like(f"{root_dinein_id}-%"),
+#             ).all()
+#             for sub in sub_orders:
+#                 db.delete(sub)
+
+#             db.delete(order_row)
+#             db.flush()
+
+#             if table_id:
+#                 table_row = db.query(DiningTable).filter(
+#                     DiningTable.id == table_id,
+#                     DiningTable.client_id == client_id,
+#                 ).first()
+#                 if table_row:
+#                     table_row.status = "vacant"
+
+#         db.commit()
+#         return ResponseModel(
+#             screen_id=context.screen_id,
+#             data={"message": "Last item deleted — order removed and table marked vacant"},
+#         )
+
+#     if order_row:
+#         new_total = sum(
+#             (i.unit_price or 0) * (i.quantity or 1)
+#             for i in remaining_items
+#         )
+#         order_row.total_price = new_total
+
+#     db.commit()
+#     return ResponseModel(
+#         screen_id=context.screen_id,
+#         data={"message": "Order item deleted"},
+#     )
+
+# @router.delete("/dinein/delete")
+# def delete_order(client_id: str, dinein_order_id: Optional[str] = Query(None), context: SaasContext = Depends(verify_token), db: Session = Depends(get_db)):
+#     """Delete by root internal id — also deletes all sub-orders sharing the same prefix."""
+#     if not dinein_order_id:
+#         raise HTTPException(status_code=400, detail="Missing dinein_order_id")
+#     try:
+#         did_int = int(str(dinein_order_id).strip())
+#     except:
+#         raise HTTPException(status_code=400, detail="Invalid dinein_order_id format")
+
+#     root_order = db.query(Db_Order_Entity).filter(
+#         Db_Order_Entity.id == did_int, Db_Order_Entity.client_id == client_id,
+#     ).first()
+#     if not root_order:
+#         raise HTTPException(status_code=404, detail="Order not found")
+#     if root_order.status == OrderStatusEnum.served:
+#         raise HTTPException(status_code=400, detail="Cannot delete a served order")
+
+#     sub_orders = db.query(Db_Order_Entity).filter(
+#         Db_Order_Entity.client_id == client_id,
+#         Db_Order_Entity.dinein_order_id.like(f"{root_order.dinein_order_id}-%"),
+#     ).all()
+#     for sub in sub_orders:
+#         db.delete(sub)
+
+#     db.delete(root_order)
+#     db.commit()
+#     return ResponseModel(screen_id=context.screen_id, data={"message": "Order deleted"})
+
+
+# @router.get("/kds/orders")
+# def get_kds_orders(client_id: str, context: SaasContext = Depends(verify_token), db: Session = Depends(get_db)):
+#     """
+#     KDS endpoint — returns FLAT individual DB rows (root + each sub-order separately).
+#     Each card on the KDS is one DB row with its own status, timer, dinein_order_id.
+#     Status changes update only that row's items independently.
+#     """
+#     orders = db.query(Db_Order_Entity).filter(
+#         Db_Order_Entity.client_id == str(client_id),
+#         Db_Order_Entity.status.in_([OrderStatusEnum.pending, OrderStatusEnum.preparing, OrderStatusEnum.ready]),
+#     ).order_by(Db_Order_Entity.created_at.asc()).all()
+
+#     result = [_order_row_to_flat(order) for order in orders]
+#     return ResponseModel(screen_id=context.screen_id, data=result)
+
+
+
+
+
+
 from fastapi import APIRouter, Depends, HTTPException, Query, Request
 from fastapi.responses import FileResponse
 from sqlalchemy.orm import Session
@@ -11,21 +659,35 @@ from utils.auth import verify_token
 from models.saas_context import SaasContext
 from typing import Optional
 from entity.inventory_entity import InventoryEntity
-from ..services.order_service import _root_dinein_id, _order_row_to_flat, STATUS_PRIORITY, _merge_group, _deduct_stock_for_order, _convert, _record_transaction,_record_partial_transaction
-# from app.services.order_service import deduct_inventory_after_order
+from ..services.order_service import _root_dinein_id, _order_row_to_flat, STATUS_PRIORITY, _merge_group, _deduct_stock_for_order, _convert, _record_transaction, _record_partial_transaction
 from decimal import Decimal
 
 
 router = APIRouter()
 
+
 @router.post("/dinein/create", response_model=ResponseModel[DineinOrderModel])
-def create_order(client_id: str, order: DineinOrderModel, context: SaasContext = Depends(verify_token), db: Session = Depends(get_db)):
+def create_order(
+    client_id: str,
+    order: DineinOrderModel,
+    context: SaasContext = Depends(verify_token),
+    db: Session = Depends(get_db),
+):
     db_order = Db_Order_Entity(
-        client_id=client_id, table_id=order.table_id, status=order.status,
-        price=order.price, gst=order.gst, cst=order.cst, discount=order.discount,
-        invoice_status=order.invoice_status, total_price=order.total_price,
-        invoice_id=order.invoice_id, dinein_order_id=None,
-        handler_id=order.handler_id, created_by=order.created_by, updated_by=order.updated_by,
+        client_id=client_id,
+        table_id=order.table_id,
+        status=order.status,
+        price=order.price,
+        gst=order.gst,
+        cst=order.cst,
+        discount=order.discount,
+        invoice_status=order.invoice_status,
+        total_price=order.total_price,
+        invoice_id=order.invoice_id,
+        dinein_order_id=None,
+        handler_id=order.handler_id,
+        created_by=order.created_by,
+        updated_by=order.updated_by,
     )
     db.add(db_order)
     db.flush()
@@ -35,25 +697,47 @@ def create_order(client_id: str, order: DineinOrderModel, context: SaasContext =
 
     for item in order.items:
         db_item = Db_OrderItem_Entity(
-            order_id=db_order.id, client_id=client_id, item_id=item.item_id,
-            item_name=item.item_name, slug=item.slug, quantity=item.quantity,
-            unit_price=item.unit_price, line_total=item.line_total, status=item.status,
+            order_id=db_order.id,
+            client_id=client_id,
+            item_id=item.item_id,
+            item_name=item.item_name,
+            slug=item.slug,
+            quantity=item.quantity,
+            unit_price=item.unit_price,
+            line_total=item.line_total,
+            status=item.status,
         )
         db.add(db_item)
     db.commit()
     db.refresh(db_order)
 
-    db_items = db.query(Db_OrderItem_Entity).filter(Db_OrderItem_Entity.order_id == db_order.id).all()
+    db_items = (
+        db.query(Db_OrderItem_Entity)
+        .filter(Db_OrderItem_Entity.order_id == db_order.id)
+        .all()
+    )
     order_items = [
         OrderItemModel(
-            client_id=i.client_id, id=i.id, item_id=i.item_id, order_id=i.order_id,
-            quantity=i.quantity, status=i.status, unit_price=i.unit_price,
-            line_total=i.line_total, item_name=i.item_name, slug=i.slug,
-        ) for i in db_items
+            client_id=i.client_id,
+            id=i.id,
+            item_id=i.item_id,
+            order_id=i.order_id,
+            quantity=i.quantity,
+            status=i.status,
+            unit_price=i.unit_price,
+            line_total=i.line_total,
+            item_name=i.item_name,
+            slug=i.slug,
+        )
+        for i in db_items
     ]
     dinein_model = DineinOrderModel(
-        id=db_order.id, dinein_order_id=db_order.dinein_order_id, table_id=db_order.table_id,
-        client_id=db_order.client_id, status=db_order.status, created_at=db_order.created_at,
+        id=db_order.id,
+        dinein_order_id=db_order.dinein_order_id,
+        table_id=db_order.table_id,
+        client_id=db_order.client_id,
+        status=db_order.status,
+        created_at=db_order.created_at,
         items=order_items,
     )
     return ResponseModel(screen_id=context.screen_id, data=dinein_model)
@@ -62,28 +746,37 @@ def create_order(client_id: str, order: DineinOrderModel, context: SaasContext =
 @router.post("/dinein/create-sub-order", response_model=ResponseModel[DineinOrderModel])
 def create_sub_order(
     client_id: str,
-    parent_dinein_order_id: str,   # e.g. "1001"
+    parent_dinein_order_id: str,
     order: DineinOrderModel,
     context: SaasContext = Depends(verify_token),
     db: Session = Depends(get_db),
 ):
-    root_order = db.query(Db_Order_Entity).filter(
-        Db_Order_Entity.client_id == client_id,
-        Db_Order_Entity.dinein_order_id == parent_dinein_order_id,
-    ).first()
+    root_order = (
+        db.query(Db_Order_Entity)
+        .filter(
+            Db_Order_Entity.client_id == client_id,
+            Db_Order_Entity.dinein_order_id == parent_dinein_order_id,
+        )
+        .first()
+    )
     if not root_order:
-        raise HTTPException(status_code=404, detail=f"Parent order '{parent_dinein_order_id}' not found")
+        raise HTTPException(
+            status_code=404,
+            detail=f"Parent order '{parent_dinein_order_id}' not found",
+        )
 
-    existing_sub_count = db.query(Db_Order_Entity).filter(
-        Db_Order_Entity.client_id == client_id,
-        Db_Order_Entity.dinein_order_id.like(f"{parent_dinein_order_id}-%"),
-    ).count()
+    existing_sub_count = (
+        db.query(Db_Order_Entity)
+        .filter(
+            Db_Order_Entity.client_id == client_id,
+            Db_Order_Entity.dinein_order_id.like(f"{parent_dinein_order_id}-%"),
+        )
+        .count()
+    )
     sub_dinein_order_id = f"{parent_dinein_order_id}-{existing_sub_count + 1}"
 
-    # Total price = sum of items' unit_price * quantity (no GST/CST)
     total_price = sum(
-        (item.unit_price or 0) * (item.quantity or 1)
-        for item in order.items
+        (item.unit_price or 0) * (item.quantity or 1) for item in order.items
     )
 
     db_sub_order = Db_Order_Entity(
@@ -91,17 +784,25 @@ def create_sub_order(
         dinein_order_id=sub_dinein_order_id,
         table_id=root_order.table_id,
         status=OrderStatusEnum.pending,
-        price=total_price, gst=0, cst=0, total_price=total_price,
-        created_by=order.created_by, invoice_id=None, invoice_status=None,
+        price=total_price,
+        gst=0,
+        cst=0,
+        total_price=total_price,
+        created_by=order.created_by,
+        invoice_id=None,
     )
     db.add(db_sub_order)
     db.flush()
 
     for item in order.items:
         db_item = Db_OrderItem_Entity(
-            order_id=db_sub_order.id, client_id=client_id,
-            item_id=item.item_id, item_name=item.item_name, slug=item.slug,
-            quantity=item.quantity, unit_price=item.unit_price,
+            order_id=db_sub_order.id,
+            client_id=client_id,
+            item_id=item.item_id,
+            item_name=item.item_name,
+            slug=item.slug,
+            quantity=item.quantity,
+            unit_price=item.unit_price,
             line_total=(item.unit_price or 0) * (item.quantity or 1),
             status=OrderStatusEnum.pending,
             frontend_unique_key=item.frontend_unique_key,
@@ -113,58 +814,102 @@ def create_sub_order(
 
     order_items = [
         OrderItemModel(
-            id=i.id, order_id=i.order_id, client_id=i.client_id,
-            item_id=i.item_id, item_name=i.item_name, slug=i.slug,
-            quantity=i.quantity, unit_price=i.unit_price, line_total=i.line_total,
-            status=i.status, frontend_unique_key=i.frontend_unique_key,
+            id=i.id,
+            order_id=i.order_id,
+            client_id=i.client_id,
+            item_id=i.item_id,
+            item_name=i.item_name,
+            slug=i.slug,
+            quantity=i.quantity,
+            unit_price=i.unit_price,
+            line_total=i.line_total,
+            status=i.status,
+            frontend_unique_key=i.frontend_unique_key,
         )
         for i in db_sub_order.items
     ]
     sub_order_model = DineinOrderModel(
-        id=db_sub_order.id, dinein_order_id=db_sub_order.dinein_order_id,
-        table_id=db_sub_order.table_id, client_id=db_sub_order.client_id,
-        status=db_sub_order.status, total_price=db_sub_order.total_price,
-        created_at=db_sub_order.created_at, items=order_items,
+        id=db_sub_order.id,
+        dinein_order_id=db_sub_order.dinein_order_id,
+        table_id=db_sub_order.table_id,
+        client_id=db_sub_order.client_id,
+        status=db_sub_order.status,
+        total_price=db_sub_order.total_price,
+        created_at=db_sub_order.created_at,
+        items=order_items,
     )
     return ResponseModel(
-        screen_id=context.screen_id, data=sub_order_model,
+        screen_id=context.screen_id,
+        data=sub_order_model,
         message=f"Sub-order {sub_dinein_order_id} created successfully",
     )
 
 
 @router.get("/dinein/order")
-def get_orders_for_order_id(client_id: str, order_id: Optional[str] = None, context: SaasContext = Depends(verify_token), db: Session = Depends(get_db)):
-    order = db.query(Db_Order_Entity).filter(
-        Db_Order_Entity.client_id == client_id,
-        Db_Order_Entity.id == order_id,
-    ).first()
+def get_orders_for_order_id(
+    client_id: str,
+    order_id: Optional[str] = None,
+    context: SaasContext = Depends(verify_token),
+    db: Session = Depends(get_db),
+):
+    order = (
+        db.query(Db_Order_Entity)
+        .filter(
+            Db_Order_Entity.client_id == client_id,
+            Db_Order_Entity.id == order_id,
+        )
+        .first()
+    )
     if not order:
         return ResponseModel(screen_id=context.screen_id, data=None, status="not_found")
 
-    db_items = db.query(Db_OrderItem_Entity).filter(Db_OrderItem_Entity.order_id == order.id).all()
+    db_items = (db.query(Db_OrderItem_Entity).filter(
+        Db_OrderItem_Entity.order_id == order.id,
+        Db_OrderItem_Entity.status != OrderStatusEnum.cancelled,  # ← add this
+    )
+    .all()
+    )
     item_models = [Db_OrderItem_Entity.copyToModel(item) for item in db_items]
     result = {
-        "id": order.id, "dinein_order_id": order.dinein_order_id,
-        "table_id": order.table_id, "client_id": order.client_id,
-        "status": order.status, "created_at": order.created_at,
-        "items": [i.dict() for i in item_models], "total_price": order.total_price,
+        "id": order.id,
+        "dinein_order_id": order.dinein_order_id,
+        "table_id": order.table_id,
+        "client_id": order.client_id,
+        "status": order.status,
+        "created_at": order.created_at,
+        "items": [i.dict() for i in item_models],
+        "total_price": order.total_price,
     }
     return ResponseModel(screen_id=context.screen_id, data=result)
 
 
 @router.get("/dinein/table")
-def get_orders_for_table(client_id: str, table_id: Optional[str] = None, context: SaasContext = Depends(verify_token), db: Session = Depends(get_db)):
+def get_orders_for_table(
+    client_id: str,
+    table_id: Optional[str] = None,
+    context: SaasContext = Depends(verify_token),
+    db: Session = Depends(get_db),
+):
     if table_id:
-        orders = db.query(Db_Order_Entity).filter(
-            Db_Order_Entity.client_id == client_id,
-            Db_Order_Entity.table_id == table_id,
-        ).all()
+        orders = (
+            db.query(Db_Order_Entity)
+            .filter(
+                Db_Order_Entity.client_id == client_id,
+                Db_Order_Entity.table_id == table_id,
+                Db_Order_Entity.status != OrderStatusEnum.cancelled,  # ← add this
+            )
+            .all()
+        )
     else:
-        orders = db.query(Db_Order_Entity).filter(
-            Db_Order_Entity.client_id == client_id,
-        ).all()
+        orders = (
+            db.query(Db_Order_Entity)
+            .filter(
+                Db_Order_Entity.client_id == client_id,
+                Db_Order_Entity.status != OrderStatusEnum.cancelled,  # ← add this
+            )
+            .all()
+        )
 
-    # Group root + sub-orders, return one merged entry per table group
     groups: dict = {}
     for order in orders:
         root = _root_dinein_id(order.dinein_order_id or str(order.id))
@@ -172,7 +917,6 @@ def get_orders_for_table(client_id: str, table_id: Optional[str] = None, context
 
     result = [_merge_group(group) for group in groups.values()]
     return ResponseModel(screen_id=context.screen_id, data=result)
-
 
 @router.post("/dinein/update")
 def update_order_status(
@@ -186,32 +930,75 @@ def update_order_status(
         db.query(Db_Order_Entity)
         .filter(
             Db_Order_Entity.id == body.id,
-            Db_Order_Entity.client_id == client_id
+            Db_Order_Entity.client_id == client_id,
         )
         .first()
     )
 
     if not order:
-        raise HTTPException(
-            status_code=404,
-            detail=f"Order {body.id} not found"
-        )
+        raise HTTPException(status_code=404, detail=f"Order {body.id} not found")
 
-    if body.status in [OrderStatusEnum.served, OrderStatusEnum.completed]:
-
+    # ── REQ 1: Handle "cancelled" status — soft cancel entire group ───────────
+    if body.status == OrderStatusEnum.cancelled:
         root_id = _root_dinein_id(order.dinein_order_id)
 
-        related_orders = db.query(Db_Order_Entity).filter(
-            Db_Order_Entity.client_id == client_id,
-            Db_Order_Entity.dinein_order_id.like(f"{root_id}%")
-        ).all()
+        related_orders = (
+            db.query(Db_Order_Entity)
+            .filter(
+                Db_Order_Entity.client_id == client_id,
+                Db_Order_Entity.dinein_order_id.like(f"{root_id}%"),
+            )
+            .all()
+        )
+
+        for o in related_orders:
+            o.status = OrderStatusEnum.cancelled
+            # Mark all items as cancelled too so KDS / reports are consistent
+            for item in (
+                db.query(Db_OrderItem_Entity)
+                .filter(
+                    Db_OrderItem_Entity.order_id == o.id,
+                    Db_OrderItem_Entity.client_id == client_id,
+                )
+                .all()
+            ):
+                item.status = OrderStatusEnum.cancelled
+
+        # Optionally store cancellation reason if the model column exists
+        cancellation_reason = getattr(body, "cancellation_reason", None)
+        if cancellation_reason:
+            for o in related_orders:
+                if hasattr(o, "cancellation_reason"):
+                    o.cancellation_reason = cancellation_reason
+
+        db.commit()
+
+        return ResponseModel(
+            screen_id=context.screen_id,
+            data={
+                "message": "Order and all sub-orders cancelled (soft delete)",
+                "cancelled_count": len(related_orders),
+            },
+        )
+
+    # ── Served / completed — deduct stock for entire group ───────────────────
+    if body.status in [OrderStatusEnum.served, OrderStatusEnum.completed]:
+        root_id = _root_dinein_id(order.dinein_order_id)
+
+        related_orders = (
+            db.query(Db_Order_Entity)
+            .filter(
+                Db_Order_Entity.client_id == client_id,
+                Db_Order_Entity.dinein_order_id.like(f"{root_id}%"),
+            )
+            .all()
+        )
 
         for o in related_orders:
             o.status = body.status
 
-        db.flush()  # write status changes before deduction
+        db.flush()
 
-        # Deduct stock for ALL related orders, skipping already-deducted items
         for o in related_orders:
             _deduct_stock_for_order(db=db, client_id=client_id, order_id=o.id)
 
@@ -225,13 +1012,15 @@ def update_order_status(
             },
         )
 
-    # ✅ Normal single order update (for other statuses)
+    # ── Normal single-order update for all other statuses ────────────────────
     if body.status is not None:
         order.status = body.status
     if body.total_price is not None:
         order.total_price = body.total_price
     if body.table_id is not None:
         order.table_id = body.table_id
+    if body.dinein_order_id is not None:
+        order.dinein_order_id = body.dinein_order_id
 
     db.commit()
     db.refresh(order)
@@ -260,12 +1049,13 @@ def update_order_items(
     except Exception:
         raise HTTPException(status_code=400, detail="Invalid order_id")
 
-    existing_items = db.query(Db_OrderItem_Entity).filter(
-        Db_OrderItem_Entity.order_id == order_id
-    ).all()
+    existing_items = (
+        db.query(Db_OrderItem_Entity)
+        .filter(Db_OrderItem_Entity.order_id == order_id)
+        .all()
+    )
 
-    # Two lookup maps — prefer frontend_unique_key, fall back to item_id
-    existing_by_fkey    = {
+    existing_by_fkey = {
         item.frontend_unique_key: item
         for item in existing_items
         if item.frontend_unique_key
@@ -274,13 +1064,11 @@ def update_order_items(
     for item in existing_items:
         existing_by_item_id.setdefault(item.item_id, []).append(item)
 
-    # Track which DB rows have been matched so we never double-assign
     matched_ids = set()
 
     for incoming in body:
         db_item = None
 
-        # 1. Try exact frontend_unique_key match first
         fkey = incoming.frontend_unique_key
         if fkey and fkey in existing_by_fkey:
             candidate = existing_by_fkey[fkey]
@@ -288,7 +1076,6 @@ def update_order_items(
                 db_item = candidate
                 matched_ids.add(candidate.id)
 
-        # 2. Fall back to item_id when fkey is absent or unmatched
         if db_item is None and incoming.item_id in existing_by_item_id:
             for candidate in existing_by_item_id[incoming.item_id]:
                 if candidate.id not in matched_ids:
@@ -297,21 +1084,23 @@ def update_order_items(
                     break
 
         if db_item:
-            db_item.quantity   = incoming.quantity
+            db_item.quantity = incoming.quantity
             db_item.line_total = (incoming.unit_price or 0) * (incoming.quantity or 1)
-            db_item.status     = incoming.status
+            db_item.status = incoming.status
         else:
-            db.add(Db_OrderItem_Entity(
-                client_id=client_id,
-                order_id=order_id,
-                item_id=incoming.item_id,
-                item_name=incoming.item_name,
-                quantity=incoming.quantity,
-                unit_price=incoming.unit_price,
-                line_total=(incoming.unit_price or 0) * (incoming.quantity or 1),
-                status="pending",
-                frontend_unique_key=incoming.frontend_unique_key,
-            ))
+            db.add(
+                Db_OrderItem_Entity(
+                    client_id=client_id,
+                    order_id=order_id,
+                    item_id=incoming.item_id,
+                    item_name=incoming.item_name,
+                    quantity=incoming.quantity,
+                    unit_price=incoming.unit_price,
+                    line_total=(incoming.unit_price or 0) * (incoming.quantity or 1),
+                    status="pending",
+                    frontend_unique_key=incoming.frontend_unique_key,
+                )
+            )
 
     db.commit()
     return ResponseModel(
@@ -319,19 +1108,34 @@ def update_order_items(
         data={"message": "Order updated without resetting old statuses"},
     )
 
+
 @router.post("/order_item/update")
-def update_order_item(client_id: str, order_id: Optional[int] = Query(None), order_item: Optional[OrderItemModel] = None, context: SaasContext = Depends(verify_token), db: Session = Depends(get_db)):
+def update_order_item(
+    client_id: str,
+    order_id: Optional[int] = Query(None),
+    order_item: Optional[OrderItemModel] = None,
+    context: SaasContext = Depends(verify_token),
+    db: Session = Depends(get_db),
+):
     if not order_id or not order_item or not order_item.id:
         raise HTTPException(status_code=400, detail="Missing order_id or order_item_id")
-    existing_item = db.query(Db_OrderItem_Entity).filter(
-        Db_OrderItem_Entity.id == order_item.id, Db_OrderItem_Entity.order_id == order_id,
-    ).first()
+    existing_item = (
+        db.query(Db_OrderItem_Entity)
+        .filter(
+            Db_OrderItem_Entity.id == order_item.id,
+            Db_OrderItem_Entity.order_id == order_id,
+        )
+        .first()
+    )
     updated_item = Db_OrderItem_Entity.copyFromModel(order_item)
     for attr, value in updated_item.__dict__.items():
         if attr != "_sa_instance_state":
             setattr(existing_item, attr, value)
     db.commit()
-    return ResponseModel(screen_id=context.screen_id, data={"message": "Order items updated successfully"})
+    return ResponseModel(
+        screen_id=context.screen_id,
+        data={"message": "Order items updated successfully"},
+    )
 
 
 @router.delete("/order_item/delete")
@@ -344,6 +1148,15 @@ def delete_order_items(
     context: SaasContext = Depends(verify_token),
     db: Session = Depends(get_db),
 ):
+    """
+    REQ 1 (item-level): Instead of hard-deleting the order_item row, mark its
+    status as 'cancelled' and record the appropriate transaction.
+
+    Partial removal (quantity param < full qty) reduces quantity on the row.
+    Full removal sets item status to 'cancelled' (row is KEPT for audit trail).
+    If all items in the order become cancelled, the parent order is also set to
+    'cancelled' and the table is freed.
+    """
     if not order_item_id:
         raise HTTPException(status_code=400, detail="Missing order_item_id")
     try:
@@ -351,20 +1164,24 @@ def delete_order_items(
     except Exception:
         raise HTTPException(status_code=400, detail="Invalid order_item_id format")
 
-    item = db.query(Db_OrderItem_Entity).filter(
-        Db_OrderItem_Entity.id == oid,
-        Db_OrderItem_Entity.client_id == client_id,
-    ).first()
+    item = (
+        db.query(Db_OrderItem_Entity)
+        .filter(
+            Db_OrderItem_Entity.id == oid,
+            Db_OrderItem_Entity.client_id == client_id,
+        )
+        .first()
+    )
     if not item:
         raise HTTPException(status_code=404, detail="Order item not found")
 
-    order_id            = item.order_id
-    ordered_qty         = item.quantity or 1
-    item_name           = item.item_name or ""
+    order_id = item.order_id
+    ordered_qty = item.quantity or 1
+    item_name = item.item_name or ""
     frontend_unique_key = item.frontend_unique_key or ""
-    inventory_item_id   = item.item_id
+    inventory_item_id = item.item_id
 
-    # ── PARTIAL REMOVE: quantity param supplied and less than full qty ─────────
+    # ── PARTIAL REMOVE ─────────────────────────────────────────────────────
     remove_qty = quantity if (quantity and 0 < quantity < ordered_qty) else None
 
     if remove_qty:
@@ -381,18 +1198,28 @@ def delete_order_items(
                 order_id=order_id,
             )
 
-        item.quantity  = new_qty
+        item.quantity = new_qty
         item.line_total = (item.unit_price or 0) * new_qty
 
-        order_row = db.query(Db_Order_Entity).filter(
-            Db_Order_Entity.id == order_id,
-            Db_Order_Entity.client_id == client_id,
-        ).first()
+        order_row = (
+            db.query(Db_Order_Entity)
+            .filter(
+                Db_Order_Entity.id == order_id,
+                Db_Order_Entity.client_id == client_id,
+            )
+            .first()
+        )
         if order_row:
-            all_items = db.query(Db_OrderItem_Entity).filter(
-                Db_OrderItem_Entity.order_id == order_id,
-                Db_OrderItem_Entity.client_id == client_id,
-            ).all()
+            all_items = (
+                db.query(Db_OrderItem_Entity)
+                .filter(
+                    Db_OrderItem_Entity.order_id == order_id,
+                    Db_OrderItem_Entity.client_id == client_id,
+                    # Only include non-cancelled items in total recalculation
+                    Db_OrderItem_Entity.status != OrderStatusEnum.cancelled,
+                )
+                .all()
+            )
             order_row.total_price = sum(
                 (i.unit_price or 0) * (new_qty if i.id == item.id else (i.quantity or 1))
                 for i in all_items
@@ -404,20 +1231,22 @@ def delete_order_items(
             data={"message": f"Reduced qty by {remove_qty}, now {new_qty}"},
         )
 
-    # ── FULL DELETE: original logic below ─────────────────────────────────────
-
-    db.delete(item)
-    db.flush()
+    # ── FULL ITEM CANCEL (soft) ─────────────────────────────────────────────
+    # REQ 1: Do NOT hard-delete the row — set status to 'cancelled' instead.
 
     if transaction_type in ("WASTAGE", "ITEM_CANCELLED"):
-
-        menu_item = db.query(InventoryEntity).filter(
-            InventoryEntity.id == inventory_item_id,
-            InventoryEntity.client_id == client_id,
-        ).first()
+        menu_item = (
+            db.query(InventoryEntity)
+            .filter(
+                InventoryEntity.id == inventory_item_id,
+                InventoryEntity.client_id == client_id,
+            )
+            .first()
+        )
 
         effective_reason = reason or (
-            "Wastage — served item deleted" if transaction_type == "WASTAGE"
+            "Wastage — served item deleted"
+            if transaction_type == "WASTAGE"
             else "Item cancelled before serving"
         )
 
@@ -447,16 +1276,16 @@ def delete_order_items(
                 )
 
             elif transaction_type == "WASTAGE":
-                serving_qty  = float(menu_item.serving_quantity or 0)
+                serving_qty = float(menu_item.serving_quantity or 0)
                 serving_unit = (menu_item.serving_unit or "").strip()
-                stock_unit   = (menu_item.unit or "").strip()
+                stock_unit = (menu_item.unit or "").strip()
 
                 if serving_qty > 0 and serving_unit and stock_unit:
                     try:
                         converted_serving = _convert(serving_qty, serving_unit, stock_unit)
-                        reversal_qty      = Decimal(str(round(converted_serving * ordered_qty, 6)))
-                        before_stock      = Decimal(str(menu_item.availability or 0))
-                        after_stock       = before_stock + reversal_qty
+                        reversal_qty = Decimal(str(round(converted_serving * ordered_qty, 6)))
+                        before_stock = Decimal(str(menu_item.availability or 0))
+                        after_stock = before_stock + reversal_qty
 
                         _record_transaction(
                             db,
@@ -477,7 +1306,9 @@ def delete_order_items(
                         menu_item.availability = after_stock
 
                     except ValueError as exc:
-                        print(f"[WARN] Skipping menu item reversal for item_id={menu_item.id}: {exc}")
+                        print(
+                            f"[WARN] Skipping menu item reversal for item_id={menu_item.id}: {exc}"
+                        )
                 else:
                     _record_transaction(
                         db,
@@ -499,29 +1330,37 @@ def delete_order_items(
                 if menu_item.recipe:
                     for ingredient in menu_item.recipe:
                         stock_item_id_raw = ingredient.get("stock_item_id")
-                        recipe_qty        = float(ingredient.get("quantity_required") or 0)
-                        recipe_unit       = (ingredient.get("unit") or "").strip()
+                        recipe_qty = float(ingredient.get("quantity_required") or 0)
+                        recipe_unit = (ingredient.get("unit") or "").strip()
 
                         if not stock_item_id_raw or recipe_qty <= 0:
                             continue
 
-                        stock_item = db.query(InventoryEntity).filter(
-                            InventoryEntity.id == int(stock_item_id_raw),
-                            InventoryEntity.client_id == client_id,
-                        ).first()
+                        stock_item = (
+                            db.query(InventoryEntity)
+                            .filter(
+                                InventoryEntity.id == int(stock_item_id_raw),
+                                InventoryEntity.client_id == client_id,
+                            )
+                            .first()
+                        )
                         if not stock_item:
                             continue
 
                         ing_stock_unit = (stock_item.unit or "").strip()
                         try:
-                            reversal = _convert(recipe_qty, recipe_unit, ing_stock_unit) * ordered_qty
+                            reversal = (
+                                _convert(recipe_qty, recipe_unit, ing_stock_unit) * ordered_qty
+                            )
                         except ValueError as exc:
-                            print(f"[WARN] Skipping ingredient reversal for stock_item_id={stock_item_id_raw}: {exc}")
+                            print(
+                                f"[WARN] Skipping ingredient reversal for stock_item_id={stock_item_id_raw}: {exc}"
+                            )
                             continue
 
                         reversal_decimal = Decimal(str(round(reversal, 6)))
-                        before_ing       = Decimal(str(stock_item.availability or 0))
-                        after_ing        = before_ing + reversal_decimal
+                        before_ing = Decimal(str(stock_item.availability or 0))
+                        after_ing = before_ing + reversal_decimal
 
                         _record_transaction(
                             db,
@@ -541,103 +1380,508 @@ def delete_order_items(
                         )
                         stock_item.availability = after_ing
 
-    remaining_items = (
+    # REQ 1: Soft cancel — mark item as 'cancelled', do NOT delete the row
+    item.status = OrderStatusEnum.cancelled
+    item.line_total = 0  # zeroed out so it doesn't skew totals
+    db.flush()
+
+    # Check whether ALL items in this order are now cancelled
+    remaining_active = (
         db.query(Db_OrderItem_Entity)
         .filter(
             Db_OrderItem_Entity.order_id == order_id,
             Db_OrderItem_Entity.client_id == client_id,
+            Db_OrderItem_Entity.status != OrderStatusEnum.cancelled,
         )
         .all()
     )
 
-    order_row = db.query(Db_Order_Entity).filter(
-        Db_Order_Entity.id == order_id,
-        Db_Order_Entity.client_id == client_id,
-    ).first()
+    order_row = (
+        db.query(Db_Order_Entity)
+        .filter(
+            Db_Order_Entity.id == order_id,
+            Db_Order_Entity.client_id == client_id,
+        )
+        .first()
+    )
 
-    if not remaining_items:
+    if not remaining_active:
+        # All items cancelled → soft-cancel the whole order and free the table
         if order_row:
-            table_id = order_row.table_id
+            root_dinein_id = _root_dinein_id(
+                order_row.dinein_order_id or str(order_row.id)
+            )
 
-            root_dinein_id = _root_dinein_id(order_row.dinein_order_id or str(order_row.id))
-            sub_orders = db.query(Db_Order_Entity).filter(
-                Db_Order_Entity.client_id == client_id,
-                Db_Order_Entity.dinein_order_id.like(f"{root_dinein_id}-%"),
-            ).all()
+            # Cancel all sub-orders in the group too
+            sub_orders = (
+                db.query(Db_Order_Entity)
+                .filter(
+                    Db_Order_Entity.client_id == client_id,
+                    Db_Order_Entity.dinein_order_id.like(f"{root_dinein_id}-%"),
+                )
+                .all()
+            )
             for sub in sub_orders:
-                db.delete(sub)
+                sub.status = OrderStatusEnum.cancelled
 
-            db.delete(order_row)
+            order_row.status = OrderStatusEnum.cancelled
+            order_row.total_price = 0
             db.flush()
 
+            table_id = order_row.table_id
             if table_id:
-                table_row = db.query(DiningTable).filter(
-                    DiningTable.id == table_id,
-                    DiningTable.client_id == client_id,
-                ).first()
+                table_row = (
+                    db.query(DiningTable)
+                    .filter(
+                        DiningTable.id == table_id,
+                        DiningTable.client_id == client_id,
+                    )
+                    .first()
+                )
                 if table_row:
                     table_row.status = "vacant"
 
         db.commit()
         return ResponseModel(
             screen_id=context.screen_id,
-            data={"message": "Last item deleted — order removed and table marked vacant"},
+            data={
+                "message": "Last active item cancelled — order marked cancelled and table freed"
+            },
         )
 
+    # Recalculate order total from remaining active items
     if order_row:
-        new_total = sum(
-            (i.unit_price or 0) * (i.quantity or 1)
-            for i in remaining_items
+        order_row.total_price = sum(
+            (i.unit_price or 0) * (i.quantity or 1) for i in remaining_active
         )
-        order_row.total_price = new_total
 
     db.commit()
     return ResponseModel(
         screen_id=context.screen_id,
-        data={"message": "Order item deleted"},
+        data={"message": "Order item cancelled (soft delete)"},
     )
 
+
+# ─────────────────────────────────────────────────────────────────────────────
+# REQ 1: /dinein/cancel  — explicit soft-cancel endpoint for the whole order
+# (The existing /dinein/update endpoint also handles status=cancelled, but this
+# dedicated route provides a cleaner API surface and accepts a reason field.)
+# ─────────────────────────────────────────────────────────────────────────────
+
+@router.post("/dinein/cancel")
+def cancel_order(
+    client_id: str,
+    order_id: int = Query(...),
+    reason: Optional[str] = Query(None),
+    context: SaasContext = Depends(verify_token),
+    db: Session = Depends(get_db),
+):
+    """
+    Soft-cancel complete dine-in order group.
+    Flow:
+    1. Record main dine-in cancellation transaction
+    2. Record item-level cancellation/wastage transactions
+    3. Cancel root + sub-orders
+    4. Free table
+    """
+
+    root_order = (
+        db.query(Db_Order_Entity)
+        .filter(
+            Db_Order_Entity.id == order_id,
+            Db_Order_Entity.client_id == client_id,
+        )
+        .first()
+    )
+
+    if not root_order:
+        raise HTTPException(status_code=404, detail="Order not found")
+
+    root_dinein_id = _root_dinein_id(
+        root_order.dinein_order_id or str(root_order.id)
+    )
+
+    related_orders = (
+        db.query(Db_Order_Entity)
+        .filter(
+            Db_Order_Entity.client_id == client_id,
+            Db_Order_Entity.dinein_order_id.like(f"{root_dinein_id}%"),
+        )
+        .all()
+    )
+
+    effective_reason = reason or "Full order cancelled"
+    table_id = root_order.table_id
+
+    # =========================================================
+    # 1. MAIN DINE-IN CANCELLATION TRANSACTION (FIRST)
+    # =========================================================
+    total_cancel_value = sum(
+        Decimal(str(order.total_price or 0))
+        for order in related_orders
+    )
+
+    _record_transaction(
+        db,
+        client_id=client_id,
+        stock_item_id=0,
+        inventory_id=f"DINEIN-{root_dinein_id}",
+        name="DINEIN_ORDER_CANCELLED",
+        transaction_type="ORDER_CANCELLED",
+        movement_type="NONE",
+        quantity=Decimal("1"),
+        unit="order",
+        before_stock=Decimal("0"),
+        after_stock=Decimal("0"),
+        reference_id=str(root_order.id),
+        reference_type="dinein_order",
+        remarks=(
+            f"[FULL_DINEIN_CANCELLED] "
+            f"Root Order #{root_order.id} | "
+            f"Table #{root_order.table_id} | "
+            f"Total Value: {total_cancel_value} | "
+            f"Reason: {effective_reason}"
+        ),
+    )
+
+    # =========================================================
+    # 2. ITEM LEVEL CANCELLATION TRANSACTIONS
+    # =========================================================
+    for order in related_orders:
+        order.status = OrderStatusEnum.cancelled
+
+        items = (
+            db.query(Db_OrderItem_Entity)
+            .filter(
+                Db_OrderItem_Entity.order_id == order.id,
+                Db_OrderItem_Entity.client_id == client_id,
+            )
+            .all()
+        )
+
+        for item in items:
+            menu_item = (
+                db.query(InventoryEntity)
+                .filter(
+                    InventoryEntity.id == item.item_id,
+                    InventoryEntity.client_id == client_id,
+                )
+                .first()
+            )
+
+            ordered_qty = item.quantity or 1
+
+            if menu_item:
+                if item.status == OrderStatusEnum.served:
+                    # Served item → wastage
+                    _record_transaction(
+                        db,
+                        client_id=client_id,
+                        stock_item_id=menu_item.id,
+                        inventory_id=menu_item.inventory_id,
+                        name=menu_item.name,
+                        transaction_type="WASTAGE",
+                        movement_type="NONE",
+                        quantity=Decimal(str(ordered_qty)),
+                        unit=menu_item.unit or "pcs",
+                        before_stock=Decimal(str(menu_item.availability or 0)),
+                        after_stock=Decimal(str(menu_item.availability or 0)),
+                        reference_id=str(order.id),
+                        reference_type="order",
+                        remarks=(
+                            f"[FULL_ORDER_CANCELLED_SERVED] "
+                            f"Order #{order.id} | "
+                            f"{item.item_name} x{ordered_qty} | "
+                            f"{effective_reason}"
+                        ),
+                    )
+                else:
+                    # Pending / preparing → item cancelled
+                    _record_transaction(
+                        db,
+                        client_id=client_id,
+                        stock_item_id=menu_item.id,
+                        inventory_id=menu_item.inventory_id,
+                        name=menu_item.name,
+                        transaction_type="ITEM_CANCELLED",
+                        movement_type="NONE",
+                        quantity=Decimal(str(ordered_qty)),
+                        unit=menu_item.unit or "pcs",
+                        before_stock=Decimal(str(menu_item.availability or 0)),
+                        after_stock=Decimal(str(menu_item.availability or 0)),
+                        reference_id=str(order.id),
+                        reference_type="order",
+                        remarks=(
+                            f"[FULL_ORDER_CANCELLED] "
+                            f"Order #{order.id} | "
+                            f"{item.item_name} x{ordered_qty} | "
+                            f"{effective_reason}"
+                        ),
+                    )
+
+            item.status = OrderStatusEnum.cancelled
+
+    # =========================================================
+    # 3. FREE TABLE
+    # =========================================================
+    if table_id:
+        table_row = (
+            db.query(DiningTable)
+            .filter(
+                DiningTable.id == table_id,
+                DiningTable.client_id == client_id,
+            )
+            .first()
+        )
+
+        if table_row:
+            table_row.status = "vacant"
+
+    db.commit()
+
+    return ResponseModel(
+        screen_id=context.screen_id,
+        data={
+            "message": "Dine-in cancelled and transactions recorded",
+            "cancelled_count": len(related_orders),
+            "table_freed": bool(table_id),
+        },
+    )
+# ─────────────────────────────────────────────────────────────────────────────
+# /dinein/delete — kept for backwards compatibility but now performs a soft
+# cancel instead of a physical DELETE.  Guarded: served orders cannot be
+# cancelled via this endpoint.
+# ─────────────────────────────────────────────────────────────────────────────
+
 @router.delete("/dinein/delete")
-def delete_order(client_id: str, dinein_order_id: Optional[str] = Query(None), context: SaasContext = Depends(verify_token), db: Session = Depends(get_db)):
-    """Delete by root internal id — also deletes all sub-orders sharing the same prefix."""
+def delete_order(
+    client_id: str,
+    dinein_order_id: Optional[str] = Query(None),
+    reason: Optional[str] = Query(None),
+    context: SaasContext = Depends(verify_token),
+    db: Session = Depends(get_db),
+):
+    """
+    REQ 1: Soft cancel — updates status to 'cancelled' instead of hard DELETE.
+    Records ITEM_CANCELLED transaction for every non-served item in the group.
+    """
     if not dinein_order_id:
         raise HTTPException(status_code=400, detail="Missing dinein_order_id")
     try:
         did_int = int(str(dinein_order_id).strip())
-    except:
+    except Exception:
         raise HTTPException(status_code=400, detail="Invalid dinein_order_id format")
 
-    root_order = db.query(Db_Order_Entity).filter(
-        Db_Order_Entity.id == did_int, Db_Order_Entity.client_id == client_id,
-    ).first()
+    root_order = (
+        db.query(Db_Order_Entity)
+        .filter(
+            Db_Order_Entity.id == did_int,
+            Db_Order_Entity.client_id == client_id,
+        )
+        .first()
+    )
     if not root_order:
         raise HTTPException(status_code=404, detail="Order not found")
     if root_order.status == OrderStatusEnum.served:
-        raise HTTPException(status_code=400, detail="Cannot delete a served order")
+        raise HTTPException(status_code=400, detail="Cannot cancel a served order")
 
-    sub_orders = db.query(Db_Order_Entity).filter(
-        Db_Order_Entity.client_id == client_id,
-        Db_Order_Entity.dinein_order_id.like(f"{root_order.dinein_order_id}-%"),
-    ).all()
-    for sub in sub_orders:
-        db.delete(sub)
+    root_dinein_id = _root_dinein_id(root_order.dinein_order_id or str(root_order.id))
 
-    db.delete(root_order)
+    related_orders = (
+        db.query(Db_Order_Entity)
+        .filter(
+            Db_Order_Entity.client_id == client_id,
+            Db_Order_Entity.dinein_order_id.like(f"{root_dinein_id}%"),
+        )
+        .all()
+    )
+
+    table_id = root_order.table_id
+    effective_reason = reason or "Order cancelled"
+
+    for o in related_orders:
+        o.status = OrderStatusEnum.cancelled
+        items = (
+            db.query(Db_OrderItem_Entity)
+            .filter(
+                Db_OrderItem_Entity.order_id == o.id,
+                Db_OrderItem_Entity.client_id == client_id,
+            )
+            .all()
+        )
+        for it in items:
+            if it.status == OrderStatusEnum.served:
+                # Already served — record wastage + reverse stock
+                menu_item = (
+                    db.query(InventoryEntity)
+                    .filter(
+                        InventoryEntity.id == it.item_id,
+                        InventoryEntity.client_id == client_id,
+                    )
+                    .first()
+                )
+                if menu_item:
+                    ordered_qty = it.quantity or 1
+                    base_remarks = (
+                        f"{effective_reason} | order cancelled | "
+                        f"{it.item_name} x{ordered_qty} | "
+                        f"[key={it.frontend_unique_key or ''}]"
+                    )
+                    serving_qty = float(menu_item.serving_quantity or 0)
+                    serving_unit = (menu_item.serving_unit or "").strip()
+                    stock_unit = (menu_item.unit or "").strip()
+
+                    if serving_qty > 0 and serving_unit and stock_unit:
+                        try:
+                            converted_serving = _convert(serving_qty, serving_unit, stock_unit)
+                            reversal_qty = Decimal(str(round(converted_serving * ordered_qty, 6)))
+                            before_stock = Decimal(str(menu_item.availability or 0))
+                            after_stock = before_stock + reversal_qty
+                            _record_transaction(
+                                db,
+                                client_id=client_id,
+                                stock_item_id=menu_item.id,
+                                inventory_id=menu_item.inventory_id,
+                                name=menu_item.name,
+                                transaction_type="WASTAGE",
+                                movement_type="REVERSAL",
+                                quantity=reversal_qty,
+                                unit=stock_unit,
+                                before_stock=before_stock,
+                                after_stock=after_stock,
+                                reference_id=str(o.id),
+                                reference_type="order",
+                                remarks=f"[WASTAGE_ORDER_CANCELLED] Order #{o.id} — {base_remarks}",
+                            )
+                            menu_item.availability = after_stock
+                        except ValueError as exc:
+                            print(f"[WARN] Skipping reversal for item_id={menu_item.id}: {exc}")
+
+                    if menu_item.recipe:
+                        for ingredient in menu_item.recipe:
+                            stock_item_id_raw = ingredient.get("stock_item_id")
+                            recipe_qty = float(ingredient.get("quantity_required") or 0)
+                            recipe_unit = (ingredient.get("unit") or "").strip()
+                            if not stock_item_id_raw or recipe_qty <= 0:
+                                continue
+                            stock_item = (
+                                db.query(InventoryEntity)
+                                .filter(
+                                    InventoryEntity.id == int(stock_item_id_raw),
+                                    InventoryEntity.client_id == client_id,
+                                )
+                                .first()
+                            )
+                            if not stock_item:
+                                continue
+                            ing_stock_unit = (stock_item.unit or "").strip()
+                            try:
+                                reversal = _convert(recipe_qty, recipe_unit, ing_stock_unit) * ordered_qty
+                            except ValueError:
+                                continue
+                            reversal_decimal = Decimal(str(round(reversal, 6)))
+                            before_ing = Decimal(str(stock_item.availability or 0))
+                            after_ing = before_ing + reversal_decimal
+                            _record_transaction(
+                                db,
+                                client_id=client_id,
+                                stock_item_id=stock_item.id,
+                                inventory_id=stock_item.inventory_id,
+                                name=stock_item.name,
+                                transaction_type="WASTAGE",
+                                movement_type="REVERSAL",
+                                quantity=reversal_decimal,
+                                unit=ing_stock_unit,
+                                before_stock=before_ing,
+                                after_ing=after_ing,
+                                reference_id=str(o.id),
+                                reference_type="order",
+                                remarks=f"[INGREDIENT_REVERSAL_ORDER_CANCELLED] Order #{o.id} — {base_remarks}",
+                            )
+                            stock_item.availability = after_ing
+
+            else:
+                # Not served — record ITEM_CANCELLED (no stock change)
+                menu_item = (
+                    db.query(InventoryEntity)
+                    .filter(
+                        InventoryEntity.id == it.item_id,
+                        InventoryEntity.client_id == client_id,
+                    )
+                    .first()
+                )
+                if menu_item:
+                    ordered_qty = it.quantity or 1
+                    _record_transaction(
+                        db,
+                        client_id=client_id,
+                        stock_item_id=menu_item.id,
+                        inventory_id=menu_item.inventory_id,
+                        name=menu_item.name,
+                        transaction_type="ITEM_CANCELLED",
+                        movement_type="NONE",
+                        quantity=Decimal(str(ordered_qty)),
+                        unit=menu_item.unit or "",
+                        before_stock=Decimal(str(menu_item.availability or 0)),
+                        after_stock=Decimal(str(menu_item.availability or 0)),
+                        reference_id=str(o.id),
+                        reference_type="order",
+                        remarks=(
+                            f"[ITEM_CANCELLED_ORDER_CANCELLED] Order #{o.id} — "
+                            f"{effective_reason} | {it.item_name} x{ordered_qty}"
+                        ),
+                    )
+
+            it.status = OrderStatusEnum.cancelled
+
+    root_order.status = OrderStatusEnum.cancelled
+
+    db.flush()
+
+    if table_id:
+        table_row = (
+            db.query(DiningTable)
+            .filter(
+                DiningTable.id == table_id,
+                DiningTable.client_id == client_id,
+            )
+            .first()
+        )
+        if table_row:
+            table_row.status = "vacant"
+
     db.commit()
-    return ResponseModel(screen_id=context.screen_id, data={"message": "Order deleted"})
 
+    return ResponseModel(
+        screen_id=context.screen_id,
+        data={"message": "Order cancelled (soft delete — row retained for audit)"},
+    )
 
 @router.get("/kds/orders")
-def get_kds_orders(client_id: str, context: SaasContext = Depends(verify_token), db: Session = Depends(get_db)):
+def get_kds_orders(
+    client_id: str,
+    context: SaasContext = Depends(verify_token),
+    db: Session = Depends(get_db),
+):
     """
     KDS endpoint — returns FLAT individual DB rows (root + each sub-order separately).
-    Each card on the KDS is one DB row with its own status, timer, dinein_order_id.
-    Status changes update only that row's items independently.
+    Excludes cancelled orders.
     """
-    orders = db.query(Db_Order_Entity).filter(
-        Db_Order_Entity.client_id == str(client_id),
-        Db_Order_Entity.status.in_([OrderStatusEnum.pending, OrderStatusEnum.preparing, OrderStatusEnum.ready]),
-    ).order_by(Db_Order_Entity.created_at.asc()).all()
+    orders = (
+        db.query(Db_Order_Entity)
+        .filter(
+            Db_Order_Entity.client_id == str(client_id),
+            Db_Order_Entity.status.in_(
+                [
+                    OrderStatusEnum.pending,
+                    OrderStatusEnum.preparing,
+                    OrderStatusEnum.ready,
+                ]
+            ),
+        )
+        .order_by(Db_Order_Entity.created_at.asc())
+        .all()
+    )
 
     result = [_order_row_to_flat(order) for order in orders]
     return ResponseModel(screen_id=context.screen_id, data=result)

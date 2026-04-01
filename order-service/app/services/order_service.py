@@ -126,6 +126,8 @@ def _merge_group(orders: list) -> dict:
     merged_items = []
     for order in orders:
         for item in order.items:
+            if (item.status or "").lower() == "cancelled":  # skip cancelled items
+                continue
             m = Db_OrderItem_Entity.copyToModel(item).dict()
             m["batch_label"] = order.dinein_order_id
             m["sub_order_id"] = order.id
@@ -146,11 +148,10 @@ def _merge_group(orders: list) -> dict:
         for o in orders
     ]
 
-    # Total price = sum of all items' unit_price * quantity (no GST/CST)
+    # Total price = sum of active (non-cancelled) items only
     total_price = sum(
-        (item.unit_price or 0) * (item.quantity or 1)
-        for order in orders
-        for item in order.items
+        (item.get("unit_price") or 0) * (item.get("quantity") or 1)
+        for item in merged_items
     )
 
     return {
@@ -159,14 +160,13 @@ def _merge_group(orders: list) -> dict:
         "table_id": root.table_id,
         "client_id": root.client_id,
         "status": overall,
-        "created_at": root.created_at,          # oldest = root timer
+        "created_at": root.created_at,
         "items": merged_items,
         "total_price": total_price,
         "item_names": [i.get("item_name", "") for i in merged_items],
-        "sub_orders": sub_orders_meta,           # for TakeOrder count + timer
-        "order_count": len(orders),              # total batches incl. root
+        "sub_orders": sub_orders_meta,
+        "order_count": len(orders),
     }
-
 # ───────────────────────────────────────────────────────────────────────────
 
 
