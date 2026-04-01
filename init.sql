@@ -880,3 +880,39 @@ CREATE TABLE IF NOT EXISTS inventory_transactions (
     created_at       TIMESTAMP   DEFAULT NOW(),
     remarks          TEXT
 );
+
+
+INSERT INTO category (
+  id, client_id, name, description, sub_categories, slug,
+  created_by, updated_by, created_at, updated_at
+)
+VALUES (
+  'dietary_type',
+  'easyfood',
+  'Dietary Type',
+  'Dietary Classification',
+  '{veg,nonveg,egg,chinese}',
+  '_DietaryType',
+  '1000',
+  '1000',
+  NOW(),
+  NOW()
+);
+
+
+INSERT INTO category (
+  id, client_id, name, description, sub_categories, slug,
+  created_by, updated_by, created_at, updated_at
+)
+VALUES (
+  'available_timings',
+  'easyfood',
+  'Availability Time',
+  'Food Availability Timings',
+  '{}',
+  '_AvailabilityTime',
+  '1000',
+  '1000',
+  NOW(),
+  NOW()
+);
