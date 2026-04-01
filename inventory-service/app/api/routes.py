@@ -1,5 +1,6 @@
 from fastapi import APIRouter, Depends, HTTPException, Query
 from sqlalchemy.orm import Session
+from sqlalchemy import text
 from typing import List, Optional, Dict, Any
 from decimal import Decimal, getcontext
 from database.postgres import get_db
@@ -8,8 +9,8 @@ from entity.inventory_entity import InventoryEntity, CategoryEntity, InventoryTr
 from models.response_model import ResponseModel
 from models.saas_context import SaasContext
 from utils.auth import verify_token
-from ..services import service
-from ..services.service import _compute_current_stock, _record_transaction, _convert
+from services import service
+from services.service import _compute_current_stock, _record_transaction, _convert
 
 # -------------------- CONFIG --------------------
 router = APIRouter()
@@ -131,6 +132,13 @@ def update_inventory(
     db.commit()
     db.refresh(record)
 
+    return ResponseModel(
+    screen_id=context.screen_id,
+    status="success",
+    message="Inventory updated successfully",
+    data=InventoryEntity.copyToModel(record)
+    )
+
 @router.post("/update/avail", response_model=ResponseModel[Inventory])
 def update_inventory_availability(
     client_id: str,
@@ -200,9 +208,19 @@ def update_inventory_availability(
     )
 @router.post("/delete", response_model=ResponseModel[Inventory])
 
-def delete_inventory(client_id: str, item: Inventory, context: SaasContext = Depends(verify_token), db: Session = Depends(get_db)):
-    record = db.query(InventoryEntity).filter(
-        InventoryEntity.id == item.id, 
+@router.post("/delete", response_model=ResponseModel[Inventory])
+def delete_inventory(
+    client_id: str,
+    item: Inventory,
+    context: SaasContext = Depends(verify_token),
+    db: Session = Depends(get_db)
+):
+    if not item.id:
+        raise HTTPException(status_code=400, detail="Missing item ID")
+
+    # ✅ Fetch ALL records with this id (base + all zone variants)
+    records = db.query(InventoryEntity).filter(
+        InventoryEntity.id == item.id,
         InventoryEntity.client_id == client_id
     ).all()
 
@@ -249,6 +267,7 @@ def delete_all_inventory( client_id: str, context: SaasContext = Depends(verify_
 
     return ResponseModel[str]( screen_id=context.screen_id, status="success", message="All inventory items deleted", data="All inventory items deleted successfully")
 # -------------------- CATEGORY ROUTES --------------------
+
 
 @router.get("/read_category", response_model=ResponseModel)
 def read_categories(client_id: str, category_id: Optional[str] = Query(None), context: SaasContext = Depends(verify_token), db: Session = Depends(get_db)):

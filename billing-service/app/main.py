@@ -1,7 +1,7 @@
 from fastapi import FastAPI, Request
 from fastapi.middleware.cors import CORSMiddleware
-from .api.routes import router as table_router
-from .api import routes
+from api.routes import router as table_router
+from api import routes
 import logging
 import time
 import os
