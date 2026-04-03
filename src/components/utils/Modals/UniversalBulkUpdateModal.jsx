@@ -53,7 +53,7 @@ const UniversalBulkUpdateModal = ({
   const fetchStatuses = async () => {
     try {
       const res = await axios.get(
-        `${import.meta.env.VITE_API_INVENTORY_SERVICE_URL}/${clientId}/inventory/masters`,
+        `${import.meta.env.VITE_API_TABLE_SERVICE_URL}/${clientId}/tables/table-types`,
         {
           params: { category_id: "status" },
           headers: { Authorization: `Bearer ${token}` }
@@ -101,7 +101,7 @@ const UniversalBulkUpdateModal = ({
   const fetchDietaryTypes = async () => {
     try {
       const res = await axios.get(
-        `${import.meta.env.VITE_API_INVENTORY_SERVICE_URL}/${clientId}/inventory/masters`,
+        `${import.meta.env.VITE_API_INVENTORY_SERVICE_URL}/${clientId}/inventory/item-types`,
         {
           params: { category_id: "dietary_type" },
           headers: { Authorization: `Bearer ${token}` }

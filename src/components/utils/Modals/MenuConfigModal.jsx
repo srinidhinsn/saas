@@ -22,11 +22,11 @@ const MenuConfigModal = ({ show, onClose, clientId, token }) => {
   const fetchMasters = async () => {
     try {
       const [dietRes, timeRes] = await Promise.all([
-        axios.get(`${INV_URL}/${clientId}/inventory/masters`, {
+        axios.get(`${INV_URL}/${clientId}/inventory/item-types`, {
           params: { category_id: "dietary_type" },
           headers: auth,
         }),
-        axios.get(`${INV_URL}/${clientId}/inventory/masters`, {
+        axios.get(`${INV_URL}/${clientId}/inventory/item-types`, {
           params: { category_id: "available_timings" },
           headers: auth,
         }),
@@ -47,7 +47,7 @@ const MenuConfigModal = ({ show, onClose, clientId, token }) => {
   const addValue = async (category, value, setter) => {
     try {
       await axios.post(
-        `${INV_URL}/${clientId}/inventory/roles`,
+        `${INV_URL}/${clientId}/inventory/item-types`,
         null,
         {
           params: {
@@ -68,7 +68,7 @@ const MenuConfigModal = ({ show, onClose, clientId, token }) => {
   const deleteValue = async (category, value, setter) => {
     try {
       await axios.delete(
-        `${INV_URL}/${clientId}/inventory/roles`,
+        `${INV_URL}/${clientId}/inventory/item-types`,
         {
           params: { category_id: category, value },
           headers: auth,

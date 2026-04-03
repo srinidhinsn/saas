@@ -67,7 +67,7 @@ const UniversalAddModal = ({
   const fetchStatuses = async () => {
     try {
       const res = await axios.get(
-        `${import.meta.env.VITE_API_INVENTORY_SERVICE_URL}/${clientId}/inventory/masters`,
+        `${import.meta.env.VITE_API_TABLE_SERVICE_URL}/${clientId}/tables/table-types`,
         {
           params: { category_id: "status" },
           headers: { Authorization: `Bearer ${token}` }
@@ -101,7 +101,7 @@ const UniversalAddModal = ({
   const fetchDietaryTypes = async () => {
     try {
       const res = await axios.get(
-        `${import.meta.env.VITE_API_INVENTORY_SERVICE_URL}/${clientId}/inventory/masters`,
+        `${import.meta.env.VITE_API_INVENTORY_SERVICE_URL}/${clientId}/inventory/item-types`,
         {
           params: { category_id: "dietary_type" },
           headers: { Authorization: `Bearer ${token}` }
@@ -118,16 +118,29 @@ const UniversalAddModal = ({
   const fetchTimings = async () => {
     try {
       const res = await axios.get(
-        `${import.meta.env.VITE_API_INVENTORY_SERVICE_URL}/${clientId}/inventory/masters`,
+        `${import.meta.env.VITE_API_INVENTORY_SERVICE_URL}/${clientId}/inventory/item-types`,
         {
           params: { category_id: "available_timings" },
-          headers: { Authorization: `Bearer ${token}` }
+          headers: { Authorization: `Bearer ${token}` },
         }
       );
-
-      setTimingOptions(res.data?.data || []);
+  
+      const raw = res.data?.data || [];
+  
+      const parsed = raw.map(v => {
+        const [name, start, end] = v.split('|');
+        return {
+          name: name?.toLowerCase(),
+          start,
+          end,
+          raw: v
+        };
+      });
+  
+      setTimingOptions(parsed);
     } catch (err) {
       console.error("Timing fetch error:", err);
+      setTimingOptions([]);
     }
   };
 
@@ -141,7 +154,7 @@ const UniversalAddModal = ({
       fetchDietaryTypes();
       fetchTimings();
     }
-  }, [showModal, modalType, clientId, token,isRestaurant]);
+  }, [showModal, modalType, clientId, token, isRestaurant]);
 
   // Drag handlers
   const handleDrag = (e) => {
@@ -283,29 +296,42 @@ const UniversalAddModal = ({
                   rows="3"
                 />
               </div>
-              {/* WRAP Availability Timing select */}
-              {isRestaurant && (
-                <div>
-                  <label className="block text-sm font-medium mb-2">
-                    Availability Timing
-                  </label>
-                  <select
-                    value={newItem?.availability_time || ""}
-                    onChange={(e) => setNewItem(prev => ({ ...prev, availability_time: e.target.value }))}
-                    className="w-full px-4 py-2 rounded-lg border"
-                  >
-                    <option value="">Select timing</option>
-                    {timingOptions.map((t) => {
-                      const [name, start, end] = t.split("|");
-                      return (
-                        <option key={t} value={name}>
-                          {name} ({start} - {end})
-                        </option>
-                      );
-                    })}
-                  </select>
-                </div>
-              )}
+              {isRestaurant &&  (
+  <div>
+    <label className="block text-sm font-medium mb-2">
+      Availability Timing
+    </label>
+    <div className="flex flex-wrap gap-2">
+      {timingOptions.map((t) => {
+        const key = (t.name || '').toLowerCase();
+        const selected = (newItem?.availability_time || []).includes(key);
+        return (
+          <button
+            key={key}
+            type="button"
+            onClick={() => {
+              const current = newItem?.availability_time || [];
+              const next = selected
+                ? current.filter(x => x !== key)
+                : [...current, key];
+              setNewItem(prev => ({ ...prev, availability_time: next }));
+            }}
+            className={`px-3 py-1.5 rounded-lg text-sm border transition-all ${
+              selected
+                ? 'bg-action-primary text-white border-action-primary'
+                : 'bg-bg-tertiary border-border-default text-text-primary hover:border-action-primary'
+            }`}
+          >
+            {t.name} {t.start && t.end ? `(${t.start}–${t.end})` : ''}
+          </button>
+        );
+      })}
+    </div>
+    {(newItem?.availability_time || []).length === 0 && (
+      <p className="text-xs text-text-secondary mt-1">No timing selected = available all day</p>
+    )}
+  </div>
+)}
               {/* Unit Price & Discount */}
               <div className="grid grid-cols-2 gap-4">
                 <div>

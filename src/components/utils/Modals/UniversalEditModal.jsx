@@ -43,7 +43,7 @@ const UniversalEditModal = ({
   const fetchStatuses = async () => {
     try {
       const res = await axios.get(
-        `${import.meta.env.VITE_API_INVENTORY_SERVICE_URL}/${clientId}/inventory/masters`,
+        `${import.meta.env.VITE_API_TABLE_SERVICE_URL}/${clientId}/tables/table-types`,
         {
           params: { category_id: "status" },
           headers: { Authorization: `Bearer ${token}` }
@@ -78,7 +78,7 @@ const UniversalEditModal = ({
   const fetchDietaryTypes = async () => {
     try {
       const res = await axios.get(
-        `${import.meta.env.VITE_API_INVENTORY_SERVICE_URL}/${clientId}/inventory/masters`,
+        `${import.meta.env.VITE_API_INVENTORY_SERVICE_URL}/${clientId}/inventory/item-types`,
         {
           params: { category_id: "dietary_type" },
           headers: { Authorization: `Bearer ${token}` }
@@ -94,14 +94,27 @@ const UniversalEditModal = ({
   const fetchTimings = async () => {
     try {
       const res = await axios.get(
-        `${import.meta.env.VITE_API_INVENTORY_SERVICE_URL}/${clientId}/inventory/masters`,
+        `${import.meta.env.VITE_API_INVENTORY_SERVICE_URL}/${clientId}/inventory/item-types`,
         {
           params: { category_id: "available_timings" },
-          headers: { Authorization: `Bearer ${token}` }
+          headers: { Authorization: `Bearer ${token}` },
         }
       );
-
-      setTimingOptions(res.data?.data || []);
+  
+      const raw = res.data?.data || [];
+  
+      // "morning|08:00|11:30" → { name: "morning", start: "08:00", end: "11:30", raw: "morning|08:00|11:30" }
+      const parsed = raw.map(v => {
+        const [name, start, end] = v.split('|');
+        return {
+          name: name?.toLowerCase(),
+          start,
+          end,
+          raw: v
+        };
+      });
+  
+      setTimingOptions(parsed);
     } catch (err) {
       console.error("Timing fetch error:", err);
       setTimingOptions([]);
@@ -117,7 +130,7 @@ const UniversalEditModal = ({
       fetchDietaryTypes();
       fetchTimings();
     }
-  }, [showModal, clientId, token,isRestaurant]);
+  }, [showModal, clientId, token, isRestaurant]);
 
   // Menu Modal Functions
   const handleEditDrag = (e) => {
@@ -258,21 +271,39 @@ const UniversalEditModal = ({
                     <label className="block text-sm font-medium mb-1 text-gray-700">
                       Availability Timing
                     </label>
-                    <select
-                      value={editingItem?.availability_time || ""}
-                      onChange={(e) => setEditingItem({ ...editingItem, availability_time: e.target.value })}
-                      className="w-full px-3 py-2 rounded-md border border-gray-300 text-gray-900 focus:outline-none focus:ring-2 focus:ring-blue-500"
-                    >
-                      <option value="">Select timing</option>
+                    <div className="flex flex-wrap gap-2">
                       {timingOptions.map((t) => {
-                        const [name, start, end] = t.split("|");
+                        // t is already {name, start, end} — no split needed
+                        const key = (t.name || '').toLowerCase();
+                        const currentTimings = Array.isArray(editingItem?.availability_time)
+                          ? editingItem.availability_time
+                          : (editingItem?.availability_time ? [editingItem.availability_time] : []);
+                        const selected = currentTimings.includes(key);
                         return (
-                          <option key={t} value={name}>
-                            {name} ({start} - {end})
-                          </option>
+                          <button
+                            key={key}
+                            type="button"
+                            onClick={() => {
+                              const next = selected
+                                ? currentTimings.filter(x => x !== key)
+                                : [...currentTimings, key];
+                              setEditingItem(prev => ({ ...prev, availability_time: next }));
+                            }}
+                            className={`px-3 py-1.5 rounded-lg text-sm border transition-all ${selected
+                                ? 'bg-blue-600 text-white border-blue-600'
+                                : 'bg-gray-50 border-gray-300 text-gray-700 hover:border-blue-500'
+                              }`}
+                          >
+                            {t.name} {t.start && t.end ? `(${t.start}–${t.end})` : ''}
+                          </button>
                         );
                       })}
-                    </select>
+                    </div>
+                    {(Array.isArray(editingItem?.availability_time)
+                      ? editingItem.availability_time.length === 0
+                      : !editingItem?.availability_time) && (
+                        <p className="text-xs text-gray-400 mt-1">No timing selected = available all day</p>
+                      )}
                   </div>
                 )}
 
