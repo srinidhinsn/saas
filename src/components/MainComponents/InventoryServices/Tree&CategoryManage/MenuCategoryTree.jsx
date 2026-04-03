@@ -95,24 +95,24 @@ const MenuCategoryTree = ({
 
   const displayCategories = useMemo(() => getDisplayCategories(), [categories, menuConfig]);
 
-  const normalizeIdPart = (value) => {
-    return value
-      ?.toLowerCase()
-      .trim()
-      .replace(/\s+/g, "_")
-      .replace(/[^a-z0-9_]/g, "")
-      .replace(/_+/g, "_")
-      .replace(/^_|_$/g, "");
-  };
+const normalizeIdPart = (value) => {
+  return value
+    ?.toLowerCase()
+    .trim()
+    .replace(/\s+/g, "_")
+    .replace(/[^a-z0-9_]/g, "")
+    .replace(/_+/g, "_")
+    .replace(/^_|_$/g, "");
+};
 
-  const generateCategoryId = (name, parentName) => {
-    const normalizedName = normalizeIdPart(name);
-    const normalizedParentName = normalizeIdPart(parentName);
+const generateCategoryId = (name, parentName) => {
+  const normalizedName = normalizeIdPart(name);
+  const normalizedParentName = normalizeIdPart(parentName);
 
-    if (!normalizedParentName) return normalizedName;
+  if (!normalizedParentName) return normalizedName;
 
-    return `${normalizedName}_${normalizedParentName}`;
-  };
+  return `${normalizedName}_${normalizedParentName}`;
+};
 
   const getCategoriesAtLevel = (nodes, targetLevel, level = 1) => {
     let result = [];
@@ -149,10 +149,8 @@ const MenuCategoryTree = ({
   };
   useEffect(() => {
     if (!displayCategories.length) return;
-
     // Only expand top-level categories
     const topLevelIds = displayCategories.map(cat => cat.id);
-
     setExpandedCategories(topLevelIds);
   }, [displayCategories]);
   // useEffect(() => {
@@ -394,9 +392,7 @@ const MenuCategoryTree = ({
       position === "inside"
         ? targetCat.id
         : findParentIdFromTree(categories, targetCat.id);
-
     if (!draggedParentId || !targetParentId) return;
-
     const getChildrenIds = (parentId) => {
       const findNode = (nodes) => {
         for (const n of nodes) {
@@ -410,45 +406,34 @@ const MenuCategoryTree = ({
       };
       return findNode(categories)?.children?.map(c => c.id) || [];
     };
-
     const isSameParent = draggedParentId === targetParentId;
-
     // Get original lists BEFORE any mutation
     let oldList = getChildrenIds(draggedParentId);
     let newList = isSameParent ? [...oldList] : getChildrenIds(targetParentId);
-
     if (position === "inside") {
       oldList = oldList.filter(id => id !== draggedCat.id);
       const insideList = getChildrenIds(targetCat.id);
       insideList.push(draggedCat.id);
-
       await updateCategorySubcategories(draggedParentId, oldList);
       await updateCategorySubcategories(targetCat.id, insideList);
       onCategoriesUpdate?.();
       return;
     }
-
     // Find target's index BEFORE removing the dragged item
     const targetIndex = newList.indexOf(targetCat.id);
-
     // Remove dragged from both
     oldList = oldList.filter(id => id !== draggedCat.id);
     newList = newList.filter(id => id !== draggedCat.id);
-
     // Re-find target after removal (target itself didn't move)
     const adjustedTargetIndex = newList.indexOf(targetCat.id);
-
     // Calculate insert position
     let insertIndex =
       position === "above"
         ? adjustedTargetIndex
         : adjustedTargetIndex + 1;
-
     // Clamp — this is what fixes dragging to very top (0) or very bottom (length)
     insertIndex = Math.max(0, Math.min(insertIndex, newList.length));
-
     newList.splice(insertIndex, 0, draggedCat.id);
-
     if (isSameParent) {
       // Same parent — only one update needed with the reordered list
       await updateCategorySubcategories(draggedParentId, newList);
@@ -456,7 +441,6 @@ const MenuCategoryTree = ({
       await updateCategorySubcategories(draggedParentId, oldList);
       await updateCategorySubcategories(targetParentId, newList);
     }
-
     onCategoriesUpdate?.();
   };
 

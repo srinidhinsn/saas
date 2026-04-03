@@ -9,7 +9,7 @@ const UniversalEditModal = ({
   showModal,
   setShowModal,
   modalType, // 'menu' or 'table'
-  isRestaurant,
+  normalizedRealm,
   // Menu-specific props
   editingItem,
   setEditingItem,
@@ -126,11 +126,11 @@ const UniversalEditModal = ({
 
     fetchConfigs();
     fetchStatuses();
-    if (isRestaurant) {
+    if (normalizedRealm === 'restaurant'){
       fetchDietaryTypes();
       fetchTimings();
     }
-  }, [showModal, clientId, token, isRestaurant]);
+  }, [showModal, clientId, token, normalizedRealm]);
 
   // Menu Modal Functions
   const handleEditDrag = (e) => {
@@ -266,7 +266,7 @@ const UniversalEditModal = ({
                     rows="3"
                   />
                 </div>
-                {isRestaurant && (
+                {normalizedRealm === 'restaurant'  && (
                   <div>
                     <label className="block text-sm font-medium mb-1 text-gray-700">
                       Availability Timing

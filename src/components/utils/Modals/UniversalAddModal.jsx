@@ -11,7 +11,7 @@ const UniversalAddModal = ({
   modalType, // 'menu' or 'table'
   clientId,
   token,
-  isRestaurant,
+  normalizedRealm,
   // Menu-specific props
   newItem,
   setNewItem,
@@ -145,16 +145,22 @@ const UniversalAddModal = ({
   };
 
   useEffect(() => {
+    console.log("EFFECT RUNNING", {
+      showModal,
+      clientId,
+      token,
+      normalizedRealm
+    });
     if (!showModal) return;
     if (!clientId || !token) return;
 
     fetchConfigs();
     fetchStatuses();
-    if (isRestaurant) {
+    if (normalizedRealm === 'restaurant'){
       fetchDietaryTypes();
       fetchTimings();
     }
-  }, [showModal, modalType, clientId, token, isRestaurant]);
+  }, [showModal, modalType, clientId, token, normalizedRealm]);
 
   // Drag handlers
   const handleDrag = (e) => {
@@ -296,7 +302,7 @@ const UniversalAddModal = ({
                   rows="3"
                 />
               </div>
-              {isRestaurant &&  (
+              {normalizedRealm === 'restaurant' &&  (
   <div>
     <label className="block text-sm font-medium mb-2">
       Availability Timing

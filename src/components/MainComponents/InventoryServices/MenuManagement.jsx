@@ -37,8 +37,7 @@ const MenuManagement = ({ clientId, token, realm }) => {
     if (!clientId) return null;
     return getMenuConfig(clientId);
   }, [clientId]);
-  const isRestaurant = (realm || '').toLowerCase() === 'restaurant';
-  // Modal states
+  const normalizedRealm = (realm || '').toLowerCase(); 
   const [showAddModal, setShowAddModal] = useState(false);
   const [showEditModal, setShowEditModal] = useState(false);
   const [showDeleteModal, setShowDeleteModal] = useState(false);
@@ -71,14 +70,13 @@ const MenuManagement = ({ clientId, token, realm }) => {
   const [currentUserId, setCurrentUserId] = useState(null);
   const [selectedDietary, setSelectedDietary] = useState(null);
   const [timingOptions, setTimingOptions] = useState([]);
-  // Stable color palette — assigned positionally to whatever dietary_type IDs come from API
-  // No hardcoded type names, just positional colors
+  
   const DIETARY_COLORS = [
-    'bg-green-500',   // first dietary type gets green
-    'bg-red-500',     // second gets red
-    'bg-yellow-400',  // third gets yellow
-    'bg-orange-500',  // fourth gets orange
-    'bg-purple-500',  // fifth gets purple (if you add more)
+    'bg-green-500', 
+    'bg-red-500',     
+    'bg-yellow-400',  
+    'bg-orange-500',  
+    'bg-purple-500',  
     'bg-blue-500',
   ];
 
@@ -99,18 +97,6 @@ const MenuManagement = ({ clientId, token, realm }) => {
     } catch { console.warn("JWT decode failed"); }
   }, [token]);
 
-  const dietaryStyles = {
-    veg: { label: "Veg", color: "bg-green-500" },
-    nonveg: { label: "Non Veg", color: "bg-red-500" },
-    egg: { label: "Egg", color: "bg-yellow-400" },
-    chinese: { label: "Chinese", color: "bg-orange-500" }
-  };
-  const dietaryBorderStyles = {
-    veg: "border-green-500",
-    nonveg: "border-red-500",
-    egg: "border-yellow-400",
-    chinese: "border-orange-500"
-  };
   const fetchTimings = async () => {
     try {
       const res = await axios.get(
@@ -140,8 +126,8 @@ const MenuManagement = ({ clientId, token, realm }) => {
     }
   };
   useEffect(() => {
-    if (isRestaurant) fetchTimings();
-  }, [clientId, isRestaurant]);
+    if (normalizedRealm === 'restaurant') fetchTimings();
+  }, [clientId, normalizedRealm]);
   useEffect(() => {
     const interval = setInterval(() => {
       setTimeTick(Date.now()); // triggers re-render
@@ -261,8 +247,8 @@ const MenuManagement = ({ clientId, token, realm }) => {
     }
   }, [clientId, token]);
   useEffect(() => {
-    if (isRestaurant) fetchDietaryTypes();
-  }, [fetchDietaryTypes, isRestaurant]);
+    if (normalizedRealm === 'restaurant')  fetchDietaryTypes();
+  }, [fetchDietaryTypes, normalizedRealm]);
 
   const fetchAddonData = useCallback(async (addonCategoryId) => {
     if (!menuConfig || !addonCategoryId) {
@@ -1692,7 +1678,7 @@ const toSlugSegment = (str) =>
 
                 <div className="flex gap-2 flex-wrap justify-end">
 
-                  {isRestaurant &&
+                  {normalizedRealm  ==='restaurant' &&
                     <button onClick={() => setShowMenuConfig(true)} className="h-9 px-3 flex items-center gap-2 rounded-lg bg-action-success text-white text-sm font-semibold shadow-sm hover:opacity-90">
                       <span>Config</span>
                     </button>}
@@ -1819,7 +1805,7 @@ const toSlugSegment = (str) =>
         handleAddItem={handleAddItem} getCategoryIdByName={getCategoryIdByName}
         inventoryIds={inventoryIds} getAddonCategoryId={getAddonCategoryId}
         fetchAddonData={fetchAddonData} setAddonSubcategories={setAddonSubcategories} setAllAddonItems={setAllAddonItems}
-        units={units} isRestaurant={isRestaurant}
+        units={units} normalizedRealm={normalizedRealm}
       />
 
       <UniversalEditModal
@@ -1831,7 +1817,7 @@ const toSlugSegment = (str) =>
         handleEditItem={handleEditItem} clientId={clientId} token={token}
         inventoryIds={inventoryIds} getAddonCategoryId={getAddonCategoryId}
         fetchAddonData={fetchAddonData} setAddonSubcategories={setAddonSubcategories} setAllAddonItems={setAllAddonItems}
-        units={units} isRestaurant={isRestaurant}
+        units={units} normalizedRealm={normalizedRealm}
 
       />
 
