@@ -9,6 +9,7 @@ import UniversalEditModal from '../../utils/Modals/UniversalEditModal';
 import UniversalBulkUpdateModal from '../../utils/Modals/UniversalBulkUpdateModal';
 import { jwtDecode } from "jwt-decode";
 import { getMenuConfig } from '../../utils/menuConfigResolver';
+import MenuConfigModal from '../../utils/Modals/MenuConfigModal';
 
 const MenuManagement = ({ clientId, token, realm }) => {
   const [searchOpen, setSearchOpen] = useState(false);
@@ -27,14 +28,16 @@ const MenuManagement = ({ clientId, token, realm }) => {
   const [sidebarCategories, setSidebarCategories] = useState([]);
 
   const savedCategoryRef = useRef(localStorage.getItem("menu_selected_category"));
-
+  const [dietaryColorMap, setDietaryColorMap] = useState({});
+  const [dietaryOptions, setDietaryOptions] = useState([]);
+  const [showMenuConfig, setShowMenuConfig] = useState(false);
+  const [timeTick, setTimeTick] = useState(Date.now());
   // All IDs and keywords come from menuConfigResolver — nothing hardcoded here
   const menuConfig = React.useMemo(() => {
     if (!clientId) return null;
     return getMenuConfig(clientId);
   }, [clientId]);
-
-  // Modal states
+  const normalizedRealm = (realm || '').toLowerCase(); 
   const [showAddModal, setShowAddModal] = useState(false);
   const [showEditModal, setShowEditModal] = useState(false);
   const [showDeleteModal, setShowDeleteModal] = useState(false);
@@ -65,6 +68,28 @@ const MenuManagement = ({ clientId, token, realm }) => {
   const [selectedSection, setSelectedSection] = useState("");
   const [zoneConfigId, setZoneConfigId] = useState(null);
   const [currentUserId, setCurrentUserId] = useState(null);
+  const [selectedDietary, setSelectedDietary] = useState(null);
+  const [timingOptions, setTimingOptions] = useState([]);
+  
+  const DIETARY_COLORS = [
+    'bg-green-500', 
+    'bg-red-500',     
+    'bg-yellow-400',  
+    'bg-orange-500',  
+    'bg-purple-500',  
+    'bg-blue-500',
+  ];
+
+  useEffect(() => {
+    if (!dietaryOptions.length) return;
+    const map = {};
+    dietaryOptions.forEach((opt, idx) => {
+      // Key is normalized (no hyphens/spaces/underscores, lowercase)
+      const key = opt.toLowerCase().replace(/[-_\s]/g, '');
+      map[key] = DIETARY_COLORS[idx % DIETARY_COLORS.length];
+    });
+    setDietaryColorMap(map);
+  }, [dietaryOptions]);
   useEffect(() => {
     try {
       const decoded = jwtDecode(token);
@@ -72,6 +97,44 @@ const MenuManagement = ({ clientId, token, realm }) => {
     } catch { console.warn("JWT decode failed"); }
   }, [token]);
 
+  const fetchTimings = async () => {
+    try {
+      const res = await axios.get(
+        `${import.meta.env.VITE_API_INVENTORY_SERVICE_URL}/${clientId}/inventory/item-types`,
+        {
+          params: { category_id: "available_timings" },
+          headers: { Authorization: `Bearer ${token}` },
+        }
+      );
+
+      const raw = res.data?.data || [];
+
+      const parsed = raw.map(v => {
+        const [name, start, end] = v.split('|');
+        return {
+          name: name?.toLowerCase(),
+          start,
+          end,
+          raw: v
+        };
+      });
+
+      setTimingOptions(parsed);
+    } catch (err) {
+      console.error("Timing fetch error:", err);
+      setTimingOptions([]);
+    }
+  };
+  useEffect(() => {
+    if (normalizedRealm === 'restaurant') fetchTimings();
+  }, [clientId, normalizedRealm]);
+  useEffect(() => {
+    const interval = setInterval(() => {
+      setTimeTick(Date.now()); // triggers re-render
+    }, 60000); // every 1 minute
+
+    return () => clearInterval(interval);
+  }, []);
   // ─── Walk up the categoriesFlat tree and collect all ancestor name segments ─
   const buildPathNames = useCallback((categoryId, flatList) => {
     const pathNames = [];
@@ -167,7 +230,25 @@ const MenuManagement = ({ clientId, token, realm }) => {
     return `addons_${slug}`;
   }, [getTopLevelSection]);
 
+  const fetchDietaryTypes = useCallback(async () => {
+    try {
+      const res = await axios.get(
+        `${import.meta.env.VITE_API_INVENTORY_SERVICE_URL}/${clientId}/inventory/item-types`,
+        {
+          params: { category_id: "dietary_type" },
+          headers: { Authorization: `Bearer ${token}` }
+        }
+      );
 
+      setDietaryOptions(res.data?.data || []);
+    } catch (err) {
+      console.error("Dietary fetch error:", err);
+      setDietaryOptions([]);
+    }
+  }, [clientId, token]);
+  useEffect(() => {
+    if (normalizedRealm === 'restaurant')  fetchDietaryTypes();
+  }, [fetchDietaryTypes, normalizedRealm]);
 
   const fetchAddonData = useCallback(async (addonCategoryId) => {
     if (!menuConfig || !addonCategoryId) {
@@ -255,16 +336,34 @@ const MenuManagement = ({ clientId, token, realm }) => {
     }
     return path;
   };
-
-  const generateSlug = (categoryIdOrObjOrName, itemName) => {
-    let catId = null;
-    if (!categoryIdOrObjOrName) { catId = null; }
-    else if (typeof categoryIdOrObjOrName === 'object' && categoryIdOrObjOrName.id) { catId = categoryIdOrObjOrName.id; }
-    else { catId = categoryIdOrObjOrName; }
-    const parts = buildCategoryPath(catId);
-    const itemPart = (itemName || '').trim().replace(/\s+/g, '_').replace(/[^a-zA-Z0-9_]/g, '');
-    if (itemPart) parts.push(itemPart);
-    return parts.filter(Boolean).join('_');
+// ✅ Add this once near generateSlug
+const toSlugSegment = (str) =>
+  (str || '')
+    .trim()
+    .replace(/[^a-zA-Z0-9]+/g, '_')  // replace ANY non-alphanumeric sequence with single _
+    .replace(/^_+|_+$/g, '');         // trim leading/trailing underscores
+  // CHANGED: accepts timings as string[] or string, joins with +
+  const generateSlug = (itemName, categoryId, timings, flatList = categoriesFlat) => {
+    const pathParts = [];
+    let currentId = categoryId;
+    const visited = new Set();
+    while (currentId && !visited.has(currentId)) {
+      visited.add(currentId);
+      const cat = flatList.find(c => c.id === currentId);
+      if (!cat) break;
+      pathParts.unshift(toSlugSegment(cat.name));
+      currentId = cat.parentId ?? cat.parent_id ?? null;
+    }
+  
+    const itemPart = toSlugSegment(itemName);
+  
+    const timingArr = Array.isArray(timings)
+      ? timings.filter(Boolean)
+      : (timings ? [timings] : []);
+    const timingPart = timingArr.length > 0 ? timingArr.join('+') : null;
+  
+    const base = [...pathParts, itemPart].filter(Boolean).join('_');
+    return timingPart ? `${base}__${timingPart}` : base;
   };
 
   const openAddModal = () => {
@@ -277,7 +376,6 @@ const MenuManagement = ({ clientId, token, realm }) => {
     setNewItemImageUrl('');
     setShowAddModal(true);
   };
-
   const handleItemClick = (item) => {
     const allSiblings = menuItems.filter(m => m.id === item.id);
     const baseRecord = allSiblings.find(m => m.zone_config_id === 0) || item;
@@ -287,15 +385,28 @@ const MenuManagement = ({ clientId, token, realm }) => {
       .filter(m => m.zone_config_id !== 0)
       .forEach(m => { zonePrices[m.zone_config_id] = m.unit_price; });
 
-    // ✅ category_id in DB is now a name — resolve back to actual id for modal dropdown
-    const resolvedCategoryId = categoriesFlat.find(
-      c => c.name.toLowerCase() === (baseRecord.category_id || '').toLowerCase()
-    )?.id || baseRecord.category_id;
+    const resolvedCategoryId =
+      categoriesFlat.find(c => c.id === baseRecord.category_id)?.id
+      ?? categoriesFlat.find(
+        c => c.name.toLowerCase() === (baseRecord.category_id || '').toLowerCase()
+      )?.id
+      ?? baseRecord.category_id;
+
+    const slug = baseRecord.slug || '';
+    const doubleUnderIdx = slug.lastIndexOf('__');
+    // CHANGED: parse as array, not single string
+    const timingsFromSlug = doubleUnderIdx !== -1
+      ? slug.slice(doubleUnderIdx + 2).toLowerCase().split('+').filter(Boolean)
+      : [];
+
+    const dietaryFromSlug = getDietaryFromSlug({ ...baseRecord, category_id: resolvedCategoryId });
 
     setEditingItem({
       ...baseRecord,
-      category_id: resolvedCategoryId,  // id for modal
+      category_id: resolvedCategoryId,
       zonePrices,
+      availability_time: timingsFromSlug,   // now an array
+      dietary_type: dietaryFromSlug,
     });
     setShowEditModal(true);
   };
@@ -413,21 +524,21 @@ const MenuManagement = ({ clientId, token, realm }) => {
         c => c.id === newItem?.category_id
       );
 
-      const finalCategoryId =
-        selectedCat?.name ||
-        categoriesFlat.find(
-          c => c.name.toLowerCase() === (newItem?.category_id || '').toLowerCase()
-        )?.name ||
-        newItem?.category_id;
+      const resolvedCat = categoriesFlat.find(c => c.id === newItem?.category_id);
+      if (!resolvedCat) {
+        console.error("Add failed: could not resolve category by ID", newItem?.category_id);
+        return;
+      }
+      const finalCategoryId = resolvedCat.id;
 
       if (!finalCategoryId) return;
-
-      const slug = generateSlug(finalCategoryId, newItem.name);
-
+      // NEW — pass category_id instead of dietary_type
+      const slug = generateSlug(newItem.name, newItem.category_id, newItem.availability_time);
+      const { dietary_type, ...cleanNewItem } = newItem;
       const created_by =
         currentUserId || localStorage.getItem("user_id") || "system";
 
-      const { dietary_type, ...cleanNewItem } = newItem;
+
 
       const basePrice = parseFloat(newItem.unit_price) || 0;
       const zonePrices = newItem.zonePrices || {};
@@ -445,7 +556,7 @@ const MenuManagement = ({ clientId, token, realm }) => {
         serving_quantity: newItem.serving_quantity
           ? parseFloat(newItem.serving_quantity)
           : null,
-        serving_unit: newItem.serving_unit || null,
+        serving_unit: newItem.serving_unit || null, availability: parseFloat(newItem.availability) || 0,
         created_by,
         updated_by: created_by,
         inventory_id: newItem.inventory_id,
@@ -519,24 +630,48 @@ const MenuManagement = ({ clientId, token, realm }) => {
     try {
       let imageId = editingItem.image_id;
       if (editItemImage) imageId = await uploadImageToDocumentService(editItemImage);
-
-      // ✅ FIXED: was incorrectly reading from newItem — must use editingItem
+  
       const resolvedCat = categoriesFlat.find(c => c.id === editingItem?.category_id);
-      const finalCategoryId =
-        resolvedCat?.name ||
-        categoriesFlat.find(
-          c => c.name.toLowerCase() === (editingItem?.category_id || '').toLowerCase()
-        )?.name ||
-        editingItem?.category_id;
-
-      if (!finalCategoryId) {
-        console.error("Edit failed: could not resolve category");
+      if (!resolvedCat) {
+        console.error("Edit failed: could not resolve category", editingItem?.category_id);
         return;
       }
-
-      const slug = generateSlug(editingItem.category_id, editingItem.name);
+      const finalCategoryId = resolvedCat.id;
+      if (!finalCategoryId) return;
+  
+      // ✅ Build slug with dietary injected — same pattern as import
       const { dietary_type, zonePrices: zp, ...cleanEditingItem } = editingItem;
-
+  
+      const slug = (() => {
+        const parts = [];
+        let currentId = finalCategoryId;
+        const visited = new Set();
+        while (currentId && !visited.has(currentId)) {
+          visited.add(currentId);
+          const cat = categoriesFlat.find(c => c.id === currentId);
+          if (!cat) break;
+          parts.unshift(toSlugSegment(cat.name));
+          currentId = cat.parentId ?? cat.parent_id ?? null;
+        }
+      
+        const itemPart = toSlugSegment(editingItem.name);
+        const normalizedDietary = (dietary_type || '').toLowerCase().replace(/[-_\s]/g, '');
+      
+        const nameParts = normalizedDietary
+          ? [...parts, normalizedDietary, itemPart]
+          : [...parts, itemPart];
+      
+        const timingArr = Array.isArray(editingItem.availability_time)
+          ? editingItem.availability_time.filter(Boolean)
+          : (editingItem.availability_time ? [editingItem.availability_time] : []);
+        const timingPart = timingArr.length > 0 ? timingArr.join('+') : null;
+      
+        const base = nameParts.filter(Boolean).join('_');
+        return timingPart ? `${base}__${timingPart}` : base;
+      })();
+  
+      console.log(`[Edit] slug="${slug}" dietary="${dietary_type}" timing="${editingItem.availability_time}"`);
+  
       const basePayload = {
         name: editingItem.name,
         description: editingItem.description || null,
@@ -550,30 +685,31 @@ const MenuManagement = ({ clientId, token, realm }) => {
         line_item_id: Array.isArray(editingItem.line_item_id) && editingItem.line_item_id.length > 0
           ? editingItem.line_item_id : null,
         realm: editingItem.realm || 'restaurant',
+        availability: Number(editingItem.availability) || 0,
         updated_by: currentUserId,
-        slug,
+        slug,  // ✅ uses new slug with dietary + timing
         client_id: clientId,
         inventory_id: editingItem.inventory_id,
         id: Number(editingItem.id),
       };
-
+  
       // Always update base record (zone_config_id = 0)
       await axios.post(
         `${import.meta.env.VITE_API_INVENTORY_SERVICE_URL}/${clientId}/menu/update`,
         { ...basePayload, unit_price: Number(editingItem.unit_price) || 0, zone_config_id: 0 },
         { headers: { Authorization: `Bearer ${token}` } }
       );
-
+  
       // Upsert zone variants
       const filledZonePrices = Object.entries(zp || {}).filter(
         ([, price]) => price !== '' && price !== null && price !== undefined
       );
-
+  
       for (const [configId, price] of filledZonePrices) {
         const existingZoneRecord = menuItems.find(
           m => m.id === editingItem.id && m.zone_config_id === Number(configId)
         );
-
+  
         if (existingZoneRecord) {
           await axios.post(
             `${import.meta.env.VITE_API_INVENTORY_SERVICE_URL}/${clientId}/menu/update`,
@@ -588,7 +724,7 @@ const MenuManagement = ({ clientId, token, realm }) => {
           );
         }
       }
-
+  
       await fetchData({ silent: true });
       setShowEditModal(false);
       setEditingItem(null);
@@ -648,13 +784,13 @@ const MenuManagement = ({ clientId, token, realm }) => {
       setCategoriesFlat(normalizedFlat);
 
       const enrichedItems = (itemRes.data.data || []).map(item => {
-        const cat = flatCategories.find(
-          c =>
-            c.id === item.category_id ||
+        const cat = flatCategories.find(c => c.id === item.category_id)
+          ?? flatCategories.find(c =>
             c.name.toLowerCase() === (item.category_id || '').toLowerCase()
-        );
+          );
         return { ...item, category: cat?.name ?? "Uncategorized" };
       });
+      enrichedItems.sort((a, b) => Number(a.id) - Number(b.id));
       setMenuItems(enrichedItems);
 
       const buildCategoryTree = (flatCats) => {
@@ -719,10 +855,21 @@ const MenuManagement = ({ clientId, token, realm }) => {
 
   const getFilteredItems = () => {
     if (!menuItems.length) return [];
+
+    const normalize = (str) => (str || '').toLowerCase().replace(/[-_\s]/g, '');
     const q = (searchQuery || '').trim().toLowerCase();
 
     let items = menuItems;
 
+    // ── 1. Dietary filter — uses getDietaryFromSlug (slug-segment based) ──
+    if (selectedDietary) {
+      items = items.filter(item => {
+        const dietary = getDietaryFromSlug(item);
+        return dietary !== null && normalize(dietary) === normalize(selectedDietary);
+      });
+    }
+
+    // ── 2. Search filter ──
     if (q.length > 0) {
       items = items.filter(item =>
         (item.name || '').toLowerCase().includes(q) ||
@@ -731,49 +878,111 @@ const MenuManagement = ({ clientId, token, realm }) => {
       );
     }
 
+    // ── 3. Category tree filter ──
     if (selectedCategoryId) {
-      // selectedCategoryId is still the actual id from the tree click
-      // so we need to collect allowed names instead of ids
       const allowedCategoryIds = getAllDescendantCategoryIds(selectedCategoryId, categories);
-      const allowedNames = allowedCategoryIds
-        .map(id => categoriesFlat.find(c => c.id === id)?.name)
-        .filter(Boolean)
-        .map(n => n.toLowerCase());
 
-      items = items.filter(item =>
-        allowedNames.includes((item.category_id || '').toLowerCase())
-      );
+      items = items.filter(item => {
+        const resolvedId =
+          categoriesFlat.find(c => c.id === item.category_id)?.id
+          ?? categoriesFlat.find(
+            c => c.name.toLowerCase() === String(item.category_id || '').toLowerCase()
+          )?.id;
+
+        return resolvedId ? allowedCategoryIds.includes(resolvedId) : false;
+      });
     }
 
-    // If a specific zone is selected, show only that zone's records
+    // ── 4. Zone filter ──
     if (zoneConfigId !== null) {
       return items.filter(item => item.zone_config_id === zoneConfigId);
     }
 
-    // "All" view — deduplicate by name, always prefer base record (zone_config_id === 0)
+    // ── 5. "All zones" dedup — prefer base record (zone_config_id === 0) ──
+    // ── 5. "All zones" dedup ──
     const seen = new Map();
+
     items.forEach(item => {
-      const key = (item.name || '').trim().toLowerCase();
-      if (!seen.has(key)) {
-        seen.set(key, item);
+      const existing = seen.get(item.id);
+      if (!existing) {
+        seen.set(item.id, item);
       } else {
-        const existing = seen.get(key);
-        if ((item.zone_config_id === 0 || item.zone_config_id === null) &&
-          existing.zone_config_id !== 0 && existing.zone_config_id !== null) {
-          seen.set(key, item);
+        // base record (zone_config_id === 0) always wins
+        if (item.zone_config_id === 0 || item.zone_config_id === null) {
+          seen.set(item.id, item);
         }
       }
     });
-    return Array.from(seen.values());
-  };
 
+    // Sort by id to guarantee same order across all zones
+    return Array.from(seen.values()).sort((a, b) => Number(a.id) - Number(b.id));
+  };
+ const isItemActive = (slug, timingOptions) => {
+  if (!slug) return true;
+
+  const doubleUnderIdx = slug.lastIndexOf('__');
+
+  // ✅ ONLY take timing from "__"
+  const timingSegment = doubleUnderIdx !== -1
+    ? slug.slice(doubleUnderIdx + 2).toLowerCase()
+    : null;
+
+  // ✅ No timing = always active
+  if (!timingSegment || timingSegment === 'allday') return true;
+
+  const timingKeys = timingSegment.split('+').filter(Boolean);
+  if (timingKeys.length === 0) return true;
+
+  const now = new Date();
+  const currentMinutes = now.getHours() * 60 + now.getMinutes();
+
+  return timingKeys.some(key => {
+    const t = timingOptions?.find(
+      o => o.name?.toLowerCase() === key
+    );
+
+    if (!t || !t.start || !t.end) {
+      console.warn("Invalid timing config for:", key, t);
+      return true;
+    }
+
+    const [sh, sm] = t.start.split(':').map(Number);
+    const [eh, em] = t.end.split(':').map(Number);
+
+    return currentMinutes >= (sh * 60 + sm) &&
+           currentMinutes <= (eh * 60 + em);
+  });
+};
+  const getDietaryFromSlug = (item) => {
+    if (!item || !dietaryOptions.length) return null;
+
+    const normalize = (str) => (str || '').toLowerCase().replace(/[-_\s]/g, '');
+
+    // Split slug on __ to drop timing suffix, then split on _ for segments
+    const [mainPart = ''] = (item.slug || '').split('__');
+    const slugSegments = mainPart.split('_').filter(Boolean);
+
+    for (const segment of slugSegments) {
+      const normalizedSegment = normalize(segment);
+      // Compare normalized segment against each normalized dietaryOption id
+      const match = dietaryOptions.find(d => normalize(d) === normalizedSegment);
+      if (match) return normalize(match); // return as normalized key e.g. "nonveg"
+    }
+
+    return null;
+  };
   const handleEditImageFile = (file) => {
     if (file?.type.startsWith('image/')) { setEditItemImage(file); setEditItemImageUrl(URL.createObjectURL(file)); }
     else { alert('Please upload a valid image file'); }
   };
 
   const filteredItems = getFilteredItems();
-
+  const sortedItems = [...filteredItems].sort((a, b) => {
+    const aActive = isItemActive(a.slug, timingOptions);
+    const bActive = isItemActive(b.slug, timingOptions);
+    if (bActive !== aActive) return bActive - aActive; // active first
+    return Number(a.id) - Number(b.id);               // same order within each group
+  });
   const uploadImageToDocumentService = async (imageFile) => {
     const formData = new FormData();
     formData.append("file", imageFile);
@@ -867,13 +1076,15 @@ const MenuManagement = ({ clientId, token, realm }) => {
     try {
       for (const id of selectedRows) {
         const { dietary_type: ed, zonePrices: zp, ...cleanEditedData } = bulkEditData[id] || {};
-        const { dietary_type: od, ...cleanOriginalItem } = menuItems.find(item => item.id === id);
+        const { dietary_type: od, ...cleanOriginalItem } = menuItems.find(item => item.id === id && (item.zone_config_id === 0 || item.zone_config_id === null));
+        // ^^^ Always grab the BASE record (zone_config_id=0) as the merge source
+
         const mergedItem = { ...cleanOriginalItem, ...cleanEditedData, client_id: clientId };
 
-        // Update the main record
+        // Update the base record
         await axios.post(
           `${import.meta.env.VITE_API_INVENTORY_SERVICE_URL}/${clientId}/menu/update`,
-          mergedItem,
+          { ...mergedItem, zone_config_id: 0 },
           { headers: { Authorization: `Bearer ${token}` } }
         );
 
@@ -883,25 +1094,39 @@ const MenuManagement = ({ clientId, token, realm }) => {
         );
 
         if (filledZonePrices.length > 0) {
-          const siblings = menuItems.filter(
-            m => (m.name || '').trim().toLowerCase() === (cleanOriginalItem.name || '').trim().toLowerCase()
+          // Find ALL zone variants for this item id (they share the same id)
+          const zoneVariants = menuItems.filter(
+            m => m.id === id && m.zone_config_id !== 0 && m.zone_config_id !== null
           );
 
           for (const [configId, price] of filledZonePrices) {
-            const existingZoneRecord = siblings.find(
-              m => m.zone_config_id === Number(configId) && m.id !== id
+            // ✅ Match by id + zone_config_id directly — no name matching needed
+            const existingZoneRecord = zoneVariants.find(
+              m => m.zone_config_id === Number(configId)
             );
 
             if (existingZoneRecord) {
+              // Update existing zone variant
               await axios.post(
                 `${import.meta.env.VITE_API_INVENTORY_SERVICE_URL}/${clientId}/menu/update`,
-                { ...mergedItem, id: Number(existingZoneRecord.id), unit_price: parseFloat(price), zone_config_id: configId ? Number(configId) : 0 },
+                {
+                  ...mergedItem,
+                  id: Number(existingZoneRecord.id),
+                  unit_price: parseFloat(price),
+                  zone_config_id: Number(configId)
+                },
                 { headers: { Authorization: `Bearer ${token}` } }
               );
             } else {
+              // Create missing zone variant
               await axios.post(
                 `${import.meta.env.VITE_API_INVENTORY_SERVICE_URL}/${clientId}/menu/create`,
-                { ...mergedItem, id: undefined, unit_price: parseFloat(price), zone_config_id: configId ? Number(configId) : 0 },
+                {
+                  ...mergedItem,
+                  id: Number(id),           // ✅ preserve shared id
+                  unit_price: parseFloat(price),
+                  zone_config_id: Number(configId)
+                },
                 { headers: { Authorization: `Bearer ${token}` } }
               );
             }
@@ -914,83 +1139,84 @@ const MenuManagement = ({ clientId, token, realm }) => {
       setSelectedRows([]);
       setBulkEditData({});
       setSelectAllChecked(false);
-    } catch (error) { console.error('Error updating items:', error); }
+    } catch (error) {
+      console.error('Error updating items:', error);
+    }
   };
-
   const handleExportToExcel = () => {
     try {
       const catNameById = (idOrName) => {
         if (!idOrName) return "Uncategorized";
-
         const found = categoriesFlat.find(
-          c =>
-            c.id === idOrName ||
-            c.name?.toLowerCase() === String(idOrName).toLowerCase()
+          c => c.id === idOrName || c.name?.toLowerCase() === String(idOrName).toLowerCase()
         );
-
         return found?.name || idOrName || "Unknown";
       };
-
-      // Build a label for each section: "Zone-Section"
+  
       const sectionLabel = (s) => `${s.zone}-${s.section}`;
-
-      // Group all menu items by slug (deduplication key)
+  
       const grouped = {};
       menuItems.forEach(item => {
         const key = item.slug || item.name;
         if (!grouped[key]) {
           grouped[key] = { baseItem: item, zonePrices: {} };
         }
-        // Store price keyed by zone-section label
         if (item.zone_config_id) {
           const sec = sections.find(s => s.id === item.zone_config_id);
-          if (sec) {
-            grouped[key].zonePrices[sectionLabel(sec)] = item.unit_price;
-          }
+          if (sec) grouped[key].zonePrices[sectionLabel(sec)] = item.unit_price;
         } else {
-          // No zone = base price
           grouped[key].zonePrices["Base"] = item.unit_price;
         }
       });
-
-      // All unique zone-section column names
+  
       const zoneColumns = sections.map(sectionLabel);
-
+  
       const exportData = Object.values(grouped).map(({ baseItem: item, zonePrices }) => {
+        const dietary = getDietaryFromSlug(item);
+  
+        // ✅ Extract timing from slug — exclude "allday", export as empty if none
+        const slugTimingPart = item.slug?.includes('__')
+          ? item.slug.split('__')[1]
+          : '';
+        const availabilityTiming = (!slugTimingPart || slugTimingPart === 'allday')
+          ? ""
+          : slugTimingPart; // e.g. "morning" or "morning+evening", empty = no timing set
+  
         const row = {
           ID: item.id ?? "",
-          Inventory_Id: item.inventory_id,
           Name: item.name ?? "",
           Description: item.description ?? "",
           Category: catNameById(item.category_id) || "Unknown",
-          Image: item.image_id,
+          Dietary_Type: dietary || "",
+          Availability_Timing: availabilityTiming, // ✅ empty string if no timing
+          Image: item.image_id ?? "",
           Unit: item.unit ?? "",
           Unit_Price: Number(item.unit_price) || 0,
           Discount: Number(item.discount) || 0,
+          Availability: Number(item.availability) || 0,
           Code: item.code != null ? String(item.code) : "",
-          Serving_Quantity: item.serving_quantity,
-          Serving_Unit: item.serving_unit,
+          Serving_Quantity: item.serving_quantity ?? "",
+          Serving_Unit: item.serving_unit ?? "",
           Realm: item.realm ?? realm ?? "",
           Slug: item.slug ?? "",
           Line_Item_IDs: Array.isArray(item.line_item_id)
             ? item.line_item_id.join(", ") : "",
         };
-
-        // Add one column per zone-section
+  
         zoneColumns.forEach(col => {
           row[`Price_${col}`] = zonePrices[col] ?? "";
         });
-
+  
         return row;
       });
-
+  
       const headers = [
-        "ID", "Inventory_Id", "Name", "Description", "Category", "Image",
-        "Unit", "Unit_Price", "Discount", "Code", "Serving_Quantity",
-        "Serving_Unit", "Realm", "Slug", "Line_Item_IDs",
+        "ID", "Name", "Description", "Category", "Dietary_Type", "Availability_Timing",
+        "Image", "Unit", "Unit_Price", "Discount", "Availability", "Code",
+        "Serving_Quantity", "Serving_Unit", "Realm", "Slug", "Line_Item_IDs",
         ...zoneColumns.map(c => `Price_${c}`)
       ];
-
+  
       const worksheet = XLSX.utils.json_to_sheet(exportData, { header: headers });
       const workbook = XLSX.utils.book_new();
       XLSX.utils.book_append_sheet(workbook, worksheet, "MenuItems");
@@ -1005,21 +1231,22 @@ const MenuManagement = ({ clientId, token, realm }) => {
   const handleImportFromExcel = async (e) => {
     const file = e.target.files[0];
     if (!file) return;
-
+  
     let created_by = "system", updated_by = "system";
     try {
       const decoded = jwtDecode(token);
       created_by = decoded?.user_id || created_by;
       updated_by = created_by;
     } catch { }
-
+  
     const sectionLabel = (s) => `${s.zone}-${s.section}`;
-
+  
     const currentCategoriesFlat = [...categoriesFlat];
     const currentSelectedCategoryId = selectedCategoryId;
     const currentSections = [...sections];
-
-    // Fetch ALL items with no zone filter
+  
+    console.log("[Import] dietaryOptions available:", dietaryOptions);
+  
     let allMenuItems = [];
     try {
       const res = await axios.get(
@@ -1034,16 +1261,14 @@ const MenuManagement = ({ clientId, token, realm }) => {
       console.error("Failed to fetch full menu:", err);
       return;
     }
-
-    // ✅ Normalize ALL zone_config_ids to numbers right after fetch
-    // This is the root cause — API may return strings, null, or numbers inconsistently
+  
     allMenuItems = allMenuItems.map(item => ({
       ...item,
       zone_config_id: item.zone_config_id === null || item.zone_config_id === undefined
         ? 0
         : Number(item.zone_config_id)
     }));
-
+  
     const reader = new FileReader();
     reader.onload = async (evt) => {
       try {
@@ -1052,43 +1277,59 @@ const MenuManagement = ({ clientId, token, realm }) => {
           workbook.Sheets[workbook.SheetNames[0]],
           { defval: "" }
         );
-
+  
         if (!parsedData.length) return;
-
+  
         const allColumns = Object.keys(parsedData[0]);
         const priceColumns = allColumns.filter(col => col.startsWith("Price_"));
-
+  
         if (!window.confirm(`Import ${parsedData.length} items?`)) {
           e.target.value = "";
           return;
         }
-
+  
         for (const row of parsedData) {
           if (!row.Name?.trim()) continue;
-
-          // ✅ Match by name from normalized full data
+  
           const existingRecords = allMenuItems.filter(
             item => item.name?.trim().toLowerCase() === row.Name?.trim().toLowerCase()
           );
-
+  
           console.log(`[Import] "${row.Name}" — found ${existingRecords.length} existing records`);
-          console.log(`[Import] zone_config_ids:`, existingRecords.map(r => r.zone_config_id));
-
-          // ✅ Use snapshot of categoriesFlat
+  
           const categoryId = currentCategoriesFlat.find(
             c => c.name.trim().toLowerCase() === (row.Category || '').trim().toLowerCase()
           )?.id || currentSelectedCategoryId;
-
+  
           const categoryName = currentCategoriesFlat.find(
             c => c.id === categoryId
           )?.name || null;
-
+  
           if (!categoryName) {
             console.warn(`[Import] Skipping "${row.Name}" — category not found: "${row.Category}"`);
             continue;
           }
-
-          // ✅ Inline slug using snapshot
+  
+          // ── Dietary — validate against actual dietaryOptions ────────────
+          const rawDietary = (row.Dietary_Type || "").trim().toLowerCase().replace(/[-_\s]/g, '');
+          const matchedDietaryOption = dietaryOptions.find(
+            d => d.toLowerCase().replace(/[-_\s]/g, '') === rawDietary
+          );
+          const importedDietary = matchedDietaryOption
+            ? matchedDietaryOption.toLowerCase().replace(/[-_\s]/g, '')
+            : rawDietary;
+  
+          console.log(`[Import] dietary raw="${row.Dietary_Type}" → matched="${importedDietary}"`);
+  
+          // ── Timing — read from Availability_Timing column directly ──────
+          // Empty string = no timing selected (item has no time restriction)
+          // "morning" or "morning+evening" = specific timings
+          const rawTiming = (row.Availability_Timing || "").trim().toLowerCase();
+  
+          // ✅ Only set timing if explicitly provided — no fallback to allday
+          const timingPart = rawTiming || null; // null = no timing
+  
+          // ── Build slug ───────────────────────────────────────────────────
           const slug = (() => {
             const parts = [];
             let currentId = categoryId;
@@ -1097,28 +1338,35 @@ const MenuManagement = ({ clientId, token, realm }) => {
               visited.add(currentId);
               const cat = currentCategoriesFlat.find(c => c.id === currentId);
               if (!cat) break;
-              parts.unshift((cat.name || '').trim().replace(/\s+/g, '_'));
+              parts.unshift(toSlugSegment(cat.name));
               currentId = cat.parentId ?? cat.parent_id ?? null;
             }
-            const itemPart = (row.Name || '').trim().replace(/\s+/g, '_').replace(/[^a-zA-Z0-9_]/g, '');
-            if (itemPart) parts.push(itemPart);
-            return parts.filter(Boolean).join('_');
+          
+            const itemPart = toSlugSegment(row.Name);
+            const nameParts = importedDietary
+              ? [...parts, importedDietary, itemPart]
+              : [...parts, itemPart];
+          
+            const base = nameParts.filter(Boolean).join('_');
+            return timingPart ? `${base}__${timingPart}` : base;
           })();
-
+  
+          console.log(`[Import] "${row.Name}" → dietary="${importedDietary}" timing="${timingPart}" slug="${slug}"`);
+  
           const basePayload = {
             client_id: clientId,
-            inventory_id: row.Inventory_Id || null,
+            inventory_id: menuConfig.menuInventoryId,
             name: row.Name?.trim(),
             description: row.Description || null,
-            category_id: categoryName,
+            category_id: categoryId,
             realm: row.Realm || realm || null,
             code: row.Code ? String(row.Code) : null,
             serving_quantity: row.Serving_Quantity || null,
             serving_unit: row.Serving_Unit || null,
             unit: row.Unit || null,
-            // ✅ Only include image_id if it's actually a real value
             ...(row.Image && String(row.Image).trim() !== "" && { image_id: String(row.Image).trim() }),
             discount: Number(row.Discount) || 0,
+            availability: Number(row.Availability) || 0,
             slug,
             line_item_id: row.Line_Item_IDs
               ? row.Line_Item_IDs.split(",").map(v => parseInt(v.trim(), 10)).filter(v => !isNaN(v))
@@ -1126,16 +1374,14 @@ const MenuManagement = ({ clientId, token, realm }) => {
             created_by,
             updated_by,
           };
-
+  
           // ================= BASE RECORD =================
           let sharedId;
-
-          // ✅ zone_config_id is now guaranteed to be a number after normalization above
           const existingBase = existingRecords.find(item => item.zone_config_id === 0);
-
+  
           if (existingBase) {
             sharedId = existingBase.id;
-            console.log(`[Import] Updating base record id=${sharedId} price=${row.Unit_Price}`);
+            console.log(`[Import] Updating base record id=${sharedId}`);
             await axios.post(
               `${import.meta.env.VITE_API_INVENTORY_SERVICE_URL}/${clientId}/menu/update`,
               {
@@ -1159,29 +1405,25 @@ const MenuManagement = ({ clientId, token, realm }) => {
             );
             sharedId = res.data.data.id;
           }
-
+  
           // ================= ZONE RECORDS =================
           for (const col of priceColumns) {
             const priceVal = row[col];
             if (priceVal === "" || priceVal === null || priceVal === undefined) continue;
-
+  
             const label = col.replace("Price_", "");
             const matchedSection = currentSections.find(s => sectionLabel(s) === label);
             if (!matchedSection) {
               console.warn(`[Import] No section matched for column: ${col}`);
               continue;
             }
-
-            // ✅ Always a number, no shadowing
+  
             const matchedZoneConfigId = Number(matchedSection.id);
-
-            // ✅ zone_config_id on existingRecords is also normalized to number — strict === works
             const existingZone = existingRecords.find(
               item => item.zone_config_id === matchedZoneConfigId
             );
-
+  
             if (existingZone) {
-              console.log(`[Import] Updating zone record id=${existingZone.id} zone=${matchedZoneConfigId} price=${priceVal}`);
               await axios.post(
                 `${import.meta.env.VITE_API_INVENTORY_SERVICE_URL}/${clientId}/menu/update`,
                 {
@@ -1193,7 +1435,6 @@ const MenuManagement = ({ clientId, token, realm }) => {
                 { headers: { Authorization: `Bearer ${token}` } }
               );
             } else {
-              console.log(`[Import] Creating zone record zone=${matchedZoneConfigId} price=${priceVal}`);
               await axios.post(
                 `${import.meta.env.VITE_API_INVENTORY_SERVICE_URL}/${clientId}/menu/create`,
                 {
@@ -1207,18 +1448,18 @@ const MenuManagement = ({ clientId, token, realm }) => {
             }
           }
         }
-
+  
         await fetchData({ silent: false });
         alert("Import complete!");
         e.target.value = "";
-
+  
       } catch (err) {
         console.error("Import Error:", err);
         alert(`Import failed: ${err.message}`);
         e.target.value = "";
       }
     };
-
+  
     reader.readAsBinaryString(file);
   };
 
@@ -1396,7 +1637,32 @@ const MenuManagement = ({ clientId, token, realm }) => {
                   <span className="text-sm ml-2 text-text-secondary">({filteredItems.length})</span>
                 </h2>
               </div>
-
+              {/* {isRestaurant && (
+                <div className="flex gap-2 mb-3 flex-wrap">
+                  {dietaryOptions.map(type => {
+                    const key = type.toLowerCase().replace(/[-_\s]/g, '');
+                    return (
+                      <button
+                        key={key}
+                        onClick={() => setSelectedDietary(key)}
+                        className={`px-3 py-1 rounded-full text-sm flex items-center gap-1 ${selectedDietary === key ? "bg-black text-white" : "bg-gray-100"
+                          }`}
+                      >
+                        {dietaryColorMap[key] && (
+                          <span className={`inline-block w-2 h-2 rounded-full ${dietaryColorMap[key]}`} />
+                        )}
+                        {type}
+                      </button>
+                    );
+                  })}
+                  <button
+                    onClick={() => setSelectedDietary(null)}
+                    className="px-3 py-1 rounded-full text-sm bg-gray-200"
+                  >
+                    All
+                  </button>
+                </div>
+              )} */}
               <div className="flex flex-col gap-2 sm:flex-row sm:items-center sm:justify-end lg:flex-nowrap lg:gap-2">
                 <div className="relative w-full sm:w-56">
                   <Search size={16} className="absolute left-3 top-1/2 -translate-y-1/2 text-text-secondary" />
@@ -1411,6 +1677,11 @@ const MenuManagement = ({ clientId, token, realm }) => {
                 </div>
 
                 <div className="flex gap-2 flex-wrap justify-end">
+
+                  {normalizedRealm  ==='restaurant' &&
+                    <button onClick={() => setShowMenuConfig(true)} className="h-9 px-3 flex items-center gap-2 rounded-lg bg-action-success text-white text-sm font-semibold shadow-sm hover:opacity-90">
+                      <span>Config</span>
+                    </button>}
                   <button onClick={openAddModal} className="h-9 px-3 flex items-center gap-2 rounded-lg bg-action-primary text-white text-sm font-semibold shadow-sm hover:opacity-90">
                     <Plus size={14} /><span>Add Item</span>
                   </button>
@@ -1438,20 +1709,26 @@ const MenuManagement = ({ clientId, token, realm }) => {
             {/* Items Grid */}
             <div className="flex-1 overflow-y-auto">
               <div className="grid gap-2 grid-cols-2 md:grid-cols-3 lg:grid-cols-3 xl:grid-cols-4">
-                {filteredItems.map((item) => {
+                {sortedItems.map((item) => {
                   const discountPercent = item.discount && item.unit_price && Number(item.discount) > 0
                     ? ((Number(item.discount) * 100) / Number(item.unit_price)).toFixed(0) : null;
-
+                  const dietary = getDietaryFromSlug(item);
+                  const dietaryColor = dietary ? (dietaryColorMap[dietary] || 'bg-transparent') : 'bg-transparent';
+                  const active = isItemActive(item.slug, timingOptions);
                   return (
-                    <div key={item.id} className="relative flex gap-2 items-center bg-bg-primary border border-border-default rounded-xl p-1 shadow-sm hover:shadow-md transition group overflow-hidden">
-                      <div className="absolute inset-0 bg-black/40 backdrop-blur-[2px] opacity-0 pointer-events-none z-10 group-hover:animate-overlayFade" />
+                    <div key={item.id}
+                      className={`relative flex gap-2 items-center bg-bg-primary border rounded-xl p-1 shadow-sm transition group overflow-hidden
+                      ${active ? "" : "opacity-40 grayscale"}
+                    `}                    >
+
+
+                      <div className={`w-[3px] h-full rounded-l-xl ${dietaryColor}`} /> <div className="absolute inset-0 bg-black/40 backdrop-blur-[2px] opacity-0 pointer-events-none z-10 group-hover:animate-overlayFade" />
 
                       {item.line_item_id?.length > 0 && (
                         <div className="absolute bottom-2 right-2 bg-orange-500 text-white text-[7px] p-1 rounded-md z-10 shadow-md flex items-center gap-1">
                           <Plus size={10} /><span>{item.line_item_id.length} add-ons</span>
                         </div>
                       )}
-
                       <div className="relative w-10 h-12 md:h-16 md:w-14 rounded-lg overflow-hidden shrink-0 bg-gray-100">
                         {discountPercent && (
                           <div className="absolute top-1 left-1 bg-action-danger text-white text-[7px] md:text-[10px] px-1 rounded z-10">
@@ -1465,6 +1742,11 @@ const MenuManagement = ({ clientId, token, realm }) => {
 
                       <div className="flex-1 min-w-0 cursor-pointer" onClick={() => handleItemClick(item)}>
                         <h3 className="text-[10px] md:text-[16px] font-semibold text-text-primary">{item.name}</h3>
+                        {/* {!active && (
+                          <p className="text-[10px] text-red-500">
+                            Not available now
+                          </p>
+                        )} */}
                         {item.description && <p className="text-[8px] md:text-[13px] text-text-secondary line-clamp-1">{item.description}</p>}
                         <div className="flex items-center gap-2 mt-1">
                           {discountPercent ? (
@@ -1523,7 +1805,7 @@ const MenuManagement = ({ clientId, token, realm }) => {
         handleAddItem={handleAddItem} getCategoryIdByName={getCategoryIdByName}
         inventoryIds={inventoryIds} getAddonCategoryId={getAddonCategoryId}
         fetchAddonData={fetchAddonData} setAddonSubcategories={setAddonSubcategories} setAllAddonItems={setAllAddonItems}
-        units={units}
+        units={units} normalizedRealm={normalizedRealm}
       />
 
       <UniversalEditModal
@@ -1535,7 +1817,7 @@ const MenuManagement = ({ clientId, token, realm }) => {
         handleEditItem={handleEditItem} clientId={clientId} token={token}
         inventoryIds={inventoryIds} getAddonCategoryId={getAddonCategoryId}
         fetchAddonData={fetchAddonData} setAddonSubcategories={setAddonSubcategories} setAllAddonItems={setAllAddonItems}
-        units={units}
+        units={units} normalizedRealm={normalizedRealm}
 
       />
 
@@ -1547,6 +1829,12 @@ const MenuManagement = ({ clientId, token, realm }) => {
         bulkEditData={bulkEditData} setBulkEditData={setBulkEditData}
         handleBulkUpdate={handleBulkUpdate} handleBulkDelete={handleBulkDelete}
         addonSubcategories={addonSubcategories} allAddonItems={allAddonItems}
+      />
+      <MenuConfigModal
+        show={showMenuConfig}
+        onClose={() => setShowMenuConfig(false)}
+        clientId={clientId}
+        token={token}
       />
     </div>
   );
