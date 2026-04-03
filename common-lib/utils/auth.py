@@ -5,14 +5,15 @@ from fastapi import Depends, HTTPException, Request
 from fastapi.security import OAuth2PasswordBearer
 from models.saas_context import SaasContext, saasContext
 from models.user_model import PageDefinitionModel
-from models.order_model import TransactionTypeEnum, MovementTypeEnum
 from entity.user_entity import PageDefinition
 from entity.inventory_entity import CategoryEntity, InventoryEntity, InventoryTransactionEntity
 from database.postgres import get_db
 from sqlalchemy.orm import Session
+from models.order_model import TransactionTypeEnum, MovementTypeEnum
 from decimal import Decimal
 from typing import Optional
 import uuid
+from entity.inventory_entity import InventoryEntity
 
 SECRET_KEY = "nsn"
 ALGORITHM = "HS256"
@@ -21,14 +22,11 @@ pwd_context = CryptContext(schemes=["bcrypt"], deprecated="auto")
 
 oauth2_scheme = OAuth2PasswordBearer(tokenUrl="login")
 
-
 def hash_password(password: str):
     return pwd_context.hash(password)
 
-
 def verify_password(plain_password, hashed_password):
     return pwd_context.verify(plain_password, hashed_password)
-
 
 def create_access_token(data: dict):
     to_encode = data.copy()
@@ -37,15 +35,12 @@ def create_access_token(data: dict):
     return jwt.encode(to_encode, SECRET_KEY, algorithm=ALGORITHM)
 
 
-def verify_token(
-    req: Request = None,
-    token: str = Depends(oauth2_scheme),
-    db: Session = Depends(get_db),
-):
+
+def verify_token(req: Request = None, token: str = Depends(oauth2_scheme), db: Session = Depends(get_db)):
     try:
-        print("token - ", token)
+        print ("token - ", token)
         payload = jwt.decode(token, SECRET_KEY, algorithms=[ALGORITHM])
-        print("Payload - ", payload)
+        print ("Payload - ", payload)
 
         client_id = payload.get("client_id")
 
@@ -58,77 +53,49 @@ def verify_token(
         grants = payload["grants"]
         realm = payload["realm"]
 
-        if grants.index(realm) < 0:
-            raise HTTPException(
-                status_code=403,
-                detail="Restricted Grant. Please contact administrator.",
-            )
+        if grants.index(realm) < 0 :
+            raise HTTPException(status_code=403, detail="Restricted Grant. Please contact administrator.")
 
+      
+        #assigning default realm and client_id at the framework level
         default_realm = "realm"
         default_client_id = "saas"
-        records = (
-            db.query(CategoryEntity)
-            .filter(CategoryEntity.client_id == default_client_id)
-            .order_by(CategoryEntity.slug)
-            .all()
-        )
+        records = db.query(CategoryEntity).filter(CategoryEntity.client_id == default_client_id).order_by(CategoryEntity.slug).all()
 
-        print("records - ", records)
+        print("records - ",records)
         models = CategoryEntity.copyToModels(records)
-
+        
         print("models - ", models)
         lookup = {cat.id: cat for cat in models}
         default_category = lookup.get(default_realm)
 
-        if default_category:
-            if default_category.sub_categories.index(realm) >= 0:
+        if default_category :
+            if default_category.sub_categories.index(realm) >= 0 :
                 realm_category = lookup.get(realm)
                 print("realm_category - ", realm_category)
-                if realm_category.sub_categories.index(url_module) >= 0:
+                if realm_category.sub_categories.index(url_module) >= 0 :
                     access_category = lookup.get(url_module)
                     print("access_category - ", access_category)
-                    if access_category.sub_categories.index(url_operation) >= 0:
-                        page_definitions = get_page_definition(
-                            roles, url_module, url_client_id, db
-                        )
+                    if access_category.sub_categories.index(url_operation) >= 0 :
+                        page_definitions = get_page_definition(roles, url_module, url_client_id, db)
                         pageDefinitionModels = PageDefinition.copyToModels(page_definitions)
                         print("pageDefinitionModels - ", pageDefinitionModels)
                         screenId = get_screen_id(pageDefinitionModels, url_operation)
-                        print("screen_id - ", screenId)
+                        print ("screen_id - ", screenId)
+            
+                        if (screenId == "accessRestricted"):
+                            raise HTTPException(status_code=403, detail="Restricted Access. Please contact administrator.")
 
-                        if screenId == "accessRestricted":
-                            raise HTTPException(
-                                status_code=403,
-                                detail="Restricted Access. Please contact administrator.",
-                            )
-
-                        context = SaasContext(
-                            url_client_id,
-                            url_module,
-                            url_operation,
-                            str(payload.get("user_id")),
-                            roles,
-                            grants,
-                            screenId,
-                        )
+                        context = SaasContext(url_client_id, url_module, url_operation, str(payload.get("user_id")), roles, grants, screenId)
                         saasContext.set(context)
                     if context is None:
-                        raise HTTPException(
-                            status_code=403,
-                            detail="Restricted Access. Please contact administrator.",
-                        )
+                        raise HTTPException(status_code=403, detail="Restricted Access. Please contact administrator.")
                     return context
-                else:
-                    raise HTTPException(
-                        status_code=403,
-                        detail="Restricted Access. Please contact administrator.",
-                    )
-            else:
+                else :
+                    raise HTTPException(status_code=403, detail="Restricted Access. Please contact administrator.")
+            else :
                 print(f"User do not have access to ", url_module)
-                raise HTTPException(
-                    status_code=403,
-                    detail="Restricted Grants. Please contact administrator.",
-                )
+                raise HTTPException(status_code=403, detail="Restricted Grants. Please contact administrator.")
     except jwt.ExpiredSignatureError:
         raise HTTPException(status_code=401, detail="Token expired")
     except JWTError as e:
@@ -136,13 +103,10 @@ def verify_token(
         raise HTTPException(status_code=401, detail="Invalid Token")
     except ValueError:
         print(f"User do not have access to ", url_module)
-        raise HTTPException(
-            status_code=403,
-            detail="Restricted Grants. Please contact administrator.",
-        )
+        raise HTTPException(status_code=403, detail="Restricted Grants. Please contact administrator.")
 
 
-def get_screen_id(page_definitions, url_operation):
+def get_screen_id(page_definitions, url_operation):    
     for page_def in page_definitions:
         if "ALL" in page_def.operations:
             return page_def.screen_id
@@ -154,21 +118,49 @@ def get_screen_id(page_definitions, url_operation):
 
 
 def get_page_definition(roles: list[str], module: str, client_id: str, db: Session):
-    page_definitions = (
-        db.query(PageDefinition)
-        .filter(
-            PageDefinition.role.in_(roles),
-            PageDefinition.module == module,
-            PageDefinition.client_id == client_id,
-        )
-        .all()
-    )
-    return page_definitions
+    page_definitions = db.query(PageDefinition).filter(
+                            PageDefinition.role.in_(roles),  # Multiple roles
+                            PageDefinition.module == module,  # Matching module
+                            PageDefinition.client_id == client_id  # Matching client ID
+                        ).all()
+
+    return page_definitions  # Returning the fetched results
+
 
 
 # ─────────────────────────────────────────────────────────────────────────────
 # Shared transaction helpers — used by order_service and order_router
 # ─────────────────────────────────────────────────────────────────────────────
+
+UNIT_TO_BASE = {
+    "g": 1,
+    "kg": 1000,
+    "ml": 1,
+    "litre": 1000,
+    "pcs": 1,
+}
+
+WEIGHT_UNITS = {"g", "kg"}
+VOLUME_UNITS = {"ml", "litre"}
+COUNT_UNITS = {"pcs"}
+
+
+def _convert(recipe_qty: float, recipe_unit: str, stock_unit: str) -> float:
+    ru, su = recipe_unit.strip(), stock_unit.strip()
+
+    if ru == su:
+        return recipe_qty
+
+    if ru not in UNIT_TO_BASE or su not in UNIT_TO_BASE:
+        raise ValueError(f"Unknown unit: recipe='{ru}', stock='{su}'")
+
+    for group in (WEIGHT_UNITS, VOLUME_UNITS, COUNT_UNITS):
+        if ru in group and su in group:
+            return (recipe_qty * UNIT_TO_BASE[ru]) / UNIT_TO_BASE[su]
+
+    raise ValueError(f"Incompatible unit dimensions: recipe='{ru}', stock='{su}'")
+
+
 
 def record_transaction(
     db: Session,
@@ -219,8 +211,7 @@ def record_partial_transaction(
     reason: Optional[str],
     order_id: int,
 ) -> None:
-    from entity.inventory_entity import InventoryEntity
-    from services.order_service import _convert
+    
 
     menu_item = (
         db.query(InventoryEntity)

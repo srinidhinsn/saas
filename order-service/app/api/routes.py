@@ -931,6 +931,9 @@ def get_orders_for_table(
     return ResponseModel(screen_id=context.screen_id, data=result)
 
 
+from fastapi import APIRouter, Depends, HTTPException, Request
+from sqlalchemy.orm import Session
+
 @router.post("/dinein/update")
 def update_order_status(
     client_id: str,
@@ -949,9 +952,12 @@ def update_order_status(
     )
 
     if not order:
-        raise HTTPException(status_code=404, detail=f"Order {body.id} not found")
+        raise HTTPException(
+            status_code=404,
+            detail=f"Order {body.id} not found"
+        )
 
-    # ── Cancelled — soft cancel entire group ─────────────────────────────────
+    # ── Cancel entire order group ───────────────────────────────────────────
     if body.status == OrderStatusEnum.cancelled:
         root_id = _root_dinein_id(order.dinein_order_id)
 
@@ -965,15 +971,20 @@ def update_order_status(
         )
 
         for o in related_orders:
+            # update main order
             o.status = OrderStatusEnum.cancelled
-            for item in (
+
+            # update all items
+            order_items = (
                 db.query(Db_OrderItem_Entity)
                 .filter(
                     Db_OrderItem_Entity.order_id == o.id,
                     Db_OrderItem_Entity.client_id == client_id,
                 )
                 .all()
-            ):
+            )
+
+            for item in order_items:
                 item.status = OrderStatusEnum.cancelled
 
         cancellation_reason = getattr(body, "cancellation_reason", None)
@@ -987,12 +998,12 @@ def update_order_status(
         return ResponseModel(
             screen_id=context.screen_id,
             data={
-                "message": "Order and all sub-orders cancelled (soft delete)",
+                "message": "Order and all sub-orders cancelled",
                 "cancelled_count": len(related_orders),
             },
         )
 
-    # ── Served / completed — deduct stock for entire group ───────────────────
+    # ── Served / completed entire group ────────────────────────────────────
     if body.status in [OrderStatusEnum.served, OrderStatusEnum.completed]:
         root_id = _root_dinein_id(order.dinein_order_id)
 
@@ -1005,31 +1016,78 @@ def update_order_status(
             .all()
         )
 
+        orders_to_deduct = []
+
         for o in related_orders:
+            # Deduct only if not already served/completed
+            should_deduct = o.status not in [
+                OrderStatusEnum.served,
+                OrderStatusEnum.completed
+            ]
+
+            # Update main order status
             o.status = body.status
+
+            # Update all items in this order
+            order_items = (
+                db.query(Db_OrderItem_Entity)
+                .filter(
+                    Db_OrderItem_Entity.order_id == o.id,
+                    Db_OrderItem_Entity.client_id == client_id,
+                )
+                .all()
+            )
+
+            for item in order_items:
+                item.status = body.status
+
+            if should_deduct:
+                orders_to_deduct.append(o.id)
 
         db.flush()
 
-        for o in related_orders:
-            _deduct_stock_for_order(db=db, client_id=client_id, order_id=o.id)
+        # Deduct stock only once
+        for order_id in orders_to_deduct:
+            _deduct_stock_for_order(
+                db=db,
+                client_id=client_id,
+                order_id=order_id
+            )
 
         db.commit()
 
         return ResponseModel(
             screen_id=context.screen_id,
             data={
-                "message": "All related orders marked as served",
+                "message": "All related orders and items marked as served",
                 "updated_count": len(related_orders),
+                "deducted_count": len(orders_to_deduct),
             },
         )
 
-    # ── Normal single-order update ────────────────────────────────────────────
+    # ── Normal single-order update ─────────────────────────────────────────
     if body.status is not None:
         order.status = body.status
+
+        # also update items if status is updated manually
+        order_items = (
+            db.query(Db_OrderItem_Entity)
+            .filter(
+                Db_OrderItem_Entity.order_id == order.id,
+                Db_OrderItem_Entity.client_id == client_id,
+            )
+            .all()
+        )
+
+        for item in order_items:
+            item.status = body.status
+
     if body.total_price is not None:
         order.total_price = body.total_price
+
     if body.table_id is not None:
         order.table_id = body.table_id
+
     if body.dinein_order_id is not None:
         order.dinein_order_id = body.dinein_order_id
 
@@ -1043,7 +1101,6 @@ def update_order_status(
             "new_status": order.status,
         },
     )
-
 
 @router.post("/order_items/update")
 def update_order_items(
