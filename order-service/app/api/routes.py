@@ -663,7 +663,7 @@ from utils.auth import verify_token, record_transaction, record_partial_transact
 from models.saas_context import SaasContext
 from typing import Optional
 from entity.inventory_entity import InventoryEntity
-from ..services.order_service import (
+from services.order_service import (
     _root_dinein_id,
     _order_row_to_flat,
     STATUS_PRIORITY,
@@ -678,27 +678,13 @@ router = APIRouter()
 
 
 @router.post("/dinein/create", response_model=ResponseModel[DineinOrderModel])
-def create_order(
-    client_id: str,
-    order: DineinOrderModel,
-    context: SaasContext = Depends(verify_token),
-    db: Session = Depends(get_db),
-):
+def create_order(client_id: str, order: DineinOrderModel, context: SaasContext = Depends(verify_token), db: Session = Depends(get_db)):
     db_order = Db_Order_Entity(
-        client_id=client_id,
-        table_id=order.table_id,
-        status=order.status,
-        price=order.price,
-        gst=order.gst,
-        cst=order.cst,
-        discount=order.discount,
-        invoice_status=order.invoice_status,
-        total_price=order.total_price,
-        invoice_id=order.invoice_id,
-        dinein_order_id=None,
-        handler_id=order.handler_id,
-        created_by=order.created_by,
-        updated_by=order.updated_by,
+        client_id=client_id, table_id=order.table_id, status=order.status,
+        price=order.price, gst=order.gst, cst=order.cst, discount=order.discount,
+        invoice_status=order.invoice_status, total_price=order.total_price,
+        invoice_id=order.invoice_id, dinein_order_id=None,
+        handler_id=order.handler_id, created_by=order.created_by, updated_by=order.updated_by,
     )
     db.add(db_order)
     db.flush()
@@ -707,48 +693,26 @@ def create_order(
 
     for item in order.items:
         db_item = Db_OrderItem_Entity(
-            order_id=db_order.id,
-            client_id=client_id,
-            item_id=item.item_id,
-            item_name=item.item_name,
-            slug=item.slug,
-            quantity=item.quantity,
-            unit_price=item.unit_price,
-            line_total=item.line_total,
-            status=item.status,
+            order_id=db_order.id, client_id=client_id, item_id=item.item_id,
+            item_name=item.item_name, slug=item.slug, quantity=item.quantity,
+            unit_price=item.unit_price, line_total=item.line_total, status=item.status,
         )
         db.add(db_item)
     db.commit()
     db.refresh(db_order)
 
-    db_items = (
-        db.query(Db_OrderItem_Entity)
-        .filter(Db_OrderItem_Entity.order_id == db_order.id)
-        .all()
-    )
+    db_items = db.query(Db_OrderItem_Entity).filter(Db_OrderItem_Entity.order_id == db_order.id).all()
+
     order_items = [
         OrderItemModel(
-            client_id=i.client_id,
-            id=i.id,
-            item_id=i.item_id,
-            order_id=i.order_id,
-            quantity=i.quantity,
-            status=i.status,
-            unit_price=i.unit_price,
-            line_total=i.line_total,
-            item_name=i.item_name,
-            slug=i.slug,
-        )
-        for i in db_items
+            client_id=i.client_id, id=i.id, item_id=i.item_id, order_id=i.order_id,
+            quantity=i.quantity, status=i.status, unit_price=i.unit_price,
+            line_total=i.line_total, item_name=i.item_name, slug=i.slug,
+        ) for i in db_items
     ]
     dinein_model = DineinOrderModel(
-        id=db_order.id,
-        dinein_order_id=db_order.dinein_order_id,
-        table_id=db_order.table_id,
-        client_id=db_order.client_id,
-        status=db_order.status,
-        created_at=db_order.created_at,
-        items=order_items,
+        id=db_order.id, dinein_order_id=db_order.dinein_order_id, table_id=db_order.table_id,
+        client_id=db_order.client_id, status=db_order.status, created_at=db_order.created_at,
     )
     return ResponseModel(screen_id=context.screen_id, data=dinein_model)
 
@@ -770,10 +734,7 @@ def create_sub_order(
         .first()
     )
     if not root_order:
-        raise HTTPException(
-            status_code=404,
-            detail=f"Parent order '{parent_dinein_order_id}' not found",
-        )
+        raise HTTPException(status_code=404, detail=f"Parent order '{parent_dinein_order_id}' not found")
 
     existing_sub_count = (
         db.query(Db_Order_Entity)
@@ -786,7 +747,8 @@ def create_sub_order(
     sub_dinein_order_id = f"{parent_dinein_order_id}-{existing_sub_count + 1}"
 
     total_price = sum(
-        (item.unit_price or 0) * (item.quantity or 1) for item in order.items
+        (item.unit_price or 0) * (item.quantity or 1)
+        for item in order.items
     )
 
     db_sub_order = Db_Order_Entity(
@@ -794,28 +756,17 @@ def create_sub_order(
         dinein_order_id=sub_dinein_order_id,
         table_id=root_order.table_id,
         status=OrderStatusEnum.pending,
-        price=total_price,
-        gst=0,
-        cst=0,
-        total_price=total_price,
-        created_by=order.created_by,
-        invoice_id=None,
+        price=total_price, gst=0, cst=0, total_price=total_price,
+        created_by=order.created_by, invoice_id=None, invoice_status=None,
     )
     db.add(db_sub_order)
     db.flush()
 
     for item in order.items:
         db_item = Db_OrderItem_Entity(
-            order_id=db_sub_order.id,
-            client_id=client_id,
-            item_id=item.item_id,
-            item_name=item.item_name,
-            slug=item.slug,
-            quantity=item.quantity,
-            unit_price=item.unit_price,
-            line_total=(item.unit_price or 0) * (item.quantity or 1),
-            status=OrderStatusEnum.pending,
-            frontend_unique_key=item.frontend_unique_key,
+            order_id=db_sub_order.id, client_id=client_id,
+            item_id=item.item_id, item_name=item.item_name, slug=item.slug,
+            quantity=item.quantity, unit_price=item.unit_price,
         )
         db.add(db_item)
 
@@ -824,33 +775,21 @@ def create_sub_order(
 
     order_items = [
         OrderItemModel(
-            id=i.id,
-            order_id=i.order_id,
-            client_id=i.client_id,
-            item_id=i.item_id,
-            item_name=i.item_name,
-            slug=i.slug,
-            quantity=i.quantity,
-            unit_price=i.unit_price,
-            line_total=i.line_total,
-            status=i.status,
-            frontend_unique_key=i.frontend_unique_key,
+            id=i.id, order_id=i.order_id, client_id=i.client_id,
+            item_id=i.item_id, item_name=i.item_name, slug=i.slug,
+            quantity=i.quantity, unit_price=i.unit_price, line_total=i.line_total,
+            status=i.status, frontend_unique_key=i.frontend_unique_key,
         )
         for i in db_sub_order.items
     ]
     sub_order_model = DineinOrderModel(
-        id=db_sub_order.id,
-        dinein_order_id=db_sub_order.dinein_order_id,
-        table_id=db_sub_order.table_id,
-        client_id=db_sub_order.client_id,
-        status=db_sub_order.status,
-        total_price=db_sub_order.total_price,
-        created_at=db_sub_order.created_at,
-        items=order_items,
+        id=db_sub_order.id, dinein_order_id=db_sub_order.dinein_order_id,
+        table_id=db_sub_order.table_id, client_id=db_sub_order.client_id,
+        status=db_sub_order.status, total_price=db_sub_order.total_price,
+        created_at=db_sub_order.created_at, items=order_items,
     )
     return ResponseModel(
-        screen_id=context.screen_id,
-        data=sub_order_model,
+        screen_id=context.screen_id, data=sub_order_model,
         message=f"Sub-order {sub_dinein_order_id} created successfully",
     )
 
@@ -931,9 +870,6 @@ def get_orders_for_table(
     return ResponseModel(screen_id=context.screen_id, data=result)
 
 
-from fastapi import APIRouter, Depends, HTTPException, Request
-from sqlalchemy.orm import Session
-
 @router.post("/dinein/update")
 def update_order_status(
     client_id: str,
@@ -946,7 +882,7 @@ def update_order_status(
         db.query(Db_Order_Entity)
         .filter(
             Db_Order_Entity.id == body.id,
-            Db_Order_Entity.client_id == client_id,
+            Db_Order_Entity.client_id == client_id
         )
         .first()
     )
@@ -1156,19 +1092,13 @@ def update_order_items(
             db_item.line_total = (incoming.unit_price or 0) * (incoming.quantity or 1)
             db_item.status = incoming.status
         else:
-            db.add(
-                Db_OrderItem_Entity(
-                    client_id=client_id,
-                    order_id=order_id,
-                    item_id=incoming.item_id,
-                    item_name=incoming.item_name,
-                    quantity=incoming.quantity,
-                    unit_price=incoming.unit_price,
-                    line_total=(incoming.unit_price or 0) * (incoming.quantity or 1),
-                    status=OrderStatusEnum.pending,
-                    frontend_unique_key=incoming.frontend_unique_key,
-                )
-            )
+            db.add(Db_OrderItem_Entity(
+                client_id=client_id, order_id=order_id,
+                item_id=incoming.item_id, item_name=incoming.item_name,
+                quantity=incoming.quantity, unit_price=incoming.unit_price,
+                line_total=(incoming.unit_price or 0) * (incoming.quantity or 1),
+                status="pending", frontend_unique_key=incoming.frontend_unique_key,
+            ))
 
     db.commit()
     return ResponseModel(
@@ -1178,13 +1108,7 @@ def update_order_items(
 
 
 @router.post("/order_item/update")
-def update_order_item(
-    client_id: str,
-    order_id: Optional[int] = Query(None),
-    order_item: Optional[OrderItemModel] = None,
-    context: SaasContext = Depends(verify_token),
-    db: Session = Depends(get_db),
-):
+def update_order_item(client_id: str, order_id: Optional[int] = Query(None), order_item: Optional[OrderItemModel] = None, context: SaasContext = Depends(verify_token), db: Session = Depends(get_db)):
     if not order_id or not order_item or not order_item.id:
         raise HTTPException(status_code=400, detail="Missing order_id or order_item_id")
     existing_item = (
@@ -1200,10 +1124,7 @@ def update_order_item(
         if attr != "_sa_instance_state":
             setattr(existing_item, attr, value)
     db.commit()
-    return ResponseModel(
-        screen_id=context.screen_id,
-        data={"message": "Order items updated successfully"},
-    )
+    return ResponseModel(screen_id=context.screen_id, data={"message": "Order items updated successfully"})
 
 
 @router.delete("/order_item/delete")
