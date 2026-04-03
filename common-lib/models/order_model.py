@@ -11,7 +11,21 @@ class OrderStatusEnum(str, Enum):
     ready = "ready"
     served = "served"
     cancelled = "cancelled"
-    completed ="completed"
+    completed = "completed"
+
+
+class TransactionTypeEnum(str, Enum):
+    order_deduction = "ORDER_DEDUCTION"
+    menu_item_deduction = "MENU_ITEM_DEDUCTION"
+    item_cancelled = "ITEM_CANCELLED"
+    wastage = "WASTAGE"
+    order_cancelled = "ORDER_CANCELLED"
+
+
+class MovementTypeEnum(str, Enum):
+    out = "OUT"
+    reversal = "REVERSAL"
+    none = "NONE"
 
 
 class OrderItemModel(BaseModel):

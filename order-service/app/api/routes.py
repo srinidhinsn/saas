@@ -644,8 +644,6 @@
 
 
 
-
-
 from fastapi import APIRouter, Depends, HTTPException, Query, Request
 from fastapi.responses import FileResponse
 from sqlalchemy.orm import Session
@@ -654,12 +652,25 @@ from database.postgres import get_db
 from models.response_model import ResponseModel
 from entity.table_entity import DiningTable
 from entity.order_entity import DineinOrder as Db_Order_Entity, OrderItem as Db_OrderItem_Entity
-from models.order_model import DineinOrderModel, OrderItemModel, OrderStatusEnum
-from utils.auth import verify_token
+from models.order_model import (
+    DineinOrderModel,
+    OrderItemModel,
+    OrderStatusEnum,
+    TransactionTypeEnum,
+    MovementTypeEnum,
+)
+from utils.auth import verify_token, record_transaction, record_partial_transaction
 from models.saas_context import SaasContext
 from typing import Optional
 from entity.inventory_entity import InventoryEntity
-from services.order_service import _root_dinein_id, _order_row_to_flat, STATUS_PRIORITY, _merge_group, _deduct_stock_for_order, _convert, _record_transaction, _record_partial_transaction
+from ..services.order_service import (
+    _root_dinein_id,
+    _order_row_to_flat,
+    STATUS_PRIORITY,
+    _merge_group,
+    _deduct_stock_for_order,
+    _convert,
+)
 from decimal import Decimal
 
 
@@ -692,7 +703,6 @@ def create_order(
     db.add(db_order)
     db.flush()
 
-    # dinein_order_id for a fresh order = its own PK
     db_order.dinein_order_id = str(db_order.id)
 
     for item in order.items:
@@ -863,11 +873,13 @@ def get_orders_for_order_id(
     if not order:
         return ResponseModel(screen_id=context.screen_id, data=None, status="not_found")
 
-    db_items = (db.query(Db_OrderItem_Entity).filter(
-        Db_OrderItem_Entity.order_id == order.id,
-        Db_OrderItem_Entity.status != OrderStatusEnum.cancelled,  # ← add this
-    )
-    .all()
+    db_items = (
+        db.query(Db_OrderItem_Entity)
+        .filter(
+            Db_OrderItem_Entity.order_id == order.id,
+            Db_OrderItem_Entity.status != OrderStatusEnum.cancelled,
+        )
+        .all()
     )
     item_models = [Db_OrderItem_Entity.copyToModel(item) for item in db_items]
     result = {
@@ -896,7 +908,7 @@ def get_orders_for_table(
             .filter(
                 Db_Order_Entity.client_id == client_id,
                 Db_Order_Entity.table_id == table_id,
-                Db_Order_Entity.status != OrderStatusEnum.cancelled,  # ← add this
+                Db_Order_Entity.status != OrderStatusEnum.cancelled,
             )
             .all()
         )
@@ -905,7 +917,7 @@ def get_orders_for_table(
             db.query(Db_Order_Entity)
             .filter(
                 Db_Order_Entity.client_id == client_id,
-                Db_Order_Entity.status != OrderStatusEnum.cancelled,  # ← add this
+                Db_Order_Entity.status != OrderStatusEnum.cancelled,
             )
             .all()
         )
@@ -917,6 +929,7 @@ def get_orders_for_table(
 
     result = [_merge_group(group) for group in groups.values()]
     return ResponseModel(screen_id=context.screen_id, data=result)
+
 
 @router.post("/dinein/update")
 def update_order_status(
@@ -938,7 +951,7 @@ def update_order_status(
     if not order:
         raise HTTPException(status_code=404, detail=f"Order {body.id} not found")
 
-    # ── REQ 1: Handle "cancelled" status — soft cancel entire group ───────────
+    # ── Cancelled — soft cancel entire group ─────────────────────────────────
     if body.status == OrderStatusEnum.cancelled:
         root_id = _root_dinein_id(order.dinein_order_id)
 
@@ -953,7 +966,6 @@ def update_order_status(
 
         for o in related_orders:
             o.status = OrderStatusEnum.cancelled
-            # Mark all items as cancelled too so KDS / reports are consistent
             for item in (
                 db.query(Db_OrderItem_Entity)
                 .filter(
@@ -964,7 +976,6 @@ def update_order_status(
             ):
                 item.status = OrderStatusEnum.cancelled
 
-        # Optionally store cancellation reason if the model column exists
         cancellation_reason = getattr(body, "cancellation_reason", None)
         if cancellation_reason:
             for o in related_orders:
@@ -1012,7 +1023,7 @@ def update_order_status(
             },
         )
 
-    # ── Normal single-order update for all other statuses ────────────────────
+    # ── Normal single-order update ────────────────────────────────────────────
     if body.status is not None:
         order.status = body.status
     if body.total_price is not None:
@@ -1097,7 +1108,7 @@ def update_order_items(
                     quantity=incoming.quantity,
                     unit_price=incoming.unit_price,
                     line_total=(incoming.unit_price or 0) * (incoming.quantity or 1),
-                    status="pending",
+                    status=OrderStatusEnum.pending,
                     frontend_unique_key=incoming.frontend_unique_key,
                 )
             )
@@ -1148,21 +1159,20 @@ def delete_order_items(
     context: SaasContext = Depends(verify_token),
     db: Session = Depends(get_db),
 ):
-    """
-    REQ 1 (item-level): Instead of hard-deleting the order_item row, mark its
-    status as 'cancelled' and record the appropriate transaction.
-
-    Partial removal (quantity param < full qty) reduces quantity on the row.
-    Full removal sets item status to 'cancelled' (row is KEPT for audit trail).
-    If all items in the order become cancelled, the parent order is also set to
-    'cancelled' and the table is freed.
-    """
     if not order_item_id:
         raise HTTPException(status_code=400, detail="Missing order_item_id")
     try:
         oid = int(str(order_item_id).strip())
     except Exception:
         raise HTTPException(status_code=400, detail="Invalid order_item_id format")
+
+    # Parse transaction_type string → enum once, used throughout
+    tx_type: Optional[TransactionTypeEnum] = None
+    if transaction_type:
+        try:
+            tx_type = TransactionTypeEnum(transaction_type)
+        except ValueError:
+            raise HTTPException(status_code=400, detail=f"Invalid transaction_type '{transaction_type}'")
 
     item = (
         db.query(Db_OrderItem_Entity)
@@ -1181,19 +1191,19 @@ def delete_order_items(
     frontend_unique_key = item.frontend_unique_key or ""
     inventory_item_id = item.item_id
 
-    # ── PARTIAL REMOVE ─────────────────────────────────────────────────────
+    # ── Partial remove ────────────────────────────────────────────────────────
     remove_qty = quantity if (quantity and 0 < quantity < ordered_qty) else None
 
     if remove_qty:
         new_qty = ordered_qty - remove_qty
 
-        if transaction_type in ("WASTAGE", "ITEM_CANCELLED"):
-            _record_partial_transaction(
+        if tx_type in (TransactionTypeEnum.wastage, TransactionTypeEnum.item_cancelled):
+            record_partial_transaction(
                 db,
                 client_id=client_id,
                 item=item,
                 remove_qty=remove_qty,
-                transaction_type=transaction_type,
+                transaction_type=tx_type,
                 reason=reason,
                 order_id=order_id,
             )
@@ -1215,7 +1225,6 @@ def delete_order_items(
                 .filter(
                     Db_OrderItem_Entity.order_id == order_id,
                     Db_OrderItem_Entity.client_id == client_id,
-                    # Only include non-cancelled items in total recalculation
                     Db_OrderItem_Entity.status != OrderStatusEnum.cancelled,
                 )
                 .all()
@@ -1231,10 +1240,8 @@ def delete_order_items(
             data={"message": f"Reduced qty by {remove_qty}, now {new_qty}"},
         )
 
-    # ── FULL ITEM CANCEL (soft) ─────────────────────────────────────────────
-    # REQ 1: Do NOT hard-delete the row — set status to 'cancelled' instead.
-
-    if transaction_type in ("WASTAGE", "ITEM_CANCELLED"):
+    # ── Full item cancel (soft) ───────────────────────────────────────────────
+    if tx_type in (TransactionTypeEnum.wastage, TransactionTypeEnum.item_cancelled):
         menu_item = (
             db.query(InventoryEntity)
             .filter(
@@ -1246,7 +1253,7 @@ def delete_order_items(
 
         effective_reason = reason or (
             "Wastage — served item deleted"
-            if transaction_type == "WASTAGE"
+            if tx_type == TransactionTypeEnum.wastage
             else "Item cancelled before serving"
         )
 
@@ -1257,15 +1264,15 @@ def delete_order_items(
         )
 
         if menu_item:
-            if transaction_type == "ITEM_CANCELLED":
-                _record_transaction(
+            if tx_type == TransactionTypeEnum.item_cancelled:
+                record_transaction(
                     db,
                     client_id=client_id,
                     stock_item_id=menu_item.id,
                     inventory_id=menu_item.inventory_id,
                     name=menu_item.name,
-                    transaction_type="ITEM_CANCELLED",
-                    movement_type="NONE",
+                    transaction_type=TransactionTypeEnum.item_cancelled,
+                    movement_type=MovementTypeEnum.none,
                     quantity=Decimal(str(ordered_qty)),
                     unit=menu_item.unit or "",
                     before_stock=Decimal(str(menu_item.availability or 0)),
@@ -1275,7 +1282,7 @@ def delete_order_items(
                     remarks=f"[ITEM_CANCELLED] Order #{order_id} — {base_remarks}",
                 )
 
-            elif transaction_type == "WASTAGE":
+            elif tx_type == TransactionTypeEnum.wastage:
                 serving_qty = float(menu_item.serving_quantity or 0)
                 serving_unit = (menu_item.serving_unit or "").strip()
                 stock_unit = (menu_item.unit or "").strip()
@@ -1287,14 +1294,14 @@ def delete_order_items(
                         before_stock = Decimal(str(menu_item.availability or 0))
                         after_stock = before_stock + reversal_qty
 
-                        _record_transaction(
+                        record_transaction(
                             db,
                             client_id=client_id,
                             stock_item_id=menu_item.id,
                             inventory_id=menu_item.inventory_id,
                             name=menu_item.name,
-                            transaction_type="WASTAGE",
-                            movement_type="REVERSAL",
+                            transaction_type=TransactionTypeEnum.wastage,
+                            movement_type=MovementTypeEnum.reversal,
                             quantity=reversal_qty,
                             unit=stock_unit,
                             before_stock=before_stock,
@@ -1310,14 +1317,14 @@ def delete_order_items(
                             f"[WARN] Skipping menu item reversal for item_id={menu_item.id}: {exc}"
                         )
                 else:
-                    _record_transaction(
+                    record_transaction(
                         db,
                         client_id=client_id,
                         stock_item_id=menu_item.id,
                         inventory_id=menu_item.inventory_id,
                         name=menu_item.name,
-                        transaction_type="WASTAGE",
-                        movement_type="REVERSAL",
+                        transaction_type=TransactionTypeEnum.wastage,
+                        movement_type=MovementTypeEnum.reversal,
                         quantity=Decimal(str(ordered_qty)),
                         unit=stock_unit or "pcs",
                         before_stock=Decimal(str(menu_item.availability or 0)),
@@ -1362,30 +1369,28 @@ def delete_order_items(
                         before_ing = Decimal(str(stock_item.availability or 0))
                         after_ing = before_ing + reversal_decimal
 
-                        _record_transaction(
+                        record_transaction(
                             db,
                             client_id=client_id,
                             stock_item_id=stock_item.id,
                             inventory_id=stock_item.inventory_id,
                             name=stock_item.name,
-                            transaction_type="WASTAGE",
-                            movement_type="REVERSAL",
+                            transaction_type=TransactionTypeEnum.wastage,
+                            movement_type=MovementTypeEnum.reversal,
                             quantity=reversal_decimal,
                             unit=ing_stock_unit,
                             before_stock=before_ing,
-                            after_ing=after_ing,
+                            after_stock=after_ing,
                             reference_id=str(order_id),
                             reference_type="order",
                             remarks=f"[INGREDIENT_REVERSAL] Order #{order_id} — {base_remarks}",
                         )
                         stock_item.availability = after_ing
 
-    # REQ 1: Soft cancel — mark item as 'cancelled', do NOT delete the row
     item.status = OrderStatusEnum.cancelled
-    item.line_total = 0  # zeroed out so it doesn't skew totals
+    item.line_total = 0
     db.flush()
 
-    # Check whether ALL items in this order are now cancelled
     remaining_active = (
         db.query(Db_OrderItem_Entity)
         .filter(
@@ -1406,13 +1411,11 @@ def delete_order_items(
     )
 
     if not remaining_active:
-        # All items cancelled → soft-cancel the whole order and free the table
         if order_row:
             root_dinein_id = _root_dinein_id(
                 order_row.dinein_order_id or str(order_row.id)
             )
 
-            # Cancel all sub-orders in the group too
             sub_orders = (
                 db.query(Db_Order_Entity)
                 .filter(
@@ -1449,7 +1452,6 @@ def delete_order_items(
             },
         )
 
-    # Recalculate order total from remaining active items
     if order_row:
         order_row.total_price = sum(
             (i.unit_price or 0) * (i.quantity or 1) for i in remaining_active
@@ -1462,12 +1464,6 @@ def delete_order_items(
     )
 
 
-# ─────────────────────────────────────────────────────────────────────────────
-# REQ 1: /dinein/cancel  — explicit soft-cancel endpoint for the whole order
-# (The existing /dinein/update endpoint also handles status=cancelled, but this
-# dedicated route provides a cleaner API surface and accepts a reason field.)
-# ─────────────────────────────────────────────────────────────────────────────
-
 @router.post("/dinein/cancel")
 def cancel_order(
     client_id: str,
@@ -1476,15 +1472,6 @@ def cancel_order(
     context: SaasContext = Depends(verify_token),
     db: Session = Depends(get_db),
 ):
-    """
-    Soft-cancel complete dine-in order group.
-    Flow:
-    1. Record main dine-in cancellation transaction
-    2. Record item-level cancellation/wastage transactions
-    3. Cancel root + sub-orders
-    4. Free table
-    """
-
     root_order = (
         db.query(Db_Order_Entity)
         .filter(
@@ -1513,22 +1500,19 @@ def cancel_order(
     effective_reason = reason or "Full order cancelled"
     table_id = root_order.table_id
 
-    # =========================================================
-    # 1. MAIN DINE-IN CANCELLATION TRANSACTION (FIRST)
-    # =========================================================
+    # 1. Main dine-in cancellation transaction
     total_cancel_value = sum(
-        Decimal(str(order.total_price or 0))
-        for order in related_orders
+        Decimal(str(order.total_price or 0)) for order in related_orders
     )
 
-    _record_transaction(
+    record_transaction(
         db,
         client_id=client_id,
         stock_item_id=0,
         inventory_id=f"DINEIN-{root_dinein_id}",
         name="DINEIN_ORDER_CANCELLED",
-        transaction_type="ORDER_CANCELLED",
-        movement_type="NONE",
+        transaction_type=TransactionTypeEnum.order_cancelled,
+        movement_type=MovementTypeEnum.none,
         quantity=Decimal("1"),
         unit="order",
         before_stock=Decimal("0"),
@@ -1544,9 +1528,7 @@ def cancel_order(
         ),
     )
 
-    # =========================================================
-    # 2. ITEM LEVEL CANCELLATION TRANSACTIONS
-    # =========================================================
+    # 2. Item-level cancellation transactions
     for order in related_orders:
         order.status = OrderStatusEnum.cancelled
 
@@ -1573,15 +1555,14 @@ def cancel_order(
 
             if menu_item:
                 if item.status == OrderStatusEnum.served:
-                    # Served item → wastage
-                    _record_transaction(
+                    record_transaction(
                         db,
                         client_id=client_id,
                         stock_item_id=menu_item.id,
                         inventory_id=menu_item.inventory_id,
                         name=menu_item.name,
-                        transaction_type="WASTAGE",
-                        movement_type="NONE",
+                        transaction_type=TransactionTypeEnum.wastage,
+                        movement_type=MovementTypeEnum.none,
                         quantity=Decimal(str(ordered_qty)),
                         unit=menu_item.unit or "pcs",
                         before_stock=Decimal(str(menu_item.availability or 0)),
@@ -1596,15 +1577,14 @@ def cancel_order(
                         ),
                     )
                 else:
-                    # Pending / preparing → item cancelled
-                    _record_transaction(
+                    record_transaction(
                         db,
                         client_id=client_id,
                         stock_item_id=menu_item.id,
                         inventory_id=menu_item.inventory_id,
                         name=menu_item.name,
-                        transaction_type="ITEM_CANCELLED",
-                        movement_type="NONE",
+                        transaction_type=TransactionTypeEnum.item_cancelled,
+                        movement_type=MovementTypeEnum.none,
                         quantity=Decimal(str(ordered_qty)),
                         unit=menu_item.unit or "pcs",
                         before_stock=Decimal(str(menu_item.availability or 0)),
@@ -1621,9 +1601,7 @@ def cancel_order(
 
             item.status = OrderStatusEnum.cancelled
 
-    # =========================================================
-    # 3. FREE TABLE
-    # =========================================================
+    # 3. Free table
     if table_id:
         table_row = (
             db.query(DiningTable)
@@ -1633,7 +1611,6 @@ def cancel_order(
             )
             .first()
         )
-
         if table_row:
             table_row.status = "vacant"
 
@@ -1647,11 +1624,7 @@ def cancel_order(
             "table_freed": bool(table_id),
         },
     )
-# ─────────────────────────────────────────────────────────────────────────────
-# /dinein/delete — kept for backwards compatibility but now performs a soft
-# cancel instead of a physical DELETE.  Guarded: served orders cannot be
-# cancelled via this endpoint.
-# ─────────────────────────────────────────────────────────────────────────────
+
 
 @router.delete("/dinein/delete")
 def delete_order(
@@ -1661,10 +1634,6 @@ def delete_order(
     context: SaasContext = Depends(verify_token),
     db: Session = Depends(get_db),
 ):
-    """
-    REQ 1: Soft cancel — updates status to 'cancelled' instead of hard DELETE.
-    Records ITEM_CANCELLED transaction for every non-served item in the group.
-    """
     if not dinein_order_id:
         raise HTTPException(status_code=400, detail="Missing dinein_order_id")
     try:
@@ -1711,7 +1680,6 @@ def delete_order(
         )
         for it in items:
             if it.status == OrderStatusEnum.served:
-                # Already served — record wastage + reverse stock
                 menu_item = (
                     db.query(InventoryEntity)
                     .filter(
@@ -1734,17 +1702,19 @@ def delete_order(
                     if serving_qty > 0 and serving_unit and stock_unit:
                         try:
                             converted_serving = _convert(serving_qty, serving_unit, stock_unit)
-                            reversal_qty = Decimal(str(round(converted_serving * ordered_qty, 6)))
+                            reversal_qty = Decimal(
+                                str(round(converted_serving * ordered_qty, 6))
+                            )
                             before_stock = Decimal(str(menu_item.availability or 0))
                             after_stock = before_stock + reversal_qty
-                            _record_transaction(
+                            record_transaction(
                                 db,
                                 client_id=client_id,
                                 stock_item_id=menu_item.id,
                                 inventory_id=menu_item.inventory_id,
                                 name=menu_item.name,
-                                transaction_type="WASTAGE",
-                                movement_type="REVERSAL",
+                                transaction_type=TransactionTypeEnum.wastage,
+                                movement_type=MovementTypeEnum.reversal,
                                 quantity=reversal_qty,
                                 unit=stock_unit,
                                 before_stock=before_stock,
@@ -1755,7 +1725,9 @@ def delete_order(
                             )
                             menu_item.availability = after_stock
                         except ValueError as exc:
-                            print(f"[WARN] Skipping reversal for item_id={menu_item.id}: {exc}")
+                            print(
+                                f"[WARN] Skipping reversal for item_id={menu_item.id}: {exc}"
+                            )
 
                     if menu_item.recipe:
                         for ingredient in menu_item.recipe:
@@ -1776,24 +1748,27 @@ def delete_order(
                                 continue
                             ing_stock_unit = (stock_item.unit or "").strip()
                             try:
-                                reversal = _convert(recipe_qty, recipe_unit, ing_stock_unit) * ordered_qty
+                                reversal = (
+                                    _convert(recipe_qty, recipe_unit, ing_stock_unit)
+                                    * ordered_qty
+                                )
                             except ValueError:
                                 continue
                             reversal_decimal = Decimal(str(round(reversal, 6)))
                             before_ing = Decimal(str(stock_item.availability or 0))
                             after_ing = before_ing + reversal_decimal
-                            _record_transaction(
+                            record_transaction(
                                 db,
                                 client_id=client_id,
                                 stock_item_id=stock_item.id,
                                 inventory_id=stock_item.inventory_id,
                                 name=stock_item.name,
-                                transaction_type="WASTAGE",
-                                movement_type="REVERSAL",
+                                transaction_type=TransactionTypeEnum.wastage,
+                                movement_type=MovementTypeEnum.reversal,
                                 quantity=reversal_decimal,
                                 unit=ing_stock_unit,
                                 before_stock=before_ing,
-                                after_ing=after_ing,
+                                after_stock=after_ing,
                                 reference_id=str(o.id),
                                 reference_type="order",
                                 remarks=f"[INGREDIENT_REVERSAL_ORDER_CANCELLED] Order #{o.id} — {base_remarks}",
@@ -1801,7 +1776,6 @@ def delete_order(
                             stock_item.availability = after_ing
 
             else:
-                # Not served — record ITEM_CANCELLED (no stock change)
                 menu_item = (
                     db.query(InventoryEntity)
                     .filter(
@@ -1812,14 +1786,14 @@ def delete_order(
                 )
                 if menu_item:
                     ordered_qty = it.quantity or 1
-                    _record_transaction(
+                    record_transaction(
                         db,
                         client_id=client_id,
                         stock_item_id=menu_item.id,
                         inventory_id=menu_item.inventory_id,
                         name=menu_item.name,
-                        transaction_type="ITEM_CANCELLED",
-                        movement_type="NONE",
+                        transaction_type=TransactionTypeEnum.item_cancelled,
+                        movement_type=MovementTypeEnum.none,
                         quantity=Decimal(str(ordered_qty)),
                         unit=menu_item.unit or "",
                         before_stock=Decimal(str(menu_item.availability or 0)),
@@ -1835,7 +1809,6 @@ def delete_order(
             it.status = OrderStatusEnum.cancelled
 
     root_order.status = OrderStatusEnum.cancelled
-
     db.flush()
 
     if table_id:
@@ -1857,16 +1830,13 @@ def delete_order(
         data={"message": "Order cancelled (soft delete — row retained for audit)"},
     )
 
+
 @router.get("/kds/orders")
 def get_kds_orders(
     client_id: str,
     context: SaasContext = Depends(verify_token),
     db: Session = Depends(get_db),
 ):
-    """
-    KDS endpoint — returns FLAT individual DB rows (root + each sub-order separately).
-    Excludes cancelled orders.
-    """
     orders = (
         db.query(Db_Order_Entity)
         .filter(
