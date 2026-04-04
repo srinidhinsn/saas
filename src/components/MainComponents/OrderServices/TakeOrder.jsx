@@ -938,11 +938,68 @@ const TakeOrder = ({ clientId, token, onOrderUpdate, realm }) => {
   const searchInputRef = useRef(null);
   const isMobile = window.matchMedia('(max-width: 1024px)').matches;
 
+  const [sections, setSections] = useState([]);
+  const [zoneConfigId, setZoneConfigId] = useState(null);
+  const [dietaryOptions, setDietaryOptions] = useState([]);
+  const [dietaryColorMap, setDietaryColorMap] = useState({});
+  const [selectedDietary, setSelectedDietary] = useState(null);
+  const [stockWarning, setStockWarning] = useState(null);
+  const [timingOptions, setTimingOptions] = useState([]);
   const menuConfig = useMemo(
     () => (clientId ? getMenuConfig(clientId) : null),
     [clientId]
   );
 
+  const fetchZoneConfig = async () => {
+    try {
+      const res = await axios.get(
+        `${import.meta.env.VITE_API_TABLE_SERVICE_URL}/${clientId}/tables/config`,
+        { headers: { Authorization: `Bearer ${token}` } }
+      );
+      setSections(res.data || []);
+    } catch (err) {
+      console.error('Zone config fetch failed', err);
+    }
+  };
+  const DIETARY_COLORS = ['bg-green-500', 'bg-red-500', 'bg-yellow-400', 'bg-orange-500', 'bg-purple-500', 'bg-blue-500'];
+
+  const fetchDietaryTypes = async () => {
+    try {
+      const res = await axios.get(
+        `${import.meta.env.VITE_API_INVENTORY_SERVICE_URL}/${clientId}/inventory/item-types`,
+        { params: { category_id: 'dietary_type' }, headers: { Authorization: `Bearer ${token}` } }
+      );
+      const opts = res.data?.data || [];
+      setDietaryOptions(opts);
+      const map = {};
+      opts.forEach((opt, idx) => {
+        map[opt.toLowerCase().replace(/[-_\s]/g, '')] = DIETARY_COLORS[idx % DIETARY_COLORS.length];
+      });
+      setDietaryColorMap(map);
+    } catch (err) {
+      console.error('Dietary fetch failed:', err);
+    }
+  };
+  const fetchTimings = async () => {
+    try {
+      const res = await axios.get(
+        `${import.meta.env.VITE_API_INVENTORY_SERVICE_URL}/${clientId}/inventory/item-types`,
+        {
+          params: { category_id: 'available_timings' },
+          headers: { Authorization: `Bearer ${token}` },
+        }
+      );
+      const raw = res.data?.data || [];
+      const parsed = raw.map(v => {
+        const [name, start, end] = v.split('|');
+        return { name: name?.toLowerCase(), start, end };
+      });
+      setTimingOptions(parsed);
+    } catch (err) {
+      console.error('Timing fetch failed:', err);
+      setTimingOptions([]);
+    }
+  };
   // ─────────────────────────────────────────────────────────────────────────
   // Draft helpers
   // ─────────────────────────────────────────────────────────────────────────
@@ -1065,7 +1122,25 @@ const TakeOrder = ({ clientId, token, onOrderUpdate, realm }) => {
     }
     return null;
   };
-
+  const isItemActive = (slug) => {
+    if (!slug) return true;
+    const doubleUnderIdx = slug.lastIndexOf('__');
+    const timingSegment = doubleUnderIdx !== -1
+      ? slug.slice(doubleUnderIdx + 2).toLowerCase()
+      : null;
+    if (!timingSegment || timingSegment === 'allday') return true;
+    const timingKeys = timingSegment.split('+').filter(Boolean);
+    if (timingKeys.length === 0) return true;
+    const now = new Date();
+    const currentMinutes = now.getHours() * 60 + now.getMinutes();
+    return timingKeys.some(key => {
+      const t = timingOptions.find(o => o.name?.toLowerCase() === key);
+      if (!t || !t.start || !t.end) return true;
+      const [sh, sm] = t.start.split(':').map(Number);
+      const [eh, em] = t.end.split(':').map(Number);
+      return currentMinutes >= (sh * 60 + sm) && currentMinutes <= (eh * 60 + em);
+    });
+  };
   // ─────────────────────────────────────────────────────────────────────────
   // Data fetching
   // ─────────────────────────────────────────────────────────────────────────
@@ -1171,7 +1246,7 @@ const TakeOrder = ({ clientId, token, onOrderUpdate, realm }) => {
       if (!clientId || !token || !menuConfig) return;
       try {
         setLoading(true);
-        await Promise.all([fetchTables(), fetchCounterTree()]);
+        await Promise.all([fetchTables(), fetchCounterTree(), fetchZoneConfig(), fetchDietaryTypes(), fetchTimings()]);
 
         const [catRes, itemRes, invRes] = await Promise.all([
           axios.get(
@@ -1179,8 +1254,14 @@ const TakeOrder = ({ clientId, token, onOrderUpdate, realm }) => {
             { headers: { Authorization: `Bearer ${token}` } }
           ),
           axios.get(
-            `${import.meta.env.VITE_API_INVENTORY_SERVICE_URL}/${clientId}/menu/read?inventory_id=${menuConfig.menuInventoryId}`,
-            { headers: { Authorization: `Bearer ${token}` } }
+            `${import.meta.env.VITE_API_INVENTORY_SERVICE_URL}/${clientId}/menu/read`,
+            {
+              headers: { Authorization: `Bearer ${token}` },
+              params: {
+                inventory_id: menuConfig.menuInventoryId,
+                ...(zoneConfigId && { zone_config_id: zoneConfigId }),
+              }
+            }
           ),
           axios.get(
             `${import.meta.env.VITE_API_INVENTORY_SERVICE_URL}/${clientId}/inventory/read`,
@@ -1209,6 +1290,7 @@ const TakeOrder = ({ clientId, token, onOrderUpdate, realm }) => {
           const cat = flatCats.find(c => c.id === item.category_id);
           return { ...item, category_name: cat?.name || 'Uncategorized' };
         });
+        enrichedItems.sort((a, b) => (a.name || '').localeCompare(b.name || ''));
         setMenuItems(enrichedItems);
 
         const buildTree = () => {
@@ -1257,6 +1339,45 @@ const TakeOrder = ({ clientId, token, onOrderUpdate, realm }) => {
     // eslint-disable-next-line react-hooks/exhaustive-deps
   }, [clientId, token, realm, menuConfig]);
 
+  useEffect(() => {
+    if (!zoneConfigId || !clientId || !token || !menuConfig) return;
+
+    const refetchMenu = async () => {
+      try {
+        const itemRes = await axios.get(
+          `${import.meta.env.VITE_API_INVENTORY_SERVICE_URL}/${clientId}/menu/read`,
+          {
+            headers: { Authorization: `Bearer ${token}` },
+            params: {
+              inventory_id: menuConfig.menuInventoryId,
+              zone_config_id: zoneConfigId,
+            }
+          }
+        );
+
+        // Deduplicate: prefer base record (zone_config_id === 0) when no zone match
+        const allItems = itemRes.data.data || [];
+        const seen = new Map();
+        allItems.forEach(item => {
+          const existing = seen.get(item.id);
+          if (!existing || item.zone_config_id === zoneConfigId) {
+            seen.set(item.id, item);
+          }
+        });
+
+        const enriched = Array.from(seen.values()).map(item => {
+          const cat = categoriesFlat.find(c => c.id === item.category_id);
+          return { ...item, category_name: cat?.name || 'Uncategorized' };
+        });
+        enriched.sort((a, b) => (a.name || '').localeCompare(b.name || ''));
+        setMenuItems(enriched);
+      } catch (err) {
+        console.error('Zone menu refetch failed:', err);
+      }
+    };
+
+    refetchMenu();
+  }, [zoneConfigId, clientId, token, menuConfig]);
   // ─────────────────────────────────────────────────────────────────────────
   // Browser history (back button) — push initial floor state once
   // ─────────────────────────────────────────────────────────────────────────
@@ -1301,6 +1422,7 @@ const TakeOrder = ({ clientId, token, onOrderUpdate, realm }) => {
     setSidebarCategories(categories);
     setSelectedCategoryId(null);
     setSearchQuery('');
+    setZoneConfigId(null);
   };
 
   // ─────────────────────────────────────────────────────────────────────────
@@ -1360,6 +1482,11 @@ const TakeOrder = ({ clientId, token, onOrderUpdate, realm }) => {
     setOrderMode('dinein');
     setSelectedTable(tableIdStr);
     setDineinTableId(tableIdStr);
+    const matchedSection = sections.find(
+      s => s.zone === table.location_zone && s.section === table.section
+    );
+    const resolvedZoneConfigId = matchedSection ? matchedSection.id : null;
+    setZoneConfigId(resolvedZoneConfigId);
     const draft = await readDraft(tableIdStr, clientId, token);
 
     if (draft) {
@@ -1526,6 +1653,21 @@ const TakeOrder = ({ clientId, token, onOrderUpdate, realm }) => {
   };
 
   const addToCart = (item, parentItemKey = null) => {
+    // Count how many of this item are already in the new (unsaved) cart
+    const alreadyInCart = cart
+      .filter(i => i.id === item.id && i.is_new_item && !i.saved_sub_order)
+      .reduce((sum, i) => sum + i.quantity, 0);
+
+    const available = Number(item.availability ?? Infinity);
+
+    if (available > 0 && alreadyInCart >= available) {
+      setStockWarning({
+        itemName: item.name,
+        available,
+      });
+      return null;
+    }
+
     setHasNewItems(true);
     let batch = currentBatchTimestamp;
     if (!batch) {
@@ -1958,6 +2100,18 @@ const TakeOrder = ({ clientId, token, onOrderUpdate, realm }) => {
   const filteredItems = useMemo(() => {
     const q = (searchQuery || '').trim().toLowerCase();
     let items = menuItems;
+    items = items.filter(item => isItemActive(item.slug));
+    // ── Dietary filter (same logic as MenuManagement) ──
+    if (selectedDietary) {
+      items = items.filter(item => {
+        const [mainPart = ''] = (item.slug || '').split('__');
+        const segments = mainPart.split('_').filter(Boolean);
+        return segments.some(seg =>
+          seg.toLowerCase().replace(/[-_\s]/g, '') === selectedDietary
+        );
+      });
+    }
+
     if (selectedCategoryId) {
       const ids = getCategoryAndChildrenIds(categories, selectedCategoryId);
       items = items.filter(i => ids.includes(i.category_id));
@@ -1968,8 +2122,7 @@ const TakeOrder = ({ clientId, token, onOrderUpdate, realm }) => {
       (i.category_name || '').toLowerCase().includes(q) ||
       String(i.code || '').toLowerCase().includes(q)
     );
-    // eslint-disable-next-line react-hooks/exhaustive-deps
-  }, [menuItems, selectedCategoryId, searchQuery, categories]);
+  }, [menuItems, selectedCategoryId, searchQuery, categories, selectedDietary,timingOptions]);
 
   const oldItems = cart.filter(i => !i.is_new_item || i.saved_sub_order);
   const newItems = cart.filter(i => i.is_new_item && !i.saved_sub_order);
@@ -2030,6 +2183,11 @@ const TakeOrder = ({ clientId, token, onOrderUpdate, realm }) => {
                   selectedCategoryId={selectedCategoryId}
                   onSelectCategory={setSelectedCategoryId}
                   defaultOpenAll
+                  zoneConfigId={zoneConfigId}
+                  dietaryOptions={dietaryOptions}
+                  dietaryColorMap={dietaryColorMap}
+                  selectedDietary={selectedDietary}
+                  onSelectDietary={setSelectedDietary}
                 />
               </div>
             </div>
@@ -2042,42 +2200,56 @@ const TakeOrder = ({ clientId, token, onOrderUpdate, realm }) => {
 
                 {/* Top controls */}
                 <div className="space-y-2 mb-2">
+                  {/* Back button + Dietary pills + Search */}
+                  <div className="flex items-center gap-2 flex-wrap">
+                    <button
+                      onClick={handleBackToTables}
+                      className="p-2 rounded-lg bg-bg-tertiary border border-border-default hover:bg-bg-secondary flex-shrink-0"
+                    >
+                      <ArrowLeft size={20} />
+                    </button>
 
-                  {/* Dietary quick-filters */}
-                  <div className="flex gap-2 overflow-x-auto scrollbar-hide pb-2">
-                    {dieterySubCategories.map(cat => (
-                      <button
-                        key={cat.id}
-                        onClick={() => {
-                          setSelectedCategoryId(cat.id);
-                          const n = findNodeAndChildren(categories, cat.id);
-                          if (n) setSidebarCategories([n]);
-                        }}
-                        className={`px-3 py-1.5 rounded-lg text-sm font-semibold border whitespace-nowrap transition-all flex-shrink-0
-                          ${selectedCategoryId === cat.id
+                    {/* Dietary type pills */}
+                    <div className="flex gap-1.5 overflow-x-auto scrollbar-hide flex-1">
+                      {/* <button
+                        onClick={() => setSelectedDietary(null)}
+                        className={`px-3 py-1.5 rounded-full text-xs font-semibold whitespace-nowrap flex-shrink-0 transition-all border
+        ${!selectedDietary
                             ? 'bg-action-primary text-white border-action-primary'
-                            : 'bg-bg-tertiary text-text-primary hover:border-action-primary'}`}
+                            : 'bg-bg-tertiary text-text-primary border-border-default hover:border-action-primary'}`}
                       >
-                        {cat.name}
-                      </button>
-                    ))}
-                  </div>
-
-                  {/* Back button + Category name + Search */}
-                  <div className="flex items-center justify-between lg:flex-row flex-col gap-2">
-                    <div className="flex items-center gap-2">
-                      <button
-                        onClick={handleBackToTables}
-                        className="p-2 rounded-lg bg-bg-tertiary border border-border-default hover:bg-bg-secondary"
-                      >
-                        <ArrowLeft size={20} />
-                      </button>
-                      <h2 className="text-xl font-semibold text-text-primary truncate">
-                        {selectedCategoryName}
-                        <span className="text-sm ml-2">({filteredItems.length})</span>
-                      </h2>
+                        All ({menuItems.length})
+                      </button> */}
+                      {dietaryOptions.map(type => {
+                        const key = type.toLowerCase().replace(/[-_\s]/g, '');
+                        const count = menuItems.filter(item => {
+                          const [mainPart = ''] = (item.slug || '').split('__');
+                          return mainPart.split('_').some(seg => seg.toLowerCase().replace(/[-_\s]/g, '') === key);
+                        }).length;
+                        return (
+                          <button
+                            key={key}
+                            onClick={() => setSelectedDietary(selectedDietary === key ? null : key)}
+                            className={`px-3 py-1.5 rounded-full text-xs font-semibold whitespace-nowrap flex-shrink-0 flex items-center gap-1.5 transition-all border
+            ${selectedDietary === key
+                                ? 'bg-action-primary text-white border-action-primary'
+                                : 'bg-bg-tertiary text-text-primary border-border-default hover:border-action-primary'}`}
+                          >
+                            {dietaryColorMap[key] && (
+                              <span className={`w-2 h-2 rounded-full flex-shrink-0 ${dietaryColorMap[key]}`} />
+                            )}
+                            {type}
+                              {/* <span className={`text-[10px] px-1.5 py-0.5 rounded-full font-bold
+              ${selectedDietary === key ? 'bg-white/20' : 'bg-bg-primary'}`}>
+                                {count}
+                              </span> */}
+                          </button>
+                        );
+                      })}
                     </div>
-                    <div className="relative w-64 max-w-full">
+
+                    {/* Search */}
+                    <div className="relative w-52 flex-shrink-0">
                       <Search size={16} className="absolute left-3 top-1/2 -translate-y-1/2 text-text-secondary" />
                       <input
                         ref={searchInputRef}
@@ -2136,6 +2308,14 @@ const TakeOrder = ({ clientId, token, onOrderUpdate, realm }) => {
                               </span>
                             )}
                           </div>
+                          {item.availability != null && (
+                            <p className={`text-[10px] font-semibold mt-0.5
+    ${Number(item.availability) <= 5
+                                ? 'text-red-500'
+                                : 'text-text-secondary'}`}>
+                              Qty: {Number(item.availability)}
+                            </p>
+                          )}
                           {ac > 0 && (
                             <span className="text-xs bg-blue-100 text-blue-700 px-2 py-0.5 rounded-full font-semibold">
                               +{ac} addon{ac > 1 ? 's' : ''}
@@ -2453,6 +2633,26 @@ const TakeOrder = ({ clientId, token, onOrderUpdate, realm }) => {
             fetchTables();
           }}
         />
+      )}
+      {stockWarning && (
+        <div className="fixed inset-0 z-50 flex items-center justify-center bg-black/40">
+          <div className="bg-white rounded-xl p-6 w-80 shadow-xl">
+            <h3 className="text-base font-bold text-red-600 mb-2">Stock Limit Reached</h3>
+            <p className="text-sm text-gray-600 mb-1">
+              <span className="font-semibold text-gray-800">{stockWarning.itemName}</span>
+            </p>
+            <p className="text-sm text-gray-500 mb-4">
+              Only <span className="font-bold text-red-500">{stockWarning.available}</span> available.
+              You've already added the maximum quantity.
+            </p>
+            <button
+              onClick={() => setStockWarning(null)}
+              className="w-full py-2.5 bg-action-primary text-white rounded-lg font-semibold text-sm hover:bg-action-danger"
+            >
+              OK
+            </button>
+          </div>
+        </div>
       )}
     </div>
   );

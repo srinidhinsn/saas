@@ -107,7 +107,6 @@ const UniversalAddModal = ({
           headers: { Authorization: `Bearer ${token}` }
         }
       );
-      console.log("Dietary API:", res.data);
       setDietaryOptions(res.data?.data || []);
     } catch (err) {
       console.error("Dietary fetch error:", err);
@@ -145,12 +144,6 @@ const UniversalAddModal = ({
   };
 
   useEffect(() => {
-    console.log("EFFECT RUNNING", {
-      showModal,
-      clientId,
-      token,
-      normalizedRealm
-    });
     if (!showModal) return;
     if (!clientId || !token) return;
 

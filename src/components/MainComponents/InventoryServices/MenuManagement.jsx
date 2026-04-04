@@ -37,7 +37,7 @@ const MenuManagement = ({ clientId, token, realm }) => {
     if (!clientId) return null;
     return getMenuConfig(clientId);
   }, [clientId]);
-  const normalizedRealm = (realm || '').toLowerCase(); 
+  const normalizedRealm = (realm || '').toLowerCase();
   const [showAddModal, setShowAddModal] = useState(false);
   const [showEditModal, setShowEditModal] = useState(false);
   const [showDeleteModal, setShowDeleteModal] = useState(false);
@@ -70,13 +70,13 @@ const MenuManagement = ({ clientId, token, realm }) => {
   const [currentUserId, setCurrentUserId] = useState(null);
   const [selectedDietary, setSelectedDietary] = useState(null);
   const [timingOptions, setTimingOptions] = useState([]);
-  
+
   const DIETARY_COLORS = [
-    'bg-green-500', 
-    'bg-red-500',     
-    'bg-yellow-400',  
-    'bg-orange-500',  
-    'bg-purple-500',  
+    'bg-green-500',
+    'bg-red-500',
+    'bg-yellow-400',
+    'bg-orange-500',
+    'bg-purple-500',
     'bg-blue-500',
   ];
 
@@ -203,7 +203,7 @@ const MenuManagement = ({ clientId, token, realm }) => {
 
     while (current && current.parentId) {
       if (current.parentId === rootNode.id) {
-        console.log("Current name", current.name)
+        // console.log("Current name", current.name)
         return current.name; // THIS is AC / Rooftop / Garden etc
       }
       current = categoriesFlat.find(c => c.id === current.parentId);
@@ -226,7 +226,7 @@ const MenuManagement = ({ clientId, token, realm }) => {
       .toLowerCase()
       .replace(/[\s-]+/g, "")
       .replace(/[^a-z0-9]/g, "");
-    console.log("Slug =", slug)
+    // console.log("Slug =", slug)
     return `addons_${slug}`;
   }, [getTopLevelSection]);
 
@@ -247,7 +247,7 @@ const MenuManagement = ({ clientId, token, realm }) => {
     }
   }, [clientId, token]);
   useEffect(() => {
-    if (normalizedRealm === 'restaurant')  fetchDietaryTypes();
+    if (normalizedRealm === 'restaurant') fetchDietaryTypes();
   }, [fetchDietaryTypes, normalizedRealm]);
 
   const fetchAddonData = useCallback(async (addonCategoryId) => {
@@ -336,12 +336,12 @@ const MenuManagement = ({ clientId, token, realm }) => {
     }
     return path;
   };
-// ✅ Add this once near generateSlug
-const toSlugSegment = (str) =>
-  (str || '')
-    .trim()
-    .replace(/[^a-zA-Z0-9]+/g, '_')  // replace ANY non-alphanumeric sequence with single _
-    .replace(/^_+|_+$/g, '');         // trim leading/trailing underscores
+  // ✅ Add this once near generateSlug
+  const toSlugSegment = (str) =>
+    (str || '')
+      .trim()
+      .replace(/[^a-zA-Z0-9]+/g, '_')  // replace ANY non-alphanumeric sequence with single _
+      .replace(/^_+|_+$/g, '');         // trim leading/trailing underscores
   // CHANGED: accepts timings as string[] or string, joins with +
   const generateSlug = (itemName, categoryId, timings, flatList = categoriesFlat) => {
     const pathParts = [];
@@ -354,14 +354,14 @@ const toSlugSegment = (str) =>
       pathParts.unshift(toSlugSegment(cat.name));
       currentId = cat.parentId ?? cat.parent_id ?? null;
     }
-  
+
     const itemPart = toSlugSegment(itemName);
-  
+
     const timingArr = Array.isArray(timings)
       ? timings.filter(Boolean)
       : (timings ? [timings] : []);
     const timingPart = timingArr.length > 0 ? timingArr.join('+') : null;
-  
+
     const base = [...pathParts, itemPart].filter(Boolean).join('_');
     return timingPart ? `${base}__${timingPart}` : base;
   };
@@ -533,8 +533,29 @@ const toSlugSegment = (str) =>
 
       if (!finalCategoryId) return;
       // NEW — pass category_id instead of dietary_type
-      const slug = generateSlug(newItem.name, newItem.category_id, newItem.availability_time);
-      const { dietary_type, ...cleanNewItem } = newItem;
+      const generateSlug = (itemName, categoryId, timings, flatList = categoriesFlat) => {
+        const pathParts = [];
+        let currentId = categoryId;
+        const visited = new Set();
+        while (currentId && !visited.has(currentId)) {
+          visited.add(currentId);
+          const cat = flatList.find(c => c.id === currentId);
+          if (!cat) break;
+          pathParts.unshift(toSlugSegment(cat.name));
+          currentId = cat.parentId ?? cat.parent_id ?? null;
+        }
+
+        const itemPart = toSlugSegment(itemName);
+
+        const timingArr = Array.isArray(timings)
+          ? timings.filter(Boolean)
+          : (timings ? [timings] : []);
+        const timingPart = timingArr.length > 0 ? timingArr.join('+') : null;
+
+        // ── dietary is already in category path, no need to inject separately ──
+        const base = [...pathParts, itemPart].filter(Boolean).join('_');
+        return timingPart ? `${base}__${timingPart}` : base;
+      }; const { dietary_type, ...cleanNewItem } = newItem;
       const created_by =
         currentUserId || localStorage.getItem("user_id") || "system";
 
@@ -630,7 +651,7 @@ const toSlugSegment = (str) =>
     try {
       let imageId = editingItem.image_id;
       if (editItemImage) imageId = await uploadImageToDocumentService(editItemImage);
-  
+
       const resolvedCat = categoriesFlat.find(c => c.id === editingItem?.category_id);
       if (!resolvedCat) {
         console.error("Edit failed: could not resolve category", editingItem?.category_id);
@@ -638,10 +659,10 @@ const toSlugSegment = (str) =>
       }
       const finalCategoryId = resolvedCat.id;
       if (!finalCategoryId) return;
-  
+
       // ✅ Build slug with dietary injected — same pattern as import
       const { dietary_type, zonePrices: zp, ...cleanEditingItem } = editingItem;
-  
+
       const slug = (() => {
         const parts = [];
         let currentId = finalCategoryId;
@@ -653,25 +674,32 @@ const toSlugSegment = (str) =>
           parts.unshift(toSlugSegment(cat.name));
           currentId = cat.parentId ?? cat.parent_id ?? null;
         }
-      
+
         const itemPart = toSlugSegment(editingItem.name);
+        // Check if category path already contains a dietary segment
+        const categoryPathStr = parts.join('_').toLowerCase().replace(/[-_\s]/g, '');
+        const dietaryAlreadyInPath = dietaryOptions.some(
+          d => categoryPathStr.includes(d.toLowerCase().replace(/[-_\s]/g, ''))
+        );
+
         const normalizedDietary = (dietary_type || '').toLowerCase().replace(/[-_\s]/g, '');
-      
-        const nameParts = normalizedDietary
+
+        // Only inject dietary segment if it's NOT already in the category path
+        const nameParts = (normalizedDietary && !dietaryAlreadyInPath)
           ? [...parts, normalizedDietary, itemPart]
           : [...parts, itemPart];
-      
+
         const timingArr = Array.isArray(editingItem.availability_time)
           ? editingItem.availability_time.filter(Boolean)
           : (editingItem.availability_time ? [editingItem.availability_time] : []);
         const timingPart = timingArr.length > 0 ? timingArr.join('+') : null;
-      
+
         const base = nameParts.filter(Boolean).join('_');
         return timingPart ? `${base}__${timingPart}` : base;
       })();
-  
-      console.log(`[Edit] slug="${slug}" dietary="${dietary_type}" timing="${editingItem.availability_time}"`);
-  
+
+      // console.log(`[Edit] slug="${slug}" dietary="${dietary_type}" timing="${editingItem.availability_time}"`);
+
       const basePayload = {
         name: editingItem.name,
         description: editingItem.description || null,
@@ -692,24 +720,24 @@ const toSlugSegment = (str) =>
         inventory_id: editingItem.inventory_id,
         id: Number(editingItem.id),
       };
-  
+
       // Always update base record (zone_config_id = 0)
       await axios.post(
         `${import.meta.env.VITE_API_INVENTORY_SERVICE_URL}/${clientId}/menu/update`,
         { ...basePayload, unit_price: Number(editingItem.unit_price) || 0, zone_config_id: 0 },
         { headers: { Authorization: `Bearer ${token}` } }
       );
-  
+
       // Upsert zone variants
       const filledZonePrices = Object.entries(zp || {}).filter(
         ([, price]) => price !== '' && price !== null && price !== undefined
       );
-  
+
       for (const [configId, price] of filledZonePrices) {
         const existingZoneRecord = menuItems.find(
           m => m.id === editingItem.id && m.zone_config_id === Number(configId)
         );
-  
+
         if (existingZoneRecord) {
           await axios.post(
             `${import.meta.env.VITE_API_INVENTORY_SERVICE_URL}/${clientId}/menu/update`,
@@ -724,7 +752,7 @@ const toSlugSegment = (str) =>
           );
         }
       }
-  
+
       await fetchData({ silent: true });
       setShowEditModal(false);
       setEditingItem(null);
@@ -917,56 +945,59 @@ const toSlugSegment = (str) =>
     // Sort by id to guarantee same order across all zones
     return Array.from(seen.values()).sort((a, b) => Number(a.id) - Number(b.id));
   };
- const isItemActive = (slug, timingOptions) => {
-  if (!slug) return true;
+  const isItemActive = (slug, timingOptions) => {
+    if (!slug) return true;
 
-  const doubleUnderIdx = slug.lastIndexOf('__');
+    // If timings haven't loaded yet, show all items
+    if (!timingOptions || timingOptions.length === 0) return true;
 
-  // ✅ ONLY take timing from "__"
-  const timingSegment = doubleUnderIdx !== -1
-    ? slug.slice(doubleUnderIdx + 2).toLowerCase()
-    : null;
+    const doubleUnderIdx = slug.lastIndexOf('__');
+    const timingSegment = doubleUnderIdx !== -1
+      ? slug.slice(doubleUnderIdx + 2).toLowerCase()
+      : null;
 
-  // ✅ No timing = always active
-  if (!timingSegment || timingSegment === 'allday') return true;
+    if (!timingSegment || timingSegment === 'allday') return true;
 
-  const timingKeys = timingSegment.split('+').filter(Boolean);
-  if (timingKeys.length === 0) return true;
+    const timingKeys = timingSegment.split('+').filter(Boolean);
+    if (timingKeys.length === 0) return true;
 
-  const now = new Date();
-  const currentMinutes = now.getHours() * 60 + now.getMinutes();
+    const now = new Date();
+    const currentMinutes = now.getHours() * 60 + now.getMinutes();
 
-  return timingKeys.some(key => {
-    const t = timingOptions?.find(
-      o => o.name?.toLowerCase() === key
-    );
+    return timingKeys.some(key => {
+      const t = timingOptions.find(o => o.name?.toLowerCase() === key);
 
-    if (!t || !t.start || !t.end) {
-      console.warn("Invalid timing config for:", key, t);
-      return true;
-    }
+      // If timing key not found in config, treat as always active (don't warn)
+      if (!t || !t.start || !t.end) return true;
 
-    const [sh, sm] = t.start.split(':').map(Number);
-    const [eh, em] = t.end.split(':').map(Number);
+      const [sh, sm] = t.start.split(':').map(Number);
+      const [eh, em] = t.end.split(':').map(Number);
 
-    return currentMinutes >= (sh * 60 + sm) &&
-           currentMinutes <= (eh * 60 + em);
-  });
-};
+      return currentMinutes >= (sh * 60 + sm) &&
+        currentMinutes <= (eh * 60 + em);
+    });
+  };
   const getDietaryFromSlug = (item) => {
     if (!item || !dietaryOptions.length) return null;
 
     const normalize = (str) => (str || '').toLowerCase().replace(/[-_\s]/g, '');
 
-    // Split slug on __ to drop timing suffix, then split on _ for segments
     const [mainPart = ''] = (item.slug || '').split('__');
     const slugSegments = mainPart.split('_').filter(Boolean);
 
-    for (const segment of slugSegments) {
-      const normalizedSegment = normalize(segment);
-      // Compare normalized segment against each normalized dietaryOption id
-      const match = dietaryOptions.find(d => normalize(d) === normalizedSegment);
-      if (match) return normalize(match); // return as normalized key e.g. "nonveg"
+    // Try matching by joining consecutive segments (to catch "Non_Veg" → "nonveg")
+    // Sort dietary options longest-first so "nonveg" is tried before "veg"
+    const sortedOptions = [...dietaryOptions].sort(
+      (a, b) => normalize(b).length - normalize(a).length
+    );
+
+    for (let i = 0; i < slugSegments.length; i++) {
+      // Try joining 1, 2, 3 consecutive segments from position i
+      for (let j = 1; j <= 3; j++) {
+        const joined = normalize(slugSegments.slice(i, i + j).join(''));
+        const match = sortedOptions.find(d => normalize(d) === joined);
+        if (match) return normalize(match);
+      }
     }
 
     return null;
@@ -1152,9 +1183,9 @@ const toSlugSegment = (str) =>
         );
         return found?.name || idOrName || "Unknown";
       };
-  
+
       const sectionLabel = (s) => `${s.zone}-${s.section}`;
-  
+
       const grouped = {};
       menuItems.forEach(item => {
         const key = item.slug || item.name;
@@ -1168,12 +1199,12 @@ const toSlugSegment = (str) =>
           grouped[key].zonePrices["Base"] = item.unit_price;
         }
       });
-  
+
       const zoneColumns = sections.map(sectionLabel);
-  
+
       const exportData = Object.values(grouped).map(({ baseItem: item, zonePrices }) => {
         const dietary = getDietaryFromSlug(item);
-  
+
         // ✅ Extract timing from slug — exclude "allday", export as empty if none
         const slugTimingPart = item.slug?.includes('__')
           ? item.slug.split('__')[1]
@@ -1181,9 +1212,8 @@ const toSlugSegment = (str) =>
         const availabilityTiming = (!slugTimingPart || slugTimingPart === 'allday')
           ? ""
           : slugTimingPart; // e.g. "morning" or "morning+evening", empty = no timing set
-  
+
         const row = {
-          ID: item.id ?? "",
           Name: item.name ?? "",
           Description: item.description ?? "",
           Category: catNameById(item.category_id) || "Unknown",
@@ -1197,26 +1227,24 @@ const toSlugSegment = (str) =>
           Code: item.code != null ? String(item.code) : "",
           Serving_Quantity: item.serving_quantity ?? "",
           Serving_Unit: item.serving_unit ?? "",
-          Realm: item.realm ?? realm ?? "",
-          Slug: item.slug ?? "",
           Line_Item_IDs: Array.isArray(item.line_item_id)
             ? item.line_item_id.join(", ") : "",
         };
-  
+
         zoneColumns.forEach(col => {
           row[`Price_${col}`] = zonePrices[col] ?? "";
         });
-  
+
         return row;
       });
-  
+
       const headers = [
-        "ID", "Name", "Description", "Category", "Dietary_Type", "Availability_Timing",
+        "Name", "Description", "Category", "Dietary_Type", "Availability_Timing",
         "Image", "Unit", "Unit_Price", "Discount", "Availability", "Code",
-        "Serving_Quantity", "Serving_Unit", "Realm", "Slug", "Line_Item_IDs",
+        "Serving_Quantity", "Serving_Unit", "Line_Item_IDs",
         ...zoneColumns.map(c => `Price_${c}`)
       ];
-  
+
       const worksheet = XLSX.utils.json_to_sheet(exportData, { header: headers });
       const workbook = XLSX.utils.book_new();
       XLSX.utils.book_append_sheet(workbook, worksheet, "MenuItems");
@@ -1231,22 +1259,22 @@ const toSlugSegment = (str) =>
   const handleImportFromExcel = async (e) => {
     const file = e.target.files[0];
     if (!file) return;
-  
+
     let created_by = "system", updated_by = "system";
     try {
       const decoded = jwtDecode(token);
       created_by = decoded?.user_id || created_by;
       updated_by = created_by;
     } catch { }
-  
+
     const sectionLabel = (s) => `${s.zone}-${s.section}`;
-  
+
     const currentCategoriesFlat = [...categoriesFlat];
     const currentSelectedCategoryId = selectedCategoryId;
     const currentSections = [...sections];
-  
-    console.log("[Import] dietaryOptions available:", dietaryOptions);
-  
+
+    // console.log("[Import] dietaryOptions available:", dietaryOptions);
+
     let allMenuItems = [];
     try {
       const res = await axios.get(
@@ -1261,14 +1289,14 @@ const toSlugSegment = (str) =>
       console.error("Failed to fetch full menu:", err);
       return;
     }
-  
+
     allMenuItems = allMenuItems.map(item => ({
       ...item,
       zone_config_id: item.zone_config_id === null || item.zone_config_id === undefined
         ? 0
         : Number(item.zone_config_id)
     }));
-  
+
     const reader = new FileReader();
     reader.onload = async (evt) => {
       try {
@@ -1277,39 +1305,39 @@ const toSlugSegment = (str) =>
           workbook.Sheets[workbook.SheetNames[0]],
           { defval: "" }
         );
-  
+
         if (!parsedData.length) return;
-  
+
         const allColumns = Object.keys(parsedData[0]);
         const priceColumns = allColumns.filter(col => col.startsWith("Price_"));
-  
+
         if (!window.confirm(`Import ${parsedData.length} items?`)) {
           e.target.value = "";
           return;
         }
-  
+
         for (const row of parsedData) {
           if (!row.Name?.trim()) continue;
-  
+
           const existingRecords = allMenuItems.filter(
             item => item.name?.trim().toLowerCase() === row.Name?.trim().toLowerCase()
           );
-  
-          console.log(`[Import] "${row.Name}" — found ${existingRecords.length} existing records`);
-  
+
+          // console.log(`[Import] "${row.Name}" — found ${existingRecords.length} existing records`);
+
           const categoryId = currentCategoriesFlat.find(
             c => c.name.trim().toLowerCase() === (row.Category || '').trim().toLowerCase()
           )?.id || currentSelectedCategoryId;
-  
+
           const categoryName = currentCategoriesFlat.find(
             c => c.id === categoryId
           )?.name || null;
-  
+
           if (!categoryName) {
             console.warn(`[Import] Skipping "${row.Name}" — category not found: "${row.Category}"`);
             continue;
           }
-  
+
           // ── Dietary — validate against actual dietaryOptions ────────────
           const rawDietary = (row.Dietary_Type || "").trim().toLowerCase().replace(/[-_\s]/g, '');
           const matchedDietaryOption = dietaryOptions.find(
@@ -1318,17 +1346,17 @@ const toSlugSegment = (str) =>
           const importedDietary = matchedDietaryOption
             ? matchedDietaryOption.toLowerCase().replace(/[-_\s]/g, '')
             : rawDietary;
-  
-          console.log(`[Import] dietary raw="${row.Dietary_Type}" → matched="${importedDietary}"`);
-  
+
+          // console.log(`[Import] dietary raw="${row.Dietary_Type}" → matched="${importedDietary}"`);
+
           // ── Timing — read from Availability_Timing column directly ──────
           // Empty string = no timing selected (item has no time restriction)
           // "morning" or "morning+evening" = specific timings
           const rawTiming = (row.Availability_Timing || "").trim().toLowerCase();
-  
+
           // ✅ Only set timing if explicitly provided — no fallback to allday
           const timingPart = rawTiming || null; // null = no timing
-  
+
           // ── Build slug ───────────────────────────────────────────────────
           const slug = (() => {
             const parts = [];
@@ -1341,25 +1369,30 @@ const toSlugSegment = (str) =>
               parts.unshift(toSlugSegment(cat.name));
               currentId = cat.parentId ?? cat.parent_id ?? null;
             }
-          
+
             const itemPart = toSlugSegment(row.Name);
-            const nameParts = importedDietary
+            const categoryPathStr = parts.join('_').toLowerCase().replace(/[-_\s]/g, '');
+            const dietaryAlreadyInPath = dietaryOptions.some(
+              d => categoryPathStr.includes(d.toLowerCase().replace(/[-_\s]/g, ''))
+            );
+
+            const nameParts = (importedDietary && !dietaryAlreadyInPath)
               ? [...parts, importedDietary, itemPart]
               : [...parts, itemPart];
-          
+
             const base = nameParts.filter(Boolean).join('_');
             return timingPart ? `${base}__${timingPart}` : base;
           })();
-  
-          console.log(`[Import] "${row.Name}" → dietary="${importedDietary}" timing="${timingPart}" slug="${slug}"`);
-  
+
+          // console.log(`[Import] "${row.Name}" → dietary="${importedDietary}" timing="${timingPart}" slug="${slug}"`);
+
           const basePayload = {
             client_id: clientId,
             inventory_id: menuConfig.menuInventoryId,
             name: row.Name?.trim(),
             description: row.Description || null,
             category_id: categoryId,
-            realm: row.Realm || realm || null,
+            realm: realm || null,
             code: row.Code ? String(row.Code) : null,
             serving_quantity: row.Serving_Quantity || null,
             serving_unit: row.Serving_Unit || null,
@@ -1374,14 +1407,14 @@ const toSlugSegment = (str) =>
             created_by,
             updated_by,
           };
-  
+
           // ================= BASE RECORD =================
           let sharedId;
           const existingBase = existingRecords.find(item => item.zone_config_id === 0);
-  
+
           if (existingBase) {
             sharedId = existingBase.id;
-            console.log(`[Import] Updating base record id=${sharedId}`);
+            // console.log(`[Import] Updating base record id=${sharedId}`);
             await axios.post(
               `${import.meta.env.VITE_API_INVENTORY_SERVICE_URL}/${clientId}/menu/update`,
               {
@@ -1393,7 +1426,7 @@ const toSlugSegment = (str) =>
               { headers: { Authorization: `Bearer ${token}` } }
             );
           } else {
-            console.log(`[Import] Creating new base record for "${row.Name}"`);
+            // console.log(`[Import] Creating new base record for "${row.Name}"`);
             const res = await axios.post(
               `${import.meta.env.VITE_API_INVENTORY_SERVICE_URL}/${clientId}/menu/create`,
               {
@@ -1405,24 +1438,24 @@ const toSlugSegment = (str) =>
             );
             sharedId = res.data.data.id;
           }
-  
+
           // ================= ZONE RECORDS =================
           for (const col of priceColumns) {
             const priceVal = row[col];
             if (priceVal === "" || priceVal === null || priceVal === undefined) continue;
-  
+
             const label = col.replace("Price_", "");
             const matchedSection = currentSections.find(s => sectionLabel(s) === label);
             if (!matchedSection) {
               console.warn(`[Import] No section matched for column: ${col}`);
               continue;
             }
-  
+
             const matchedZoneConfigId = Number(matchedSection.id);
             const existingZone = existingRecords.find(
               item => item.zone_config_id === matchedZoneConfigId
             );
-  
+
             if (existingZone) {
               await axios.post(
                 `${import.meta.env.VITE_API_INVENTORY_SERVICE_URL}/${clientId}/menu/update`,
@@ -1448,18 +1481,18 @@ const toSlugSegment = (str) =>
             }
           }
         }
-  
+
         await fetchData({ silent: false });
         alert("Import complete!");
         e.target.value = "";
-  
+
       } catch (err) {
         console.error("Import Error:", err);
         alert(`Import failed: ${err.message}`);
         e.target.value = "";
       }
     };
-  
+
     reader.readAsBinaryString(file);
   };
 
@@ -1678,7 +1711,7 @@ const toSlugSegment = (str) =>
 
                 <div className="flex gap-2 flex-wrap justify-end">
 
-                  {normalizedRealm  ==='restaurant' &&
+                  {normalizedRealm === 'restaurant' &&
                     <button onClick={() => setShowMenuConfig(true)} className="h-9 px-3 flex items-center gap-2 rounded-lg bg-action-success text-white text-sm font-semibold shadow-sm hover:opacity-90">
                       <span>Config</span>
                     </button>}

@@ -159,9 +159,6 @@ const UniversalBulkUpdateModal = ({
     }
   };
 
-  useEffect(() => {
-    console.log("CONFIGS:", configs);
-  }, [configs]);
   // ✅ Clear global add-ons for all selected items
   const clearGlobalAddons = () => {
     if (selectedRows.length === 0) {

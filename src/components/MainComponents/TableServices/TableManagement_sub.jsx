@@ -781,7 +781,7 @@ const TableManagement = ({ clientId, token, screenIds, userId }) => {
                                                             Seats: <span className="font-bold">{table.table_type}</span>
                                                         </div>
                                                     </div>
-                                                    <span className="text-md font-semibold">
+                                                    <span className="text-[10px] font-semibold">
                                                         {config?.section?.toUpperCase() || "-"}
                                                     </span>
                                                 </div>
