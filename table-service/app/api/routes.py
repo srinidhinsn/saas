@@ -8,6 +8,7 @@ from entity.table_entity import DiningTable , Tables
 from models.response_model import ResponseModel 
 from models.saas_context import SaasContext
 from utils.auth import verify_token
+from utils.services import add_master_value , get_master_values ,delete_master_value
 
 router = APIRouter()
 
@@ -115,3 +116,21 @@ def delete_config(id: int, client_id: str, db: Session = Depends(get_db)):
 
     return {"message": "Deleted"}
 
+
+@router.get("/table-types")
+def get_table_types(client_id: str, category_id: str,context: SaasContext = Depends(verify_token),db: Session = Depends(get_db)):
+    data = get_master_values(db, client_id, category_id)
+
+    return ResponseModel(screen_id=context.screen_id,status="success",message="Config fetched",data=data)
+    
+@router.post("/table-types")
+def add_table_type(client_id: str, category_id: str, value: str,context: SaasContext = Depends(verify_token),db: Session = Depends(get_db)):
+    data = add_master_value(db, client_id, category_id, value)
+
+    return ResponseModel(screen_id=context.screen_id,status="success",message="Config added",data=data)
+
+@router.delete("/table-types")
+def delete_table_type(client_id: str, category_id: str, value: str,context: SaasContext = Depends(verify_token),db: Session = Depends(get_db)):
+    data = delete_master_value(db, client_id, category_id, value)
+
+    return ResponseModel(screen_id=context.screen_id,status="success",message="Config deleted",data=data)
