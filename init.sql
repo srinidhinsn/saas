@@ -856,8 +856,9 @@ INSERT INTO category (id, client_id, name, description, sub_categories, slug, cr
 INSERT INTO category (id, client_id, name, description, sub_categories, slug, created_by, updated_by, created_at, updated_at) VALUES ('admin', 'easyfood', 'Admin', 'admin', NULL, '_Roles_Admin', '1000', '1000', '2025-08-19 12:47:01.377214', '2025-08-19 12:47:01.377214');
 INSERT INTO category (id, client_id, name, description, sub_categories, slug, created_by, updated_by, created_at, updated_at) VALUES ('waiter', 'easyfood', 'Waiter', 'admin', NULL, '_Roles_Waiter', '1000', '1000', '2025-08-19 12:47:01.377214', '2025-08-19 12:47:01.377214');
 INSERT INTO category (id, client_id, name, description, sub_categories, slug, created_by, updated_by, created_at, updated_at) VALUES ('receptionist', 'easyfood', 'Receptionist', 'admin', NULL, '_Roles_Receptionist', '1000', '1000', '2025-08-19 12:47:01.377214', '2025-08-19 12:47:01.377214');
+INSERT INTO category (id, client_id, name, description, sub_categories, slug, created_by, updated_by, created_at, updated_at) VALUES ('zone', 'easyfood', 'Zones', 'Zone Selection', '{Ground,First,Second,third}', '_Zones', '1000', '1000', '2025-08-19 12:47:01.377214', '2025-08-19 12:47:01.377214');
+INSERT INTO category (id, client_id, name, description, sub_categories, slug, created_by, updated_by, created_at, updated_at) VALUES ('section', 'easyfood', 'Section', 'Section Selection', '{AC,Non-AC}', '_Section', '1000', '1000', '2025-08-19 12:47:01.377214', '2025-08-19 12:47:01.377214');
 INSERT INTO category (id, client_id, name, description, sub_categories, slug, created_by, updated_by, created_at, updated_at) VALUES ('status', 'easyfood', 'Status', 'Status Selection', '{Vacant,Occupied,Reserved}', '_Status', '1000', '1000', '2025-08-19 12:47:01.377214', '2025-08-19 12:47:01.377214');
-
 
 CREATE TABLE IF NOT EXISTS inventory_transactions (
     id               BIGSERIAL PRIMARY KEY,
@@ -878,3 +879,25 @@ CREATE TABLE IF NOT EXISTS inventory_transactions (
     created_at       TIMESTAMP   DEFAULT NOW(),
     remarks          TEXT
 );
+
+--  April 4 2026 --- Menu Configuration and Available Timings,DIetary_types updates
+-- dietary_type row 
+INSERT INTO category (id, client_id, name, description, sub_categories, slug,created_by, updated_by, created_at, updated_at)
+VALUES ('dietary_type','easyfood','Dietary Type','Dietary Classification','{veg,nonveg,egg,chinese}','_DietaryType','1000','1000',NOW(),NOW());
+-- available_timings row 
+INSERT INTO category (id, client_id, name, description, sub_categories, slug,created_by, updated_by, created_at, updated_at)
+VALUES ('available_timings','easyfood','Availability Time','Food Availability Timings','{}','_AvailabilityTime','1000','1000',NOW(),NOW());
+-- user-service
+UPDATE category
+SET sub_categories = array_cat(sub_categories, ARRAY['roles'])
+WHERE id = 'users' AND client_id = 'saas';
+-- table-service
+UPDATE category
+SET sub_categories = array_cat(sub_categories, ARRAY['table-types','config'])
+WHERE id = 'tables' AND client_id = 'saas';
+-- inventory-service
+UPDATE category
+SET sub_categories = array_cat(sub_categories, ARRAY['item-types'])
+WHERE id = 'tables' AND client_id = 'saas';
+
+ALTER TABLE inventory ALTER COLUMN id DROP DEFAULT;   -- stopping the sequence of inventory table's id
