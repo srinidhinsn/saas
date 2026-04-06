@@ -65,6 +65,7 @@ const MenuManagement = ({ clientId, token, realm }) => {
   const [selectedSection, setSelectedSection] = useState("");
   const [zoneConfigId, setZoneConfigId] = useState(null);
   const [currentUserId, setCurrentUserId] = useState(null);
+
   useEffect(() => {
     try {
       const decoded = jwtDecode(token);
@@ -72,20 +73,6 @@ const MenuManagement = ({ clientId, token, realm }) => {
     } catch { console.warn("JWT decode failed"); }
   }, [token]);
 
-  // ─── Walk up the categoriesFlat tree and collect all ancestor name segments ─
-  const buildPathNames = useCallback((categoryId, flatList) => {
-    const pathNames = [];
-    let currentId = categoryId;
-    const visited = new Set();
-    while (currentId && !visited.has(currentId)) {
-      visited.add(currentId);
-      const cat = flatList.find(c => c.id === currentId);
-      if (!cat) break;
-      pathNames.push((cat.name || '').toLowerCase());
-      currentId = cat.parentId || cat.parent_id;
-    }
-    return pathNames; // nearest-first: [leafName, parentName, grandparentName, ...]
-  }, []);
   const fetchZoneConfig = useCallback(async () => {
     try {
       const res = await axios.get(
@@ -94,12 +81,10 @@ const MenuManagement = ({ clientId, token, realm }) => {
       );
 
       const data = res.data || [];
-
       setSections(data);
 
       const uniqueZones = [...new Set(data.map(d => d.zone))];
       setZones(uniqueZones);
-
     } catch (err) {
       console.error("Zone config fetch failed", err);
     }
@@ -108,76 +93,26 @@ const MenuManagement = ({ clientId, token, realm }) => {
   useEffect(() => {
     fetchZoneConfig();
   }, [fetchZoneConfig]);
-  const filteredSections = sections.filter(
-    s => s.zone === selectedZone
-  );
+
+  const filteredSections = sections.filter(s => s.zone === selectedZone);
 
   useEffect(() => {
     if (!selectedZone || !selectedSection) return;
-
     const found = sections.find(
       s => s.zone === selectedZone && s.section === selectedSection
     );
-
-    if (found) {
-      setZoneConfigId(found.id);
-    }
+    if (found) setZoneConfigId(found.id);
   }, [selectedZone, selectedSection, sections]);
 
-  // ─── Get top-level section name dynamically ─────────────────────────
-  const getTopLevelSection = useCallback((categoryId) => {
-    if (!categoryId || !categoriesFlat.length || !menuConfig) return null;
-
-    const rootNode = categoriesFlat.find(
-      c =>
-        c.name.toLowerCase() === menuConfig.root.toLowerCase() ||
-        c.id.toLowerCase() === menuConfig.root.toLowerCase()
-    );
-
-    if (!rootNode) return null;
-
-    let current = categoriesFlat.find(c => c.id === categoryId);
-
-    while (current && current.parentId) {
-      if (current.parentId === rootNode.id) {
-        console.log("Current name", current.name)
-        return current.name; // THIS is AC / Rooftop / Garden etc
-      }
-      current = categoriesFlat.find(c => c.id === current.parentId);
-    }
-
-    return null;
-  }, [categoriesFlat, menuConfig]);
-
-
-
-  const getAddonCategoryId = useCallback((itemCategoryId) => {
-    if (!itemCategoryId) return null;
-
-    const sectionName = getTopLevelSection(itemCategoryId);
-    if (!sectionName) return null;
-
-    // convert to slug format
-    const slug = sectionName
-      .trim()
-      .toLowerCase()
-      .replace(/[\s-]+/g, "")
-      .replace(/[^a-z0-9]/g, "");
-    console.log("Slug =", slug)
-    return `addons_${slug}`;
-  }, [getTopLevelSection]);
-
-
-
-  const fetchAddonData = useCallback(async (addonCategoryId) => {
-    if (!menuConfig || !addonCategoryId) {
-      return { subcategories: [], items: [] };
-    }
+  // ─── Simplified addon fetch — always uses "addons" root category ───────────
+  // No more section-name slug logic. Subcategories under "addons" are universal.
+  const fetchAddonData = useCallback(async () => {
+    if (!menuConfig) return { subcategories: [], items: [] };
 
     try {
       const [catRes, itemRes] = await Promise.all([
         axios.get(
-          `${import.meta.env.VITE_API_INVENTORY_SERVICE_URL}/${clientId}/menu/read_category?category_id=${addonCategoryId}`,
+          `${import.meta.env.VITE_API_INVENTORY_SERVICE_URL}/${clientId}/menu/read_category?category_id=addons`,
           { headers: { Authorization: `Bearer ${token}` } }
         ),
         axios.get(
@@ -195,51 +130,54 @@ const MenuManagement = ({ clientId, token, realm }) => {
       const addonsCategory = catRes.data.data?.[0];
 
       if (!addonsCategory) {
-        // No addon category created yet
         return { subcategories: [], items: [] };
       }
 
       const subcats = addonsCategory.subCategories || [];
       const allItems = itemRes.data.data || [];
 
+      // Collect all valid addon subcategory IDs
       const subcategoryIds = new Set(subcats.map(s => s.id));
 
+      // Include items that belong to "addons" directly OR any of its subcategories
       const filteredAddons = allItems.filter(
         item =>
-          item.category_id === addonCategoryId ||
+          item.category_id === 'addons' ||
           subcategoryIds.has(item.category_id)
       );
 
       return { subcategories: subcats, items: filteredAddons };
     } catch (error) {
-      console.warn(`Addon category not found: ${addonCategoryId}`);
+      console.warn('Addon fetch failed:', error);
       return { subcategories: [], items: [] };
     }
   }, [clientId, token, menuConfig, zoneConfigId]);
+
+  // ─── Fetch addons whenever the selected category changes ─────────────────
+  // No more slug derivation — just fetch once for all categories
+  useEffect(() => {
+    if (!selectedCategoryId) return;
+
+    fetchAddonData().then(({ subcategories, items }) => {
+      setAddonSubcategories(subcategories);
+      setAllAddonItems(items);
+    });
+  }, [selectedCategoryId, fetchAddonData]);
+
+  // Also load addons on initial mount so Add modal works even before a category is selected
+  useEffect(() => {
+    fetchAddonData().then(({ subcategories, items }) => {
+      setAddonSubcategories(subcategories);
+      setAllAddonItems(items);
+    });
+    // eslint-disable-next-line react-hooks/exhaustive-deps
+  }, []);
 
   useEffect(() => {
     if (zoneConfigId) {
       fetchData();
     }
   }, [zoneConfigId]);
-
-  useEffect(() => {
-    if (!selectedCategoryId) return;
-
-    const addonCatId = getAddonCategoryId(selectedCategoryId);
-
-    if (!addonCatId) {
-      setAddonSubcategories([]);
-      setAllAddonItems([]);
-      return;
-    }
-
-    fetchAddonData(addonCatId).then(({ subcategories, items }) => {
-      setAddonSubcategories(subcategories);
-      setAllAddonItems(items);
-    });
-  }, [selectedCategoryId, getAddonCategoryId, fetchAddonData]);
-
 
   const buildCategoryPath = (categoryId) => {
     if (!categoryId) return [];
@@ -287,18 +225,19 @@ const MenuManagement = ({ clientId, token, realm }) => {
       .filter(m => m.zone_config_id !== 0)
       .forEach(m => { zonePrices[m.zone_config_id] = m.unit_price; });
 
-    // ✅ category_id in DB is now a name — resolve back to actual id for modal dropdown
+    // category_id in DB is now a name — resolve back to actual id for modal dropdown
     const resolvedCategoryId = categoriesFlat.find(
       c => c.name.toLowerCase() === (baseRecord.category_id || '').toLowerCase()
     )?.id || baseRecord.category_id;
 
     setEditingItem({
       ...baseRecord,
-      category_id: resolvedCategoryId,  // id for modal
+      category_id: resolvedCategoryId,
       zonePrices,
     });
     setShowEditModal(true);
   };
+
   const flattenCategoryTree = (tree, level = 0, parentId = null) => {
     let flatList = [];
     tree.forEach(category => {
@@ -331,7 +270,6 @@ const MenuManagement = ({ clientId, token, realm }) => {
     return result;
   };
 
-  // ✅ FIXED — uses the same axios pattern as the rest of MenuManagement
   const fetchUnits = useCallback(async () => {
     try {
       const res = await axios.get(
@@ -367,7 +305,7 @@ const MenuManagement = ({ clientId, token, realm }) => {
     );
     return found?.name || null;
   };
-  // Uses inventoryCategoryRoot from config — not hardcoded "inventory"
+
   const fetchInventoryIds = useCallback(async () => {
     if (!menuConfig) return;
     try {
@@ -409,9 +347,7 @@ const MenuManagement = ({ clientId, token, realm }) => {
         imageId = await uploadImageToDocumentService(newItemImage);
       }
 
-      const selectedCat = categoriesFlat.find(
-        c => c.id === newItem?.category_id
-      );
+      const selectedCat = categoriesFlat.find(c => c.id === newItem?.category_id);
 
       const finalCategoryId =
         selectedCat?.name ||
@@ -466,8 +402,7 @@ const MenuManagement = ({ clientId, token, realm }) => {
 
       const sharedId = baseRes.data.data.id;
 
-      // STEP 2: Always create records for ALL sections,
-      // using entered zone price if provided, otherwise falling back to base price
+      // STEP 2: Create records for ALL sections
       if (sections && sections.length > 0) {
         for (const section of sections) {
           const configId = Number(section.id);
@@ -492,35 +427,25 @@ const MenuManagement = ({ clientId, token, realm }) => {
         console.warn("No sections found → skipping zone creation");
       }
 
-      // Refresh UI
       await fetchData({ silent: true });
 
-      // Reset form
       setShowAddModal(false);
       setNewItem({
-        name: "",
-        description: "",
-        category_id: "",
-        unit_price: "",
-        discount: "",
-        code: "",
-        unit: "",
-        line_item_id: [],
-        zonePrices: {},
+        name: "", description: "", category_id: "", unit_price: "",
+        discount: "", code: "", unit: "", line_item_id: [], zonePrices: {},
       });
       setNewItemImage(null);
       setNewItemImageUrl("");
-
     } catch (error) {
       console.error("Error adding item:", error);
     }
   };
+
   const handleEditItem = async () => {
     try {
       let imageId = editingItem.image_id;
       if (editItemImage) imageId = await uploadImageToDocumentService(editItemImage);
 
-      // ✅ FIXED: was incorrectly reading from newItem — must use editingItem
       const resolvedCat = categoriesFlat.find(c => c.id === editingItem?.category_id);
       const finalCategoryId =
         resolvedCat?.name ||
@@ -607,7 +532,6 @@ const MenuManagement = ({ clientId, token, realm }) => {
     return () => document.removeEventListener("mousedown", handleClickOutside);
   }, []);
 
-  // Uses menuInventoryId and root from config — not hardcoded
   const fetchData = useCallback(async (options = { silent: false }) => {
     const { silent = false } = options;
     if (!clientId || !token || !menuConfig) {
@@ -732,8 +656,6 @@ const MenuManagement = ({ clientId, token, realm }) => {
     }
 
     if (selectedCategoryId) {
-      // selectedCategoryId is still the actual id from the tree click
-      // so we need to collect allowed names instead of ids
       const allowedCategoryIds = getAllDescendantCategoryIds(selectedCategoryId, categories);
       const allowedNames = allowedCategoryIds
         .map(id => categoriesFlat.find(c => c.id === id)?.name)
@@ -745,7 +667,6 @@ const MenuManagement = ({ clientId, token, realm }) => {
       );
     }
 
-    // If a specific zone is selected, show only that zone's records
     if (zoneConfigId !== null) {
       return items.filter(item => item.zone_config_id === zoneConfigId);
     }
@@ -797,7 +718,6 @@ const MenuManagement = ({ clientId, token, realm }) => {
     try {
       const deletedItemId = deleteTarget.id;
 
-      // ✅ Send zone_config_id: 0 — backend will now delete ALL variants for this id
       await axios.post(
         `${import.meta.env.VITE_API_INVENTORY_SERVICE_URL}/${clientId}/menu/delete`,
         { id: deletedItemId, zone_config_id: 0 },
@@ -818,8 +738,8 @@ const MenuManagement = ({ clientId, token, realm }) => {
 
       await fetchData({ silent: true });
 
-      const addonCatId = getAddonCategoryId(deleteTarget.category_id);
-      const { subcategories, items } = await fetchAddonData(addonCatId);
+      // Refresh addon data (simplified — no slug needed)
+      const { subcategories, items } = await fetchAddonData();
       setAddonSubcategories(subcategories);
       setAllAddonItems(items);
 
@@ -835,7 +755,6 @@ const MenuManagement = ({ clientId, token, realm }) => {
     if (!window.confirm(`Delete ${selectedRows.length} selected items?`)) return;
 
     try {
-      // ✅ Backend now deletes all zone variants — just send id + zone_config_id: 0
       await Promise.all(selectedRows.map(id => axios.post(
         `${import.meta.env.VITE_API_INVENTORY_SERVICE_URL}/${clientId}/menu/delete`,
         { id, zone_config_id: 0 },
@@ -870,14 +789,12 @@ const MenuManagement = ({ clientId, token, realm }) => {
         const { dietary_type: od, ...cleanOriginalItem } = menuItems.find(item => item.id === id);
         const mergedItem = { ...cleanOriginalItem, ...cleanEditedData, client_id: clientId };
 
-        // Update the main record
         await axios.post(
           `${import.meta.env.VITE_API_INVENTORY_SERVICE_URL}/${clientId}/menu/update`,
           mergedItem,
           { headers: { Authorization: `Bearer ${token}` } }
         );
 
-        // Upsert zone price records
         const filledZonePrices = Object.entries(zp || {}).filter(
           ([, price]) => price !== '' && price !== null && price !== undefined
         );
@@ -921,39 +838,30 @@ const MenuManagement = ({ clientId, token, realm }) => {
     try {
       const catNameById = (idOrName) => {
         if (!idOrName) return "Uncategorized";
-
         const found = categoriesFlat.find(
-          c =>
-            c.id === idOrName ||
-            c.name?.toLowerCase() === String(idOrName).toLowerCase()
+          c => c.id === idOrName || c.name?.toLowerCase() === String(idOrName).toLowerCase()
         );
-
         return found?.name || idOrName || "Unknown";
       };
 
-      // Build a label for each section: "Zone-Section"
       const sectionLabel = (s) => `${s.zone}-${s.section}`;
 
-      // Group all menu items by slug (deduplication key)
       const grouped = {};
       menuItems.forEach(item => {
         const key = item.slug || item.name;
         if (!grouped[key]) {
           grouped[key] = { baseItem: item, zonePrices: {} };
         }
-        // Store price keyed by zone-section label
         if (item.zone_config_id) {
           const sec = sections.find(s => s.id === item.zone_config_id);
           if (sec) {
             grouped[key].zonePrices[sectionLabel(sec)] = item.unit_price;
           }
         } else {
-          // No zone = base price
           grouped[key].zonePrices["Base"] = item.unit_price;
         }
       });
 
-      // All unique zone-section column names
       const zoneColumns = sections.map(sectionLabel);
 
       const exportData = Object.values(grouped).map(({ baseItem: item, zonePrices }) => {
@@ -976,7 +884,6 @@ const MenuManagement = ({ clientId, token, realm }) => {
             ? item.line_item_id.join(", ") : "",
         };
 
-        // Add one column per zone-section
         zoneColumns.forEach(col => {
           row[`Price_${col}`] = zonePrices[col] ?? "";
         });
@@ -999,6 +906,7 @@ const MenuManagement = ({ clientId, token, realm }) => {
       console.error("Export failed:", err);
     }
   };
+
   const clean = (v) => (v === "" || v === undefined || v === null || (typeof v === "number" && isNaN(v)) ? null : v);
   const num = (v) => { if (v === "" || v === undefined || v === null || (typeof v === "number" && isNaN(v))) return 0; const n = Number(v); return isNaN(n) ? 0 : n; };
 
@@ -1019,7 +927,6 @@ const MenuManagement = ({ clientId, token, realm }) => {
     const currentSelectedCategoryId = selectedCategoryId;
     const currentSections = [...sections];
 
-    // Fetch ALL items with no zone filter
     let allMenuItems = [];
     try {
       const res = await axios.get(
@@ -1035,8 +942,6 @@ const MenuManagement = ({ clientId, token, realm }) => {
       return;
     }
 
-    // ✅ Normalize ALL zone_config_ids to numbers right after fetch
-    // This is the root cause — API may return strings, null, or numbers inconsistently
     allMenuItems = allMenuItems.map(item => ({
       ...item,
       zone_config_id: item.zone_config_id === null || item.zone_config_id === undefined
@@ -1066,15 +971,10 @@ const MenuManagement = ({ clientId, token, realm }) => {
         for (const row of parsedData) {
           if (!row.Name?.trim()) continue;
 
-          // ✅ Match by name from normalized full data
           const existingRecords = allMenuItems.filter(
             item => item.name?.trim().toLowerCase() === row.Name?.trim().toLowerCase()
           );
 
-          console.log(`[Import] "${row.Name}" — found ${existingRecords.length} existing records`);
-          console.log(`[Import] zone_config_ids:`, existingRecords.map(r => r.zone_config_id));
-
-          // ✅ Use snapshot of categoriesFlat
           const categoryId = currentCategoriesFlat.find(
             c => c.name.trim().toLowerCase() === (row.Category || '').trim().toLowerCase()
           )?.id || currentSelectedCategoryId;
@@ -1088,7 +988,6 @@ const MenuManagement = ({ clientId, token, realm }) => {
             continue;
           }
 
-          // ✅ Inline slug using snapshot
           const slug = (() => {
             const parts = [];
             let currentId = categoryId;
@@ -1116,7 +1015,6 @@ const MenuManagement = ({ clientId, token, realm }) => {
             serving_quantity: row.Serving_Quantity || null,
             serving_unit: row.Serving_Unit || null,
             unit: row.Unit || null,
-            // ✅ Only include image_id if it's actually a real value
             ...(row.Image && String(row.Image).trim() !== "" && { image_id: String(row.Image).trim() }),
             discount: Number(row.Discount) || 0,
             slug,
@@ -1127,40 +1025,25 @@ const MenuManagement = ({ clientId, token, realm }) => {
             updated_by,
           };
 
-          // ================= BASE RECORD =================
           let sharedId;
-
-          // ✅ zone_config_id is now guaranteed to be a number after normalization above
           const existingBase = existingRecords.find(item => item.zone_config_id === 0);
 
           if (existingBase) {
             sharedId = existingBase.id;
-            console.log(`[Import] Updating base record id=${sharedId} price=${row.Unit_Price}`);
             await axios.post(
               `${import.meta.env.VITE_API_INVENTORY_SERVICE_URL}/${clientId}/menu/update`,
-              {
-                ...basePayload,
-                id: Number(sharedId),
-                unit_price: Number(row.Unit_Price) || 0,
-                zone_config_id: 0
-              },
+              { ...basePayload, id: Number(sharedId), unit_price: Number(row.Unit_Price) || 0, zone_config_id: 0 },
               { headers: { Authorization: `Bearer ${token}` } }
             );
           } else {
-            console.log(`[Import] Creating new base record for "${row.Name}"`);
             const res = await axios.post(
               `${import.meta.env.VITE_API_INVENTORY_SERVICE_URL}/${clientId}/menu/create`,
-              {
-                ...basePayload,
-                unit_price: Number(row.Unit_Price) || 0,
-                zone_config_id: 0
-              },
+              { ...basePayload, unit_price: Number(row.Unit_Price) || 0, zone_config_id: 0 },
               { headers: { Authorization: `Bearer ${token}` } }
             );
             sharedId = res.data.data.id;
           }
 
-          // ================= ZONE RECORDS =================
           for (const col of priceColumns) {
             const priceVal = row[col];
             if (priceVal === "" || priceVal === null || priceVal === undefined) continue;
@@ -1172,36 +1055,21 @@ const MenuManagement = ({ clientId, token, realm }) => {
               continue;
             }
 
-            // ✅ Always a number, no shadowing
             const matchedZoneConfigId = Number(matchedSection.id);
-
-            // ✅ zone_config_id on existingRecords is also normalized to number — strict === works
             const existingZone = existingRecords.find(
               item => item.zone_config_id === matchedZoneConfigId
             );
 
             if (existingZone) {
-              console.log(`[Import] Updating zone record id=${existingZone.id} zone=${matchedZoneConfigId} price=${priceVal}`);
               await axios.post(
                 `${import.meta.env.VITE_API_INVENTORY_SERVICE_URL}/${clientId}/menu/update`,
-                {
-                  ...basePayload,
-                  id: Number(existingZone.id),
-                  unit_price: Number(priceVal),
-                  zone_config_id: matchedZoneConfigId
-                },
+                { ...basePayload, id: Number(existingZone.id), unit_price: Number(priceVal), zone_config_id: matchedZoneConfigId },
                 { headers: { Authorization: `Bearer ${token}` } }
               );
             } else {
-              console.log(`[Import] Creating zone record zone=${matchedZoneConfigId} price=${priceVal}`);
               await axios.post(
                 `${import.meta.env.VITE_API_INVENTORY_SERVICE_URL}/${clientId}/menu/create`,
-                {
-                  ...basePayload,
-                  id: sharedId,
-                  unit_price: Number(priceVal),
-                  zone_config_id: matchedZoneConfigId
-                },
+                { ...basePayload, id: sharedId, unit_price: Number(priceVal), zone_config_id: matchedZoneConfigId },
                 { headers: { Authorization: `Bearer ${token}` } }
               );
             }
@@ -1211,7 +1079,6 @@ const MenuManagement = ({ clientId, token, realm }) => {
         await fetchData({ silent: false });
         alert("Import complete!");
         e.target.value = "";
-
       } catch (err) {
         console.error("Import Error:", err);
         alert(`Import failed: ${err.message}`);
@@ -1240,15 +1107,12 @@ const MenuManagement = ({ clientId, token, realm }) => {
       return null;
     };
 
-    // Find the saved node
     const node = findNode(categories, saved);
     if (!node) return;
 
-    // Find its parent (first level under root)
     const findParentAtLevel = (nodes, targetId, parentNode = null, level = 0) => {
       for (const n of nodes) {
         if (n.id === targetId) {
-          // Return the parent at level 1 (AC/Non-AC level)
           return level === 2 ? parentNode : n;
         }
         if (n.children?.length) {
@@ -1335,38 +1199,11 @@ const MenuManagement = ({ clientId, token, realm }) => {
 
           {/* Main Content */}
           <div className="lg:col-span-3 border-default border-border-default p-3 rounded-lg h-[88.5vh] flex flex-col">
-            {/* Quick category pills */}
-            {/* <div className="flex gap-2 overflow-x-auto scrollbar-hide lg:overflow-visible pb-2">
-              {dieterySubCategories.map(cat => (
-                <button
-                  key={cat.id}
-                  onClick={() => {
-                    setSelectedCategoryId(cat.id);
-                    localStorage.setItem("menu_selected_category", cat.id);
-                    savedCategoryRef.current = cat.id;
-                    const selectedNode = findNodeAndChildren(categories, cat.id);
-                    if (selectedNode) setSidebarCategories([selectedNode]);
-                  }}
-                  className="px-3 py-1.5 rounded-lg text-sm font-semibold border whitespace-nowrap transition-all flex-shrink-0"
-                >
-                  {(() => {
-                    const section = getTopSectionName(cat.id);
-                    return (
-                      <div className="flex flex-col leading-tight text-left">
-                        {section && <span className="text-[10px] opacity-60">{section}</span>}
-                        <span className="text-sm font-semibold">{cat.name}</span>
-                      </div>
-                    );
-                  })()}
-                </button>
-              ))}
-            </div> */}
             <div className="mb-3 flex flex-wrap gap-2">
-
               <button
                 onClick={() => setZoneConfigId(null)}
                 className={`px-3 py-1 rounded-full text-sm border transition
-    ${zoneConfigId === null
+                  ${zoneConfigId === null
                     ? "bg-black text-white border-black"
                     : "bg-gray-100 text-gray-700 hover:bg-gray-200"
                   }`}
@@ -1379,7 +1216,7 @@ const MenuManagement = ({ clientId, token, realm }) => {
                   key={s.id}
                   onClick={() => setZoneConfigId(s.id)}
                   className={`px-3 py-1 rounded-full text-sm border transition
-      ${zoneConfigId === s.id
+                    ${zoneConfigId === s.id
                       ? "bg-blue-600 text-white border-blue-600"
                       : "bg-gray-100 text-gray-700 hover:bg-gray-200"
                     }`}
@@ -1388,6 +1225,7 @@ const MenuManagement = ({ clientId, token, realm }) => {
                 </button>
               ))}
             </div>
+
             {/* Header */}
             <div className="flex flex-col gap-3 lg:flex-row lg:items-center lg:justify-between mb-4">
               <div className="flex-shrink-0">
@@ -1521,8 +1359,9 @@ const MenuManagement = ({ clientId, token, realm }) => {
         newItemImage={newItemImage} setNewItemImage={setNewItemImage}
         newItemImageUrl={newItemImageUrl} setNewItemImageUrl={setNewItemImageUrl}
         handleAddItem={handleAddItem} getCategoryIdByName={getCategoryIdByName}
-        inventoryIds={inventoryIds} getAddonCategoryId={getAddonCategoryId}
-        fetchAddonData={fetchAddonData} setAddonSubcategories={setAddonSubcategories} setAllAddonItems={setAllAddonItems}
+        inventoryIds={inventoryIds}
+        fetchAddonData={fetchAddonData}
+        setAddonSubcategories={setAddonSubcategories} setAllAddonItems={setAllAddonItems}
         units={units}
       />
 
@@ -1533,10 +1372,10 @@ const MenuManagement = ({ clientId, token, realm }) => {
         editItemImage={editItemImage} setEditItemImage={setEditItemImage}
         editItemImageUrl={editItemImageUrl} setEditItemImageUrl={setEditItemImageUrl}
         handleEditItem={handleEditItem} clientId={clientId} token={token}
-        inventoryIds={inventoryIds} getAddonCategoryId={getAddonCategoryId}
-        fetchAddonData={fetchAddonData} setAddonSubcategories={setAddonSubcategories} setAllAddonItems={setAllAddonItems}
+        inventoryIds={inventoryIds}
+        fetchAddonData={fetchAddonData}
+        setAddonSubcategories={setAddonSubcategories} setAllAddonItems={setAllAddonItems}
         units={units}
-
       />
 
       <UniversalBulkUpdateModal clientId={clientId}

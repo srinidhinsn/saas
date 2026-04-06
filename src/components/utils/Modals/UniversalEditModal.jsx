@@ -595,10 +595,6 @@
 
 
 
-
-
-
-
 import React, { useState, useEffect } from 'react';
 import { X, Upload, Plus } from 'lucide-react';
 import MenuImagePreview from '../../MainComponents/InventoryServices/Tree&CategoryManage/MenuImagePreview';
@@ -615,8 +611,8 @@ const UniversalEditModal = ({
   editingItem,
   setEditingItem,
   categories,
-  addonSubcategories, // ✅ Addon subcategories
-  allAddonItems, // ✅ All addon items
+  addonSubcategories,
+  allAddonItems,
   editItemImage,
   setEditItemImage,
   editItemImageUrl,
@@ -625,6 +621,11 @@ const UniversalEditModal = ({
   clientId,
   token,
   inventoryIds,
+  // Simplified: single fetchAddonData with no arguments needed
+  fetchAddonData,
+  setAddonSubcategories,
+  setAllAddonItems,
+  units,
 
   // Table-specific props
   editRowId,
@@ -635,10 +636,11 @@ const UniversalEditModal = ({
   editFieldErrors
 }) => {
   const [dragActive, setDragActive] = useState(false);
-  const [showAddonPopup, setShowAddonPopup] = useState(false); // ✅ Popup state
+  const [showAddonPopup, setShowAddonPopup] = useState(false);
   const [configs, setConfigs] = useState([]);
   const [statusOptions, setStatusOptions] = useState([]);
   const [loadingConfigs, setLoadingConfigs] = useState(false);
+
   const fetchStatuses = async () => {
     try {
       const res = await axios.get(
@@ -654,10 +656,10 @@ const UniversalEditModal = ({
       setStatusOptions([]);
     }
   };
+
   const fetchConfigs = async () => {
     try {
       setLoadingConfigs(true);
-
       const res = await axios.get(
         `${import.meta.env.VITE_API_TABLE_SERVICE_URL}/${clientId}/tables/config`,
         {
@@ -665,7 +667,6 @@ const UniversalEditModal = ({
           headers: { Authorization: `Bearer ${token}` }
         }
       );
-
       setConfigs(res.data || []);
     } catch (err) {
       console.error("Config fetch error:", err);
@@ -678,12 +679,20 @@ const UniversalEditModal = ({
   useEffect(() => {
     if (!showModal) return;
     if (!clientId || !token) return;
-
     fetchConfigs();
     fetchStatuses();
   }, [showModal, clientId, token]);
 
-  // Menu Modal Functions
+  // Refresh addon data when the edit modal opens
+  useEffect(() => {
+    if (!showModal || modalType !== 'menu') return;
+    if (!fetchAddonData) return;
+    fetchAddonData().then(({ subcategories, items }) => {
+      setAddonSubcategories?.(subcategories);
+      setAllAddonItems?.(items);
+    });
+  }, [showModal, modalType]);
+
   const handleEditDrag = (e) => {
     e.preventDefault();
     e.stopPropagation();
@@ -698,7 +707,6 @@ const UniversalEditModal = ({
     e.preventDefault();
     e.stopPropagation();
     setDragActive(false);
-
     if (e.dataTransfer.files && e.dataTransfer.files[0]) {
       handleEditImageFile(e.dataTransfer.files[0]);
     }
@@ -726,13 +734,11 @@ const UniversalEditModal = ({
     return result;
   };
 
-  // ✅ Get addon name by ID
   const getAddonNameById = (id) => {
     const addon = allAddonItems?.find(item => item.id === id);
     return addon?.name || 'Unknown';
   };
 
-  // ✅ Remove individual addon
   const removeAddon = (addonId) => {
     setEditingItem(prev => ({
       ...prev,
@@ -811,7 +817,7 @@ const UniversalEditModal = ({
                 <div>
                   <label className="block text-sm font-medium mb-1 text-gray-700">Description</label>
                   <textarea
-                    value={editingItem.description}
+                    value={editingItem.description || ''}
                     onChange={(e) => setEditingItem({ ...editingItem, description: e.target.value })}
                     className="w-full px-3 py-2 rounded-md border border-gray-300 text-gray-900 focus:outline-none focus:ring-2 focus:ring-blue-500 focus:border-transparent"
                     rows="3"
@@ -843,6 +849,7 @@ const UniversalEditModal = ({
                     />
                   </div>
                 </div>
+
                 {/* Zone-wise pricing */}
                 {configs.length > 0 && (
                   <div>
@@ -877,6 +884,7 @@ const UniversalEditModal = ({
                     ))}
                   </div>
                 )}
+
                 {/* Code & Unit */}
                 <div className="grid grid-cols-2 gap-4">
                   <div>
@@ -889,7 +897,8 @@ const UniversalEditModal = ({
                       onChange={(e) =>
                         setEditingItem({
                           ...editingItem,
-                          inventory_id: baseRecord.inventory_id || 'menu',
+                          // ✅ Fixed: was incorrectly referencing undefined `baseRecord`
+                          inventory_id: editingItem.inventory_id || 'menu',
                           code: e.target.value
                         })
                       }
@@ -900,14 +909,30 @@ const UniversalEditModal = ({
                     />
                   </div>
                   <div>
-                    <label className="block text-sm font-medium mb-1 text-gray-700">Unit</label>
-                    <input
-                      type="text"
-                      value={editingItem.unit}
-                      onChange={(e) => setEditingItem({ ...editingItem, unit: e.target.value })}
-                      className="w-full px-3 py-2 rounded-md border border-gray-300 text-gray-900 focus:outline-none focus:ring-2 focus:ring-blue-500 focus:border-transparent"
-                    />
+                    <label className="block text-sm font-medium mb-1 text-gray-700">Serving Unit</label>
+                    <select
+                      value={editingItem.serving_unit ?? ''}
+                      onChange={(e) => setEditingItem({ ...editingItem, serving_unit: e.target.value })}
+                      className="w-full px-3 py-2 rounded-md border border-gray-300 text-gray-900 focus:outline-none focus:ring-2 focus:ring-blue-500"
+                    >
+                      <option value="">Select unit</option>
+                      {(units || []).map((u) => (
+                        <option key={u} value={u}>{u}</option>
+                      ))}
+                    </select>
                   </div>
+                </div>
+
+                {/* Serving Quantity */}
+                <div>
+                  <label className="block text-sm font-medium mb-1 text-gray-700">Serving Quantity</label>
+                  <input
+                    type="number"
+                    value={editingItem.serving_quantity ?? ''}
+                    onChange={(e) => setEditingItem({ ...editingItem, serving_quantity: e.target.value })}
+                    className="w-full px-3 py-2 rounded-md border border-gray-300 text-gray-900 focus:outline-none focus:ring-2 focus:ring-blue-500 focus:border-transparent"
+                    placeholder="0"
+                  />
                 </div>
 
                 {/* Item Image Upload */}
@@ -981,13 +1006,12 @@ const UniversalEditModal = ({
                   </div>
                 </div>
 
-                {/* ✅ Add-ons with Popup */}
+                {/* Add-ons */}
                 <div>
                   <label className="block text-sm font-medium mb-2 text-gray-700">
                     Add-ons
                   </label>
 
-                  {/* Selected Addons Display */}
                   {editingItem.line_item_id && editingItem.line_item_id.length > 0 && (
                     <div className="mb-3 flex flex-wrap gap-2">
                       {editingItem.line_item_id.map(addonId => (
@@ -1008,7 +1032,6 @@ const UniversalEditModal = ({
                     </div>
                   )}
 
-                  {/* Select Addons Button */}
                   <button
                     type="button"
                     onClick={() => setShowAddonPopup(true)}
@@ -1043,7 +1066,7 @@ const UniversalEditModal = ({
           </div>
         </div>
 
-        {/* ✅ Addon Selection Popup */}
+        {/* Addon Selection Popup */}
         <AddonSelectionPopup
           isOpen={showAddonPopup}
           onClose={() => setShowAddonPopup(false)}
@@ -1078,18 +1101,15 @@ const UniversalEditModal = ({
 
           {/* Content */}
           <div className="px-6 py-4">
-            {/* Table Name Display */}
             <div className="bg-gray-50 border border-gray-200 rounded-md p-4 mb-4 text-center">
               <p className="text-xs font-medium text-gray-600 uppercase tracking-wide mb-1">Table Name</p>
               <p className="text-2xl font-bold text-gray-900">{table.name}</p>
             </div>
 
             <div className="space-y-4">
-              {/* No of Seating */}
               <div>
                 <label className="block text-sm font-medium mb-1 text-gray-700">No of Seating</label>
 
-                {/* Desktop */}
                 <input
                   type="number"
                   min="1"
@@ -1102,7 +1122,6 @@ const UniversalEditModal = ({
                     }`}
                 />
 
-                {/* Mobile */}
                 <div className={`md:hidden flex items-center gap-2 border rounded-md ${editFieldErrors?.table_type ? 'border-red-500 bg-red-50' : 'border-gray-300'
                   }`}>
                   <button
@@ -1141,9 +1160,9 @@ const UniversalEditModal = ({
                   <p className="text-red-600 text-xs mt-1">{editFieldErrors.table_type}</p>
                 )}
               </div>
-              <div className="">
-                <label className="block text-sm font-medium mb-1 text-gray-700">Section & Zone :</label>
 
+              <div>
+                <label className="block text-sm font-medium mb-1 text-gray-700">Section & Zone :</label>
                 <select
                   value={table.config_id || ""}
                   onChange={(e) =>
@@ -1152,7 +1171,6 @@ const UniversalEditModal = ({
                   className="w-full px-3 py-2 border rounded-md"
                 >
                   <option value="">Select Config</option>
-
                   {loadingConfigs ? (
                     <option disabled>Loading...</option>
                   ) : configs.length === 0 ? (
@@ -1167,7 +1185,6 @@ const UniversalEditModal = ({
                 </select>
               </div>
 
-              {/* Status */}
               <div>
                 <label className="block text-sm font-medium mb-1 text-gray-700">Status</label>
                 <select

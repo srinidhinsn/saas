@@ -1299,7 +1299,6 @@
 
 
 
-
 import React, { useState, useEffect, useCallback } from 'react';
 import { X, Upload, Plus } from 'lucide-react';
 import { FaTimes, FaPlus } from 'react-icons/fa';
@@ -1318,8 +1317,8 @@ const UniversalAddModal = ({
   newItem,
   setNewItem,
   categories,
-  addonSubcategories, // ✅ Addon subcategories
-  allAddonItems, // ✅ All addon items
+  addonSubcategories,
+  allAddonItems,
   newItemImage,
   setNewItemImage,
   newItemImageUrl,
@@ -1327,6 +1326,10 @@ const UniversalAddModal = ({
   handleAddItem,
   getCategoryIdByName,
   inventoryIds,
+  // Simplified: single fetchAddonData with no arguments needed
+  fetchAddonData,
+  setAddonSubcategories,
+  setAllAddonItems,
 
   // Table-specific props
   tableRanges,
@@ -1338,27 +1341,23 @@ const UniversalAddModal = ({
   units
 }) => {
   const [dragActive, setDragActive] = useState(false);
-  const [showAddonPopup, setShowAddonPopup] = useState(false); // ✅ Popup state
+  const [showAddonPopup, setShowAddonPopup] = useState(false);
   const [configs, setConfigs] = useState([]);
-  const [loadingConfigs, setLoadingConfigs] = useState(false); const [statusOptions, setStatusOptions] = useState([]);
-  // Memoize helpers so they're stable across renders (prevents unnecessary effect runs)
+  const [loadingConfigs, setLoadingConfigs] = useState(false);
+  const [statusOptions, setStatusOptions] = useState([]);
+
   const flattenCategories = useCallback((items = [], level = 0) => {
     let result = [];
-
     items.forEach(item => {
       if (!item) return;
-
       const children = item.children || item.subCategories || [];
-
       if (item.id !== 'all') {
         result.push({ ...item, level });
-
         if (children.length) {
           result = result.concat(flattenCategories(children, level + 1));
         }
       }
     });
-
     return result;
   }, []);
 
@@ -1396,15 +1395,24 @@ const UniversalAddModal = ({
       setLoadingConfigs(false);
     }
   };
+
   useEffect(() => {
     if (!showModal) return;
     if (!clientId || !token) return;
-
     fetchConfigs();
     fetchStatuses();
   }, [showModal, modalType, clientId, token]);
 
-  // Drag handlers
+  // Refresh addon data when the add modal opens
+  useEffect(() => {
+    if (!showModal || modalType !== 'menu') return;
+    if (!fetchAddonData) return;
+    fetchAddonData().then(({ subcategories, items }) => {
+      setAddonSubcategories?.(subcategories);
+      setAllAddonItems?.(items);
+    });
+  }, [showModal, modalType]);
+
   const handleDrag = (e) => {
     e.preventDefault();
     e.stopPropagation();
@@ -1440,13 +1448,11 @@ const UniversalAddModal = ({
     setTableRanges(updated);
   };
 
-  // ✅ Get addon name by ID
   const getAddonNameById = (id) => {
     const addon = allAddonItems?.find(item => item.id === id);
     return addon?.name || 'Unknown';
   };
 
-  // ✅ Remove individual addon
   const removeAddon = (addonId) => {
     setNewItem(prev => ({
       ...(prev || {}),
@@ -1468,7 +1474,6 @@ const UniversalAddModal = ({
         line_item_id: [],
         inventory_id: 'menu'
       });
-
       setNewItemImage?.(null);
       setNewItemImageUrl?.('');
     } else if (modalType === 'table') {
@@ -1499,13 +1504,11 @@ const UniversalAddModal = ({
                   value={newItem?.category_id || ''}
                   onChange={(e) => {
                     const selectedCatId = e.target.value;
-
                     setNewItem(prev => ({
                       ...(prev || {}),
                       category_id: selectedCatId
                     }));
                   }}
-
                   className="w-full px-4 py-2 rounded-lg bg-bg-tertiary border border-border-default text-text-primary focus:outline-none focus:ring-2 focus:ring-action-primary"
                   required
                 >
@@ -1517,8 +1520,6 @@ const UniversalAddModal = ({
                   ))}
                 </select>
               </div>
-
-
 
               {/* Item Name */}
               <div>
@@ -1570,6 +1571,8 @@ const UniversalAddModal = ({
                   />
                 </div>
               </div>
+
+              {/* Zone-wise pricing */}
               <div>
                 <label className="block text-sm font-medium mb-2 text-text-primary">
                   Pricing by Zone & Section
@@ -1577,9 +1580,6 @@ const UniversalAddModal = ({
                 <p className="text-xs text-gray-400 mb-2">
                   Leave blank to skip. Filled prices create separate zone records.
                 </p>
-
-                {/* Base price row — already exists above, just keep it */}
-
                 {configs.map(c => (
                   <div key={c.id} className="flex items-center justify-between gap-3 px-3 py-2 mb-1 rounded-xl border border-border-default bg-bg-tertiary">
                     <span className="text-sm font-medium text-text-primary">
@@ -1604,9 +1604,9 @@ const UniversalAddModal = ({
                   </div>
                 ))}
               </div>
-              {/* Code & Unit */}
-              <div className="grid grid-cols-2 gap-4">
 
+              {/* Serving & Code & Add-ons */}
+              <div className="grid grid-cols-2 gap-4">
                 <div>
                   <label className="block text-sm font-medium mb-2 text-text-primary">Serving Quantity</label>
                   <input
@@ -1632,7 +1632,6 @@ const UniversalAddModal = ({
                   </select>
                 </div>
 
-
                 <div>
                   <label className="block text-sm font-medium mb-2 text-text-primary">Code *</label>
                   <input
@@ -1643,13 +1642,13 @@ const UniversalAddModal = ({
                     placeholder="0"
                   />
                 </div>
-                {/* ✅ Add-ons with Popup */}
+
+                {/* Add-ons */}
                 <div>
                   <label className="block text-sm font-medium mb-2 text-text-primary">
                     Add-ons
                   </label>
 
-                  {/* Selected Addons Display */}
                   {newItem?.line_item_id && newItem.line_item_id.length > 0 && (
                     <div className="mb-3 flex flex-wrap gap-2">
                       {newItem.line_item_id.map(addonId => (
@@ -1670,7 +1669,6 @@ const UniversalAddModal = ({
                     </div>
                   )}
 
-                  {/* Select Addons Button */}
                   <button
                     type="button"
                     onClick={() => setShowAddonPopup(true)}
@@ -1685,8 +1683,6 @@ const UniversalAddModal = ({
                   </button>
                 </div>
               </div>
-
-
 
               {/* Item Image Upload */}
               <div>
@@ -1737,8 +1733,6 @@ const UniversalAddModal = ({
                 </div>
               </div>
 
-
-
               {/* Action Buttons */}
               <div className="flex gap-3 pt-4">
                 <button
@@ -1758,7 +1752,7 @@ const UniversalAddModal = ({
           </div>
         </div>
 
-        {/* ✅ Addon Selection Popup */}
+        {/* Addon Selection Popup */}
         <AddonSelectionPopup
           isOpen={showAddonPopup}
           onClose={() => setShowAddonPopup(false)}
@@ -1912,7 +1906,6 @@ const UniversalAddModal = ({
                         <option key={s} value={s.toLowerCase()}>{s}</option>
                       ))
                       : (
-                        // fallback if masters API has nothing yet
                         <>
                           <option value="vacant">Vacant</option>
                           <option value="reserved">Reserved</option>
