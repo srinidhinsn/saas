@@ -880,7 +880,142 @@ const TableReservation = ({
     </div>
   );
 };
+// ─────────────────────────────────────────────────────────────────────────────
+// TakeawayOrdersModal — today's takeaway orders picker
+// ─────────────────────────────────────────────────────────────────────────────
 
+const TakeawayOrdersModal = ({ isOpen, onClose, clientId, token, takeawayTableIds, onSelectOrder }) => {
+  const [orders, setOrders] = useState([]);
+  const [loading, setLoading] = useState(false);
+
+  useEffect(() => {
+    if (!isOpen) return;
+    const fetchTodayOrders = async () => {
+      setLoading(true);
+      try {
+        const r = await axios.get(
+          `${import.meta.env.VITE_API_ORDER_SERVICE_URL}/${clientId}/dinein/table`,
+          { headers: { Authorization: `Bearer ${token}` } }
+        );
+        const all = r.data?.data || [];
+        const todayStart = new Date();
+        todayStart.setHours(0, 0, 0, 0);
+
+        const todayTakeaway = all.filter(o => {
+          if (!takeawayTableIds.includes(String(o.table_id))) return false;
+          if (o.status?.toLowerCase() === 'completed') return false;
+          if (o.status?.toLowerCase() === 'draft') return false;
+          const created = new Date(
+            typeof o.created_at === 'string'
+              ? o.created_at.replace(' ', 'T').split('.')[0] + 'Z'
+              : o.created_at
+          );
+          return created >= todayStart;
+        }).sort((a, b) => new Date(b.created_at) - new Date(a.created_at));
+
+        setOrders(todayTakeaway);
+      } catch (err) {
+        console.error('TakeawayOrdersModal fetch failed:', err);
+      } finally {
+        setLoading(false);
+      }
+    };
+    fetchTodayOrders();
+  }, [isOpen, clientId, token, takeawayTableIds]);
+
+  if (!isOpen) return null;
+
+  const statusStyle = (s) => ({
+    pending: 'bg-orange-100 text-orange-700',
+    preparing: 'bg-blue-100 text-blue-700',
+    ready: 'bg-green-100 text-green-700',
+    served: 'bg-purple-100 text-purple-700',
+  }[s?.toLowerCase()] || 'bg-gray-100 text-gray-600');
+
+  const calcElapsed = (createdAt) => {
+    if (!createdAt) return '';
+    const utc = typeof createdAt === 'string'
+      ? createdAt.replace(' ', 'T').split('.')[0] + 'Z'
+      : createdAt;
+    const diff = Date.now() - new Date(utc).getTime();
+    const m = Math.floor(diff / 60000);
+    if (m < 1) return 'Just now';
+    if (m < 60) return `${m} min ago`;
+    const h = Math.floor(m / 60);
+    return h < 24 ? `${h} hr ago` : `${Math.floor(h / 24)} day ago`;
+  };
+
+  return (
+    <div className="fixed inset-0 z-50 flex items-center justify-center p-4 bg-black/50">
+      <div className="rounded-xl w-full max-w-md bg-white shadow-xl flex flex-col max-h-[80vh]">
+        {/* Header */}
+        <div className="px-5 py-4 border-b flex justify-between items-center">
+          <div>
+            <h2 className="text-lg font-bold text-gray-800">Today's Takeaway Orders</h2>
+            <p className="text-xs text-gray-500 mt-0.5">Select an order to add more items</p>
+          </div>
+          <button onClick={onClose} className="text-gray-400 hover:text-gray-600">
+            <X size={20} />
+          </button>
+        </div>
+
+        {/* Body */}
+        <div className="flex-1 overflow-y-auto px-4 py-3 space-y-2">
+          {loading && (
+            <p className="text-sm text-center text-gray-400 py-6">Loading…</p>
+          )}
+          {!loading && orders.length === 0 && (
+            <p className="text-sm text-center text-gray-400 py-6">No takeaway orders today yet.</p>
+          )}
+          {!loading && orders.map(order => (
+            <button
+              key={order.id}
+              onClick={() => { onSelectOrder(order); onClose(); }}
+              className="w-full text-left p-3 rounded-xl border border-gray-200 hover:border-action-primary hover:bg-orange-50 transition group"
+            >
+              <div className="flex items-center justify-between gap-2">
+                <div className="flex items-center gap-2">
+                  <span className="text-sm font-bold text-gray-800 font-mono">
+                    #{order.dinein_order_id || order.id}
+                  </span>
+                  <span className={`text-xs px-2 py-0.5 rounded-full font-semibold ${statusStyle(order.status)}`}>
+                    {order.status?.toUpperCase()}
+                  </span>
+                </div>
+                <span className="text-sm font-bold text-action-primary">
+                  ₹{Number(order.total_price || 0).toFixed(0)}
+                </span>
+              </div>
+              <div className="flex items-center justify-between mt-1.5 text-xs text-gray-500">
+                <span>{(order.items || []).length} item{(order.items || []).length !== 1 ? 's' : ''}</span>
+                <span className="flex items-center gap-1">
+                  <Clock size={11} className="text-orange-400" />
+                  {calcElapsed(order.created_at)}
+                </span>
+              </div>
+              {(order.items || []).length > 0 && (
+                <p className="mt-1 text-xs text-gray-400 truncate">
+                  {order.items.slice(0, 3).map(i => i.item_name).join(', ')}
+                  {order.items.length > 3 ? ` +${order.items.length - 3} more` : ''}
+                </p>
+              )}
+            </button>
+          ))}
+        </div>
+
+        {/* Footer — new order option */}
+        <div className="px-4 py-3 border-t bg-gray-50 rounded-b-xl">
+          <button
+            onClick={() => { onSelectOrder(null); onClose(); }}
+            className="w-full py-2.5 rounded-lg border-2 border-dashed border-orange-300 text-orange-600 text-sm font-semibold hover:bg-orange-50 transition"
+          >
+            + Start a new takeaway order
+          </button>
+        </div>
+      </div>
+    </div>
+  );
+};
 // ─────────────────────────────────────────────────────────────────────────────
 // TakeOrder — main component
 // ─────────────────────────────────────────────────────────────────────────────
@@ -945,6 +1080,7 @@ const TakeOrder = ({ clientId, token, onOrderUpdate, realm }) => {
   const [selectedDietary, setSelectedDietary] = useState(null);
   const [stockWarning, setStockWarning] = useState(null);
   const [timingOptions, setTimingOptions] = useState([]);
+  const [showTakeawayOrdersModal, setShowTakeawayOrdersModal] = useState(false);
   const menuConfig = useMemo(
     () => (clientId ? getMenuConfig(clientId) : null),
     [clientId]
@@ -1378,6 +1514,23 @@ const TakeOrder = ({ clientId, token, onOrderUpdate, realm }) => {
 
     refetchMenu();
   }, [zoneConfigId, clientId, token, menuConfig]);
+  const getDietaryFromSlug = useCallback((item) => {
+    if (!item || !dietaryOptions.length) return null;
+    const normalize = (str) => (str || '').toLowerCase().replace(/[-_\s]/g, '');
+    const [mainPart = ''] = (item.slug || '').split('__');
+    const slugSegments = mainPart.split('_').filter(Boolean);
+    const sortedOptions = [...dietaryOptions].sort(
+      (a, b) => normalize(b).length - normalize(a).length
+    );
+    for (let i = 0; i < slugSegments.length; i++) {
+      for (let j = 1; j <= 3; j++) {
+        const joined = normalize(slugSegments.slice(i, i + j).join(''));
+        const match = sortedOptions.find(d => normalize(d) === joined);
+        if (match) return normalize(match);
+      }
+    }
+    return null;
+  }, [dietaryOptions]);
   // ─────────────────────────────────────────────────────────────────────────
   // Browser history (back button) — push initial floor state once
   // ─────────────────────────────────────────────────────────────────────────
@@ -1530,13 +1683,60 @@ const TakeOrder = ({ clientId, token, onOrderUpdate, realm }) => {
       toast.error('No takeaway table configured');
       return;
     }
-
+    setShowTakeawayOrdersModal(true);
     const tableIdStr = (takeawayTableId || takeawayTables[0].id).toString();
     setOrderMode('takeaway');
     setSelectedTable(tableIdStr);
     setActiveOrderId(null);
     setActiveDineinOrderId(null);
     setCart([]);
+    setShowCart(true);
+    goToOrderView();
+  };
+  const handleTakeawayOrderSelected = async (existingOrder) => {
+    const tableIdStr = (takeawayTableId || takeawayTables[0].id).toString();
+    setOrderMode('takeaway');
+    setSelectedTable(tableIdStr);
+
+    if (!existingOrder) {
+      // New order
+      setActiveOrderId(null);
+      setActiveDineinOrderId(null);
+      setCart([]);
+      setHasNewItems(false);
+      setCurrentBatchTimestamp(null);
+      setDraftSavedAt(null);
+    } else {
+      // Resume existing order — reconstruct cart as old (read-only) items
+      const reconstructedCart = (existingOrder.items || []).map(item => {
+        const menuItem = menuItems.find(mi => Number(mi.id) === Number(item.item_id));
+        return {
+          id: Number(item.item_id),
+          name: item.item_name || menuItem?.name || 'Unnamed Item',
+          unit_price: item.unit_price || menuItem?.unit_price || 0,
+          quantity: item.quantity || 1,
+          note: item.note || '',
+          image_id: menuItem?.image_id,
+          discount: menuItem?.discount || 0,
+          slug: item.slug || menuItem?.slug,
+          category: menuItem?.category_name,
+          category_id: menuItem?.category_id || null,
+          frontend_unique_key: item.frontend_unique_key,
+          batch_timestamp: null,
+          is_new_item: false,
+          saved_sub_order: true,
+          status: item.status || 'pending',
+          batch_label: item.batch_label,
+          sub_order_id: item.sub_order_id,
+        };
+      });
+      setCart(reconstructedCart);
+      setActiveOrderId(existingOrder.id);
+      setActiveDineinOrderId(existingOrder.dinein_order_id);
+      setHasNewItems(false);
+      setCurrentBatchTimestamp(null);
+      setDraftSavedAt(null);
+    }
     setShowCart(true);
     goToOrderView();
   };
@@ -1880,19 +2080,20 @@ const TakeOrder = ({ clientId, token, onOrderUpdate, realm }) => {
           );
         }
 
-        // Update table to Occupied — unchanged
-        const tableToUpdate = tables.find(t => t.id.toString() === selectedTable);
-        if (tableToUpdate) {
-          await axios.post(
-            `${import.meta.env.VITE_API_TABLE_SERVICE_URL}/${clientId}/tables/update`,
-            {
-              ...tableToUpdate,
-              id: Number(selectedTable),
-              status: 'Occupied',
-              table_type: tableToUpdate.table_type.toString(),
-            },
-            { headers }
-          );
+        if (orderMode !== 'takeaway') {
+          const tableToUpdate = tables.find(t => t.id.toString() === selectedTable);
+          if (tableToUpdate) {
+            await axios.post(
+              `${import.meta.env.VITE_API_TABLE_SERVICE_URL}/${clientId}/tables/update`,
+              {
+                ...tableToUpdate,
+                id: Number(selectedTable),
+                status: 'Occupied',
+                table_type: tableToUpdate.table_type.toString(),
+              },
+              { headers }
+            );
+          }
         }
       }
 
@@ -2122,7 +2323,7 @@ const TakeOrder = ({ clientId, token, onOrderUpdate, realm }) => {
       (i.category_name || '').toLowerCase().includes(q) ||
       String(i.code || '').toLowerCase().includes(q)
     );
-  }, [menuItems, selectedCategoryId, searchQuery, categories, selectedDietary,timingOptions]);
+  }, [menuItems, selectedCategoryId, searchQuery, categories, selectedDietary, timingOptions]);
 
   const oldItems = cart.filter(i => !i.is_new_item || i.saved_sub_order);
   const newItems = cart.filter(i => i.is_new_item && !i.saved_sub_order);
@@ -2153,8 +2354,8 @@ const TakeOrder = ({ clientId, token, onOrderUpdate, realm }) => {
       {/* ══════════════ FLOOR VIEW ══════════════ */}
       {currentView === 'floor' && (
         <TableReservation
-          tables={tables}
-          orderMode={orderMode}
+        tables={tables.filter(t => !takeawayTables.some(tw => tw.id === t.id))}
+        orderMode={orderMode}
           tableOrders={tableOrders}
           draftTableIds={draftTableIds}
           onSelectTable={handleTableSelect}
@@ -2239,7 +2440,7 @@ const TakeOrder = ({ clientId, token, onOrderUpdate, realm }) => {
                               <span className={`w-2 h-2 rounded-full flex-shrink-0 ${dietaryColorMap[key]}`} />
                             )}
                             {type}
-                              {/* <span className={`text-[10px] px-1.5 py-0.5 rounded-full font-bold
+                            {/* <span className={`text-[10px] px-1.5 py-0.5 rounded-full font-bold
               ${selectedDietary === key ? 'bg-white/20' : 'bg-bg-primary'}`}>
                                 {count}
                               </span> */}
@@ -2269,12 +2470,15 @@ const TakeOrder = ({ clientId, token, onOrderUpdate, realm }) => {
                       ? ((Number(item.discount) * 100) / Number(item.unit_price)).toFixed(0)
                       : null;
                     const ac = item.line_item_id?.length || 0;
+                    const dietary = getDietaryFromSlug(item);
+                    const dietaryColor = dietary ? (dietaryColorMap[dietary] || '') : '';
                     return (
                       <div
-                        key={item.id}
+                      key={`${item.id}_${item.zone_config_id ?? 0}`}
                         onClick={() => handleItemClick(item)}
                         className="flex gap-2 items-center bg-bg-primary border-default border-border-default rounded-xl p-1 shadow-sm hover:shadow-md transition cursor-pointer"
                       >
+                        <div className={`w-[4px] self-stretch rounded-l-xl flex-shrink-0 ${dietaryColor}`} />
                         <div className="w-14 h-16 rounded-lg overflow-hidden shrink-0 bg-gray-100">
                           <ImagePreview
                             clientId={clientId}
@@ -2615,6 +2819,14 @@ const TakeOrder = ({ clientId, token, onOrderUpdate, realm }) => {
         tables={tables}
         currentTableId={selectedTable}
         onConfirm={handleTransferTable}
+      />
+      <TakeawayOrdersModal
+        isOpen={showTakeawayOrdersModal}
+        onClose={() => setShowTakeawayOrdersModal(false)}
+        clientId={clientId}
+        token={token}
+        takeawayTableIds={takeawayTables.map(t => String(t.id))}
+        onSelectOrder={handleTakeawayOrderSelected}
       />
       {invoiceModalOpen && invoiceOrderData && (
         <InvoiceModal

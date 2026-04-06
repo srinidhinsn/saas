@@ -110,11 +110,11 @@ const MenuManagement = ({ clientId, token, realm }) => {
       const raw = res.data?.data || [];
 
       const parsed = raw.map(v => {
-        const [name, start, end] = v.split('|');
+        const match = v.match(/^(.+)\((.+)-(.+)\)$/);
         return {
-          name: name?.toLowerCase(),
-          start,
-          end,
+          name: (match?.[1] ?? v).toLowerCase(),
+          start: match?.[2] ?? null,
+          end: match?.[3] ?? null,
           raw: v
         };
       });
@@ -811,14 +811,19 @@ const MenuManagement = ({ clientId, token, realm }) => {
       }));
       setCategoriesFlat(normalizedFlat);
 
-      const enrichedItems = (itemRes.data.data || []).map(item => {
-        const cat = flatCategories.find(c => c.id === item.category_id)
-          ?? flatCategories.find(c =>
-            c.name.toLowerCase() === (item.category_id || '').toLowerCase()
-          );
-        return { ...item, category: cat?.name ?? "Uncategorized" };
+      const rawItems = itemRes.data.data;
+      const seenInit = new Map();
+      rawItems.forEach(item => {
+        const existing = seenInit.get(item.id);
+        if (!existing || (item.zone_config_id && item.zone_config_id !== 0)) {
+          seenInit.set(item.id, item);
+        }
       });
-      enrichedItems.sort((a, b) => Number(a.id) - Number(b.id));
+      const enrichedItems = Array.from(seenInit.values()).map(item => {
+        const cat = flatCategories.find(c => c.id === item.category_id);
+        return { ...item, category_name: cat?.name || 'Uncategorized' };
+      });
+      enrichedItems.sort((a, b) => (a.name || '').localeCompare(b.name || ''));
       setMenuItems(enrichedItems);
 
       const buildCategoryTree = (flatCats) => {

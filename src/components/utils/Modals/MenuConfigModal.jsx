@@ -192,9 +192,7 @@ const MenuConfigModal = ({ show, onClose, clientId, token }) => {
                   onClick={() => {
                     if (!timeInput || !timeStart || !timeEnd) return;
 
-                    const value = `${timeInput
-                      .trim()
-                      .toLowerCase()}|${timeStart}|${timeEnd}`;
+                    const value = `${timeInput.trim().toLowerCase()}(${timeStart}-${timeEnd})`;
 
                     addValue("available_timings", value, setTimingOptions);
 
@@ -221,11 +219,10 @@ const MenuConfigModal = ({ show, onClose, clientId, token }) => {
                   )}
 
                   {timingOptions.map((v) => {
-                    const parts = v.split("|");
-
-                    const name = parts[0];
-                    const start = parts[1];
-                    const end = parts[2];
+                    const match = v.match(/^(.+)\((.+)-(.+)\)$/);
+                    const name = match?.[1] ?? v;
+                    const start = match?.[2] ?? null;
+                    const end = match?.[3] ?? null;
 
                     return (
                       <span

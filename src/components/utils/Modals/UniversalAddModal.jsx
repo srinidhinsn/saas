@@ -123,19 +123,19 @@ const UniversalAddModal = ({
           headers: { Authorization: `Bearer ${token}` },
         }
       );
-  
+
       const raw = res.data?.data || [];
-  
+
       const parsed = raw.map(v => {
-        const [name, start, end] = v.split('|');
+        const match = v.match(/^(.+)\((.+)-(.+)\)$/);
         return {
-          name: name?.toLowerCase(),
-          start,
-          end,
+          name: (match?.[1] ?? v).toLowerCase(),
+          start: match?.[2] ?? null,
+          end: match?.[3] ?? null,
           raw: v
         };
       });
-  
+
       setTimingOptions(parsed);
     } catch (err) {
       console.error("Timing fetch error:", err);
@@ -149,7 +149,7 @@ const UniversalAddModal = ({
 
     fetchConfigs();
     fetchStatuses();
-    if (normalizedRealm === 'restaurant'){
+    if (normalizedRealm === 'restaurant') {
       fetchDietaryTypes();
       fetchTimings();
     }
@@ -295,42 +295,41 @@ const UniversalAddModal = ({
                   rows="3"
                 />
               </div>
-              {normalizedRealm === 'restaurant' &&  (
-  <div>
-    <label className="block text-sm font-medium mb-2">
-      Availability Timing
-    </label>
-    <div className="flex flex-wrap gap-2">
-      {timingOptions.map((t) => {
-        const key = (t.name || '').toLowerCase();
-        const selected = (newItem?.availability_time || []).includes(key);
-        return (
-          <button
-            key={key}
-            type="button"
-            onClick={() => {
-              const current = newItem?.availability_time || [];
-              const next = selected
-                ? current.filter(x => x !== key)
-                : [...current, key];
-              setNewItem(prev => ({ ...prev, availability_time: next }));
-            }}
-            className={`px-3 py-1.5 rounded-lg text-sm border transition-all ${
-              selected
-                ? 'bg-action-primary text-white border-action-primary'
-                : 'bg-bg-tertiary border-border-default text-text-primary hover:border-action-primary'
-            }`}
-          >
-            {t.name} {t.start && t.end ? `(${t.start}–${t.end})` : ''}
-          </button>
-        );
-      })}
-    </div>
-    {(newItem?.availability_time || []).length === 0 && (
-      <p className="text-xs text-text-secondary mt-1">No timing selected = available all day</p>
-    )}
-  </div>
-)}
+              {normalizedRealm === 'restaurant' && (
+                <div>
+                  <label className="block text-sm font-medium mb-2">
+                    Availability Timing
+                  </label>
+                  <div className="flex flex-wrap gap-2">
+                    {timingOptions.map((t) => {
+                      const key = (t.name || '').toLowerCase();
+                      const selected = (newItem?.availability_time || []).includes(key);
+                      return (
+                        <button
+                          key={key}
+                          type="button"
+                          onClick={() => {
+                            const current = newItem?.availability_time || [];
+                            const next = selected
+                              ? current.filter(x => x !== key)
+                              : [...current, key];
+                            setNewItem(prev => ({ ...prev, availability_time: next }));
+                          }}
+                          className={`px-3 py-1.5 rounded-lg text-sm border transition-all ${selected
+                              ? 'bg-action-primary text-white border-action-primary'
+                              : 'bg-bg-tertiary border-border-default text-text-primary hover:border-action-primary'
+                            }`}
+                        >
+                          {t.name} {t.start && t.end ? `(${t.start}–${t.end})` : ''}
+                        </button>
+                      );
+                    })}
+                  </div>
+                  {(newItem?.availability_time || []).length === 0 && (
+                    <p className="text-xs text-text-secondary mt-1">No timing selected = available all day</p>
+                  )}
+                </div>
+              )}
               {/* Unit Price & Discount */}
               <div className="grid grid-cols-2 gap-4">
                 <div>
