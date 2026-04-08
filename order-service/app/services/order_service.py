@@ -4,7 +4,7 @@ from entity.order_entity import DineinOrder as DBOrder, OrderItem as DBOrderItem
 from entity.order_entity import DineinOrder as Db_Order_Entity, OrderItem as Db_OrderItem_Entity
 from entity.inventory_entity import InventoryEntity, InventoryTransactionEntity
 from models.order_model import TransactionTypeEnum, MovementTypeEnum
-from utils.auth import record_transaction
+from utils.transaction import record_transaction
 from decimal import Decimal
 
 
