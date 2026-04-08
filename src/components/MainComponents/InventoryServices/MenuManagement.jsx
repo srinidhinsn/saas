@@ -17,6 +17,7 @@ const MenuManagement = ({ clientId, token, realm }) => {
   const searchInputRef = useRef(null);
   const [categories, setCategories] = useState([]);
   const [menuItems, setMenuItems] = useState([]);
+  const [allMenuItemsRaw, setAllMenuItemsRaw] = useState([]);
   const [loading, setLoading] = useState(true);
   const [inventoryIds, setInventoryIds] = useState([]);
 
@@ -377,7 +378,8 @@ const MenuManagement = ({ clientId, token, realm }) => {
     setShowAddModal(true);
   };
   const handleItemClick = (item) => {
-    const allSiblings = menuItems.filter(m => m.id === item.id);
+    // Use allMenuItemsRaw to get ALL zone variants for this item
+    const allSiblings = allMenuItemsRaw.filter(m => Number(m.id) === Number(item.id));
     const baseRecord = allSiblings.find(m => m.zone_config_id === 0) || item;
 
     const zonePrices = {};
@@ -515,55 +517,36 @@ const MenuManagement = ({ clientId, token, realm }) => {
   const handleAddItem = async () => {
     try {
       let imageId = null;
-
+  
       if (newItemImage) {
         imageId = await uploadImageToDocumentService(newItemImage);
       }
-
-      const selectedCat = categoriesFlat.find(
+  
+      const resolvedCat = categoriesFlat.find(
         c => c.id === newItem?.category_id
       );
-
-      const resolvedCat = categoriesFlat.find(c => c.id === newItem?.category_id);
       if (!resolvedCat) {
         console.error("Add failed: could not resolve category by ID", newItem?.category_id);
         return;
       }
       const finalCategoryId = resolvedCat.id;
-
       if (!finalCategoryId) return;
-      // NEW — pass category_id instead of dietary_type
-      const generateSlug = (itemName, categoryId, timings, flatList = categoriesFlat) => {
-        const pathParts = [];
-        let currentId = categoryId;
-        const visited = new Set();
-        while (currentId && !visited.has(currentId)) {
-          visited.add(currentId);
-          const cat = flatList.find(c => c.id === currentId);
-          if (!cat) break;
-          pathParts.unshift(toSlugSegment(cat.name));
-          currentId = cat.parentId ?? cat.parent_id ?? null;
-        }
-
-        const itemPart = toSlugSegment(itemName);
-
-        const timingArr = Array.isArray(timings)
-          ? timings.filter(Boolean)
-          : (timings ? [timings] : []);
-        const timingPart = timingArr.length > 0 ? timingArr.join('+') : null;
-
-        // ── dietary is already in category path, no need to inject separately ──
-        const base = [...pathParts, itemPart].filter(Boolean).join('_');
-        return timingPart ? `${base}__${timingPart}` : base;
-      }; const { dietary_type, ...cleanNewItem } = newItem;
+  
+      const { dietary_type, ...cleanNewItem } = newItem;
+  
+      const slug = generateSlug(
+        newItem.name,
+        finalCategoryId,
+        newItem.availability_time ?? [],
+        categoriesFlat
+      );
+  
       const created_by =
         currentUserId || localStorage.getItem("user_id") || "system";
-
-
-
+  
       const basePrice = parseFloat(newItem.unit_price) || 0;
       const zonePrices = newItem.zonePrices || {};
-
+  
       const basePayload = {
         ...cleanNewItem,
         client_id: clientId,
@@ -577,13 +560,14 @@ const MenuManagement = ({ clientId, token, realm }) => {
         serving_quantity: newItem.serving_quantity
           ? parseFloat(newItem.serving_quantity)
           : null,
-        serving_unit: newItem.serving_unit || null, availability: parseFloat(newItem.availability) || 0,
+        serving_unit: newItem.serving_unit || null,
+        availability: parseFloat(newItem.availability) || 0,
         created_by,
         updated_by: created_by,
         inventory_id: newItem.inventory_id,
         zone_config_id: 0,
       };
-
+  
       // STEP 1: Create base record (zone_config_id = 0)
       const baseRes = await axios.post(
         `${import.meta.env.VITE_API_INVENTORY_SERVICE_URL}/${clientId}/menu/create`,
@@ -595,11 +579,10 @@ const MenuManagement = ({ clientId, token, realm }) => {
           },
         }
       );
-
+  
       const sharedId = baseRes.data.data.id;
-
-      // STEP 2: Always create records for ALL sections,
-      // using entered zone price if provided, otherwise falling back to base price
+  
+      // STEP 2: Create records for ALL sections
       if (sections && sections.length > 0) {
         for (const section of sections) {
           const configId = Number(section.id);
@@ -608,7 +591,7 @@ const MenuManagement = ({ clientId, token, realm }) => {
             enteredPrice !== "" && enteredPrice !== null && enteredPrice !== undefined
               ? parseFloat(enteredPrice)
               : basePrice;
-
+  
           await axios.post(
             `${import.meta.env.VITE_API_INVENTORY_SERVICE_URL}/${clientId}/menu/create`,
             {
@@ -623,11 +606,9 @@ const MenuManagement = ({ clientId, token, realm }) => {
       } else {
         console.warn("No sections found → skipping zone creation");
       }
-
-      // Refresh UI
+  
       await fetchData({ silent: true });
-
-      // Reset form
+  
       setShowAddModal(false);
       setNewItem({
         name: "",
@@ -642,7 +623,7 @@ const MenuManagement = ({ clientId, token, realm }) => {
       });
       setNewItemImage(null);
       setNewItemImageUrl("");
-
+  
     } catch (error) {
       console.error("Error adding item:", error);
     }
@@ -728,26 +709,35 @@ const MenuManagement = ({ clientId, token, realm }) => {
         { headers: { Authorization: `Bearer ${token}` } }
       );
 
-      // Upsert zone variants
-      const filledZonePrices = Object.entries(zp || {}).filter(
-        ([, price]) => price !== '' && price !== null && price !== undefined
-      );
+      // Always sync ALL zone records — category_id, slug, and other fields
+      // must be consistent across every zone variant
+      for (const section of sections) {
+        const configId = Number(section.id);
 
-      for (const [configId, price] of filledZonePrices) {
-        const existingZoneRecord = menuItems.find(
-          m => m.id === editingItem.id && m.zone_config_id === Number(configId)
+        const existingZoneRecord = allMenuItemsRaw.find(
+          m => Number(m.id) === Number(editingItem.id) && m.zone_config_id === configId
         );
+
+        // Use entered zone price if provided, else keep existing zone price,
+        // else fall back to base unit_price
+        const enteredPrice = zp?.[configId];
+        const finalPrice =
+          enteredPrice !== '' && enteredPrice !== null && enteredPrice !== undefined
+            ? parseFloat(enteredPrice)
+            : existingZoneRecord
+              ? Number(existingZoneRecord.unit_price)
+              : Number(editingItem.unit_price) || 0;
 
         if (existingZoneRecord) {
           await axios.post(
             `${import.meta.env.VITE_API_INVENTORY_SERVICE_URL}/${clientId}/menu/update`,
-            { ...basePayload, unit_price: parseFloat(price), zone_config_id: Number(configId) },
+            { ...basePayload, unit_price: finalPrice, zone_config_id: configId },
             { headers: { Authorization: `Bearer ${token}` } }
           );
         } else {
           await axios.post(
             `${import.meta.env.VITE_API_INVENTORY_SERVICE_URL}/${clientId}/menu/create`,
-            { ...basePayload, unit_price: parseFloat(price), zone_config_id: Number(configId) },
+            { ...basePayload, unit_price: finalPrice, zone_config_id: configId },
             { headers: { Authorization: `Bearer ${token}` } }
           );
         }
@@ -812,12 +802,29 @@ const MenuManagement = ({ clientId, token, realm }) => {
       setCategoriesFlat(normalizedFlat);
 
       const rawItems = itemRes.data.data;
+
+      // Store ALL raw records (including all zone variants) for edit operations
+      setAllMenuItemsRaw(rawItems.map(item => ({
+        ...item,
+        zone_config_id: item.zone_config_id === null || item.zone_config_id === undefined
+          ? 0
+          : Number(item.zone_config_id)
+      })));
+
+      // ✅ FIXED — always prefer zone_config_id === 0 (base record)
       const seenInit = new Map();
       rawItems.forEach(item => {
-        const existing = seenInit.get(item.id);
-        if (!existing || (item.zone_config_id && item.zone_config_id !== 0)) {
-          seenInit.set(item.id, item);
+        const zid = item.zone_config_id === null || item.zone_config_id === undefined
+          ? 0
+          : Number(item.zone_config_id);
+
+        if (!seenInit.has(item.id)) {
+          seenInit.set(item.id, { ...item, zone_config_id: zid });
+        } else if (zid === 0) {
+          // Base record always wins — overwrite whatever zone record is there
+          seenInit.set(item.id, { ...item, zone_config_id: 0 });
         }
+        // zone records (zid > 0) never overwrite an existing entry
       });
       const enrichedItems = Array.from(seenInit.values()).map(item => {
         const cat = flatCategories.find(c => c.id === item.category_id);
@@ -1179,6 +1186,89 @@ const MenuManagement = ({ clientId, token, realm }) => {
       console.error('Error updating items:', error);
     }
   };
+  // const handleExportToExcel = () => {
+  //   try {
+  //     const catNameById = (idOrName) => {
+  //       if (!idOrName) return "Uncategorized";
+  //       const found = categoriesFlat.find(
+  //         c => c.id === idOrName || c.name?.toLowerCase() === String(idOrName).toLowerCase()
+  //       );
+  //       return found?.name || idOrName || "Unknown";
+  //     };
+
+  //     const sectionLabel = (s) => `${s.zone}-${s.section}`;
+
+  //     const grouped = {};
+  //     menuItems.forEach(item => {
+  //       const key = item.slug || item.name;
+  //       if (!grouped[key]) {
+  //         grouped[key] = { baseItem: item, zonePrices: {} };
+  //       }
+  //       if (item.zone_config_id) {
+  //         const sec = sections.find(s => s.id === item.zone_config_id);
+  //         if (sec) grouped[key].zonePrices[sectionLabel(sec)] = item.unit_price;
+  //       } else {
+  //         grouped[key].zonePrices["Base"] = item.unit_price;
+  //       }
+  //     });
+
+  //     const zoneColumns = sections.map(sectionLabel);
+
+  //     const exportData = Object.values(grouped).map(({ baseItem: item, zonePrices }) => {
+  //       const dietary = getDietaryFromSlug(item);
+
+  //       // ✅ Extract timing from slug — exclude "allday", export as empty if none
+  //       const slugTimingPart = item.slug?.includes('__')
+  //         ? item.slug.split('__')[1]
+  //         : '';
+  //       const availabilityTiming = (!slugTimingPart || slugTimingPart === 'allday')
+  //         ? ""
+  //         : slugTimingPart; // e.g. "morning" or "morning+evening", empty = no timing set
+
+  //       const row = {
+  //         Name: item.name ?? "",
+  //         Description: item.description ?? "",
+  //         Category: catNameById(item.category_id) || "Unknown",
+  //         Dietary_Type: dietary || "",
+  //         Availability_Timing: availabilityTiming, // ✅ empty string if no timing
+  //         Image: item.image_id ?? "",
+  //         Unit: item.unit ?? "",
+  //         Unit_Price: Number(item.unit_price) || 0,
+  //         Discount: Number(item.discount) || 0,
+  //         Availability: Number(item.availability) || 0,
+  //         Code: item.code != null ? String(item.code) : "",
+  //         Serving_Quantity: item.serving_quantity ?? "",
+  //         Serving_Unit: item.serving_unit ?? "",
+  //         Line_Item_IDs: Array.isArray(item.line_item_id)
+  //           ? item.line_item_id.join(", ") : "",
+  //       };
+
+  //       zoneColumns.forEach(col => {
+  //         row[`Price_${col}`] = zonePrices[col] ?? "";
+  //       });
+
+  //       return row;
+  //     });
+
+  //     const headers = [
+  //       "Name", "Description", "Category", "Dietary_Type", "Availability_Timing",
+  //       "Image", "Unit", "Unit_Price", "Discount", "Availability", "Code",
+  //       "Serving_Quantity", "Serving_Unit", "Line_Item_IDs",
+  //       ...zoneColumns.map(c => `Price_${c}`)
+  //     ];
+
+  //     const worksheet = XLSX.utils.json_to_sheet(exportData, { header: headers });
+  //     const workbook = XLSX.utils.book_new();
+  //     XLSX.utils.book_append_sheet(workbook, worksheet, "MenuItems");
+  //     XLSX.writeFile(workbook, `menu_items_${new Date().toISOString().slice(0, 10)}.xlsx`);
+  //   } catch (err) {
+  //     console.error("Export failed:", err);
+  //   }
+  // };
+  const clean = (v) => (v === "" || v === undefined || v === null || (typeof v === "number" && isNaN(v)) ? null : v);
+  const num = (v) => { if (v === "" || v === undefined || v === null || (typeof v === "number" && isNaN(v))) return 0; const n = Number(v); return isNaN(n) ? 0 : n; };
+  const sectionLabel = (s) => `${s.zone}-${s.section}`.trim().toLowerCase();
+
   const handleExportToExcel = () => {
     try {
       const catNameById = (idOrName) => {
@@ -1189,59 +1279,58 @@ const MenuManagement = ({ clientId, token, realm }) => {
         return found?.name || idOrName || "Unknown";
       };
 
-      const sectionLabel = (s) => `${s.zone}-${s.section}`;
-
+      // Group by item id using allMenuItemsRaw so we get every zone variant
       const grouped = {};
-      menuItems.forEach(item => {
-        const key = item.slug || item.name;
+      allMenuItemsRaw.forEach(item => {
+        const key = item.id; // group by id, not slug (slug can be same across zones)
         if (!grouped[key]) {
-          grouped[key] = { baseItem: item, zonePrices: {} };
+          grouped[key] = { baseItem: null, zonePrices: {} };
         }
-        if (item.zone_config_id) {
-          const sec = sections.find(s => s.id === item.zone_config_id);
-          if (sec) grouped[key].zonePrices[sectionLabel(sec)] = item.unit_price;
+
+        const zid = Number(item.zone_config_id);
+
+        if (zid === 0) {
+          // ✅ This is the true base record — use it as baseItem AND for Unit_Price
+          grouped[key].baseItem = item;
         } else {
-          grouped[key].zonePrices["Base"] = item.unit_price;
+          // Zone-specific record — store price keyed by section label
+          const sec = sections.find(s => Number(s.id) === zid);
+          if (sec) grouped[key].zonePrices[sectionLabel(sec)] = item.unit_price;
         }
       });
 
       const zoneColumns = sections.map(sectionLabel);
 
-      const exportData = Object.values(grouped).map(({ baseItem: item, zonePrices }) => {
-        const dietary = getDietaryFromSlug(item);
+      const exportData = Object.values(grouped)
+        .filter(({ baseItem }) => baseItem !== null) // skip orphaned zone records
+        .map(({ baseItem: item, zonePrices }) => {
+          const dietary = getDietaryFromSlug(item);
+          const slugTimingPart = item.slug?.includes('__') ? item.slug.split('__')[1] : '';
+          const availabilityTiming = (!slugTimingPart || slugTimingPart === 'allday') ? "" : slugTimingPart;
 
-        // ✅ Extract timing from slug — exclude "allday", export as empty if none
-        const slugTimingPart = item.slug?.includes('__')
-          ? item.slug.split('__')[1]
-          : '';
-        const availabilityTiming = (!slugTimingPart || slugTimingPart === 'allday')
-          ? ""
-          : slugTimingPart; // e.g. "morning" or "morning+evening", empty = no timing set
+          const row = {
+            Name: item.name ?? "",
+            Description: item.description ?? "",
+            Category: catNameById(item.category_id) || "Unknown",
+            Dietary_Type: dietary || "",
+            Availability_Timing: availabilityTiming,
+            Image: item.image_id ?? "",
+            Unit: item.unit ?? "",
+            Unit_Price: Number(item.unit_price) || 0, // ✅ always from zone_config_id=0 record
+            Discount: Number(item.discount) || 0,
+            Availability: Number(item.availability) || 0,
+            Code: item.code != null ? String(item.code) : "",
+            Serving_Quantity: item.serving_quantity ?? "",
+            Serving_Unit: item.serving_unit ?? "",
+            Line_Item_IDs: Array.isArray(item.line_item_id) ? item.line_item_id.join(", ") : "",
+          };
 
-        const row = {
-          Name: item.name ?? "",
-          Description: item.description ?? "",
-          Category: catNameById(item.category_id) || "Unknown",
-          Dietary_Type: dietary || "",
-          Availability_Timing: availabilityTiming, // ✅ empty string if no timing
-          Image: item.image_id ?? "",
-          Unit: item.unit ?? "",
-          Unit_Price: Number(item.unit_price) || 0,
-          Discount: Number(item.discount) || 0,
-          Availability: Number(item.availability) || 0,
-          Code: item.code != null ? String(item.code) : "",
-          Serving_Quantity: item.serving_quantity ?? "",
-          Serving_Unit: item.serving_unit ?? "",
-          Line_Item_IDs: Array.isArray(item.line_item_id)
-            ? item.line_item_id.join(", ") : "",
-        };
+          zoneColumns.forEach(col => {
+            row[`Price_${col}`] = zonePrices[col] ?? "";
+          });
 
-        zoneColumns.forEach(col => {
-          row[`Price_${col}`] = zonePrices[col] ?? "";
+          return row;
         });
-
-        return row;
-      });
 
       const headers = [
         "Name", "Description", "Category", "Dietary_Type", "Availability_Timing",
@@ -1258,9 +1347,11 @@ const MenuManagement = ({ clientId, token, realm }) => {
       console.error("Export failed:", err);
     }
   };
-  const clean = (v) => (v === "" || v === undefined || v === null || (typeof v === "number" && isNaN(v)) ? null : v);
-  const num = (v) => { if (v === "" || v === undefined || v === null || (typeof v === "number" && isNaN(v))) return 0; const n = Number(v); return isNaN(n) ? 0 : n; };
 
+
+  // ─────────────────────────────────────────────────────────────────
+  // CHANGE 3 of 3:  handleImportFromExcel  — full rewrite
+  // ─────────────────────────────────────────────────────────────────
   const handleImportFromExcel = async (e) => {
     const file = e.target.files[0];
     if (!file) return;
@@ -1272,14 +1363,11 @@ const MenuManagement = ({ clientId, token, realm }) => {
       updated_by = created_by;
     } catch { }
 
-    const sectionLabel = (s) => `${s.zone}-${s.section}`;
-
     const currentCategoriesFlat = [...categoriesFlat];
     const currentSelectedCategoryId = selectedCategoryId;
     const currentSections = [...sections];
 
-    // console.log("[Import] dietaryOptions available:", dietaryOptions);
-
+    // ── Fetch the full menu (all zone variants) ───────────────────
     let allMenuItems = [];
     try {
       const res = await axios.get(
@@ -1295,11 +1383,13 @@ const MenuManagement = ({ clientId, token, realm }) => {
       return;
     }
 
+    // Normalise zone_config_id: null → 0
     allMenuItems = allMenuItems.map(item => ({
       ...item,
-      zone_config_id: item.zone_config_id === null || item.zone_config_id === undefined
-        ? 0
-        : Number(item.zone_config_id)
+      zone_config_id:
+        item.zone_config_id === null || item.zone_config_id === undefined
+          ? 0
+          : Number(item.zone_config_id),
     }));
 
     const reader = new FileReader();
@@ -1314,6 +1404,7 @@ const MenuManagement = ({ clientId, token, realm }) => {
         if (!parsedData.length) return;
 
         const allColumns = Object.keys(parsedData[0]);
+        // All columns that start with "Price_" are zone-price columns
         const priceColumns = allColumns.filter(col => col.startsWith("Price_"));
 
         if (!window.confirm(`Import ${parsedData.length} items?`)) {
@@ -1324,26 +1415,25 @@ const MenuManagement = ({ clientId, token, realm }) => {
         for (const row of parsedData) {
           if (!row.Name?.trim()) continue;
 
+          // All DB records (all zone variants) for this item name
           const existingRecords = allMenuItems.filter(
             item => item.name?.trim().toLowerCase() === row.Name?.trim().toLowerCase()
           );
 
-          // console.log(`[Import] "${row.Name}" — found ${existingRecords.length} existing records`);
+          // Resolve category
+          const categoryId =
+            currentCategoriesFlat.find(
+              c => c.name.trim().toLowerCase() === (row.Category || '').trim().toLowerCase()
+            )?.id || currentSelectedCategoryId;
 
-          const categoryId = currentCategoriesFlat.find(
-            c => c.name.trim().toLowerCase() === (row.Category || '').trim().toLowerCase()
-          )?.id || currentSelectedCategoryId;
-
-          const categoryName = currentCategoriesFlat.find(
-            c => c.id === categoryId
-          )?.name || null;
+          const categoryName = currentCategoriesFlat.find(c => c.id === categoryId)?.name || null;
 
           if (!categoryName) {
             console.warn(`[Import] Skipping "${row.Name}" — category not found: "${row.Category}"`);
             continue;
           }
 
-          // ── Dietary — validate against actual dietaryOptions ────────────
+          // ── Dietary ──────────────────────────────────────────────
           const rawDietary = (row.Dietary_Type || "").trim().toLowerCase().replace(/[-_\s]/g, '');
           const matchedDietaryOption = dietaryOptions.find(
             d => d.toLowerCase().replace(/[-_\s]/g, '') === rawDietary
@@ -1352,17 +1442,11 @@ const MenuManagement = ({ clientId, token, realm }) => {
             ? matchedDietaryOption.toLowerCase().replace(/[-_\s]/g, '')
             : rawDietary;
 
-          // console.log(`[Import] dietary raw="${row.Dietary_Type}" → matched="${importedDietary}"`);
-
-          // ── Timing — read from Availability_Timing column directly ──────
-          // Empty string = no timing selected (item has no time restriction)
-          // "morning" or "morning+evening" = specific timings
+          // ── Timing ───────────────────────────────────────────────
           const rawTiming = (row.Availability_Timing || "").trim().toLowerCase();
+          const timingPart = rawTiming || null; // null = no timing restriction
 
-          // ✅ Only set timing if explicitly provided — no fallback to allday
-          const timingPart = rawTiming || null; // null = no timing
-
-          // ── Build slug ───────────────────────────────────────────────────
+          // ── Slug ─────────────────────────────────────────────────
           const slug = (() => {
             const parts = [];
             let currentId = categoryId;
@@ -1374,23 +1458,20 @@ const MenuManagement = ({ clientId, token, realm }) => {
               parts.unshift(toSlugSegment(cat.name));
               currentId = cat.parentId ?? cat.parent_id ?? null;
             }
-
             const itemPart = toSlugSegment(row.Name);
             const categoryPathStr = parts.join('_').toLowerCase().replace(/[-_\s]/g, '');
             const dietaryAlreadyInPath = dietaryOptions.some(
               d => categoryPathStr.includes(d.toLowerCase().replace(/[-_\s]/g, ''))
             );
-
-            const nameParts = (importedDietary && !dietaryAlreadyInPath)
-              ? [...parts, importedDietary, itemPart]
-              : [...parts, itemPart];
-
+            const nameParts =
+              importedDietary && !dietaryAlreadyInPath
+                ? [...parts, importedDietary, itemPart]
+                : [...parts, itemPart];
             const base = nameParts.filter(Boolean).join('_');
             return timingPart ? `${base}__${timingPart}` : base;
           })();
 
-          // console.log(`[Import] "${row.Name}" → dietary="${importedDietary}" timing="${timingPart}" slug="${slug}"`);
-
+          // ── Shared payload (no price, no zone_config_id) ─────────
           const basePayload = {
             client_id: clientId,
             inventory_id: menuConfig.menuInventoryId,
@@ -1402,64 +1483,96 @@ const MenuManagement = ({ clientId, token, realm }) => {
             serving_quantity: row.Serving_Quantity || null,
             serving_unit: row.Serving_Unit || null,
             unit: row.Unit || null,
-            ...(row.Image && String(row.Image).trim() !== "" && { image_id: String(row.Image).trim() }),
+            ...(row.Image && String(row.Image).trim() !== "" && {
+              image_id: String(row.Image).trim(),
+            }),
             discount: Number(row.Discount) || 0,
             availability: Number(row.Availability) || 0,
             slug,
             line_item_id: row.Line_Item_IDs
-              ? row.Line_Item_IDs.split(",").map(v => parseInt(v.trim(), 10)).filter(v => !isNaN(v))
+              ? row.Line_Item_IDs.split(",")
+                .map(v => parseInt(v.trim(), 10))
+                .filter(v => !isNaN(v))
               : null,
             created_by,
             updated_by,
           };
 
-          // ================= BASE RECORD =================
+          // ── BASE RECORD (zone_config_id = 0) ─────────────────────
+          // Always uses Unit_Price column — zone prices never touch this
+          const baseUnitPrice = Number(row.Unit_Price) || 0;
           let sharedId;
           const existingBase = existingRecords.find(item => item.zone_config_id === 0);
 
           if (existingBase) {
             sharedId = existingBase.id;
-            // console.log(`[Import] Updating base record id=${sharedId}`);
             await axios.post(
               `${import.meta.env.VITE_API_INVENTORY_SERVICE_URL}/${clientId}/menu/update`,
               {
                 ...basePayload,
                 id: Number(sharedId),
-                unit_price: Number(row.Unit_Price) || 0,
-                zone_config_id: 0
+                unit_price: baseUnitPrice, // ✅ always Unit_Price
+                zone_config_id: 0,
               },
               { headers: { Authorization: `Bearer ${token}` } }
             );
           } else {
-            // console.log(`[Import] Creating new base record for "${row.Name}"`);
             const res = await axios.post(
               `${import.meta.env.VITE_API_INVENTORY_SERVICE_URL}/${clientId}/menu/create`,
               {
                 ...basePayload,
-                unit_price: Number(row.Unit_Price) || 0,
-                zone_config_id: 0
+                unit_price: baseUnitPrice, // ✅ always Unit_Price
+                zone_config_id: 0,
               },
               { headers: { Authorization: `Bearer ${token}` } }
             );
             sharedId = res.data.data.id;
           }
 
-          // ================= ZONE RECORDS =================
+          // ── Build zone price map from Excel Price_ columns ────────
+          // Key = section DB id (number), Value = price from Excel
+          const zonePriceMap = {};
           for (const col of priceColumns) {
             const priceVal = row[col];
             if (priceVal === "" || priceVal === null || priceVal === undefined) continue;
 
-            const label = col.replace("Price_", "");
-            const matchedSection = currentSections.find(s => sectionLabel(s) === label);
+            // "Price_top-ac" → "top-ac"  (already lowercase in exported file)
+            const label = col.replace("Price_", "").trim().toLowerCase();
+
+            const matchedSection = currentSections.find(
+              s => sectionLabel(s) === label // sectionLabel() is lowercase on both sides
+            );
+
             if (!matchedSection) {
-              console.warn(`[Import] No section matched for column: ${col}`);
+              console.warn(
+                `[Import] No section matched for "${col}" (label="${label}"). ` +
+                `Available: ${currentSections.map(sectionLabel).join(', ')}`
+              );
               continue;
             }
 
-            const matchedZoneConfigId = Number(matchedSection.id);
+            const sid = Number(matchedSection.id);
+            if (!sid || sid === 0) continue; // safety: never overwrite base slot
+
+            zonePriceMap[sid] = Number(priceVal);
+          }
+
+          // ── ZONE RECORDS (zone_config_id > 0) ────────────────────
+          for (const section of currentSections) {
+            const configId = Number(section.id);
+            if (!configId || configId === 0) continue; // ✅ base slot already handled
+
             const existingZone = existingRecords.find(
-              item => item.zone_config_id === matchedZoneConfigId
+              item => item.zone_config_id === configId
             );
+
+            // Priority: Excel zone price → keep existing DB price → fall back to base price
+            const finalPrice =
+              zonePriceMap[configId] !== undefined
+                ? zonePriceMap[configId]
+                : existingZone
+                  ? Number(existingZone.unit_price)
+                  : baseUnitPrice;
 
             if (existingZone) {
               await axios.post(
@@ -1467,8 +1580,8 @@ const MenuManagement = ({ clientId, token, realm }) => {
                 {
                   ...basePayload,
                   id: Number(existingZone.id),
-                  unit_price: Number(priceVal),
-                  zone_config_id: matchedZoneConfigId
+                  unit_price: finalPrice,
+                  zone_config_id: configId,
                 },
                 { headers: { Authorization: `Bearer ${token}` } }
               );
@@ -1478,19 +1591,18 @@ const MenuManagement = ({ clientId, token, realm }) => {
                 {
                   ...basePayload,
                   id: sharedId,
-                  unit_price: Number(priceVal),
-                  zone_config_id: matchedZoneConfigId
+                  unit_price: finalPrice,
+                  zone_config_id: configId,
                 },
                 { headers: { Authorization: `Bearer ${token}` } }
               );
             }
           }
-        }
+        } // end for row
 
         await fetchData({ silent: false });
         alert("Import complete!");
         e.target.value = "";
-
       } catch (err) {
         console.error("Import Error:", err);
         alert(`Import failed: ${err.message}`);

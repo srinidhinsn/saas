@@ -1074,6 +1074,7 @@ const TakeOrder = ({ clientId, token, onOrderUpdate, realm }) => {
   const isMobile = window.matchMedia('(max-width: 1024px)').matches;
 
   const [sections, setSections] = useState([]);
+  const [takeawaySections, setTakeawaySections] = useState([]);
   const [zoneConfigId, setZoneConfigId] = useState(null);
   const [dietaryOptions, setDietaryOptions] = useState([]);
   const [dietaryColorMap, setDietaryColorMap] = useState({});
@@ -1092,7 +1093,37 @@ const TakeOrder = ({ clientId, token, onOrderUpdate, realm }) => {
         `${import.meta.env.VITE_API_TABLE_SERVICE_URL}/${clientId}/tables/config`,
         { headers: { Authorization: `Bearer ${token}` } }
       );
-      setSections(res.data || []);
+
+      const takeawayRoots =
+        (import.meta.env.VITE_EASYFOOD_TAKEAWAY_TABLE_DEFAULT_ROOT || '')
+          .split(',')
+          .map(v => v.trim().toLowerCase())
+          .filter(Boolean);
+
+      const allSections = res.data || [];
+
+      // Dine-in sections — exclude anything that matches takeaway roots
+      const dineInSections = takeawayRoots.length > 0
+        ? allSections.filter(s =>
+          !takeawayRoots.some(root =>
+            (s.zone || '').toLowerCase().startsWith(root) ||
+            (s.section || '').toLowerCase().startsWith(root)
+          )
+        )
+        : allSections;
+
+      // Takeaway sections — only those matching takeaway roots
+      const takeawaySectionsFiltered = takeawayRoots.length > 0
+        ? allSections.filter(s =>
+          takeawayRoots.some(root =>
+            (s.zone || '').toLowerCase().startsWith(root) ||
+            (s.section || '').toLowerCase().startsWith(root)
+          )
+        )
+        : [];
+
+      setSections(dineInSections);
+      setTakeawaySections(takeawaySectionsFiltered);
     } catch (err) {
       console.error('Zone config fetch failed', err);
     }
@@ -1127,8 +1158,13 @@ const TakeOrder = ({ clientId, token, onOrderUpdate, realm }) => {
       );
       const raw = res.data?.data || [];
       const parsed = raw.map(v => {
-        const [name, start, end] = v.split('|');
-        return { name: name?.toLowerCase(), start, end };
+        const match = v.match(/^(.+)\((.+)-(.+)\)$/);
+        return {
+          name: (match?.[1] ?? v).trim().toLowerCase(),
+          start: match?.[2] ?? null,
+          end: match?.[3] ?? null,
+          raw: v
+        };
       });
       setTimingOptions(parsed);
     } catch (err) {
@@ -1211,18 +1247,18 @@ const TakeOrder = ({ clientId, token, onOrderUpdate, realm }) => {
     return null;
   }, [categoriesFlat]);
 
-  const getCategoryAndChildrenIds = (cats, targetId) => {
+  const getCategoryAndChildrenIds = useCallback((targetId) => {
+    if (!targetId || !categoriesFlat.length) return [];
     const result = new Set();
-    const traverse = (nodes, found = false) => {
-      for (const n of nodes) {
-        const isT = n.id === targetId;
-        if (isT || found) result.add(n.id);
-        if (n.children?.length) traverse(n.children, found || isT);
-      }
+    const addWithChildren = (id) => {
+      result.add(id);
+      categoriesFlat
+        .filter(c => c.parentId === id)
+        .forEach(c => addWithChildren(c.id));
     };
-    traverse(cats);
+    addWithChildren(targetId);
     return Array.from(result);
-  };
+  }, [categoriesFlat]);
 
   const findCategoryNode = (tree, matcher) => {
     for (const c of tree) {
@@ -1258,25 +1294,39 @@ const TakeOrder = ({ clientId, token, onOrderUpdate, realm }) => {
     }
     return null;
   };
-  const isItemActive = (slug) => {
+  const isItemActive = useCallback((slug) => {
     if (!slug) return true;
+    if (!timingOptions || timingOptions.length === 0) return true;
+
     const doubleUnderIdx = slug.lastIndexOf('__');
     const timingSegment = doubleUnderIdx !== -1
       ? slug.slice(doubleUnderIdx + 2).toLowerCase()
       : null;
+
     if (!timingSegment || timingSegment === 'allday') return true;
+
     const timingKeys = timingSegment.split('+').filter(Boolean);
     if (timingKeys.length === 0) return true;
+
+    // Only consider keys that are actually recognized in config
+    const recognizedKeys = timingKeys.filter(key => {
+      const t = timingOptions.find(o => o.name?.toLowerCase() === key);
+      return t && t.start && t.end;
+    });
+
+    // If no keys are recognized, don't hide the item (same as MenuManagement)
+    if (recognizedKeys.length === 0) return true;
+
     const now = new Date();
     const currentMinutes = now.getHours() * 60 + now.getMinutes();
-    return timingKeys.some(key => {
+
+    return recognizedKeys.some(key => {
       const t = timingOptions.find(o => o.name?.toLowerCase() === key);
-      if (!t || !t.start || !t.end) return true;
       const [sh, sm] = t.start.split(':').map(Number);
       const [eh, em] = t.end.split(':').map(Number);
       return currentMinutes >= (sh * 60 + sm) && currentMinutes <= (eh * 60 + em);
     });
-  };
+  }, [timingOptions]);
   // ─────────────────────────────────────────────────────────────────────────
   // Data fetching
   // ─────────────────────────────────────────────────────────────────────────
@@ -1691,12 +1741,25 @@ const TakeOrder = ({ clientId, token, onOrderUpdate, realm }) => {
     setActiveDineinOrderId(null);
     setCart([]);
     setShowCart(true);
+
+    // Set takeaway zone_config_id so correct prices are fetched
+    const takeawayZoneConfigId = takeawaySections.length > 0
+      ? takeawaySections[0].id
+      : null;
+    setZoneConfigId(takeawayZoneConfigId);
+
     goToOrderView();
   };
   const handleTakeawayOrderSelected = async (existingOrder) => {
     const tableIdStr = (takeawayTableId || takeawayTables[0].id).toString();
     setOrderMode('takeaway');
     setSelectedTable(tableIdStr);
+
+    // Set takeaway zone_config_id so correct prices are fetched
+    const takeawayZoneConfigId = takeawaySections.length > 0
+      ? takeawaySections[0].id
+      : null;
+    setZoneConfigId(takeawayZoneConfigId);
 
     if (!existingOrder) {
       // New order
@@ -2301,8 +2364,13 @@ const TakeOrder = ({ clientId, token, onOrderUpdate, realm }) => {
   const filteredItems = useMemo(() => {
     const q = (searchQuery || '').trim().toLowerCase();
     let items = menuItems;
-    items = items.filter(item => isItemActive(item.slug));
-    // ── Dietary filter (same logic as MenuManagement) ──
+
+    // ── 1. Timing filter — skip entirely if timings not loaded yet ──
+    if (timingOptions.length > 0) {
+      items = items.filter(item => isItemActive(item.slug));
+    }
+
+    // ── 2. Dietary filter ──
     if (selectedDietary) {
       items = items.filter(item => {
         const [mainPart = ''] = (item.slug || '').split('__');
@@ -2313,18 +2381,20 @@ const TakeOrder = ({ clientId, token, onOrderUpdate, realm }) => {
       });
     }
 
+    // ── 3. Category filter — uses flat list for reliable traversal ──
     if (selectedCategoryId) {
-      const ids = getCategoryAndChildrenIds(categories, selectedCategoryId);
+      const ids = getCategoryAndChildrenIds(selectedCategoryId); // ← no categories arg needed now
       items = items.filter(i => ids.includes(i.category_id));
     }
+
+    // ── 4. Search filter ──
     if (!q) return items;
     return items.filter(i =>
       (i.name || '').toLowerCase().includes(q) ||
       (i.category_name || '').toLowerCase().includes(q) ||
       String(i.code || '').toLowerCase().includes(q)
     );
-  }, [menuItems, selectedCategoryId, searchQuery, categories, selectedDietary, timingOptions]);
-
+  }, [menuItems, selectedCategoryId, searchQuery, selectedDietary, timingOptions, isItemActive, getCategoryAndChildrenIds]);
   const oldItems = cart.filter(i => !i.is_new_item || i.saved_sub_order);
   const newItems = cart.filter(i => i.is_new_item && !i.saved_sub_order);
   const groupedNewItems = newItems.reduce((acc, item) => {
@@ -2354,8 +2424,8 @@ const TakeOrder = ({ clientId, token, onOrderUpdate, realm }) => {
       {/* ══════════════ FLOOR VIEW ══════════════ */}
       {currentView === 'floor' && (
         <TableReservation
-        tables={tables.filter(t => !takeawayTables.some(tw => tw.id === t.id))}
-        orderMode={orderMode}
+          tables={tables.filter(t => !takeawayTables.some(tw => tw.id === t.id))}
+          orderMode={orderMode}
           tableOrders={tableOrders}
           draftTableIds={draftTableIds}
           onSelectTable={handleTableSelect}
@@ -2474,7 +2544,7 @@ const TakeOrder = ({ clientId, token, onOrderUpdate, realm }) => {
                     const dietaryColor = dietary ? (dietaryColorMap[dietary] || '') : '';
                     return (
                       <div
-                      key={`${item.id}_${item.zone_config_id ?? 0}`}
+                        key={`${item.id}_${item.zone_config_id ?? 0}`}
                         onClick={() => handleItemClick(item)}
                         className="flex gap-2 items-center bg-bg-primary border-default border-border-default rounded-xl p-1 shadow-sm hover:shadow-md transition cursor-pointer"
                       >
@@ -2871,3 +2941,5 @@ const TakeOrder = ({ clientId, token, onOrderUpdate, realm }) => {
 };
 
 export default TakeOrder;
+
+// =================================================================================        =========================   //
