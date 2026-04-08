@@ -1,14 +1,14 @@
-import React, { useState,useEffect, useMemo } from 'react';
+import React, { useState, useEffect, useMemo } from 'react';
 import { X, Search, Check } from 'lucide-react';
 
-const AddonSelectionPopup = ({ 
-  isOpen, 
-  onClose, 
-  selectedAddons, 
-  onSave, 
-  addonSubcategories, 
+const AddonSelectionPopup = ({
+  isOpen,
+  onClose,
+  selectedAddons,
+  onSave,
+  addonSubcategories,
   allAddonItems,
-  currentItemId // ✅ To exclude current item from selection
+  currentItemId // To exclude current item from selection
 }) => {
   const [selectedSubcategory, setSelectedSubcategory] = useState(null);
   const [searchQuery, setSearchQuery] = useState('');
@@ -17,19 +17,33 @@ const AddonSelectionPopup = ({
   useEffect(() => {
     setTempSelectedAddons(selectedAddons || []);
   }, [selectedAddons]);
-  
 
-  // ✅ Filter addons by selected subcategory
+  // Count items per subcategory — match by both ID and name
+  const getItemCountForSubcategory = (subcategory) => {
+    const subId = subcategory.id;
+    const subName = (subcategory.name || '').trim().toLowerCase();
+    return allAddonItems.filter(item => {
+      const catVal = (item.category_id || '').trim().toLowerCase();
+      return catVal === subId || catVal === subName;
+    }).length;
+  };
+
+  // Filter addons by selected subcategory — match by both ID and name
   const filteredAddonItems = useMemo(() => {
     if (!selectedSubcategory) return [];
-    
+
+    const subId = selectedSubcategory.id;
+    const subName = (selectedSubcategory.name || '').trim().toLowerCase();
+
     return allAddonItems.filter(item => {
       // Exclude current item
       if (currentItemId && item.id === currentItemId) return false;
-      
-      // Filter by subcategory
-      if (item.category_id !== selectedSubcategory.id) return false;
-      
+
+      // Match by subcategory ID or name (DB stores category_id as name string)
+      const catVal = (item.category_id || '').trim().toLowerCase();
+      const matchesCategory = catVal === subId || catVal === subName;
+      if (!matchesCategory) return false;
+
       // Filter by search query
       if (searchQuery) {
         const query = searchQuery.toLowerCase();
@@ -37,12 +51,11 @@ const AddonSelectionPopup = ({
         const code = String(item.code || '').toLowerCase();
         return name.includes(query) || code.includes(query);
       }
-      
+
       return true;
     });
   }, [selectedSubcategory, allAddonItems, searchQuery, currentItemId]);
 
-  // ✅ Toggle addon selection
   const toggleAddon = (addonId) => {
     setTempSelectedAddons(prev => {
       if (prev.includes(addonId)) {
@@ -53,28 +66,23 @@ const AddonSelectionPopup = ({
     });
   };
 
-  // ✅ Select/Deselect all visible addons
   const toggleSelectAll = () => {
     const visibleAddonIds = filteredAddonItems.map(item => item.id);
     const allSelected = visibleAddonIds.every(id => tempSelectedAddons.includes(id));
-    
+
     if (allSelected) {
-      // Deselect all visible
       setTempSelectedAddons(prev => prev.filter(id => !visibleAddonIds.includes(id)));
     } else {
-      // Select all visible
       const newSelection = [...new Set([...tempSelectedAddons, ...visibleAddonIds])];
       setTempSelectedAddons(newSelection);
     }
   };
 
-  // ✅ Handle save
   const handleSave = () => {
     onSave(tempSelectedAddons);
     onClose();
   };
 
-  // ✅ Handle close (reset temp selection)
   const handleClose = () => {
     setTempSelectedAddons(selectedAddons || []);
     setSelectedSubcategory(null);
@@ -82,7 +90,6 @@ const AddonSelectionPopup = ({
     onClose();
   };
 
-  // ✅ Get addon name by ID
   const getAddonNameById = (id) => {
     const addon = allAddonItems.find(item => item.id === id);
     return addon?.name || 'Unknown';
@@ -93,7 +100,7 @@ const AddonSelectionPopup = ({
   return (
     <div className="fixed inset-0 z-50 flex items-center justify-center p-4 bg-black bg-opacity-50">
       <div className="bg-white rounded-xl w-full max-w-4xl shadow-2xl max-h-[90vh] flex flex-col">
-        
+
         {/* Header */}
         <div className="px-6 py-4 border-b border-gray-200 flex justify-between items-center">
           <div>
@@ -112,7 +119,7 @@ const AddonSelectionPopup = ({
 
         {/* Content */}
         <div className="flex-1 overflow-hidden flex">
-          
+
           {/* Left Panel - Subcategories */}
           <div className="w-64 border-r border-gray-200 overflow-y-auto bg-gray-50">
             <div className="p-4">
@@ -133,7 +140,7 @@ const AddonSelectionPopup = ({
                   >
                     <div className="font-medium text-sm">{subcategory.name}</div>
                     <div className="text-xs opacity-75 mt-0.5">
-                      {allAddonItems.filter(item => item.category_id === subcategory.id).length} items
+                      {getItemCountForSubcategory(subcategory)} items
                     </div>
                   </button>
                 ))}
@@ -173,7 +180,7 @@ const AddonSelectionPopup = ({
                       disabled={filteredAddonItems.length === 0}
                       className="px-4 py-2 bg-gray-100 text-gray-700 rounded-lg hover:bg-gray-200 transition-colors text-sm font-medium disabled:opacity-50 disabled:cursor-not-allowed whitespace-nowrap"
                     >
-                      {filteredAddonItems.every(item => tempSelectedAddons.includes(item.id))
+                      {filteredAddonItems.length > 0 && filteredAddonItems.every(item => tempSelectedAddons.includes(item.id))
                         ? 'Deselect All'
                         : 'Select All'}
                     </button>
@@ -192,7 +199,7 @@ const AddonSelectionPopup = ({
                     <div className="grid grid-cols-1 md:grid-cols-2 gap-3">
                       {filteredAddonItems.map(addon => {
                         const isSelected = tempSelectedAddons.includes(addon.id);
-                        
+
                         return (
                           <button
                             key={addon.id}

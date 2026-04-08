@@ -18,42 +18,53 @@ const MenuManagement = ({ clientId, token, realm }) => {
   const [menuItems, setMenuItems] = useState([]);
   const [loading, setLoading] = useState(true);
   const [inventoryIds, setInventoryIds] = useState([]);
-
   const [addonSubcategories, setAddonSubcategories] = useState([]);
   const [allAddonItems, setAllAddonItems] = useState([]);
+  const [categoriesFlat, setCategoriesFlat] = useState([]);
+
+  // Deduped menu items (one per name) — used by combo component picker
+  const [dedupedMenuItems, setDedupedMenuItems] = useState([]);
 
   const [selectedCategoryId, setSelectedCategoryId] = useState(null);
   const [dieterySubCategories, setDieterySubCategories] = useState([]);
   const [sidebarCategories, setSidebarCategories] = useState([]);
-
   const savedCategoryRef = useRef(localStorage.getItem("menu_selected_category"));
 
-  // All IDs and keywords come from menuConfigResolver — nothing hardcoded here
   const menuConfig = React.useMemo(() => {
     if (!clientId) return null;
     return getMenuConfig(clientId);
   }, [clientId]);
 
-  // Modal states
+  // Detect combo category: any category whose name (or any ancestor) contains "combo"
+  const isComboCategory = React.useMemo(() => {
+    if (!selectedCategoryId || !categoriesFlat?.length) return false;
+    let currentId = selectedCategoryId;
+    const visited = new Set();
+    while (currentId && !visited.has(currentId)) {
+      visited.add(currentId);
+      const cat = categoriesFlat.find(c => c.id === currentId);
+      if (!cat) break;
+      if ((cat.name || '').toLowerCase().includes('combo')) return true;
+      currentId = cat.parentId ?? null;
+    }
+    return false;
+  }, [selectedCategoryId, categoriesFlat]);
+
   const [showAddModal, setShowAddModal] = useState(false);
   const [showEditModal, setShowEditModal] = useState(false);
   const [showDeleteModal, setShowDeleteModal] = useState(false);
   const [showBulkModal, setShowBulkModal] = useState(false);
   const [units, setUnits] = useState([]);
-
   const [newItemImage, setNewItemImage] = useState(null);
   const [newItemImageUrl, setNewItemImageUrl] = useState('');
   const [editItemImage, setEditItemImage] = useState(null);
   const [editItemImageUrl, setEditItemImageUrl] = useState('');
-
   const [editingItem, setEditingItem] = useState(null);
   const [deleteTarget, setDeleteTarget] = useState(null);
   const [newItem, setNewItem] = useState({
     name: '', description: '', category_id: '', unit_price: '',
     discount: '', code: '', unit: '', serving_quantity: "", serving_unit: "", line_item_id: []
   });
-
-  const [categoriesFlat, setCategoriesFlat] = useState([]);
 
   const [selectedRows, setSelectedRows] = useState([]);
   const [selectAllChecked, setSelectAllChecked] = useState(false);
@@ -79,36 +90,22 @@ const MenuManagement = ({ clientId, token, realm }) => {
         `${import.meta.env.VITE_API_TABLE_SERVICE_URL}/${clientId}/tables/config`,
         { headers: { Authorization: `Bearer ${token}` } }
       );
-
       const data = res.data || [];
       setSections(data);
-
-      const uniqueZones = [...new Set(data.map(d => d.zone))];
-      setZones(uniqueZones);
-    } catch (err) {
-      console.error("Zone config fetch failed", err);
-    }
+      setZones([...new Set(data.map(d => d.zone))]);
+    } catch (err) { console.error("Zone config fetch failed", err); }
   }, [clientId, token]);
 
-  useEffect(() => {
-    fetchZoneConfig();
-  }, [fetchZoneConfig]);
-
-  const filteredSections = sections.filter(s => s.zone === selectedZone);
+  useEffect(() => { fetchZoneConfig(); }, [fetchZoneConfig]);
 
   useEffect(() => {
     if (!selectedZone || !selectedSection) return;
-    const found = sections.find(
-      s => s.zone === selectedZone && s.section === selectedSection
-    );
+    const found = sections.find(s => s.zone === selectedZone && s.section === selectedSection);
     if (found) setZoneConfigId(found.id);
   }, [selectedZone, selectedSection, sections]);
 
-  // ─── Simplified addon fetch — always uses "addons" root category ───────────
-  // No more section-name slug logic. Subcategories under "addons" are universal.
   const fetchAddonData = useCallback(async () => {
     if (!menuConfig) return { subcategories: [], items: [] };
-
     try {
       const [catRes, itemRes] = await Promise.all([
         axios.get(
@@ -117,54 +114,51 @@ const MenuManagement = ({ clientId, token, realm }) => {
         ),
         axios.get(
           `${import.meta.env.VITE_API_INVENTORY_SERVICE_URL}/${clientId}/menu/read`,
-          {
-            headers: { Authorization: `Bearer ${token}` },
-            params: {
-              inventory_id: menuConfig.menuInventoryId,
-              ...(zoneConfigId && { zone_config_id: zoneConfigId })
-            }
-          }
+          { headers: { Authorization: `Bearer ${token}` }, params: { inventory_id: menuConfig.menuInventoryId } }
         )
       ]);
 
       const addonsCategory = catRes.data.data?.[0];
-
-      if (!addonsCategory) {
-        return { subcategories: [], items: [] };
-      }
+      if (!addonsCategory) return { subcategories: [], items: [] };
 
       const subcats = addonsCategory.subCategories || [];
       const allItems = itemRes.data.data || [];
-
-      // Collect all valid addon subcategory IDs
       const subcategoryIds = new Set(subcats.map(s => s.id));
+      const subcategoryNames = new Set(subcats.map(s => (s.name || '').trim().toLowerCase()));
 
-      // Include items that belong to "addons" directly OR any of its subcategories
-      const filteredAddons = allItems.filter(
-        item =>
-          item.category_id === 'addons' ||
-          subcategoryIds.has(item.category_id)
-      );
+      const matchingAddons = allItems.filter(item => {
+        const catVal = (item.category_id || '').trim().toLowerCase();
+        return catVal === 'addons' || subcategoryIds.has(item.category_id) || subcategoryNames.has(catVal);
+      });
 
-      return { subcategories: subcats, items: filteredAddons };
+      const seen = new Map();
+      matchingAddons.forEach(item => {
+        const key = (item.name || '').trim().toLowerCase();
+        if (!seen.has(key)) {
+          seen.set(key, item);
+        } else {
+          const existing = seen.get(key);
+          const itemIsBase = item.zone_config_id === 0 || item.zone_config_id === null;
+          const existingIsBase = existing.zone_config_id === 0 || existing.zone_config_id === null;
+          if (itemIsBase && !existingIsBase) seen.set(key, item);
+        }
+      });
+
+      return { subcategories: subcats, items: Array.from(seen.values()) };
     } catch (error) {
       console.warn('Addon fetch failed:', error);
       return { subcategories: [], items: [] };
     }
-  }, [clientId, token, menuConfig, zoneConfigId]);
+  }, [clientId, token, menuConfig]);
 
-  // ─── Fetch addons whenever the selected category changes ─────────────────
-  // No more slug derivation — just fetch once for all categories
   useEffect(() => {
     if (!selectedCategoryId) return;
-
     fetchAddonData().then(({ subcategories, items }) => {
       setAddonSubcategories(subcategories);
       setAllAddonItems(items);
     });
   }, [selectedCategoryId, fetchAddonData]);
 
-  // Also load addons on initial mount so Add modal works even before a category is selected
   useEffect(() => {
     fetchAddonData().then(({ subcategories, items }) => {
       setAddonSubcategories(subcategories);
@@ -173,11 +167,7 @@ const MenuManagement = ({ clientId, token, realm }) => {
     // eslint-disable-next-line react-hooks/exhaustive-deps
   }, []);
 
-  useEffect(() => {
-    if (zoneConfigId) {
-      fetchData();
-    }
-  }, [zoneConfigId]);
+  useEffect(() => { if (zoneConfigId) fetchData(); }, [zoneConfigId]);
 
   const buildCategoryPath = (categoryId) => {
     if (!categoryId) return [];
@@ -209,11 +199,27 @@ const MenuManagement = ({ clientId, token, realm }) => {
     setNewItem({
       name: '', description: '', category_id: selectedCategoryId || '',
       unit_price: '', discount: '', code: '', unit: '',
-      serving_quantity: "", serving_unit: "", line_item_id: [], inventory_id: 'menu', zone_config_id: zoneConfigId || null
+      serving_quantity: "", serving_unit: "", line_item_id: [],
+      inventory_id: 'menu', zone_config_id: zoneConfigId || null
     });
     setNewItemImage(null);
     setNewItemImageUrl('');
     setShowAddModal(true);
+  };
+
+  // Determine if an item's category is a combo category
+  const resolveCategoryIsCombo = (categoryId) => {
+    if (!categoryId || !categoriesFlat?.length) return false;
+    let currentId = categoryId;
+    const visited = new Set();
+    while (currentId && !visited.has(currentId)) {
+      visited.add(currentId);
+      const cat = categoriesFlat.find(c => c.id === currentId);
+      if (!cat) break;
+      if ((cat.name || '').toLowerCase().includes('combo')) return true;
+      currentId = cat.parentId ?? null;
+    }
+    return false;
   };
 
   const handleItemClick = (item) => {
@@ -221,11 +227,8 @@ const MenuManagement = ({ clientId, token, realm }) => {
     const baseRecord = allSiblings.find(m => m.zone_config_id === 0) || item;
 
     const zonePrices = {};
-    allSiblings
-      .filter(m => m.zone_config_id !== 0)
-      .forEach(m => { zonePrices[m.zone_config_id] = m.unit_price; });
+    allSiblings.filter(m => m.zone_config_id !== 0).forEach(m => { zonePrices[m.zone_config_id] = m.unit_price; });
 
-    // category_id in DB is now a name — resolve back to actual id for modal dropdown
     const resolvedCategoryId = categoriesFlat.find(
       c => c.name.toLowerCase() === (baseRecord.category_id || '').toLowerCase()
     )?.id || baseRecord.category_id;
@@ -234,6 +237,7 @@ const MenuManagement = ({ clientId, token, realm }) => {
       ...baseRecord,
       category_id: resolvedCategoryId,
       zonePrices,
+      isCombo: resolveCategoryIsCombo(resolvedCategoryId),
     });
     setShowEditModal(true);
   };
@@ -241,10 +245,7 @@ const MenuManagement = ({ clientId, token, realm }) => {
   const flattenCategoryTree = (tree, level = 0, parentId = null) => {
     let flatList = [];
     tree.forEach(category => {
-      flatList.push({
-        id: category.id, name: category.name, level,
-        parentId, hasChildren: !!(category.subCategories?.length),
-      });
+      flatList.push({ id: category.id, name: category.name, level, parentId, hasChildren: !!(category.subCategories?.length) });
       if (category.subCategories?.length) {
         flatList = flatList.concat(flattenCategoryTree(category.subCategories, level + 1, category.id));
       }
@@ -264,9 +265,7 @@ const MenuManagement = ({ clientId, token, realm }) => {
     if (!node) return [];
     if (currentLevel === targetLevel) return [node];
     let result = [];
-    for (const child of node.children || []) {
-      result = result.concat(getCategoriesAtLevel(child, targetLevel, currentLevel + 1));
-    }
+    for (const child of node.children || []) result = result.concat(getCategoriesAtLevel(child, targetLevel, currentLevel + 1));
     return result;
   };
 
@@ -277,33 +276,18 @@ const MenuManagement = ({ clientId, token, realm }) => {
         { headers: { Authorization: `Bearer ${token}` } }
       );
       const data = res.data?.data || [];
-      const unitsNode = Array.isArray(data) ? data.find((d) => d.id === "units") : data;
+      const unitsNode = Array.isArray(data) ? data.find(d => d.id === "units") : data;
       const subCats = unitsNode?.subCategories || [];
-      const unitList = subCats.map((u) => (typeof u === "string" ? u : u.id));
+      const unitList = subCats.map(u => (typeof u === "string" ? u : u.id));
       setUnits(unitList.length > 0 ? unitList : ["g", "kg", "ml", "litre", "pcs"]);
-    } catch (err) {
-      console.error("fetchUnits failed:", err);
-      setUnits(["g", "kg", "ml", "litre", "pcs"]);
-    }
+    } catch (err) { setUnits(["g", "kg", "ml", "litre", "pcs"]); }
   }, [clientId, token]);
 
-  useEffect(() => {
-    fetchUnits();
-  }, [fetchUnits]);
+  useEffect(() => { fetchUnits(); }, [fetchUnits]);
 
   const getCategoryIdByName = (categoryName) => {
     if (!categoryName) return null;
-    return categoriesFlat.find(
-      c => c.name.trim().toLowerCase() === categoryName.trim().toLowerCase()
-    )?.id || null;
-  };
-
-  const getCategoryNameById = (categoryId) => {
-    if (!categoryId) return null;
-    const found = categoriesFlat.find(
-      c => c.id === categoryId || c.name?.toLowerCase() === String(categoryId).toLowerCase()
-    );
-    return found?.name || null;
+    return categoriesFlat.find(c => c.name.trim().toLowerCase() === categoryName.trim().toLowerCase())?.id || null;
   };
 
   const fetchInventoryIds = useCallback(async () => {
@@ -314,131 +298,70 @@ const MenuManagement = ({ clientId, token, realm }) => {
         { headers: { Authorization: `Bearer ${token}` } }
       );
       setInventoryIds(res.data.data[0]?.subCategories ?? []);
-    } catch (error) {
-      console.error("Error fetching inventory IDs:", error);
-    }
+    } catch (error) { console.error("Error fetching inventory IDs:", error); }
   }, [clientId, token, menuConfig]);
 
-  useEffect(() => {
-    fetchInventoryIds();
-  }, [fetchInventoryIds]);
-
-  const getModalCategories = () => {
-    if (!categories?.length || !menuConfig) return [];
-    const { root } = menuConfig;
-    const findRoot = (nodes) => {
-      for (const node of nodes) {
-        if (String(node.id).toLowerCase() === String(root).toLowerCase() || String(node.name).toLowerCase() === String(root).toLowerCase()) return node;
-        if (node.children?.length) { const found = findRoot(node.children); if (found) return found; }
-      }
-      return null;
-    };
-    const rootNode = findRoot(categories);
-    if (!rootNode) return categories;
-    const flattenedGrandChildren = (rootNode.children || []).flatMap(child => child.children || []);
-    return [{ ...rootNode, id: rootNode.id, name: "All Categories", children: flattenedGrandChildren }];
-  };
+  useEffect(() => { fetchInventoryIds(); }, [fetchInventoryIds]);
 
   const handleAddItem = async () => {
     try {
       let imageId = null;
-
-      if (newItemImage) {
-        imageId = await uploadImageToDocumentService(newItemImage);
-      }
+      if (newItemImage) imageId = await uploadImageToDocumentService(newItemImage);
 
       const selectedCat = categoriesFlat.find(c => c.id === newItem?.category_id);
-
       const finalCategoryId =
         selectedCat?.name ||
-        categoriesFlat.find(
-          c => c.name.toLowerCase() === (newItem?.category_id || '').toLowerCase()
-        )?.name ||
+        categoriesFlat.find(c => c.name.toLowerCase() === (newItem?.category_id || '').toLowerCase())?.name ||
         newItem?.category_id;
 
       if (!finalCategoryId) return;
 
       const slug = generateSlug(finalCategoryId, newItem.name);
-
-      const created_by =
-        currentUserId || localStorage.getItem("user_id") || "system";
-
+      const created_by = currentUserId || localStorage.getItem("user_id") || "system";
       const { dietary_type, ...cleanNewItem } = newItem;
-
       const basePrice = parseFloat(newItem.unit_price) || 0;
       const zonePrices = newItem.zonePrices || {};
 
       const basePayload = {
         ...cleanNewItem,
-        client_id: clientId,
-        category_id: finalCategoryId,
-        image_id: imageId,
-        realm: realm || newItem.realm || "",
-        slug,
-        unit_price: basePrice,
+        client_id: clientId, category_id: finalCategoryId, image_id: imageId,
+        realm: realm || newItem.realm || "", slug, unit_price: basePrice,
         discount: parseFloat(newItem.discount) || 0,
         code: newItem.code ? String(newItem.code).trim() : null,
-        serving_quantity: newItem.serving_quantity
-          ? parseFloat(newItem.serving_quantity)
-          : null,
+        serving_quantity: newItem.serving_quantity ? parseFloat(newItem.serving_quantity) : null,
         serving_unit: newItem.serving_unit || null,
-        created_by,
-        updated_by: created_by,
-        inventory_id: newItem.inventory_id,
-        zone_config_id: 0,
+        created_by, updated_by: created_by,
+        inventory_id: newItem.inventory_id, zone_config_id: 0,
       };
 
-      // STEP 1: Create base record (zone_config_id = 0)
       const baseRes = await axios.post(
         `${import.meta.env.VITE_API_INVENTORY_SERVICE_URL}/${clientId}/menu/create`,
         basePayload,
-        {
-          headers: {
-            Authorization: `Bearer ${token}`,
-            "Content-Type": "application/json",
-          },
-        }
+        { headers: { Authorization: `Bearer ${token}`, "Content-Type": "application/json" } }
       );
 
       const sharedId = baseRes.data.data.id;
 
-      // STEP 2: Create records for ALL sections
       if (sections && sections.length > 0) {
         for (const section of sections) {
           const configId = Number(section.id);
           const enteredPrice = zonePrices[configId];
-          const finalPrice =
-            enteredPrice !== "" && enteredPrice !== null && enteredPrice !== undefined
-              ? parseFloat(enteredPrice)
-              : basePrice;
-
+          const finalPrice = enteredPrice !== "" && enteredPrice !== null && enteredPrice !== undefined
+            ? parseFloat(enteredPrice) : basePrice;
           await axios.post(
             `${import.meta.env.VITE_API_INVENTORY_SERVICE_URL}/${clientId}/menu/create`,
-            {
-              ...basePayload,
-              id: sharedId,
-              unit_price: finalPrice,
-              zone_config_id: configId,
-            },
+            { ...basePayload, id: sharedId, unit_price: finalPrice, zone_config_id: configId },
             { headers: { Authorization: `Bearer ${token}` } }
           );
         }
-      } else {
-        console.warn("No sections found → skipping zone creation");
       }
 
       await fetchData({ silent: true });
-
       setShowAddModal(false);
-      setNewItem({
-        name: "", description: "", category_id: "", unit_price: "",
-        discount: "", code: "", unit: "", line_item_id: [], zonePrices: {},
-      });
+      setNewItem({ name: "", description: "", category_id: "", unit_price: "", discount: "", code: "", unit: "", line_item_id: [], zonePrices: {} });
       setNewItemImage(null);
       setNewItemImageUrl("");
-    } catch (error) {
-      console.error("Error adding item:", error);
-    }
+    } catch (error) { console.error("Error adding item:", error); }
   };
 
   const handleEditItem = async () => {
@@ -449,24 +372,17 @@ const MenuManagement = ({ clientId, token, realm }) => {
       const resolvedCat = categoriesFlat.find(c => c.id === editingItem?.category_id);
       const finalCategoryId =
         resolvedCat?.name ||
-        categoriesFlat.find(
-          c => c.name.toLowerCase() === (editingItem?.category_id || '').toLowerCase()
-        )?.name ||
+        categoriesFlat.find(c => c.name.toLowerCase() === (editingItem?.category_id || '').toLowerCase())?.name ||
         editingItem?.category_id;
 
-      if (!finalCategoryId) {
-        console.error("Edit failed: could not resolve category");
-        return;
-      }
+      if (!finalCategoryId) { console.error("Edit failed: could not resolve category"); return; }
 
       const slug = generateSlug(editingItem.category_id, editingItem.name);
-      const { dietary_type, zonePrices: zp, ...cleanEditingItem } = editingItem;
+      const { dietary_type, zonePrices: zp, isCombo: _ic, ...cleanEditingItem } = editingItem;
 
       const basePayload = {
-        name: editingItem.name,
-        description: editingItem.description || null,
-        category_id: finalCategoryId,
-        image_id: imageId || null,
+        name: editingItem.name, description: editingItem.description || null,
+        category_id: finalCategoryId, image_id: imageId || null,
         discount: Number(editingItem.discount) || 0,
         code: editingItem.code ? String(editingItem.code).trim() : null,
         unit: editingItem.unit || null,
@@ -475,30 +391,20 @@ const MenuManagement = ({ clientId, token, realm }) => {
         line_item_id: Array.isArray(editingItem.line_item_id) && editingItem.line_item_id.length > 0
           ? editingItem.line_item_id : null,
         realm: editingItem.realm || 'restaurant',
-        updated_by: currentUserId,
-        slug,
-        client_id: clientId,
-        inventory_id: editingItem.inventory_id,
-        id: Number(editingItem.id),
+        updated_by: currentUserId, slug,
+        client_id: clientId, inventory_id: editingItem.inventory_id, id: Number(editingItem.id),
       };
 
-      // Always update base record (zone_config_id = 0)
       await axios.post(
         `${import.meta.env.VITE_API_INVENTORY_SERVICE_URL}/${clientId}/menu/update`,
         { ...basePayload, unit_price: Number(editingItem.unit_price) || 0, zone_config_id: 0 },
         { headers: { Authorization: `Bearer ${token}` } }
       );
 
-      // Upsert zone variants
-      const filledZonePrices = Object.entries(zp || {}).filter(
-        ([, price]) => price !== '' && price !== null && price !== undefined
-      );
+      const filledZonePrices = Object.entries(zp || {}).filter(([, price]) => price !== '' && price !== null && price !== undefined);
 
       for (const [configId, price] of filledZonePrices) {
-        const existingZoneRecord = menuItems.find(
-          m => m.id === editingItem.id && m.zone_config_id === Number(configId)
-        );
-
+        const existingZoneRecord = menuItems.find(m => m.id === editingItem.id && m.zone_config_id === Number(configId));
         if (existingZoneRecord) {
           await axios.post(
             `${import.meta.env.VITE_API_INVENTORY_SERVICE_URL}/${clientId}/menu/update`,
@@ -519,9 +425,7 @@ const MenuManagement = ({ clientId, token, realm }) => {
       setEditingItem(null);
       setEditItemImage(null);
       setEditItemImageUrl('');
-    } catch (error) {
-      console.error('Error updating item:', error);
-    }
+    } catch (error) { console.error('Error updating item:', error); }
   };
 
   useEffect(() => {
@@ -534,10 +438,7 @@ const MenuManagement = ({ clientId, token, realm }) => {
 
   const fetchData = useCallback(async (options = { silent: false }) => {
     const { silent = false } = options;
-    if (!clientId || !token || !menuConfig) {
-      if (!silent) setLoading(false);
-      return;
-    }
+    if (!clientId || !token || !menuConfig) { if (!silent) setLoading(false); return; }
 
     try {
       if (!silent) setLoading(true);
@@ -551,10 +452,7 @@ const MenuManagement = ({ clientId, token, realm }) => {
           `${import.meta.env.VITE_API_INVENTORY_SERVICE_URL}/${clientId}/menu/read`,
           {
             headers: { Authorization: `Bearer ${token}` },
-            params: {
-              inventory_id: menuConfig.menuInventoryId,
-              ...(zoneConfigId && { zone_config_id: zoneConfigId })
-            }
+            params: { inventory_id: menuConfig.menuInventoryId, ...(zoneConfigId && { zone_config_id: zoneConfigId }) }
           }
         )
       ]);
@@ -566,20 +464,30 @@ const MenuManagement = ({ clientId, token, realm }) => {
       const topLevelCategories = fullTree.filter(cat => !subcategoryIds.has(cat.id));
       const flatCategories = flattenCategoryTree(topLevelCategories);
       const normalizedFlat = flatCategories.map(cat => ({
-        id: cat.id, name: (cat.name || '').trim(),
-        parentId: cat.parentId ?? cat.parent_id ?? null
+        id: cat.id, name: (cat.name || '').trim(), parentId: cat.parentId ?? cat.parent_id ?? null
       }));
       setCategoriesFlat(normalizedFlat);
 
       const enrichedItems = (itemRes.data.data || []).map(item => {
-        const cat = flatCategories.find(
-          c =>
-            c.id === item.category_id ||
-            c.name.toLowerCase() === (item.category_id || '').toLowerCase()
-        );
+        const cat = flatCategories.find(c => c.id === item.category_id || c.name.toLowerCase() === (item.category_id || '').toLowerCase());
         return { ...item, category: cat?.name ?? "Uncategorized" };
       });
       setMenuItems(enrichedItems);
+
+      // Build deduped list for combo component picker
+      const dedupMap = new Map();
+      enrichedItems.forEach(item => {
+        const key = (item.name || '').trim().toLowerCase();
+        if (!dedupMap.has(key)) {
+          dedupMap.set(key, item);
+        } else {
+          const existing = dedupMap.get(key);
+          const isBase = item.zone_config_id === 0 || item.zone_config_id === null;
+          const existingIsBase = existing.zone_config_id === 0 || existing.zone_config_id === null;
+          if (isBase && !existingIsBase) dedupMap.set(key, item);
+        }
+      });
+      setDedupedMenuItems(Array.from(dedupMap.values()));
 
       const buildCategoryTree = (flatCats) => {
         const categoryMap = new Map();
@@ -605,20 +513,13 @@ const MenuManagement = ({ clientId, token, realm }) => {
       let quickCategories = [];
       if (rootNode) {
         let level = menuConfig.level;
-        while (level >= 0) {
-          quickCategories = getCategoriesAtLevel(rootNode, level);
-          if (quickCategories.length > 0) break;
-          level--;
-        }
+        while (level >= 0) { quickCategories = getCategoriesAtLevel(rootNode, level); if (quickCategories.length > 0) break; level--; }
       }
       setDieterySubCategories(quickCategories);
 
       if (!savedCategoryRef.current) setSidebarCategories(categoryTree);
-    } catch (error) {
-      console.error('Error fetching data:', error);
-    } finally {
-      if (!silent) setLoading(false);
-    }
+    } catch (error) { console.error('Error fetching data:', error); }
+    finally { if (!silent) setLoading(false); }
   }, [clientId, token, realm, menuConfig, zoneConfigId]);
 
   useEffect(() => { fetchData(); }, [fetchData]);
@@ -633,9 +534,7 @@ const MenuManagement = ({ clientId, token, realm }) => {
       }
       return null;
     };
-    const collectDescendants = (cat) => {
-      cat.children?.forEach(child => { descendants.push(child.id); collectDescendants(child); });
-    };
+    const collectDescendants = (cat) => { cat.children?.forEach(child => { descendants.push(child.id); collectDescendants(child); }); };
     const category = findCategory(categoryTree, categoryId);
     if (category) collectDescendants(category);
     return descendants;
@@ -644,7 +543,6 @@ const MenuManagement = ({ clientId, token, realm }) => {
   const getFilteredItems = () => {
     if (!menuItems.length) return [];
     const q = (searchQuery || '').trim().toLowerCase();
-
     let items = menuItems;
 
     if (q.length > 0) {
@@ -657,32 +555,20 @@ const MenuManagement = ({ clientId, token, realm }) => {
 
     if (selectedCategoryId) {
       const allowedCategoryIds = getAllDescendantCategoryIds(selectedCategoryId, categories);
-      const allowedNames = allowedCategoryIds
-        .map(id => categoriesFlat.find(c => c.id === id)?.name)
-        .filter(Boolean)
-        .map(n => n.toLowerCase());
-
-      items = items.filter(item =>
-        allowedNames.includes((item.category_id || '').toLowerCase())
-      );
+      const allowedNames = allowedCategoryIds.map(id => categoriesFlat.find(c => c.id === id)?.name).filter(Boolean).map(n => n.toLowerCase());
+      items = items.filter(item => allowedNames.includes((item.category_id || '').toLowerCase()));
     }
 
-    if (zoneConfigId !== null) {
-      return items.filter(item => item.zone_config_id === zoneConfigId);
-    }
+    if (zoneConfigId !== null) return items.filter(item => item.zone_config_id === zoneConfigId);
 
-    // "All" view — deduplicate by name, always prefer base record (zone_config_id === 0)
     const seen = new Map();
     items.forEach(item => {
       const key = (item.name || '').trim().toLowerCase();
-      if (!seen.has(key)) {
-        seen.set(key, item);
-      } else {
+      if (!seen.has(key)) { seen.set(key, item); }
+      else {
         const existing = seen.get(key);
         if ((item.zone_config_id === 0 || item.zone_config_id === null) &&
-          existing.zone_config_id !== 0 && existing.zone_config_id !== null) {
-          seen.set(key, item);
-        }
+          existing.zone_config_id !== 0 && existing.zone_config_id !== null) { seen.set(key, item); }
       }
     });
     return Array.from(seen.values());
@@ -717,17 +603,12 @@ const MenuManagement = ({ clientId, token, realm }) => {
   const handleDeleteItem = async () => {
     try {
       const deletedItemId = deleteTarget.id;
-
       await axios.post(
         `${import.meta.env.VITE_API_INVENTORY_SERVICE_URL}/${clientId}/menu/delete`,
         { id: deletedItemId, zone_config_id: 0 },
         { headers: { Authorization: `Bearer ${token}` } }
       );
-
-      // Clean up line_item_id references in other items
-      const itemsToUpdate = menuItems.filter(
-        item => Array.isArray(item.line_item_id) && item.line_item_id.includes(deletedItemId)
-      );
+      const itemsToUpdate = menuItems.filter(item => Array.isArray(item.line_item_id) && item.line_item_id.includes(deletedItemId));
       if (itemsToUpdate.length > 0) {
         await Promise.all(itemsToUpdate.map(item => axios.post(
           `${import.meta.env.VITE_API_INVENTORY_SERVICE_URL}/${clientId}/menu/update`,
@@ -735,35 +616,26 @@ const MenuManagement = ({ clientId, token, realm }) => {
           { headers: { Authorization: `Bearer ${token}` } }
         )));
       }
-
       await fetchData({ silent: true });
-
-      // Refresh addon data (simplified — no slug needed)
       const { subcategories, items } = await fetchAddonData();
       setAddonSubcategories(subcategories);
       setAllAddonItems(items);
-
       setShowDeleteModal(false);
       setDeleteTarget(null);
-    } catch (error) {
-      console.error('Error deleting item:', error);
-    }
+    } catch (error) { console.error('Error deleting item:', error); }
   };
 
   const handleBulkDelete = async () => {
     if (selectedRows.length === 0) { alert('No items selected'); return; }
     if (!window.confirm(`Delete ${selectedRows.length} selected items?`)) return;
-
     try {
       await Promise.all(selectedRows.map(id => axios.post(
         `${import.meta.env.VITE_API_INVENTORY_SERVICE_URL}/${clientId}/menu/delete`,
         { id, zone_config_id: 0 },
         { headers: { Authorization: `Bearer ${token}` } }
       )));
-
       const itemsToUpdate = menuItems.filter(item =>
-        Array.isArray(item.line_item_id) &&
-        item.line_item_id.some(addonId => selectedRows.includes(addonId))
+        Array.isArray(item.line_item_id) && item.line_item_id.some(addonId => selectedRows.includes(addonId))
       );
       if (itemsToUpdate.length > 0) {
         await Promise.all(itemsToUpdate.map(item => axios.post(
@@ -772,13 +644,10 @@ const MenuManagement = ({ clientId, token, realm }) => {
           { headers: { Authorization: `Bearer ${token}` } }
         )));
       }
-
       await fetchData({ silent: true });
       setSelectedRows([]);
       setSelectAllChecked(false);
-    } catch (error) {
-      console.error('Error deleting items:', error);
-    }
+    } catch (error) { console.error('Error deleting items:', error); }
   };
 
   const handleBulkUpdate = async () => {
@@ -788,44 +657,25 @@ const MenuManagement = ({ clientId, token, realm }) => {
         const { dietary_type: ed, zonePrices: zp, ...cleanEditedData } = bulkEditData[id] || {};
         const { dietary_type: od, ...cleanOriginalItem } = menuItems.find(item => item.id === id);
         const mergedItem = { ...cleanOriginalItem, ...cleanEditedData, client_id: clientId };
+        await axios.post(`${import.meta.env.VITE_API_INVENTORY_SERVICE_URL}/${clientId}/menu/update`, mergedItem, { headers: { Authorization: `Bearer ${token}` } });
 
-        await axios.post(
-          `${import.meta.env.VITE_API_INVENTORY_SERVICE_URL}/${clientId}/menu/update`,
-          mergedItem,
-          { headers: { Authorization: `Bearer ${token}` } }
-        );
-
-        const filledZonePrices = Object.entries(zp || {}).filter(
-          ([, price]) => price !== '' && price !== null && price !== undefined
-        );
-
+        const filledZonePrices = Object.entries(zp || {}).filter(([, price]) => price !== '' && price !== null && price !== undefined);
         if (filledZonePrices.length > 0) {
-          const siblings = menuItems.filter(
-            m => (m.name || '').trim().toLowerCase() === (cleanOriginalItem.name || '').trim().toLowerCase()
-          );
-
+          const siblings = menuItems.filter(m => (m.name || '').trim().toLowerCase() === (cleanOriginalItem.name || '').trim().toLowerCase());
           for (const [configId, price] of filledZonePrices) {
-            const existingZoneRecord = siblings.find(
-              m => m.zone_config_id === Number(configId) && m.id !== id
-            );
-
+            const existingZoneRecord = siblings.find(m => m.zone_config_id === Number(configId) && m.id !== id);
             if (existingZoneRecord) {
-              await axios.post(
-                `${import.meta.env.VITE_API_INVENTORY_SERVICE_URL}/${clientId}/menu/update`,
+              await axios.post(`${import.meta.env.VITE_API_INVENTORY_SERVICE_URL}/${clientId}/menu/update`,
                 { ...mergedItem, id: Number(existingZoneRecord.id), unit_price: parseFloat(price), zone_config_id: configId ? Number(configId) : 0 },
-                { headers: { Authorization: `Bearer ${token}` } }
-              );
+                { headers: { Authorization: `Bearer ${token}` } });
             } else {
-              await axios.post(
-                `${import.meta.env.VITE_API_INVENTORY_SERVICE_URL}/${clientId}/menu/create`,
+              await axios.post(`${import.meta.env.VITE_API_INVENTORY_SERVICE_URL}/${clientId}/menu/create`,
                 { ...mergedItem, id: undefined, unit_price: parseFloat(price), zone_config_id: configId ? Number(configId) : 0 },
-                { headers: { Authorization: `Bearer ${token}` } }
-              );
+                { headers: { Authorization: `Bearer ${token}` } });
             }
           }
         }
       }
-
       await fetchData({ silent: true });
       setShowBulkModal(false);
       setSelectedRows([]);
@@ -838,156 +688,71 @@ const MenuManagement = ({ clientId, token, realm }) => {
     try {
       const catNameById = (idOrName) => {
         if (!idOrName) return "Uncategorized";
-        const found = categoriesFlat.find(
-          c => c.id === idOrName || c.name?.toLowerCase() === String(idOrName).toLowerCase()
-        );
-        return found?.name || idOrName || "Unknown";
+        return categoriesFlat.find(c => c.id === idOrName || c.name?.toLowerCase() === String(idOrName).toLowerCase())?.name || idOrName || "Unknown";
       };
-
       const sectionLabel = (s) => `${s.zone}-${s.section}`;
-
       const grouped = {};
       menuItems.forEach(item => {
         const key = item.slug || item.name;
-        if (!grouped[key]) {
-          grouped[key] = { baseItem: item, zonePrices: {} };
-        }
+        if (!grouped[key]) grouped[key] = { baseItem: item, zonePrices: {} };
         if (item.zone_config_id) {
           const sec = sections.find(s => s.id === item.zone_config_id);
-          if (sec) {
-            grouped[key].zonePrices[sectionLabel(sec)] = item.unit_price;
-          }
-        } else {
-          grouped[key].zonePrices["Base"] = item.unit_price;
-        }
+          if (sec) grouped[key].zonePrices[sectionLabel(sec)] = item.unit_price;
+        } else { grouped[key].zonePrices["Base"] = item.unit_price; }
       });
-
       const zoneColumns = sections.map(sectionLabel);
-
       const exportData = Object.values(grouped).map(({ baseItem: item, zonePrices }) => {
         const row = {
-          ID: item.id ?? "",
-          Inventory_Id: item.inventory_id,
-          Name: item.name ?? "",
-          Description: item.description ?? "",
-          Category: catNameById(item.category_id) || "Unknown",
-          Image: item.image_id,
-          Unit: item.unit ?? "",
-          Unit_Price: Number(item.unit_price) || 0,
-          Discount: Number(item.discount) || 0,
-          Code: item.code != null ? String(item.code) : "",
-          Serving_Quantity: item.serving_quantity,
-          Serving_Unit: item.serving_unit,
-          Realm: item.realm ?? realm ?? "",
-          Slug: item.slug ?? "",
-          Line_Item_IDs: Array.isArray(item.line_item_id)
-            ? item.line_item_id.join(", ") : "",
+          ID: item.id ?? "", Inventory_Id: item.inventory_id, Name: item.name ?? "",
+          Description: item.description ?? "", Category: catNameById(item.category_id) || "Unknown",
+          Image: item.image_id, Unit: item.unit ?? "", Unit_Price: Number(item.unit_price) || 0,
+          Discount: Number(item.discount) || 0, Code: item.code != null ? String(item.code) : "",
+          Serving_Quantity: item.serving_quantity, Serving_Unit: item.serving_unit,
+          Realm: item.realm ?? realm ?? "", Slug: item.slug ?? "",
+          Line_Item_IDs: Array.isArray(item.line_item_id) ? item.line_item_id.join(", ") : "",
         };
-
-        zoneColumns.forEach(col => {
-          row[`Price_${col}`] = zonePrices[col] ?? "";
-        });
-
+        zoneColumns.forEach(col => { row[`Price_${col}`] = zonePrices[col] ?? ""; });
         return row;
       });
-
-      const headers = [
-        "ID", "Inventory_Id", "Name", "Description", "Category", "Image",
-        "Unit", "Unit_Price", "Discount", "Code", "Serving_Quantity",
-        "Serving_Unit", "Realm", "Slug", "Line_Item_IDs",
-        ...zoneColumns.map(c => `Price_${c}`)
-      ];
-
+      const headers = ["ID", "Inventory_Id", "Name", "Description", "Category", "Image", "Unit", "Unit_Price", "Discount", "Code", "Serving_Quantity", "Serving_Unit", "Realm", "Slug", "Line_Item_IDs", ...zoneColumns.map(c => `Price_${c}`)];
       const worksheet = XLSX.utils.json_to_sheet(exportData, { header: headers });
       const workbook = XLSX.utils.book_new();
       XLSX.utils.book_append_sheet(workbook, worksheet, "MenuItems");
       XLSX.writeFile(workbook, `menu_items_${new Date().toISOString().slice(0, 10)}.xlsx`);
-    } catch (err) {
-      console.error("Export failed:", err);
-    }
+    } catch (err) { console.error("Export failed:", err); }
   };
-
-  const clean = (v) => (v === "" || v === undefined || v === null || (typeof v === "number" && isNaN(v)) ? null : v);
-  const num = (v) => { if (v === "" || v === undefined || v === null || (typeof v === "number" && isNaN(v))) return 0; const n = Number(v); return isNaN(n) ? 0 : n; };
 
   const handleImportFromExcel = async (e) => {
     const file = e.target.files[0];
     if (!file) return;
-
     let created_by = "system", updated_by = "system";
-    try {
-      const decoded = jwtDecode(token);
-      created_by = decoded?.user_id || created_by;
-      updated_by = created_by;
-    } catch { }
-
+    try { const decoded = jwtDecode(token); created_by = decoded?.user_id || created_by; updated_by = created_by; } catch { }
     const sectionLabel = (s) => `${s.zone}-${s.section}`;
-
     const currentCategoriesFlat = [...categoriesFlat];
     const currentSelectedCategoryId = selectedCategoryId;
     const currentSections = [...sections];
-
     let allMenuItems = [];
     try {
-      const res = await axios.get(
-        `${import.meta.env.VITE_API_INVENTORY_SERVICE_URL}/${clientId}/menu/read`,
-        {
-          headers: { Authorization: `Bearer ${token}` },
-          params: { inventory_id: menuConfig.menuInventoryId }
-        }
-      );
+      const res = await axios.get(`${import.meta.env.VITE_API_INVENTORY_SERVICE_URL}/${clientId}/menu/read`,
+        { headers: { Authorization: `Bearer ${token}` }, params: { inventory_id: menuConfig.menuInventoryId } });
       allMenuItems = res.data.data || [];
-    } catch (err) {
-      console.error("Failed to fetch full menu:", err);
-      return;
-    }
-
-    allMenuItems = allMenuItems.map(item => ({
-      ...item,
-      zone_config_id: item.zone_config_id === null || item.zone_config_id === undefined
-        ? 0
-        : Number(item.zone_config_id)
-    }));
-
+    } catch (err) { console.error("Failed to fetch full menu:", err); return; }
+    allMenuItems = allMenuItems.map(item => ({ ...item, zone_config_id: item.zone_config_id === null || item.zone_config_id === undefined ? 0 : Number(item.zone_config_id) }));
     const reader = new FileReader();
     reader.onload = async (evt) => {
       try {
         const workbook = XLSX.read(evt.target.result, { type: "binary" });
-        const parsedData = XLSX.utils.sheet_to_json(
-          workbook.Sheets[workbook.SheetNames[0]],
-          { defval: "" }
-        );
-
+        const parsedData = XLSX.utils.sheet_to_json(workbook.Sheets[workbook.SheetNames[0]], { defval: "" });
         if (!parsedData.length) return;
-
         const allColumns = Object.keys(parsedData[0]);
         const priceColumns = allColumns.filter(col => col.startsWith("Price_"));
-
-        if (!window.confirm(`Import ${parsedData.length} items?`)) {
-          e.target.value = "";
-          return;
-        }
-
+        if (!window.confirm(`Import ${parsedData.length} items?`)) { e.target.value = ""; return; }
         for (const row of parsedData) {
           if (!row.Name?.trim()) continue;
-
-          const existingRecords = allMenuItems.filter(
-            item => item.name?.trim().toLowerCase() === row.Name?.trim().toLowerCase()
-          );
-
-          const categoryId = currentCategoriesFlat.find(
-            c => c.name.trim().toLowerCase() === (row.Category || '').trim().toLowerCase()
-          )?.id || currentSelectedCategoryId;
-
-          const categoryName = currentCategoriesFlat.find(
-            c => c.id === categoryId
-          )?.name || null;
-
-          if (!categoryName) {
-            console.warn(`[Import] Skipping "${row.Name}" — category not found: "${row.Category}"`);
-            continue;
-          }
-
+          const existingRecords = allMenuItems.filter(item => item.name?.trim().toLowerCase() === row.Name?.trim().toLowerCase());
+          const categoryId = currentCategoriesFlat.find(c => c.name.trim().toLowerCase() === (row.Category || '').trim().toLowerCase())?.id || currentSelectedCategoryId;
+          const categoryName = currentCategoriesFlat.find(c => c.id === categoryId)?.name || null;
+          if (!categoryName) { console.warn(`[Import] Skipping "${row.Name}"`); continue; }
           const slug = (() => {
             const parts = [];
             let currentId = categoryId;
@@ -1003,89 +768,53 @@ const MenuManagement = ({ clientId, token, realm }) => {
             if (itemPart) parts.push(itemPart);
             return parts.filter(Boolean).join('_');
           })();
-
           const basePayload = {
-            client_id: clientId,
-            inventory_id: row.Inventory_Id || null,
-            name: row.Name?.trim(),
-            description: row.Description || null,
-            category_id: categoryName,
-            realm: row.Realm || realm || null,
-            code: row.Code ? String(row.Code) : null,
-            serving_quantity: row.Serving_Quantity || null,
-            serving_unit: row.Serving_Unit || null,
-            unit: row.Unit || null,
+            client_id: clientId, inventory_id: row.Inventory_Id || null, name: row.Name?.trim(),
+            description: row.Description || null, category_id: categoryName, realm: row.Realm || realm || null,
+            code: row.Code ? String(row.Code) : null, serving_quantity: row.Serving_Quantity || null,
+            serving_unit: row.Serving_Unit || null, unit: row.Unit || null,
             ...(row.Image && String(row.Image).trim() !== "" && { image_id: String(row.Image).trim() }),
-            discount: Number(row.Discount) || 0,
-            slug,
-            line_item_id: row.Line_Item_IDs
-              ? row.Line_Item_IDs.split(",").map(v => parseInt(v.trim(), 10)).filter(v => !isNaN(v))
-              : null,
-            created_by,
-            updated_by,
+            discount: Number(row.Discount) || 0, slug,
+            line_item_id: row.Line_Item_IDs ? row.Line_Item_IDs.split(",").map(v => parseInt(v.trim(), 10)).filter(v => !isNaN(v)) : null,
+            created_by, updated_by,
           };
-
           let sharedId;
           const existingBase = existingRecords.find(item => item.zone_config_id === 0);
-
           if (existingBase) {
             sharedId = existingBase.id;
-            await axios.post(
-              `${import.meta.env.VITE_API_INVENTORY_SERVICE_URL}/${clientId}/menu/update`,
+            await axios.post(`${import.meta.env.VITE_API_INVENTORY_SERVICE_URL}/${clientId}/menu/update`,
               { ...basePayload, id: Number(sharedId), unit_price: Number(row.Unit_Price) || 0, zone_config_id: 0 },
-              { headers: { Authorization: `Bearer ${token}` } }
-            );
+              { headers: { Authorization: `Bearer ${token}` } });
           } else {
-            const res = await axios.post(
-              `${import.meta.env.VITE_API_INVENTORY_SERVICE_URL}/${clientId}/menu/create`,
+            const res = await axios.post(`${import.meta.env.VITE_API_INVENTORY_SERVICE_URL}/${clientId}/menu/create`,
               { ...basePayload, unit_price: Number(row.Unit_Price) || 0, zone_config_id: 0 },
-              { headers: { Authorization: `Bearer ${token}` } }
-            );
+              { headers: { Authorization: `Bearer ${token}` } });
             sharedId = res.data.data.id;
           }
-
           for (const col of priceColumns) {
             const priceVal = row[col];
             if (priceVal === "" || priceVal === null || priceVal === undefined) continue;
-
             const label = col.replace("Price_", "");
             const matchedSection = currentSections.find(s => sectionLabel(s) === label);
-            if (!matchedSection) {
-              console.warn(`[Import] No section matched for column: ${col}`);
-              continue;
-            }
-
+            if (!matchedSection) continue;
             const matchedZoneConfigId = Number(matchedSection.id);
-            const existingZone = existingRecords.find(
-              item => item.zone_config_id === matchedZoneConfigId
-            );
-
+            const existingZone = existingRecords.find(item => item.zone_config_id === matchedZoneConfigId);
             if (existingZone) {
-              await axios.post(
-                `${import.meta.env.VITE_API_INVENTORY_SERVICE_URL}/${clientId}/menu/update`,
+              await axios.post(`${import.meta.env.VITE_API_INVENTORY_SERVICE_URL}/${clientId}/menu/update`,
                 { ...basePayload, id: Number(existingZone.id), unit_price: Number(priceVal), zone_config_id: matchedZoneConfigId },
-                { headers: { Authorization: `Bearer ${token}` } }
-              );
+                { headers: { Authorization: `Bearer ${token}` } });
             } else {
-              await axios.post(
-                `${import.meta.env.VITE_API_INVENTORY_SERVICE_URL}/${clientId}/menu/create`,
+              await axios.post(`${import.meta.env.VITE_API_INVENTORY_SERVICE_URL}/${clientId}/menu/create`,
                 { ...basePayload, id: sharedId, unit_price: Number(priceVal), zone_config_id: matchedZoneConfigId },
-                { headers: { Authorization: `Bearer ${token}` } }
-              );
+                { headers: { Authorization: `Bearer ${token}` } });
             }
           }
         }
-
         await fetchData({ silent: false });
         alert("Import complete!");
         e.target.value = "";
-      } catch (err) {
-        console.error("Import Error:", err);
-        alert(`Import failed: ${err.message}`);
-        e.target.value = "";
-      }
+      } catch (err) { console.error("Import Error:", err); alert(`Import failed: ${err.message}`); e.target.value = ""; }
     };
-
     reader.readAsBinaryString(file);
   };
 
@@ -1098,7 +827,6 @@ const MenuManagement = ({ clientId, token, realm }) => {
     if (!categories?.length) return;
     const saved = savedCategoryRef.current;
     if (!saved) return;
-
     const findNode = (nodes, id) => {
       for (const node of nodes) {
         if (node.id === id) return node;
@@ -1106,23 +834,15 @@ const MenuManagement = ({ clientId, token, realm }) => {
       }
       return null;
     };
-
     const node = findNode(categories, saved);
     if (!node) return;
-
     const findParentAtLevel = (nodes, targetId, parentNode = null, level = 0) => {
       for (const n of nodes) {
-        if (n.id === targetId) {
-          return level === 2 ? parentNode : n;
-        }
-        if (n.children?.length) {
-          const found = findParentAtLevel(n.children, targetId, n, level + 1);
-          if (found) return found;
-        }
+        if (n.id === targetId) return level === 2 ? parentNode : n;
+        if (n.children?.length) { const found = findParentAtLevel(n.children, targetId, n, level + 1); if (found) return found; }
       }
       return null;
     };
-
     const parentCategory = findParentAtLevel(categories, saved);
     if (parentCategory) {
       setSelectedCategoryId(parentCategory.id);
@@ -1132,10 +852,7 @@ const MenuManagement = ({ clientId, token, realm }) => {
   }, [categories]);
 
   useEffect(() => {
-    if (searchOpen && searchInputRef.current) {
-      const t = setTimeout(() => searchInputRef.current.focus(), 80);
-      return () => clearTimeout(t);
-    }
+    if (searchOpen && searchInputRef.current) { const t = setTimeout(() => searchInputRef.current.focus(), 80); return () => clearTimeout(t); }
   }, [searchOpen]);
 
   useEffect(() => {
@@ -1149,108 +866,56 @@ const MenuManagement = ({ clientId, token, realm }) => {
     return categoriesFlat.find(c => c.id === selectedCategoryId)?.name || 'All Categories';
   };
 
-  const getTopSectionName = (categoryId) => {
-    if (!categoryId || !menuConfig) return null;
-    const rootNode = categoriesFlat.find(
-      c => c.name.toLowerCase() === menuConfig.root.toLowerCase() || c.id.toLowerCase() === menuConfig.root.toLowerCase()
-    );
-    if (!rootNode) return null;
-    let current = categoriesFlat.find(c => c.id === categoryId);
-    while (current && current.parentId) {
-      if (current.parentId === rootNode.id) return current.name;
-      current = categoriesFlat.find(c => c.id === current.parentId);
-    }
-    return null;
-  };
-
-  const findNodeAndChildren = (nodes, id) => {
-    for (const node of nodes) {
-      if (node.id === id) return node;
-      if (node.children?.length) { const found = findNodeAndChildren(node.children, id); if (found) return found; }
-    }
-    return null;
-  };
-
-  useEffect(() => {
-    if (!selectedCategoryId) setSidebarCategories(categories);
-  }, [selectedCategoryId, categories]);
+  useEffect(() => { if (!selectedCategoryId) setSidebarCategories(categories); }, [selectedCategoryId, categories]);
 
   return (
     <div className="h-[90vh] bg-bg-primary overflow-hidden">
       <div className="mx-auto p-2">
         <div className="lg:grid lg:grid-cols-4 gap-2">
-          {/* Sidebar */}
           <div className="lg:col-span-1">
             <div className="lg:sticky lg:top-2">
               <MenuCategoryTree
-                categories={categories}
-                selectedCategoryId={selectedCategoryId}
-                onSelectCategory={(id) => {
-                  setSelectedCategoryId(id);
-                  localStorage.setItem("menu_selected_category", id);
-                }}
-                clientId={clientId}
-                token={token}
+                categories={categories} selectedCategoryId={selectedCategoryId}
+                onSelectCategory={(id) => { setSelectedCategoryId(id); localStorage.setItem("menu_selected_category", id); }}
+                clientId={clientId} token={token}
                 onCategoriesUpdate={() => fetchData({ silent: true })}
                 menuConfig={menuConfig}
               />
             </div>
           </div>
 
-          {/* Main Content */}
           <div className="lg:col-span-3 border-default border-border-default p-3 rounded-lg h-[88.5vh] flex flex-col">
             <div className="mb-3 flex flex-wrap gap-2">
-              <button
-                onClick={() => setZoneConfigId(null)}
-                className={`px-3 py-1 rounded-full text-sm border transition
-                  ${zoneConfigId === null
-                    ? "bg-black text-white border-black"
-                    : "bg-gray-100 text-gray-700 hover:bg-gray-200"
-                  }`}
-              >
-                All
-              </button>
-
-              {sections.map((s) => (
-                <button
-                  key={s.id}
-                  onClick={() => setZoneConfigId(s.id)}
-                  className={`px-3 py-1 rounded-full text-sm border transition
-                    ${zoneConfigId === s.id
-                      ? "bg-blue-600 text-white border-blue-600"
-                      : "bg-gray-100 text-gray-700 hover:bg-gray-200"
-                    }`}
-                >
+              <button onClick={() => setZoneConfigId(null)} className={`px-3 py-1 rounded-full text-sm border transition ${zoneConfigId === null ? "bg-black text-white border-black" : "bg-gray-100 text-gray-700 hover:bg-gray-200"}`}>All</button>
+              {sections.map(s => (
+                <button key={s.id} onClick={() => setZoneConfigId(s.id)} className={`px-3 py-1 rounded-full text-sm border transition ${zoneConfigId === s.id ? "bg-blue-600 text-white border-blue-600" : "bg-gray-100 text-gray-700 hover:bg-gray-200"}`}>
                   {s.zone} - {s.section}
                 </button>
               ))}
             </div>
 
-            {/* Header */}
             <div className="flex flex-col gap-3 lg:flex-row lg:items-center lg:justify-between mb-4">
-              <div className="flex-shrink-0">
+              <div className="flex-shrink-0 flex items-center gap-2">
                 <h2 className="text-lg lg:text-2xl font-semibold text-text-primary leading-tight">
                   {getSelectedCategoryNameById() || 'All Categories'}
                   <span className="text-sm ml-2 text-text-secondary">({filteredItems.length})</span>
                 </h2>
+                {isComboCategory && (
+                  <span className="px-2 py-0.5 bg-violet-100 text-violet-700 text-xs font-semibold rounded-full border border-violet-200">
+                    Combo
+                  </span>
+                )}
               </div>
 
               <div className="flex flex-col gap-2 sm:flex-row sm:items-center sm:justify-end lg:flex-nowrap lg:gap-2">
                 <div className="relative w-full sm:w-56">
                   <Search size={16} className="absolute left-3 top-1/2 -translate-y-1/2 text-text-secondary" />
-                  <input
-                    ref={searchInputRef}
-                    type="text"
-                    value={searchQuery}
-                    onChange={(e) => setSearchQuery(e.target.value)}
-                    placeholder="Search items…"
-                    className="w-full h-9 pl-10 pr-3 rounded-lg bg-bg-tertiary border border-border-default text-sm text-text-primary placeholder:text-text-secondary focus:outline-none focus:ring-2 focus:ring-action-primary/30"
-                  />
+                  <input ref={searchInputRef} type="text" value={searchQuery} onChange={e => setSearchQuery(e.target.value)} placeholder="Search items…"
+                    className="w-full h-9 pl-10 pr-3 rounded-lg bg-bg-tertiary border border-border-default text-sm text-text-primary placeholder:text-text-secondary focus:outline-none focus:ring-2 focus:ring-action-primary/30" />
                 </div>
-
                 <div className="flex gap-2 flex-wrap justify-end">
                   <button onClick={openAddModal} className="h-9 px-3 flex items-center gap-2 rounded-lg bg-action-primary text-white text-sm font-semibold shadow-sm hover:opacity-90">
-                    <Plus size={14} /><span>Add Item</span>
+                    <Plus size={14} /><span>{isComboCategory ? 'Add Combo' : 'Add Item'}</span>
                   </button>
                   <button onClick={() => setShowBulkModal(true)} className="h-9 px-3 flex items-center gap-2 rounded-lg bg-bg-tertiary border border-border-default text-sm font-semibold hover:border-action-primary hover:bg-bg-secondary">
                     <Edit size={14} /><span className="hidden sm:inline">Bulk Update</span>
@@ -1260,12 +925,8 @@ const MenuManagement = ({ clientId, token, realm }) => {
                       <CloudUpload size={14} />
                     </button>
                     <div className="absolute right-0 mt-1 w-36 bg-bg-primary border border-border-default rounded-lg shadow-lg opacity-0 invisible group-hover:opacity-100 group-hover:visible transition-all duration-200 z-50">
-                      <button onClick={() => document.getElementById('excelInput').click()} className="w-full px-4 py-2 flex items-center gap-2 text-sm hover:bg-bg-secondary">
-                        <Upload size={14} />Import
-                      </button>
-                      <button onClick={handleExportToExcel} className="w-full px-4 py-2 flex items-center gap-2 text-sm hover:bg-bg-secondary">
-                        <Download size={14} />Export
-                      </button>
+                      <button onClick={() => document.getElementById('excelInput').click()} className="w-full px-4 py-2 flex items-center gap-2 text-sm hover:bg-bg-secondary"><Upload size={14} />Import</button>
+                      <button onClick={handleExportToExcel} className="w-full px-4 py-2 flex items-center gap-2 text-sm hover:bg-bg-secondary"><Download size={14} />Export</button>
                     </div>
                   </div>
                   <input type="file" id="excelInput" accept=".xlsx, .xls" className="hidden" onChange={handleImportFromExcel} />
@@ -1273,58 +934,44 @@ const MenuManagement = ({ clientId, token, realm }) => {
               </div>
             </div>
 
-            {/* Items Grid */}
             <div className="flex-1 overflow-y-auto">
               <div className="grid gap-2 grid-cols-2 md:grid-cols-3 lg:grid-cols-3 xl:grid-cols-4">
-                {filteredItems.map((item) => {
+                {filteredItems.map(item => {
                   const discountPercent = item.discount && item.unit_price && Number(item.discount) > 0
                     ? ((Number(item.discount) * 100) / Number(item.unit_price)).toFixed(0) : null;
+                  const hasComponents = item.line_item_id?.length > 0;
+                  const isComboItem = hasComponents && (item.category_id || '').toLowerCase().includes('combo');
 
                   return (
                     <div key={item.id} className="relative flex gap-2 items-center bg-bg-primary border border-border-default rounded-xl p-1 shadow-sm hover:shadow-md transition group overflow-hidden">
                       <div className="absolute inset-0 bg-black/40 backdrop-blur-[2px] opacity-0 pointer-events-none z-10 group-hover:animate-overlayFade" />
-
-                      {item.line_item_id?.length > 0 && (
-                        <div className="absolute bottom-2 right-2 bg-orange-500 text-white text-[7px] p-1 rounded-md z-10 shadow-md flex items-center gap-1">
-                          <Plus size={10} /><span>{item.line_item_id.length} add-ons</span>
+                      {hasComponents && (
+                        <div className={`absolute bottom-2 right-2 text-white text-[7px] p-1 rounded-md z-10 shadow-md flex items-center gap-1 ${isComboItem ? 'bg-violet-600' : 'bg-orange-500'}`}>
+                          <Plus size={10} /><span>{item.line_item_id.length} {isComboItem ? 'items' : 'add-ons'}</span>
                         </div>
                       )}
-
                       <div className="relative w-10 h-12 md:h-16 md:w-14 rounded-lg overflow-hidden shrink-0 bg-gray-100">
                         {discountPercent && (
-                          <div className="absolute top-1 left-1 bg-action-danger text-white text-[7px] md:text-[10px] px-1 rounded z-10">
-                            {discountPercent}% OFF
-                          </div>
+                          <div className="absolute top-1 left-1 bg-action-danger text-white text-[7px] md:text-[10px] px-1 rounded z-10">{discountPercent}% OFF</div>
                         )}
                         <MenuImagePreview clientId={clientId} imageId={item.image_id} token={token} alt={item.name}
                           baseUrl={import.meta.env.VITE_API_DOCUMENT_SERVICE_URL} className="w-full h-full object-cover"
                           urlBuilder={({ baseUrl, clientId, imageId }) => `${baseUrl}/${clientId}/document/download?doc_id=${imageId}`} />
                       </div>
-
                       <div className="flex-1 min-w-0 cursor-pointer" onClick={() => handleItemClick(item)}>
                         <h3 className="text-[10px] md:text-[16px] font-semibold text-text-primary">{item.name}</h3>
                         {item.description && <p className="text-[8px] md:text-[13px] text-text-secondary line-clamp-1">{item.description}</p>}
                         <div className="flex items-center gap-2 mt-1">
                           {discountPercent ? (
-                            <>
-                              <span className="text-sm font-bold text-action-primary">₹{(item.unit_price - item.discount).toFixed(0)}</span>
-                              <span className="text-xs line-through text-text-secondary">₹{item.unit_price}</span>
-                            </>
+                            <><span className="text-sm font-bold text-action-primary">₹{(item.unit_price - item.discount).toFixed(0)}</span><span className="text-xs line-through text-text-secondary">₹{item.unit_price}</span></>
                           ) : (
                             <span className="text-sm font-bold text-action-primary">₹{item.unit_price}</span>
                           )}
                         </div>
                       </div>
-
                       <div className="absolute top-1 right-1 flex gap-1 opacity-0 group-hover:opacity-100 transition-opacity duration-200 z-20">
-                        <button className="bg-action-primary text-white p-1 rounded-full hover:scale-110"
-                          onClick={(e) => { e.stopPropagation(); handleItemClick(item); }}>
-                          <Edit size={10} />
-                        </button>
-                        <button className="bg-action-danger text-white p-1 rounded-full hover:scale-110"
-                          onClick={(e) => { e.stopPropagation(); setDeleteTarget(item); setShowDeleteModal(true); }}>
-                          <Trash2 size={10} />
-                        </button>
+                        <button className="bg-action-primary text-white p-1 rounded-full hover:scale-110" onClick={e => { e.stopPropagation(); handleItemClick(item); }}><Edit size={10} /></button>
+                        <button className="bg-action-danger text-white p-1 rounded-full hover:scale-110" onClick={e => { e.stopPropagation(); setDeleteTarget(item); setShowDeleteModal(true); }}><Trash2 size={10} /></button>
                       </div>
                     </div>
                   );
@@ -1335,14 +982,11 @@ const MenuManagement = ({ clientId, token, realm }) => {
         </div>
       </div>
 
-      {/* Delete Modal */}
       {showDeleteModal && deleteTarget && (
         <div className="fixed inset-0 z-50 flex items-center justify-center p-4 bg-color-modalsbg">
           <div className="rounded-lg max-w-md w-full p-6 bg-bg-primary">
             <h3 className="text-xl font-semibold mb-4 text-text-primary">Confirm Delete</h3>
-            <p className="mb-6 text-text-secondary">
-              Are you sure you want to delete <strong className="text-text-primary">{deleteTarget.name}</strong>? This action cannot be undone.
-            </p>
+            <p className="mb-6 text-text-secondary">Are you sure you want to delete <strong className="text-text-primary">{deleteTarget.name}</strong>? This action cannot be undone.</p>
             <div className="flex gap-3">
               <button onClick={() => setShowDeleteModal(false)} className="flex-1 px-4 py-2 rounded-lg bg-bg-tertiary text-text-primary border border-border-default hover:bg-bg-secondary transition-colors">Cancel</button>
               <button onClick={handleDeleteItem} className="flex-1 px-4 py-2 rounded-lg bg-action-danger text-text-white hover:opacity-90 transition-opacity">Delete</button>
@@ -1351,18 +995,20 @@ const MenuManagement = ({ clientId, token, realm }) => {
         </div>
       )}
 
-      <UniversalAddModal clientId={clientId}
-        token={token}
+      <UniversalAddModal
+        clientId={clientId} token={token}
         showModal={showAddModal} setShowModal={setShowAddModal} modalType="menu"
         newItem={newItem} setNewItem={setNewItem} selectedCategoryId={selectedCategoryId}
         categories={categories} addonSubcategories={addonSubcategories} allAddonItems={allAddonItems}
         newItemImage={newItemImage} setNewItemImage={setNewItemImage}
         newItemImageUrl={newItemImageUrl} setNewItemImageUrl={setNewItemImageUrl}
         handleAddItem={handleAddItem} getCategoryIdByName={getCategoryIdByName}
-        inventoryIds={inventoryIds}
-        fetchAddonData={fetchAddonData}
+        inventoryIds={inventoryIds} fetchAddonData={fetchAddonData}
         setAddonSubcategories={setAddonSubcategories} setAllAddonItems={setAllAddonItems}
         units={units}
+        isComboCategory={isComboCategory}
+        dedupedMenuItems={dedupedMenuItems}
+        categoriesFlat={categoriesFlat}
       />
 
       <UniversalEditModal
@@ -1372,14 +1018,15 @@ const MenuManagement = ({ clientId, token, realm }) => {
         editItemImage={editItemImage} setEditItemImage={setEditItemImage}
         editItemImageUrl={editItemImageUrl} setEditItemImageUrl={setEditItemImageUrl}
         handleEditItem={handleEditItem} clientId={clientId} token={token}
-        inventoryIds={inventoryIds}
-        fetchAddonData={fetchAddonData}
+        inventoryIds={inventoryIds} fetchAddonData={fetchAddonData}
         setAddonSubcategories={setAddonSubcategories} setAllAddonItems={setAllAddonItems}
         units={units}
+        dedupedMenuItems={dedupedMenuItems}
+        categoriesFlat={categoriesFlat}
       />
 
-      <UniversalBulkUpdateModal clientId={clientId}
-        token={token} menuItems={menuItems}
+      <UniversalBulkUpdateModal
+        clientId={clientId} token={token} menuItems={menuItems}
         showModal={showBulkModal} setShowModal={setShowBulkModal} modalType="menu"
         filteredItems={filteredItems} selectedRows={selectedRows} setSelectedRows={setSelectedRows}
         selectAllChecked={selectAllChecked} setSelectAllChecked={setSelectAllChecked}
