@@ -196,7 +196,7 @@ const MasterTagManager = ({ label, categoryId, clientId, token, showPopup, close
 /* ─────────────────────────────────────────────
    Main Modal
 ───────────────────────────────────────────── */
-const TableConfigModal = ({ show, onClose, clientId, token, refresh }) => {
+const TableConfigModal = ({ show, onClose, clientId, token, refresh,realm }) => {
     const [activeTab,      setActiveTab]      = useState("config");
     const [sectionInput,   setSectionInput]   = useState("");
     const [zoneInput,      setZoneInput]      = useState("");
@@ -248,7 +248,7 @@ const TableConfigModal = ({ show, onClose, clientId, token, refresh }) => {
         setAddingConfig(true);
         try {
             const res = await axios.post(`${BASE_URL}/${clientId}/tables/config`,
-                { client_id: clientId, section, zone }, { headers: auth });
+                { client_id: clientId, section, zone,realm }, { headers: auth });
 
             // ✅ Use returned data if available, else construct locally
             const saved = res.data?.data || res.data;
