@@ -880,7 +880,142 @@ const TableReservation = ({
     </div>
   );
 };
+// ─────────────────────────────────────────────────────────────────────────────
+// TakeawayOrdersModal — today's takeaway orders picker
+// ─────────────────────────────────────────────────────────────────────────────
 
+const TakeawayOrdersModal = ({ isOpen, onClose, clientId, token, takeawayTableIds, onSelectOrder }) => {
+  const [orders, setOrders] = useState([]);
+  const [loading, setLoading] = useState(false);
+
+  useEffect(() => {
+    if (!isOpen) return;
+    const fetchTodayOrders = async () => {
+      setLoading(true);
+      try {
+        const r = await axios.get(
+          `${import.meta.env.VITE_API_ORDER_SERVICE_URL}/${clientId}/dinein/table`,
+          { headers: { Authorization: `Bearer ${token}` } }
+        );
+        const all = r.data?.data || [];
+        const todayStart = new Date();
+        todayStart.setHours(0, 0, 0, 0);
+
+        const todayTakeaway = all.filter(o => {
+          if (!takeawayTableIds.includes(String(o.table_id))) return false;
+          if (o.status?.toLowerCase() === 'completed') return false;
+          if (o.status?.toLowerCase() === 'draft') return false;
+          const created = new Date(
+            typeof o.created_at === 'string'
+              ? o.created_at.replace(' ', 'T').split('.')[0] + 'Z'
+              : o.created_at
+          );
+          return created >= todayStart;
+        }).sort((a, b) => new Date(b.created_at) - new Date(a.created_at));
+
+        setOrders(todayTakeaway);
+      } catch (err) {
+        console.error('TakeawayOrdersModal fetch failed:', err);
+      } finally {
+        setLoading(false);
+      }
+    };
+    fetchTodayOrders();
+  }, [isOpen, clientId, token, takeawayTableIds]);
+
+  if (!isOpen) return null;
+
+  const statusStyle = (s) => ({
+    pending: 'bg-orange-100 text-orange-700',
+    preparing: 'bg-blue-100 text-blue-700',
+    ready: 'bg-green-100 text-green-700',
+    served: 'bg-purple-100 text-purple-700',
+  }[s?.toLowerCase()] || 'bg-gray-100 text-gray-600');
+
+  const calcElapsed = (createdAt) => {
+    if (!createdAt) return '';
+    const utc = typeof createdAt === 'string'
+      ? createdAt.replace(' ', 'T').split('.')[0] + 'Z'
+      : createdAt;
+    const diff = Date.now() - new Date(utc).getTime();
+    const m = Math.floor(diff / 60000);
+    if (m < 1) return 'Just now';
+    if (m < 60) return `${m} min ago`;
+    const h = Math.floor(m / 60);
+    return h < 24 ? `${h} hr ago` : `${Math.floor(h / 24)} day ago`;
+  };
+
+  return (
+    <div className="fixed inset-0 z-50 flex items-center justify-center p-4 bg-black/50">
+      <div className="rounded-xl w-full max-w-md bg-white shadow-xl flex flex-col max-h-[80vh]">
+        {/* Header */}
+        <div className="px-5 py-4 border-b flex justify-between items-center">
+          <div>
+            <h2 className="text-lg font-bold text-gray-800">Today's Takeaway Orders</h2>
+            <p className="text-xs text-gray-500 mt-0.5">Select an order to add more items</p>
+          </div>
+          <button onClick={onClose} className="text-gray-400 hover:text-gray-600">
+            <X size={20} />
+          </button>
+        </div>
+
+        {/* Body */}
+        <div className="flex-1 overflow-y-auto px-4 py-3 space-y-2">
+          {loading && (
+            <p className="text-sm text-center text-gray-400 py-6">Loading…</p>
+          )}
+          {!loading && orders.length === 0 && (
+            <p className="text-sm text-center text-gray-400 py-6">No takeaway orders today yet.</p>
+          )}
+          {!loading && orders.map(order => (
+            <button
+              key={order.id}
+              onClick={() => { onSelectOrder(order); onClose(); }}
+              className="w-full text-left p-3 rounded-xl border border-gray-200 hover:border-action-primary hover:bg-orange-50 transition group"
+            >
+              <div className="flex items-center justify-between gap-2">
+                <div className="flex items-center gap-2">
+                  <span className="text-sm font-bold text-gray-800 font-mono">
+                    #{order.dinein_order_id || order.id}
+                  </span>
+                  <span className={`text-xs px-2 py-0.5 rounded-full font-semibold ${statusStyle(order.status)}`}>
+                    {order.status?.toUpperCase()}
+                  </span>
+                </div>
+                <span className="text-sm font-bold text-action-primary">
+                  ₹{Number(order.total_price || 0).toFixed(0)}
+                </span>
+              </div>
+              <div className="flex items-center justify-between mt-1.5 text-xs text-gray-500">
+                <span>{(order.items || []).length} item{(order.items || []).length !== 1 ? 's' : ''}</span>
+                <span className="flex items-center gap-1">
+                  <Clock size={11} className="text-orange-400" />
+                  {calcElapsed(order.created_at)}
+                </span>
+              </div>
+              {(order.items || []).length > 0 && (
+                <p className="mt-1 text-xs text-gray-400 truncate">
+                  {order.items.slice(0, 3).map(i => i.item_name).join(', ')}
+                  {order.items.length > 3 ? ` +${order.items.length - 3} more` : ''}
+                </p>
+              )}
+            </button>
+          ))}
+        </div>
+
+        {/* Footer — new order option */}
+        <div className="px-4 py-3 border-t bg-gray-50 rounded-b-xl">
+          <button
+            onClick={() => { onSelectOrder(null); onClose(); }}
+            className="w-full py-2.5 rounded-lg border-2 border-dashed border-orange-300 text-orange-600 text-sm font-semibold hover:bg-orange-50 transition"
+          >
+            + Start a new takeaway order
+          </button>
+        </div>
+      </div>
+    </div>
+  );
+};
 // ─────────────────────────────────────────────────────────────────────────────
 // TakeOrder — main component
 // ─────────────────────────────────────────────────────────────────────────────
@@ -938,11 +1073,105 @@ const TakeOrder = ({ clientId, token, onOrderUpdate, realm }) => {
   const searchInputRef = useRef(null);
   const isMobile = window.matchMedia('(max-width: 1024px)').matches;
 
+  const [sections, setSections] = useState([]);
+  const [takeawaySections, setTakeawaySections] = useState([]);
+  const [zoneConfigId, setZoneConfigId] = useState(null);
+  const [dietaryOptions, setDietaryOptions] = useState([]);
+  const [dietaryColorMap, setDietaryColorMap] = useState({});
+  const [selectedDietary, setSelectedDietary] = useState(null);
+  const [stockWarning, setStockWarning] = useState(null);
+  const [timingOptions, setTimingOptions] = useState([]);
+  const [showTakeawayOrdersModal, setShowTakeawayOrdersModal] = useState(false);
   const menuConfig = useMemo(
     () => (clientId ? getMenuConfig(clientId) : null),
     [clientId]
   );
 
+  const fetchZoneConfig = async () => {
+    try {
+      const res = await axios.get(
+        `${import.meta.env.VITE_API_TABLE_SERVICE_URL}/${clientId}/tables/config`,
+        { headers: { Authorization: `Bearer ${token}` } }
+      );
+
+      const takeawayRoots =
+        (import.meta.env.VITE_EASYFOOD_TAKEAWAY_TABLE_DEFAULT_ROOT || '')
+          .split(',')
+          .map(v => v.trim().toLowerCase())
+          .filter(Boolean);
+
+      const allSections = res.data || [];
+
+      // Dine-in sections — exclude anything that matches takeaway roots
+      const dineInSections = takeawayRoots.length > 0
+        ? allSections.filter(s =>
+          !takeawayRoots.some(root =>
+            (s.zone || '').toLowerCase().startsWith(root) ||
+            (s.section || '').toLowerCase().startsWith(root)
+          )
+        )
+        : allSections;
+
+      // Takeaway sections — only those matching takeaway roots
+      const takeawaySectionsFiltered = takeawayRoots.length > 0
+        ? allSections.filter(s =>
+          takeawayRoots.some(root =>
+            (s.zone || '').toLowerCase().startsWith(root) ||
+            (s.section || '').toLowerCase().startsWith(root)
+          )
+        )
+        : [];
+
+      setSections(dineInSections);
+      setTakeawaySections(takeawaySectionsFiltered);
+    } catch (err) {
+      console.error('Zone config fetch failed', err);
+    }
+  };
+  const DIETARY_COLORS = ['bg-green-500', 'bg-red-500', 'bg-yellow-400', 'bg-orange-500', 'bg-purple-500', 'bg-blue-500'];
+
+  const fetchDietaryTypes = async () => {
+    try {
+      const res = await axios.get(
+        `${import.meta.env.VITE_API_INVENTORY_SERVICE_URL}/${clientId}/inventory/item-types`,
+        { params: { category_id: 'dietary_type' }, headers: { Authorization: `Bearer ${token}` } }
+      );
+      const opts = res.data?.data || [];
+      setDietaryOptions(opts);
+      const map = {};
+      opts.forEach((opt, idx) => {
+        map[opt.toLowerCase().replace(/[-_\s]/g, '')] = DIETARY_COLORS[idx % DIETARY_COLORS.length];
+      });
+      setDietaryColorMap(map);
+    } catch (err) {
+      console.error('Dietary fetch failed:', err);
+    }
+  };
+  const fetchTimings = async () => {
+    try {
+      const res = await axios.get(
+        `${import.meta.env.VITE_API_INVENTORY_SERVICE_URL}/${clientId}/inventory/item-types`,
+        {
+          params: { category_id: 'available_timings' },
+          headers: { Authorization: `Bearer ${token}` },
+        }
+      );
+      const raw = res.data?.data || [];
+      const parsed = raw.map(v => {
+        const match = v.match(/^(.+)\((.+)-(.+)\)$/);
+        return {
+          name: (match?.[1] ?? v).trim().toLowerCase(),
+          start: match?.[2] ?? null,
+          end: match?.[3] ?? null,
+          raw: v
+        };
+      });
+      setTimingOptions(parsed);
+    } catch (err) {
+      console.error('Timing fetch failed:', err);
+      setTimingOptions([]);
+    }
+  };
   // ─────────────────────────────────────────────────────────────────────────
   // Draft helpers
   // ─────────────────────────────────────────────────────────────────────────
@@ -1018,18 +1247,18 @@ const TakeOrder = ({ clientId, token, onOrderUpdate, realm }) => {
     return null;
   }, [categoriesFlat]);
 
-  const getCategoryAndChildrenIds = (cats, targetId) => {
+  const getCategoryAndChildrenIds = useCallback((targetId) => {
+    if (!targetId || !categoriesFlat.length) return [];
     const result = new Set();
-    const traverse = (nodes, found = false) => {
-      for (const n of nodes) {
-        const isT = n.id === targetId;
-        if (isT || found) result.add(n.id);
-        if (n.children?.length) traverse(n.children, found || isT);
-      }
+    const addWithChildren = (id) => {
+      result.add(id);
+      categoriesFlat
+        .filter(c => c.parentId === id)
+        .forEach(c => addWithChildren(c.id));
     };
-    traverse(cats);
+    addWithChildren(targetId);
     return Array.from(result);
-  };
+  }, [categoriesFlat]);
 
   const findCategoryNode = (tree, matcher) => {
     for (const c of tree) {
@@ -1065,7 +1294,39 @@ const TakeOrder = ({ clientId, token, onOrderUpdate, realm }) => {
     }
     return null;
   };
+  const isItemActive = useCallback((slug) => {
+    if (!slug) return true;
+    if (!timingOptions || timingOptions.length === 0) return true;
 
+    const doubleUnderIdx = slug.lastIndexOf('__');
+    const timingSegment = doubleUnderIdx !== -1
+      ? slug.slice(doubleUnderIdx + 2).toLowerCase()
+      : null;
+
+    if (!timingSegment || timingSegment === 'allday') return true;
+
+    const timingKeys = timingSegment.split('+').filter(Boolean);
+    if (timingKeys.length === 0) return true;
+
+    // Only consider keys that are actually recognized in config
+    const recognizedKeys = timingKeys.filter(key => {
+      const t = timingOptions.find(o => o.name?.toLowerCase() === key);
+      return t && t.start && t.end;
+    });
+
+    // If no keys are recognized, don't hide the item (same as MenuManagement)
+    if (recognizedKeys.length === 0) return true;
+
+    const now = new Date();
+    const currentMinutes = now.getHours() * 60 + now.getMinutes();
+
+    return recognizedKeys.some(key => {
+      const t = timingOptions.find(o => o.name?.toLowerCase() === key);
+      const [sh, sm] = t.start.split(':').map(Number);
+      const [eh, em] = t.end.split(':').map(Number);
+      return currentMinutes >= (sh * 60 + sm) && currentMinutes <= (eh * 60 + em);
+    });
+  }, [timingOptions]);
   // ─────────────────────────────────────────────────────────────────────────
   // Data fetching
   // ─────────────────────────────────────────────────────────────────────────
@@ -1171,7 +1432,7 @@ const TakeOrder = ({ clientId, token, onOrderUpdate, realm }) => {
       if (!clientId || !token || !menuConfig) return;
       try {
         setLoading(true);
-        await Promise.all([fetchTables(), fetchCounterTree()]);
+        await Promise.all([fetchTables(), fetchCounterTree(), fetchZoneConfig(), fetchDietaryTypes(), fetchTimings()]);
 
         const [catRes, itemRes, invRes] = await Promise.all([
           axios.get(
@@ -1179,8 +1440,14 @@ const TakeOrder = ({ clientId, token, onOrderUpdate, realm }) => {
             { headers: { Authorization: `Bearer ${token}` } }
           ),
           axios.get(
-            `${import.meta.env.VITE_API_INVENTORY_SERVICE_URL}/${clientId}/menu/read?inventory_id=${menuConfig.menuInventoryId}`,
-            { headers: { Authorization: `Bearer ${token}` } }
+            `${import.meta.env.VITE_API_INVENTORY_SERVICE_URL}/${clientId}/menu/read`,
+            {
+              headers: { Authorization: `Bearer ${token}` },
+              params: {
+                inventory_id: menuConfig.menuInventoryId,
+                ...(zoneConfigId && { zone_config_id: zoneConfigId }),
+              }
+            }
           ),
           axios.get(
             `${import.meta.env.VITE_API_INVENTORY_SERVICE_URL}/${clientId}/inventory/read`,
@@ -1209,6 +1476,7 @@ const TakeOrder = ({ clientId, token, onOrderUpdate, realm }) => {
           const cat = flatCats.find(c => c.id === item.category_id);
           return { ...item, category_name: cat?.name || 'Uncategorized' };
         });
+        enrichedItems.sort((a, b) => (a.name || '').localeCompare(b.name || ''));
         setMenuItems(enrichedItems);
 
         const buildTree = () => {
@@ -1257,6 +1525,62 @@ const TakeOrder = ({ clientId, token, onOrderUpdate, realm }) => {
     // eslint-disable-next-line react-hooks/exhaustive-deps
   }, [clientId, token, realm, menuConfig]);
 
+  useEffect(() => {
+    if (!zoneConfigId || !clientId || !token || !menuConfig) return;
+
+    const refetchMenu = async () => {
+      try {
+        const itemRes = await axios.get(
+          `${import.meta.env.VITE_API_INVENTORY_SERVICE_URL}/${clientId}/menu/read`,
+          {
+            headers: { Authorization: `Bearer ${token}` },
+            params: {
+              inventory_id: menuConfig.menuInventoryId,
+              zone_config_id: zoneConfigId,
+            }
+          }
+        );
+
+        // Deduplicate: prefer base record (zone_config_id === 0) when no zone match
+        const allItems = itemRes.data.data || [];
+        const seen = new Map();
+        allItems.forEach(item => {
+          const existing = seen.get(item.id);
+          if (!existing || item.zone_config_id === zoneConfigId) {
+            seen.set(item.id, item);
+          }
+        });
+
+        const enriched = Array.from(seen.values()).map(item => {
+          const cat = categoriesFlat.find(c => c.id === item.category_id);
+          return { ...item, category_name: cat?.name || 'Uncategorized' };
+        });
+        enriched.sort((a, b) => (a.name || '').localeCompare(b.name || ''));
+        setMenuItems(enriched);
+      } catch (err) {
+        console.error('Zone menu refetch failed:', err);
+      }
+    };
+
+    refetchMenu();
+  }, [zoneConfigId, clientId, token, menuConfig]);
+  const getDietaryFromSlug = useCallback((item) => {
+    if (!item || !dietaryOptions.length) return null;
+    const normalize = (str) => (str || '').toLowerCase().replace(/[-_\s]/g, '');
+    const [mainPart = ''] = (item.slug || '').split('__');
+    const slugSegments = mainPart.split('_').filter(Boolean);
+    const sortedOptions = [...dietaryOptions].sort(
+      (a, b) => normalize(b).length - normalize(a).length
+    );
+    for (let i = 0; i < slugSegments.length; i++) {
+      for (let j = 1; j <= 3; j++) {
+        const joined = normalize(slugSegments.slice(i, i + j).join(''));
+        const match = sortedOptions.find(d => normalize(d) === joined);
+        if (match) return normalize(match);
+      }
+    }
+    return null;
+  }, [dietaryOptions]);
   // ─────────────────────────────────────────────────────────────────────────
   // Browser history (back button) — push initial floor state once
   // ─────────────────────────────────────────────────────────────────────────
@@ -1301,6 +1625,7 @@ const TakeOrder = ({ clientId, token, onOrderUpdate, realm }) => {
     setSidebarCategories(categories);
     setSelectedCategoryId(null);
     setSearchQuery('');
+    setZoneConfigId(null);
   };
 
   // ─────────────────────────────────────────────────────────────────────────
@@ -1360,6 +1685,11 @@ const TakeOrder = ({ clientId, token, onOrderUpdate, realm }) => {
     setOrderMode('dinein');
     setSelectedTable(tableIdStr);
     setDineinTableId(tableIdStr);
+    const matchedSection = sections.find(
+      s => s.zone === table.location_zone && s.section === table.section
+    );
+    const resolvedZoneConfigId = matchedSection ? matchedSection.id : null;
+    setZoneConfigId(resolvedZoneConfigId);
     const draft = await readDraft(tableIdStr, clientId, token);
 
     if (draft) {
@@ -1403,13 +1733,73 @@ const TakeOrder = ({ clientId, token, onOrderUpdate, realm }) => {
       toast.error('No takeaway table configured');
       return;
     }
-
+    setShowTakeawayOrdersModal(true);
     const tableIdStr = (takeawayTableId || takeawayTables[0].id).toString();
     setOrderMode('takeaway');
     setSelectedTable(tableIdStr);
     setActiveOrderId(null);
     setActiveDineinOrderId(null);
     setCart([]);
+    setShowCart(true);
+
+    // Set takeaway zone_config_id so correct prices are fetched
+    const takeawayZoneConfigId = takeawaySections.length > 0
+      ? takeawaySections[0].id
+      : null;
+    setZoneConfigId(takeawayZoneConfigId);
+
+    goToOrderView();
+  };
+  const handleTakeawayOrderSelected = async (existingOrder) => {
+    const tableIdStr = (takeawayTableId || takeawayTables[0].id).toString();
+    setOrderMode('takeaway');
+    setSelectedTable(tableIdStr);
+
+    // Set takeaway zone_config_id so correct prices are fetched
+    const takeawayZoneConfigId = takeawaySections.length > 0
+      ? takeawaySections[0].id
+      : null;
+    setZoneConfigId(takeawayZoneConfigId);
+
+    if (!existingOrder) {
+      // New order
+      setActiveOrderId(null);
+      setActiveDineinOrderId(null);
+      setCart([]);
+      setHasNewItems(false);
+      setCurrentBatchTimestamp(null);
+      setDraftSavedAt(null);
+    } else {
+      // Resume existing order — reconstruct cart as old (read-only) items
+      const reconstructedCart = (existingOrder.items || []).map(item => {
+        const menuItem = menuItems.find(mi => Number(mi.id) === Number(item.item_id));
+        return {
+          id: Number(item.item_id),
+          name: item.item_name || menuItem?.name || 'Unnamed Item',
+          unit_price: item.unit_price || menuItem?.unit_price || 0,
+          quantity: item.quantity || 1,
+          note: item.note || '',
+          image_id: menuItem?.image_id,
+          discount: menuItem?.discount || 0,
+          slug: item.slug || menuItem?.slug,
+          category: menuItem?.category_name,
+          category_id: menuItem?.category_id || null,
+          frontend_unique_key: item.frontend_unique_key,
+          batch_timestamp: null,
+          is_new_item: false,
+          saved_sub_order: true,
+          status: item.status || 'pending',
+          batch_label: item.batch_label,
+          sub_order_id: item.sub_order_id,
+        };
+      });
+      setCart(reconstructedCart);
+      setActiveOrderId(existingOrder.id);
+      setActiveDineinOrderId(existingOrder.dinein_order_id);
+      setHasNewItems(false);
+      setCurrentBatchTimestamp(null);
+      setDraftSavedAt(null);
+    }
     setShowCart(true);
     goToOrderView();
   };
@@ -1526,6 +1916,21 @@ const TakeOrder = ({ clientId, token, onOrderUpdate, realm }) => {
   };
 
   const addToCart = (item, parentItemKey = null) => {
+    // Count how many of this item are already in the new (unsaved) cart
+    const alreadyInCart = cart
+      .filter(i => i.id === item.id && i.is_new_item && !i.saved_sub_order)
+      .reduce((sum, i) => sum + i.quantity, 0);
+
+    const available = Number(item.availability ?? Infinity);
+
+    if (available > 0 && alreadyInCart >= available) {
+      setStockWarning({
+        itemName: item.name,
+        available,
+      });
+      return null;
+    }
+
     setHasNewItems(true);
     let batch = currentBatchTimestamp;
     if (!batch) {
@@ -1738,19 +2143,20 @@ const TakeOrder = ({ clientId, token, onOrderUpdate, realm }) => {
           );
         }
 
-        // Update table to Occupied — unchanged
-        const tableToUpdate = tables.find(t => t.id.toString() === selectedTable);
-        if (tableToUpdate) {
-          await axios.post(
-            `${import.meta.env.VITE_API_TABLE_SERVICE_URL}/${clientId}/tables/update`,
-            {
-              ...tableToUpdate,
-              id: Number(selectedTable),
-              status: 'Occupied',
-              table_type: tableToUpdate.table_type.toString(),
-            },
-            { headers }
-          );
+        if (orderMode !== 'takeaway') {
+          const tableToUpdate = tables.find(t => t.id.toString() === selectedTable);
+          if (tableToUpdate) {
+            await axios.post(
+              `${import.meta.env.VITE_API_TABLE_SERVICE_URL}/${clientId}/tables/update`,
+              {
+                ...tableToUpdate,
+                id: Number(selectedTable),
+                status: 'Occupied',
+                table_type: tableToUpdate.table_type.toString(),
+              },
+              { headers }
+            );
+          }
         }
       }
 
@@ -1958,19 +2364,37 @@ const TakeOrder = ({ clientId, token, onOrderUpdate, realm }) => {
   const filteredItems = useMemo(() => {
     const q = (searchQuery || '').trim().toLowerCase();
     let items = menuItems;
+
+    // ── 1. Timing filter — skip entirely if timings not loaded yet ──
+    if (timingOptions.length > 0) {
+      items = items.filter(item => isItemActive(item.slug));
+    }
+
+    // ── 2. Dietary filter ──
+    if (selectedDietary) {
+      items = items.filter(item => {
+        const [mainPart = ''] = (item.slug || '').split('__');
+        const segments = mainPart.split('_').filter(Boolean);
+        return segments.some(seg =>
+          seg.toLowerCase().replace(/[-_\s]/g, '') === selectedDietary
+        );
+      });
+    }
+
+    // ── 3. Category filter — uses flat list for reliable traversal ──
     if (selectedCategoryId) {
-      const ids = getCategoryAndChildrenIds(categories, selectedCategoryId);
+      const ids = getCategoryAndChildrenIds(selectedCategoryId); // ← no categories arg needed now
       items = items.filter(i => ids.includes(i.category_id));
     }
+
+    // ── 4. Search filter ──
     if (!q) return items;
     return items.filter(i =>
       (i.name || '').toLowerCase().includes(q) ||
       (i.category_name || '').toLowerCase().includes(q) ||
       String(i.code || '').toLowerCase().includes(q)
     );
-    // eslint-disable-next-line react-hooks/exhaustive-deps
-  }, [menuItems, selectedCategoryId, searchQuery, categories]);
-
+  }, [menuItems, selectedCategoryId, searchQuery, selectedDietary, timingOptions, isItemActive, getCategoryAndChildrenIds]);
   const oldItems = cart.filter(i => !i.is_new_item || i.saved_sub_order);
   const newItems = cart.filter(i => i.is_new_item && !i.saved_sub_order);
   const groupedNewItems = newItems.reduce((acc, item) => {
@@ -2000,7 +2424,7 @@ const TakeOrder = ({ clientId, token, onOrderUpdate, realm }) => {
       {/* ══════════════ FLOOR VIEW ══════════════ */}
       {currentView === 'floor' && (
         <TableReservation
-          tables={tables}
+          tables={tables.filter(t => !takeawayTables.some(tw => tw.id === t.id))}
           orderMode={orderMode}
           tableOrders={tableOrders}
           draftTableIds={draftTableIds}
@@ -2030,6 +2454,11 @@ const TakeOrder = ({ clientId, token, onOrderUpdate, realm }) => {
                   selectedCategoryId={selectedCategoryId}
                   onSelectCategory={setSelectedCategoryId}
                   defaultOpenAll
+                  zoneConfigId={zoneConfigId}
+                  dietaryOptions={dietaryOptions}
+                  dietaryColorMap={dietaryColorMap}
+                  selectedDietary={selectedDietary}
+                  onSelectDietary={setSelectedDietary}
                 />
               </div>
             </div>
@@ -2042,42 +2471,56 @@ const TakeOrder = ({ clientId, token, onOrderUpdate, realm }) => {
 
                 {/* Top controls */}
                 <div className="space-y-2 mb-2">
+                  {/* Back button + Dietary pills + Search */}
+                  <div className="flex items-center gap-2 flex-wrap">
+                    <button
+                      onClick={handleBackToTables}
+                      className="p-2 rounded-lg bg-bg-tertiary border border-border-default hover:bg-bg-secondary flex-shrink-0"
+                    >
+                      <ArrowLeft size={20} />
+                    </button>
 
-                  {/* Dietary quick-filters */}
-                  <div className="flex gap-2 overflow-x-auto scrollbar-hide pb-2">
-                    {dieterySubCategories.map(cat => (
-                      <button
-                        key={cat.id}
-                        onClick={() => {
-                          setSelectedCategoryId(cat.id);
-                          const n = findNodeAndChildren(categories, cat.id);
-                          if (n) setSidebarCategories([n]);
-                        }}
-                        className={`px-3 py-1.5 rounded-lg text-sm font-semibold border whitespace-nowrap transition-all flex-shrink-0
-                          ${selectedCategoryId === cat.id
+                    {/* Dietary type pills */}
+                    <div className="flex gap-1.5 overflow-x-auto scrollbar-hide flex-1">
+                      {/* <button
+                        onClick={() => setSelectedDietary(null)}
+                        className={`px-3 py-1.5 rounded-full text-xs font-semibold whitespace-nowrap flex-shrink-0 transition-all border
+        ${!selectedDietary
                             ? 'bg-action-primary text-white border-action-primary'
-                            : 'bg-bg-tertiary text-text-primary hover:border-action-primary'}`}
+                            : 'bg-bg-tertiary text-text-primary border-border-default hover:border-action-primary'}`}
                       >
-                        {cat.name}
-                      </button>
-                    ))}
-                  </div>
-
-                  {/* Back button + Category name + Search */}
-                  <div className="flex items-center justify-between lg:flex-row flex-col gap-2">
-                    <div className="flex items-center gap-2">
-                      <button
-                        onClick={handleBackToTables}
-                        className="p-2 rounded-lg bg-bg-tertiary border border-border-default hover:bg-bg-secondary"
-                      >
-                        <ArrowLeft size={20} />
-                      </button>
-                      <h2 className="text-xl font-semibold text-text-primary truncate">
-                        {selectedCategoryName}
-                        <span className="text-sm ml-2">({filteredItems.length})</span>
-                      </h2>
+                        All ({menuItems.length})
+                      </button> */}
+                      {dietaryOptions.map(type => {
+                        const key = type.toLowerCase().replace(/[-_\s]/g, '');
+                        const count = menuItems.filter(item => {
+                          const [mainPart = ''] = (item.slug || '').split('__');
+                          return mainPart.split('_').some(seg => seg.toLowerCase().replace(/[-_\s]/g, '') === key);
+                        }).length;
+                        return (
+                          <button
+                            key={key}
+                            onClick={() => setSelectedDietary(selectedDietary === key ? null : key)}
+                            className={`px-3 py-1.5 rounded-full text-xs font-semibold whitespace-nowrap flex-shrink-0 flex items-center gap-1.5 transition-all border
+            ${selectedDietary === key
+                                ? 'bg-action-primary text-white border-action-primary'
+                                : 'bg-bg-tertiary text-text-primary border-border-default hover:border-action-primary'}`}
+                          >
+                            {dietaryColorMap[key] && (
+                              <span className={`w-2 h-2 rounded-full flex-shrink-0 ${dietaryColorMap[key]}`} />
+                            )}
+                            {type}
+                            {/* <span className={`text-[10px] px-1.5 py-0.5 rounded-full font-bold
+              ${selectedDietary === key ? 'bg-white/20' : 'bg-bg-primary'}`}>
+                                {count}
+                              </span> */}
+                          </button>
+                        );
+                      })}
                     </div>
-                    <div className="relative w-64 max-w-full">
+
+                    {/* Search */}
+                    <div className="relative w-52 flex-shrink-0">
                       <Search size={16} className="absolute left-3 top-1/2 -translate-y-1/2 text-text-secondary" />
                       <input
                         ref={searchInputRef}
@@ -2097,12 +2540,15 @@ const TakeOrder = ({ clientId, token, onOrderUpdate, realm }) => {
                       ? ((Number(item.discount) * 100) / Number(item.unit_price)).toFixed(0)
                       : null;
                     const ac = item.line_item_id?.length || 0;
+                    const dietary = getDietaryFromSlug(item);
+                    const dietaryColor = dietary ? (dietaryColorMap[dietary] || '') : '';
                     return (
                       <div
-                        key={item.id}
+                        key={`${item.id}_${item.zone_config_id ?? 0}`}
                         onClick={() => handleItemClick(item)}
                         className="flex gap-2 items-center bg-bg-primary border-default border-border-default rounded-xl p-1 shadow-sm hover:shadow-md transition cursor-pointer"
                       >
+                        <div className={`w-[4px] self-stretch rounded-l-xl flex-shrink-0 ${dietaryColor}`} />
                         <div className="w-14 h-16 rounded-lg overflow-hidden shrink-0 bg-gray-100">
                           <ImagePreview
                             clientId={clientId}
@@ -2136,6 +2582,14 @@ const TakeOrder = ({ clientId, token, onOrderUpdate, realm }) => {
                               </span>
                             )}
                           </div>
+                          {item.availability != null && (
+                            <p className={`text-[10px] font-semibold mt-0.5
+    ${Number(item.availability) <= 5
+                                ? 'text-red-500'
+                                : 'text-text-secondary'}`}>
+                              Qty: {Number(item.availability)}
+                            </p>
+                          )}
                           {ac > 0 && (
                             <span className="text-xs bg-blue-100 text-blue-700 px-2 py-0.5 rounded-full font-semibold">
                               +{ac} addon{ac > 1 ? 's' : ''}
@@ -2436,6 +2890,14 @@ const TakeOrder = ({ clientId, token, onOrderUpdate, realm }) => {
         currentTableId={selectedTable}
         onConfirm={handleTransferTable}
       />
+      <TakeawayOrdersModal
+        isOpen={showTakeawayOrdersModal}
+        onClose={() => setShowTakeawayOrdersModal(false)}
+        clientId={clientId}
+        token={token}
+        takeawayTableIds={takeawayTables.map(t => String(t.id))}
+        onSelectOrder={handleTakeawayOrderSelected}
+      />
       {invoiceModalOpen && invoiceOrderData && (
         <InvoiceModal
           clientId={clientId}
@@ -2454,8 +2916,30 @@ const TakeOrder = ({ clientId, token, onOrderUpdate, realm }) => {
           }}
         />
       )}
+      {stockWarning && (
+        <div className="fixed inset-0 z-50 flex items-center justify-center bg-black/40">
+          <div className="bg-white rounded-xl p-6 w-80 shadow-xl">
+            <h3 className="text-base font-bold text-red-600 mb-2">Stock Limit Reached</h3>
+            <p className="text-sm text-gray-600 mb-1">
+              <span className="font-semibold text-gray-800">{stockWarning.itemName}</span>
+            </p>
+            <p className="text-sm text-gray-500 mb-4">
+              Only <span className="font-bold text-red-500">{stockWarning.available}</span> available.
+              You've already added the maximum quantity.
+            </p>
+            <button
+              onClick={() => setStockWarning(null)}
+              className="w-full py-2.5 bg-action-primary text-white rounded-lg font-semibold text-sm hover:bg-action-danger"
+            >
+              OK
+            </button>
+          </div>
+        </div>
+      )}
     </div>
   );
 };
 
 export default TakeOrder;
+
+// =================================================================================        =========================   //

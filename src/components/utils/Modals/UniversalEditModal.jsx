@@ -100,20 +100,19 @@ const UniversalEditModal = ({
           headers: { Authorization: `Bearer ${token}` },
         }
       );
-  
+
       const raw = res.data?.data || [];
-  
-      // "morning|08:00|11:30" → { name: "morning", start: "08:00", end: "11:30", raw: "morning|08:00|11:30" }
+
       const parsed = raw.map(v => {
-        const [name, start, end] = v.split('|');
+        const match = v.match(/^(.+)\((.+)-(.+)\)$/);
         return {
-          name: name?.toLowerCase(),
-          start,
-          end,
+          name: (match?.[1] ?? v).toLowerCase(),
+          start: match?.[2] ?? null,
+          end: match?.[3] ?? null,
           raw: v
         };
       });
-  
+
       setTimingOptions(parsed);
     } catch (err) {
       console.error("Timing fetch error:", err);
@@ -126,7 +125,7 @@ const UniversalEditModal = ({
 
     fetchConfigs();
     fetchStatuses();
-    if (normalizedRealm === 'restaurant'){
+    if (normalizedRealm === 'restaurant') {
       fetchDietaryTypes();
       fetchTimings();
     }
@@ -260,13 +259,13 @@ const UniversalEditModal = ({
                 <div>
                   <label className="block text-sm font-medium mb-1 text-gray-700">Description</label>
                   <textarea
-                    value={editingItem.description}
+                    value={editingItem.description || ""}
                     onChange={(e) => setEditingItem({ ...editingItem, description: e.target.value })}
                     className="w-full px-3 py-2 rounded-md border border-gray-300 text-gray-900 focus:outline-none focus:ring-2 focus:ring-blue-500 focus:border-transparent"
                     rows="3"
                   />
                 </div>
-                {normalizedRealm === 'restaurant'  && (
+                {normalizedRealm === 'restaurant' && (
                   <div>
                     <label className="block text-sm font-medium mb-1 text-gray-700">
                       Availability Timing
@@ -290,8 +289,8 @@ const UniversalEditModal = ({
                               setEditingItem(prev => ({ ...prev, availability_time: next }));
                             }}
                             className={`px-3 py-1.5 rounded-lg text-sm border transition-all ${selected
-                                ? 'bg-blue-600 text-white border-blue-600'
-                                : 'bg-gray-50 border-gray-300 text-gray-700 hover:border-blue-500'
+                              ? 'bg-blue-600 text-white border-blue-600'
+                              : 'bg-gray-50 border-gray-300 text-gray-700 hover:border-blue-500'
                               }`}
                           >
                             {t.name} {t.start && t.end ? `(${t.start}–${t.end})` : ''}
