@@ -699,7 +699,7 @@ const TableReservation = ({
               </button>
             ))}
             <div className="w-px bg-border-default mx-1" />
-            {zonesFromDB.map(zone => (
+            {/* {zonesFromDB.map(zone => (
               <button
                 key={zone}
                 onClick={() => toggleFilter(zone, setSelectedZones)}
@@ -710,7 +710,7 @@ const TableReservation = ({
               >
                 {zone}
               </button>
-            ))}
+            ))} */}
           </div>
 
           {/* Dine-in / Takeaway toggle */}
