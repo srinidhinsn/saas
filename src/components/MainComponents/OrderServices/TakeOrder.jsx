@@ -22,15 +22,8 @@ const TABLE_STATUS_CONFIG = {
   occupied: { clickable: false, bg: 'bg-action-primary', border: 'border-action-primary', badge: 'bg-red-100 text-action-primary', viewable: true },
   served: { clickable: false, bg: 'bg-blue-50', border: 'border-blue-400', badge: 'bg-blue-100 text-blue-700', viewable: true },
   reserved: { clickable: false, bg: 'bg-yellow-50', border: 'border-yellow-400', badge: 'bg-yellow-100 text-yellow-700' },
-  // REQ 1: cancelled tables should look similar to vacant so they're clickable again
   cancelled: { clickable: true, bg: 'bg-action-success', border: 'border-border-default', badge: 'bg-gray-100 text-gray-500' },
 };
-
-// ─────────────────────────────────────────────────────────────────────────────
-// Predefined reason lists per transaction type
-// Cancellation = item deleted BEFORE serving
-// Wastage = item deleted AFTER serving
-// ─────────────────────────────────────────────────────────────────────────────
 
 const CANCELLATION_REASONS = [
   'Customer changed mind',
@@ -144,7 +137,6 @@ async function writeDraft(tableId, cart, clientId, token, customerDetails = {}) 
   try {
     const existing = await readDraft(tableId, clientId, token);
     if (existing) {
-      // REQ 1: soft-cancel existing draft instead of deleting
       await axios.post(
         `${import.meta.env.VITE_API_ORDER_SERVICE_URL}/${clientId}/dinein/update`,
         { id: existing.id, status: 'cancelled' },
@@ -152,7 +144,10 @@ async function writeDraft(tableId, cart, clientId, token, customerDetails = {}) 
       );
     }
 
-    const total = cart.reduce((s, i) => s + (i.unit_price || 0) * i.quantity, 0);
+    // Only send parent (non-addon) items in the draft — addons are stored
+    // as metadata on the parent via parent_item_key so they can be restored
+    const parentItems = cart.filter(i => !i.is_addon);
+    const total = parentItems.reduce((s, i) => s + (i.unit_price || 0) * i.quantity, 0);
 
     await axios.post(
       `${import.meta.env.VITE_API_ORDER_SERVICE_URL}/${clientId}/dinein/create`,
@@ -164,7 +159,7 @@ async function writeDraft(tableId, cart, clientId, token, customerDetails = {}) 
         cst: 0,
         total_price: total,
         status: 'draft',
-        items: cart.map(i => ({
+        items: parentItems.map(i => ({
           item_id: i.id,
           item_name: i.name,
           quantity: i.quantity,
@@ -173,6 +168,10 @@ async function writeDraft(tableId, cart, clientId, token, customerDetails = {}) 
           status: 'draft',
           slug: i.slug || '',
           frontend_unique_key: i.frontend_unique_key,
+          // Store linked addon IDs so we can restore them on re-open
+          line_item_id: cart
+            .filter(a => a.is_addon && a.parent_item_key === i.frontend_unique_key)
+            .map(a => a.id),
         })),
       },
       { headers: { Authorization: `Bearer ${token}` } }
@@ -184,7 +183,6 @@ async function writeDraft(tableId, cart, clientId, token, customerDetails = {}) 
   }
 }
 
-// REQ 1: Soft-cancel draft instead of hard delete
 async function deleteDraftFromDB(tableId, clientId, token) {
   try {
     const existing = await readDraft(tableId, clientId, token);
@@ -204,12 +202,6 @@ function getDraftTableIdsFromOrders(allOrders) {
     .filter(o => o.status === 'draft')
     .map(o => String(o.table_id));
 }
-
-// ─────────────────────────────────────────────────────────────────────────────
-// REQ 2: Helper — upsert billing document for customer details capture
-// Called after placing an order so customer info is stored in billing service.
-// Returns the billing document id (or null on failure).
-// ─────────────────────────────────────────────────────────────────────────────
 
 async function upsertBillingDocumentForCustomer({
   clientId,
@@ -246,7 +238,6 @@ async function upsertBillingDocumentForCustomer({
     );
     return res?.data?.data?.id ?? null;
   } catch (err) {
-    // Non-fatal — customer details capture failing should not block the order
     console.warn('[upsertBillingDocumentForCustomer] failed:', err?.response?.data || err.message);
     return null;
   }
@@ -273,9 +264,7 @@ const ItemStatusBadge = ({ status }) => {
 };
 
 // ─────────────────────────────────────────────────────────────────────────────
-// REQ 1: CancelOrderConfirmModal
-// Used when the "Delete Order" button on the table card is clicked.
-// Shows a reason list and cancels (soft) the order instead of hard-deleting it.
+// CancelOrderConfirmModal
 // ─────────────────────────────────────────────────────────────────────────────
 
 const ORDER_CANCEL_REASONS = [
@@ -360,7 +349,7 @@ const CancelOrderConfirmModal = ({ isOpen, onClose, onConfirm }) => {
 };
 
 // ─────────────────────────────────────────────────────────────────────────────
-// OldItemDeleteModal — item-level cancel/wastage (unchanged logic, kept intact)
+// OldItemDeleteModal
 // ─────────────────────────────────────────────────────────────────────────────
 
 const OldItemDeleteModal = ({ isOpen, onClose, item, onRemoveOne, onRemoveAll }) => {
@@ -504,7 +493,7 @@ const OldItemDeleteModal = ({ isOpen, onClose, item, onRemoveOne, onRemoveAll })
 };
 
 // ─────────────────────────────────────────────────────────────────────────────
-// REQ 2: CustomerCapturePanel
+// CustomerCapturePanel
 // ─────────────────────────────────────────────────────────────────────────────
 
 const CustomerCapturePanel = ({ value, onChange }) => {
@@ -531,7 +520,44 @@ const CustomerCapturePanel = ({ value, onChange }) => {
 };
 
 // ─────────────────────────────────────────────────────────────────────────────
-// LineItemsModal
+// TablePaymentConfirmModal
+// ─────────────────────────────────────────────────────────────────────────────
+
+const TablePaymentConfirmModal = ({ isOpen, orderId, onClose, onConfirm }) => {
+  if (!isOpen) return null;
+  return (
+    <div className="fixed inset-0 z-50 flex items-center justify-center p-4 bg-black/50">
+      <div className="rounded-lg w-full max-w-sm bg-white shadow-xl">
+        <div className="px-6 py-4 border-b flex justify-between items-center">
+          <h2 className="text-lg font-bold text-green-700">Confirm Payment</h2>
+          <button onClick={onClose} className="text-gray-500 hover:text-gray-700"><X size={20} /></button>
+        </div>
+        <div className="px-6 py-5">
+          <p className="text-sm text-gray-600">
+            Mark order <span className="font-semibold">#{orderId}</span> as paid and free the table?
+          </p>
+        </div>
+        <div className="px-6 py-4 flex gap-3 bg-gray-50 rounded-b-lg">
+          <button
+            onClick={onClose}
+            className="flex-1 py-2.5 rounded-lg font-medium text-sm border border-gray-300 bg-white text-gray-700 hover:bg-gray-50"
+          >
+            Cancel
+          </button>
+          <button
+            onClick={() => { onConfirm(orderId); onClose(); }}
+            className="flex-1 py-2.5 rounded-lg font-bold text-sm bg-green-600 hover:bg-green-700 text-white"
+          >
+            Confirm Paid
+          </button>
+        </div>
+      </div>
+    </div>
+  );
+};
+
+// ─────────────────────────────────────────────────────────────────────────────
+// LineItemsModal — shown when a regular item with addons is clicked
 // ─────────────────────────────────────────────────────────────────────────────
 
 const LineItemsModal = ({ isOpen, onClose, mainItem, lineItems, onAddWithSelectedAddons, onAddMainOnly }) => {
@@ -611,10 +637,121 @@ const LineItemsModal = ({ isOpen, onClose, mainItem, lineItems, onAddWithSelecte
 };
 
 // ─────────────────────────────────────────────────────────────────────────────
+// ComboDetailModal — shown when a combo item is clicked
+// ─────────────────────────────────────────────────────────────────────────────
+
+const ComboDetailModal = ({ isOpen, onClose, comboItem, comboComponents, onAddCombo }) => {
+  if (!isOpen || !comboItem) return null;
+
+  const aLaCarteTotal = comboComponents.reduce(
+    (sum, c) => sum + (Number(c.unit_price) || 0), 0
+  );
+  const savings = aLaCarteTotal - Number(comboItem.unit_price);
+
+  return (
+    <div className="fixed inset-0 z-50 flex items-center justify-center p-4 bg-black/60 backdrop-blur-sm">
+      <div className="rounded-2xl w-full max-w-md bg-white shadow-2xl overflow-hidden">
+        <div className="bg-gradient-to-r from-violet-600 to-indigo-600 px-6 py-4 flex items-start justify-between">
+          <div>
+            <h3 className="text-lg font-bold text-white">{comboItem.name}</h3>
+            {comboItem.description && (
+              <p className="text-xs text-violet-200 mt-0.5">{comboItem.description}</p>
+            )}
+          </div>
+          <button onClick={onClose} className="w-7 h-7 rounded-lg bg-white/20 hover:bg-white/30 flex items-center justify-center text-white">
+            <X size={16} />
+          </button>
+        </div>
+
+        <div className="px-6 py-3 bg-violet-50 border-b border-violet-100 flex items-center justify-between">
+          <div>
+            <span className="text-2xl font-bold text-violet-700">₹{Number(comboItem.unit_price).toFixed(0)}</span>
+            {savings > 0 && (
+              <span className="ml-2 text-xs text-gray-400 line-through">₹{aLaCarteTotal.toFixed(0)}</span>
+            )}
+          </div>
+          {savings > 0 && (
+            <span className="text-xs font-bold bg-green-100 text-green-700 px-2 py-1 rounded-full">
+              Save ₹{savings.toFixed(0)}
+            </span>
+          )}
+        </div>
+
+        <div className="px-6 py-4">
+          <p className="text-xs font-semibold text-gray-500 uppercase tracking-wider mb-3">
+            What's included ({comboComponents.length} items)
+          </p>
+          <div className="space-y-2 max-h-56 overflow-y-auto pr-1">
+            {comboComponents.length === 0 ? (
+              <p className="text-sm text-gray-400 italic text-center py-4">No component details available</p>
+            ) : (
+              comboComponents.map((c, idx) => (
+                <div
+                  key={c.id || idx}
+                  className="flex items-center justify-between px-3 py-2 rounded-xl bg-violet-50 border border-violet-100"
+                >
+                  <div className="flex items-center gap-2">
+                    <span className="w-5 h-5 rounded-full bg-violet-200 text-violet-700 text-xs font-bold flex items-center justify-center shrink-0">
+                      {idx + 1}
+                    </span>
+                    <span className="text-sm font-medium text-gray-800">{c.name}</span>
+                  </div>
+                  <span className="text-xs text-violet-600 font-semibold">₹{Number(c.unit_price).toFixed(0)}</span>
+                </div>
+              ))
+            )}
+          </div>
+        </div>
+
+        <div className="px-6 py-4 border-t border-gray-100 bg-gray-50 flex gap-3">
+          <button
+            onClick={onClose}
+            className="flex-1 py-2.5 rounded-xl font-medium text-sm border border-gray-300 bg-white text-gray-700 hover:bg-gray-50"
+          >
+            Cancel
+          </button>
+          <button
+            onClick={() => { onAddCombo(); onClose(); }}
+            className="flex-1 py-2.5 rounded-xl font-bold text-sm bg-violet-600 hover:bg-violet-700 text-white transition-colors"
+          >
+            Add Combo · ₹{Number(comboItem.unit_price).toFixed(0)}
+          </button>
+        </div>
+      </div>
+    </div>
+  );
+};
+
+// ─────────────────────────────────────────────────────────────────────────────
 // printKOT
+//
+// FIX: Items store category_name (e.g. "Juices") in category_id field instead
+// of the actual DB category ID (e.g. "juices_veg"). We resolve the real ID by
+// looking up the category by name in categoriesFlat before walking ancestors.
 // ─────────────────────────────────────────────────────────────────────────────
 
 const printKOT = ({ counterTree, categoriesFlat, itemsToPrint, meta }) => {
+
+  // Build a name→id map from categoriesFlat so we can resolve category names
+  // that items store in their category_id field
+  const categoryNameToId = {};
+  categoriesFlat.forEach(c => {
+    if (c.name) categoryNameToId[c.name.trim().toLowerCase()] = c.id;
+  });
+
+  // Resolve the real category ID for an item, handling both actual IDs and
+  // category names stored in the category_id field
+  const resolveRealCategoryId = (rawCategoryId) => {
+    if (!rawCategoryId) return null;
+    // Check if it already exists as a real category ID
+    const directMatch = categoriesFlat.find(c => c.id === rawCategoryId);
+    if (directMatch) return rawCategoryId;
+    // Otherwise treat it as a category name and look up the ID
+    const nameKey = String(rawCategoryId).trim().toLowerCase();
+    return categoryNameToId[nameKey] || null;
+  };
+
+  // Walk from a category ID up through all ancestor IDs (inclusive)
   const getCategoryAncestors = (categoryId) => {
     const ancestors = new Set();
     let cur = categoryId;
@@ -628,6 +765,7 @@ const printKOT = ({ counterTree, categoriesFlat, itemsToPrint, meta }) => {
     return ancestors;
   };
 
+  // Map counter id → set of assigned sub-category IDs
   const counterCategoryMap = {};
   counterTree.forEach(counter => {
     counterCategoryMap[counter.id] = new Set(
@@ -635,8 +773,14 @@ const printKOT = ({ counterTree, categoriesFlat, itemsToPrint, meta }) => {
     );
   });
 
+  // Find which counter an item belongs to by resolving its real category ID
+  // first, then walking ancestors to match against counter assignments
   const findCounterForItem = (item) => {
-    const ancestors = getCategoryAncestors(item.category_id || item.category);
+    // Resolve the actual category ID (item.category_id may be a name)
+    const realCategoryId = resolveRealCategoryId(item.category_id || item.category);
+    if (!realCategoryId) return null;
+
+    const ancestors = getCategoryAncestors(realCategoryId);
     for (const counter of counterTree) {
       const assigned = counterCategoryMap[counter.id];
       for (const catId of assigned) {
@@ -646,6 +790,7 @@ const printKOT = ({ counterTree, categoriesFlat, itemsToPrint, meta }) => {
     return null;
   };
 
+  // Build addon-by-parent map (addons are in itemsToPrint but only for display)
   const addonsByParentKey = {};
   itemsToPrint.forEach(item => {
     if (item.is_addon && item.parent_item_key) {
@@ -656,6 +801,7 @@ const printKOT = ({ counterTree, categoriesFlat, itemsToPrint, meta }) => {
     }
   });
 
+  // Only parent items go to KDS as main rows; addons appear indented below
   const parentItems = itemsToPrint.filter(item => !item.is_addon);
 
   const groups = {};
@@ -918,8 +1064,9 @@ const TableReservation = ({
   onSelectDineIn,
   onViewOrder,
   onPrintBill,
-  onCancelOrder,   // REQ 1: renamed from onDeleteOrder — triggers soft cancel
+  onCancelOrder,
   onMarkAsServed,
+  onConfirmPayment,
 }) => {
   const [selectedSections, setSelectedSections] = useState([]);
   const [selectedZones, setSelectedZones] = useState([]);
@@ -1069,6 +1216,9 @@ const TableReservation = ({
                         ? `₹${Number(orderInfo.total_price).toFixed(0)}`
                         : null;
 
+                      const invoiceStatus = orderInfo?.invoice_status?.toLowerCase();
+                      const showConfirmPayment = hasViewableOrder && invoiceStatus === 'pending';
+
                       const handleCardClick = () => {
                         if (config.clickable) onSelectTable(table);
                         else if (hasViewableOrder && onViewOrder) onViewOrder(table);
@@ -1133,7 +1283,6 @@ const TableReservation = ({
                                   >
                                     <Printer size={22} />
                                   </button>
-                                  {/* REQ 1: Soft cancel — opens reason modal instead of immediate hard delete */}
                                   <button
                                     onClick={e => { e.stopPropagation(); onCancelOrder?.(orderInfo.id, table.id); }}
                                     className="text-red-600 hover:scale-110 transition-transform"
@@ -1155,7 +1304,20 @@ const TableReservation = ({
                             )}
                           </div>
 
-                          {hasViewableOrder && orderInfo.status === 'ready' && (
+                          {showConfirmPayment && (
+                            <button
+                              onClick={e => {
+                                e.stopPropagation();
+                                onConfirmPayment?.(orderInfo.id, table.id);
+                              }}
+                              className="w-full px-4 py-2 bg-green-600 text-white text-sm font-semibold hover:bg-green-700 transition-colors flex items-center justify-center gap-1"
+                            >
+                              <Check size={14} />
+                              Confirm Payment
+                            </button>
+                          )}
+
+                          {hasViewableOrder && orderInfo.status === 'ready' && !showConfirmPayment && (
                             <button
                               onClick={e => { e.stopPropagation(); onMarkAsServed?.(orderInfo.id, table.id); }}
                               className="w-full px-4 py-2 bg-green-600 text-white text-sm font-semibold hover:bg-green-700 transition-colors"
@@ -1220,19 +1382,23 @@ const TakeOrder = ({ clientId, token, onOrderUpdate, realm }) => {
   const [draftSavedAt, setDraftSavedAt] = useState(null);
   const [draftTableIds, setDraftTableIds] = useState([]);
 
-  // REQ 2: Customer details state
   const [customerDetails, setCustomerDetails] = useState({ customer_id: '', contact_phone: '' });
 
   const [selectedCategoryId, setSelectedCategoryId] = useState(null);
   const [searchQuery, setSearchQuery] = useState('');
   const [showClearConfirm, setShowClearConfirm] = useState(false);
 
-  // REQ 1: Cancel order modal state (replaces old showDeleteConfirm/orderToDelete)
   const [cancelOrderModal, setCancelOrderModal] = useState({ isOpen: false, orderId: null, tableId: null });
+  const [tablePayConfirmModal, setTablePayConfirmModal] = useState({ isOpen: false, orderId: null, tableId: null });
 
   const [lineItemsModalOpen, setLineItemsModalOpen] = useState(false);
   const [selectedMainItem, setSelectedMainItem] = useState(null);
   const [lineItemsDetails, setLineItemsDetails] = useState([]);
+
+  const [comboModalOpen, setComboModalOpen] = useState(false);
+  const [comboModalItem, setComboModalItem] = useState(null);
+  const [comboModalComponents, setComboModalComponents] = useState([]);
+
   const [invoiceModalOpen, setInvoiceModalOpen] = useState(false);
   const [invoiceOrderData, setInvoiceOrderData] = useState(null);
 
@@ -1287,22 +1453,6 @@ const TakeOrder = ({ clientId, token, onOrderUpdate, realm }) => {
     return flat;
   };
 
-  const getAddonCategoryId = useCallback((itemCategoryId) => {
-    if (!itemCategoryId || !categoriesFlat.length) return null;
-    const rootNode = categoriesFlat.find(c => c.parentId === null || c.parentId === undefined);
-    if (!rootNode) return null;
-    let current = categoriesFlat.find(c => c.id === itemCategoryId);
-    while (current && current.parentId) {
-      if (current.parentId === rootNode.id) {
-        const slug = current.name
-          .trim().toLowerCase().replace(/[\s-]+/g, '').replace(/[^a-z0-9]/g, '');
-        return `addons_${slug}`;
-      }
-      current = categoriesFlat.find(c => c.id === current.parentId);
-    }
-    return null;
-  }, [categoriesFlat]);
-
   const getCategoryAndChildrenIds = (cats, targetId) => {
     const result = new Set();
     const traverse = (nodes, found = false) => {
@@ -1352,6 +1502,24 @@ const TakeOrder = ({ clientId, token, onOrderUpdate, realm }) => {
   };
 
   // ─────────────────────────────────────────────────────────────────────────
+  // Determine if a category is a combo category (walks ancestors)
+  // ─────────────────────────────────────────────────────────────────────────
+
+  const isComboCategoryId = useCallback((categoryId) => {
+    if (!categoryId || !categoriesFlat.length) return false;
+    let cur = categoryId;
+    const visited = new Set();
+    while (cur && !visited.has(cur)) {
+      visited.add(cur);
+      const cat = categoriesFlat.find(c => c.id === cur);
+      if (!cat) break;
+      if ((cat.name || '').toLowerCase().includes('combo')) return true;
+      cur = cat.parentId ?? null;
+    }
+    return false;
+  }, [categoriesFlat]);
+
+  // ─────────────────────────────────────────────────────────────────────────
   // Data fetching
   // ─────────────────────────────────────────────────────────────────────────
 
@@ -1388,7 +1556,7 @@ const TakeOrder = ({ clientId, token, onOrderUpdate, realm }) => {
               o.table_id === table.id &&
               o.status?.toLowerCase() !== 'completed' &&
               o.status?.toLowerCase() !== 'draft' &&
-              o.status?.toLowerCase() !== 'cancelled'   // REQ 1: exclude cancelled from live view
+              o.status?.toLowerCase() !== 'cancelled'
             )
             .sort((a, b) => new Date(b.created_at) - new Date(a.created_at))[0];
           if (o) {
@@ -1399,6 +1567,7 @@ const TakeOrder = ({ clientId, token, onOrderUpdate, realm }) => {
               created_at: o.created_at,
               order_count: o.order_count || 1,
               total_price: o.total_price || 0,
+              invoice_status: o.invoice_status || null,
             };
           }
         }
@@ -1632,9 +1801,10 @@ const TakeOrder = ({ clientId, token, onOrderUpdate, realm }) => {
     const draft = await readDraft(tableIdStr, clientId, token);
 
     if (draft) {
-      const restoredCart = (draft.items || []).map(item => {
+      const restoredCart = (draft.items || []).flatMap(item => {
         const menuItem = menuItems.find(mi => Number(mi.id) === Number(item.item_id));
-        return {
+        const mainKey = item.frontend_unique_key || `${item.item_id}_restored_${Date.now()}`;
+        const mainEntry = {
           id: Number(item.item_id),
           name: item.item_name || menuItem?.name || 'Item',
           unit_price: item.unit_price ?? menuItem?.unit_price ?? 0,
@@ -1645,13 +1815,43 @@ const TakeOrder = ({ clientId, token, onOrderUpdate, realm }) => {
           category_id: menuItem?.category_id || null,
           quantity: item.quantity || 1,
           note: '',
-          frontend_unique_key: item.frontend_unique_key,
+          frontend_unique_key: mainKey,
           batch_timestamp: null,
           is_new_item: true,
           saved_sub_order: false,
           status: 'draft',
+          is_addon: false,
+          parent_item_key: null,
         };
+
+        // Restore linked addons that were saved as line_item_id on the draft item
+        const addonEntries = (item.line_item_id || []).map((addonId, idx) => {
+          const addonMenuItem = menuItems.find(mi => Number(mi.id) === Number(addonId));
+          if (!addonMenuItem) return null;
+          return {
+            id: Number(addonId),
+            name: addonMenuItem.name || 'Addon',
+            unit_price: addonMenuItem.unit_price ?? 0,
+            discount: addonMenuItem.discount || 0,
+            image_id: addonMenuItem.image_id,
+            slug: addonMenuItem.slug,
+            category: addonMenuItem.category_name,
+            category_id: addonMenuItem.category_id || null,
+            quantity: 1,
+            note: '',
+            frontend_unique_key: `${addonId}_addon_${mainKey}_${idx}`,
+            batch_timestamp: null,
+            is_new_item: true,
+            saved_sub_order: false,
+            status: 'draft',
+            is_addon: true,
+            parent_item_key: mainKey,
+          };
+        }).filter(Boolean);
+
+        return [mainEntry, ...addonEntries];
       });
+
       setCart(restoredCart);
       setHasNewItems(true);
       setDraftSavedAt(Date.now());
@@ -1692,7 +1892,7 @@ const TakeOrder = ({ clientId, token, onOrderUpdate, realm }) => {
     goToOrderView();
   };
 
-  const handleViewOrder = async (table) => {
+const handleViewOrder = async (table) => {
     if (menuItems.length === 0) {
       alert('Menu still loading...');
       return;
@@ -1706,8 +1906,8 @@ const TakeOrder = ({ clientId, token, onOrderUpdate, realm }) => {
       const allOrders = r.data?.data || [];
       const tableGroups = allOrders.filter(
         o => o.table_id === table.id &&
-             o.status?.toLowerCase() !== 'completed' &&
-             o.status?.toLowerCase() !== 'cancelled'   // REQ 1: don't reopen cancelled orders
+          o.status?.toLowerCase() !== 'completed' &&
+          o.status?.toLowerCase() !== 'cancelled'
       );
       if (tableGroups.length === 0) {
         alert('No active order');
@@ -1806,6 +2006,8 @@ const TakeOrder = ({ clientId, token, onOrderUpdate, realm }) => {
       frontend_unique_key: key,
       is_new_item: true,
       saved_sub_order: false,
+      is_addon: false,
+      parent_item_key: null,
       ...extra,
     };
   };
@@ -1871,9 +2073,7 @@ const TakeOrder = ({ clientId, token, onOrderUpdate, realm }) => {
   };
 
   // ─────────────────────────────────────────────────────────────────────────
-  // Old-item delete — API-backed (item-level, uses order_item/delete endpoint)
-  // The backend handles the transaction recording; item row status is set to
-  // cancelled there. Frontend just reloads cart from server after the call.
+  // Old-item delete
   // ─────────────────────────────────────────────────────────────────────────
 
   const handleOldItemRequestDelete = (item) => {
@@ -1921,6 +2121,8 @@ const TakeOrder = ({ clientId, token, onOrderUpdate, realm }) => {
           status: item.status || 'pending',
           batch_label: item.batch_label,
           sub_order_id: item.sub_order_id,
+          is_addon: false,
+          parent_item_key: null,
         };
       });
 
@@ -2010,10 +2212,16 @@ const TakeOrder = ({ clientId, token, onOrderUpdate, realm }) => {
   };
 
   // ─────────────────────────────────────────────────────────────────────────
-  // Item click — opens addon modal or directly adds to cart
+  // Item click — addon/combo detection
   // ─────────────────────────────────────────────────────────────────────────
 
   const handleItemClick = (item) => {
+
+     if (item.category_id === 'Combos') {
+      // Add the item to the cart directly
+      addToCart(item);
+      return; // Exit early without opening the modal
+    }
     const hasLineItems =
       item.line_item_id &&
       Array.isArray(item.line_item_id) &&
@@ -2024,34 +2232,27 @@ const TakeOrder = ({ clientId, token, onOrderUpdate, realm }) => {
       return;
     }
 
-    const addonCatId = getAddonCategoryId(item.category_id);
+    const isCombo = isComboCategoryId(item.category_id);
 
-    const getAddonDescendantIds = (rootId) => {
-      const ids = new Set([rootId]);
-      const addChildren = (parentId) => {
-        categoriesFlat
-          .filter(c => c.parentId === parentId)
-          .forEach(c => { ids.add(c.id); addChildren(c.id); });
-      };
-      addChildren(rootId);
-      return ids;
-    };
-    const validAddonCategoryIds = getAddonDescendantIds(addonCatId);
-
-    const lineItems = item.line_item_id
-      .map(id => {
-        const ai = menuItems.find(i => i.id === id);
-        if (!ai) return null;
-        return validAddonCategoryIds.has(ai.category_id) ? ai : null;
-      })
+    // Resolve component / addon items directly by ID
+    const linkedItems = item.line_item_id
+      .map(id => menuItems.find(mi => Number(mi.id) === Number(id)))
       .filter(Boolean);
 
-    if (lineItems.length > 0) {
-      setSelectedMainItem(item);
-      setLineItemsDetails(lineItems);
-      setLineItemsModalOpen(true);
+    if (isCombo) {
+      // Show the combo detail modal — combo goes to KDS as a single item
+      setComboModalItem(item);
+      setComboModalComponents(linkedItems);
+      setComboModalOpen(true);
     } else {
-      addToCart(item);
+      // Show addon picker
+      if (linkedItems.length > 0) {
+        setSelectedMainItem(item);
+        setLineItemsDetails(linkedItems);
+        setLineItemsModalOpen(true);
+      } else {
+        addToCart(item);
+      }
     }
   };
 
@@ -2093,8 +2294,12 @@ const TakeOrder = ({ clientId, token, onOrderUpdate, realm }) => {
 
   // ─────────────────────────────────────────────────────────────────────────
   // Place order
-  // REQ 2: After successfully placing the order, call billing create_document
-  // to persist customer details so InvoiceModal can pre-fill them.
+  //
+  // FIX: Addons (is_addon: true) are displayed in the cart but must NOT be
+  // sent as separate order items to the API. They are visual-only sub-rows
+  // that belong to their parent item. Only parent items go in the payload.
+  // Combos likewise go as a single item — their components are on the menu
+  // record (line_item_id) and are shown by KDS via that reference.
   // ─────────────────────────────────────────────────────────────────────────
 
   const handlePlaceOrder = async () => {
@@ -2102,37 +2307,15 @@ const TakeOrder = ({ clientId, token, onOrderUpdate, realm }) => {
     isPlacingRef.current = true;
     setIsPlacingOrder(true);
 
+    // For KOT printing we want both parent items and their addon rows
+    // (addons print indented below the parent on the slip)
     const itemsToPrintKOT = newItems.length > 0 ? [...newItems] : [...cart];
 
-    try {
-      const headers = { Authorization: `Bearer ${token}` };
-      let placedOrderId = null;  // will hold the dinein order DB id after placement
-
-      if (activeOrderId && activeDineinOrderId) {
-        const newOnly = cart.filter(i => i.is_new_item && !i.saved_sub_order);
-        if (newOnly.length > 0) {
-          const r = await axios.post(
-            `${import.meta.env.VITE_API_ORDER_SERVICE_URL}/${clientId}/dinein/create-sub-order`,
-            {
-              items: newOnly.map(i => ({
-                item_id: i.id,
-                item_name: i.name,
-                quantity: i.quantity,
-                unit_price: i.unit_price,
-                line_total: i.unit_price * i.quantity,
-                slug: i.slug,
-                frontend_unique_key: i.frontend_unique_key,
-              })),
-            },
-            { headers, params: { client_id: clientId, parent_dinein_order_id: activeDineinOrderId } }
-          );
-          placedOrderId = activeOrderId;  // use root order id for billing document
-          toast.success(`Sub-order ${r.data.data.dinein_order_id} created!`);
-        }
-      } else {
-        const existingDraft = await readDraft(selectedTable, clientId, token);
-        const total = cart.reduce((s, i) => s + (i.unit_price || 0) * i.quantity, 0);
-        const itemsPayload = cart.map(i => ({
+    // For the order API we only send parent (non-addon) items
+    const buildOrderPayload = (items) =>
+      items
+        .filter(i => !i.is_addon)
+        .map(i => ({
           item_id: i.id,
           item_name: i.name,
           quantity: i.quantity,
@@ -2142,6 +2325,27 @@ const TakeOrder = ({ clientId, token, onOrderUpdate, realm }) => {
           slug: i.slug || '',
           frontend_unique_key: i.frontend_unique_key,
         }));
+
+    try {
+      const headers = { Authorization: `Bearer ${token}` };
+      let placedOrderId = null;
+
+      if (activeOrderId && activeDineinOrderId) {
+        const newOnly = cart.filter(i => i.is_new_item && !i.saved_sub_order);
+        if (newOnly.length > 0) {
+          const r = await axios.post(
+            `${import.meta.env.VITE_API_ORDER_SERVICE_URL}/${clientId}/dinein/create-sub-order`,
+            { items: buildOrderPayload(newOnly) },
+            { headers, params: { client_id: clientId, parent_dinein_order_id: activeDineinOrderId } }
+          );
+          placedOrderId = activeOrderId;
+          toast.success(`Sub-order ${r.data.data.dinein_order_id} created!`);
+        }
+      } else {
+        const existingDraft = await readDraft(selectedTable, clientId, token);
+        const parentItemsOnly = cart.filter(i => !i.is_addon);
+        const total = parentItemsOnly.reduce((s, i) => s + (i.unit_price || 0) * i.quantity, 0);
+        const itemsPayload = buildOrderPayload(cart);
 
         if (existingDraft) {
           await axios.post(
@@ -2193,11 +2397,10 @@ const TakeOrder = ({ clientId, token, onOrderUpdate, realm }) => {
         }
       }
 
-      // REQ 2: Create/update billing document to persist customer details.
-      // This ensures InvoiceModal can find them via fetchInvoiceDraft(orderId).
       if (placedOrderId && (customerDetails.customer_id || customerDetails.contact_phone)) {
         const tableObj = tables.find(t => t.id.toString() === selectedTable);
-        const orderSubtotal = cart.reduce((s, i) => s + (i.unit_price || 0) * i.quantity, 0);
+        const parentItemsOnly = cart.filter(i => !i.is_addon);
+        const orderSubtotal = parentItemsOnly.reduce((s, i) => s + (i.unit_price || 0) * i.quantity, 0);
         await upsertBillingDocumentForCustomer({
           clientId,
           token,
@@ -2208,10 +2411,10 @@ const TakeOrder = ({ clientId, token, onOrderUpdate, realm }) => {
         });
       }
 
-      // Soft-cancel draft (sets draft status → cancelled, not a DB delete)
       await deleteDraftFromDB(selectedTable, clientId, token);
       await fetchTables();
 
+      // Enrich items for KOT with real category_id from menu data
       const enrichedForKOT = itemsToPrintKOT.map(ci => {
         if (ci.category_id) return ci;
         const mi = menuItems.find(m => Number(m.id) === Number(ci.id));
@@ -2272,27 +2475,26 @@ const TakeOrder = ({ clientId, token, onOrderUpdate, realm }) => {
   };
 
   // ─────────────────────────────────────────────────────────────────────────
-  // REQ 1: Cancel order (soft) — called from table card's trash icon
-  // Updates order status to "cancelled" and frees the table.
+  // Cancel order (soft)
   // ─────────────────────────────────────────────────────────────────────────
 
-const handleCancelOrder = async (orderId, tableId, reason) => {
-  try {
-    const headers = { Authorization: `Bearer ${token}` };
+  const handleCancelOrder = async (orderId, tableId, reason) => {
+    try {
+      const headers = { Authorization: `Bearer ${token}` };
 
-    await axios.post(
-      `${import.meta.env.VITE_API_ORDER_SERVICE_URL}/${clientId}/dinein/cancel?order_id=${orderId}&reason=${encodeURIComponent(reason || '')}`,
-      {},
-      { headers }
-    );
+      await axios.post(
+        `${import.meta.env.VITE_API_ORDER_SERVICE_URL}/${clientId}/dinein/cancel?order_id=${orderId}&reason=${encodeURIComponent(reason || '')}`,
+        {},
+        { headers }
+      );
 
-    toast.success('Order cancelled and transaction recorded.');
-    await fetchTables();
-  } catch (err) {
-    console.error('[handleCancelOrder]', err);
-    toast.error('Failed to cancel order');
-  }
-};
+      toast.success('Order cancelled and transaction recorded.');
+      await fetchTables();
+    } catch (err) {
+      console.error('[handleCancelOrder]', err);
+      toast.error('Failed to cancel order');
+    }
+  };
 
   // ─────────────────────────────────────────────────────────────────────────
   // Mark as served
@@ -2314,9 +2516,69 @@ const handleCancelOrder = async (orderId, tableId, reason) => {
   };
 
   // ─────────────────────────────────────────────────────────────────────────
+  // Confirm payment from the table grid
+  // ─────────────────────────────────────────────────────────────────────────
+
+  const handleConfirmPaymentFromGrid = async (orderId, tableId) => {
+    try {
+      setLoading(true);
+      const headers = { Authorization: `Bearer ${token}` };
+
+      const docsRes = await axios.get(
+        `${import.meta.env.VITE_API_BILLING_SERVICE_URL}/${clientId}/invoice/read_document`,
+        { headers, params: { client_id: clientId } }
+      );
+      const invoices = (docsRes.data?.data || []).filter(
+        d => d.order_id?.toString() === orderId?.toString()
+      );
+      if (invoices.length > 0) {
+        invoices.sort(
+          (a, b) =>
+            (b.document_version || 1) - (a.document_version || 1) ||
+            new Date(b.updated_at || b.created_at || 0) - new Date(a.updated_at || a.created_at || 0)
+        );
+        const latestDoc = invoices[0];
+        await axios.post(
+          `${import.meta.env.VITE_API_BILLING_SERVICE_URL}/${clientId}/invoice/update_document`,
+          { id: latestDoc.id, client_id: clientId, payment_status: 'Paid', status: 'Issued' },
+          { headers }
+        );
+      }
+
+      await axios.post(
+        `${import.meta.env.VITE_API_ORDER_SERVICE_URL}/${clientId}/dinein/update`,
+        { id: orderId, status: 'served', invoice_status: 'paid' },
+        { headers }
+      );
+
+      const tableObj = tables.find(t => t.id === tableId);
+      if (tableObj) {
+        await axios.post(
+          `${import.meta.env.VITE_API_TABLE_SERVICE_URL}/${clientId}/tables/update`,
+          {
+            id: tableId,
+            client_id: clientId,
+            name: tableObj.name || `Table ${tableId}`,
+            table_type: String(tableObj.table_type || 'Regular'),
+            status: 'Vacant',
+            location_zone: tableObj.location_zone || 'Main',
+          },
+          { headers }
+        );
+      }
+
+      toast.success('Payment confirmed! Table is now free.');
+      await fetchTables();
+    } catch (err) {
+      console.error('[handleConfirmPaymentFromGrid]', err);
+      toast.error('Failed to confirm payment');
+    } finally {
+      setLoading(false);
+    }
+  };
+
+  // ─────────────────────────────────────────────────────────────────────────
   // Bill / Invoice
-  // REQ 2: Fetch billing document pre-created during order placement and
-  // inject customer details so InvoiceModal fields are pre-filled.
   // ─────────────────────────────────────────────────────────────────────────
 
   const combineDuplicateItems = (items) => {
@@ -2329,7 +2591,6 @@ const handleCancelOrder = async (orderId, tableId, reason) => {
     return Array.from(m.values());
   };
 
-  // Fetches the billing document for a given order to extract customer details
   const fetchBillingDocumentForOrder = async (orderId) => {
     try {
       const res = await axios.get(
@@ -2372,13 +2633,11 @@ const handleCancelOrder = async (orderId, tableId, reason) => {
         };
       });
 
-      // REQ 2: Fetch billing document to get pre-stored customer details
       const billingDoc = await fetchBillingDocumentForOrder(orderId);
 
       setInvoiceOrderData({
         ...order,
         items: combineDuplicateItems(enriched),
-        // Prefer billing document fields, fall back to order row, then empty
         customer_id: billingDoc?.customer_id || order.customer_id || '',
         contact_phone: billingDoc?.contact_phone || order.contact_phone || '',
         contact_email: billingDoc?.contact_email || order.contact_email || '',
@@ -2411,8 +2670,6 @@ const handleCancelOrder = async (orderId, tableId, reason) => {
         };
       });
 
-      // REQ 2: Fetch billing document to get pre-stored customer details.
-      // Merge with live customerDetails (user may have updated them since placement).
       const billingDoc = await fetchBillingDocumentForOrder(activeOrderId);
 
       setInvoiceOrderData({
@@ -2462,10 +2719,10 @@ const handleCancelOrder = async (orderId, tableId, reason) => {
   const batchTimestamps = Object.keys(groupedNewItems).sort();
 
   const canPlaceOrder = orderMode === 'takeaway'
-    ? cart.length > 0
+    ? cart.filter(i => !i.is_addon).length > 0
     : activeOrderId
-      ? hasNewItems && newItems.length > 0
-      : selectedTable && cart.length > 0;
+      ? hasNewItems && newItems.filter(i => !i.is_addon).length > 0
+      : selectedTable && cart.filter(i => !i.is_addon).length > 0;
 
   const selectedCategoryName =
     categoriesFlat.find(c => c.id === selectedCategoryId)?.name || 'All Categories';
@@ -2489,11 +2746,13 @@ const handleCancelOrder = async (orderId, tableId, reason) => {
           onSelectDineIn={() => setOrderMode('dinein')}
           onViewOrder={handleViewOrder}
           onPrintBill={handlePrintBill}
-          // REQ 1: opens CancelOrderConfirmModal instead of immediate delete
           onCancelOrder={(orderId, tableId) =>
             setCancelOrderModal({ isOpen: true, orderId, tableId })
           }
           onMarkAsServed={handleMarkAsServed}
+          onConfirmPayment={(orderId, tableId) =>
+            setTablePayConfirmModal({ isOpen: true, orderId, tableId })
+          }
         />
       )}
 
@@ -2523,13 +2782,11 @@ const handleCancelOrder = async (orderId, tableId, reason) => {
                 {/* Top controls */}
                 <div className="space-y-2 mb-2">
 
-                  {/* REQ 2: Customer capture panel */}
                   <CustomerCapturePanel
                     value={customerDetails}
                     onChange={setCustomerDetails}
                   />
 
-                  {/* Dietary quick-filters */}
                   <div className="flex gap-2 overflow-x-auto scrollbar-hide pb-2">
                     {dieterySubCategories.map(cat => (
                       <button
@@ -2549,7 +2806,6 @@ const handleCancelOrder = async (orderId, tableId, reason) => {
                     ))}
                   </div>
 
-                  {/* Back button + Category name + Search */}
                   <div className="flex items-center justify-between lg:flex-row flex-col gap-2">
                     <div className="flex items-center gap-2">
                       <button
@@ -2582,6 +2838,7 @@ const handleCancelOrder = async (orderId, tableId, reason) => {
                     const dp = item.discount && item.unit_price && Number(item.discount) > 0
                       ? ((Number(item.discount) * 100) / Number(item.unit_price)).toFixed(0)
                       : null;
+                    const isCombo = isComboCategoryId(item.category_id);
                     const ac = item.line_item_id?.length || 0;
                     return (
                       <div
@@ -2623,8 +2880,11 @@ const handleCancelOrder = async (orderId, tableId, reason) => {
                             )}
                           </div>
                           {ac > 0 && (
-                            <span className="text-xs bg-blue-100 text-blue-700 px-2 py-0.5 rounded-full font-semibold">
-                              +{ac} addon{ac > 1 ? 's' : ''}
+                            <span className={`text-xs px-2 py-0.5 rounded-full font-semibold
+                              ${isCombo
+                                ? 'bg-violet-100 text-violet-700'
+                                : 'bg-blue-100 text-blue-700'}`}>
+                              {isCombo ? `${ac} items` : `+${ac} addon${ac > 1 ? 's' : ''}`}
                             </span>
                           )}
                         </div>
@@ -2689,7 +2949,6 @@ const handleCancelOrder = async (orderId, tableId, reason) => {
                           <span className="text-base font-bold text-red-600">₹{getTotalPrice()}</span>
                         </div>
 
-                        {/* Draft saved indicator */}
                         {draftSavedAt && (
                           <div className="flex items-center gap-1.5 text-xs text-green-700 bg-green-50 px-2 py-1 rounded-lg">
                             <Save size={11} />
@@ -2743,7 +3002,6 @@ const handleCancelOrder = async (orderId, tableId, reason) => {
                         <>
                           <div className="flex-1 overflow-y-auto mt-4 space-y-2">
 
-                            {/* Old (previously placed) items */}
                             {getGroupedCartItems(oldItems).map((group, idx) => (
                               <OldItemRow
                                 key={`old-${idx}`}
@@ -2755,7 +3013,6 @@ const handleCancelOrder = async (orderId, tableId, reason) => {
                               />
                             ))}
 
-                            {/* Divider between old and new */}
                             {activeOrderId && oldItems.length > 0 && newItems.length > 0 && (
                               <div className="flex items-center gap-2 my-2">
                                 <div className="flex-1 h-px bg-gradient-to-r from-transparent via-orange-400 to-transparent" />
@@ -2764,7 +3021,6 @@ const handleCancelOrder = async (orderId, tableId, reason) => {
                               </div>
                             )}
 
-                            {/* New items (editable), grouped by batch */}
                             {batchTimestamps.map((ts, bi) => (
                               <React.Fragment key={ts}>
                                 {bi > 0 && (
@@ -2890,7 +3146,20 @@ const handleCancelOrder = async (orderId, tableId, reason) => {
         onAddWithSelectedAddons={handleAddMainItemWithSelectedAddons}
       />
 
-      {/* REQ 1: Soft-cancel modal (replaces DeleteConfirmModal) */}
+      <ComboDetailModal
+        isOpen={comboModalOpen}
+        onClose={() => {
+          setComboModalOpen(false);
+          setComboModalItem(null);
+          setComboModalComponents([]);
+        }}
+        comboItem={comboModalItem}
+        comboComponents={comboModalComponents}
+        onAddCombo={() => {
+          if (comboModalItem) addToCart(comboModalItem);
+        }}
+      />
+
       <CancelOrderConfirmModal
         isOpen={cancelOrderModal.isOpen}
         onClose={() => setCancelOrderModal({ isOpen: false, orderId: null, tableId: null })}
@@ -2901,7 +3170,15 @@ const handleCancelOrder = async (orderId, tableId, reason) => {
         }}
       />
 
-      {/* Old-item delete modal */}
+      <TablePaymentConfirmModal
+        isOpen={tablePayConfirmModal.isOpen}
+        orderId={tablePayConfirmModal.orderId}
+        onClose={() => setTablePayConfirmModal({ isOpen: false, orderId: null, tableId: null })}
+        onConfirm={(orderId) => {
+          handleConfirmPaymentFromGrid(orderId, tablePayConfirmModal.tableId);
+        }}
+      />
+
       <OldItemDeleteModal
         isOpen={oldItemDeleteModal.isOpen}
         item={oldItemDeleteModal.item}

@@ -43,17 +43,17 @@ export default function CounterManager({ clientId, token }) {
   const fetchAllCategories = async () => {
     try {
       const res = await axios.get(
-        `${API}/${clientId}/inventory/read_category`,
+        `${API}/${clientId}/inventory/read_category?category_id=dietery`,
         {
           params: {
             client_id: clientId,
-            category_id: "ac",
           },
           headers,
         }
       );
 
       const acRoot = res.data.data?.[0];
+      console.log("catgeories are",acRoot)
 
       if (!acRoot) {
         setAllCategories([]);
@@ -62,6 +62,7 @@ export default function CounterManager({ clientId, token }) {
 
       // Keep levelOne as groups (veg, non_veg, etc)
       const levelOne = acRoot.subCategories || [];
+      console.log("The categories are",levelOne)
 
       setAllCategories(levelOne);
 

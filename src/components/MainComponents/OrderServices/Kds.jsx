@@ -4,7 +4,7 @@ import { useParams } from 'react-router-dom';
 import { toast } from 'react-toastify';
 import 'react-toastify/dist/ReactToastify.css';
 import { FaCheckCircle, FaClock, FaHourglassHalf } from 'react-icons/fa';
-import { Filter, Clock, Users, Package, Truck, Trash2, BarChart2, X } from 'lucide-react';
+import { Filter, Clock, Users, Package, Truck, Trash2, BarChart2, X, ChevronDown, ChevronUp } from 'lucide-react';
 
 // ─── Constants ─────────────────────────────────────────────────────────────────
 
@@ -18,8 +18,6 @@ const KDS_CONFIG = {
   STATUS: {
     PENDING: 'pending',
     PREPARING: 'preparing',
-    // REQ 1: "ready" is the per-item terminal status (not "served").
-    // "served" is only set when the waiter clicks "Mark as Served".
     READY: 'ready',
     SERVED: 'served',
   },
@@ -56,23 +54,14 @@ const calculateElapsedTime = (createdAt) => {
   return `${totalMinutes}m`;
 };
 
-// ─── REQ 1: Derive card status from items
-// A card is "ready" only when ALL items are "ready" (not "served").
-// Once the waiter clicks Mark as Served, all items and order become "served".
-// ──────────────────────────────────────────────────────────────────────────────
-
 const deriveStatus = (items) => {
   const { PENDING, PREPARING, READY } = KDS_CONFIG.STATUS;
   if (!items?.length) return PENDING;
   if (items.some((i) => i.status === PENDING))   return PENDING;
   if (items.some((i) => i.status === PREPARING)) return PREPARING;
-  // All items are "ready" → card is "ready"
   if (items.every((i) => i.status === READY || i.status === KDS_CONFIG.STATUS.SERVED)) return READY;
   return PENDING;
 };
-
-// ─── Urgency helper (REQ 3: priority ordering) ────────────────────────────────
-// Returns minutes elapsed; used for colour-coding in aggregate panel.
 
 const minutesElapsed = (createdAt) => {
   if (!createdAt) return 0;
@@ -131,19 +120,16 @@ const DeleteOrderModal = ({ isOpen, onClose, onConfirm, cardToDelete }) => {
   );
 };
 
-// ─── REQ 3: AggregatePanel ─────────────────────────────────────────────────────
-// Shows how many of each item are needed across ALL active orders,
-// grouped by item name, with per-order breakdown and urgency colour.
+// ─── AggregatePanel ─────────────────────────────────────────────────────────────
 
 const AggregatePanel = ({ cards, tablesMap, onClose }) => {
-  // Build map: itemName → { totalQty, orders: [{tableLabel, qty, createdAt, cardId}] }
   const aggregateMap = {};
 
   cards.forEach((card) => {
     const tableLabel =
       tablesMap[card.table_id] || `${KDS_CONFIG.DEFAULT_TABLE_PREFIX}${card.table_id}`;
     (card.items || []).forEach((item) => {
-      if (item.status === KDS_CONFIG.STATUS.SERVED) return; // already done
+      if (item.status === KDS_CONFIG.STATUS.SERVED) return;
       const name = item.item_name || 'Unnamed';
       if (!aggregateMap[name]) {
         aggregateMap[name] = { totalQty: 0, orders: [] };
@@ -160,12 +146,10 @@ const AggregatePanel = ({ cards, tablesMap, onClose }) => {
     });
   });
 
-  // Sort entries: highest total qty first
   const entries = Object.entries(aggregateMap).sort(
     (a, b) => b[1].totalQty - a[1].totalQty
   );
 
-  // Within each item, sort orders: oldest first (highest priority)
   entries.forEach(([, data]) => {
     data.orders.sort(
       (a, b) => new Date(a.createdAt || 0) - new Date(b.createdAt || 0)
@@ -189,7 +173,6 @@ const AggregatePanel = ({ cards, tablesMap, onClose }) => {
   return (
     <div className="fixed inset-0 z-50 flex items-center justify-center bg-black/50 p-4">
       <div className="bg-white rounded-2xl shadow-2xl w-full max-w-3xl max-h-[85vh] flex flex-col">
-        {/* Header */}
         <div className="flex items-center justify-between px-6 py-4 border-b bg-action-primary rounded-t-2xl">
           <div className="flex items-center gap-3">
             <BarChart2 size={22} className="text-white" />
@@ -203,7 +186,6 @@ const AggregatePanel = ({ cards, tablesMap, onClose }) => {
           </button>
         </div>
 
-        {/* Legend */}
         <div className="flex items-center gap-4 px-6 py-2 bg-gray-50 border-b text-xs text-gray-500">
           <span className="font-semibold">Priority:</span>
           <span className="flex items-center gap-1"><span className="w-2 h-2 rounded-full bg-red-500 inline-block" /> &gt;20 min — urgent</span>
@@ -211,21 +193,18 @@ const AggregatePanel = ({ cards, tablesMap, onClose }) => {
           <span className="flex items-center gap-1"><span className="w-2 h-2 rounded-full bg-green-400 inline-block" /> &lt;10 min — fresh</span>
         </div>
 
-        {/* Body */}
         <div className="overflow-y-auto flex-1 p-6 space-y-4">
           {entries.length === 0 ? (
             <p className="text-center text-gray-400 py-8">No active items</p>
           ) : (
             entries.map(([itemName, data]) => (
               <div key={itemName} className="rounded-xl border border-gray-200 overflow-hidden">
-                {/* Item header */}
                 <div className="flex items-center justify-between px-4 py-3 bg-gray-50 border-b border-gray-200">
                   <span className="font-bold text-gray-800 text-base">{itemName}</span>
                   <span className="bg-action-primary text-white text-sm font-bold px-3 py-1 rounded-full">
                     × {data.totalQty} total
                   </span>
                 </div>
-                {/* Per-order breakdown */}
                 <div className="divide-y divide-gray-100">
                   {data.orders.map((ord, idx) => (
                     <div
@@ -242,7 +221,6 @@ const AggregatePanel = ({ cards, tablesMap, onClose }) => {
                         </div>
                       </div>
                       <div className="flex items-center gap-3">
-                        {/* Priority badge: oldest order = #1 */}
                         <span className="text-xs font-semibold opacity-60">
                           {idx === 0 ? '🔴 Serve first' : `#${idx + 1}`}
                         </span>
@@ -271,23 +249,70 @@ const AggregatePanel = ({ cards, tablesMap, onClose }) => {
   );
 };
 
+// ─── REQ 1: ComboComponentsList — collapsible inline display in a KDS card ───
+// Shows what's included in a combo item directly on the kitchen card.
+
+const ComboComponentsList = ({ item, menuItemsMap }) => {
+  const [expanded, setExpanded] = useState(false);
+
+  const componentIds = item.line_item_id;
+  if (!componentIds || !Array.isArray(componentIds) || componentIds.length === 0) return null;
+
+  const components = componentIds
+    .map(id => menuItemsMap[Number(id)] || menuItemsMap[String(id)])
+    .filter(Boolean);
+
+  if (components.length === 0) {
+    // IDs present but items not in map — show IDs as fallback
+    return (
+      <div className="mt-1 pl-2 border-l-2 border-violet-200">
+        <p className="text-[10px] text-violet-500 font-semibold">
+          Combo · {componentIds.length} items
+        </p>
+      </div>
+    );
+  }
+
+  return (
+    <div className="mt-1">
+      <button
+        type="button"
+        onClick={() => setExpanded(e => !e)}
+        className="flex items-center gap-1 text-[10px] font-semibold text-violet-600 hover:text-violet-800 transition-colors"
+      >
+        <span className="px-1.5 py-0.5 bg-violet-100 rounded-full">
+          Combo · {components.length} items
+        </span>
+        {expanded ? <ChevronUp size={11} /> : <ChevronDown size={11} />}
+      </button>
+      {expanded && (
+        <div className="mt-1 pl-2 border-l-2 border-violet-200 space-y-0.5">
+          {components.map((c, i) => (
+            <div key={c.id || i} className="flex items-center justify-between">
+              <span className="text-[10px] text-gray-600">↳ {c.name}</span>
+              <span className="text-[10px] text-violet-500 font-semibold ml-2">
+                ₹{Number(c.unit_price).toFixed(0)}
+              </span>
+            </div>
+          ))}
+        </div>
+      )}
+    </div>
+  );
+};
+
 // ─── KDS card ─────────────────────────────────────────────────────────────────
-// REQ 1:
-//  - Per-item status buttons cycle: pending → preparing → ready (NOT served)
-//  - "Mark as Served" button appears when ALL items are "ready"
-//  - Clicking "Mark as Served" sets all items + the dine-in order to "served"
-//    and only THEN removes the card from the KDS.
 
 const KitchenCard = ({
   card,
   tablesMap,
+  menuItemsMap,          // REQ 1: map of id → menu item for combo lookup
   onItemStatusChange,
   onDeleteItem,
   onMarkAsServed,
 }) => {
   const elapsedTime = card.created_at ? calculateElapsedTime(card.created_at) : null;
 
-  // REQ 1: card is visually "ready" when all items are ready
   const allReady =
     card.items?.length > 0 &&
     card.items.every((i) => i.status === KDS_CONFIG.STATUS.READY);
@@ -322,67 +347,91 @@ const KitchenCard = ({
 
       {/* ── Card body — item list ── */}
       <div className="bg-bg-primary px-4 py-4 space-y-3 flex-1">
-        {(card.items || []).map((item, idx) => (
-          <div key={item.id || idx} className="flex items-center w-full rounded-lg bg-white">
-            <div className="flex-1">
-              <div className="flex items-center justify-between w-full">
-                <span className="font-medium text-sm">
-                  <span className="mr-2">{item.quantity} x</span>
-                  <span>{item.item_name || 'Unnamed Item'}</span>
-                </span>
+        {(card.items || []).map((item, idx) => {
+          // REQ 1: detect if this item is a combo by checking line_item_id on
+          // the menu item record (KDS item rows carry item_id, not line_item_id)
+          const menuRecord = menuItemsMap[Number(item.item_id)] || menuItemsMap[String(item.item_id)];
+          const isCombo = menuRecord?.line_item_id?.length > 0;
+
+          return (
+            <div key={item.id || idx} className="flex flex-col w-full rounded-lg bg-white">
+              <div className="flex items-center w-full">
+                <div className="flex-1">
+                  <div className="flex items-center justify-between w-full gap-2">
+                    <div className="flex items-center gap-1.5 min-w-0">
+                      <span className="font-medium text-sm">
+                        <span className="mr-1">{item.quantity} x</span>
+                        <span>{item.item_name || 'Unnamed Item'}</span>
+                      </span>
+                      {/* REQ 1: Combo badge on the item row */}
+                      {isCombo && (
+                        <span className="shrink-0 text-[9px] font-bold px-1.5 py-0.5 bg-violet-100 text-violet-700 rounded-full">
+                          COMBO
+                        </span>
+                      )}
+                    </div>
+                  </div>
+                </div>
+
+                {/* Status buttons */}
+                <div className="flex items-center gap-1 ml-3">
+                  <button
+                    type="button"
+                    onClick={() => onItemStatusChange(card.card_id, item.id, KDS_CONFIG.STATUS.PENDING)}
+                    title="Mark as Pending"
+                    className="p-2 rounded-md hover:bg-gray-100 transition-colors"
+                  >
+                    <FaClock
+                      size={20}
+                      className={item.status === 'pending' ? 'text-blue-600' : 'text-gray-400'}
+                    />
+                  </button>
+
+                  <button
+                    type="button"
+                    onClick={() => onItemStatusChange(card.card_id, item.id, KDS_CONFIG.STATUS.PREPARING)}
+                    title="Mark as Preparing"
+                    className="p-2 rounded-md hover:bg-gray-100 transition-colors"
+                  >
+                    <FaHourglassHalf
+                      size={20}
+                      className={item.status === 'preparing' ? 'text-orange-500' : 'text-gray-400'}
+                    />
+                  </button>
+
+                  <button
+                    type="button"
+                    onClick={() => onItemStatusChange(card.card_id, item.id, KDS_CONFIG.STATUS.READY)}
+                    title="Mark as Ready"
+                    className="p-2 rounded-md hover:bg-gray-100 transition-colors"
+                  >
+                    <FaCheckCircle
+                      size={20}
+                      className={item.status === 'ready' ? 'text-green-500' : 'text-gray-400'}
+                    />
+                  </button>
+
+                  <button
+                    type="button"
+                    onClick={() => onDeleteItem(card.card_id, item)}
+                    title="Remove item"
+                    className="p-2 rounded-md hover:bg-red-50 transition-colors"
+                  >
+                    <Trash2 size={18} className="text-red-400 hover:text-red-600" />
+                  </button>
+                </div>
               </div>
+
+              {/* REQ 1: Combo component list (collapsible) */}
+              {isCombo && (
+                <ComboComponentsList
+                  item={menuRecord}
+                  menuItemsMap={menuItemsMap}
+                />
+              )}
             </div>
-
-            {/* REQ 1: Status buttons — terminal state is "ready", not "served" */}
-            <div className="flex items-center gap-1 ml-3">
-              <button
-                type="button"
-                onClick={() => onItemStatusChange(card.card_id, item.id, KDS_CONFIG.STATUS.PENDING)}
-                title="Mark as Pending"
-                className="p-2 rounded-md hover:bg-gray-100 transition-colors"
-              >
-                <FaClock
-                  size={20}
-                  className={item.status === 'pending' ? 'text-blue-600' : 'text-gray-400'}
-                />
-              </button>
-
-              <button
-                type="button"
-                onClick={() => onItemStatusChange(card.card_id, item.id, KDS_CONFIG.STATUS.PREPARING)}
-                title="Mark as Preparing"
-                className="p-2 rounded-md hover:bg-gray-100 transition-colors"
-              >
-                <FaHourglassHalf
-                  size={20}
-                  className={item.status === 'preparing' ? 'text-orange-500' : 'text-gray-400'}
-                />
-              </button>
-
-              {/* REQ 1: ✓ button sets item to "ready" (not "served") */}
-              <button
-                type="button"
-                onClick={() => onItemStatusChange(card.card_id, item.id, KDS_CONFIG.STATUS.READY)}
-                title="Mark as Ready"
-                className="p-2 rounded-md hover:bg-gray-100 transition-colors"
-              >
-                <FaCheckCircle
-                  size={20}
-                  className={item.status === 'ready' ? 'text-green-500' : 'text-gray-400'}
-                />
-              </button>
-
-              <button
-                type="button"
-                onClick={() => onDeleteItem(card.card_id, item)}
-                title="Remove item"
-                className="p-2 rounded-md hover:bg-red-50 transition-colors"
-              >
-                <Trash2 size={18} className="text-red-400 hover:text-red-600" />
-              </button>
-            </div>
-          </div>
-        ))}
+          );
+        })}
       </div>
 
       {/* ── Card footer ── */}
@@ -390,6 +439,17 @@ const KitchenCard = ({
         <span className={`text-l font-semibold uppercase ${statusColorClass}`}>
           {allReady ? 'ready' : card.status}
         </span>
+
+        {/* Mark as Served button — only when all items are ready */}
+        {allReady && (
+          <button
+            type="button"
+            onClick={() => onMarkAsServed(card)}
+            className="px-3 py-1.5 rounded-lg bg-green-600 hover:bg-green-700 text-white text-xs font-bold transition-colors"
+          >
+            Mark as Served
+          </button>
+        )}
       </div>
     </div>
   );
@@ -403,10 +463,11 @@ const KitchenDisplay = () => {
 
   const [cards, setCards] = useState([]);
   const [tablesMap, setTablesMap] = useState({});
-  const [inventoryItems, setInventoryItems] = useState([]);
+  // REQ 1: store all menu items indexed by id for combo lookup
+  const [menuItemsMap, setMenuItemsMap] = useState({});
   const [loading, setLoading] = useState(true);
   const [orderFilter, setOrderFilter] = useState('ALL');
-  const [showAggregate, setShowAggregate] = useState(false); // REQ 3
+  const [showAggregate, setShowAggregate] = useState(false);
 
   const itemOrderRef = useRef({});
 
@@ -432,16 +493,52 @@ const KitchenDisplay = () => {
       .catch(() => toast.error('Failed to fetch tables'));
   }, [clientId, token]);
 
-  // ─── Fetch inventory ────────────────────────────────────────────────────────
+  // ─── REQ 1: Fetch menu items for combo component resolution ───────────────
 
   useEffect(() => {
     if (!token || !clientId) return;
+    // We need the full menu to resolve line_item_id on combo items.
+    // Use the inventory/read endpoint as a lightweight source of all items.
     axios
       .get(`${import.meta.env.VITE_API_INVENTORY_SERVICE_URL}/${clientId}/inventory/read`, {
         headers: { Authorization: `Bearer ${token}` },
       })
-      .then((res) => setInventoryItems(res.data?.data || []))
-      .catch(() => toast.error('Failed to fetch inventory'));
+      .then((res) => {
+        const map = {};
+        (res.data?.data || []).forEach((item) => {
+          map[Number(item.id)] = item;
+          map[String(item.id)] = item;
+        });
+        setMenuItemsMap(map);
+      })
+      .catch((err) => {
+        console.warn('[KDS] Failed to fetch menu items for combo lookup:', err);
+        // Non-fatal — cards still display without combo detail
+      });
+  }, [clientId, token]);
+
+  // ─── Also try fetching from the menu read endpoint for richer data ─────────
+
+  useEffect(() => {
+    if (!token || !clientId) return;
+    // Try the menu/read endpoint which has line_item_id
+    axios
+      .get(`${import.meta.env.VITE_API_INVENTORY_SERVICE_URL}/${clientId}/menu/read`, {
+        headers: { Authorization: `Bearer ${token}` },
+        params: { inventory_id: 'menu' },
+      })
+      .then((res) => {
+        const map = {};
+        (res.data?.data || []).forEach((item) => {
+          // Prefer menu items over inventory items (richer, has line_item_id)
+          map[Number(item.id)] = item;
+          map[String(item.id)] = item;
+        });
+        setMenuItemsMap(prev => ({ ...prev, ...map }));
+      })
+      .catch(() => {
+        // Silent — inventory/read fallback is sufficient
+      });
   }, [clientId, token]);
 
   // ─── Parse merged orders into per-sub-order cards ─────────────────────────
@@ -510,13 +607,9 @@ const KitchenDisplay = () => {
           if (new Date(utc).toLocaleDateString(KDS_CONFIG.DATE_FORMAT) !== today) return;
         }
 
-        // REQ 1: don't filter out "served" orders here — we only remove after
-        // "Mark as Served" is explicitly clicked. The order stays in the grid
-        // until all items are ready AND the waiter triggers the final action.
         if (mergedOrder.status === KDS_CONFIG.STATUS.SERVED) return;
 
         parseIntoCards(mergedOrder).forEach((card) => {
-          // Skip cards where every item is already served
           if (
             card.items.length > 0 &&
             card.items.every((i) => i.status === KDS_CONFIG.STATUS.SERVED)
@@ -574,9 +667,7 @@ const KitchenDisplay = () => {
     return () => clearInterval(interval);
   }, [fetchOrders]);
 
-  // ─── REQ 1: Item status change ─────────────────────────────────────────────
-  // Clicking ✓ on an item sets it to "ready" (not "served").
-  // The overall order status is also updated to reflect the derived state.
+  // ─── Item status change ────────────────────────────────────────────────────
 
   const handleItemStatusChange = async (cardId, itemId, newStatus) => {
     const card = cards.find((c) => c.card_id === cardId);
@@ -585,7 +676,6 @@ const KitchenDisplay = () => {
     const updatedItems = (card.items || []).map((i) =>
       String(i.id) === String(itemId) ? { ...i, status: newStatus } : i
     );
-    // REQ 1: derived status from items — "ready" when all are ready
     const derivedStatus = deriveStatus(updatedItems);
 
     try {
@@ -610,14 +700,12 @@ const KitchenDisplay = () => {
         { headers: { Authorization: `Bearer ${token}` } }
       );
 
-      // Update the sub-order's overall status (never to "served" here)
       await axios.post(
         `${import.meta.env.VITE_API_ORDER_SERVICE_URL}/${clientId}/dinein/update`,
         { id: card.sub_order_id, status: derivedStatus },
         { headers: { Authorization: `Bearer ${token}` } }
       );
 
-      // REQ 1: Notify when card first becomes "ready"
       if (derivedStatus === KDS_CONFIG.STATUS.READY && card.status !== KDS_CONFIG.STATUS.READY) {
         window.dispatchEvent(
           new CustomEvent('orderCollect', {
@@ -629,7 +717,6 @@ const KitchenDisplay = () => {
         );
       }
 
-      // Optimistic update — do NOT remove the card; it stays until Mark as Served
       setCards((prev) =>
         prev.map((c) =>
           c.card_id !== cardId
@@ -643,10 +730,7 @@ const KitchenDisplay = () => {
     }
   };
 
-  // ─── REQ 1: Mark as Served ─────────────────────────────────────────────────
-  // Called from the "Mark as Served" button (only shown when all items are ready).
-  // Sets ALL items to "served" and the dine-in order to "served", then removes
-  // the card from the KDS grid.
+  // ─── Mark as Served ────────────────────────────────────────────────────────
 
   const handleMarkAsServed = async (card) => {
     try {
@@ -665,21 +749,18 @@ const KitchenDisplay = () => {
         frontend_unique_key: item.frontend_unique_key || null,
       }));
 
-      // 1. Update all items to served
       await axios.post(
         `${import.meta.env.VITE_API_ORDER_SERVICE_URL}/${clientId}/order_items/update?order_id=${card.sub_order_id}`,
         servedItems,
         { headers: { Authorization: `Bearer ${token}` } }
       );
 
-      // 2. Update the dine-in order to served
       await axios.post(
         `${import.meta.env.VITE_API_ORDER_SERVICE_URL}/${clientId}/dinein/update`,
         { id: card.sub_order_id, status: KDS_CONFIG.STATUS.SERVED },
         { headers: { Authorization: `Bearer ${token}` } }
       );
 
-      // 3. Dispatch collect event
       window.dispatchEvent(
         new CustomEvent('orderCollect', {
           detail: {
@@ -690,8 +771,6 @@ const KitchenDisplay = () => {
       );
 
       toast.success(`Order #${card.dinein_order_id} marked as served!`);
-
-      // 4. Remove card from grid
       setCards((prev) => prev.filter((c) => c.card_id !== card.card_id));
     } catch (err) {
       console.error('[handleMarkAsServed]', err);
@@ -830,7 +909,6 @@ const KitchenDisplay = () => {
                 </button>
               ))}
 
-              {/* REQ 3: Aggregate view button */}
               <button
                 onClick={() => setShowAggregate(true)}
                 className="flex items-center gap-2 px-4 py-2 rounded-lg font-medium text-sm transition-all bg-purple-600 text-white hover:bg-purple-700 shadow-sm ml-2"
@@ -859,6 +937,7 @@ const KitchenDisplay = () => {
                     key={card.card_id}
                     card={card}
                     tablesMap={tablesMap}
+                    menuItemsMap={menuItemsMap}
                     onItemStatusChange={handleItemStatusChange}
                     onDeleteItem={handleDeleteItem}
                     onMarkAsServed={handleMarkAsServed}
@@ -885,7 +964,6 @@ const KitchenDisplay = () => {
         onConfirm={confirmDeleteCard}
       />
 
-      {/* REQ 3: Aggregate panel modal */}
       {showAggregate && (
         <AggregatePanel
           cards={filteredCards}
