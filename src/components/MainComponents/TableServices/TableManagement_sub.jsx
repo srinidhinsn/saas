@@ -8,7 +8,7 @@ import UniversalBulkDeleteModal from "../../utils/Modals/UniversalBulkDeleteModa
 import AccessGuard from "../../utils/Interceptors/ProtectedRoute";
 import TableConfigModal from "../../utils/Modals/TableConfigModal";
 
-const TableManagement = ({ clientId, token, screenIds, userId }) => {
+const TableManagement = ({ clientId, token, screenIds, userId, realm }) => {
 
     const [searchTerm, setSearchTerm] = useState("");
     const [tableRanges, setTableRanges] = useState([]);
@@ -781,7 +781,7 @@ const TableManagement = ({ clientId, token, screenIds, userId }) => {
                                                             Seats: <span className="font-bold">{table.table_type}</span>
                                                         </div>
                                                     </div>
-                                                    <span className="text-md font-semibold">
+                                                    <span className="text-[10px] font-semibold">
                                                         {config?.section?.toUpperCase() || "-"}
                                                     </span>
                                                 </div>
@@ -912,6 +912,7 @@ const TableManagement = ({ clientId, token, screenIds, userId }) => {
                         clientId={clientId}
                         token={token}
                         refresh={() => { fetchConfigs(); }}
+                        realm={realm}
                     />
 
                     {/* First Delete Confirmation */}

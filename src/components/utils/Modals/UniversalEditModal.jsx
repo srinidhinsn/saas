@@ -6,25 +6,46 @@ import ComboSelectionPopup from './CombosSelectionPopup';
 import axios from 'axios';
 
 const UniversalEditModal = ({
-  showModal, setShowModal, modalType,
-  // Menu props
-  editingItem, setEditingItem, categories, addonSubcategories, allAddonItems,
-  editItemImage, setEditItemImage, editItemImageUrl, setEditItemImageUrl,
-  handleEditItem, clientId, token, inventoryIds,
+  // Common props
+  showModal,
+  setShowModal,
+  modalType, // 'menu' or 'table'
+  normalizedRealm,
+  // Menu-specific props
+  editingItem,
+  setEditingItem,
+  categories,
+  addonSubcategories, // ✅ Addon subcategories
+  allAddonItems, // ✅ All addon items
+  editItemImage,
+  setEditItemImage,
+  editItemImageUrl,
+  setEditItemImageUrl,
+  handleEditItem,
+  clientId,
+  token,
+  inventoryIds,
   fetchAddonData, setAddonSubcategories, setAllAddonItems, units,
   // Combo props
   dedupedMenuItems, categoriesFlat,
-  // Table props
-  editRowId, setEditRowId, table, handleEditChange, saveEdit, editFieldErrors,
+
+  // Table-specific props
+  editRowId,
+  setEditRowId,
+  table,
+  handleEditChange,
+  saveEdit,
+  editFieldErrors
 }) => {
   const [dragActive, setDragActive] = useState(false);
   const [showAddonPopup, setShowAddonPopup] = useState(false);
   const [configs, setConfigs] = useState([]);
   const [statusOptions, setStatusOptions] = useState([]);
   const [loadingConfigs, setLoadingConfigs] = useState(false);
+  const [dietaryOptions, setDietaryOptions] = useState([]);
+  const [timingOptions, setTimingOptions] = useState([]);
 
-  // Detect if this item's category is a combo category
-  const isComboItem = React.useMemo(() => {
+   const isComboItem = React.useMemo(() => {
     if (!editingItem?.category_id || !categoriesFlat?.length) return false;
     // editingItem.isCombo is pre-computed by handleItemClick in MenuManagement
     if (editingItem.isCombo !== undefined) return editingItem.isCombo;
@@ -39,12 +60,15 @@ const UniversalEditModal = ({
     }
     return false;
   }, [editingItem, categoriesFlat]);
-
+  
   const fetchStatuses = async () => {
     try {
       const res = await axios.get(
-        `${import.meta.env.VITE_API_INVENTORY_SERVICE_URL}/${clientId}/inventory/masters`,
-        { params: { category_id: "status" }, headers: { Authorization: `Bearer ${token}` } }
+        `${import.meta.env.VITE_API_TABLE_SERVICE_URL}/${clientId}/tables/table-types`,
+        {
+          params: { category_id: "status" },
+          headers: { Authorization: `Bearer ${token}` }
+        }
       );
       setStatusOptions(res.data?.data || []);
     } catch (err) { setStatusOptions([]); }
@@ -61,12 +85,59 @@ const UniversalEditModal = ({
     } catch (err) { setConfigs([]); }
     finally { setLoadingConfigs(false); }
   };
+  const fetchDietaryTypes = async () => {
+    try {
+      const res = await axios.get(
+        `${import.meta.env.VITE_API_INVENTORY_SERVICE_URL}/${clientId}/inventory/item-types`,
+        {
+          params: { category_id: "dietary_type" },
+          headers: { Authorization: `Bearer ${token}` }
+        }
+      );
 
+      setDietaryOptions(res.data?.data || []);
+    } catch (err) {
+      console.error("Dietary fetch error:", err);
+      setDietaryOptions([]);
+    }
+  };
+  const fetchTimings = async () => {
+    try {
+      const res = await axios.get(
+        `${import.meta.env.VITE_API_INVENTORY_SERVICE_URL}/${clientId}/inventory/item-types`,
+        {
+          params: { category_id: "available_timings" },
+          headers: { Authorization: `Bearer ${token}` },
+        }
+      );
+
+      const raw = res.data?.data || [];
+
+      const parsed = raw.map(v => {
+        const match = v.match(/^(.+)\((.+)-(.+)\)$/);
+        return {
+          name: (match?.[1] ?? v).toLowerCase(),
+          start: match?.[2] ?? null,
+          end: match?.[3] ?? null,
+          raw: v
+        };
+      });
+
+      setTimingOptions(parsed);
+    } catch (err) {
+      console.error("Timing fetch error:", err);
+      setTimingOptions([]);
+    }
+  };
   useEffect(() => {
     if (!showModal || !clientId || !token) return;
     fetchConfigs();
     fetchStatuses();
-  }, [showModal, clientId, token]);
+    if (normalizedRealm === 'restaurant') {
+      fetchDietaryTypes();
+      fetchTimings();
+    }
+  }, [showModal, clientId, token, normalizedRealm]);
 
   useEffect(() => {
     if (!showModal || modalType !== 'menu' || !fetchAddonData) return;
@@ -159,9 +230,53 @@ const UniversalEditModal = ({
                 {/* Description */}
                 <div>
                   <label className="block text-sm font-medium mb-1 text-gray-700">Description</label>
-                  <textarea value={editingItem.description || ''} onChange={e => setEditingItem({ ...editingItem, description: e.target.value })}
-                    className="w-full px-3 py-2 rounded-md border border-gray-300 text-gray-900 focus:outline-none focus:ring-2 focus:ring-blue-500" rows="3" />
+                  <textarea
+                    value={editingItem.description || ""}
+                    onChange={(e) => setEditingItem({ ...editingItem, description: e.target.value })}
+                    className="w-full px-3 py-2 rounded-md border border-gray-300 text-gray-900 focus:outline-none focus:ring-2 focus:ring-blue-500 focus:border-transparent"
+                    rows="3"
+                  />
                 </div>
+                {normalizedRealm === 'restaurant' && (
+                  <div>
+                    <label className="block text-sm font-medium mb-1 text-gray-700">
+                      Availability Timing
+                    </label>
+                    <div className="flex flex-wrap gap-2">
+                      {timingOptions.map((t) => {
+                        // t is already {name, start, end} — no split needed
+                        const key = (t.name || '').toLowerCase();
+                        const currentTimings = Array.isArray(editingItem?.availability_time)
+                          ? editingItem.availability_time
+                          : (editingItem?.availability_time ? [editingItem.availability_time] : []);
+                        const selected = currentTimings.includes(key);
+                        return (
+                          <button
+                            key={key}
+                            type="button"
+                            onClick={() => {
+                              const next = selected
+                                ? currentTimings.filter(x => x !== key)
+                                : [...currentTimings, key];
+                              setEditingItem(prev => ({ ...prev, availability_time: next }));
+                            }}
+                            className={`px-3 py-1.5 rounded-lg text-sm border transition-all ${selected
+                              ? 'bg-blue-600 text-white border-blue-600'
+                              : 'bg-gray-50 border-gray-300 text-gray-700 hover:border-blue-500'
+                              }`}
+                          >
+                            {t.name} {t.start && t.end ? `(${t.start}–${t.end})` : ''}
+                          </button>
+                        );
+                      })}
+                    </div>
+                    {(Array.isArray(editingItem?.availability_time)
+                      ? editingItem.availability_time.length === 0
+                      : !editingItem?.availability_time) && (
+                        <p className="text-xs text-gray-400 mt-1">No timing selected = available all day</p>
+                      )}
+                  </div>
+                )}
 
                 {/* Price & Discount */}
                 <div className="grid grid-cols-2 gap-4">
@@ -205,18 +320,48 @@ const UniversalEditModal = ({
                 {/* Code & Serving Unit */}
                 <div className="grid grid-cols-2 gap-4">
                   <div>
-                    <label className="block text-sm font-medium mb-1 text-gray-700">Code <span className="text-red-600">*</span></label>
-                    <input type="text" value={editingItem.code ?? ''}
-                      onChange={e => setEditingItem({ ...editingItem, inventory_id: editingItem.inventory_id || 'menu', code: e.target.value })}
-                      className="w-full px-3 py-2 rounded-md border border-gray-300 text-gray-900 focus:outline-none focus:ring-2 focus:ring-action-primary" required />
+                    <label className="block text-sm font-medium mb-1 text-gray-700">
+                      Code <span className="text-red-600">*</span>
+                    </label>
+                    <input
+                      type="text"
+                      value={editingItem.code ?? ''}
+                      onChange={(e) =>
+                        setEditingItem({
+                          ...editingItem,
+
+                          code: e.target.value
+                        })
+                      }
+                      className="w-full px-3 py-2 rounded-md border border-gray-300 text-gray-900
+                        focus:outline-none focus:ring-2 focus:ring-action-primary"
+                      placeholder="Item Code"
+                      required
+                    />
                   </div>
                   <div>
-                    <label className="block text-sm font-medium mb-1 text-gray-700">Serving Unit</label>
-                    <select value={editingItem.serving_unit ?? ''} onChange={e => setEditingItem({ ...editingItem, serving_unit: e.target.value })}
-                      className="w-full px-3 py-2 rounded-md border border-gray-300 text-gray-900 focus:outline-none focus:ring-2 focus:ring-blue-500">
-                      <option value="">Select unit</option>
-                      {(units || []).map(u => <option key={u} value={u}>{u}</option>)}
-                    </select>
+                    <label className="block text-sm font-medium mb-1 text-gray-700">
+                      Availability  <span className="text-red-600">*</span>
+                    </label>
+                    <input
+                      type="number"
+                      value={editingItem.availability ?? ''}
+                      onChange={(e) =>
+                        setEditingItem({
+                          ...editingItem,
+                          availability: e.target.value
+                        })
+                      } className="w-full px-3 py-2 rounded-md border border-gray-300 text-gray-900 focus:outline-none focus:ring-2 focus:ring-blue-500 focus:border-transparent"
+                    />
+                  </div>
+                  <div>
+                    <label className="block text-sm font-medium mb-1 text-gray-700">Unit</label>
+                    <input
+                      type="text"
+                      value={editingItem.unit}
+                      onChange={(e) => setEditingItem({ ...editingItem, unit: e.target.value })}
+                      className="w-full px-3 py-2 rounded-md border border-gray-300 text-gray-900 focus:outline-none focus:ring-2 focus:ring-blue-500 focus:border-transparent"
+                    />
                   </div>
                 </div>
 

@@ -271,17 +271,7 @@ const ComboComponentsList = ({ item, menuItemsMap }) => {
     );
   }
 
-  // FIX 4: Always expanded — no toggle button
-  return (
-    <div className="mt-1 pl-2 border-l-2 border-violet-200 space-y-0.5">
-      {components.map((c, i) => (
-        <div key={c.id || i} className="flex items-center justify-between">
-          <span className="text-xs text-gray-600">↳ {c.name}</span>
-         
-        </div>
-      ))}
-    </div>
-  );
+
 };
 
 // ─── KDS card ─────────────────────────────────────────────────────────────────
@@ -767,6 +757,7 @@ const KitchenDisplay = () => {
           </div>
         </div>
       </div>
+
 
 
       {showAggregate && (

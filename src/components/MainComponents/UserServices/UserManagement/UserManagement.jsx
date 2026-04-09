@@ -258,7 +258,7 @@ const UsersList = ({ onAddNew, clientId, token, onEdit,isSuperAdminScreen}) => {
 
     try {
       const res = await axios.post(
-        `${import.meta.env.VITE_API_INVENTORY_SERVICE_URL}/${clientId}/inventory/roles`,
+        `${import.meta.env.VITE_API_USER_SERVICE_URL}/${clientId}/users/roles`,
         null,
         {
           params: {
@@ -287,7 +287,7 @@ const UsersList = ({ onAddNew, clientId, token, onEdit,isSuperAdminScreen}) => {
 
     try {
       const res = await axios.delete(
-        `${import.meta.env.VITE_API_INVENTORY_SERVICE_URL}/${clientId}/inventory/roles`,
+        `${import.meta.env.VITE_API_USER_SERVICE_URL}/${clientId}/users/roles`,
         {
           params: {
             category_id: "roles",

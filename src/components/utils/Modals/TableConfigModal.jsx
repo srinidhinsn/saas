@@ -58,7 +58,7 @@ const MasterTagManager = ({ label, categoryId, clientId, token, showPopup, close
 
     const fetchValues = async () => {
         try {
-            const res = await axios.get(`${INV_URL}/${clientId}/inventory/masters`,
+            const res = await axios.get(`${import.meta.env.VITE_API_TABLE_SERVICE_URL}/${clientId}/tables/table-types`,
                 { params: { category_id: categoryId }, headers: auth });
             setValues(res.data?.data || []);
         } catch (err) {
@@ -85,7 +85,7 @@ const MasterTagManager = ({ label, categoryId, clientId, token, showPopup, close
         setAdding(true);
         try {
             // ✅ Send the normalized value — DB stores "First Floor" not "first floor"
-            await axios.post(`${INV_URL}/${clientId}/inventory/roles`, null,
+            await axios.post(`${import.meta.env.VITE_API_TABLE_SERVICE_URL}/${clientId}/tables/table-types`, null,
                 { params: { category_id: categoryId, value: val }, headers: auth });
 
             setValues(prev => [...prev, val]);  // local update with normalized val
@@ -108,7 +108,7 @@ const MasterTagManager = ({ label, categoryId, clientId, token, showPopup, close
             closePopup();
             setDeletingVal(val);
             try {
-                await axios.delete(`${INV_URL}/${clientId}/inventory/roles`,
+                await axios.delete(`${import.meta.env.VITE_API_TABLE_SERVICE_URL}/${clientId}/tables/table-types`,
                     { params: { category_id: categoryId, value: val }, headers: auth });
                 setValues(prev => prev.filter(v => v !== val));  // local update
                 onChanged?.();
@@ -196,7 +196,7 @@ const MasterTagManager = ({ label, categoryId, clientId, token, showPopup, close
 /* ─────────────────────────────────────────────
    Main Modal
 ───────────────────────────────────────────── */
-const TableConfigModal = ({ show, onClose, clientId, token, refresh }) => {
+const TableConfigModal = ({ show, onClose, clientId, token, refresh,realm }) => {
     const [activeTab,      setActiveTab]      = useState("config");
     const [sectionInput,   setSectionInput]   = useState("");
     const [zoneInput,      setZoneInput]      = useState("");
@@ -221,8 +221,8 @@ const TableConfigModal = ({ show, onClose, clientId, token, refresh }) => {
     const loadMasters = async () => {
         try {
             const [zRes, sRes] = await Promise.all([
-                axios.get(`${INV_URL}/${clientId}/inventory/masters`, { params: { category_id: "zone"    }, headers: auth }),
-                axios.get(`${INV_URL}/${clientId}/inventory/masters`, { params: { category_id: "section" }, headers: auth }),
+                axios.get(`${import.meta.env.VITE_API_TABLE_SERVICE_URL}/${clientId}/tables/table-types`, { params: { category_id: "zone"    }, headers: auth }),
+                axios.get(`${import.meta.env.VITE_API_TABLE_SERVICE_URL}/${clientId}/tables/table-types`, { params: { category_id: "section" }, headers: auth }),
             ]);
             setZoneOptions(   zRes.data?.data || []);
             setSectionOptions(sRes.data?.data || []);
@@ -248,7 +248,7 @@ const TableConfigModal = ({ show, onClose, clientId, token, refresh }) => {
         setAddingConfig(true);
         try {
             const res = await axios.post(`${BASE_URL}/${clientId}/tables/config`,
-                { client_id: clientId, section, zone }, { headers: auth });
+                { client_id: clientId, section, zone,realm }, { headers: auth });
 
             // ✅ Use returned data if available, else construct locally
             const saved = res.data?.data || res.data;

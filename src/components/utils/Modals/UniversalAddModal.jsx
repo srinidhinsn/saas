@@ -6,23 +6,46 @@ import AddonSelectionPopup from './AddonSelection';
 import ComboSelectionPopup from './CombosSelectionPopup';
 
 const UniversalAddModal = ({
-  showModal, setShowModal, modalType, clientId, token,
-  // Menu props
-  newItem, setNewItem, categories, addonSubcategories, allAddonItems,
-  newItemImage, setNewItemImage, newItemImageUrl, setNewItemImageUrl,
-  handleAddItem, getCategoryIdByName, inventoryIds,
-  fetchAddonData, setAddonSubcategories, setAllAddonItems, units,
-  // Combo props
+  // Common props
+  showModal,
+  setShowModal,
+  modalType, // 'menu' or 'table'
+  clientId,
+  token,
+  normalizedRealm,
+  // Menu-specific props
+  newItem,
+  setNewItem,
+  categories,
+  addonSubcategories, // ✅ Addon subcategories
+  allAddonItems, // ✅ All addon items
+  newItemImage,
+  setNewItemImage,
+  newItemImageUrl,
+  setNewItemImageUrl,
+  handleAddItem,
+  getCategoryIdByName,
+  inventoryIds,
   isComboCategory, dedupedMenuItems, categoriesFlat,
-  // Table props
-  tableRanges, setTableRanges, fieldErrors, setFieldErrors, isGenerating, generateTables,
+fetchAddonData,
+  // Table-specific props
+  tableRanges,
+  setTableRanges,
+  fieldErrors,
+  setFieldErrors,
+  isGenerating,
+  generateTables,
+  units
 }) => {
   const [dragActive, setDragActive] = useState(false);
   const [showAddonPopup, setShowAddonPopup] = useState(false);
   const [configs, setConfigs] = useState([]);
   const [loadingConfigs, setLoadingConfigs] = useState(false);
   const [statusOptions, setStatusOptions] = useState([]);
+  const [dietaryOptions, setDietaryOptions] = useState([]);
+  const [timingOptions, setTimingOptions] = useState([]);
 
+  // Memoize helpers so they're stable across renders (prevents unnecessary effect runs)
   const flattenCategories = useCallback((items = [], level = 0) => {
     let result = [];
     items.forEach(item => {
@@ -39,8 +62,11 @@ const UniversalAddModal = ({
   const fetchStatuses = async () => {
     try {
       const res = await axios.get(
-        `${import.meta.env.VITE_API_INVENTORY_SERVICE_URL}/${clientId}/inventory/masters`,
-        { params: { category_id: "status" }, headers: { Authorization: `Bearer ${token}` } }
+        `${import.meta.env.VITE_API_TABLE_SERVICE_URL}/${clientId}/tables/table-types`,
+        {
+          params: { category_id: "status" },
+          headers: { Authorization: `Bearer ${token}` }
+        }
       );
       setStatusOptions(res.data?.data || []);
     } catch (err) { setStatusOptions([]); }
@@ -57,12 +83,64 @@ const UniversalAddModal = ({
     } catch (err) { setConfigs([]); }
     finally { setLoadingConfigs(false); }
   };
+  const fetchDietaryTypes = async () => {
+    try {
+      const res = await axios.get(
+        `${import.meta.env.VITE_API_INVENTORY_SERVICE_URL}/${clientId}/inventory/item-types`,
+        {
+          params: { category_id: "dietary_type" },
+          headers: { Authorization: `Bearer ${token}` }
+        }
+      );
+      setDietaryOptions(res.data?.data || []);
+    } catch (err) {
+      console.error("Dietary fetch error:", err);
+      setDietaryOptions([]);
+    }
+  };
 
+  const fetchTimings = async () => {
+    try {
+      const res = await axios.get(
+        `${import.meta.env.VITE_API_INVENTORY_SERVICE_URL}/${clientId}/inventory/item-types`,
+        {
+          params: { category_id: "available_timings" },
+          headers: { Authorization: `Bearer ${token}` },
+        }
+      );
+
+      const raw = res.data?.data || [];
+
+      const parsed = raw.map(v => {
+        const match = v.match(/^(.+)\((.+)-(.+)\)$/);
+        return {
+          name: (match?.[1] ?? v).toLowerCase(),
+          start: match?.[2] ?? null,
+          end: match?.[3] ?? null,
+          raw: v
+        };
+      });
+
+      setTimingOptions(parsed);
+    } catch (err) {
+      console.error("Timing fetch error:", err);
+      setTimingOptions([]);
+    }
+  };
+
+  useEffect(() => {
+    if (!showModal) return;
+    if (!clientId || !token) return;
+  })
   useEffect(() => {
     if (!showModal || !clientId || !token) return;
     fetchConfigs();
     fetchStatuses();
-  }, [showModal, modalType, clientId, token]);
+    if (normalizedRealm === 'restaurant') {
+      fetchDietaryTypes();
+      fetchTimings();
+    }
+  }, [showModal, modalType, clientId, token, normalizedRealm]);
 
   useEffect(() => {
     if (!showModal || modalType !== 'menu' || !fetchAddonData) return;
@@ -164,8 +242,42 @@ const UniversalAddModal = ({
                   className="w-full px-4 py-2 rounded-lg bg-bg-tertiary border border-border-default text-text-primary focus:outline-none focus:ring-2 focus:ring-action-primary"
                   placeholder={isComboCategory ? "What's included, portion details…" : "Enter item description"} rows="3" />
               </div>
-
-              {/* Price & Discount */}
+              {normalizedRealm === 'restaurant' && (
+                <div>
+                  <label className="block text-sm font-medium mb-2">
+                    Availability Timing
+                  </label>
+                  <div className="flex flex-wrap gap-2">
+                    {timingOptions.map((t) => {
+                      const key = (t.name || '').toLowerCase();
+                      const selected = (newItem?.availability_time || []).includes(key);
+                      return (
+                        <button
+                          key={key}
+                          type="button"
+                          onClick={() => {
+                            const current = newItem?.availability_time || [];
+                            const next = selected
+                              ? current.filter(x => x !== key)
+                              : [...current, key];
+                            setNewItem(prev => ({ ...prev, availability_time: next }));
+                          }}
+                          className={`px-3 py-1.5 rounded-lg text-sm border transition-all ${selected
+                              ? 'bg-action-primary text-white border-action-primary'
+                              : 'bg-bg-tertiary border-border-default text-text-primary hover:border-action-primary'
+                            }`}
+                        >
+                          {t.name} {t.start && t.end ? `(${t.start}–${t.end})` : ''}
+                        </button>
+                      );
+                    })}
+                  </div>
+                  {(newItem?.availability_time || []).length === 0 && (
+                    <p className="text-xs text-text-secondary mt-1">No timing selected = available all day</p>
+                  )}
+                </div>
+              )}
+              {/* Unit Price & Discount */}
               <div className="grid grid-cols-2 gap-4">
                 <div>
                   <label className="block text-sm font-medium mb-2 text-text-primary">
@@ -185,8 +297,10 @@ const UniversalAddModal = ({
 
               {/* Zone pricing */}
               <div>
-                <label className="block text-sm font-medium mb-2 text-text-primary">Pricing by Zone & Section</label>
-                <p className="text-xs text-gray-400 mb-2">Leave blank to use the price above for all zones.</p>
+                <label className="block text-sm font-medium mb-2 text-text-primary">
+                  Pricing by Zone & Section
+                </label>
+                {/* Base price row — already exists above, just keep it */}
                 {configs.map(c => (
                   <div key={c.id} className="flex items-center justify-between gap-3 px-3 py-2 mb-1 rounded-xl border border-border-default bg-bg-tertiary">
                     <span className="text-sm font-medium text-text-primary">
@@ -204,13 +318,30 @@ const UniversalAddModal = ({
                   </div>
                 ))}
               </div>
-
-              {/* Serving & Code */}
+              {/* Code & Unit */}
               <div className="grid grid-cols-2 gap-4">
                 <div>
                   <label className="block text-sm font-medium mb-2 text-text-primary">Serving Quantity</label>
                   <input type="number" value={newItem?.serving_quantity ?? ''} onChange={e => setNewItem(prev => ({ ...(prev || {}), serving_quantity: e.target.value }))}
                     className="w-full px-4 py-2 rounded-lg bg-bg-tertiary border border-border-default text-text-primary focus:outline-none focus:ring-2 focus:ring-action-primary" placeholder="0" />
+                </div>
+                <div>
+                  <label className="block text-sm font-medium mb-2 text-text-primary">
+                    Availability
+                  </label>
+                  <input
+                    type="number"
+                    step="0.01"
+                    value={newItem?.availability ?? ''}
+                    onChange={(e) =>
+                      setNewItem(prev => ({
+                        ...(prev || {}),
+                        availability: e.target.value
+                      }))
+                    }
+                    className="w-full px-4 py-2 rounded-lg bg-bg-tertiary border border-border-default"
+                    placeholder="Enter stock / quantity"
+                  />
                 </div>
                 <div>
                   <label className="block text-sm font-medium mb-2 text-text-primary">Serving Unit</label>

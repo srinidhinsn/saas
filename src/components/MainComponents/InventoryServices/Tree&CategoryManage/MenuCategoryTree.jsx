@@ -149,10 +149,8 @@ const generateCategoryId = (name, parentName) => {
   };
   useEffect(() => {
     if (!displayCategories.length) return;
-  
     // Only expand top-level categories
     const topLevelIds = displayCategories.map(cat => cat.id);
-  
     setExpandedCategories(topLevelIds);
   }, [displayCategories]);
   // useEffect(() => {
@@ -394,9 +392,7 @@ const generateCategoryId = (name, parentName) => {
       position === "inside"
         ? targetCat.id
         : findParentIdFromTree(categories, targetCat.id);
-  
     if (!draggedParentId || !targetParentId) return;
-  
     const getChildrenIds = (parentId) => {
       const findNode = (nodes) => {
         for (const n of nodes) {
@@ -410,45 +406,34 @@ const generateCategoryId = (name, parentName) => {
       };
       return findNode(categories)?.children?.map(c => c.id) || [];
     };
-  
     const isSameParent = draggedParentId === targetParentId;
-  
     // Get original lists BEFORE any mutation
     let oldList = getChildrenIds(draggedParentId);
     let newList = isSameParent ? [...oldList] : getChildrenIds(targetParentId);
-  
     if (position === "inside") {
       oldList = oldList.filter(id => id !== draggedCat.id);
       const insideList = getChildrenIds(targetCat.id);
       insideList.push(draggedCat.id);
-  
       await updateCategorySubcategories(draggedParentId, oldList);
       await updateCategorySubcategories(targetCat.id, insideList);
       onCategoriesUpdate?.();
       return;
     }
-  
     // Find target's index BEFORE removing the dragged item
     const targetIndex = newList.indexOf(targetCat.id);
-  
     // Remove dragged from both
     oldList = oldList.filter(id => id !== draggedCat.id);
     newList = newList.filter(id => id !== draggedCat.id);
-  
     // Re-find target after removal (target itself didn't move)
     const adjustedTargetIndex = newList.indexOf(targetCat.id);
-  
     // Calculate insert position
     let insertIndex =
       position === "above"
         ? adjustedTargetIndex
         : adjustedTargetIndex + 1;
-  
     // Clamp — this is what fixes dragging to very top (0) or very bottom (length)
     insertIndex = Math.max(0, Math.min(insertIndex, newList.length));
-  
     newList.splice(insertIndex, 0, draggedCat.id);
-  
     if (isSameParent) {
       // Same parent — only one update needed with the reordered list
       await updateCategorySubcategories(draggedParentId, newList);
@@ -456,7 +441,6 @@ const generateCategoryId = (name, parentName) => {
       await updateCategorySubcategories(draggedParentId, oldList);
       await updateCategorySubcategories(targetParentId, newList);
     }
-  
     onCategoriesUpdate?.();
   };
 
@@ -623,26 +607,26 @@ const generateCategoryId = (name, parentName) => {
   // ── handleAddCategory ────────────────────────────────────────────────────────
   const handleAddCategory = async () => {
     if (!newCategoryName.trim()) return;
-  
+
     let userId = "system";
     try {
       userId = jwtDecode(token)?.user_id || userId;
     } catch { }
-  
+
     // Find root node
     const rootNode = categories.find(
       cat =>
         String(cat.id).toLowerCase() === String(menuConfig.root).toLowerCase() ||
         String(cat.name).toLowerCase() === String(menuConfig.root).toLowerCase()
     );
-  
+
     // Always attach directly under root — not under root's first child
     const parentId = rootNode?.id || menuConfig.root;
     const parentName = rootNode?.name || menuConfig.root;
-  
+
     // Generate ID using root's name as parent
     const newId = generateCategoryId(newCategoryName, parentName);
-  
+
     try {
       // 1️⃣ Create the new category
       await axios.post(
@@ -658,11 +642,11 @@ const generateCategoryId = (name, parentName) => {
         },
         { headers: { Authorization: `Bearer ${token}` } }
       );
-  
+
       // 2️⃣ Attach directly under root
       const parent = await fetchCategoryById(parentId);
       const existingSubs = parent?.subCategories?.map(c => c.id) || [];
-  
+
       await axios.post(
         `${import.meta.env.VITE_API_INVENTORY_SERVICE_URL}/${clientId}/menu/update_category`,
         {
@@ -675,10 +659,10 @@ const generateCategoryId = (name, parentName) => {
         },
         { headers: { Authorization: `Bearer ${token}` } }
       );
-  
+
       // 3️⃣ Build slug from root down
       const slug = await buildSlugFromParentChain(newCategoryName, parentId);
-  
+
       // 4️⃣ Save slug on new category
       await axios.post(
         `${import.meta.env.VITE_API_INVENTORY_SERVICE_URL}/${clientId}/menu/update_category`,
@@ -692,10 +676,10 @@ const generateCategoryId = (name, parentName) => {
         },
         { headers: { Authorization: `Bearer ${token}` } }
       );
-  
+
       closeAddModal();
       onCategoriesUpdate?.();
-  
+
     } catch (err) {
       console.error(err);
     }
@@ -714,10 +698,10 @@ const generateCategoryId = (name, parentName) => {
       let finalSubs = editingCategory.children?.map(c => c.id) || [];
 
       if (editNewSubcategoryName.trim()) {
-      const newSubId = generateCategoryId(
-  editNewSubcategoryName,
-  editingCategory.name
- );
+        const newSubId = generateCategoryId(
+          editNewSubcategoryName,
+          editingCategory.name
+        );
         await axios.post(
           `${import.meta.env.VITE_API_INVENTORY_SERVICE_URL}/${clientId}/menu/create_category`,
           {
@@ -892,6 +876,43 @@ const generateCategoryId = (name, parentName) => {
     });
   };
 
+  const handleReorderByIndex = async (category, newIndex) => {
+    const parentId = findParentIdFromTree(categories, category.id);
+    if (!parentId) return;
+
+    // 🔥 IMPORTANT: use LOCAL TREE (not API)
+    const getChildrenIds = (parentId) => {
+      const findNode = (nodes) => {
+        for (const n of nodes) {
+          if (n.id === parentId) return n;
+          if (n.children) {
+            const found = findNode(n.children);
+            if (found) return found;
+          }
+        }
+        return null;
+      };
+      return findNode(categories)?.children?.map(c => c.id) || [];
+    };
+
+    let list = getChildrenIds(parentId);
+
+    // Remove current
+    list = list.filter(id => id !== category.id);
+
+    // Convert 1-based → 0-based
+    const index = Math.max(0, newIndex - 1);
+
+    // Clamp
+    const finalIndex = Math.min(index, list.length);
+
+    // Insert
+    list.splice(finalIndex, 0, category.id);
+
+    await updateCategorySubcategories(parentId, list);
+
+    onCategoriesUpdate?.();
+  };
   const renderTree = (items, level = 0) =>
     items.map((category, index) => {
       const hasChildren = category.children?.length > 0;
@@ -917,6 +938,7 @@ const generateCategoryId = (name, parentName) => {
             onDragEnd={handleDragEnd}
             isDragging={isDragging}
             dragOverPosition={isDragOver ? dragOverPosition : null}
+            onReorderByIndex={handleReorderByIndex}
           />
 
           {hasChildren && expandedCategories.includes(category.id) && (
