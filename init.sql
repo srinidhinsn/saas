@@ -898,6 +898,6 @@ WHERE id = 'tables' AND client_id = 'saas';
 -- inventory-service
 UPDATE category
 SET sub_categories = array_cat(sub_categories, ARRAY['item-types'])
-WHERE id = 'tables' AND client_id = 'saas';
+WHERE id = 'inventory' AND client_id = 'saas';
 
 ALTER TABLE inventory ALTER COLUMN id DROP DEFAULT;   -- stopping the sequence of inventory table's id
