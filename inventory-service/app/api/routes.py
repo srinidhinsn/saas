@@ -9,8 +9,8 @@ from entity.inventory_entity import InventoryEntity, CategoryEntity, InventoryTr
 from models.response_model import ResponseModel
 from models.saas_context import SaasContext
 from utils.auth import verify_token
-from services import service
-from services.service import _compute_current_stock, _record_transaction, _convert
+from ..services import service
+from ..services.service import _compute_current_stock, _record_transaction, _convert
 
 # -------------------- CONFIG --------------------
 router = APIRouter()
