@@ -1851,6 +1851,10 @@ const TakeOrder = ({ clientId, token, onOrderUpdate, realm }) => {
 
       setCart(reconstructedCart);
       setSelectedTable(table.id.toString());
+      const matchedSection = sections.find(
+  s => s.zone === table.location_zone && s.section === table.section
+);
+setZoneConfigId(matchedSection ? matchedSection.id : null);
       setOrderMode('dinein');
       setActiveOrderId(activeOrder.id);
       setActiveDineinOrderId(activeOrder.dinein_order_id);
