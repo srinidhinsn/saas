@@ -4,7 +4,7 @@ import { useParams } from 'react-router-dom';
 import { toast } from 'react-toastify';
 import 'react-toastify/dist/ReactToastify.css';
 import { FaCheckCircle, FaClock, FaHourglassHalf } from 'react-icons/fa';
-import { Filter, Clock, Users, Package, Truck, Trash2, BarChart2, X, ChevronDown, ChevronUp } from 'lucide-react';
+import { Filter, Clock, Users, Package, Truck, Trash2, BarChart2, X } from 'lucide-react';
 
 // ─── Constants ─────────────────────────────────────────────────────────────────
 
@@ -249,12 +249,10 @@ const AggregatePanel = ({ cards, tablesMap, onClose }) => {
   );
 };
 
-// ─── REQ 1: ComboComponentsList — collapsible inline display in a KDS card ───
-// Shows what's included in a combo item directly on the kitchen card.
+// ─── FIX 4: ComboComponentsList — now shows items DIRECTLY (no expand/collapse)
+// Also used for addon display below main items on the KDS card.
 
 const ComboComponentsList = ({ item, menuItemsMap }) => {
-  const [expanded, setExpanded] = useState(false);
-
   const componentIds = item.line_item_id;
   if (!componentIds || !Array.isArray(componentIds) || componentIds.length === 0) return null;
 
@@ -263,40 +261,25 @@ const ComboComponentsList = ({ item, menuItemsMap }) => {
     .filter(Boolean);
 
   if (components.length === 0) {
-    // IDs present but items not in map — show IDs as fallback
+    // IDs present but items not in map — show count as fallback
     return (
       <div className="mt-1 pl-2 border-l-2 border-violet-200">
         <p className="text-[10px] text-violet-500 font-semibold">
-          Combo · {componentIds.length} items
+          {componentIds.length} included items
         </p>
       </div>
     );
   }
 
+  // FIX 4: Always expanded — no toggle button
   return (
-    <div className="mt-1">
-      <button
-        type="button"
-        onClick={() => setExpanded(e => !e)}
-        className="flex items-center gap-1 text-[10px] font-semibold text-violet-600 hover:text-violet-800 transition-colors"
-      >
-        <span className="px-1.5 py-0.5 bg-violet-100 rounded-full">
-          Combo · {components.length} items
-        </span>
-        {expanded ? <ChevronUp size={11} /> : <ChevronDown size={11} />}
-      </button>
-      {expanded && (
-        <div className="mt-1 pl-2 border-l-2 border-violet-200 space-y-0.5">
-          {components.map((c, i) => (
-            <div key={c.id || i} className="flex items-center justify-between">
-              <span className="text-[10px] text-gray-600">↳ {c.name}</span>
-              <span className="text-[10px] text-violet-500 font-semibold ml-2">
-                ₹{Number(c.unit_price).toFixed(0)}
-              </span>
-            </div>
-          ))}
+    <div className="mt-1 pl-2 border-l-2 border-violet-200 space-y-0.5">
+      {components.map((c, i) => (
+        <div key={c.id || i} className="flex items-center justify-between">
+          <span className="text-xs text-gray-600">↳ {c.name}</span>
+         
         </div>
-      )}
+      ))}
     </div>
   );
 };
@@ -306,7 +289,7 @@ const ComboComponentsList = ({ item, menuItemsMap }) => {
 const KitchenCard = ({
   card,
   tablesMap,
-  menuItemsMap,          // REQ 1: map of id → menu item for combo lookup
+  menuItemsMap,
   onItemStatusChange,
   onDeleteItem,
   onMarkAsServed,
@@ -348,10 +331,11 @@ const KitchenCard = ({
       {/* ── Card body — item list ── */}
       <div className="bg-bg-primary px-4 py-4 space-y-3 flex-1">
         {(card.items || []).map((item, idx) => {
-          // REQ 1: detect if this item is a combo by checking line_item_id on
-          // the menu item record (KDS item rows carry item_id, not line_item_id)
           const menuRecord = menuItemsMap[Number(item.item_id)] || menuItemsMap[String(item.item_id)];
-          const isCombo = menuRecord?.line_item_id?.length > 0;
+          // FIX 6: An item is a combo only if its menu record has line_item_id AND
+          // the item itself is not an addon (is_addon flag). This prevents addon
+          // items from being shown with the combo badge.
+          const isCombo = !item.is_addon && menuRecord?.line_item_id?.length > 0;
 
           return (
             <div key={item.id || idx} className="flex flex-col w-full rounded-lg bg-white">
@@ -363,17 +347,12 @@ const KitchenCard = ({
                         <span className="mr-1">{item.quantity} x</span>
                         <span>{item.item_name || 'Unnamed Item'}</span>
                       </span>
-                      {/* REQ 1: Combo badge on the item row */}
-                      {isCombo && (
-                        <span className="shrink-0 text-[9px] font-bold px-1.5 py-0.5 bg-violet-100 text-violet-700 rounded-full">
-                          COMBO
-                        </span>
-                      )}
+                      {/* FIX 4 & 6: No combo badge shown — components appear directly below */}
                     </div>
                   </div>
                 </div>
 
-                {/* Status buttons */}
+                {/* Status buttons — only for non-addon items or if addon show status inline */}
                 <div className="flex items-center gap-1 ml-3">
                   <button
                     type="button"
@@ -410,24 +389,24 @@ const KitchenCard = ({
                       className={item.status === 'ready' ? 'text-green-500' : 'text-gray-400'}
                     />
                   </button>
-
-                  <button
-                    type="button"
-                    onClick={() => onDeleteItem(card.card_id, item)}
-                    title="Remove item"
-                    className="p-2 rounded-md hover:bg-red-50 transition-colors"
-                  >
-                    <Trash2 size={18} className="text-red-400 hover:text-red-600" />
-                  </button>
                 </div>
               </div>
 
-              {/* REQ 1: Combo component list (collapsible) */}
+              {/* FIX 4: Combo components shown directly (no expand/collapse toggle)
+                  FIX 6: Only shown for actual combo items, not addons */}
               {isCombo && (
                 <ComboComponentsList
                   item={menuRecord}
                   menuItemsMap={menuItemsMap}
                 />
+              )}
+
+              {/* FIX 2 / 6: Show addon label below its parent on KDS
+                  Addons sent with is_addon: true appear as sub-rows */}
+              {item.is_addon && (
+                <div className="mt-0.5 pl-2 border-l-2 border-blue-200">
+                  <span className="text-[10px] text-blue-500 font-semibold">↳ add-on</span>
+                </div>
               )}
             </div>
           );
@@ -439,17 +418,6 @@ const KitchenCard = ({
         <span className={`text-l font-semibold uppercase ${statusColorClass}`}>
           {allReady ? 'ready' : card.status}
         </span>
-
-        {/* Mark as Served button — only when all items are ready */}
-        {allReady && (
-          <button
-            type="button"
-            onClick={() => onMarkAsServed(card)}
-            className="px-3 py-1.5 rounded-lg bg-green-600 hover:bg-green-700 text-white text-xs font-bold transition-colors"
-          >
-            Mark as Served
-          </button>
-        )}
       </div>
     </div>
   );
@@ -463,7 +431,6 @@ const KitchenDisplay = () => {
 
   const [cards, setCards] = useState([]);
   const [tablesMap, setTablesMap] = useState({});
-  // REQ 1: store all menu items indexed by id for combo lookup
   const [menuItemsMap, setMenuItemsMap] = useState({});
   const [loading, setLoading] = useState(true);
   const [orderFilter, setOrderFilter] = useState('ALL');
@@ -493,12 +460,10 @@ const KitchenDisplay = () => {
       .catch(() => toast.error('Failed to fetch tables'));
   }, [clientId, token]);
 
-  // ─── REQ 1: Fetch menu items for combo component resolution ───────────────
+  // ─── Fetch menu items for combo component resolution ──────────────────────
 
   useEffect(() => {
     if (!token || !clientId) return;
-    // We need the full menu to resolve line_item_id on combo items.
-    // Use the inventory/read endpoint as a lightweight source of all items.
     axios
       .get(`${import.meta.env.VITE_API_INVENTORY_SERVICE_URL}/${clientId}/inventory/read`, {
         headers: { Authorization: `Bearer ${token}` },
@@ -513,7 +478,6 @@ const KitchenDisplay = () => {
       })
       .catch((err) => {
         console.warn('[KDS] Failed to fetch menu items for combo lookup:', err);
-        // Non-fatal — cards still display without combo detail
       });
   }, [clientId, token]);
 
@@ -521,7 +485,6 @@ const KitchenDisplay = () => {
 
   useEffect(() => {
     if (!token || !clientId) return;
-    // Try the menu/read endpoint which has line_item_id
     axios
       .get(`${import.meta.env.VITE_API_INVENTORY_SERVICE_URL}/${clientId}/menu/read`, {
         headers: { Authorization: `Bearer ${token}` },
@@ -530,7 +493,6 @@ const KitchenDisplay = () => {
       .then((res) => {
         const map = {};
         (res.data?.data || []).forEach((item) => {
-          // Prefer menu items over inventory items (richer, has line_item_id)
           map[Number(item.id)] = item;
           map[String(item.id)] = item;
         });
@@ -692,6 +654,8 @@ const KitchenDisplay = () => {
         client_id: clientId,
         order_id: card.sub_order_id,
         frontend_unique_key: item.frontend_unique_key || null,
+        is_addon: item.is_addon || false,
+        parent_item_key: item.parent_item_key || null,
       }));
 
       await axios.post(
@@ -730,149 +694,6 @@ const KitchenDisplay = () => {
     }
   };
 
-  // ─── Mark as Served ────────────────────────────────────────────────────────
-
-  const handleMarkAsServed = async (card) => {
-    try {
-      const servedItems = (card.items || []).map((item) => ({
-        id: item.id,
-        item_id: item.item_id,
-        item_name: item.item_name,
-        quantity: item.quantity,
-        status: KDS_CONFIG.STATUS.SERVED,
-        note: item.note || '',
-        slug: item.slug || '',
-        unit_price: item.unit_price || 0,
-        line_total: (item.unit_price || 0) * (item.quantity || 1),
-        client_id: clientId,
-        order_id: card.sub_order_id,
-        frontend_unique_key: item.frontend_unique_key || null,
-      }));
-
-      await axios.post(
-        `${import.meta.env.VITE_API_ORDER_SERVICE_URL}/${clientId}/order_items/update?order_id=${card.sub_order_id}`,
-        servedItems,
-        { headers: { Authorization: `Bearer ${token}` } }
-      );
-
-      await axios.post(
-        `${import.meta.env.VITE_API_ORDER_SERVICE_URL}/${clientId}/dinein/update`,
-        { id: card.sub_order_id, status: KDS_CONFIG.STATUS.SERVED },
-        { headers: { Authorization: `Bearer ${token}` } }
-      );
-
-      window.dispatchEvent(
-        new CustomEvent('orderCollect', {
-          detail: {
-            tableName: tablesMap[card.table_id] || KDS_CONFIG.DEFAULT_UNKNOWN_LABEL,
-            orderId: card.sub_order_id,
-          },
-        })
-      );
-
-      toast.success(`Order #${card.dinein_order_id} marked as served!`);
-      setCards((prev) => prev.filter((c) => c.card_id !== card.card_id));
-    } catch (err) {
-      console.error('[handleMarkAsServed]', err);
-      toast.error('Failed to mark as served');
-    }
-  };
-
-  // ─── Delete individual item ────────────────────────────────────────────────
-
-  const handleDeleteItem = (cardId, item) => {
-    setItemToDelete({ cardId, item });
-    setShowDeleteItemModal(true);
-  };
-
-  const confirmDeleteItem = async () => {
-    if (!itemToDelete) return;
-    const { cardId, item } = itemToDelete;
-    const card = cards.find((c) => c.card_id === cardId);
-    if (!card) { setShowDeleteItemModal(false); setItemToDelete(null); return; }
-
-    const remainingItems = (card.items || []).filter(
-      (i) => String(i.id) !== String(item.id)
-    );
-    const isLastItem = remainingItems.length === 0;
-
-    try {
-      await axios.delete(
-        `${import.meta.env.VITE_API_ORDER_SERVICE_URL}/${clientId}/order_item/delete`,
-        {
-          params: { order_item_id: item.id },
-          headers: { Authorization: `Bearer ${token}` },
-        }
-      );
-
-      if (isLastItem) {
-        await axios.delete(
-          `${import.meta.env.VITE_API_ORDER_SERVICE_URL}/${clientId}/dinein/delete`,
-          {
-            params: { dinein_order_id: card.sub_order_id, client_id: clientId },
-            headers: { Authorization: `Bearer ${token}` },
-          }
-        );
-        setCards((prev) => prev.filter((c) => c.card_id !== cardId));
-      } else {
-        setCards((prev) =>
-          prev.map((c) =>
-            c.card_id !== cardId
-              ? c
-              : { ...c, items: remainingItems, status: deriveStatus(remainingItems) }
-          )
-        );
-      }
-
-      toast.success(
-        isLastItem
-          ? `"${item.item_name}" removed — empty order deleted`
-          : `"${item.item_name}" removed from order`
-      );
-    } catch (err) {
-      console.error(err);
-      toast.error('Failed to remove item');
-    } finally {
-      setShowDeleteItemModal(false);
-      setItemToDelete(null);
-    }
-  };
-
-  // ─── Delete entire order ───────────────────────────────────────────────────
-
-  const confirmDeleteCard = async () => {
-    if (!cardToDelete) return;
-    try {
-      await axios.delete(
-        `${import.meta.env.VITE_API_ORDER_SERVICE_URL}/${clientId}/dinein/delete`,
-        {
-          params: { dinein_order_id: cardToDelete.sub_order_id, client_id: clientId },
-          headers: { Authorization: `Bearer ${token}` },
-        }
-      );
-
-      if (!cardToDelete.is_sub_order) {
-        const prefix = String(cardToDelete.dinein_order_id) + '-';
-        setCards((prev) =>
-          prev.filter(
-            (c) =>
-              c.card_id !== cardToDelete.card_id &&
-              !String(c.dinein_order_id || '').startsWith(prefix)
-          )
-        );
-      } else {
-        setCards((prev) => prev.filter((c) => c.card_id !== cardToDelete.card_id));
-      }
-
-      toast.success('Order deleted');
-    } catch (err) {
-      console.error(err);
-      toast.error('Failed to delete order');
-    } finally {
-      setShowDeleteOrderModal(false);
-      setCardToDelete(null);
-    }
-  };
 
   // ─── Filter cards ──────────────────────────────────────────────────────────
 
@@ -939,8 +760,6 @@ const KitchenDisplay = () => {
                     tablesMap={tablesMap}
                     menuItemsMap={menuItemsMap}
                     onItemStatusChange={handleItemStatusChange}
-                    onDeleteItem={handleDeleteItem}
-                    onMarkAsServed={handleMarkAsServed}
                   />
                 ))}
               </div>
@@ -949,20 +768,6 @@ const KitchenDisplay = () => {
         </div>
       </div>
 
-      {/* ── Modals ── */}
-      <DeleteItemModal
-        isOpen={showDeleteItemModal}
-        itemName={itemToDelete?.item?.item_name}
-        onClose={() => { setShowDeleteItemModal(false); setItemToDelete(null); }}
-        onConfirm={confirmDeleteItem}
-      />
-
-      <DeleteOrderModal
-        isOpen={showDeleteOrderModal}
-        cardToDelete={cardToDelete}
-        onClose={() => { setShowDeleteOrderModal(false); setCardToDelete(null); }}
-        onConfirm={confirmDeleteCard}
-      />
 
       {showAggregate && (
         <AggregatePanel
