@@ -1906,7 +1906,7 @@ setZoneConfigId(matchedSection ? matchedSection.id : null);
       name: item.name,
       unit_price: item.unit_price || 0,
       image_id: item.image_id,
-      discount: item.discount || 0,
+      unit_price: (item.unit_price || 0) - (item.discount || 0),
       slug: item.slug,
       category: item.category_name,
       category_id: item.category_id || null,
