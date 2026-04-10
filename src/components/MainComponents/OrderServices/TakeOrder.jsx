@@ -1904,7 +1904,6 @@ setZoneConfigId(matchedSection ? matchedSection.id : null);
     return {
       id: Number(item.id),
       name: item.name,
-      unit_price: item.unit_price || 0,
       image_id: item.image_id,
       unit_price: (item.unit_price || 0) - (item.discount || 0),
       slug: item.slug,
