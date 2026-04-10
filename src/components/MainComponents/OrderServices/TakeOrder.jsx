@@ -2315,7 +2315,7 @@ const TakeOrder = ({ clientId, token, onOrderUpdate, realm }) => {
     goToOrderView();
   };
 
-const handleViewOrder = async (table) => {
+  const handleViewOrder = async (table) => {
     if (menuItems.length === 0) {
       alert('Menu still loading...');
       return;
@@ -2342,6 +2342,7 @@ const handleViewOrder = async (table) => {
         const menuItem = menuItems.find(mi => Number(mi.id) === Number(item.item_id));
         return {
           id: Number(item.item_id),
+          order_item_id: item.id,
           name: item.item_name || menuItem?.name || 'Unnamed Item',
           unit_price: item.unit_price || menuItem?.unit_price || 0,
           quantity: item.quantity || 1,
@@ -2364,9 +2365,9 @@ const handleViewOrder = async (table) => {
       setCart(reconstructedCart);
       setSelectedTable(table.id.toString());
       const matchedSection = sections.find(
-  s => s.zone === table.location_zone && s.section === table.section
-);
-setZoneConfigId(matchedSection ? matchedSection.id : null);
+        s => s.zone === table.location_zone && s.section === table.section
+      );
+      setZoneConfigId(matchedSection ? matchedSection.id : null);
       setOrderMode('dinein');
       setActiveOrderId(activeOrder.id);
       setActiveDineinOrderId(activeOrder.dinein_order_id);
@@ -2548,15 +2549,15 @@ setZoneConfigId(matchedSection ? matchedSection.id : null);
           slug: item.slug || menuItem?.slug,
           category: menuItem?.category_name,
           category_id: menuItem?.category_id || null,
-          frontend_unique_key: item.frontend_unique_key,
+          frontend_unique_key: item.frontend_unique_key || String(item.id),
           batch_timestamp: null,
           is_new_item: false,
           saved_sub_order: true,
           status: item.status || 'pending',
           batch_label: item.batch_label,
           sub_order_id: item.sub_order_id,
-          is_addon: false,
-          parent_item_key: null,
+          is_addon: item.is_addon || false,
+          parent_item_key: item.parent_item_key || null,
         };
       });
 
@@ -2598,6 +2599,34 @@ setZoneConfigId(matchedSection ? matchedSection.id : null);
       );
 
       const newQty = item.quantity - removeQty;
+
+      if (newQty <= 0 && !item.is_addon) {
+        const parentKeys = new Set([
+          item.frontend_unique_key,
+          String(item.order_item_id),
+          item.parent_item_key,
+        ].filter(Boolean));
+        const addonItems = cart.filter(
+          i => i.order_item_id && i.parent_item_key && parentKeys.has(i.parent_item_key)
+        );
+        if (addonItems.length > 0) {
+          await Promise.all(addonItems.map(addon =>
+            axios.delete(
+              `${import.meta.env.VITE_API_ORDER_SERVICE_URL}/${clientId}/order_item/delete`,
+              {
+                params: {
+                  client_id: clientId,
+                  order_item_id: addon.order_item_id,
+                  transaction_type: transactionType,
+                  reason: reason || undefined,
+                },
+                headers: { Authorization: `Bearer ${token}` },
+              }
+            )
+          ));
+        }
+      }
+
       toast.success(
         newQty > 0
           ? `Quantity reduced to ${newQty}. (${transactionType})`
@@ -2622,18 +2651,35 @@ setZoneConfigId(matchedSection ? matchedSection.id : null);
 
     try {
       setLoading(true);
-      await axios.delete(
-        `${import.meta.env.VITE_API_ORDER_SERVICE_URL}/${clientId}/order_item/delete`,
-        {
-          params: {
-            client_id: clientId,
-            order_item_id: item.order_item_id,
-            transaction_type: transactionType,
-            reason: reason || undefined,
-          },
-          headers: { Authorization: `Bearer ${token}` },
-        }
-      );
+
+      const parentKeys = new Set([
+        item.frontend_unique_key,
+        String(item.order_item_id),
+        item.parent_item_key,
+      ].filter(Boolean));
+      const itemsToDelete = item.is_addon
+        ? [item]
+        : [
+            item,
+            ...cart.filter(
+              i => i.order_item_id && i.parent_item_key && parentKeys.has(i.parent_item_key)
+            ),
+          ];
+
+      await Promise.all(itemsToDelete.map(targetItem =>
+        axios.delete(
+          `${import.meta.env.VITE_API_ORDER_SERVICE_URL}/${clientId}/order_item/delete`,
+          {
+            params: {
+              client_id: clientId,
+              order_item_id: targetItem.order_item_id,
+              transaction_type: transactionType,
+              reason: reason || undefined,
+            },
+            headers: { Authorization: `Bearer ${token}` },
+          }
+        )
+      ));
 
       toast.success('Item removed.');
       await reloadCartFromServer(activeOrderId);
@@ -2644,14 +2690,13 @@ setZoneConfigId(matchedSection ? matchedSection.id : null);
       setLoading(false);
     }
   };
-
   // ─────────────────────────────────────────────────────────────────────────
   // Item click — addon/combo detection
   // ─────────────────────────────────────────────────────────────────────────
 
   const handleItemClick = (item) => {
 
-     if (item.category_id === 'Combos') {
+    if (item.category_id === 'Combos') {
       // Add the item to the cart directly
       addToCart(item);
       return; // Exit early without opening the modal
@@ -3161,6 +3206,7 @@ setZoneConfigId(matchedSection ? matchedSection.id : null);
       String(i.code || '').toLowerCase().includes(q)
     );
   }, [menuItems, selectedCategoryId, searchQuery, selectedDietary, timingOptions, isItemActive, getCategoryAndChildrenIds]);
+
   const oldItems = cart.filter(i => !i.is_new_item || i.saved_sub_order);
   const newItems = cart.filter(i => i.is_new_item && !i.saved_sub_order);
   const groupedNewItems = newItems.reduce((acc, item) => {
