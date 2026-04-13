@@ -91,7 +91,7 @@ export default function InvoiceModal({
   tablesMap,
   inventoryMap,
   onClose,
-  onSave,
+  onSave
 }) {
   const [selectedOrder, setSelectedOrder] = useState(initialOrder);
   const [invoiceDraftId, setInvoiceDraftId] = useState(null);
@@ -117,16 +117,28 @@ export default function InvoiceModal({
 
   const orderSubtotal = Number(
     (selectedOrder?.items || []).reduce(
-      (sum, item) => sum + (Number(item.unit_price) || 0) * (Number(item.quantity) || 0),
-      0
+      (sum, item) =>
+        sum + (Number(item.unit_price) || 0) * (Number(item.quantity) || 0), 0
     ).toFixed(2)
   );
-  const calculatedGST = Number((orderSubtotal * (taxPercent / 100)).toFixed(2));
-  const amountAfterTax = Number((orderSubtotal + calculatedGST).toFixed(2));
+  // 2️⃣ GST on subtotal
+  const calculatedGST = Number(
+    (orderSubtotal * (taxPercent / 100)).toFixed(2)
+  );
+
+  // 3️⃣ Amount after tax
+  const amountAfterTax = Number(
+    (orderSubtotal + calculatedGST).toFixed(2)
+  );
+
+  // 4️⃣ Discount on final amount (after tax)
   const calculatedDiscount = discountIsPercent
     ? Number(((amountAfterTax * discount) / 100).toFixed(2))
     : Number(discount);
-  const calculatedTotal = Number((amountAfterTax - calculatedDiscount).toFixed(2));
+  const calculatedTotal = Number(
+    (amountAfterTax - calculatedDiscount).toFixed(2)
+  );
+   
   const total = calculatedTotal;
 
   // ─── Split payment helpers ─────────────────────────────────────────────────
@@ -249,7 +261,7 @@ export default function InvoiceModal({
         (a, b) =>
           (b.document_version || 1) - (a.document_version || 1) ||
           new Date(b.updated_at || b.created_at || 0) -
-            new Date(a.updated_at || a.created_at || 0)
+          new Date(a.updated_at || a.created_at || 0)
       );
       return filtered[0] || {};
     } catch (err) {
@@ -441,7 +453,7 @@ export default function InvoiceModal({
       // REQ 2: Update dine-in order invoice_status column with the current payment status.
       // Do NOT set order status to "served" here — only do that on payment confirmation.
 
-      console.log("Invoice status is",paymentStatus.toLowerCase())
+      console.log("Invoice status is", paymentStatus.toLowerCase())
       await axios.post(
         `${import.meta.env.VITE_API_ORDER_SERVICE_URL}/${clientId}/dinein/update`,
         {
@@ -991,11 +1003,10 @@ export default function InvoiceModal({
                           <button
                             key={statusOption}
                             type="button"
-                            className={`px-3 py-1.5 rounded-lg text-xs font-semibold transition-all ${
-                              paymentStatus === statusOption
-                                ? "bg-action-primary text-white shadow-md"
-                                : "bg-bg-tertiary text-text-secondary hover:bg-bg-secondary border border-border-default"
-                            }`}
+                            className={`px-3 py-1.5 rounded-lg text-xs font-semibold transition-all ${paymentStatus === statusOption
+                              ? "bg-action-primary text-white shadow-md"
+                              : "bg-bg-tertiary text-text-secondary hover:bg-bg-secondary border border-border-default"
+                              }`}
                             onClick={() => setPaymentStatus(statusOption)}
                           >
                             {statusOption}
@@ -1185,10 +1196,10 @@ export default function InvoiceModal({
               const paymentsToVerify = isSplit
                 ? response.completed_razorpay_payments
                 : [{
-                    razorpay_payment_id: response.razorpay_payment_id,
-                    razorpay_order_id: response.razorpay_order_id,
-                    razorpay_signature: response.razorpay_signature,
-                  }];
+                  razorpay_payment_id: response.razorpay_payment_id,
+                  razorpay_order_id: response.razorpay_order_id,
+                  razorpay_signature: response.razorpay_signature,
+                }];
 
               for (const p of paymentsToVerify) {
                 if (!p.razorpay_payment_id || !p.razorpay_order_id || !p.razorpay_signature) {

@@ -4,7 +4,7 @@ import { useParams } from 'react-router-dom';
 import { toast } from 'react-toastify';
 import 'react-toastify/dist/ReactToastify.css';
 import { FaCheckCircle, FaClock, FaHourglassHalf } from 'react-icons/fa';
-import { Filter, Clock, Users, Package, Truck, Trash2, BarChart2, X } from 'lucide-react';
+import { Filter, Clock, Users, Package, Truck, Trash2, BarChart2, X, ChevronRight } from 'lucide-react';
 
 // ─── Constants ─────────────────────────────────────────────────────────────────
 
@@ -26,6 +26,8 @@ const KDS_CONFIG = {
   DATE_FORMAT: 'en-CA',
   DEFAULT_TABLE_PREFIX: 'T-',
   DEFAULT_UNKNOWN_LABEL: 'Unknown',
+  // The category_id value used in your menu data to identify combo items
+  COMBO_CATEGORY_ID: 'Combos',
 };
 
 const ORDER_FILTER_OPTIONS = [
@@ -56,11 +58,20 @@ const calculateElapsedTime = (createdAt) => {
 
 const deriveStatus = (items) => {
   const { PENDING, PREPARING, READY } = KDS_CONFIG.STATUS;
-  if (!items?.length) return PENDING;
-  if (items.some((i) => i.status === PENDING))   return PENDING;
-  if (items.some((i) => i.status === PREPARING)) return PREPARING;
-  if (items.every((i) => i.status === READY || i.status === KDS_CONFIG.STATUS.SERVED)) return READY;
+  const activeItems = (items || []).filter((item) => {
+    const status = String(item?.status || '').toLowerCase();
+    return status !== 'cancelled' && status !== 'canceled';
+  });
+  if (!activeItems.length) return PENDING;
+  if (activeItems.some((i) => i.status === PENDING))   return PENDING;
+  if (activeItems.some((i) => i.status === PREPARING)) return PREPARING;
+  if (activeItems.every((i) => i.status === READY || i.status === KDS_CONFIG.STATUS.SERVED)) return READY;
   return PENDING;
+};
+
+const isCancelledStatus = (status) => {
+  const normalized = String(status || '').toLowerCase();
+  return normalized === 'cancelled' || normalized === 'canceled';
 };
 
 const minutesElapsed = (createdAt) => {
@@ -70,6 +81,28 @@ const minutesElapsed = (createdAt) => {
       ? createdAt.replace(' ', 'T').split('.')[0] + 'Z'
       : createdAt;
   return Math.floor((Date.now() - new Date(utcString).getTime()) / 60000);
+};
+
+// ─── Helper: is this order item a combo? ──────────────────────────────────────
+// Requires BOTH category_id === 'Combos' AND line_item_id present.
+// Addons also carry line_item_id so checking only line items is not enough.
+
+const isComboItem = (orderItem, menuRecord) => {
+  if (orderItem?.is_addon) return false;
+  if (!menuRecord) return false;
+
+  // Must have category_id matching 'Combos' — this is what separates combos
+  // from addons, which also carry line_item_id but belong to a different category.
+  const isComboCategoryId =
+    String(menuRecord.category_id || '').toLowerCase() ===
+    KDS_CONFIG.COMBO_CATEGORY_ID.toLowerCase();
+
+  // Must also have line items to actually display
+  const hasLineItems =
+    Array.isArray(menuRecord.line_item_id) && menuRecord.line_item_id.length > 0;
+
+  // AND — both conditions required
+  return isComboCategoryId && hasLineItems;
 };
 
 // ─── Modals ────────────────────────────────────────────────────────────────────
@@ -129,7 +162,7 @@ const AggregatePanel = ({ cards, tablesMap, onClose }) => {
     const tableLabel =
       tablesMap[card.table_id] || `${KDS_CONFIG.DEFAULT_TABLE_PREFIX}${card.table_id}`;
     (card.items || []).forEach((item) => {
-      if (item.status === KDS_CONFIG.STATUS.SERVED) return;
+      if (item.status === KDS_CONFIG.STATUS.SERVED || isCancelledStatus(item.status)) return;
       const name = item.item_name || 'Unnamed';
       if (!aggregateMap[name]) {
         aggregateMap[name] = { totalQty: 0, orders: [] };
@@ -249,29 +282,42 @@ const AggregatePanel = ({ cards, tablesMap, onClose }) => {
   );
 };
 
-// ─── FIX 4: ComboComponentsList — now shows items DIRECTLY (no expand/collapse)
-// Also used for addon display below main items on the KDS card.
+// ─── ComboComponentsList ───────────────────────────────────────────────────────
+// Shows the included line items of a combo directly below the main item row.
+// Industry standard KDS pattern: always-visible, indented, read-only sub-list.
 
-const ComboComponentsList = ({ item, menuItemsMap }) => {
-  const componentIds = item.line_item_id;
+const ComboComponentsList = ({ menuRecord, menuItemsMap }) => {
+  const componentIds = menuRecord?.line_item_id;
   if (!componentIds || !Array.isArray(componentIds) || componentIds.length === 0) return null;
 
   const components = componentIds
-    .map(id => menuItemsMap[Number(id)] || menuItemsMap[String(id)])
+    .map((id) => menuItemsMap[Number(id)] || menuItemsMap[String(id)])
     .filter(Boolean);
 
-  if (components.length === 0) {
-    // IDs present but items not in map — show count as fallback
-    return (
-      <div className="mt-1 pl-2 border-l-2 border-violet-200">
-        <p className="text-[10px] text-violet-500 font-semibold">
-          {componentIds.length} included items
-        </p>
-      </div>
-    );
-  }
-
-
+  return (
+    <div className="mt-1.5 ml-1 space-y-0.5">
+      {components.length > 0 ? (
+        components.map((comp, idx) => (
+          <div
+            key={comp.id || idx}
+            className="flex items-center gap-1.5 pl-3 border-l-2 border-violet-300 py-0.5"
+          >
+            <ChevronRight size={10} className="text-violet-400 flex-shrink-0" />
+            <span className="text-[11px] text-violet-700 font-medium leading-tight">
+              {comp.name || comp.item_name || `Item #${comp.id}`}
+            </span>
+          </div>
+        ))
+      ) : (
+        // IDs present but not resolved in map — show count as safe fallback
+        <div className="pl-3 border-l-2 border-violet-200 py-0.5">
+          <span className="text-[11px] text-violet-500 font-medium">
+            {componentIds.length} included item{componentIds.length !== 1 ? 's' : ''}
+          </span>
+        </div>
+      )}
+    </div>
+  );
 };
 
 // ─── KDS card ─────────────────────────────────────────────────────────────────
@@ -281,9 +327,10 @@ const KitchenCard = ({
   tablesMap,
   menuItemsMap,
   onItemStatusChange,
-  onDeleteItem,
-  onMarkAsServed,
 }) => {
+  // Track which item buttons are currently being saved to prevent double-clicks
+  const [pendingItemIds, setPendingItemIds] = useState(new Set());
+
   const elapsedTime = card.created_at ? calculateElapsedTime(card.created_at) : null;
 
   const allReady =
@@ -298,6 +345,20 @@ const KitchenCard = ({
         : card.status === KDS_CONFIG.STATUS.PREPARING
           ? 'text-orange-600'
           : '';
+
+  const handleStatusClick = async (cardId, itemId, newStatus) => {
+    if (pendingItemIds.has(itemId)) return; // debounce rapid taps
+    setPendingItemIds((prev) => new Set(prev).add(itemId));
+    try {
+      await onItemStatusChange(cardId, itemId, newStatus);
+    } finally {
+      setPendingItemIds((prev) => {
+        const next = new Set(prev);
+        next.delete(itemId);
+        return next;
+      });
+    }
+  };
 
   return (
     <div className="rounded-xl shadow-md overflow-hidden border border-gray-200 bg-white transition-transform transform hover:-translate-y-0.5 flex flex-col">
@@ -321,34 +382,40 @@ const KitchenCard = ({
       {/* ── Card body — item list ── */}
       <div className="bg-bg-primary px-4 py-4 space-y-3 flex-1">
         {(card.items || []).map((item, idx) => {
-          const menuRecord = menuItemsMap[Number(item.item_id)] || menuItemsMap[String(item.item_id)];
-          // FIX 6: An item is a combo only if its menu record has line_item_id AND
-          // the item itself is not an addon (is_addon flag). This prevents addon
-          // items from being shown with the combo badge.
-          const isCombo = !item.is_addon && menuRecord?.line_item_id?.length > 0;
+          const menuRecord =
+            menuItemsMap[Number(item.item_id)] || menuItemsMap[String(item.item_id)];
+
+          // Use category_name === 'Combos' as the primary signal (your requirement)
+          const combo = isComboItem(item, menuRecord);
+          const isPending = pendingItemIds.has(item.id);
+          const isCancelled = isCancelledStatus(item.status);
 
           return (
             <div key={item.id || idx} className="flex flex-col w-full rounded-lg bg-white">
               <div className="flex items-center w-full">
-                <div className="flex-1">
-                  <div className="flex items-center justify-between w-full gap-2">
-                    <div className="flex items-center gap-1.5 min-w-0">
-                      <span className="font-medium text-sm">
-                        <span className="mr-1">{item.quantity} x</span>
-                        <span>{item.item_name || 'Unnamed Item'}</span>
+                <div className="flex-1 min-w-0">
+                  <div className="flex items-center gap-1.5 flex-wrap">
+                    <span className="font-medium text-sm">
+                      <span className="mr-1">{item.quantity} x</span>
+                      <span>{item.item_name || 'Unnamed Item'}</span>
+                    </span>
+                    {/* Combo badge */}
+                    {combo && (
+                      <span className="text-[10px] bg-violet-100 text-violet-700 font-bold px-1.5 py-0.5 rounded-full leading-none">
+                        COMBO
                       </span>
-                      {/* FIX 4 & 6: No combo badge shown — components appear directly below */}
-                    </div>
+                    )}
                   </div>
                 </div>
 
-                {/* Status buttons — only for non-addon items or if addon show status inline */}
+                {/* Status buttons */}
                 <div className="flex items-center gap-1 ml-3">
                   <button
                     type="button"
-                    onClick={() => onItemStatusChange(card.card_id, item.id, KDS_CONFIG.STATUS.PENDING)}
+                    disabled={isPending || isCancelled}
+                    onClick={() => handleStatusClick(card.card_id, item.id, KDS_CONFIG.STATUS.PENDING)}
                     title="Mark as Pending"
-                    className="p-2 rounded-md hover:bg-gray-100 transition-colors"
+                    className={`p-2 rounded-md hover:bg-gray-100 transition-colors ${isPending || isCancelled ? 'opacity-40 cursor-not-allowed' : ''}`}
                   >
                     <FaClock
                       size={20}
@@ -358,9 +425,10 @@ const KitchenCard = ({
 
                   <button
                     type="button"
-                    onClick={() => onItemStatusChange(card.card_id, item.id, KDS_CONFIG.STATUS.PREPARING)}
+                    disabled={isPending || isCancelled}
+                    onClick={() => handleStatusClick(card.card_id, item.id, KDS_CONFIG.STATUS.PREPARING)}
                     title="Mark as Preparing"
-                    className="p-2 rounded-md hover:bg-gray-100 transition-colors"
+                    className={`p-2 rounded-md hover:bg-gray-100 transition-colors ${isPending || isCancelled ? 'opacity-40 cursor-not-allowed' : ''}`}
                   >
                     <FaHourglassHalf
                       size={20}
@@ -370,9 +438,10 @@ const KitchenCard = ({
 
                   <button
                     type="button"
-                    onClick={() => onItemStatusChange(card.card_id, item.id, KDS_CONFIG.STATUS.READY)}
+                    disabled={isPending || isCancelled}
+                    onClick={() => handleStatusClick(card.card_id, item.id, KDS_CONFIG.STATUS.READY)}
                     title="Mark as Ready"
-                    className="p-2 rounded-md hover:bg-gray-100 transition-colors"
+                    className={`p-2 rounded-md hover:bg-gray-100 transition-colors ${isPending || isCancelled ? 'opacity-40 cursor-not-allowed' : ''}`}
                   >
                     <FaCheckCircle
                       size={20}
@@ -382,17 +451,15 @@ const KitchenCard = ({
                 </div>
               </div>
 
-              {/* FIX 4: Combo components shown directly (no expand/collapse toggle)
-                  FIX 6: Only shown for actual combo items, not addons */}
-              {isCombo && (
+              {/* Combo line items — always visible, indented below the main item */}
+              {combo && (
                 <ComboComponentsList
-                  item={menuRecord}
+                  menuRecord={menuRecord}
                   menuItemsMap={menuItemsMap}
                 />
               )}
 
-              {/* FIX 2 / 6: Show addon label below its parent on KDS
-                  Addons sent with is_addon: true appear as sub-rows */}
+              {/* Addon label */}
               {item.is_addon && (
                 <div className="mt-0.5 pl-2 border-l-2 border-blue-200">
                   <span className="text-[10px] text-blue-500 font-semibold">↳ add-on</span>
@@ -428,6 +495,10 @@ const KitchenDisplay = () => {
 
   const itemOrderRef = useRef({});
 
+  // ── FIX 1: track how many status updates are in-flight so polling never
+  //    overwrites an optimistic update that hasn't reached the backend yet.
+  const inflightUpdatesRef = useRef(0);
+
   const [showDeleteOrderModal, setShowDeleteOrderModal] = useState(false);
   const [cardToDelete, setCardToDelete] = useState(null);
 
@@ -450,7 +521,7 @@ const KitchenDisplay = () => {
       .catch(() => toast.error('Failed to fetch tables'));
   }, [clientId, token]);
 
-  // ─── Fetch menu items for combo component resolution ──────────────────────
+  // ─── Fetch menu items (inventory) ─────────────────────────────────────────
 
   useEffect(() => {
     if (!token || !clientId) return;
@@ -467,11 +538,11 @@ const KitchenDisplay = () => {
         setMenuItemsMap(map);
       })
       .catch((err) => {
-        console.warn('[KDS] Failed to fetch menu items for combo lookup:', err);
+        console.warn('[KDS] Failed to fetch inventory for combo lookup:', err);
       });
   }, [clientId, token]);
 
-  // ─── Also try fetching from the menu read endpoint for richer data ─────────
+  // ─── Also try the richer menu/read endpoint ───────────────────────────────
 
   useEffect(() => {
     if (!token || !clientId) return;
@@ -486,7 +557,7 @@ const KitchenDisplay = () => {
           map[Number(item.id)] = item;
           map[String(item.id)] = item;
         });
-        setMenuItemsMap(prev => ({ ...prev, ...map }));
+        setMenuItemsMap((prev) => ({ ...prev, ...map }));
       })
       .catch(() => {
         // Silent — inventory/read fallback is sufficient
@@ -498,8 +569,10 @@ const KitchenDisplay = () => {
   const parseIntoCards = (mergedOrder) => {
     const subOrders = mergedOrder.sub_orders || [];
 
+    const activeItems = (mergedOrder.items || []).filter((item) => !isCancelledStatus(item.status));
+
     const itemsBySubOrder = {};
-    (mergedOrder.items || []).forEach((item) => {
+    activeItems.forEach((item) => {
       const sid = item.sub_order_id;
       if (!itemsBySubOrder[sid]) itemsBySubOrder[sid] = [];
       itemsBySubOrder[sid].push(item);
@@ -514,7 +587,7 @@ const KitchenDisplay = () => {
         table_id: mergedOrder.table_id,
         status: mergedOrder.status || 'pending',
         created_at: mergedOrder.created_at,
-        items: mergedOrder.items || [],
+        items: activeItems,
         is_sub_order: false,
       }];
     }
@@ -540,11 +613,21 @@ const KitchenDisplay = () => {
   const fetchOrders = useCallback(async () => {
     if (!token || !clientId) { setLoading(false); return; }
 
+    // ── FIX 1: Skip poll entirely while any status update is still in-flight.
+    //    This is the core fix for the flickering issue — we never let a stale
+    //    server response overwrite a fresh optimistic UI update.
+    if (inflightUpdatesRef.current > 0) {
+      return;
+    }
+
     try {
       const res = await axios.get(
         `${import.meta.env.VITE_API_ORDER_SERVICE_URL}/${clientId}/dinein/table`,
         { headers: { Authorization: `Bearer ${token}` } }
       );
+
+      // Check again after the await — a user may have clicked in the meantime
+      if (inflightUpdatesRef.current > 0) return;
 
       const today = new Date().toLocaleDateString(KDS_CONFIG.DATE_FORMAT);
       const allCards = [];
@@ -562,6 +645,7 @@ const KitchenDisplay = () => {
         if (mergedOrder.status === KDS_CONFIG.STATUS.SERVED) return;
 
         parseIntoCards(mergedOrder).forEach((card) => {
+          if (!card.items || card.items.length === 0) return;
           if (
             card.items.length > 0 &&
             card.items.every((i) => i.status === KDS_CONFIG.STATUS.SERVED)
@@ -572,7 +656,7 @@ const KitchenDisplay = () => {
 
       allCards.sort((a, b) => new Date(a.created_at || 0) - new Date(b.created_at || 0));
 
-      // Stabilise item order
+      // Stabilise item order across polls
       const stableCards = allCards.map((incoming) => {
         const cardId = incoming.card_id;
         const incomingItemIds = incoming.items.map((i) => i.id);
@@ -620,45 +704,76 @@ const KitchenDisplay = () => {
   }, [fetchOrders]);
 
   // ─── Item status change ────────────────────────────────────────────────────
+  // FIX 1 — three-step pattern used in production KDS systems:
+  //   1. Optimistic local state update (instant UI feedback)
+  //   2. Increment in-flight counter (blocks polls)
+  //   3. Fire API call; decrement counter when done
+  // This means the kitchen staff sees the change immediately and the next poll
+  // only runs after the round-trip completes, so stale data never overwrites.
 
   const handleItemStatusChange = async (cardId, itemId, newStatus) => {
     const card = cards.find((c) => c.card_id === cardId);
     if (!card) return;
 
+    const targetItem = (card.items || []).find((i) => String(i.id) === String(itemId));
+    if (!targetItem) return;
+
+    const previousStatus = targetItem.status;
+
+    // Build the full updated items list for local state + deriving order status.
+    // We do NOT send this full list to the backend — only the changed item goes,
+    // so sibling items' statuses are never touched on the server.
     const updatedItems = (card.items || []).map((i) =>
       String(i.id) === String(itemId) ? { ...i, status: newStatus } : i
     );
     const derivedStatus = deriveStatus(updatedItems);
 
+    // Step 1 — optimistic update (instant, local only)
+    setCards((prev) =>
+      prev.map((c) =>
+        c.card_id !== cardId
+          ? c
+          : { ...c, items: updatedItems, status: derivedStatus }
+      )
+    );
+
+    // Step 2 — block the polling loop while this request is in-flight
+    inflightUpdatesRef.current += 1;
+
     try {
-      const payload = updatedItems.map((item) => ({
-        id: item.id,
-        item_id: item.item_id,
-        item_name: item.item_name,
-        quantity: item.quantity,
-        status: item.status,
-        note: item.note || '',
-        slug: item.slug || '',
-        unit_price: item.unit_price || 0,
-        line_total: (item.unit_price || 0) * (item.quantity || 1),
+      // ── KEY FIX: send ONLY the single changed item in the payload.
+      //    Sending all items was writing every sibling's stale status back to the
+      //    backend, resetting them to whatever the JS closure had at click time.
+      const singleItemPayload = [{
+        id: targetItem.id,
+        item_id: targetItem.item_id,
+        item_name: targetItem.item_name,
+        quantity: targetItem.quantity,
+        status: newStatus,                              // ← the only field that changes
+        note: targetItem.note || '',
+        slug: targetItem.slug || '',
+        unit_price: targetItem.unit_price || 0,
+        line_total: (targetItem.unit_price || 0) * (targetItem.quantity || 1),
         client_id: clientId,
         order_id: card.sub_order_id,
-        frontend_unique_key: item.frontend_unique_key || null,
-        is_addon: item.is_addon || false,
-        parent_item_key: item.parent_item_key || null,
-      }));
+        frontend_unique_key: targetItem.frontend_unique_key || null,
+        is_addon: targetItem.is_addon || false,
+        parent_item_key: targetItem.parent_item_key || null,
+      }];
 
-      await axios.post(
-        `${import.meta.env.VITE_API_ORDER_SERVICE_URL}/${clientId}/order_items/update?order_id=${card.sub_order_id}`,
-        payload,
-        { headers: { Authorization: `Bearer ${token}` } }
-      );
-
-      await axios.post(
-        `${import.meta.env.VITE_API_ORDER_SERVICE_URL}/${clientId}/dinein/update`,
-        { id: card.sub_order_id, status: derivedStatus },
-        { headers: { Authorization: `Bearer ${token}` } }
-      );
+      // Fire both API calls in parallel — faster round-trip
+      await Promise.all([
+        axios.post(
+          `${import.meta.env.VITE_API_ORDER_SERVICE_URL}/${clientId}/order_items/update?order_id=${card.sub_order_id}`,
+          singleItemPayload,
+          { headers: { Authorization: `Bearer ${token}` } }
+        ),
+        axios.post(
+          `${import.meta.env.VITE_API_ORDER_SERVICE_URL}/${clientId}/dinein/update`,
+          { id: card.sub_order_id, status: derivedStatus },
+          { headers: { Authorization: `Bearer ${token}` } }
+        ),
+      ]);
 
       if (derivedStatus === KDS_CONFIG.STATUS.READY && card.status !== KDS_CONFIG.STATUS.READY) {
         window.dispatchEvent(
@@ -670,20 +785,25 @@ const KitchenDisplay = () => {
           })
         );
       }
-
-      setCards((prev) =>
-        prev.map((c) =>
-          c.card_id !== cardId
-            ? c
-            : { ...c, items: updatedItems, status: derivedStatus }
-        )
-      );
     } catch (err) {
       console.error(err);
       toast.error('Failed to update item status');
+
+      // Roll back only the one item that failed — restore its previous status
+      setCards((prev) =>
+        prev.map((c) => {
+          if (c.card_id !== cardId) return c;
+          const rolledBackItems = c.items.map((i) =>
+            String(i.id) === String(itemId) ? { ...i, status: previousStatus } : i
+          );
+          return { ...c, items: rolledBackItems, status: deriveStatus(rolledBackItems) };
+        })
+      );
+    } finally {
+      // Step 3 — unblock the polling loop
+      inflightUpdatesRef.current = Math.max(0, inflightUpdatesRef.current - 1);
     }
   };
-
 
   // ─── Filter cards ──────────────────────────────────────────────────────────
 
@@ -757,8 +877,6 @@ const KitchenDisplay = () => {
           </div>
         </div>
       </div>
-
-
 
       {showAggregate && (
         <AggregatePanel
