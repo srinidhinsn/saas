@@ -270,27 +270,61 @@ const UniversalEditModal = ({
                     <label className="block text-sm font-medium mb-1 text-gray-700">
                       Availability Timing
                     </label>
+
+                    {/* ✅ Show unavailable banner if slug ends with __unavailable */}
+                    {(editingItem?.slug || '').includes('__unavailable') && (
+                      <div className="flex items-center justify-between mb-2 px-3 py-2 rounded-lg bg-red-50 border border-red-200">
+                        <div className="flex items-center gap-2">
+                          <span className="w-2 h-2 rounded-full bg-red-500" />
+                          <span className="text-sm font-semibold text-red-700">
+                            Currently marked as Unavailable
+                          </span>
+                        </div>
+                        <button
+                          type="button"
+                          onClick={() => {
+                            // Strip __unavailable from slug, restore to base
+                            const currentSlug = editingItem.slug || '';
+                            const baseSlug = currentSlug.replace(/__unavailable$/, '');
+                            setEditingItem(prev => ({
+                              ...prev,
+                              slug: baseSlug,
+                              availability: prev._previousAvailability ?? 999,
+                              availability_time: prev._previousTiming ?? [],
+                            }));
+                          }}
+                          className="px-3 py-1 rounded-lg text-xs font-semibold bg-green-600 text-white hover:bg-green-700"
+                        >
+                          ✓ Mark Available
+                        </button>
+                      </div>
+                    )}
+
                     <div className="flex flex-wrap gap-2">
                       {timingOptions.map((t) => {
-                        // t is already {name, start, end} — no split needed
                         const key = (t.name || '').toLowerCase();
                         const currentTimings = Array.isArray(editingItem?.availability_time)
                           ? editingItem.availability_time
                           : (editingItem?.availability_time ? [editingItem.availability_time] : []);
+                        // Disable timing buttons when item is marked unavailable
+                        const isUnavailable = (editingItem?.slug || '').includes('__unavailable');
                         const selected = currentTimings.includes(key);
                         return (
                           <button
                             key={key}
                             type="button"
+                            disabled={isUnavailable}
                             onClick={() => {
                               const next = selected
                                 ? currentTimings.filter(x => x !== key)
                                 : [...currentTimings, key];
                               setEditingItem(prev => ({ ...prev, availability_time: next }));
                             }}
-                            className={`px-3 py-1.5 rounded-lg text-sm border transition-all ${selected
-                              ? 'bg-blue-600 text-white border-blue-600'
-                              : 'bg-gray-50 border-gray-300 text-gray-700 hover:border-blue-500'
+                            className={`px-3 py-1.5 rounded-lg text-sm border transition-all
+              ${isUnavailable ? 'opacity-40 cursor-not-allowed bg-gray-100 border-gray-200 text-gray-400' :
+                                selected
+                                  ? 'bg-blue-600 text-white border-blue-600'
+                                  : 'bg-gray-50 border-gray-300 text-gray-700 hover:border-blue-500'
                               }`}
                           >
                             {t.name} {t.start && t.end ? `(${t.start}–${t.end})` : ''}
@@ -298,14 +332,15 @@ const UniversalEditModal = ({
                         );
                       })}
                     </div>
-                    {(Array.isArray(editingItem?.availability_time)
-                      ? editingItem.availability_time.length === 0
-                      : !editingItem?.availability_time) && (
+
+                    {!(editingItem?.slug || '').includes('__unavailable') &&
+                      (Array.isArray(editingItem?.availability_time)
+                        ? editingItem.availability_time.length === 0
+                        : !editingItem?.availability_time) && (
                         <p className="text-xs text-gray-400 mt-1">No timing selected = available all day</p>
                       )}
                   </div>
                 )}
-
                 {/* Unit Price & Discount */}
                 <div className="grid grid-cols-2 gap-4">
                   <div>

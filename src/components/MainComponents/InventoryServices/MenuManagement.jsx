@@ -49,7 +49,9 @@ const MenuManagement = ({ clientId, token, realm }) => {
   const [newItemImageUrl, setNewItemImageUrl] = useState('');
   const [editItemImage, setEditItemImage] = useState(null);
   const [editItemImageUrl, setEditItemImageUrl] = useState('');
-
+  const [importValidationModal, setImportValidationModal] = useState(null);
+  const [importSuccess, setImportSuccess] = useState(false);
+  const [importError, setImportError] = useState(null);
   const [editingItem, setEditingItem] = useState(null);
   const [deleteTarget, setDeleteTarget] = useState(null);
   const [newItem, setNewItem] = useState({
@@ -517,11 +519,11 @@ const MenuManagement = ({ clientId, token, realm }) => {
   const handleAddItem = async () => {
     try {
       let imageId = null;
-  
+
       if (newItemImage) {
         imageId = await uploadImageToDocumentService(newItemImage);
       }
-  
+
       const resolvedCat = categoriesFlat.find(
         c => c.id === newItem?.category_id
       );
@@ -531,22 +533,22 @@ const MenuManagement = ({ clientId, token, realm }) => {
       }
       const finalCategoryId = resolvedCat.id;
       if (!finalCategoryId) return;
-  
+
       const { dietary_type, ...cleanNewItem } = newItem;
-  
+
       const slug = generateSlug(
         newItem.name,
         finalCategoryId,
         newItem.availability_time ?? [],
         categoriesFlat
       );
-  
+
       const created_by =
         currentUserId || localStorage.getItem("user_id") || "system";
-  
+
       const basePrice = parseFloat(newItem.unit_price) || 0;
       const zonePrices = newItem.zonePrices || {};
-  
+
       const basePayload = {
         ...cleanNewItem,
         client_id: clientId,
@@ -567,7 +569,7 @@ const MenuManagement = ({ clientId, token, realm }) => {
         inventory_id: newItem.inventory_id,
         zone_config_id: 0,
       };
-  
+
       // STEP 1: Create base record (zone_config_id = 0)
       const baseRes = await axios.post(
         `${import.meta.env.VITE_API_INVENTORY_SERVICE_URL}/${clientId}/menu/create`,
@@ -579,9 +581,9 @@ const MenuManagement = ({ clientId, token, realm }) => {
           },
         }
       );
-  
+
       const sharedId = baseRes.data.data.id;
-  
+
       // STEP 2: Create records for ALL sections
       if (sections && sections.length > 0) {
         for (const section of sections) {
@@ -591,7 +593,7 @@ const MenuManagement = ({ clientId, token, realm }) => {
             enteredPrice !== "" && enteredPrice !== null && enteredPrice !== undefined
               ? parseFloat(enteredPrice)
               : basePrice;
-  
+
           await axios.post(
             `${import.meta.env.VITE_API_INVENTORY_SERVICE_URL}/${clientId}/menu/create`,
             {
@@ -606,9 +608,9 @@ const MenuManagement = ({ clientId, token, realm }) => {
       } else {
         console.warn("No sections found → skipping zone creation");
       }
-  
+
       await fetchData({ silent: true });
-  
+
       setShowAddModal(false);
       setNewItem({
         name: "",
@@ -623,7 +625,7 @@ const MenuManagement = ({ clientId, token, realm }) => {
       });
       setNewItemImage(null);
       setNewItemImageUrl("");
-  
+
     } catch (error) {
       console.error("Error adding item:", error);
     }
@@ -676,6 +678,10 @@ const MenuManagement = ({ clientId, token, realm }) => {
         const timingPart = timingArr.length > 0 ? timingArr.join('+') : null;
 
         const base = nameParts.filter(Boolean).join('_');
+
+        if ((editingItem.slug || '').endsWith('__unavailable') && timingArr.length === 0) {
+          return `${base}__unavailable`;
+        }
         return timingPart ? `${base}__${timingPart}` : base;
       })();
 
@@ -960,14 +966,14 @@ const MenuManagement = ({ clientId, token, realm }) => {
   const isItemActive = (slug, timingOptions) => {
     if (!slug) return true;
 
-    // If timings haven't loaded yet, show all items
-    if (!timingOptions || timingOptions.length === 0) return true;
-
     const doubleUnderIdx = slug.lastIndexOf('__');
     const timingSegment = doubleUnderIdx !== -1
       ? slug.slice(doubleUnderIdx + 2).toLowerCase()
       : null;
 
+    if (timingSegment === 'unavailable') return false;
+
+    if (!timingOptions || timingOptions.length === 0) return true;
     if (!timingSegment || timingSegment === 'allday') return true;
 
     const timingKeys = timingSegment.split('+').filter(Boolean);
@@ -978,15 +984,10 @@ const MenuManagement = ({ clientId, token, realm }) => {
 
     return timingKeys.some(key => {
       const t = timingOptions.find(o => o.name?.toLowerCase() === key);
-
-      // If timing key not found in config, treat as always active (don't warn)
       if (!t || !t.start || !t.end) return true;
-
       const [sh, sm] = t.start.split(':').map(Number);
       const [eh, em] = t.end.split(':').map(Number);
-
-      return currentMinutes >= (sh * 60 + sm) &&
-        currentMinutes <= (eh * 60 + em);
+      return currentMinutes >= (sh * 60 + sm) && currentMinutes <= (eh * 60 + em);
     });
   };
   const getDietaryFromSlug = (item) => {
@@ -1114,157 +1115,109 @@ const MenuManagement = ({ clientId, token, realm }) => {
     }
   };
 
-  const handleBulkUpdate = async () => {
-    if (selectedRows.length === 0) return;
-    try {
-      for (const id of selectedRows) {
-        const { dietary_type: ed, zonePrices: zp, ...cleanEditedData } = bulkEditData[id] || {};
-        const { dietary_type: od, ...cleanOriginalItem } = menuItems.find(item => item.id === id && (item.zone_config_id === 0 || item.zone_config_id === null));
-        // ^^^ Always grab the BASE record (zone_config_id=0) as the merge source
+// Find and replace the entire handleBulkUpdate function:
+const handleBulkUpdate = async () => {
+  if (selectedRows.length === 0) return;
+  try {
+    for (const id of selectedRows) {
+      const { dietary_type: ed, zonePrices: zp, ...cleanEditedData } = bulkEditData[id] || {};
+      const baseItem = menuItems.find(item => item.id === id && (item.zone_config_id === 0 || item.zone_config_id === null));
+      if (!baseItem) continue;
+      const { dietary_type: od, ...cleanOriginalItem } = baseItem;
 
-        const mergedItem = { ...cleanOriginalItem, ...cleanEditedData, client_id: clientId };
+      // ✅ Handle slug update when availability changes
+      let updatedSlug = cleanOriginalItem.slug;
+      if ('availability' in cleanEditedData) {
+        const currentSlug = cleanOriginalItem.slug || '';
+        const doubleUnderIdx = currentSlug.lastIndexOf('__');
+        const existingTimingPart = doubleUnderIdx !== -1
+          ? currentSlug.slice(doubleUnderIdx + 2).toLowerCase()
+          : null;
+        const baseSlug = doubleUnderIdx !== -1
+          ? currentSlug.slice(0, doubleUnderIdx)
+          : currentSlug;
 
-        // Update the base record
-        await axios.post(
-          `${import.meta.env.VITE_API_INVENTORY_SERVICE_URL}/${clientId}/menu/update`,
-          { ...mergedItem, zone_config_id: 0 },
-          { headers: { Authorization: `Bearer ${token}` } }
-        );
-
-        // Upsert zone price records
-        const filledZonePrices = Object.entries(zp || {}).filter(
-          ([, price]) => price !== '' && price !== null && price !== undefined
-        );
-
-        if (filledZonePrices.length > 0) {
-          // Find ALL zone variants for this item id (they share the same id)
-          const zoneVariants = menuItems.filter(
-            m => m.id === id && m.zone_config_id !== 0 && m.zone_config_id !== null
-          );
-
-          for (const [configId, price] of filledZonePrices) {
-            // ✅ Match by id + zone_config_id directly — no name matching needed
-            const existingZoneRecord = zoneVariants.find(
-              m => m.zone_config_id === Number(configId)
-            );
-
-            if (existingZoneRecord) {
-              // Update existing zone variant
-              await axios.post(
-                `${import.meta.env.VITE_API_INVENTORY_SERVICE_URL}/${clientId}/menu/update`,
-                {
-                  ...mergedItem,
-                  id: Number(existingZoneRecord.id),
-                  unit_price: parseFloat(price),
-                  zone_config_id: Number(configId)
-                },
-                { headers: { Authorization: `Bearer ${token}` } }
-              );
-            } else {
-              // Create missing zone variant
-              await axios.post(
-                `${import.meta.env.VITE_API_INVENTORY_SERVICE_URL}/${clientId}/menu/create`,
-                {
-                  ...mergedItem,
-                  id: Number(id),           // ✅ preserve shared id
-                  unit_price: parseFloat(price),
-                  zone_config_id: Number(configId)
-                },
-                { headers: { Authorization: `Bearer ${token}` } }
-              );
-            }
+        if (Number(cleanEditedData.availability) === 0) {
+          updatedSlug = `${baseSlug}__unavailable`;
+        } else {
+          if (existingTimingPart === 'unavailable') {
+            updatedSlug = baseSlug;
           }
         }
+        cleanEditedData.slug = updatedSlug;
       }
 
-      await fetchData({ silent: true });
-      setShowBulkModal(false);
-      setSelectedRows([]);
-      setBulkEditData({});
-      setSelectAllChecked(false);
-    } catch (error) {
-      console.error('Error updating items:', error);
+      const mergedItem = { ...cleanOriginalItem, ...cleanEditedData, client_id: clientId };
+
+      // ✅ Update the base record (zone_config_id = 0)
+      await axios.post(
+        `${import.meta.env.VITE_API_INVENTORY_SERVICE_URL}/${clientId}/menu/update`,
+        { ...mergedItem, zone_config_id: 0 },
+        { headers: { Authorization: `Bearer ${token}` } }
+      );
+
+      // ✅ Always sync slug + availability to ALL zone variants
+      const zoneVariants = allMenuItemsRaw.filter(
+        m => Number(m.id) === Number(id) && m.zone_config_id !== 0 && m.zone_config_id !== null
+      );
+
+      for (const zoneRecord of zoneVariants) {
+        const configId = Number(zoneRecord.zone_config_id);
+
+        // Zone price: use explicitly entered price if provided, else keep existing
+        const enteredPrice = zp?.[configId];
+        const finalPrice =
+          enteredPrice !== '' && enteredPrice !== null && enteredPrice !== undefined
+            ? parseFloat(enteredPrice)
+            : Number(zoneRecord.unit_price);
+
+        await axios.post(
+          `${import.meta.env.VITE_API_INVENTORY_SERVICE_URL}/${clientId}/menu/update`,
+          {
+            ...mergedItem,           // carries updated slug + availability
+            id: Number(id),
+            unit_price: finalPrice,
+            zone_config_id: configId,
+          },
+          { headers: { Authorization: `Bearer ${token}` } }
+        );
+      }
+
+      // ✅ Handle any explicitly entered zone prices for zones that don't have a record yet
+      const filledZonePrices = Object.entries(zp || {}).filter(
+        ([, price]) => price !== '' && price !== null && price !== undefined
+      );
+
+      for (const [configId, price] of filledZonePrices) {
+        const alreadyUpdated = zoneVariants.some(
+          m => m.zone_config_id === Number(configId)
+        );
+        if (alreadyUpdated) continue; // already handled above
+
+        // This is a new zone record that doesn't exist yet — create it
+        await axios.post(
+          `${import.meta.env.VITE_API_INVENTORY_SERVICE_URL}/${clientId}/menu/create`,
+          {
+            ...mergedItem,
+            id: Number(id),
+            unit_price: parseFloat(price),
+            zone_config_id: Number(configId),
+          },
+          { headers: { Authorization: `Bearer ${token}` } }
+        );
+      }
     }
-  };
-  // const handleExportToExcel = () => {
-  //   try {
-  //     const catNameById = (idOrName) => {
-  //       if (!idOrName) return "Uncategorized";
-  //       const found = categoriesFlat.find(
-  //         c => c.id === idOrName || c.name?.toLowerCase() === String(idOrName).toLowerCase()
-  //       );
-  //       return found?.name || idOrName || "Unknown";
-  //     };
 
-  //     const sectionLabel = (s) => `${s.zone}-${s.section}`;
+    await fetchData({ silent: true });
+    setShowBulkModal(false);
+    setSelectedRows([]);
+    setBulkEditData({});
+    setSelectAllChecked(false);
+  } catch (error) {
+    console.error('Error updating items:', error);
+  }
+};
 
-  //     const grouped = {};
-  //     menuItems.forEach(item => {
-  //       const key = item.slug || item.name;
-  //       if (!grouped[key]) {
-  //         grouped[key] = { baseItem: item, zonePrices: {} };
-  //       }
-  //       if (item.zone_config_id) {
-  //         const sec = sections.find(s => s.id === item.zone_config_id);
-  //         if (sec) grouped[key].zonePrices[sectionLabel(sec)] = item.unit_price;
-  //       } else {
-  //         grouped[key].zonePrices["Base"] = item.unit_price;
-  //       }
-  //     });
-
-  //     const zoneColumns = sections.map(sectionLabel);
-
-  //     const exportData = Object.values(grouped).map(({ baseItem: item, zonePrices }) => {
-  //       const dietary = getDietaryFromSlug(item);
-
-  //       // ✅ Extract timing from slug — exclude "allday", export as empty if none
-  //       const slugTimingPart = item.slug?.includes('__')
-  //         ? item.slug.split('__')[1]
-  //         : '';
-  //       const availabilityTiming = (!slugTimingPart || slugTimingPart === 'allday')
-  //         ? ""
-  //         : slugTimingPart; // e.g. "morning" or "morning+evening", empty = no timing set
-
-  //       const row = {
-  //         Name: item.name ?? "",
-  //         Description: item.description ?? "",
-  //         Category: catNameById(item.category_id) || "Unknown",
-  //         Dietary_Type: dietary || "",
-  //         Availability_Timing: availabilityTiming, // ✅ empty string if no timing
-  //         Image: item.image_id ?? "",
-  //         Unit: item.unit ?? "",
-  //         Unit_Price: Number(item.unit_price) || 0,
-  //         Discount: Number(item.discount) || 0,
-  //         Availability: Number(item.availability) || 0,
-  //         Code: item.code != null ? String(item.code) : "",
-  //         Serving_Quantity: item.serving_quantity ?? "",
-  //         Serving_Unit: item.serving_unit ?? "",
-  //         Line_Item_IDs: Array.isArray(item.line_item_id)
-  //           ? item.line_item_id.join(", ") : "",
-  //       };
-
-  //       zoneColumns.forEach(col => {
-  //         row[`Price_${col}`] = zonePrices[col] ?? "";
-  //       });
-
-  //       return row;
-  //     });
-
-  //     const headers = [
-  //       "Name", "Description", "Category", "Dietary_Type", "Availability_Timing",
-  //       "Image", "Unit", "Unit_Price", "Discount", "Availability", "Code",
-  //       "Serving_Quantity", "Serving_Unit", "Line_Item_IDs",
-  //       ...zoneColumns.map(c => `Price_${c}`)
-  //     ];
-
-  //     const worksheet = XLSX.utils.json_to_sheet(exportData, { header: headers });
-  //     const workbook = XLSX.utils.book_new();
-  //     XLSX.utils.book_append_sheet(workbook, worksheet, "MenuItems");
-  //     XLSX.writeFile(workbook, `menu_items_${new Date().toISOString().slice(0, 10)}.xlsx`);
-  //   } catch (err) {
-  //     console.error("Export failed:", err);
-  //   }
-  // };
   const clean = (v) => (v === "" || v === undefined || v === null || (typeof v === "number" && isNaN(v)) ? null : v);
   const num = (v) => { if (v === "" || v === undefined || v === null || (typeof v === "number" && isNaN(v))) return 0; const n = Number(v); return isNaN(n) ? 0 : n; };
   const sectionLabel = (s) => `${s.zone}-${s.section}`.trim().toLowerCase();
@@ -1352,6 +1305,147 @@ const MenuManagement = ({ clientId, token, realm }) => {
   // ─────────────────────────────────────────────────────────────────
   // CHANGE 3 of 3:  handleImportFromExcel  — full rewrite
   // ─────────────────────────────────────────────────────────────────
+  const runImport = async ({
+    parsedData, priceColumns, allMenuItems,
+    created_by, updated_by,
+    currentCategoriesFlat, currentSelectedCategoryId, currentSections,
+  }) => {
+    for (const row of parsedData) {
+      if (!row.Name?.trim()) continue;
+
+      const existingRecords = allMenuItems.filter(
+        item => item.name?.trim().toLowerCase() === row.Name?.trim().toLowerCase()
+      );
+
+      const categoryId =
+        currentCategoriesFlat.find(
+          c => c.name.trim().toLowerCase() === (row.Category || '').trim().toLowerCase()
+        )?.id || currentSelectedCategoryId;
+
+      const categoryName = currentCategoriesFlat.find(c => c.id === categoryId)?.name || null;
+      if (!categoryName) {
+        console.warn(`[Import] Skipping "${row.Name}" — category not found: "${row.Category}"`);
+        continue;
+      }
+
+      const rawDietary = (row.Dietary_Type || "").trim().toLowerCase().replace(/[-_\s]/g, '');
+      const matchedDietaryOption = dietaryOptions.find(
+        d => d.toLowerCase().replace(/[-_\s]/g, '') === rawDietary
+      );
+      const importedDietary = matchedDietaryOption
+        ? matchedDietaryOption.toLowerCase().replace(/[-_\s]/g, '')
+        : rawDietary;
+
+      const rawTiming = (row.Availability_Timing || "").trim().toLowerCase();
+      const timingPart = rawTiming || null;
+
+      const slug = (() => {
+        const parts = [];
+        let currentId = categoryId;
+        const visited = new Set();
+        while (currentId && !visited.has(currentId)) {
+          visited.add(currentId);
+          const cat = currentCategoriesFlat.find(c => c.id === currentId);
+          if (!cat) break;
+          parts.unshift(toSlugSegment(cat.name));
+          currentId = cat.parentId ?? cat.parent_id ?? null;
+        }
+        const itemPart = toSlugSegment(row.Name);
+        const categoryPathStr = parts.join('_').toLowerCase().replace(/[-_\s]/g, '');
+        const dietaryAlreadyInPath = dietaryOptions.some(
+          d => categoryPathStr.includes(d.toLowerCase().replace(/[-_\s]/g, ''))
+        );
+        const nameParts =
+          importedDietary && !dietaryAlreadyInPath
+            ? [...parts, importedDietary, itemPart]
+            : [...parts, itemPart];
+        const base = nameParts.filter(Boolean).join('_');
+        return timingPart ? `${base}__${timingPart}` : base;
+      })();
+
+      const basePayload = {
+        client_id: clientId,
+        inventory_id: menuConfig.menuInventoryId,
+        name: row.Name?.trim(),
+        description: row.Description || null,
+        category_id: categoryId,
+        realm: realm || null,
+        code: row.Code ? String(row.Code) : null,
+        serving_quantity: row.Serving_Quantity || null,
+        serving_unit: row.Serving_Unit || null,
+        unit: row.Unit || null,
+        ...(row.Image && String(row.Image).trim() !== "" && { image_id: String(row.Image).trim() }),
+        discount: Number(row.Discount) || 0,
+        availability: Number(row.Availability) || 0,
+        slug,
+        line_item_id: row.Line_Item_IDs
+          ? row.Line_Item_IDs.split(",").map(v => parseInt(v.trim(), 10)).filter(v => !isNaN(v))
+          : null,
+        created_by,
+        updated_by,
+      };
+
+      const baseUnitPrice = Number(row.Unit_Price) || 0;
+      let sharedId;
+      const existingBase = existingRecords.find(item => item.zone_config_id === 0);
+
+      if (existingBase) {
+        sharedId = existingBase.id;
+        await axios.post(
+          `${import.meta.env.VITE_API_INVENTORY_SERVICE_URL}/${clientId}/menu/update`,
+          { ...basePayload, id: Number(sharedId), unit_price: baseUnitPrice, zone_config_id: 0 },
+          { headers: { Authorization: `Bearer ${token}` } }
+        );
+      } else {
+        const res = await axios.post(
+          `${import.meta.env.VITE_API_INVENTORY_SERVICE_URL}/${clientId}/menu/create`,
+          { ...basePayload, unit_price: baseUnitPrice, zone_config_id: 0 },
+          { headers: { Authorization: `Bearer ${token}` } }
+        );
+        sharedId = res.data.data.id;
+      }
+
+      const zonePriceMap = {};
+      for (const col of priceColumns) {
+        const priceVal = row[col];
+        if (priceVal === "" || priceVal === null || priceVal === undefined) continue;
+        const label = col.replace("Price_", "").trim().toLowerCase();
+        const matchedSection = currentSections.find(s => sectionLabel(s) === label);
+        if (!matchedSection) continue;
+        const sid = Number(matchedSection.id);
+        if (!sid || sid === 0) continue;
+        zonePriceMap[sid] = Number(priceVal);
+      }
+
+      for (const section of currentSections) {
+        const configId = Number(section.id);
+        if (!configId || configId === 0) continue;
+        const existingZone = existingRecords.find(item => item.zone_config_id === configId);
+        const finalPrice =
+          zonePriceMap[configId] !== undefined
+            ? zonePriceMap[configId]
+            : existingZone ? Number(existingZone.unit_price) : baseUnitPrice;
+
+        if (existingZone) {
+          await axios.post(
+            `${import.meta.env.VITE_API_INVENTORY_SERVICE_URL}/${clientId}/menu/update`,
+            { ...basePayload, id: Number(existingZone.id), unit_price: finalPrice, zone_config_id: configId },
+            { headers: { Authorization: `Bearer ${token}` } }
+          );
+        } else {
+          await axios.post(
+            `${import.meta.env.VITE_API_INVENTORY_SERVICE_URL}/${clientId}/menu/create`,
+            { ...basePayload, id: sharedId, unit_price: finalPrice, zone_config_id: configId },
+            { headers: { Authorization: `Bearer ${token}` } }
+          );
+        }
+      }
+    }
+
+    await fetchData({ silent: false });
+    setImportSuccess(true);
+    setTimeout(() => setImportSuccess(false), 3000);
+  };
   const handleImportFromExcel = async (e) => {
     const file = e.target.files[0];
     if (!file) return;
@@ -1367,7 +1461,6 @@ const MenuManagement = ({ clientId, token, realm }) => {
     const currentSelectedCategoryId = selectedCategoryId;
     const currentSections = [...sections];
 
-    // ── Fetch the full menu (all zone variants) ───────────────────
     let allMenuItems = [];
     try {
       const res = await axios.get(
@@ -1383,13 +1476,11 @@ const MenuManagement = ({ clientId, token, realm }) => {
       return;
     }
 
-    // Normalise zone_config_id: null → 0
     allMenuItems = allMenuItems.map(item => ({
       ...item,
       zone_config_id:
         item.zone_config_id === null || item.zone_config_id === undefined
-          ? 0
-          : Number(item.zone_config_id),
+          ? 0 : Number(item.zone_config_id),
     }));
 
     const reader = new FileReader();
@@ -1400,216 +1491,71 @@ const MenuManagement = ({ clientId, token, realm }) => {
           workbook.Sheets[workbook.SheetNames[0]],
           { defval: "" }
         );
-
         if (!parsedData.length) return;
 
         const allColumns = Object.keys(parsedData[0]);
-        // All columns that start with "Price_" are zone-price columns
         const priceColumns = allColumns.filter(col => col.startsWith("Price_"));
+        const normalize = (str) => (str || '').toLowerCase().replace(/[-_\s]/g, '');
 
-        if (!window.confirm(`Import ${parsedData.length} items?`)) {
-          e.target.value = "";
+        const invalidDietarySet = new Set();
+        const invalidTimingSet = new Set();
+        const invalidCategorySet = new Set();
+        for (const row of parsedData) {
+          if (!row.Name?.trim()) continue;
+          const rawCategory = (row.Category || "").trim();
+          if (rawCategory) {
+            const matched = currentCategoriesFlat.find(
+              c => c.name.trim().toLowerCase() === rawCategory.toLowerCase()
+            );
+            if (!matched) invalidCategorySet.add(rawCategory);
+          }
+          const rawDietary = (row.Dietary_Type || "").trim();
+          if (rawDietary) {
+            const matched = dietaryOptions.find(d => normalize(d) === normalize(rawDietary));
+            if (!matched) invalidDietarySet.add(rawDietary);
+          }
+
+          const rawTiming = (row.Availability_Timing || "").trim();
+          if (rawTiming && rawTiming.toLowerCase() !== 'allday') {
+            const timingKeys = rawTiming.toLowerCase().split('+').map(t => t.trim()).filter(Boolean);
+            for (const key of timingKeys) {
+              const matched = timingOptions.find(o => o.name?.toLowerCase() === key);
+              if (!matched) invalidTimingSet.add(key);
+            }
+          }
+        }
+
+        if (invalidDietarySet.size > 0 || invalidTimingSet.size > 0) {
+          setImportValidationModal({
+            invalidCategory: [...invalidCategorySet],
+            invalidDietary: [...invalidDietarySet],
+            invalidTiming: [...invalidTimingSet],
+            parsedData,
+            priceColumns,
+            allMenuItems,
+            created_by,
+            updated_by,
+            currentCategoriesFlat,
+            currentSelectedCategoryId,
+            currentSections,
+            fileEvent: e,
+          });
           return;
         }
 
-        for (const row of parsedData) {
-          if (!row.Name?.trim()) continue;
-
-          // All DB records (all zone variants) for this item name
-          const existingRecords = allMenuItems.filter(
-            item => item.name?.trim().toLowerCase() === row.Name?.trim().toLowerCase()
-          );
-
-          // Resolve category
-          const categoryId =
-            currentCategoriesFlat.find(
-              c => c.name.trim().toLowerCase() === (row.Category || '').trim().toLowerCase()
-            )?.id || currentSelectedCategoryId;
-
-          const categoryName = currentCategoriesFlat.find(c => c.id === categoryId)?.name || null;
-
-          if (!categoryName) {
-            console.warn(`[Import] Skipping "${row.Name}" — category not found: "${row.Category}"`);
-            continue;
-          }
-
-          // ── Dietary ──────────────────────────────────────────────
-          const rawDietary = (row.Dietary_Type || "").trim().toLowerCase().replace(/[-_\s]/g, '');
-          const matchedDietaryOption = dietaryOptions.find(
-            d => d.toLowerCase().replace(/[-_\s]/g, '') === rawDietary
-          );
-          const importedDietary = matchedDietaryOption
-            ? matchedDietaryOption.toLowerCase().replace(/[-_\s]/g, '')
-            : rawDietary;
-
-          // ── Timing ───────────────────────────────────────────────
-          const rawTiming = (row.Availability_Timing || "").trim().toLowerCase();
-          const timingPart = rawTiming || null; // null = no timing restriction
-
-          // ── Slug ─────────────────────────────────────────────────
-          const slug = (() => {
-            const parts = [];
-            let currentId = categoryId;
-            const visited = new Set();
-            while (currentId && !visited.has(currentId)) {
-              visited.add(currentId);
-              const cat = currentCategoriesFlat.find(c => c.id === currentId);
-              if (!cat) break;
-              parts.unshift(toSlugSegment(cat.name));
-              currentId = cat.parentId ?? cat.parent_id ?? null;
-            }
-            const itemPart = toSlugSegment(row.Name);
-            const categoryPathStr = parts.join('_').toLowerCase().replace(/[-_\s]/g, '');
-            const dietaryAlreadyInPath = dietaryOptions.some(
-              d => categoryPathStr.includes(d.toLowerCase().replace(/[-_\s]/g, ''))
-            );
-            const nameParts =
-              importedDietary && !dietaryAlreadyInPath
-                ? [...parts, importedDietary, itemPart]
-                : [...parts, itemPart];
-            const base = nameParts.filter(Boolean).join('_');
-            return timingPart ? `${base}__${timingPart}` : base;
-          })();
-
-          // ── Shared payload (no price, no zone_config_id) ─────────
-          const basePayload = {
-            client_id: clientId,
-            inventory_id: menuConfig.menuInventoryId,
-            name: row.Name?.trim(),
-            description: row.Description || null,
-            category_id: categoryId,
-            realm: realm || null,
-            code: row.Code ? String(row.Code) : null,
-            serving_quantity: row.Serving_Quantity || null,
-            serving_unit: row.Serving_Unit || null,
-            unit: row.Unit || null,
-            ...(row.Image && String(row.Image).trim() !== "" && {
-              image_id: String(row.Image).trim(),
-            }),
-            discount: Number(row.Discount) || 0,
-            availability: Number(row.Availability) || 0,
-            slug,
-            line_item_id: row.Line_Item_IDs
-              ? row.Line_Item_IDs.split(",")
-                .map(v => parseInt(v.trim(), 10))
-                .filter(v => !isNaN(v))
-              : null,
-            created_by,
-            updated_by,
-          };
-
-          // ── BASE RECORD (zone_config_id = 0) ─────────────────────
-          // Always uses Unit_Price column — zone prices never touch this
-          const baseUnitPrice = Number(row.Unit_Price) || 0;
-          let sharedId;
-          const existingBase = existingRecords.find(item => item.zone_config_id === 0);
-
-          if (existingBase) {
-            sharedId = existingBase.id;
-            await axios.post(
-              `${import.meta.env.VITE_API_INVENTORY_SERVICE_URL}/${clientId}/menu/update`,
-              {
-                ...basePayload,
-                id: Number(sharedId),
-                unit_price: baseUnitPrice, // ✅ always Unit_Price
-                zone_config_id: 0,
-              },
-              { headers: { Authorization: `Bearer ${token}` } }
-            );
-          } else {
-            const res = await axios.post(
-              `${import.meta.env.VITE_API_INVENTORY_SERVICE_URL}/${clientId}/menu/create`,
-              {
-                ...basePayload,
-                unit_price: baseUnitPrice, // ✅ always Unit_Price
-                zone_config_id: 0,
-              },
-              { headers: { Authorization: `Bearer ${token}` } }
-            );
-            sharedId = res.data.data.id;
-          }
-
-          // ── Build zone price map from Excel Price_ columns ────────
-          // Key = section DB id (number), Value = price from Excel
-          const zonePriceMap = {};
-          for (const col of priceColumns) {
-            const priceVal = row[col];
-            if (priceVal === "" || priceVal === null || priceVal === undefined) continue;
-
-            // "Price_top-ac" → "top-ac"  (already lowercase in exported file)
-            const label = col.replace("Price_", "").trim().toLowerCase();
-
-            const matchedSection = currentSections.find(
-              s => sectionLabel(s) === label // sectionLabel() is lowercase on both sides
-            );
-
-            if (!matchedSection) {
-              console.warn(
-                `[Import] No section matched for "${col}" (label="${label}"). ` +
-                `Available: ${currentSections.map(sectionLabel).join(', ')}`
-              );
-              continue;
-            }
-
-            const sid = Number(matchedSection.id);
-            if (!sid || sid === 0) continue; // safety: never overwrite base slot
-
-            zonePriceMap[sid] = Number(priceVal);
-          }
-
-          // ── ZONE RECORDS (zone_config_id > 0) ────────────────────
-          for (const section of currentSections) {
-            const configId = Number(section.id);
-            if (!configId || configId === 0) continue; // ✅ base slot already handled
-
-            const existingZone = existingRecords.find(
-              item => item.zone_config_id === configId
-            );
-
-            // Priority: Excel zone price → keep existing DB price → fall back to base price
-            const finalPrice =
-              zonePriceMap[configId] !== undefined
-                ? zonePriceMap[configId]
-                : existingZone
-                  ? Number(existingZone.unit_price)
-                  : baseUnitPrice;
-
-            if (existingZone) {
-              await axios.post(
-                `${import.meta.env.VITE_API_INVENTORY_SERVICE_URL}/${clientId}/menu/update`,
-                {
-                  ...basePayload,
-                  id: Number(existingZone.id),
-                  unit_price: finalPrice,
-                  zone_config_id: configId,
-                },
-                { headers: { Authorization: `Bearer ${token}` } }
-              );
-            } else {
-              await axios.post(
-                `${import.meta.env.VITE_API_INVENTORY_SERVICE_URL}/${clientId}/menu/create`,
-                {
-                  ...basePayload,
-                  id: sharedId,
-                  unit_price: finalPrice,
-                  zone_config_id: configId,
-                },
-                { headers: { Authorization: `Bearer ${token}` } }
-              );
-            }
-          }
-        } // end for row
-
-        await fetchData({ silent: false });
-        alert("Import complete!");
+        await runImport({
+          parsedData, priceColumns, allMenuItems,
+          created_by, updated_by,
+          currentCategoriesFlat, currentSelectedCategoryId, currentSections,
+        });
         e.target.value = "";
       } catch (err) {
         console.error("Import Error:", err);
-        alert(`Import failed: ${err.message}`);
+        setImportError(err.message || "Something went wrong during import.");
+        setTimeout(() => setImportError(null), 4000);
         e.target.value = "";
       }
     };
-
     reader.readAsBinaryString(file);
   };
 
@@ -1860,8 +1806,8 @@ const MenuManagement = ({ clientId, token, realm }) => {
             <div className="flex-1 overflow-y-auto">
               <div className="grid gap-2 grid-cols-2 md:grid-cols-3 lg:grid-cols-3 xl:grid-cols-4">
                 {sortedItems.map((item) => {
-                  const discountPercent = item.discount && item.unit_price && Number(item.discount) > 0
-                    ? ((Number(item.discount) * 100) / Number(item.unit_price)).toFixed(0) : null;
+                  const discountPercent = item.discount && Number(item.discount) > 0
+                    ? Number(item.discount).toFixed(0) : null;
                   const dietary = getDietaryFromSlug(item);
                   const dietaryColor = dietary ? (dietaryColorMap[dietary] || 'bg-transparent') : 'bg-transparent';
                   const active = isItemActive(item.slug, timingOptions);
@@ -1901,7 +1847,9 @@ const MenuManagement = ({ clientId, token, realm }) => {
                         <div className="flex items-center gap-2 mt-1">
                           {discountPercent ? (
                             <>
-                              <span className="text-sm font-bold text-action-primary">₹{(item.unit_price - item.discount).toFixed(0)}</span>
+                              <span className="text-sm font-bold text-action-primary">
+                                ₹{(item.unit_price * (1 - Number(item.discount) / 100)).toFixed(0)}
+                              </span>
                               <span className="text-xs line-through text-text-secondary">₹{item.unit_price}</span>
                             </>
                           ) : (
@@ -1944,7 +1892,187 @@ const MenuManagement = ({ clientId, token, realm }) => {
           </div>
         </div>
       )}
+      {importValidationModal && (
+        <div className="fixed inset-0 z-50 flex items-center justify-center p-4 bg-black/50">
+          <div className="bg-bg-primary rounded-2xl w-full max-w-md shadow-xl border border-border-default overflow-hidden">
 
+            {/* Header */}
+            <div className="flex items-center gap-3 px-5 py-4 border-b border-border-default bg-yellow-50">
+              <div className="w-9 h-9 rounded-full bg-yellow-100 flex items-center justify-center shrink-0">
+                <svg width="18" height="18" viewBox="0 0 24 24" fill="none" stroke="#b45309" strokeWidth="2" strokeLinecap="round" strokeLinejoin="round">
+                  <path d="M10.29 3.86L1.82 18a2 2 0 001.71 3h16.94a2 2 0 001.71-3L13.71 3.86a2 2 0 00-3.42 0z" />
+                  <line x1="12" y1="9" x2="12" y2="13" /><line x1="12" y1="17" x2="12.01" y2="17" />
+                </svg>
+              </div>
+              <div>
+                <h3 className="text-base font-semibold text-yellow-900">Invalid values detected</h3>
+                <p className="text-xs text-yellow-700 mt-0.5">Some values in your file don't match existing categories</p>
+              </div>
+            </div>
+
+            {/* Body */}
+            <div className="px-5 py-4 space-y-4 max-h-72 overflow-y-auto">
+
+              {/* ── CATEGORY ERRORS ── */}
+              {importValidationModal.invalidCategory?.length > 0 && (
+                <div>
+                  <p className="text-xs font-semibold text-text-secondary uppercase tracking-wide mb-2">
+                    Category — not found
+                  </p>
+                  <div className="flex flex-wrap gap-1.5 mb-2">
+                    {importValidationModal.invalidCategory.map(v => (
+                      <span key={v} className="px-2.5 py-1 rounded-full text-xs bg-red-100 text-red-800 font-medium">
+                        {v}
+                      </span>
+                    ))}
+                  </div>
+                  <p className="text-xs text-text-secondary leading-relaxed">
+                    These categories don't exist in your menu tree. Create them first in the sidebar for a smooth import.
+                    {/* Go to the{" "}
+                    <strong className="text-text-primary">category sidebar</strong> and create them first, then re-import.
+                    Items with missing categories will be <strong className="text-text-primary">skipped</strong> during import. */}
+                  </p>
+                </div>
+              )}
+
+              {/* ── DIETARY ERRORS ── */}
+              {importValidationModal.invalidDietary?.length > 0 && (
+                <div>
+                  <p className="text-xs font-semibold text-text-secondary uppercase tracking-wide mb-2">
+                    Dietary type — not found
+                  </p>
+                  <div className="flex flex-wrap gap-1.5 mb-2">
+                    {importValidationModal.invalidDietary.map(v => (
+                      <span key={v} className="px-2.5 py-1 rounded-full text-xs bg-red-100 text-red-800 font-medium">
+                        {v}
+                      </span>
+                    ))}
+                  </div>
+                  <p className="text-xs text-text-secondary">
+                    Valid options:{" "}
+                    {dietaryOptions.length > 0
+                      ? dietaryOptions.map(d => (
+                        <span key={d} className="inline-block mx-0.5 px-2 py-0.5 rounded-full bg-green-100 text-green-800 text-xs font-medium">{d}</span>
+                      ))
+                      : <span className="italic">none configured</span>}
+                  </p>
+                </div>
+              )}
+
+              {/* ── TIMING ERRORS ── */}
+              {importValidationModal.invalidTiming?.length > 0 && (
+                <div>
+                  <p className="text-xs font-semibold text-text-secondary uppercase tracking-wide mb-2">
+                    Availability timing — not found
+                  </p>
+                  <div className="flex flex-wrap gap-1.5 mb-2">
+                    {importValidationModal.invalidTiming.map(v => (
+                      <span key={v} className="px-2.5 py-1 rounded-full text-xs bg-red-100 text-red-800 font-medium">
+                        {v}
+                      </span>
+                    ))}
+                  </div>
+                  <p className="text-xs text-text-secondary">
+                    Valid options:{" "}
+                    {timingOptions.length > 0
+                      ? timingOptions.map(t => (
+                        <span key={t.name} className="inline-block mx-0.5 px-2 py-0.5 rounded-full bg-green-100 text-green-800 text-xs font-medium">{t.name}</span>
+                      ))
+                      : <span className="italic">none configured</span>}
+                  </p>
+                </div>
+              )}
+
+              {/* ── FOOTER NOTE ── */}
+              <div className="pt-1 border-t border-border-default">
+                <p className="text-xs text-text-secondary leading-relaxed">
+                  {importValidationModal.invalidCategory?.length > 0
+                    ? <>Items with <strong className="text-text-primary">missing categories will always be skipped</strong> even if you proceed. Fix those categories first for a clean import.</>
+                    : <>Clicking <strong className="text-text-primary">Import anyway</strong> will use the raw values as-is. Go to <strong className="text-text-primary">Config</strong> to create missing categories first.</>
+                  }
+                </p>
+              </div>
+            </div>
+
+            {/* Footer buttons */}
+            <div className="flex gap-2 px-5 py-4 border-t border-border-default">
+              <button
+                onClick={() => {
+                  if (importValidationModal.fileEvent) importValidationModal.fileEvent.target.value = "";
+                  setImportValidationModal(null);
+                }}
+                className="flex-1 h-9 rounded-lg border border-border-default text-sm font-semibold bg-bg-tertiary hover:bg-bg-secondary transition-colors"
+              >
+                Cancel
+              </button>
+              <button
+                onClick={async () => {
+                  const ctx = importValidationModal;
+                  setImportValidationModal(null);
+                  try {
+                    await runImport({
+                      parsedData: ctx.parsedData,
+                      priceColumns: ctx.priceColumns,
+                      allMenuItems: ctx.allMenuItems,
+                      created_by: ctx.created_by,
+                      updated_by: ctx.updated_by,
+                      currentCategoriesFlat: ctx.currentCategoriesFlat,
+                      currentSelectedCategoryId: ctx.currentSelectedCategoryId,
+                      currentSections: ctx.currentSections,
+                    });
+                  } catch (err) {
+                    console.error("Import Error:", err);
+                    setImportError(err.message || "Something went wrong during import.");
+                    setTimeout(() => setImportError(null), 4000);
+                  }
+                  if (ctx.fileEvent) ctx.fileEvent.target.value = "";
+                }}
+                className="flex-1 h-9 rounded-lg border border-yellow-400 text-sm font-semibold bg-yellow-50 text-yellow-900 hover:bg-yellow-100 transition-colors"
+              >
+                Import anyway
+              </button>
+            </div>
+
+          </div>
+        </div>
+      )}
+      {importSuccess && (
+        <div className="fixed bottom-6 right-6 z-50 flex items-center gap-3 px-4 py-3 rounded-xl bg-green-600 text-white shadow-lg animate-slideUp">
+          <svg width="18" height="18" viewBox="0 0 24 24" fill="none" stroke="currentColor" strokeWidth="2.5" strokeLinecap="round" strokeLinejoin="round">
+            <path d="M20 6L9 17l-5-5" />
+          </svg>
+          <span className="text-sm font-semibold">Import completed successfully</span>
+          <button
+            onClick={() => setImportSuccess(false)}
+            className="ml-1 opacity-70 hover:opacity-100 transition-opacity"
+          >
+            <svg width="14" height="14" viewBox="0 0 24 24" fill="none" stroke="currentColor" strokeWidth="2.5" strokeLinecap="round" strokeLinejoin="round">
+              <line x1="18" y1="6" x2="6" y2="18" /><line x1="6" y1="6" x2="18" y2="18" />
+            </svg>
+          </button>
+        </div>
+      )}
+      {importError && (
+        <div className="fixed bottom-6 right-6 z-50 flex items-center gap-3 px-4 py-3 rounded-xl bg-red-600 text-white shadow-lg animate-slideUp max-w-sm">
+          <svg width="18" height="18" viewBox="0 0 24 24" fill="none" stroke="currentColor" strokeWidth="2.5" strokeLinecap="round" strokeLinejoin="round" className="shrink-0">
+            <circle cx="12" cy="12" r="10" />
+            <line x1="12" y1="8" x2="12" y2="12" />
+            <line x1="12" y1="16" x2="12.01" y2="16" />
+          </svg>
+          <div className="flex flex-col">
+            <span className="text-sm font-semibold">Import failed</span>
+            <span className="text-xs opacity-80 mt-0.5 leading-snug">{importError}</span>
+          </div>
+          <button
+            onClick={() => setImportError(null)}
+            className="ml-1 opacity-70 hover:opacity-100 transition-opacity shrink-0"
+          >
+            <svg width="14" height="14" viewBox="0 0 24 24" fill="none" stroke="currentColor" strokeWidth="2.5" strokeLinecap="round" strokeLinejoin="round">
+              <line x1="18" y1="6" x2="6" y2="18" /><line x1="6" y1="6" x2="18" y2="18" />
+            </svg>
+          </button>
+        </div>
+      )}
       <UniversalAddModal clientId={clientId}
         token={token}
         showModal={showAddModal} setShowModal={setShowAddModal} modalType="menu"
