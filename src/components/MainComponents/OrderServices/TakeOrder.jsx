@@ -2690,6 +2690,7 @@ const TakeOrder = ({ clientId, token, onOrderUpdate, realm }) => {
       setLoading(false);
     }
   };
+  
   // ─────────────────────────────────────────────────────────────────────────
   // Item click — addon/combo detection
   // ─────────────────────────────────────────────────────────────────────────
@@ -2802,6 +2803,7 @@ const TakeOrder = ({ clientId, token, onOrderUpdate, realm }) => {
           status: 'pending',
           slug: i.slug || '',
           frontend_unique_key: i.frontend_unique_key,
+          parent_item_key: i.parent_item_key,
         }));
 
     try {

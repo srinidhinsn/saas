@@ -31,10 +31,10 @@ const KDS_CONFIG = {
 };
 
 const ORDER_FILTER_OPTIONS = [
-  { key: KDS_CONFIG.FILTERS.ALL,      label: 'All Orders', Icon: Filter },
-  { key: KDS_CONFIG.FILTERS.DINEIN,   label: 'Dine-In',   Icon: Users  },
-  { key: KDS_CONFIG.FILTERS.TAKEAWAY, label: 'Takeaway',  Icon: Package},
-  { key: KDS_CONFIG.FILTERS.DELIVERY, label: 'Delivery',  Icon: Truck  },
+  { key: KDS_CONFIG.FILTERS.ALL, label: 'All Orders', Icon: Filter },
+  { key: KDS_CONFIG.FILTERS.DINEIN, label: 'Dine-In', Icon: Users },
+  { key: KDS_CONFIG.FILTERS.TAKEAWAY, label: 'Takeaway', Icon: Package },
+  { key: KDS_CONFIG.FILTERS.DELIVERY, label: 'Delivery', Icon: Truck },
 ];
 
 // ─── Elapsed time ──────────────────────────────────────────────────────────────
@@ -63,7 +63,7 @@ const deriveStatus = (items) => {
     return status !== 'cancelled' && status !== 'canceled';
   });
   if (!activeItems.length) return PENDING;
-  if (activeItems.some((i) => i.status === PENDING))   return PENDING;
+  if (activeItems.some((i) => i.status === PENDING)) return PENDING;
   if (activeItems.some((i) => i.status === PREPARING)) return PREPARING;
   if (activeItems.every((i) => i.status === READY || i.status === KDS_CONFIG.STATUS.SERVED)) return READY;
   return PENDING;
@@ -122,7 +122,7 @@ const DeleteItemModal = ({ isOpen, onClose, onConfirm, itemName }) => {
         </div>
         <div className="px-6 py-4 flex justify-end gap-3 border-t">
           <button onClick={onConfirm} className="px-4 py-2 rounded-md bg-red-500 text-white font-semibold hover:bg-red-600 transition-colors">Remove</button>
-          <button onClick={onClose}   className="px-4 py-2 rounded-md bg-gray-100 text-gray-700 hover:bg-gray-200 transition-colors">Cancel</button>
+          <button onClick={onClose} className="px-4 py-2 rounded-md bg-gray-100 text-gray-700 hover:bg-gray-200 transition-colors">Cancel</button>
         </div>
       </div>
     </div>
@@ -146,7 +146,7 @@ const DeleteOrderModal = ({ isOpen, onClose, onConfirm, cardToDelete }) => {
         </div>
         <div className="px-6 py-4 flex justify-end gap-3 border-t">
           <button onClick={onConfirm} className="px-4 py-2 rounded-md bg-red-500 text-white font-semibold hover:bg-red-600 transition-colors">Yes</button>
-          <button onClick={onClose}   className="px-4 py-2 rounded-md bg-gray-100 text-gray-700 hover:bg-gray-200 transition-colors">No</button>
+          <button onClick={onClose} className="px-4 py-2 rounded-md bg-gray-100 text-gray-700 hover:bg-gray-200 transition-colors">No</button>
         </div>
       </div>
     </div>
@@ -263,7 +263,7 @@ const AggregatePanel = ({ cards, tablesMap, onClose }) => {
                         <span className="font-bold text-sm">× {ord.qty}</span>
                         <span
                           className={`text-xs px-2 py-0.5 rounded-full font-semibold
-                            ${ord.itemStatus === 'ready'    ? 'bg-green-200 text-green-800' :
+                            ${ord.itemStatus === 'ready' ? 'bg-green-200 text-green-800' :
                               ord.itemStatus === 'preparing' ? 'bg-orange-200 text-orange-800' :
                                 'bg-blue-100 text-blue-700'}`}
                         >
@@ -321,6 +321,29 @@ const ComboComponentsList = ({ menuRecord, menuItemsMap }) => {
 };
 
 // ─── KDS card ─────────────────────────────────────────────────────────────────
+
+const groupItemsWithAddons = (items) => {
+  const grouped = [];
+
+  const mainItems = (items || []).filter(
+    (item) => !item.parent_item_key
+  );
+
+  mainItems.forEach((main) => {
+    const addons = (items || []).filter(
+      (item) =>
+        item.parent_item_key &&
+        item.parent_item_key.startsWith(`${main.item_id}_`)
+    );
+
+    grouped.push({
+      main,
+      addons,
+    });
+  });
+
+  return grouped;
+};
 
 const KitchenCard = ({
   card,
@@ -381,7 +404,8 @@ const KitchenCard = ({
 
       {/* ── Card body — item list ── */}
       <div className="bg-bg-primary px-4 py-4 space-y-3 flex-1">
-        {(card.items || []).map((item, idx) => {
+        {groupItemsWithAddons(card.items).map(({ main, addons }, idx) => {
+          const item = main;
           const menuRecord =
             menuItemsMap[Number(item.item_id)] || menuItemsMap[String(item.item_id)];
 
@@ -459,10 +483,19 @@ const KitchenCard = ({
                 />
               )}
 
-              {/* Addon label */}
-              {item.is_addon && (
-                <div className="mt-0.5 pl-2 border-l-2 border-blue-200">
-                  <span className="text-[10px] text-blue-500 font-semibold">↳ add-on</span>
+              {addons.length > 0 && (
+                <div className="mt-1.5 ml-1 space-y-0.5">
+                  {addons.map((addon, addonIdx) => (
+                    <div
+                      key={addon.id || addonIdx}
+                      className="flex items-center gap-1.5 pl-3 border-l-2 border-blue-300 py-0.5"
+                    >
+                      <ChevronRight size={10} className="text-blue-400 flex-shrink-0" />
+                      <span className="text-[11px] text-blue-700 font-medium leading-tight">
+                        {addon.quantity} x {addon.item_name}
+                      </span>
+                    </div>
+                  ))}
                 </div>
               )}
             </div>
@@ -744,22 +777,31 @@ const KitchenDisplay = () => {
       // ── KEY FIX: send ONLY the single changed item in the payload.
       //    Sending all items was writing every sibling's stale status back to the
       //    backend, resetting them to whatever the JS closure had at click time.
-      const singleItemPayload = [{
-        id: targetItem.id,
-        item_id: targetItem.item_id,
-        item_name: targetItem.item_name,
-        quantity: targetItem.quantity,
-        status: newStatus,                              // ← the only field that changes
-        note: targetItem.note || '',
-        slug: targetItem.slug || '',
-        unit_price: targetItem.unit_price || 0,
-        line_total: (targetItem.unit_price || 0) * (targetItem.quantity || 1),
+      const linkedItems = (card.items || []).filter((i) => {
+        if (String(i.id) === String(itemId)) return true;
+
+        return (
+          i.parent_item_key &&
+          i.parent_item_key.startsWith(`${targetItem.item_id}_`)
+        );
+      });
+
+      const singleItemPayload = linkedItems.map((linked) => ({
+        id: linked.id,
+        item_id: linked.item_id,
+        item_name: linked.item_name,
+        quantity: linked.quantity,
+        status: newStatus,
+        note: linked.note || '',
+        slug: linked.slug || '',
+        unit_price: linked.unit_price || 0,
+        line_total: (linked.unit_price || 0) * (linked.quantity || 1),
         client_id: clientId,
         order_id: card.sub_order_id,
-        frontend_unique_key: targetItem.frontend_unique_key || null,
-        is_addon: targetItem.is_addon || false,
-        parent_item_key: targetItem.parent_item_key || null,
-      }];
+        frontend_unique_key: linked.frontend_unique_key || null,
+        is_addon: linked.is_addon || false,
+        parent_item_key: linked.parent_item_key || null,
+      }));
 
       // Fire both API calls in parallel — faster round-trip
       await Promise.all([
@@ -829,11 +871,10 @@ const KitchenDisplay = () => {
                 <button
                   key={key}
                   onClick={() => setOrderFilter(key)}
-                  className={`flex items-center gap-2 px-4 py-2 rounded-lg font-medium text-sm transition-all ${
-                    orderFilter === key
-                      ? 'bg-action-primary text-text-white shadow-sm'
-                      : 'bg-bg-tertiary text-text-secondary hover:text-text-primary border border-border-default'
-                  }`}
+                  className={`flex items-center gap-2 px-4 py-2 rounded-lg font-medium text-sm transition-all ${orderFilter === key
+                    ? 'bg-action-primary text-text-white shadow-sm'
+                    : 'bg-bg-tertiary text-text-secondary hover:text-text-primary border border-border-default'
+                    }`}
                 >
                   <Icon size={16} />
                   {label}
