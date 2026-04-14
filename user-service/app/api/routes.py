@@ -20,6 +20,7 @@ from jose import jwt
 import uuid
 from sqlalchemy import func
 from models.client_model import AddressModel 
+from utils.services import add_master_value , get_master_values ,delete_master_value
 router = APIRouter()
 # ================== ADD USER ==================
 @router.post("/add")
@@ -692,3 +693,21 @@ async def get_addresses(client_id: str, context: SaasContext = Depends(verify_to
     address_models = [Address.copyToModel(a) for a in addresses]
 
     return ResponseModel(screen_id=context.screen_id,data={"addresses": address_models})
+
+@router.get("/roles")
+def get_roles(client_id: str, category_id: str,context: SaasContext = Depends(verify_token),db: Session = Depends(get_db)):
+    data = get_master_values(db, client_id, category_id)
+
+    return ResponseModel(screen_id=context.screen_id,status="success",message="Roles fetched",data=data)
+
+@router.post("/roles")
+def add_role(client_id: str, category_id: str, value: str,context: SaasContext = Depends(verify_token),db: Session = Depends(get_db)):
+    data = add_master_value(db, client_id, category_id, value)
+
+    return ResponseModel(screen_id=context.screen_id,status="success",message="Role added",data=data)
+
+@router.delete("/roles")
+def delete_role(client_id: str, category_id: str, value: str,context: SaasContext = Depends(verify_token),db: Session = Depends(get_db)):
+    data = delete_master_value(db, client_id, category_id, value)
+
+    return ResponseModel(screen_id=context.screen_id,status="success",message="Role deleted",data=data)
