@@ -10,7 +10,9 @@ from models.response_model import ResponseModel
 from models.saas_context import SaasContext
 from utils.auth import verify_token
 from ..services import service
-from ..services.service import _compute_current_stock, _record_transaction, _convert
+from utils.transaction import _compute_current_stock, record_transaction, _convert
+from sqlalchemy import text
+from utils.services import add_master_value , get_master_values ,delete_master_value
 
 # -------------------- CONFIG --------------------
 router = APIRouter()
@@ -66,6 +68,7 @@ def create_inventory(item: Inventory, client_id: str, context: SaasContext = Dep
 
     model = InventoryEntity.copyToModel(saved)
     return ResponseModel[Inventory](screen_id=context.screen_id,status="success",message="Inventory item created",data=model)
+
 
 @router.post("/update", response_model=ResponseModel[Inventory])
 def update_inventory(
@@ -178,8 +181,7 @@ def update_inventory_availability(
         if delta != Decimal("0"):
             movement = "IN" if delta > 0 else "OUT"
 
-            _record_transaction(
-                db,
+            record_transaction( db, InventoryTransaction(
                 client_id=client_id,
                 stock_item_id=record.id,
                 inventory_id=record.inventory_id,
@@ -192,6 +194,7 @@ def update_inventory_availability(
                 after_stock=new_qty,
                 created_by=getattr(context, "user_id", None),
                 remarks=f"Manual availability update for menu item '{record.name}'",
+            )
             )
 
         record.availability = new_qty
@@ -206,7 +209,7 @@ def update_inventory_availability(
         message="Inventory availability updated",
         data=model,
     )
-@router.post("/delete", response_model=ResponseModel[Inventory])
+
 
 @router.post("/delete", response_model=ResponseModel[Inventory])
 def delete_inventory(
@@ -381,6 +384,9 @@ def create_stock_item(
  
     payload = item.dict()
     payload["client_id"] = client_id
+    if not payload.get("id"):
+        result = db.execute(text("SELECT nextval('inventory_id_seq')"))
+        payload["id"] = result.scalar()
  
     # Quantity that will go into the transaction (defaults to 0 if not provided)
     opening_qty = Decimal(str(payload.get("availability") or "0"))
@@ -398,8 +404,7 @@ def create_stock_item(
     before_stock = Decimal("0")
     after_stock = before_stock + opening_qty
  
-    _record_transaction(
-        db,
+    record_transaction(db, InventoryTransaction(
         client_id=client_id,
         stock_item_id=db_item.id,
         inventory_id=db_item.inventory_id,
@@ -412,6 +417,7 @@ def create_stock_item(
         after_stock=after_stock,
         created_by=getattr(context, "user_id", None),
         remarks="Opening stock on item creation",
+    )
     )
  
     # Sync availability back onto the inventory row
@@ -457,8 +463,7 @@ def add_stock_quantity(
     before_stock = _compute_current_stock(db, client_id, stock_item_id)
     after_stock = before_stock + Decimal(str(quantity))
  
-    _record_transaction(
-        db,
+    record_transaction( db, InventoryTransaction(
         client_id=client_id,
         stock_item_id=stock_item_id,
         inventory_id=record.inventory_id,
@@ -473,6 +478,7 @@ def add_stock_quantity(
         reference_type=reference_type,
         created_by=getattr(context, "user_id", None),
         remarks=remarks or "Stock replenishment",
+    )
     )
  
     # Sync availability
@@ -525,8 +531,7 @@ def deduct_stock_quantity(
             detail=f"Insufficient stock. Available: {before_stock}, Requested: {qty}",
         )
  
-    _record_transaction(
-        db,
+    record_transaction( db, InventoryTransaction(
         client_id=client_id,
         stock_item_id=stock_item_id,
         inventory_id=record.inventory_id,
@@ -541,6 +546,7 @@ def deduct_stock_quantity(
         reference_type=reference_type,
         created_by=getattr(context, "user_id", None),
         remarks=remarks,
+    )
     )
  
     # Sync availability
@@ -619,8 +625,7 @@ def manual_deduct_stock(
             ),
         )
 
-    _record_transaction(
-        db,
+    record_transaction( db, InventoryTransaction(
         client_id=client_id,
         stock_item_id=stock_item_id,
         inventory_id=record.inventory_id,
@@ -633,6 +638,7 @@ def manual_deduct_stock(
         after_stock=after_stock,
         created_by=getattr(context, "user_id", None),
         remarks=remarks or None,
+    )
     )
 
     record.availability = after_stock
@@ -690,8 +696,7 @@ def update_stock_item(
  
         if delta != Decimal("0"):
             movement = "IN" if delta > 0 else "OUT"
-            _record_transaction(
-                db,
+            record_transaction( db, InventoryTransaction(
                 client_id=client_id,
                 stock_item_id=record.id,
                 inventory_id=record.inventory_id,
@@ -704,6 +709,7 @@ def update_stock_item(
                 after_stock=new_qty,
                 created_by=getattr(context, "user_id", None),
                 remarks="Manual stock adjustment via update",
+            )
             )
  
         record.availability = new_qty
@@ -899,108 +905,21 @@ def update_recipe_for_menu(
         message="Recipe updated", 
         data=model
     )
-# ============================================= Add Role ======================================================== #
-@router.post("/roles", response_model=ResponseModel)
-def add_role(client_id: str,category_id: str,value: str,context: SaasContext = Depends(verify_token),db: Session = Depends(get_db)):
-    role = value.strip().lower()
-    
-    if not role:
-        raise HTTPException(status_code=400, detail="Role name is required")
 
-    category = db.query(CategoryEntity).filter(
-        CategoryEntity.id == category_id,
-        CategoryEntity.client_id == client_id
-    ).first()
+@router.get("/item-types")
+def get_item_types(client_id: str, category_id: str,context: SaasContext = Depends(verify_token),db: Session = Depends(get_db)):
+    data = get_master_values(db, client_id, category_id)
 
-    if not category:
-        raise HTTPException(status_code=404, detail="Category not found")
+    return ResponseModel(screen_id=context.screen_id,status="success",message="Config fetched",data=data)
 
-    items = category.sub_categories or []
+@router.post("/item-types")
+def add_item_type(client_id: str, category_id: str, value: str,context: SaasContext = Depends(verify_token),db: Session = Depends(get_db)):
+    data = add_master_value(db, client_id, category_id, value)
 
-    if role in [r.lower() for r in items]:
-        raise HTTPException(status_code=409, detail="Role already exists")
+    return ResponseModel(screen_id=context.screen_id,status="success",message="Config added",data=data)
 
-    category.sub_categories = items + [role]
+@router.delete("/item-types")
+def delete_item_type(client_id: str, category_id: str, value: str,context: SaasContext = Depends(verify_token),db: Session = Depends(get_db)):
+    data = delete_master_value(db, client_id, category_id, value)
 
-    existing_role_row = db.query(CategoryEntity).filter(
-        CategoryEntity.id == role,
-        CategoryEntity.client_id == client_id
-    ).first()
-
-    if not existing_role_row:
-        db.add(
-            CategoryEntity(
-                id=role,
-                client_id=client_id,
-                name=role.capitalize(),
-                description=f"Role {role}",
-                sub_categories=None,
-                slug=f"_Role_{role}",
-            )
-        )
-
-    db.commit()
-    db.refresh(category)
-
-    return ResponseModel(screen_id=context.screen_id,status="success",message="Role added successfully",data=category.sub_categories)
-
-@router.delete("/roles", response_model=ResponseModel)
-def delete_role(client_id: str,category_id: str,value: str,context: SaasContext = Depends(verify_token),db: Session = Depends(get_db)):
-    role = value.strip().lower()
-
-    category = db.query(CategoryEntity).filter(
-        CategoryEntity.id == category_id,
-        CategoryEntity.client_id == client_id
-    ).first()
-
-    if not category:
-        raise HTTPException(status_code=404, detail="Category not found")
-
-    items = category.sub_categories or []
-
-    if role not in [i.lower() for i in items]:
-        raise HTTPException(status_code=404, detail="Role not found")
-
-    category.sub_categories = [i for i in items if i.lower() != role]
-
-    role_row = db.query(CategoryEntity).filter(
-        CategoryEntity.id == role,
-        CategoryEntity.client_id == client_id
-    ).first()
-
-    if role_row:
-        db.delete(role_row)
-
-    db.commit()
-    db.refresh(category)
-
-    return ResponseModel(screen_id=context.screen_id,status="success",message="Role deleted successfully",data=category.sub_categories)
-
-@router.get("/masters", response_model=ResponseModel)
-def get_master_values(
-    client_id: str,
-    category_id: str,
-    context: SaasContext = Depends(verify_token),
-    db: Session = Depends(get_db),
-):
-    category = db.query(CategoryEntity).filter(
-        CategoryEntity.id == category_id,
-        CategoryEntity.client_id == client_id
-    ).first()
-
-    if not category:
-        return ResponseModel(
-            screen_id=context.screen_id,
-            status="success",
-            message="No master values",
-            data=[]
-        )
-
-    values = category.sub_categories or []
-
-    return ResponseModel(
-        screen_id=context.screen_id,
-        status="success",
-        message="Fetched master values",
-        data=values
-    )
+    return ResponseModel(screen_id=context.screen_id,status="success",message="Config deleted",data=data)

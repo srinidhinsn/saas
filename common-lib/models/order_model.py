@@ -40,6 +40,7 @@ class OrderItemModel(BaseModel):
     line_total: Optional[float] = None
     status: Optional[OrderStatusEnum] = None
     frontend_unique_key: Optional[str] = None
+    parent_item_key: Optional[str] = None
 
     class Config:
         orm_mode = True

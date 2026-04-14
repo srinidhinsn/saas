@@ -2,6 +2,7 @@ from entity.inventory_entity import CategoryEntity, InventoryEntity, InventoryTr
 from database.postgres import get_db
 from sqlalchemy.orm import Session
 from models.order_model import TransactionTypeEnum, MovementTypeEnum
+from models.inventory_model import InventoryTransaction
 from decimal import Decimal
 from typing import Optional
 import uuid
@@ -9,6 +10,30 @@ from entity.inventory_entity import InventoryEntity
 # ─────────────────────────────────────────────────────────────────────────────
 # Shared transaction helpers — used by order_service and order_router
 # ─────────────────────────────────────────────────────────────────────────────
+
+def _compute_current_stock(db: Session, client_id: str, stock_item_id: int) -> Decimal:
+    """
+    Sum all transactions for a stock item to get the live stock level.
+    IN transactions add, OUT transactions subtract.
+    """
+    rows = (
+        db.query(InventoryTransactionEntity)
+        .filter(
+            InventoryTransactionEntity.client_id == client_id,
+            InventoryTransactionEntity.stock_item_id == stock_item_id,
+        )
+        .all()
+    )
+    total = Decimal("0")
+    for row in rows:
+        qty = Decimal(str(row.quantity))
+        if row.movement_type == "IN":
+            total += qty
+        else:
+            total -= qty
+    return total
+ 
+
 
 UNIT_TO_BASE = {
     "g": 1,
@@ -42,39 +67,13 @@ def _convert(recipe_qty: float, recipe_unit: str, stock_unit: str) -> float:
 
 def record_transaction(
     db: Session,
-    *,
-    client_id: str,
-    stock_item_id: int,
-    inventory_id: Optional[str],
-    name: Optional[str],
-    transaction_type: TransactionTypeEnum,
-    movement_type: MovementTypeEnum,
-    quantity: Decimal,
-    unit: Optional[str],
-    before_stock: Decimal,
-    after_stock: Decimal,
-    reference_id: Optional[str] = None,
-    reference_type: Optional[str] = None,
-    created_by: Optional[str] = None,
-    remarks: Optional[str] = None,
+    tx_model: InventoryTransaction
 ) -> InventoryTransactionEntity:
-    tx = InventoryTransactionEntity(
-        transaction_id=str(uuid.uuid4()),
-        client_id=client_id,
-        stock_item_id=stock_item_id,
-        inventory_id=inventory_id,
-        name=name,
-        transaction_type=transaction_type.value,
-        movement_type=movement_type.value,
-        quantity=quantity,
-        unit=unit,
-        before_stock=before_stock,
-        after_stock=after_stock,
-        reference_id=reference_id,
-        reference_type=reference_type,
-        created_by=created_by,
-        remarks=remarks,
-    )
+    tx = InventoryTransactionEntity(**tx_model.dict())
+
+    if not tx.transaction_id:
+        tx.transaction_id = str(uuid.uuid4())
+
     db.add(tx)
     return tx
 

@@ -4,6 +4,7 @@ from entity.order_entity import DineinOrder as DBOrder, OrderItem as DBOrderItem
 from entity.order_entity import DineinOrder as Db_Order_Entity, OrderItem as Db_OrderItem_Entity
 from entity.inventory_entity import InventoryEntity, InventoryTransactionEntity
 from models.order_model import TransactionTypeEnum, MovementTypeEnum
+from models.inventory_model import InventoryTransaction
 from utils.transaction import record_transaction
 from decimal import Decimal
 
@@ -214,8 +215,7 @@ def _deduct_stock_for_order(db: Session, client_id: str, order_id: int) -> None:
                     before_stock = Decimal(str(menu_item.availability or 0))
                     after_stock = max(before_stock - total_menu_deduction, Decimal("0"))
 
-                    record_transaction(
-                        db,
+                    record_transaction( db, InventoryTransaction(
                         client_id=client_id,
                         stock_item_id=menu_item.id,
                         inventory_id=menu_item.inventory_id,
@@ -229,6 +229,7 @@ def _deduct_stock_for_order(db: Session, client_id: str, order_id: int) -> None:
                         reference_id=str(order_id),
                         reference_type="order",
                         remarks=menu_dedup_key,
+                    )
                     )
 
                     menu_item.availability = after_stock
@@ -287,8 +288,7 @@ def _deduct_stock_for_order(db: Session, client_id: str, order_id: int) -> None:
             before_stock = Decimal(str(stock_item.availability or 0))
             after_stock = max(before_stock - deduction_decimal, Decimal("0"))
 
-            record_transaction(
-                db,
+            record_transaction( db, InventoryTransaction(
                 client_id=client_id,
                 stock_item_id=stock_item.id,
                 inventory_id=stock_item.inventory_id,
@@ -302,6 +302,7 @@ def _deduct_stock_for_order(db: Session, client_id: str, order_id: int) -> None:
                 reference_id=str(order_id),
                 reference_type="order",
                 remarks=dedup_key,
+            )
             )
 
             stock_item.availability = after_stock

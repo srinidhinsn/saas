@@ -18,6 +18,7 @@ from utils.transaction import record_transaction, record_partial_transaction
 from models.saas_context import SaasContext
 from typing import Optional
 from entity.inventory_entity import InventoryEntity
+from models.inventory_model import InventoryTransaction
 from ..services.order_service import (
     _root_dinein_id,
     _order_row_to_flat,
@@ -48,10 +49,12 @@ def create_order(client_id: str, order: DineinOrderModel, context: SaasContext =
 
     for item in order.items:
         db_item = Db_OrderItem_Entity(
-            order_id=db_order.id, client_id=client_id, item_id=item.item_id,
-            item_name=item.item_name, slug=item.slug, quantity=item.quantity,
-            unit_price=item.unit_price, line_total=item.line_total, status=item.status,
-        )
+           order_id=db_order.id, client_id=client_id, item_id=item.item_id,
+           item_name=item.item_name, slug=item.slug, quantity=item.quantity,
+           unit_price=item.unit_price, line_total=item.line_total, status=item.status,
+           parent_item_key=item.parent_item_key,
+           frontend_unique_key=item.frontend_unique_key,
+)
         db.add(db_item)
     db.commit()
     db.refresh(db_order)
@@ -598,8 +601,7 @@ def delete_order_items(
 
         if menu_item:
             if tx_type == TransactionTypeEnum.item_cancelled:
-                record_transaction(
-                    db,
+                record_transaction( db, InventoryTransaction(
                     client_id=client_id,
                     stock_item_id=menu_item.id,
                     inventory_id=menu_item.inventory_id,
@@ -613,7 +615,7 @@ def delete_order_items(
                     reference_id=str(order_id),
                     reference_type="order",
                     remarks=f"[ITEM_CANCELLED] Order #{order_id} — {base_remarks}",
-                )
+                ))
 
             elif tx_type == TransactionTypeEnum.wastage:
                 serving_qty = float(menu_item.serving_quantity or 0)
@@ -627,8 +629,7 @@ def delete_order_items(
                         before_stock = Decimal(str(menu_item.availability or 0))
                         after_stock = before_stock + reversal_qty
 
-                        record_transaction(
-                            db,
+                        record_transaction( db, InventoryTransaction(
                             client_id=client_id,
                             stock_item_id=menu_item.id,
                             inventory_id=menu_item.inventory_id,
@@ -643,6 +644,7 @@ def delete_order_items(
                             reference_type="order",
                             remarks=f"[MENU_ITEM_REVERSAL] Order #{order_id} — {base_remarks}",
                         )
+                        )
                         menu_item.availability = after_stock
 
                     except ValueError as exc:
@@ -650,8 +652,7 @@ def delete_order_items(
                             f"[WARN] Skipping menu item reversal for item_id={menu_item.id}: {exc}"
                         )
                 else:
-                    record_transaction(
-                        db,
+                    record_transaction( db, InventoryTransaction(
                         client_id=client_id,
                         stock_item_id=menu_item.id,
                         inventory_id=menu_item.inventory_id,
@@ -665,6 +666,7 @@ def delete_order_items(
                         reference_id=str(order_id),
                         reference_type="order",
                         remarks=f"[WASTAGE_NO_SERVING_QTY] Order #{order_id} — {base_remarks}",
+                    )
                     )
 
                 if menu_item.recipe:
@@ -702,8 +704,7 @@ def delete_order_items(
                         before_ing = Decimal(str(stock_item.availability or 0))
                         after_ing = before_ing + reversal_decimal
 
-                        record_transaction(
-                            db,
+                        record_transaction( db, InventoryTransaction(
                             client_id=client_id,
                             stock_item_id=stock_item.id,
                             inventory_id=stock_item.inventory_id,
@@ -717,6 +718,7 @@ def delete_order_items(
                             reference_id=str(order_id),
                             reference_type="order",
                             remarks=f"[INGREDIENT_REVERSAL] Order #{order_id} — {base_remarks}",
+                        )
                         )
                         stock_item.availability = after_ing
 
@@ -838,8 +840,7 @@ def cancel_order(
         Decimal(str(order.total_price or 0)) for order in related_orders
     )
 
-    record_transaction(
-        db,
+    record_transaction( db, InventoryTransaction(
         client_id=client_id,
         stock_item_id=0,
         inventory_id=f"DINEIN-{root_dinein_id}",
@@ -859,6 +860,7 @@ def cancel_order(
             f"Total Value: {total_cancel_value} | "
             f"Reason: {effective_reason}"
         ),
+    )
     )
 
     # 2. Item-level cancellation transactions
@@ -888,8 +890,7 @@ def cancel_order(
 
             if menu_item:
                 if item.status == OrderStatusEnum.served:
-                    record_transaction(
-                        db,
+                    record_transaction( db, InventoryTransaction(
                         client_id=client_id,
                         stock_item_id=menu_item.id,
                         inventory_id=menu_item.inventory_id,
@@ -909,9 +910,9 @@ def cancel_order(
                             f"{effective_reason}"
                         ),
                     )
+                    )
                 else:
-                    record_transaction(
-                        db,
+                    record_transaction( db, InventoryTransaction(
                         client_id=client_id,
                         stock_item_id=menu_item.id,
                         inventory_id=menu_item.inventory_id,
@@ -930,6 +931,7 @@ def cancel_order(
                             f"{item.item_name} x{ordered_qty} | "
                             f"{effective_reason}"
                         ),
+                    )
                     )
 
             item.status = OrderStatusEnum.cancelled
@@ -1040,8 +1042,7 @@ def delete_order(
                             )
                             before_stock = Decimal(str(menu_item.availability or 0))
                             after_stock = before_stock + reversal_qty
-                            record_transaction(
-                                db,
+                            record_transaction( db, InventoryTransaction(
                                 client_id=client_id,
                                 stock_item_id=menu_item.id,
                                 inventory_id=menu_item.inventory_id,
@@ -1055,6 +1056,7 @@ def delete_order(
                                 reference_id=str(o.id),
                                 reference_type="order",
                                 remarks=f"[WASTAGE_ORDER_CANCELLED] Order #{o.id} — {base_remarks}",
+                            )
                             )
                             menu_item.availability = after_stock
                         except ValueError as exc:
@@ -1090,8 +1092,7 @@ def delete_order(
                             reversal_decimal = Decimal(str(round(reversal, 6)))
                             before_ing = Decimal(str(stock_item.availability or 0))
                             after_ing = before_ing + reversal_decimal
-                            record_transaction(
-                                db,
+                            record_transaction( db, InventoryTransaction(
                                 client_id=client_id,
                                 stock_item_id=stock_item.id,
                                 inventory_id=stock_item.inventory_id,
@@ -1106,6 +1107,7 @@ def delete_order(
                                 reference_type="order",
                                 remarks=f"[INGREDIENT_REVERSAL_ORDER_CANCELLED] Order #{o.id} — {base_remarks}",
                             )
+                            )
                             stock_item.availability = after_ing
 
             else:
@@ -1119,8 +1121,7 @@ def delete_order(
                 )
                 if menu_item:
                     ordered_qty = it.quantity or 1
-                    record_transaction(
-                        db,
+                    record_transaction( db, InventoryTransaction(
                         client_id=client_id,
                         stock_item_id=menu_item.id,
                         inventory_id=menu_item.inventory_id,
@@ -1137,6 +1138,7 @@ def delete_order(
                             f"[ITEM_CANCELLED_ORDER_CANCELLED] Order #{o.id} — "
                             f"{effective_reason} | {it.item_name} x{ordered_qty}"
                         ),
+                    )
                     )
 
             it.status = OrderStatusEnum.cancelled
