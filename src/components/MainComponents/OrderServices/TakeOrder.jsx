@@ -938,7 +938,7 @@ const OldItemRow = ({ group, clientId, token, activeDineinOrderId, onRequestDele
           <div className="min-w-0 flex-1">
             <h4 className="text-sm font-semibold truncate text-gray-800">{main.name}</h4>
             <p className="text-xs font-bold text-action-primary">
-              ₹{(main.unit_price - (main.discount || 0)).toFixed(2)}
+            ₹{(main.unit_price * (1 - (Number(main.discount) || 0) / 100)).toFixed(2)}
             </p>
             <div className="flex items-center gap-1.5 mt-1 flex-wrap">
               {main.batch_label && main.batch_label !== activeDineinOrderId && (
@@ -970,7 +970,7 @@ const OldItemRow = ({ group, clientId, token, activeDineinOrderId, onRequestDele
           <span className="text-xs text-blue-600">↳</span>
           <span className="text-sm text-gray-700 truncate flex-1">{addon.name}</span>
           <span className="text-xs font-semibold text-blue-600">
-            ₹{(addon.unit_price - (addon.discount || 0)).toFixed(2)}
+          ₹{(addon.unit_price * (1 - (Number(addon.discount) || 0) / 100)).toFixed(2)}
           </span>
           <span className="text-xs text-gray-500 w-6 text-center">×{addon.quantity}</span>
         </div>
@@ -1004,7 +1004,7 @@ const NewItemRow = ({ group, clientId, token, onUpdateQuantity, onRemove }) => {
           <div className="min-w-0 flex-1">
             <h4 className="text-sm font-semibold truncate text-gray-800">{main.name}</h4>
             <p className="text-xs font-bold text-action-primary">
-              ₹{(main.unit_price - (main.discount || 0)).toFixed(2)}
+            ₹{(main.unit_price * (1 - (Number(main.discount) || 0) / 100)).toFixed(2)}
             </p>
           </div>
         </div>
@@ -1041,7 +1041,7 @@ const NewItemRow = ({ group, clientId, token, onUpdateQuantity, onRemove }) => {
           <span className="text-xs text-orange-600">↳</span>
           <span className="text-sm text-gray-700 truncate flex-1">{addon.name}</span>
           <span className="text-xs font-semibold text-orange-600">
-            ₹{(addon.unit_price - (addon.discount || 0)).toFixed(2)}
+          ₹{(addon.unit_price * (1 - (Number(addon.discount) || 0) / 100)).toFixed(2)}
           </span>
           <span className="text-xs text-gray-500 w-6 text-center">×{addon.quantity}</span>
         </div>
@@ -1153,7 +1153,7 @@ const TableReservation = ({
               </button>
             ))}
             <div className="w-px bg-border-default mx-1" />
-            {zonesFromDB.map(zone => (
+            {/* {zonesFromDB.map(zone => (
               <button
                 key={zone}
                 onClick={() => toggleFilter(zone, setSelectedZones)}
@@ -1164,7 +1164,7 @@ const TableReservation = ({
               >
                 {zone}
               </button>
-            ))}
+            ))} */}
           </div>
           <div className="ml-auto flex bg-bg-primary border-2 rounded-full border-action-primary p-1 shadow-sm">
             <button
@@ -1760,39 +1760,40 @@ const TakeOrder = ({ clientId, token, onOrderUpdate, realm }) => {
     }
     return null;
   };
-  const isItemActive = useCallback((slug) => {
-    if (!slug) return true;
-    if (!timingOptions || timingOptions.length === 0) return true;
+const isItemActive = useCallback((slug) => {
+  if (!slug) return true;
 
-    const doubleUnderIdx = slug.lastIndexOf('__');
-    const timingSegment = doubleUnderIdx !== -1
-      ? slug.slice(doubleUnderIdx + 2).toLowerCase()
-      : null;
+  const doubleUnderIdx = slug.lastIndexOf('__');
+  const timingSegment = doubleUnderIdx !== -1
+    ? slug.slice(doubleUnderIdx + 2).toLowerCase()
+    : null;
 
-    if (!timingSegment || timingSegment === 'allday') return true;
+  // ✅ Explicit unavailable flag
+  if (timingSegment === 'unavailable') return false;
 
-    const timingKeys = timingSegment.split('+').filter(Boolean);
-    if (timingKeys.length === 0) return true;
+  if (!timingOptions || timingOptions.length === 0) return true;
+  if (!timingSegment || timingSegment === 'allday') return true;
 
-    // Only consider keys that are actually recognized in config
-    const recognizedKeys = timingKeys.filter(key => {
-      const t = timingOptions.find(o => o.name?.toLowerCase() === key);
-      return t && t.start && t.end;
-    });
+  const timingKeys = timingSegment.split('+').filter(Boolean);
+  if (timingKeys.length === 0) return true;
 
-    // If no keys are recognized, don't hide the item (same as MenuManagement)
-    if (recognizedKeys.length === 0) return true;
+  const recognizedKeys = timingKeys.filter(key => {
+    const t = timingOptions.find(o => o.name?.toLowerCase() === key);
+    return t && t.start && t.end;
+  });
 
-    const now = new Date();
-    const currentMinutes = now.getHours() * 60 + now.getMinutes();
+  if (recognizedKeys.length === 0) return true;
 
-    return recognizedKeys.some(key => {
-      const t = timingOptions.find(o => o.name?.toLowerCase() === key);
-      const [sh, sm] = t.start.split(':').map(Number);
-      const [eh, em] = t.end.split(':').map(Number);
-      return currentMinutes >= (sh * 60 + sm) && currentMinutes <= (eh * 60 + em);
-    });
-  }, [timingOptions]);
+  const now = new Date();
+  const currentMinutes = now.getHours() * 60 + now.getMinutes();
+
+  return recognizedKeys.some(key => {
+    const t = timingOptions.find(o => o.name?.toLowerCase() === key);
+    const [sh, sm] = t.start.split(':').map(Number);
+    const [eh, em] = t.end.split(':').map(Number);
+    return currentMinutes >= (sh * 60 + sm) && currentMinutes <= (eh * 60 + em);
+  });
+}, [timingOptions]);
   // ─────────────────────────────────────────────────────────────────────────
   // Determine if a category is a combo category (walks ancestors)
   // ─────────────────────────────────────────────────────────────────────────
@@ -2415,9 +2416,8 @@ const TakeOrder = ({ clientId, token, onOrderUpdate, realm }) => {
     return {
       id: Number(item.id),
       name: item.name,
-      unit_price: item.unit_price || 0,
       image_id: item.image_id,
-      discount: item.discount || 0,
+      unit_price: (item.unit_price || 0) * (1 - (Number(item.discount) || 0) / 100),
       slug: item.slug,
       category: item.category_name,
       category_id: item.category_id || null,
@@ -3297,15 +3297,15 @@ const TakeOrder = ({ clientId, token, onOrderUpdate, realm }) => {
 
                     {/* Dietary type pills */}
                     <div className="flex gap-1.5 overflow-x-auto scrollbar-hide flex-1">
-                      {/* <button
+                      <button
                         onClick={() => setSelectedDietary(null)}
                         className={`px-3 py-1.5 rounded-full text-xs font-semibold whitespace-nowrap flex-shrink-0 transition-all border
         ${!selectedDietary
                             ? 'bg-action-primary text-white border-action-primary'
                             : 'bg-bg-tertiary text-text-primary border-border-default hover:border-action-primary'}`}
                       >
-                        All ({menuItems.length})
-                      </button> */}
+                        All
+                      </button>
                       {dietaryOptions.map(type => {
                         const key = type.toLowerCase().replace(/[-_\s]/g, '');
                         const count = menuItems.filter(item => {
@@ -3351,10 +3351,8 @@ const TakeOrder = ({ clientId, token, onOrderUpdate, realm }) => {
                 {/* Item grid */}
                 <div className={`grid gap-2 grid-cols-2 md:grid-cols-4 ${showCart ? 'lg:grid-cols-3' : 'lg:grid-cols-4'}`}>
                   {filteredItems.map(item => {
-                    const dp = item.discount && item.unit_price && Number(item.discount) > 0
-                      ? ((Number(item.discount) * 100) / Number(item.unit_price)).toFixed(0)
-                      : null;
-                    const isCombo = isComboCategoryId(item.category_id);
+                    const dp = item.discount && Number(item.discount) > 0
+                      ? Number(item.discount).toFixed(0) : null;
                     const ac = item.line_item_id?.length || 0;
                     const dietary = getDietaryFromSlug(item);
                     const dietaryColor = dietary ? (dietaryColorMap[dietary] || '') : '';
@@ -3385,7 +3383,7 @@ const TakeOrder = ({ clientId, token, onOrderUpdate, realm }) => {
                             {dp ? (
                               <>
                                 <span className="text-sm font-bold text-action-primary">
-                                  ₹{(item.unit_price - item.discount).toFixed(0)}
+                                  ₹{(item.unit_price * (1 - Number(item.discount) / 100)).toFixed(0)}
                                 </span>
                                 <span className="text-xs line-through text-text-secondary">
                                   ₹{item.unit_price}

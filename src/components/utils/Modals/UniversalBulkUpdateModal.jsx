@@ -107,7 +107,7 @@ const UniversalBulkUpdateModal = ({
           headers: { Authorization: `Bearer ${token}` }
         }
       );
-  
+
       setDietaryOptions(res.data?.data || []);
     } catch (err) {
       console.error("Dietary fetch error:", err);
@@ -372,7 +372,7 @@ const UniversalBulkUpdateModal = ({
                 </span>
               </div>
 
-              <div className="flex gap-2 w-full sm:w-auto">
+              <div className="flex gap-2 w-full sm:w-auto flex-wrap">
                 <button
                   onClick={handleBulkUpdate}
                   disabled={selectedRows.length === 0}
@@ -380,6 +380,34 @@ const UniversalBulkUpdateModal = ({
                 >
                   <Edit className="w-4 h-4" />
                   Update Selected
+                </button>
+                <button
+                  onClick={() => {
+                    if (selectedRows.length === 0) return;
+                    const updated = { ...bulkEditData };
+                    selectedRows.forEach(id => {
+                      updated[id] = { ...(updated[id] || {}), availability: 0 };
+                    });
+                    setBulkEditData(updated);
+                  }}
+                  disabled={selectedRows.length === 0}
+                  className="flex-1 sm:flex-none flex items-center justify-center gap-2 px-4 py-2 rounded-lg bg-orange-500 text-white hover:bg-orange-600 transition-colors disabled:bg-gray-300 disabled:cursor-not-allowed font-medium text-sm"
+                >
+                  Mark Unavailable
+                </button>
+                <button
+                  onClick={() => {
+                    if (selectedRows.length === 0) return;
+                    const updated = { ...bulkEditData };
+                    selectedRows.forEach(id => {
+                      updated[id] = { ...(updated[id] || {}), availability: 999 };
+                    });
+                    setBulkEditData(updated);
+                  }}
+                  disabled={selectedRows.length === 0}
+                  className="flex-1 sm:flex-none flex items-center justify-center gap-2 px-4 py-2 rounded-lg bg-green-600 text-white hover:bg-green-700 transition-colors disabled:bg-gray-300 disabled:cursor-not-allowed font-medium text-sm"
+                >
+                  Mark Available
                 </button>
                 <button
                   onClick={handleBulkDelete}
@@ -413,6 +441,7 @@ const UniversalBulkUpdateModal = ({
                       <th className="px-4 py-3 text-left text-sm font-semibold text-gray-700 bg-gray-50">Discount</th>
                       <th className="px-4 py-3 text-left text-sm font-semibold text-gray-700 bg-gray-50">Zone Price :</th>
                       <th className="px-4 py-3 text-left text-sm font-semibold text-gray-700 bg-gray-50">Code</th>
+                      <th className="px-4 py-3 text-left text-sm font-semibold text-gray-700 bg-gray-50">Availability</th>
                       <th className="px-4 py-3 text-left text-sm font-semibold text-gray-700 bg-gray-50">Add-ons</th>
                     </tr>
                   </thead>
@@ -572,6 +601,43 @@ const UniversalBulkUpdateModal = ({
                             ) : (
                               <span className="text-sm text-gray-900">
                                 {item.code ?? '-'}
+                              </span>
+                            )}
+                          </td>
+                          <td className="px-4 py-3">
+                            {isSelected ? (
+                              <div className="flex items-center gap-2">
+                                <input
+                                  type="number"
+                                  min="0"
+                                  value={editData.availability !== undefined ? editData.availability : (item.availability ?? '')}
+                                  onChange={(e) => updateBulkEditData(item.id, 'availability', e.target.value)}
+                                  className="w-20 px-2 py-2 rounded-md border border-gray-300 text-sm focus:outline-none focus:ring-2 focus:ring-blue-500"
+                                  placeholder="0"
+                                />
+                                <div className="flex flex-col gap-1">
+                                  <button
+                                    type="button"
+                                    onClick={() => updateBulkEditData(item.id, 'availability', 0)}
+                                    className="px-2 py-0.5 rounded text-xs bg-red-100 text-red-700 hover:bg-red-200 font-semibold whitespace-nowrap"
+                                  >
+                                    × Off
+                                  </button>
+                                  <button
+                                    type="button"
+                                    onClick={() => updateBulkEditData(item.id, 'availability', 999)}
+                                    className="px-2 py-0.5 rounded text-xs bg-green-100 text-green-700 hover:bg-green-200 font-semibold whitespace-nowrap"
+                                  >
+                                    ✓ On
+                                  </button>
+                                </div>
+                              </div>
+                            ) : (
+                              <span className={`text-sm font-semibold px-2 py-1 rounded-full ${Number(item.availability) === 0
+                                  ? 'bg-red-100 text-red-700'
+                                  : 'bg-green-100 text-green-700'
+                                }`}>
+                                {Number(item.availability) === 0 ? 'Off' : item.availability ?? '—'}
                               </span>
                             )}
                           </td>
