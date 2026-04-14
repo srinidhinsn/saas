@@ -424,11 +424,11 @@ const KitchenCard = ({
                       <span>{item.item_name || 'Unnamed Item'}</span>
                     </span>
                     {/* Combo badge */}
-                    {combo && (
+                    {/* {combo && (
                       <span className="text-[10px] bg-violet-100 text-violet-700 font-bold px-1.5 py-0.5 rounded-full leading-none">
                         COMBO
                       </span>
-                    )}
+                    )} */}
                   </div>
                 </div>
 
@@ -476,12 +476,12 @@ const KitchenCard = ({
               </div>
 
               {/* Combo line items — always visible, indented below the main item */}
-              {combo && (
+              {/* {combo && (
                 <ComboComponentsList
                   menuRecord={menuRecord}
                   menuItemsMap={menuItemsMap}
                 />
-              )}
+              )} */}
 
               {addons.length > 0 && (
                 <div className="mt-1.5 ml-1 space-y-0.5">

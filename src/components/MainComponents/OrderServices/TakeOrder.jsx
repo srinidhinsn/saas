@@ -2660,11 +2660,11 @@ const TakeOrder = ({ clientId, token, onOrderUpdate, realm }) => {
       const itemsToDelete = item.is_addon
         ? [item]
         : [
-            item,
-            ...cart.filter(
-              i => i.order_item_id && i.parent_item_key && parentKeys.has(i.parent_item_key)
-            ),
-          ];
+          item,
+          ...cart.filter(
+            i => i.order_item_id && i.parent_item_key && parentKeys.has(i.parent_item_key)
+          ),
+        ];
 
       await Promise.all(itemsToDelete.map(targetItem =>
         axios.delete(
@@ -2690,18 +2690,18 @@ const TakeOrder = ({ clientId, token, onOrderUpdate, realm }) => {
       setLoading(false);
     }
   };
-  
+
   // ─────────────────────────────────────────────────────────────────────────
   // Item click — addon/combo detection
   // ─────────────────────────────────────────────────────────────────────────
 
   const handleItemClick = (item) => {
 
-    if (item.category_id === 'Combos') {
-      // Add the item to the cart directly
-      addToCart(item);
-      return; // Exit early without opening the modal
-    }
+    // if (item.category_id === 'Combos') {
+    //   // Add the item to the cart directly
+    //   addToCart(item);
+    //   return; // Exit early without opening the modal
+    // }
     const hasLineItems =
       item.line_item_id &&
       Array.isArray(item.line_item_id) &&
@@ -2793,19 +2793,18 @@ const TakeOrder = ({ clientId, token, onOrderUpdate, realm }) => {
 
     // For the order API we only send parent (non-addon) items
     const buildOrderPayload = (items) =>
-      items
-        .map(i => ({
-          item_id: i.id,
-          item_name: i.name,
-          quantity: i.quantity,
-          unit_price: i.unit_price,
-          line_total: i.unit_price * i.quantity,
-          status: 'pending',
-          slug: i.slug || '',
-          frontend_unique_key: i.frontend_unique_key,
-          parent_item_key: i.parent_item_key,
-        }));
-
+      items.map(i => ({
+        item_id: i.id,
+        item_name: i.name,
+        quantity: i.quantity,
+        unit_price: i.unit_price,
+        line_total: i.unit_price * i.quantity,
+        status: 'pending',
+        slug: i.slug || '',
+        frontend_unique_key: i.frontend_unique_key,
+        is_addon: i.is_addon || false,
+        parent_item_key: i.parent_item_key || null,
+      }));
     try {
       const headers = { Authorization: `Bearer ${token}` };
       let placedOrderId = null;
@@ -3684,7 +3683,20 @@ const TakeOrder = ({ clientId, token, onOrderUpdate, realm }) => {
         comboItem={comboModalItem}
         comboComponents={comboModalComponents}
         onAddCombo={() => {
-          if (comboModalItem) addToCart(comboModalItem);
+          if (!comboModalItem) return;
+          let batch = currentBatchTimestamp;
+          if (!batch) { batch = Date.now(); setCurrentBatchTimestamp(batch); }
+          const mainKey = addToCart(comboModalItem);
+          // Add each combo component as a child entry (is_addon=true, parent_item_key=mainKey)
+          comboModalComponents.forEach((comp, idx) => {
+            const addonEntry = buildCartItem(comp, {
+              batch_timestamp: batch,
+              parent_item_key: mainKey,
+              is_addon: true,
+            });
+            setCart(prev => [...prev, addonEntry]);
+          });
+          setHasNewItems(true);
         }}
       />
 
