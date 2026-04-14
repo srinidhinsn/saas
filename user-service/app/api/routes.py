@@ -15,7 +15,7 @@ from entity.inventory_entity import CategoryEntity
 from entity.order_entity import DineinOrder
 import random
 from datetime import datetime, timedelta
-from ..services.add_users import create_user_and_person, getting_screen_id, get_user_perms, has_user_permission
+from services.add_users import create_user_and_person, getting_screen_id, get_user_perms, has_user_permission
 from jose import jwt
 import uuid
 from sqlalchemy import func

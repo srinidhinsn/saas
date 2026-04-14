@@ -19,7 +19,7 @@ from models.saas_context import SaasContext
 from typing import Optional
 from entity.inventory_entity import InventoryEntity
 from models.inventory_model import InventoryTransaction
-from ..services.order_service import (
+from services.order_service import (
     _root_dinein_id,
     _order_row_to_flat,
     STATUS_PRIORITY,
