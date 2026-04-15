@@ -79,6 +79,8 @@ def _merge_group(orders: list) -> dict:
             m = Db_OrderItem_Entity.copyToModel(item).dict()
             m["batch_label"] = order.dinein_order_id
             m["sub_order_id"] = order.id
+            # ✅ FIX: explicitly carry parent_item_key so frontend can re-group
+            m["parent_item_key"] = getattr(item, "parent_item_key", None)
             merged_items.append(m)
 
     statuses = [o.status for o in orders if o.status]
@@ -97,9 +99,11 @@ def _merge_group(orders: list) -> dict:
         for o in orders
     ]
 
+    # ✅ FIX: only sum parent items (no parent_item_key) to avoid double-counting
     total_price = sum(
         (item.get("unit_price") or 0) * (item.get("quantity") or 1)
         for item in merged_items
+        if not item.get("parent_item_key")
     )
 
     return {
@@ -115,7 +119,6 @@ def _merge_group(orders: list) -> dict:
         "sub_orders": sub_orders_meta,
         "order_count": len(orders),
     }
-
 
 # ── Unit conversion ──────────────────────────────────────────────────────────
 

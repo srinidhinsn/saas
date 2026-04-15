@@ -52,7 +52,7 @@ def create_order(client_id: str, order: DineinOrderModel, context: SaasContext =
            order_id=db_order.id, client_id=client_id, item_id=item.item_id,
            item_name=item.item_name, slug=item.slug, quantity=item.quantity,
            unit_price=item.unit_price, line_total=item.line_total, status=item.status,
-           parent_item_key=item.parent_item_key,
+           parent_item_key=item.parent_item_key, frontend_unique_key=item.frontend_unique_key,
 )
         db.add(db_item)
     db.commit()
@@ -519,6 +519,8 @@ def delete_order_items(
         )
         .first()
     )
+
+    
     if not item:
         raise HTTPException(status_code=404, detail="Order item not found")
 
