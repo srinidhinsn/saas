@@ -754,11 +754,22 @@ const KitchenDisplay = () => {
     const previousStatus = targetItem.status;
 
     // Build the full updated items list for local state + deriving order status.
-    // We do NOT send this full list to the backend — only the changed item goes,
-    // so sibling items' statuses are never touched on the server.
-    const updatedItems = (card.items || []).map((i) =>
-      String(i.id) === String(itemId) ? { ...i, status: newStatus } : i
-    );
+    // We need to update linked items (parent + addons) in the optimistic update
+    // to match what gets sent to the backend.
+    const linkedItems = (card.items || []).filter((i) => {
+      if (String(i.id) === String(itemId)) return true;
+      return (
+        i.parent_item_key &&
+        i.parent_item_key.startsWith(`${targetItem.item_id}_`)
+      );
+    });
+
+    const updatedItems = (card.items || []).map((i) => {
+      const isLinked = linkedItems.some(linked => String(linked.id) === String(i.id));
+      // Don't change status of already cancelled items
+      if (isCancelledStatus(i.status)) return i;
+      return isLinked ? { ...i, status: newStatus } : i;
+    });
     const derivedStatus = deriveStatus(updatedItems);
 
     // Step 1 — optimistic update (instant, local only)
@@ -786,7 +797,10 @@ const KitchenDisplay = () => {
         );
       });
 
-      const singleItemPayload = linkedItems.map((linked) => ({
+      // Filter out cancelled items from the update payload
+      const activeLinkedItems = linkedItems.filter(item => !isCancelledStatus(item.status));
+
+      const singleItemPayload = activeLinkedItems.map((linked) => ({
         id: linked.id,
         item_id: linked.item_id,
         item_name: linked.item_name,

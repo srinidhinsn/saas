@@ -938,7 +938,7 @@ const OldItemRow = ({ group, clientId, token, activeDineinOrderId, onRequestDele
           <div className="min-w-0 flex-1">
             <h4 className="text-sm font-semibold truncate text-gray-800">{main.name}</h4>
             <p className="text-xs font-bold text-action-primary">
-            ₹{(main.unit_price * (1 - (Number(main.discount) || 0) / 100)).toFixed(2)}
+              ₹{(main.unit_price * (1 - (Number(main.discount) || 0) / 100)).toFixed(2)}
             </p>
             <div className="flex items-center gap-1.5 mt-1 flex-wrap">
               {main.batch_label && main.batch_label !== activeDineinOrderId && (
@@ -970,7 +970,7 @@ const OldItemRow = ({ group, clientId, token, activeDineinOrderId, onRequestDele
           <span className="text-xs text-blue-600">↳</span>
           <span className="text-sm text-gray-700 truncate flex-1">{addon.name}</span>
           <span className="text-xs font-semibold text-blue-600">
-          ₹{(addon.unit_price * (1 - (Number(addon.discount) || 0) / 100)).toFixed(2)}
+            ₹{(addon.unit_price * (1 - (Number(addon.discount) || 0) / 100)).toFixed(2)}
           </span>
           <span className="text-xs text-gray-500 w-6 text-center">×{addon.quantity}</span>
         </div>
@@ -1004,7 +1004,7 @@ const NewItemRow = ({ group, clientId, token, onUpdateQuantity, onRemove }) => {
           <div className="min-w-0 flex-1">
             <h4 className="text-sm font-semibold truncate text-gray-800">{main.name}</h4>
             <p className="text-xs font-bold text-action-primary">
-            ₹{(main.unit_price * (1 - (Number(main.discount) || 0) / 100)).toFixed(2)}
+              ₹{(main.unit_price * (1 - (Number(main.discount) || 0) / 100)).toFixed(2)}
             </p>
           </div>
         </div>
@@ -1041,7 +1041,7 @@ const NewItemRow = ({ group, clientId, token, onUpdateQuantity, onRemove }) => {
           <span className="text-xs text-orange-600">↳</span>
           <span className="text-sm text-gray-700 truncate flex-1">{addon.name}</span>
           <span className="text-xs font-semibold text-orange-600">
-          ₹{(addon.unit_price * (1 - (Number(addon.discount) || 0) / 100)).toFixed(2)}
+            ₹{(addon.unit_price * (1 - (Number(addon.discount) || 0) / 100)).toFixed(2)}
           </span>
           <span className="text-xs text-gray-500 w-6 text-center">×{addon.quantity}</span>
         </div>
@@ -1760,40 +1760,40 @@ const TakeOrder = ({ clientId, token, onOrderUpdate, realm }) => {
     }
     return null;
   };
-const isItemActive = useCallback((slug) => {
-  if (!slug) return true;
+  const isItemActive = useCallback((slug) => {
+    if (!slug) return true;
 
-  const doubleUnderIdx = slug.lastIndexOf('__');
-  const timingSegment = doubleUnderIdx !== -1
-    ? slug.slice(doubleUnderIdx + 2).toLowerCase()
-    : null;
+    const doubleUnderIdx = slug.lastIndexOf('__');
+    const timingSegment = doubleUnderIdx !== -1
+      ? slug.slice(doubleUnderIdx + 2).toLowerCase()
+      : null;
 
-  // ✅ Explicit unavailable flag
-  if (timingSegment === 'unavailable') return false;
+    // ✅ Explicit unavailable flag
+    if (timingSegment === 'unavailable') return false;
 
-  if (!timingOptions || timingOptions.length === 0) return true;
-  if (!timingSegment || timingSegment === 'allday') return true;
+    if (!timingOptions || timingOptions.length === 0) return true;
+    if (!timingSegment || timingSegment === 'allday') return true;
 
-  const timingKeys = timingSegment.split('+').filter(Boolean);
-  if (timingKeys.length === 0) return true;
+    const timingKeys = timingSegment.split('+').filter(Boolean);
+    if (timingKeys.length === 0) return true;
 
-  const recognizedKeys = timingKeys.filter(key => {
-    const t = timingOptions.find(o => o.name?.toLowerCase() === key);
-    return t && t.start && t.end;
-  });
+    const recognizedKeys = timingKeys.filter(key => {
+      const t = timingOptions.find(o => o.name?.toLowerCase() === key);
+      return t && t.start && t.end;
+    });
 
-  if (recognizedKeys.length === 0) return true;
+    if (recognizedKeys.length === 0) return true;
 
-  const now = new Date();
-  const currentMinutes = now.getHours() * 60 + now.getMinutes();
+    const now = new Date();
+    const currentMinutes = now.getHours() * 60 + now.getMinutes();
 
-  return recognizedKeys.some(key => {
-    const t = timingOptions.find(o => o.name?.toLowerCase() === key);
-    const [sh, sm] = t.start.split(':').map(Number);
-    const [eh, em] = t.end.split(':').map(Number);
-    return currentMinutes >= (sh * 60 + sm) && currentMinutes <= (eh * 60 + em);
-  });
-}, [timingOptions]);
+    return recognizedKeys.some(key => {
+      const t = timingOptions.find(o => o.name?.toLowerCase() === key);
+      const [sh, sm] = t.start.split(':').map(Number);
+      const [eh, em] = t.end.split(':').map(Number);
+      return currentMinutes >= (sh * 60 + sm) && currentMinutes <= (eh * 60 + em);
+    });
+  }, [timingOptions]);
   // ─────────────────────────────────────────────────────────────────────────
   // Determine if a category is a combo category (walks ancestors)
   // ─────────────────────────────────────────────────────────────────────────
@@ -2303,6 +2303,8 @@ const isItemActive = useCallback((slug) => {
           status: item.status || 'pending',
           batch_label: item.batch_label,
           sub_order_id: item.sub_order_id,
+          parent_item_key: item.parent_item_key || null,
+
         };
       });
       setCart(reconstructedCart);
@@ -2360,6 +2362,8 @@ const isItemActive = useCallback((slug) => {
           status: item.status || 'pending',
           batch_label: item.batch_label,
           sub_order_id: item.sub_order_id,
+          parent_item_key: item.parent_item_key || null,
+
         };
       });
 
@@ -2397,18 +2401,26 @@ const isItemActive = useCallback((slug) => {
     items.forEach(item => {
       const key = item.frontend_unique_key || item.id;
       if (processed.has(key)) return;
-      if (!item.is_addon && !item.parent_item_key) {
-        const addons = items.filter(i => i.parent_item_key === item.frontend_unique_key);
-        grouped.push({ main: { ...item }, addons });
+      if (!item.parent_item_key) {  // ← parent items have no parent_item_key
+        const children = items.filter(i => i.parent_item_key === item.frontend_unique_key);
+        grouped.push({ main: { ...item }, addons: children });
         processed.add(key);
-        addons.forEach(a => processed.add(a.frontend_unique_key || a.id));
+        children.forEach(c => processed.add(c.frontend_unique_key || c.id));
       }
     });
     return grouped;
   };
 
   const getTotalPrice = () =>
-    cart.reduce((t, i) => t + (i.unit_price || 0) * i.quantity, 0).toFixed(2);
+    cart
+      .filter(i => {
+        if (!i.parent_item_key) return true; // parent item — always include
+        // child item — only include if its parent is NOT a combo
+        const parent = cart.find(p => p.frontend_unique_key === i.parent_item_key);
+        return !isComboCategoryId(parent?.category_id);
+      })
+      .reduce((t, i) => t + (i.unit_price || 0) * i.quantity, 0)
+      .toFixed(2);
 
   const buildCartItem = (item, extra = {}) => {
     const ts = Date.now() + Math.random();
@@ -2556,7 +2568,6 @@ const isItemActive = useCallback((slug) => {
           status: item.status || 'pending',
           batch_label: item.batch_label,
           sub_order_id: item.sub_order_id,
-          is_addon: item.is_addon || false,
           parent_item_key: item.parent_item_key || null,
         };
       });
@@ -2600,23 +2611,20 @@ const isItemActive = useCallback((slug) => {
 
       const newQty = item.quantity - removeQty;
 
-      if (newQty <= 0 && !item.is_addon) {
-        const parentKeys = new Set([
-          item.frontend_unique_key,
-          String(item.order_item_id),
-          item.parent_item_key,
-        ].filter(Boolean));
-        const addonItems = cart.filter(
-          i => i.order_item_id && i.parent_item_key && parentKeys.has(i.parent_item_key)
+      // ✅ FIX: after main item delete, if qty hit zero cascade to children
+      if (newQty <= 0 && !item.parent_item_key) {
+        const childItems = cart.filter(
+          i => i.order_item_id &&
+            i.parent_item_key === item.frontend_unique_key
         );
-        if (addonItems.length > 0) {
-          await Promise.all(addonItems.map(addon =>
+        if (childItems.length > 0) {
+          await Promise.all(childItems.map(child =>
             axios.delete(
               `${import.meta.env.VITE_API_ORDER_SERVICE_URL}/${clientId}/order_item/delete`,
               {
                 params: {
                   client_id: clientId,
-                  order_item_id: addon.order_item_id,
+                  order_item_id: child.order_item_id,
                   transaction_type: transactionType,
                   reason: reason || undefined,
                 },
@@ -2626,7 +2634,6 @@ const isItemActive = useCallback((slug) => {
           ));
         }
       }
-
       toast.success(
         newQty > 0
           ? `Quantity reduced to ${newQty}. (${transactionType})`
@@ -2652,17 +2659,14 @@ const isItemActive = useCallback((slug) => {
     try {
       setLoading(true);
 
-      const parentKeys = new Set([
-        item.frontend_unique_key,
-        String(item.order_item_id),
-        item.parent_item_key,
-      ].filter(Boolean));
-      const itemsToDelete = item.is_addon
-        ? [item]
+      // ✅ FIX: if this is a parent, find all saved children by parent_item_key
+      const itemsToDelete = item.parent_item_key
+        ? [item]   // it's a child itself — only delete it
         : [
           item,
           ...cart.filter(
-            i => i.order_item_id && i.parent_item_key && parentKeys.has(i.parent_item_key)
+            i => i.order_item_id &&
+              i.parent_item_key === item.frontend_unique_key
           ),
         ];
 
@@ -2690,7 +2694,6 @@ const isItemActive = useCallback((slug) => {
       setLoading(false);
     }
   };
-
   // ─────────────────────────────────────────────────────────────────────────
   // Item click — addon/combo detection
   // ─────────────────────────────────────────────────────────────────────────
@@ -3219,11 +3222,11 @@ const isItemActive = useCallback((slug) => {
   const batchTimestamps = Object.keys(groupedNewItems).sort();
 
   const canPlaceOrder = orderMode === 'takeaway'
-    ? cart.filter(i => !i.is_addon).length > 0
+    ? cart.filter(i => !i.parent_item_key).length > 0
     : activeOrderId
-      ? hasNewItems && newItems.filter(i => !i.is_addon).length > 0
-      : selectedTable && cart.filter(i => !i.is_addon).length > 0;
-
+      ? hasNewItems && newItems.filter(i => !i.parent_item_key).length > 0
+      : selectedTable && cart.filter(i => !i.parent_item_key).length > 0;
+      
   const selectedCategoryName =
     categoriesFlat.find(c => c.id === selectedCategoryId)?.name || 'All Categories';
 
@@ -3406,10 +3409,10 @@ const isItemActive = useCallback((slug) => {
                           )}
                           {ac > 0 && (
                             <span className={`text-xs px-2 py-0.5 rounded-full font-semibold
-                              ${isCombo
+                              ${isComboCategoryId(item.category_id)
                                 ? 'bg-violet-100 text-violet-700'
                                 : 'bg-blue-100 text-blue-700'}`}>
-                              {isCombo ? `${ac} items` : `+${ac} addon${ac > 1 ? 's' : ''}`}
+                              {isComboCategoryId(item.category_id) ? `${ac} items` : `+${ac} addon${ac > 1 ? 's' : ''}`}
                             </span>
                           )}
                         </div>
