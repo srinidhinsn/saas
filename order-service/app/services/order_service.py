@@ -5,7 +5,7 @@ from entity.order_entity import DineinOrder as Db_Order_Entity, OrderItem as Db_
 from entity.inventory_entity import InventoryEntity, InventoryTransactionEntity
 from models.order_model import TransactionTypeEnum, MovementTypeEnum
 from models.inventory_model import InventoryTransaction
-from utils.transaction import record_transaction
+from utils.transaction import record_transaction, build_inventory_transaction
 from decimal import Decimal
 
 
@@ -151,6 +151,162 @@ def _convert(recipe_qty: float, recipe_unit: str, stock_unit: str) -> float:
 # ── Stock deduction ──────────────────────────────────────────────────────────
 
 def _deduct_stock_for_order(db: Session, client_id: str, order_id: int) -> None:
+    order_items = (
+        db.query(Db_OrderItem_Entity)
+        .filter(
+            Db_OrderItem_Entity.order_id == order_id,
+            Db_OrderItem_Entity.client_id == client_id,
+        )
+        .all()
+    )
+
+    already_deducted_keys: set[str] = set(
+        row.remarks
+        for row in db.query(InventoryTransactionEntity.remarks).filter(
+            InventoryTransactionEntity.reference_id == str(order_id),
+            InventoryTransactionEntity.reference_type == "order",
+            InventoryTransactionEntity.transaction_type.in_([
+                TransactionTypeEnum.order_deduction.value,
+                TransactionTypeEnum.menu_item_deduction.value,
+            ]),
+        ).all()
+        if row.remarks
+    )
+
+    for order_item in order_items:
+        menu_item = (
+            db.query(InventoryEntity)
+            .filter(
+                InventoryEntity.id == order_item.item_id,
+                InventoryEntity.client_id == client_id,
+            )
+            .first()
+        )
+
+        if not menu_item:
+            continue
+
+        ordered_qty = order_item.quantity or 1
+        serving_qty = float(menu_item.serving_quantity or 0)
+        serving_unit = (menu_item.serving_unit or "").strip()
+        stock_unit = (menu_item.unit or "").strip()
+
+        # 1. Menu item self-deduction
+        if serving_qty > 0 and serving_unit and stock_unit:
+            menu_dedup_key = (
+                f"Menu item deduction Order #{order_id} — "
+                f"{order_item.item_name} x{ordered_qty} "
+                f"[key={order_item.frontend_unique_key}]"
+            )
+
+            if menu_dedup_key not in already_deducted_keys:
+                try:
+                    converted_serving = _convert(serving_qty, serving_unit, stock_unit)
+                except ValueError as e:
+                    print(
+                        f"[WARN] Skipping menu item deduction for item_id={menu_item.id}: {e}"
+                    )
+                    converted_serving = None
+
+                if converted_serving is not None:
+                    total_menu_deduction = Decimal(
+                        str(round(converted_serving * ordered_qty, 6))
+                    )
+                    before_stock = Decimal(str(menu_item.availability or 0))
+                    after_stock = max(before_stock - total_menu_deduction, Decimal("0"))
+
+                    record_transaction(
+                        db,
+                        build_inventory_transaction(
+                            client_id=client_id,
+                            item_obj=menu_item,
+                            transaction_type=TransactionTypeEnum.menu_item_deduction,
+                            movement_type=MovementTypeEnum.out,
+                            quantity=total_menu_deduction,
+                            unit=stock_unit,
+                            before_stock=before_stock,
+                            after_stock=after_stock,
+                            reference_id=str(order_id),
+                            reference_type="order",
+                            remarks=menu_dedup_key,
+                        )
+                    )
+
+                    menu_item.availability = after_stock
+                    already_deducted_keys.add(menu_dedup_key)
+
+        elif serving_qty > 0:
+            print(
+                f"[WARN] Skipping menu item deduction for item_id={menu_item.id} "
+                f"'{menu_item.name}': serving_unit='{serving_unit}' stock_unit='{stock_unit}'"
+            )
+
+        # 2. Ingredient deduction
+        if not menu_item.recipe:
+            continue
+
+        for ingredient in menu_item.recipe:
+            stock_item_id = ingredient.get("stock_item_id")
+            recipe_qty = float(ingredient.get("quantity_required") or 0)
+            recipe_unit = (ingredient.get("unit") or "").strip()
+
+            if not stock_item_id or recipe_qty <= 0:
+                continue
+
+            dedup_key = (
+                f"order={order_id}|"
+                f"item={order_item.item_id}|"
+                f"ingredient={stock_item_id}|"
+                f"fkey={order_item.frontend_unique_key}"
+            )
+            if dedup_key in already_deducted_keys:
+                continue
+
+            stock_item = (
+                db.query(InventoryEntity)
+                .filter(
+                    InventoryEntity.id == int(stock_item_id),
+                    InventoryEntity.client_id == client_id,
+                )
+                .first()
+            )
+
+            if not stock_item:
+                continue
+
+            stock_unit = (stock_item.unit or "").strip()
+
+            try:
+                deduction = _convert(recipe_qty, recipe_unit, stock_unit) * ordered_qty
+            except ValueError as e:
+                print(
+                    f"[WARN] Skipping ingredient deduction for stock_item_id={stock_item_id}: {e}"
+                )
+                continue
+
+            deduction_decimal = Decimal(str(round(deduction, 6)))
+            before_stock = Decimal(str(stock_item.availability or 0))
+            after_stock = max(before_stock - deduction_decimal, Decimal("0"))
+
+            record_transaction(
+                db,
+                build_inventory_transaction(
+                    client_id=client_id,
+                    item_obj=stock_item,
+                    transaction_type=TransactionTypeEnum.order_deduction,
+                    movement_type=MovementTypeEnum.out,
+                    quantity=deduction_decimal,
+                    unit=stock_unit,
+                    before_stock=before_stock,
+                    after_stock=after_stock,
+                    reference_id=str(order_id),
+                    reference_type="order",
+                    remarks=dedup_key,
+                )
+            )
+
+            stock_item.availability = after_stock
+            already_deducted_keys.add(dedup_key)
     order_items = (
         db.query(Db_OrderItem_Entity)
         .filter(

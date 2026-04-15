@@ -64,6 +64,23 @@ def _convert(recipe_qty: float, recipe_unit: str, stock_unit: str) -> float:
     raise ValueError(f"Incompatible unit dimensions: recipe='{ru}', stock='{su}'")
 
 
+def build_inventory_transaction(
+    *,
+    client_id: str,
+    item_obj=None,
+    stock_item_id=None,
+    inventory_id=None,
+    name=None,
+    **kwargs
+) -> InventoryTransaction:
+    return InventoryTransaction(
+        client_id=client_id,
+        stock_item_id=stock_item_id if stock_item_id is not None else item_obj.id,
+        inventory_id=inventory_id if inventory_id is not None else item_obj.inventory_id,
+        name=name if name is not None else item_obj.name,
+        **kwargs
+    )
+
 
 def record_transaction(
     db: Session,
@@ -111,12 +128,9 @@ def record_partial_transaction(
     serving_unit = (menu_item.serving_unit or "").strip()
 
     if transaction_type == TransactionTypeEnum.item_cancelled:
-        record_transaction(
-            db,
+        record_transaction( db, build_inventory_transaction(
             client_id=client_id,
-            stock_item_id=menu_item.id,
-            inventory_id=menu_item.inventory_id,
-            name=menu_item.name,
+            item_obj=menu_item,
             transaction_type=TransactionTypeEnum.item_cancelled,
             movement_type=MovementTypeEnum.none,
             quantity=Decimal(str(remove_qty)),
@@ -127,6 +141,7 @@ def record_partial_transaction(
             reference_type="order",
             remarks=f"[ITEM_CANCELLED_PARTIAL] Order #{order_id} — {base_remarks}",
         )
+        )
 
     elif transaction_type == TransactionTypeEnum.wastage:
         if serving_qty > 0 and serving_unit and stock_unit:
@@ -135,12 +150,9 @@ def record_partial_transaction(
                 reversal = Decimal(str(round(converted * remove_qty, 6)))
                 before = Decimal(str(menu_item.availability or 0))
                 after = before + reversal
-                record_transaction(
-                    db,
+                record_transaction( db, build_inventory_transaction(
                     client_id=client_id,
-                    stock_item_id=menu_item.id,
-                    inventory_id=menu_item.inventory_id,
-                    name=menu_item.name,
+                    item_obj=menu_item,
                     transaction_type=TransactionTypeEnum.wastage,
                     movement_type=MovementTypeEnum.reversal,
                     quantity=reversal,
@@ -150,6 +162,7 @@ def record_partial_transaction(
                     reference_id=str(order_id),
                     reference_type="order",
                     remarks=f"[WASTAGE_PARTIAL] Order #{order_id} — {base_remarks}",
+                )
                 )
                 menu_item.availability = after
             except ValueError:
@@ -185,12 +198,9 @@ def record_partial_transaction(
                 before_ing = Decimal(str(stock_item.availability or 0))
                 after_ing = before_ing + reversal_decimal
 
-                record_transaction(
-                    db,
+                record_transaction( db, build_inventory_transaction(
                     client_id=client_id,
-                    stock_item_id=stock_item.id,
-                    inventory_id=stock_item.inventory_id,
-                    name=stock_item.name,
+                    item_obj=stock_item,
                     transaction_type=TransactionTypeEnum.wastage,
                     movement_type=MovementTypeEnum.reversal,
                     quantity=reversal_decimal,
@@ -200,5 +210,6 @@ def record_partial_transaction(
                     reference_id=str(order_id),
                     reference_type="order",
                     remarks=f"[INGREDIENT_REVERSAL_PARTIAL] Order #{order_id} — {base_remarks}",
+                )
                 )
                 stock_item.availability = after_ing

@@ -10,7 +10,7 @@ from models.response_model import ResponseModel
 from models.saas_context import SaasContext
 from utils.auth import verify_token
 from services import service
-from utils.transaction import _compute_current_stock, record_transaction, _convert
+from utils.transaction import _compute_current_stock, record_transaction, _convert, build_inventory_transaction
 from sqlalchemy import text
 from utils.services import add_master_value , get_master_values ,delete_master_value
 
@@ -181,20 +181,20 @@ def update_inventory_availability(
         if delta != Decimal("0"):
             movement = "IN" if delta > 0 else "OUT"
 
-            record_transaction( db, InventoryTransaction(
-                client_id=client_id,
-                stock_item_id=record.id,
-                inventory_id=record.inventory_id,
-                name=record.name,
-                transaction_type="MENU_AVAILABILITY_ADJUSTMENT",
-                movement_type=movement,
-                quantity=abs(delta),
-                unit=record.serving_unit or record.unit,   # use serving_unit for menu items
-                before_stock=before_stock,
-                after_stock=new_qty,
-                created_by=getattr(context, "user_id", None),
-                remarks=f"Manual availability update for menu item '{record.name}'",
-            )
+            record_transaction(
+                db,
+                build_inventory_transaction(
+                    client_id=client_id,
+                    item_obj=record,
+                    transaction_type="MENU_AVAILABILITY_ADJUSTMENT",
+                    movement_type=movement,
+                    quantity=abs(delta),
+                    unit=record.serving_unit or record.unit,
+                    before_stock=before_stock,
+                    after_stock=new_qty,
+                    created_by=getattr(context, "user_id", None),
+                    remarks=f"Manual availability update for menu item '{record.name}'",
+                )
             )
 
         record.availability = new_qty
@@ -404,20 +404,20 @@ def create_stock_item(
     before_stock = Decimal("0")
     after_stock = before_stock + opening_qty
  
-    record_transaction(db, InventoryTransaction(
-        client_id=client_id,
-        stock_item_id=db_item.id,
-        inventory_id=db_item.inventory_id,
-        name=db_item.name,
-        transaction_type="STOCK_IN",
-        movement_type="IN",
-        quantity=opening_qty,
-        unit=unit,
-        before_stock=before_stock,
-        after_stock=after_stock,
-        created_by=getattr(context, "user_id", None),
-        remarks="Opening stock on item creation",
-    )
+    record_transaction(
+        db,
+        build_inventory_transaction(
+            client_id=client_id,
+            item_obj=db_item,
+            transaction_type="STOCK_IN",
+            movement_type="IN",
+            quantity=opening_qty,
+            unit=unit,
+            before_stock=before_stock,
+            after_stock=after_stock,
+            created_by=getattr(context, "user_id", None),
+            remarks="Opening stock on item creation",
+        )
     )
  
     # Sync availability back onto the inventory row
@@ -433,7 +433,6 @@ def create_stock_item(
         message="Stock item created with opening transaction",
         data=model,
     )
- 
  
 @router.post("/stock/add", response_model=ResponseModel)
 def add_stock_quantity(
@@ -463,22 +462,22 @@ def add_stock_quantity(
     before_stock = _compute_current_stock(db, client_id, stock_item_id)
     after_stock = before_stock + Decimal(str(quantity))
  
-    record_transaction( db, InventoryTransaction(
-        client_id=client_id,
-        stock_item_id=stock_item_id,
-        inventory_id=record.inventory_id,
-        name=record.name,
-        transaction_type="STOCK_IN",
-        movement_type="IN",
-        quantity=Decimal(str(quantity)),
-        unit=unit or record.unit,
-        before_stock=before_stock,
-        after_stock=after_stock,
-        reference_id=reference_id,
-        reference_type=reference_type,
-        created_by=getattr(context, "user_id", None),
-        remarks=remarks or "Stock replenishment",
-    )
+    record_transaction(
+        db,
+        build_inventory_transaction(
+            client_id=client_id,
+            item_obj=record,
+            transaction_type="STOCK_IN",
+            movement_type="IN",
+            quantity=Decimal(str(quantity)),
+            unit=unit or record.unit,
+            before_stock=before_stock,
+            after_stock=after_stock,
+            reference_id=reference_id,
+            reference_type=reference_type,
+            created_by=getattr(context, "user_id", None),
+            remarks=remarks or "Stock replenishment",
+        )
     )
  
     # Sync availability
@@ -493,7 +492,6 @@ def add_stock_quantity(
         message=f"Added {quantity} {unit or record.unit} to {record.name}",
         data=model,
     )
- 
  
 @router.post("/stock/deduct", response_model=ResponseModel)
 def deduct_stock_quantity(
@@ -531,11 +529,9 @@ def deduct_stock_quantity(
             detail=f"Insufficient stock. Available: {before_stock}, Requested: {qty}",
         )
  
-    record_transaction( db, InventoryTransaction(
+    tx = build_inventory_transaction(
         client_id=client_id,
-        stock_item_id=stock_item_id,
-        inventory_id=record.inventory_id,
-        name=record.name,
+        item_obj=record,
         transaction_type=transaction_type,
         movement_type="OUT",
         quantity=qty,
@@ -547,7 +543,7 @@ def deduct_stock_quantity(
         created_by=getattr(context, "user_id", None),
         remarks=remarks,
     )
-    )
+    record_transaction(db, tx)
  
     # Sync availability
     record.availability = after_stock
@@ -561,7 +557,7 @@ def deduct_stock_quantity(
         message=f"Deducted {quantity} {unit or record.unit} from {record.name}",
         data=model,
     )
- 
+
 
 @router.post("/stock/manual-deduct", response_model=ResponseModel)
 def manual_deduct_stock(
@@ -625,11 +621,9 @@ def manual_deduct_stock(
             ),
         )
 
-    record_transaction( db, InventoryTransaction(
+    tx = build_inventory_transaction(
         client_id=client_id,
-        stock_item_id=stock_item_id,
-        inventory_id=record.inventory_id,
-        name=record.name,
+        item_obj=record,
         transaction_type=transaction_type.upper(),
         movement_type="OUT",
         quantity=converted_qty,          # store in stock's native unit
@@ -639,7 +633,7 @@ def manual_deduct_stock(
         created_by=getattr(context, "user_id", None),
         remarks=remarks or None,
     )
-    )
+    record_transaction(db, tx)
 
     record.availability = after_stock
     db.commit()
@@ -696,11 +690,10 @@ def update_stock_item(
  
         if delta != Decimal("0"):
             movement = "IN" if delta > 0 else "OUT"
-            record_transaction( db, InventoryTransaction(
+
+            tx = build_inventory_transaction(
                 client_id=client_id,
-                stock_item_id=record.id,
-                inventory_id=record.inventory_id,
-                name=record.name,
+                item_obj=record,
                 transaction_type="ADJUSTMENT",
                 movement_type=movement,
                 quantity=abs(delta),
@@ -710,7 +703,7 @@ def update_stock_item(
                 created_by=getattr(context, "user_id", None),
                 remarks="Manual stock adjustment via update",
             )
-            )
+            record_transaction(db, tx)
  
         record.availability = new_qty
  
@@ -719,7 +712,7 @@ def update_stock_item(
     model = InventoryEntity.copyToModel(record)
  
     return ResponseModel(screen_id=context.screen_id, status="success", message="Stock item updated", data=model)
- 
+
  
 @router.delete("/stock/delete_by_inventory")
 async def delete_inventory_records(client_id: str, inventory_id: str,db: Session = Depends(get_db)):
