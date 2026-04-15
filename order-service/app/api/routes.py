@@ -53,7 +53,6 @@ def create_order(client_id: str, order: DineinOrderModel, context: SaasContext =
            item_name=item.item_name, slug=item.slug, quantity=item.quantity,
            unit_price=item.unit_price, line_total=item.line_total, status=item.status,
            parent_item_key=item.parent_item_key,
-           frontend_unique_key=item.frontend_unique_key,
 )
         db.add(db_item)
     db.commit()
@@ -124,7 +123,9 @@ def create_sub_order(
         db_item = Db_OrderItem_Entity(
             order_id=db_sub_order.id, client_id=client_id,
             item_id=item.item_id, item_name=item.item_name, slug=item.slug,
-            quantity=item.quantity, unit_price=item.unit_price,
+            quantity=item.quantity, unit_price=item.unit_price,status=item.status or "pending",
+            frontend_unique_key=item.frontend_unique_key, parent_item_key=item.parent_item_key,
+
         )
         db.add(db_item)
 
@@ -333,7 +334,8 @@ def update_order_status(
             )
 
             for item in order_items:
-                item.status = body.status
+             if item.status != OrderStatusEnum.cancelled:
+               item.status = body.status
 
             if should_deduct:
                 orders_to_deduct.append(o.id)
@@ -734,27 +736,29 @@ def delete_order_items(
         .first()
     )
 
+    # AFTER:
     if not remaining_active:
-        if order_row:
-            root_dinein_id = _root_dinein_id(
-                order_row.dinein_order_id or str(order_row.id)
+      if order_row:
+        root_dinein_id = _root_dinein_id(order_row.dinein_order_id or str(order_row.id))
+
+        # Cancel THIS order
+        order_row.status = OrderStatusEnum.cancelled
+        order_row.total_price = 0
+        db.flush()
+
+        # Check if any sibling order still has active items
+        all_group_orders = (
+            db.query(Db_Order_Entity)
+            .filter(
+                Db_Order_Entity.client_id == client_id,
+                Db_Order_Entity.dinein_order_id.like(f"{root_dinein_id}%"),
+                Db_Order_Entity.status != OrderStatusEnum.cancelled,
             )
+            .all()
+        )
 
-            sub_orders = (
-                db.query(Db_Order_Entity)
-                .filter(
-                    Db_Order_Entity.client_id == client_id,
-                    Db_Order_Entity.dinein_order_id.like(f"{root_dinein_id}-%"),
-                )
-                .all()
-            )
-            for sub in sub_orders:
-                sub.status = OrderStatusEnum.cancelled
-
-            order_row.status = OrderStatusEnum.cancelled
-            order_row.total_price = 0
-            db.flush()
-
+        # Only free the table when the ENTIRE group is cancelled
+        if not all_group_orders:
             table_id = order_row.table_id
             if table_id:
                 table_row = (
@@ -828,30 +832,27 @@ def cancel_order(
         Decimal(str(order.total_price or 0)) for order in related_orders
     )
 
-    record_transaction(
-        db,
-        build_inventory_transaction(
-            client_id=client_id,
-            stock_item=None,
-            transaction_type=TransactionTypeEnum.order_cancelled,
-            movement_type=MovementTypeEnum.none,
-            quantity=Decimal("1"),
-            unit="order",
-            before_stock=Decimal("0"),
-            after_stock=Decimal("0"),
-            reference_id=str(root_order.id),
-            reference_type="dinein_order",
-            remarks=(
-                f"[FULL_DINEIN_CANCELLED] "
-                f"Root Order #{root_order.id} | "
-                f"Table #{root_order.table_id} | "
-                f"Total Value: {total_cancel_value} | "
-                f"Reason: {effective_reason}"
-            ),
-            inventory_id=f"DINEIN-{root_dinein_id}",
-            name="DINEIN_ORDER_CANCELLED",
-            stock_item_id=0,
-        )
+    record_transaction( db, InventoryTransaction(
+        client_id=client_id,
+        stock_item_id=0,
+        inventory_id=f"DINEIN-{root_dinein_id}",
+        name="DINEIN_ORDER_CANCELLED",
+        transaction_type=TransactionTypeEnum.order_cancelled,
+        movement_type=MovementTypeEnum.none,
+        quantity=Decimal("1"),
+        unit="order",
+        before_stock=Decimal("0"),
+        after_stock=Decimal("0"),
+        reference_id=str(root_order.id),
+        reference_type="dinein_order",
+        remarks=(
+            f"[FULL_DINEIN_CANCELLED] "
+            f"Root Order #{root_order.id} | "
+            f"Table #{root_order.table_id} | "
+            f"Total Value: {total_cancel_value} | "
+            f"Reason: {effective_reason}"
+        ),
+    )
     )
 
     # 2. Item-level cancellation transactions
@@ -881,48 +882,48 @@ def cancel_order(
 
             if menu_item:
                 if item.status == OrderStatusEnum.served:
-                    record_transaction(
-                        db,
-                        build_inventory_transaction(
-                            client_id=client_id,
-                            stock_item=menu_item,
-                            transaction_type=TransactionTypeEnum.wastage,
-                            movement_type=MovementTypeEnum.none,
-                            quantity=Decimal(str(ordered_qty)),
-                            unit=menu_item.unit or "pcs",
-                            before_stock=Decimal(str(menu_item.availability or 0)),
-                            after_stock=Decimal(str(menu_item.availability or 0)),
-                            reference_id=str(order.id),
-                            reference_type="order",
-                            remarks=(
-                                f"[FULL_ORDER_CANCELLED_SERVED] "
-                                f"Order #{order.id} | "
-                                f"{item.item_name} x{ordered_qty} | "
-                                f"{effective_reason}"
-                            ),
-                        )
+                    record_transaction( db, InventoryTransaction(
+                        client_id=client_id,
+                        stock_item_id=menu_item.id,
+                        inventory_id=menu_item.inventory_id,
+                        name=menu_item.name,
+                        transaction_type=TransactionTypeEnum.wastage,
+                        movement_type=MovementTypeEnum.none,
+                        quantity=Decimal(str(ordered_qty)),
+                        unit=menu_item.unit or "pcs",
+                        before_stock=Decimal(str(menu_item.availability or 0)),
+                        after_stock=Decimal(str(menu_item.availability or 0)),
+                        reference_id=str(order.id),
+                        reference_type="order",
+                        remarks=(
+                            f"[FULL_ORDER_CANCELLED_SERVED] "
+                            f"Order #{order.id} | "
+                            f"{item.item_name} x{ordered_qty} | "
+                            f"{effective_reason}"
+                        ),
+                    )
                     )
                 else:
-                    record_transaction(
-                        db,
-                        build_inventory_transaction(
-                            client_id=client_id,
-                            stock_item=menu_item,
-                            transaction_type=TransactionTypeEnum.item_cancelled,
-                            movement_type=MovementTypeEnum.none,
-                            quantity=Decimal(str(ordered_qty)),
-                            unit=menu_item.unit or "pcs",
-                            before_stock=Decimal(str(menu_item.availability or 0)),
-                            after_stock=Decimal(str(menu_item.availability or 0)),
-                            reference_id=str(order.id),
-                            reference_type="order",
-                            remarks=(
-                                f"[FULL_ORDER_CANCELLED] "
-                                f"Order #{order.id} | "
-                                f"{item.item_name} x{ordered_qty} | "
-                                f"{effective_reason}"
-                            ),
-                        )
+                    record_transaction( db, InventoryTransaction(
+                        client_id=client_id,
+                        stock_item_id=menu_item.id,
+                        inventory_id=menu_item.inventory_id,
+                        name=menu_item.name,
+                        transaction_type=TransactionTypeEnum.item_cancelled,
+                        movement_type=MovementTypeEnum.none,
+                        quantity=Decimal(str(ordered_qty)),
+                        unit=menu_item.unit or "pcs",
+                        before_stock=Decimal(str(menu_item.availability or 0)),
+                        after_stock=Decimal(str(menu_item.availability or 0)),
+                        reference_id=str(order.id),
+                        reference_type="order",
+                        remarks=(
+                            f"[FULL_ORDER_CANCELLED] "
+                            f"Order #{order.id} | "
+                            f"{item.item_name} x{ordered_qty} | "
+                            f"{effective_reason}"
+                        ),
+                    )
                     )
 
             item.status = OrderStatusEnum.cancelled
