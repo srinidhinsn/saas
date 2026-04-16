@@ -27,7 +27,7 @@ const UniversalAddModal = ({
   getCategoryIdByName,
   inventoryIds,
   isComboCategory, dedupedMenuItems, categoriesFlat,
-fetchAddonData,
+  fetchAddonData,
   // Table-specific props
   tableRanges,
   setTableRanges,
@@ -38,7 +38,7 @@ fetchAddonData,
   units
 }) => {
   const [dragActive, setDragActive] = useState(false);
-  const [showAddonPopup, setShowAddonPopup] = useState(false);
+  const [showAddonPopup, setShowAddonPopup] = useState(false); // ✅ Popup state
   const [configs, setConfigs] = useState([]);
   const [loadingConfigs, setLoadingConfigs] = useState(false);
   const [statusOptions, setStatusOptions] = useState([]);
@@ -48,14 +48,20 @@ fetchAddonData,
   // Memoize helpers so they're stable across renders (prevents unnecessary effect runs)
   const flattenCategories = useCallback((items = [], level = 0) => {
     let result = [];
+
     items.forEach(item => {
       if (!item) return;
+
       const children = item.children || item.subCategories || [];
       if (item.id !== 'all') {
         result.push({ ...item, level });
-        if (children.length) result = result.concat(flattenCategories(children, level + 1));
+
+        if (children.length) {
+          result = result.concat(flattenCategories(children, level + 1));
+        }
       }
     });
+
     return result;
   }, []);
 
@@ -69,7 +75,10 @@ fetchAddonData,
         }
       );
       setStatusOptions(res.data?.data || []);
-    } catch (err) { setStatusOptions([]); }
+    } catch (err) {
+      console.error("Status fetch error:", err);
+      setStatusOptions([]);
+    }
   };
 
   const fetchConfigs = async () => {
@@ -77,11 +86,18 @@ fetchAddonData,
       setLoadingConfigs(true);
       const res = await axios.get(
         `${import.meta.env.VITE_API_TABLE_SERVICE_URL}/${clientId}/tables/config`,
-        { params: { client_id: clientId }, headers: { Authorization: `Bearer ${token}` } }
+        {
+          params: { client_id: clientId },
+          headers: { Authorization: `Bearer ${token}` }
+        }
       );
       setConfigs(res.data || []);
-    } catch (err) { setConfigs([]); }
-    finally { setLoadingConfigs(false); }
+    } catch (err) {
+      console.error("Config fetch error:", err);
+      setConfigs([]);
+    } finally {
+      setLoadingConfigs(false);
+    }
   };
   const fetchDietaryTypes = async () => {
     try {
@@ -131,6 +147,7 @@ fetchAddonData,
   useEffect(() => {
     if (!showModal) return;
     if (!clientId || !token) return;
+
   })
   useEffect(() => {
     if (!showModal || !clientId || !token) return;
@@ -142,6 +159,7 @@ fetchAddonData,
     }
   }, [showModal, modalType, clientId, token, normalizedRealm]);
 
+  // Drag handlers
   useEffect(() => {
     if (!showModal || modalType !== 'menu' || !fetchAddonData) return;
     fetchAddonData().then(({ subcategories, items }) => {
@@ -151,19 +169,31 @@ fetchAddonData,
   }, [showModal, modalType]);
 
   const handleDrag = (e) => {
-    e.preventDefault(); e.stopPropagation();
-    if (e.type === "dragenter" || e.type === "dragover") setDragActive(true);
-    else if (e.type === "dragleave") setDragActive(false);
+    e.preventDefault();
+    e.stopPropagation();
+    if (e.type === "dragenter" || e.type === "dragover") {
+      setDragActive(true);
+    } else if (e.type === "dragleave") {
+      setDragActive(false);
+    }
   };
 
   const handleDrop = (e) => {
-    e.preventDefault(); e.stopPropagation(); setDragActive(false);
-    if (e.dataTransfer.files?.[0]) handleImageFile(e.dataTransfer.files[0]);
+    e.preventDefault();
+    e.stopPropagation();
+    setDragActive(false);
+    if (e.dataTransfer.files && e.dataTransfer.files[0]) {
+      handleImageFile(e.dataTransfer.files[0]);
+    }
   };
 
   const handleImageFile = (file) => {
-    if (file?.type?.startsWith('image/')) { setNewItemImage(file); setNewItemImageUrl(URL.createObjectURL(file)); }
-    else alert('Please upload a valid image file');
+    if (file && file.type && file.type.startsWith('image/')) {
+      setNewItemImage(file);
+      setNewItemImageUrl(URL.createObjectURL(file));
+    } else {
+      alert('Please upload a valid image file');
+    }
   };
 
   const handleRangeChange = (index, field, value) => {
@@ -175,14 +205,28 @@ fetchAddonData,
 
   const getAddonNameById = (id) => allAddonItems?.find(item => item.id === id)?.name || 'Unknown';
 
+  // ✅ Remove individual addon
   const removeAddon = (addonId) => {
-    setNewItem(prev => ({ ...(prev || {}), line_item_id: (prev?.line_item_id || []).filter(id => id !== addonId) }));
+    setNewItem(prev => ({
+      ...(prev || {}),
+      line_item_id: (prev?.line_item_id || []).filter(id => id !== addonId)
+    }));
   };
 
   const handleClose = () => {
     setShowModal(false);
     if (modalType === 'menu') {
-      setNewItem?.({ name: '', description: '', category_id: '', unit_price: '', discount: '', code: '', unit: '', line_item_id: [], inventory_id: 'menu' });
+      setNewItem?.({
+        name: '',
+        description: '',
+        category_id: '',
+        unit_price: '',
+        discount: '',
+        code: '',
+        unit: '',
+        line_item_id: [],
+        inventory_id: 'menu'
+      });
       setNewItemImage?.(null);
       setNewItemImageUrl?.('');
     } else if (modalType === 'table') {
@@ -213,19 +257,23 @@ fetchAddonData,
             </div>
 
             <div className="space-y-4">
-              {/* Category */}
+              {/* Category Selector */}
               <div>
                 <label className="block text-sm font-medium mb-2 text-text-primary">Category *</label>
                 <select value={newItem?.category_id || ''} onChange={e => setNewItem(prev => ({ ...(prev || {}), category_id: e.target.value }))}
                   className="w-full px-4 py-2 rounded-lg bg-bg-tertiary border border-border-default text-text-primary focus:outline-none focus:ring-2 focus:ring-action-primary" required>
                   <option value="">Select a category</option>
                   {flattenCategories(categories || []).map(cat => (
-                    <option key={cat.id} value={cat.id}>{'—'.repeat(cat.level)} {cat.name}</option>
+                    <option key={cat.id} value={cat.id}>
+                      {'—'.repeat(cat.level)} {cat.name}
+                    </option>
                   ))}
                 </select>
               </div>
 
-              {/* Name */}
+
+
+              {/* Item Name */}
               <div>
                 <label className="block text-sm font-medium mb-2 text-text-primary">
                   {isComboCategory ? 'Combo Name *' : 'Item Name *'}
@@ -238,7 +286,9 @@ fetchAddonData,
               {/* Description */}
               <div>
                 <label className="block text-sm font-medium mb-2 text-text-primary">Description</label>
-                <textarea value={newItem?.description ?? ''} onChange={e => setNewItem(prev => ({ ...(prev || {}), description: e.target.value }))}
+                <textarea
+                  value={newItem?.description ?? ''}
+                  onChange={(e) => setNewItem(prev => ({ ...(prev || {}), description: e.target.value }))}
                   className="w-full px-4 py-2 rounded-lg bg-bg-tertiary border border-border-default text-text-primary focus:outline-none focus:ring-2 focus:ring-action-primary"
                   placeholder={isComboCategory ? "What's included, portion details…" : "Enter item description"} rows="3" />
               </div>
@@ -263,8 +313,8 @@ fetchAddonData,
                             setNewItem(prev => ({ ...prev, availability_time: next }));
                           }}
                           className={`px-3 py-1.5 rounded-lg text-sm border transition-all ${selected
-                              ? 'bg-action-primary text-white border-action-primary'
-                              : 'bg-bg-tertiary border-border-default text-text-primary hover:border-action-primary'
+                            ? 'bg-action-primary text-white border-action-primary'
+                            : 'bg-bg-tertiary border-border-default text-text-primary hover:border-action-primary'
                             }`}
                         >
                           {t.name} {t.start && t.end ? `(${t.start}–${t.end})` : ''}
@@ -285,13 +335,20 @@ fetchAddonData,
                   </label>
                   <input type="number" value={newItem?.unit_price ?? ''} onChange={e => setNewItem(prev => ({ ...(prev || {}), unit_price: e.target.value }))}
                     className="w-full px-4 py-2 rounded-lg bg-bg-tertiary border border-border-default text-text-primary focus:outline-none focus:ring-2 focus:ring-action-primary"
-                    placeholder="0.00" required />
+                    placeholder="0.00"
+                    required
+                  />
                 </div>
+
                 <div>
                   <label className="block text-sm font-medium mb-2 text-text-primary">Discount</label>
-                  <input type="number" value={newItem?.discount ?? ''} onChange={e => setNewItem(prev => ({ ...(prev || {}), discount: e.target.value }))}
+                  <input
+                    type="number"
+                    value={newItem?.discount ?? ''}
+                    onChange={(e) => setNewItem(prev => ({ ...(prev || {}), discount: e.target.value }))}
                     className="w-full px-4 py-2 rounded-lg bg-bg-tertiary border border-border-default text-text-primary focus:outline-none focus:ring-2 focus:ring-action-primary"
-                    placeholder="0.00" />
+                    placeholder="0.00"
+                  />
                 </div>
               </div>
 
@@ -310,10 +367,17 @@ fetchAddonData,
                     </span>
                     <div className="flex items-center gap-1">
                       <span className="text-xs text-gray-400">₹</span>
-                      <input type="number" min="0" placeholder={newItem?.unit_price || "0.00"}
+                      <input
+                        type="number"
+                        min="0"
+                        placeholder={newItem?.unit_price || "0.00"}
                         value={newItem?.zonePrices?.[c.id] ?? ''}
-                        onChange={e => setNewItem(prev => ({ ...prev, zonePrices: { ...(prev.zonePrices || {}), [c.id]: e.target.value } }))}
-                        className="w-24 px-2 py-1 rounded-lg border border-border-default bg-bg-primary text-sm text-right focus:outline-none focus:ring-2 focus:ring-action-primary" />
+                        onChange={e => setNewItem(prev => ({
+                          ...prev,
+                          zonePrices: { ...(prev.zonePrices || {}), [c.id]: e.target.value }
+                        }))}
+                        className="w-24 px-2 py-1 rounded-lg border border-border-default bg-bg-primary text-sm text-right focus:outline-none focus:ring-2 focus:ring-action-primary"
+                      />
                     </div>
                   </div>
                 ))}
@@ -322,8 +386,13 @@ fetchAddonData,
               <div className="grid grid-cols-2 gap-4">
                 <div>
                   <label className="block text-sm font-medium mb-2 text-text-primary">Serving Quantity</label>
-                  <input type="number" value={newItem?.serving_quantity ?? ''} onChange={e => setNewItem(prev => ({ ...(prev || {}), serving_quantity: e.target.value }))}
-                    className="w-full px-4 py-2 rounded-lg bg-bg-tertiary border border-border-default text-text-primary focus:outline-none focus:ring-2 focus:ring-action-primary" placeholder="0" />
+                  <input
+                    type="number"
+                    value={newItem?.serving_quantity ?? ''}
+                    onChange={(e) => setNewItem(prev => ({ ...(prev || {}), serving_quantity: e.target.value }))}
+                    className="w-full px-4 py-2 rounded-lg bg-bg-tertiary border border-border-default text-text-primary focus:outline-none focus:ring-2 focus:ring-action-primary"
+                    placeholder="0"
+                  />
                 </div>
                 <div>
                   <label className="block text-sm font-medium mb-2 text-text-primary">
@@ -345,16 +414,28 @@ fetchAddonData,
                 </div>
                 <div>
                   <label className="block text-sm font-medium mb-2 text-text-primary">Serving Unit</label>
-                  <select value={newItem?.serving_unit ?? ''} onChange={e => setNewItem(prev => ({ ...(prev || {}), serving_unit: e.target.value }))}
-                    className="w-full px-4 py-2 rounded-lg bg-bg-tertiary border border-border-default text-text-primary focus:outline-none focus:ring-2 focus:ring-action-primary">
+                  <select
+                    value={newItem?.serving_unit ?? ''}
+                    onChange={(e) => setNewItem(prev => ({ ...(prev || {}), serving_unit: e.target.value }))}
+                    className="w-full px-4 py-2 rounded-lg bg-bg-tertiary border border-border-default text-text-primary focus:outline-none focus:ring-2 focus:ring-action-primary"
+                  >
                     <option value="">Select unit</option>
-                    {(units || []).map(u => <option key={u} value={u}>{u}</option>)}
+                    {(units || []).map((u) => (
+                      <option key={u} value={u}>{u}</option>
+                    ))}
                   </select>
                 </div>
+
+
                 <div>
                   <label className="block text-sm font-medium mb-2 text-text-primary">Code *</label>
-                  <input type="text" value={newItem?.code ?? ''} onChange={e => setNewItem(prev => ({ ...(prev || {}), code: e.target.value }))}
-                    className="w-full px-4 py-2 rounded-lg bg-bg-tertiary border border-border-default text-text-primary focus:outline-none focus:ring-2 focus:ring-action-primary" placeholder="0" />
+                  <input
+                    type="text"
+                    value={newItem?.code ?? ''}
+                    onChange={(e) => setNewItem(prev => ({ ...(prev || {}), code: e.target.value }))}
+                    className="w-full px-4 py-2 rounded-lg bg-bg-tertiary border border-border-default text-text-primary focus:outline-none focus:ring-2 focus:ring-action-primary"
+                    placeholder="0"
+                  />
                 </div>
 
                 {/* ── Combo OR Addon picker ── */}
@@ -418,25 +499,54 @@ fetchAddonData,
               {/* Image */}
               <div>
                 <label className="block text-sm font-medium mb-2 text-text-primary">Item Image</label>
-                <div className={`relative border-2 border-dashed rounded-lg p-4 transition-colors ${dragActive ? 'border-action-primary bg-bg-secondary' : 'border-border-default'}`}
-                  onDragEnter={handleDrag} onDragLeave={handleDrag} onDragOver={handleDrag} onDrop={handleDrop}>
+                <div
+                  className={`relative border-2 border-dashed rounded-lg p-4 transition-colors ${dragActive ? 'border-action-primary bg-bg-secondary' : 'border-border-default'
+                    }`}
+                  onDragEnter={handleDrag}
+                  onDragLeave={handleDrag}
+                  onDragOver={handleDrag}
+                  onDrop={handleDrop}
+                >
                   {newItemImageUrl ? (
                     <div className="relative">
                       <img src={newItemImageUrl} alt="Preview" className="w-full h-48 object-cover rounded-lg" />
-                      <button type="button" onClick={() => { setNewItemImage(null); setNewItemImageUrl(''); }}
-                        className="absolute top-2 right-2 bg-action-danger text-text-white p-2 rounded-full hover:opacity-90"><X size={16} /></button>
+                      <button
+                        type="button"
+                        onClick={() => {
+                          setNewItemImage(null);
+                          setNewItemImageUrl('');
+                        }}
+                        className="absolute top-2 right-2 bg-action-danger text-text-white p-2 rounded-full hover:opacity-90"
+                      >
+                        <X size={16} />
+                      </button>
                     </div>
                   ) : (
                     <div className="text-center py-8">
                       <Upload className="mx-auto mb-2 text-text-secondary" size={32} />
-                      <p className="text-sm text-text-secondary mb-2">Drag & drop an image here, or click to browse</p>
-                      <input type="file" accept="image/*" onChange={e => e.target.files[0] && handleImageFile(e.target.files[0])} className="hidden" id="imageUpload" />
-                      <label htmlFor="imageUpload" className="inline-block px-4 py-2 bg-action-primary text-text-white rounded-lg cursor-pointer hover:opacity-90">Choose File</label>
+                      <p className="text-sm text-text-secondary mb-2">
+                        Drag & drop an image here, or click to browse
+                      </p>
+                      <input
+                        type="file"
+                        accept="image/*"
+                        onChange={(e) => e.target.files[0] && handleImageFile(e.target.files[0])}
+                        className="hidden"
+                        id="imageUpload"
+                      />
+                      <label
+                        htmlFor="imageUpload"
+                        className="inline-block px-4 py-2 bg-action-primary text-text-white rounded-lg cursor-pointer hover:opacity-90"
+                      >
+                        Choose File
+                      </label>
                     </div>
                   )}
                 </div>
               </div>
 
+
+              {/* Action Buttons */}
               <div className="flex gap-3 pt-4">
                 <button onClick={handleClose} className="flex-1 px-4 py-2 rounded-lg bg-bg-tertiary text-text-primary border border-border-default hover:bg-bg-secondary transition-colors">Cancel</button>
                 <button onClick={handleAddItem} className="flex-1 px-4 py-2 rounded-lg bg-action-primary text-text-white hover:opacity-90 transition-opacity">
@@ -473,17 +583,24 @@ fetchAddonData,
     );
   }
 
+  // TABLE modal
   if (modalType === 'table') {
     return (
       <div className="fixed inset-0 bg-color-modalsbg bg-opacity-50 z-50 flex items-center justify-center p-4 overflow-y-auto">
         <div className="bg-bg-primary rounded-xl w-full max-w-xl shadow-2xl border border-border-default my-8">
           <div className="sticky top-0 bg-bg-primary px-4 py-2 border-b-border-default flex justify-between items-center z-10 rounded-t-xl">
             <h3 className="text-xl font-bold text-text-primary">Add Tables</h3>
-            <button onClick={handleClose} className="p-1.5 rounded-lg bg-action-primary text-text-white hover:opacity-90"><X size={24} /></button>
+            <button onClick={handleClose} className="p-1.5 rounded-lg bg-action-primary text-text-white hover:opacity-90 transition-opacity">
+              <X size={24} />
+            </button>
           </div>
+
           <div className="p-6 max-h-[calc(100vh-12rem)] overflow-y-auto">
             {(tableRanges || []).map((row, index) => (
-              <div className="grid grid-cols-1 md:grid-cols-2 lg:grid-cols-3 gap-4 mb-6 p-4 bg-bg-tertiary rounded-lg border-default border-border-default" key={index}>
+              <div
+                className="grid grid-cols-1 md:grid-cols-2 lg:grid-cols-3 gap-4 mb-6 p-4 bg-bg-tertiary rounded-lg border-default border-border-default"
+                key={index}
+              >
                 <div>
                   <label className="flex items-center gap-2 text-sm font-semibold mb-2 text-text-primary">Table Range *</label>
                   <input value={row?.range ?? ''} onChange={e => handleRangeChange(index, 'range', e.target.value)}
@@ -500,15 +617,23 @@ fetchAddonData,
                 </div>
                 <div>
                   <label className="block text-sm font-semibold mb-2">Table Config *</label>
-                  <select value={row?.config_id ?? ""} onChange={e => handleRangeChange(index, "config_id", Number(e.target.value))} className="w-full px-3 py-2 border rounded-lg">
+
+                  <select
+                    value={row?.config_id ?? ""}
+                    onChange={(e) => handleRangeChange(index, "config_id", Number(e.target.value))}
+                    className="w-full px-3 py-2 border rounded-lg"
+                  >
                     <option value="">Select Config</option>
                     {loadingConfigs ? <option disabled>Loading...</option> : configs.length === 0 ? <option disabled>No Config Available</option> : configs.map(c => <option key={c.id} value={c.id}>{c.section} - {c.zone}</option>)}
                   </select>
                 </div>
                 <div>
                   <label className="block text-sm font-semibold mb-2 text-text-primary">Remark</label>
-                  <select value={row?.remark ?? ''} onChange={e => handleRangeChange(index, 'remark', e.target.value)}
-                    className="w-full px-3 py-2 border-default border-border-default rounded-lg focus:outline-none focus:ring-2 focus:ring-action-primary">
+                  <select
+                    value={row?.remark ?? ''}
+                    onChange={(e) => handleRangeChange(index, 'remark', e.target.value)}
+                    className="w-full px-3 py-2 border-default border-border-default rounded-lg focus:outline-none focus:ring-2 focus:ring-action-primary"
+                  >
                     <option value="">Select status</option>
                     {statusOptions.length > 0 ? statusOptions.map(s => <option key={s} value={s.toLowerCase()}>{s}</option>) : (<><option value="vacant">Vacant</option><option value="reserved">Reserved</option></>)}
                   </select>

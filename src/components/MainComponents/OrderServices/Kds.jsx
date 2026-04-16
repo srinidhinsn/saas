@@ -8,6 +8,8 @@ import { Filter, Clock, Users, Package, Truck, Trash2, BarChart2, X, ChevronRigh
 
 // ─── Constants ─────────────────────────────────────────────────────────────────
 
+// ─── Dynamic Configuration ─────────────────────────────────────────────────────
+
 const KDS_CONFIG = {
   FILTERS: {
     ALL: 'ALL',
@@ -15,13 +17,16 @@ const KDS_CONFIG = {
     TAKEAWAY: 'TAKEAWAY',
     DELIVERY: 'DELIVERY',
   },
+
   STATUS: {
     PENDING: 'pending',
     PREPARING: 'preparing',
-    READY: 'ready',
     SERVED: 'served',
+    READY: 'ready',
   },
-  TAKEAWAY_TABLE_IDS: [500],
+
+  TAKEAWAY_TABLE_IDS: [500], // can support multiple IDs
+
   POLL_INTERVAL_MS: 10000,
   DATE_FORMAT: 'en-CA',
   DEFAULT_TABLE_PREFIX: 'T-',
@@ -37,7 +42,7 @@ const ORDER_FILTER_OPTIONS = [
   { key: KDS_CONFIG.FILTERS.DELIVERY, label: 'Delivery', Icon: Truck },
 ];
 
-// ─── Elapsed time ──────────────────────────────────────────────────────────────
+// ─── Elapsed time helper ───────────────────────────────────────────────────────
 
 const calculateElapsedTime = (createdAt) => {
   if (!createdAt) return null;
@@ -121,13 +126,25 @@ const DeleteItemModal = ({ isOpen, onClose, onConfirm, itemName }) => {
           </p>
         </div>
         <div className="px-6 py-4 flex justify-end gap-3 border-t">
-          <button onClick={onConfirm} className="px-4 py-2 rounded-md bg-red-500 text-white font-semibold hover:bg-red-600 transition-colors">Remove</button>
-          <button onClick={onClose} className="px-4 py-2 rounded-md bg-gray-100 text-gray-700 hover:bg-gray-200 transition-colors">Cancel</button>
+          <button
+            onClick={onConfirm}
+            className="px-4 py-2 rounded-md bg-red-500 text-white font-semibold hover:bg-red-600 transition-colors"
+          >
+            Remove
+          </button>
+          <button
+            onClick={onClose}
+            className="px-4 py-2 rounded-md bg-gray-100 text-gray-700 hover:bg-gray-200 transition-colors"
+          >
+            Cancel
+          </button>
         </div>
       </div>
     </div>
   );
 };
+
+// ─── Delete order confirmation modal ──────────────────────────────────────────
 
 const DeleteOrderModal = ({ isOpen, onClose, onConfirm, cardToDelete }) => {
   if (!isOpen) return null;
@@ -286,6 +303,7 @@ const AggregatePanel = ({ cards, tablesMap, onClose }) => {
 // Shows the included line items of a combo directly below the main item row.
 // Industry standard KDS pattern: always-visible, indented, read-only sub-list.
 
+// ─── Item status icon button ───────────────────────────────────────────────────
 const ComboComponentsList = ({ menuRecord, menuItemsMap }) => {
   const componentIds = menuRecord?.line_item_id;
   if (!componentIds || !Array.isArray(componentIds) || componentIds.length === 0) return null;
@@ -503,7 +521,7 @@ const KitchenCard = ({
         })}
       </div>
 
-      {/* ── Card footer ── */}
+      {/* ── Card footer — status label ── */}
       <div className="px-4 py-3 border-t border-gray-100 bg-white flex items-center justify-between">
         <span className={`text-l font-semibold uppercase ${statusColorClass}`}>
           {allReady ? 'ready' : card.status}
@@ -526,6 +544,8 @@ const KitchenDisplay = () => {
   const [orderFilter, setOrderFilter] = useState('ALL');
   const [showAggregate, setShowAggregate] = useState(false);
 
+  // Stores the canonical item order (array of item ids) per card_id.
+  // Persists across re-renders and poll ticks so item positions never shift.
   const itemOrderRef = useRef({});
 
   // ── FIX 1: track how many status updates are in-flight so polling never
@@ -536,9 +556,9 @@ const KitchenDisplay = () => {
   const [cardToDelete, setCardToDelete] = useState(null);
 
   const [showDeleteItemModal, setShowDeleteItemModal] = useState(false);
-  const [itemToDelete, setItemToDelete] = useState(null);
+  const [itemToDelete, setItemToDelete] = useState(null);  // { cardId, item }
 
-  // ─── Fetch tables ──────────────────────────────────────────────────────────
+  // ─── Fetch tables ────────────────────────────────────────────────────────────
 
   useEffect(() => {
     if (!token || !clientId) return;
@@ -554,7 +574,7 @@ const KitchenDisplay = () => {
       .catch(() => toast.error('Failed to fetch tables'));
   }, [clientId, token]);
 
-  // ─── Fetch menu items (inventory) ─────────────────────────────────────────
+  // ─── Fetch inventory ─────────────────────────────────────────────────────────
 
   useEffect(() => {
     if (!token || !clientId) return;
@@ -602,6 +622,7 @@ const KitchenDisplay = () => {
   const parseIntoCards = (mergedOrder) => {
     const subOrders = mergedOrder.sub_orders || [];
 
+    // Group merged items by sub_order_id — preserve server-returned order
     const activeItems = (mergedOrder.items || []).filter((item) => !isCancelledStatus(item.status));
 
     const itemsBySubOrder = {};
@@ -612,17 +633,19 @@ const KitchenDisplay = () => {
     });
 
     if (subOrders.length === 0) {
-      return [{
-        card_id: mergedOrder.id,
-        sub_order_id: mergedOrder.id,
-        dinein_order_id: mergedOrder.dinein_order_id,
-        root_dinein_order_id: mergedOrder.dinein_order_id,
-        table_id: mergedOrder.table_id,
-        status: mergedOrder.status || 'pending',
-        created_at: mergedOrder.created_at,
-        items: activeItems,
-        is_sub_order: false,
-      }];
+      return [
+        {
+          card_id: mergedOrder.id,
+          sub_order_id: mergedOrder.id,
+          dinein_order_id: mergedOrder.dinein_order_id,
+          root_dinein_order_id: mergedOrder.dinein_order_id,
+          table_id: mergedOrder.table_id,
+          status: mergedOrder.status || 'pending',
+          created_at: mergedOrder.created_at,
+          items: activeItems,
+          is_sub_order: false,
+        }
+      ];
     }
 
     return subOrders
@@ -641,7 +664,7 @@ const KitchenDisplay = () => {
       }));
   };
 
-  // ─── Fetch & poll orders ───────────────────────────────────────────────────
+  // ─── Fetch & poll orders ──────────────────────────────────────────────────────
 
   const fetchOrders = useCallback(async () => {
     if (!token || !clientId) { setLoading(false); return; }
@@ -666,6 +689,7 @@ const KitchenDisplay = () => {
       const allCards = [];
 
       (res.data?.data || []).forEach((mergedOrder) => {
+        // Date filter using root created_at
         if (mergedOrder.status === 'draft') return;
         const createdAt = mergedOrder.created_at;
         if (createdAt) {
@@ -687,6 +711,7 @@ const KitchenDisplay = () => {
         });
       });
 
+      // Sort all cards by created_at ascending so newest orders appear last
       allCards.sort((a, b) => new Date(a.created_at || 0) - new Date(b.created_at || 0));
 
       // Stabilise item order across polls
@@ -695,25 +720,35 @@ const KitchenDisplay = () => {
         const incomingItemIds = incoming.items.map((i) => i.id);
 
         if (!itemOrderRef.current[cardId]) {
+          // First time we see this card — lock in the server order as canonical
           itemOrderRef.current[cardId] = incomingItemIds;
         } else {
+          // Merge: keep known order, append any genuinely new items at the end
           const lockedIds = itemOrderRef.current[cardId];
           const lockedSet = new Set(lockedIds);
           const incomingSet = new Set(incomingItemIds);
+
+          // Drop ids that no longer exist on the server (deleted items)
           const prunedLocked = lockedIds.filter((id) => incomingSet.has(id));
-          incomingItemIds.forEach((id) => { if (!lockedSet.has(id)) prunedLocked.push(id); });
+
+          // Append brand-new item ids not yet in our locked list
+          incomingItemIds.forEach((id) => {
+            if (!lockedSet.has(id)) prunedLocked.push(id);
+          });
           itemOrderRef.current[cardId] = prunedLocked;
         }
 
+        // Build a lookup map then re-order items by the locked id sequence
         const itemById = {};
         incoming.items.forEach((i) => { itemById[i.id] = i; });
         const orderedItems = itemOrderRef.current[cardId]
-          .filter((id) => itemById[id])
+          .filter((id) => itemById[id]) // skip ids that vanished
           .map((id) => itemById[id]);
 
         return { ...incoming, items: orderedItems };
       });
 
+      // Clean up ref entries for cards that are no longer active
       const activeIds = new Set(allCards.map((c) => c.card_id));
       Object.keys(itemOrderRef.current).forEach((id) => {
         if (!activeIds.has(Number(id)) && !activeIds.has(id)) {
@@ -863,22 +898,23 @@ const KitchenDisplay = () => {
 
   // ─── Filter cards ──────────────────────────────────────────────────────────
 
-  const filteredCards = cards.filter((card) => {
-    if (orderFilter === KDS_CONFIG.FILTERS.ALL) return true;
-    const isTakeaway = KDS_CONFIG.TAKEAWAY_TABLE_IDS.includes(Number(card.table_id));
-    if (orderFilter === KDS_CONFIG.FILTERS.TAKEAWAY) return isTakeaway;
-    if (orderFilter === KDS_CONFIG.FILTERS.DINEIN) return !isTakeaway;
-    return true;
-  });
+  const filteredCards = cards
+    .filter((card) => {
+      if (orderFilter === KDS_CONFIG.FILTERS.ALL) return true;
+      const isTakeaway = KDS_CONFIG.TAKEAWAY_TABLE_IDS.includes(Number(card.table_id));
+      if (orderFilter === KDS_CONFIG.FILTERS.TAKEAWAY) return isTakeaway;
+      if (orderFilter === KDS_CONFIG.FILTERS.DINEIN) return !isTakeaway;
+      return true;
+    });
 
-  // ─── Render ────────────────────────────────────────────────────────────────
+  // ─── Render ───────────────────────────────────────────────────────────────────
 
   return (
     <>
       <div className="min-h-screen w-full bg-gray-50 text-gray-900">
         <div className="mx-auto p-6 lg:py-8">
 
-          {/* ── Filter + Aggregate bar ── */}
+          {/* ── Filter bar ── */}
           <div className="mb-3 overflow-x-auto">
             <div className="flex gap-2 items-center min-w-max">
               {ORDER_FILTER_OPTIONS.map(({ key, label, Icon }) => (
@@ -886,8 +922,8 @@ const KitchenDisplay = () => {
                   key={key}
                   onClick={() => setOrderFilter(key)}
                   className={`flex items-center gap-2 px-4 py-2 rounded-lg font-medium text-sm transition-all ${orderFilter === key
-                    ? 'bg-action-primary text-text-white shadow-sm'
-                    : 'bg-bg-tertiary text-text-secondary hover:text-text-primary border border-border-default'
+                     ? 'bg-action-primary text-text-white shadow-sm'
+                     : 'bg-bg-tertiary text-text-secondary hover:text-text-primary border border-border-default'
                     }`}
                 >
                   <Icon size={16} />

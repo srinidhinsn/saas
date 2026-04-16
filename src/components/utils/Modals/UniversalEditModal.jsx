@@ -45,7 +45,7 @@ const UniversalEditModal = ({
   const [dietaryOptions, setDietaryOptions] = useState([]);
   const [timingOptions, setTimingOptions] = useState([]);
 
-   const isComboItem = React.useMemo(() => {
+  const isComboItem = React.useMemo(() => {
     if (!editingItem?.category_id || !categoriesFlat?.length) return false;
     // editingItem.isCombo is pre-computed by handleItemClick in MenuManagement
     if (editingItem.isCombo !== undefined) return editingItem.isCombo;
@@ -60,7 +60,7 @@ const UniversalEditModal = ({
     }
     return false;
   }, [editingItem, categoriesFlat]);
-  
+
   const fetchStatuses = async () => {
     try {
       const res = await axios.get(
@@ -71,19 +71,30 @@ const UniversalEditModal = ({
         }
       );
       setStatusOptions(res.data?.data || []);
-    } catch (err) { setStatusOptions([]); }
+    } catch (err) {
+      console.error("Status fetch error:", err);
+      setStatusOptions([]);
+    }
   };
 
   const fetchConfigs = async () => {
     try {
       setLoadingConfigs(true);
+
       const res = await axios.get(
         `${import.meta.env.VITE_API_TABLE_SERVICE_URL}/${clientId}/tables/config`,
-        { params: { client_id: clientId }, headers: { Authorization: `Bearer ${token}` } }
+        {
+          params: { client_id: clientId },
+          headers: { Authorization: `Bearer ${token}` }
+        }
       );
       setConfigs(res.data || []);
-    } catch (err) { setConfigs([]); }
-    finally { setLoadingConfigs(false); }
+    } catch (err) {
+      console.error("Config fetch error:", err);
+      setConfigs([]);
+    } finally {
+      setLoadingConfigs(false);
+    }
   };
   const fetchDietaryTypes = async () => {
     try {
@@ -139,6 +150,7 @@ const UniversalEditModal = ({
     }
   }, [showModal, clientId, token, normalizedRealm]);
 
+  // Menu Modal Functions
   useEffect(() => {
     if (!showModal || modalType !== 'menu' || !fetchAddonData) return;
     fetchAddonData().then(({ subcategories, items }) => {
@@ -148,19 +160,32 @@ const UniversalEditModal = ({
   }, [showModal, modalType]);
 
   const handleEditDrag = (e) => {
-    e.preventDefault(); e.stopPropagation();
-    if (e.type === "dragenter" || e.type === "dragover") setDragActive(true);
-    else if (e.type === "dragleave") setDragActive(false);
+    e.preventDefault();
+    e.stopPropagation();
+    if (e.type === "dragenter" || e.type === "dragover") {
+      setDragActive(true);
+    } else if (e.type === "dragleave") {
+      setDragActive(false);
+    }
   };
 
   const handleEditDrop = (e) => {
-    e.preventDefault(); e.stopPropagation(); setDragActive(false);
-    if (e.dataTransfer.files?.[0]) handleEditImageFile(e.dataTransfer.files[0]);
+    e.preventDefault();
+    e.stopPropagation();
+    setDragActive(false);
+
+    if (e.dataTransfer.files && e.dataTransfer.files[0]) {
+      handleEditImageFile(e.dataTransfer.files[0]);
+    }
   };
 
   const handleEditImageFile = (file) => {
-    if (file?.type.startsWith('image/')) { setEditItemImage(file); setEditItemImageUrl(URL.createObjectURL(file)); }
-    else alert('Please upload a valid image file');
+    if (file && file.type.startsWith('image/')) {
+      setEditItemImage(file);
+      setEditItemImageUrl(URL.createObjectURL(file));
+    } else {
+      alert('Please upload a valid image file');
+    }
   };
 
   const flattenCategories = (items, level = 0) => {
@@ -168,7 +193,9 @@ const UniversalEditModal = ({
     items.forEach(item => {
       if (item.id !== 'all') {
         result.push({ ...item, level });
-        if (item.children) result = result.concat(flattenCategories(item.children, level + 1));
+        if (item.children) {
+          result = result.concat(flattenCategories(item.children, level + 1));
+        }
       }
     });
     return result;
@@ -176,24 +203,35 @@ const UniversalEditModal = ({
 
   const getAddonNameById = (id) => allAddonItems?.find(item => item.id === id)?.name || 'Unknown';
 
+  // ✅ Remove individual addon
   const removeAddon = (addonId) => {
-    setEditingItem(prev => ({ ...prev, line_item_id: (prev?.line_item_id || []).filter(id => id !== addonId) }));
+    setEditingItem(prev => ({
+      ...prev,
+      line_item_id: (prev?.line_item_id || []).filter(id => id !== addonId)
+    }));
   };
 
   const handleClose = () => {
     setShowModal(false);
-    if (modalType === 'menu') { setEditingItem?.(null); setEditItemImage?.(null); setEditItemImageUrl?.(''); }
-    else if (modalType === 'table') { setEditRowId?.(null); }
+    if (modalType === 'menu') {
+      setEditingItem?.(null);
+      setEditItemImage?.(null);
+      setEditItemImageUrl?.('');
+    } else if (modalType === 'table') {
+      setEditRowId?.(null);
+    }
   };
 
   if (!showModal) return null;
 
+  // Render Menu Edit Modal
   if (modalType === 'menu' && editingItem) {
     return (
       <>
         <div className="fixed inset-0 z-50 flex items-center justify-center p-4 bg-black bg-opacity-50">
           <div className="rounded-lg max-w-2xl w-full bg-white max-h-[90vh] overflow-hidden flex flex-col shadow-xl">
 
+            {/* Header */}
             <div className="px-6 py-4 border-b border-gray-200 flex justify-between items-center">
               <div>
                 <h2 className="text-xl font-semibold text-gray-900">
@@ -206,21 +244,31 @@ const UniversalEditModal = ({
               <button onClick={handleClose} className="p-1.5 rounded-lg bg-action-primary text-text-white hover:opacity-90"><X className="w-5 h-5" /></button>
             </div>
 
+            {/* Content */}
             <div className="flex-1 overflow-y-auto px-6 py-4">
               <div className="space-y-4">
-                {/* Category */}
+                {/* Category Selector */}
                 <div>
                   <label className="block text-sm font-medium mb-1 text-gray-700">Category <span className="text-red-600">*</span></label>
-                  <select value={editingItem.category_id || ''} onChange={e => setEditingItem({ ...editingItem, category_id: e.target.value })}
-                    className="w-full px-3 py-2 rounded-md border border-gray-300 text-gray-900 focus:outline-none focus:ring-2 focus:ring-blue-500" required>
+                  <label className="block text-sm font-medium mb-1 text-gray-700">
+                    Category <span className="text-red-600">*</span>
+                  </label>
+                  <select
+                    value={editingItem.category_id || ''}
+                    onChange={(e) => setEditingItem({ ...editingItem, category_id: e.target.value })}
+                    className="w-full px-3 py-2 rounded-md border border-gray-300 text-gray-900 focus:outline-none focus:ring-2 focus:ring-blue-500 focus:border-transparent"
+                    required
+                  >
                     <option value="">Select a category</option>
                     {flattenCategories(categories || []).map(cat => (
-                      <option key={cat.id} value={cat.id}>{'—'.repeat(cat.level)} {cat.name}</option>
+                      <option key={cat.id} value={cat.id}>
+                        {'—'.repeat(cat.level)} {cat.name}
+                      </option>
                     ))}
                   </select>
                 </div>
 
-                {/* Name */}
+                {/* Item Name */}
                 <div>
                   <label className="block text-sm font-medium mb-1 text-gray-700">{isComboItem ? 'Combo Name' : 'Item Name'} <span className="text-red-600">*</span></label>
                   <input type="text" value={editingItem.name} onChange={e => setEditingItem({ ...editingItem, name: e.target.value })}
@@ -329,12 +377,17 @@ const UniversalEditModal = ({
                   </div>
                 </div>
 
-                {/* Zone pricing */}
+                {/* Zone-wise pricing */}
                 {configs.length > 0 && (
                   <div>
-                    <label className="block text-sm font-medium mb-1 text-gray-700">Zone-wise Pricing</label>
+                    <label className="block text-sm font-medium mb-1 text-gray-700">
+                      Zone-wise Pricing
+                    </label>
                     {configs.map(c => (
-                      <div key={c.id} className="flex items-center justify-between gap-3 px-3 py-2 mb-1 rounded-xl border border-gray-200 bg-gray-50">
+                      <div
+                        key={c.id}
+                        className="flex items-center justify-between gap-3 px-3 py-2 mb-1 rounded-xl border border-gray-200 bg-gray-50"
+                      >
                         <span className="text-sm font-medium text-gray-700">
                           <span className="font-semibold text-blue-600">{c.section}</span>
                           <span className="text-gray-400 mx-1">—</span>
@@ -342,17 +395,23 @@ const UniversalEditModal = ({
                         </span>
                         <div className="flex items-center gap-1">
                           <span className="text-xs text-gray-400">₹</span>
-                          <input type="number" min="0" placeholder={editingItem?.unit_price || "base price"}
+                          <input
+                            type="number"
+                            min="0"
+                            placeholder={editingItem?.unit_price || "base price"}
                             value={editingItem?.zonePrices?.[c.id] ?? ''}
-                            onChange={e => setEditingItem(prev => ({ ...prev, zonePrices: { ...(prev.zonePrices || {}), [c.id]: e.target.value } }))}
-                            className="w-24 px-2 py-1 rounded-lg border border-gray-300 bg-white text-sm text-right focus:outline-none focus:ring-2 focus:ring-blue-500" />
+                            onChange={e => setEditingItem(prev => ({
+                              ...prev,
+                              zonePrices: { ...(prev.zonePrices || {}), [c.id]: e.target.value }
+                            }))}
+                            className="w-24 px-2 py-1 rounded-lg border border-gray-300 bg-white text-sm text-right focus:outline-none focus:ring-2 focus:ring-blue-500"
+                          />
                         </div>
                       </div>
                     ))}
                   </div>
                 )}
-
-                {/* Code & Serving Unit */}
+                {/* Code & Unit */}
                 <div className="grid grid-cols-2 gap-4">
                   <div>
                     <label className="block text-sm font-medium mb-1 text-gray-700">
@@ -415,15 +474,34 @@ const UniversalEditModal = ({
                       <p className="text-xs text-gray-600 mb-1">Current Image:</p>
                       {editItemImageUrl ? (
                         <div className="relative">
-                          <img src={editItemImageUrl} alt="New Preview" className="w-full h-32 object-cover rounded-md border border-gray-200" />
-                          <button type="button" onClick={() => { setEditItemImage(null); setEditItemImageUrl(''); }}
-                            className="absolute top-2 right-2 bg-red-600 text-white p-1.5 rounded-full hover:bg-red-700"><X className="w-4 h-4" /></button>
+                          <img
+                            src={editItemImageUrl}
+                            alt="New Preview"
+                            className="w-full h-32 object-cover rounded-md border border-gray-200"
+                          />
+                          <button
+                            type="button"
+                            onClick={() => {
+                              setEditItemImage(null);
+                              setEditItemImageUrl('');
+                            }}
+                            className="absolute top-2 right-2 bg-red-600 text-white p-1.5 rounded-full hover:bg-red-700"
+                          >
+                            <X className="w-4 h-4" />
+                          </button>
                         </div>
                       ) : (
-                        <MenuImagePreview clientId={clientId} imageId={editingItem.image_id} token={token} alt={editingItem.name}
+                        <MenuImagePreview
+                          clientId={clientId}
+                          imageId={editingItem.image_id}
+                          token={token}
+                          alt={editingItem.name}
                           baseUrl={import.meta.env.VITE_API_DOCUMENT_SERVICE_URL}
-                          urlBuilder={({ baseUrl, clientId, imageId }) => `${baseUrl}/${clientId}/document/download?doc_id=${imageId}`}
-                          className="w-full h-32 object-cover rounded-md border border-gray-200" />
+                          urlBuilder={({ baseUrl, clientId, imageId }) =>
+                            `${baseUrl}/${clientId}/document/download?doc_id=${imageId}`
+                          }
+                          className="w-full h-32 object-cover rounded-md border border-gray-200"
+                        />
                       )}
                     </div>
                   )}
@@ -431,9 +509,22 @@ const UniversalEditModal = ({
                     onDragEnter={handleEditDrag} onDragLeave={handleEditDrag} onDragOver={handleEditDrag} onDrop={handleEditDrop}>
                     <div className="text-center">
                       <Upload className="mx-auto mb-2 text-gray-400" size={32} />
-                      <p className="text-sm text-gray-600 mb-2">{editingItem.image_id ? 'Upload new image to replace' : 'Drag & drop an image here'}</p>
-                      <input type="file" accept="image/*" onChange={e => e.target.files[0] && handleEditImageFile(e.target.files[0])} className="hidden" id="editImageUpload" />
-                      <label htmlFor="editImageUpload" className="inline-block px-4 py-2 bg-blue-600 text-white rounded-md cursor-pointer hover:bg-blue-700 text-sm font-medium">Choose File</label>
+                      <p className="text-sm text-gray-600 mb-2">
+                        {editingItem.image_id ? 'Upload new image to replace' : 'Drag & drop an image here'}
+                      </p>
+                      <input
+                        type="file"
+                        accept="image/*"
+                        onChange={(e) => e.target.files[0] && handleEditImageFile(e.target.files[0])}
+                        className="hidden"
+                        id="editImageUpload"
+                      />
+                      <label
+                        htmlFor="editImageUpload"
+                        className="inline-block px-4 py-2 bg-blue-600 text-white rounded-md cursor-pointer hover:bg-blue-700 text-sm font-medium"
+                      >
+                        Choose File
+                      </label>
                     </div>
                   </div>
                 </div>
@@ -498,9 +589,20 @@ const UniversalEditModal = ({
               </div>
             </div>
 
+            {/* Footer */}
             <div className="px-6 py-4 border-t border-border-default bg-gray-50 flex gap-3 justify-end">
-              <button onClick={handleClose} className="px-6 py-2 rounded-md bg-white text-gray-700 border border-gray-300 hover:bg-gray-50 font-medium">Cancel</button>
-              <button onClick={handleEditItem} className="px-6 py-2 rounded-md bg-action-primary text-text-white font-medium">Save Changes</button>
+              <button
+                onClick={handleClose}
+                className="px-6 py-2 rounded-md bg-white text-gray-700 border border-gray-300 hover:bg-gray-50 font-medium"
+              >
+                Cancel
+              </button>
+              <button
+                onClick={handleEditItem}
+                className="px-6 py-2 rounded-md bg-action-primary text-text-white font-medium"
+              >
+                Save Changes
+              </button>
             </div>
           </div>
         </div>
@@ -531,20 +633,33 @@ const UniversalEditModal = ({
     );
   }
 
+  // Render Table Edit Modal
   if (modalType === 'table' && table) {
     return (
       <div className="fixed inset-0 bg-black bg-opacity-50 z-50 flex items-center justify-center p-4">
         <div className="bg-white rounded-lg w-full max-w-md shadow-xl">
+
+          {/* Header */}
           <div className="px-6 py-4 border-b border-gray-200 flex justify-between items-center">
             <h2 className="text-xl font-semibold text-gray-900">Edit Table</h2>
-            <button className="p-1.5 rounded-lg bg-action-primary text-text-white hover:opacity-90" onClick={handleClose}><X className="w-5 h-5" /></button>
+            <button
+              className="p-1.5 rounded-lg bg-action-primary text-text-white hover:opacity-90 transition-opacity"
+              onClick={handleClose}
+            >
+              <X className="w-5 h-5" />
+            </button>
           </div>
+
+          {/* Content */}
           <div className="px-6 py-4">
+            {/* Table Name Display */}
             <div className="bg-gray-50 border border-gray-200 rounded-md p-4 mb-4 text-center">
               <p className="text-xs font-medium text-gray-600 uppercase tracking-wide mb-1">Table Name</p>
               <p className="text-2xl font-bold text-gray-900">{table.name}</p>
             </div>
+
             <div className="space-y-4">
+              {/* No of Seating */}
               <div>
                 <label className="block text-sm font-medium mb-1 text-gray-700">No of Seating</label>
                 <input type="number" min="1" value={table.table_type}
@@ -552,27 +667,67 @@ const UniversalEditModal = ({
                   className={`w-full px-3 py-2 rounded-md border focus:outline-none focus:ring-2 focus:ring-blue-500 ${editFieldErrors?.table_type ? 'border-red-500 bg-red-50' : 'border-gray-300'}`} />
                 {editFieldErrors?.table_type && <p className="text-red-600 text-xs mt-1">{editFieldErrors.table_type}</p>}
               </div>
-              <div>
-                <label className="block text-sm font-medium mb-1 text-gray-700">Section & Zone:</label>
-                <select value={table.config_id || ""} onChange={e => handleEditChange(table.id, "config_id", Number(e.target.value))} className="w-full px-3 py-2 border rounded-md">
+              <div className="">
+                <label className="block text-sm font-medium mb-1 text-gray-700">Section & Zone :</label>
+
+                <select
+                  value={table.config_id || ""}
+                  onChange={(e) =>
+                    handleEditChange(table.id, "config_id", Number(e.target.value))
+                  }
+                  className="w-full px-3 py-2 border rounded-md"
+                >
                   <option value="">Select Config</option>
-                  {loadingConfigs ? <option disabled>Loading...</option> : configs.length === 0 ? <option disabled>No Config Available</option> : configs.map(c => <option key={c.id} value={c.id}>{c.section} - {c.zone}</option>)}
+
+                  {loadingConfigs ? (
+                    <option disabled>Loading...</option>
+                  ) : configs.length === 0 ? (
+                    <option disabled>No Config Available</option>
+                  ) : (
+                    configs.map(c => (
+                      <option key={c.id} value={c.id}>
+                        {c.section} - {c.zone}
+                      </option>
+                    ))
+                  )}
                 </select>
               </div>
+
+              {/* Status */}
               <div>
                 <label className="block text-sm font-medium mb-1 text-gray-700">Status</label>
-                <select value={table.status || ""} onChange={e => handleEditChange(table.id, "status", e.target.value)}
-                  className={`w-full px-3 py-2 rounded-md border focus:outline-none focus:ring-2 focus:ring-blue-500 ${editFieldErrors?.status ? 'border-red-500 bg-red-50' : 'border-gray-300'}`}>
+                <select
+                  value={table.status || ""}
+                  onChange={(e) => handleEditChange(table.id, "status", e.target.value)}
+                  className={`w-full px-3 py-2 rounded-md border focus:outline-none focus:ring-2 focus:ring-blue-500 ${editFieldErrors?.status ? 'border-red-500 bg-red-50' : 'border-gray-300'
+                    }`}
+                >
                   <option value="">Select Status</option>
-                  {statusOptions.map(s => <option key={s} value={s}>{s}</option>)}
+                  {statusOptions.map(s => (
+                    <option key={s} value={s}>{s}</option>
+                  ))}
                 </select>
-                {editFieldErrors?.status && <p className="text-red-600 text-xs mt-1">{editFieldErrors.status}</p>}
+                {editFieldErrors?.status && (
+                  <p className="text-red-600 text-xs mt-1">{editFieldErrors.status}</p>
+                )}
               </div>
             </div>
           </div>
+
+          {/* Footer */}
           <div className="px-6 py-4 border-t border-gray-200 bg-gray-50 flex gap-3 justify-end">
-            <button className="px-6 py-2 rounded-md bg-white text-gray-700 border border-gray-300 hover:bg-gray-50 font-medium" onClick={handleClose}>Cancel</button>
-            <button className="px-6 py-2 rounded-md bg-action-primary text-text-white hover:bg-blue-700 font-medium" onClick={saveEdit}>Save</button>
+            <button
+              className="px-6 py-2 rounded-md bg-white text-gray-700 border border-gray-300 hover:bg-gray-50 font-medium"
+              onClick={handleClose}
+            >
+              Cancel
+            </button>
+            <button
+              className="px-6 py-2 rounded-md bg-action-primary text-text-white hover:bg-blue-700 font-medium"
+              onClick={saveEdit}
+            >
+              Save
+            </button>
           </div>
         </div>
       </div>

@@ -2,13 +2,13 @@ import React, { useState, useEffect, useMemo } from 'react';
 import { X, Search, Check } from 'lucide-react';
 
 const AddonSelectionPopup = ({
-  isOpen,
-  onClose,
-  selectedAddons,
-  onSave,
-  addonSubcategories,
-  allAddonItems,
-  currentItemId // To exclude current item from selection
+  isOpen, 
+  onClose, 
+  selectedAddons, 
+  onSave, 
+  addonSubcategories, 
+  allAddonItems, 
+  currentItemId // ✅ To exclude current item from selection
 }) => {
   const [selectedSubcategory, setSelectedSubcategory] = useState(null);
   const [searchQuery, setSearchQuery] = useState('');
@@ -66,23 +66,28 @@ const AddonSelectionPopup = ({
     });
   };
 
+  // ✅ Select/Deselect all visible addons
   const toggleSelectAll = () => {
     const visibleAddonIds = filteredAddonItems.map(item => item.id);
     const allSelected = visibleAddonIds.every(id => tempSelectedAddons.includes(id));
 
     if (allSelected) {
+      // Deselect all visible
       setTempSelectedAddons(prev => prev.filter(id => !visibleAddonIds.includes(id)));
     } else {
+      // Select all visible
       const newSelection = [...new Set([...tempSelectedAddons, ...visibleAddonIds])];
       setTempSelectedAddons(newSelection);
     }
   };
 
+  // ✅ Handle save
   const handleSave = () => {
     onSave(tempSelectedAddons);
     onClose();
   };
 
+  // ✅ Handle close (reset temp selection)
   const handleClose = () => {
     setTempSelectedAddons(selectedAddons || []);
     setSelectedSubcategory(null);
@@ -90,6 +95,7 @@ const AddonSelectionPopup = ({
     onClose();
   };
 
+  // ✅ Get addon name by ID
   const getAddonNameById = (id) => {
     const addon = allAddonItems.find(item => item.id === id);
     return addon?.name || 'Unknown';

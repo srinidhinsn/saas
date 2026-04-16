@@ -183,8 +183,13 @@ const MenuManagement = ({ clientId, token, realm }) => {
 
   useEffect(() => {
     if (!selectedZone || !selectedSection) return;
-    const found = sections.find(s => s.zone === selectedZone && s.section === selectedSection);
-    if (found) setZoneConfigId(found.id);
+    const found = sections.find(
+      s => s.zone === selectedZone && s.section === selectedSection
+    );
+
+    if (found) {
+      setZoneConfigId(found.id);
+    }
   }, [selectedZone, selectedSection, sections]);
 
   // ─── Get top-level section name dynamically ─────────────────────────
@@ -273,7 +278,10 @@ const MenuManagement = ({ clientId, token, realm }) => {
       ]);
 
       const addonsCategory = catRes.data.data?.[0];
-      if (!addonsCategory) return { subcategories: [], items: [] };
+      if (!addonsCategory) {
+        // No addon category created yet
+        return { subcategories: [], items: [] };
+      }
 
       const subcats = addonsCategory.subCategories || [];
       const allItems = itemRes.data.data || [];
@@ -324,7 +332,7 @@ const MenuManagement = ({ clientId, token, realm }) => {
     }
   }, [clientId, token, menuConfig, zoneConfigId]);
 
-  
+
 
   useEffect(() => {
     fetchAddonData(zoneConfigId).then(({ subcategories, items }) => {
@@ -391,8 +399,7 @@ const MenuManagement = ({ clientId, token, realm }) => {
     setNewItem({
       name: '', description: '', category_id: selectedCategoryId || '',
       unit_price: '', discount: '', code: '', unit: '',
-      serving_quantity: "", serving_unit: "", line_item_id: [],
-      inventory_id: 'menu', zone_config_id: zoneConfigId || null
+      serving_quantity: "", serving_unit: "", line_item_id: [], inventory_id: 'menu', zone_config_id: zoneConfigId || null
     });
     setNewItemImage(null);
     setNewItemImageUrl('');
@@ -420,7 +427,9 @@ const MenuManagement = ({ clientId, token, realm }) => {
     const baseRecord = allSiblings.find(m => m.zone_config_id === 0) || item;
 
     const zonePrices = {};
-    allSiblings.filter(m => m.zone_config_id !== 0).forEach(m => { zonePrices[m.zone_config_id] = m.unit_price; });
+    allSiblings
+      .filter(m => m.zone_config_id !== 0)
+      .forEach(m => { zonePrices[m.zone_config_id] = m.unit_price; });
 
     const resolvedCategoryId =
       categoriesFlat.find(c => c.id === baseRecord.category_id)?.id
@@ -452,7 +461,10 @@ const MenuManagement = ({ clientId, token, realm }) => {
   const flattenCategoryTree = (tree, level = 0, parentId = null) => {
     let flatList = [];
     tree.forEach(category => {
-      flatList.push({ id: category.id, name: category.name, level, parentId, hasChildren: !!(category.subCategories?.length) });
+      flatList.push({
+        id: category.id, name: category.name, level,
+        parentId, hasChildren: !!(category.subCategories?.length),
+      });
       if (category.subCategories?.length) {
         flatList = flatList.concat(flattenCategoryTree(category.subCategories, level + 1, category.id));
       }
@@ -472,7 +484,9 @@ const MenuManagement = ({ clientId, token, realm }) => {
     if (!node) return [];
     if (currentLevel === targetLevel) return [node];
     let result = [];
-    for (const child of node.children || []) result = result.concat(getCategoriesAtLevel(child, targetLevel, currentLevel + 1));
+    for (const child of node.children || []) {
+      result = result.concat(getCategoriesAtLevel(child, targetLevel, currentLevel + 1));
+    }
     return result;
   };
 
@@ -490,11 +504,15 @@ const MenuManagement = ({ clientId, token, realm }) => {
     } catch (err) { setUnits(["g", "kg", "ml", "litre", "pcs"]); }
   }, [clientId, token]);
 
-  useEffect(() => { fetchUnits(); }, [fetchUnits]);
+  useEffect(() => {
+    fetchUnits();
+  }, [fetchUnits]);
 
   const getCategoryIdByName = (categoryName) => {
     if (!categoryName) return null;
-    return categoriesFlat.find(c => c.name.trim().toLowerCase() === categoryName.trim().toLowerCase())?.id || null;
+    return categoriesFlat.find(
+      c => c.name.trim().toLowerCase() === categoryName.trim().toLowerCase()
+    )?.id || null;
   };
 
   const fetchInventoryIds = useCallback(async () => {
@@ -505,7 +523,9 @@ const MenuManagement = ({ clientId, token, realm }) => {
         { headers: { Authorization: `Bearer ${token}` } }
       );
       setInventoryIds(res.data.data[0]?.subCategories ?? []);
-    } catch (error) { console.error("Error fetching inventory IDs:", error); }
+    } catch (error) {
+      console.error("Error fetching inventory IDs:", error);
+    }
   }, [clientId, token, menuConfig]);
 
   useEffect(() => { fetchInventoryIds(); }, [fetchInventoryIds]);
@@ -545,11 +565,17 @@ const MenuManagement = ({ clientId, token, realm }) => {
 
       const basePayload = {
         ...cleanNewItem,
-        client_id: clientId, category_id: finalCategoryId, image_id: imageId,
-        realm: realm || newItem.realm || "", slug, unit_price: basePrice,
+        client_id: clientId,
+        category_id: finalCategoryId,
+        image_id: imageId,
+        realm: realm || newItem.realm || "",
+        slug,
+        unit_price: basePrice,
         discount: parseFloat(newItem.discount) || 0,
         code: newItem.code ? String(newItem.code).trim() : null,
-        serving_quantity: newItem.serving_quantity ? parseFloat(newItem.serving_quantity) : null,
+        serving_quantity: newItem.serving_quantity
+          ? parseFloat(newItem.serving_quantity)
+          : null,
         serving_unit: newItem.serving_unit || null,
         availability: parseFloat(newItem.availability) || 0,
         created_by,
@@ -562,7 +588,12 @@ const MenuManagement = ({ clientId, token, realm }) => {
       const baseRes = await axios.post(
         `${import.meta.env.VITE_API_INVENTORY_SERVICE_URL}/${clientId}/menu/create`,
         basePayload,
-        { headers: { Authorization: `Bearer ${token}`, "Content-Type": "application/json" } }
+        {
+          headers: {
+            Authorization: `Bearer ${token}`,
+            "Content-Type": "application/json",
+          },
+        }
       );
 
       const sharedId = baseRes.data.data.id;
@@ -579,7 +610,12 @@ const MenuManagement = ({ clientId, token, realm }) => {
 
           await axios.post(
             `${import.meta.env.VITE_API_INVENTORY_SERVICE_URL}/${clientId}/menu/create`,
-            { ...basePayload, id: sharedId, unit_price: finalPrice, zone_config_id: configId },
+            {
+              ...basePayload,
+              id: sharedId,
+              unit_price: finalPrice,
+              zone_config_id: configId,
+            },
             { headers: { Authorization: `Bearer ${token}` } }
           );
         }
@@ -588,7 +624,17 @@ const MenuManagement = ({ clientId, token, realm }) => {
       await fetchData({ silent: true });
 
       setShowAddModal(false);
-      setNewItem({ name: "", description: "", category_id: "", unit_price: "", discount: "", code: "", unit: "", line_item_id: [], zonePrices: {} });
+      setNewItem({
+        name: "",
+        description: "",
+        category_id: "",
+        unit_price: "",
+        discount: "",
+        code: "",
+        unit: "",
+        line_item_id: [],
+        zonePrices: {},
+      });
       setNewItemImage(null);
       setNewItemImageUrl("");
 
@@ -655,8 +701,10 @@ const MenuManagement = ({ clientId, token, realm }) => {
       // console.log(`[Edit] slug="${slug}" dietary="${dietary_type}" timing="${editingItem.availability_time}"`);
 
       const basePayload = {
-        name: editingItem.name, description: editingItem.description || null,
-        category_id: finalCategoryId, image_id: imageId || null,
+        name: editingItem.name,
+        description: editingItem.description || null,
+        category_id: finalCategoryId,
+        image_id: imageId || null,
         discount: Number(editingItem.discount) || 0,
         code: editingItem.code ? String(editingItem.code).trim() : null,
         unit: editingItem.unit || null,
@@ -718,7 +766,9 @@ const MenuManagement = ({ clientId, token, realm }) => {
       setEditingItem(null);
       setEditItemImage(null);
       setEditItemImageUrl('');
-    } catch (error) { console.error('Error updating item:', error); }
+    } catch (error) {
+      console.error('Error updating item:', error);
+    }
   };
 
   useEffect(() => {
@@ -731,7 +781,10 @@ const MenuManagement = ({ clientId, token, realm }) => {
 
   const fetchData = useCallback(async (options = { silent: false }) => {
     const { silent = false } = options;
-    if (!clientId || !token || !menuConfig) { if (!silent) setLoading(false); return; }
+    if (!clientId || !token || !menuConfig) {
+      if (!silent) setLoading(false);
+      return;
+    }
 
     try {
       if (!silent) setLoading(true);
@@ -745,7 +798,10 @@ const MenuManagement = ({ clientId, token, realm }) => {
           `${import.meta.env.VITE_API_INVENTORY_SERVICE_URL}/${clientId}/menu/read`,
           {
             headers: { Authorization: `Bearer ${token}` },
-            params: { inventory_id: menuConfig.menuInventoryId, ...(zoneConfigId && { zone_config_id: zoneConfigId }) }
+            params: {
+              inventory_id: menuConfig.menuInventoryId,
+              ...(zoneConfigId && { zone_config_id: zoneConfigId })
+            }
           }
         )
       ]);
@@ -757,7 +813,8 @@ const MenuManagement = ({ clientId, token, realm }) => {
       const topLevelCategories = fullTree.filter(cat => !subcategoryIds.has(cat.id));
       const flatCategories = flattenCategoryTree(topLevelCategories);
       const normalizedFlat = flatCategories.map(cat => ({
-        id: cat.id, name: (cat.name || '').trim(), parentId: cat.parentId ?? cat.parent_id ?? null
+        id: cat.id, name: (cat.name || '').trim(),
+        parentId: cat.parentId ?? cat.parent_id ?? null
       }));
       setCategoriesFlat(normalizedFlat);
 
@@ -832,13 +889,20 @@ const MenuManagement = ({ clientId, token, realm }) => {
       let quickCategories = [];
       if (rootNode) {
         let level = menuConfig.level;
-        while (level >= 0) { quickCategories = getCategoriesAtLevel(rootNode, level); if (quickCategories.length > 0) break; level--; }
+        while (level >= 0) {
+          quickCategories = getCategoriesAtLevel(rootNode, level);
+          if (quickCategories.length > 0) break;
+          level--;
+        }
       }
       setDieterySubCategories(quickCategories);
 
       if (!savedCategoryRef.current) setSidebarCategories(categoryTree);
-    } catch (error) { console.error('Error fetching data:', error); }
-    finally { if (!silent) setLoading(false); }
+    } catch (error) {
+      console.error('Error fetching data:', error);
+    } finally {
+      if (!silent) setLoading(false);
+    }
   }, [clientId, token, realm, menuConfig, zoneConfigId]);
 
   useEffect(() => { fetchData(); }, [fetchData]);
@@ -853,7 +917,9 @@ const MenuManagement = ({ clientId, token, realm }) => {
       }
       return null;
     };
-    const collectDescendants = (cat) => { cat.children?.forEach(child => { descendants.push(child.id); collectDescendants(child); }); };
+    const collectDescendants = (cat) => {
+      cat.children?.forEach(child => { descendants.push(child.id); collectDescendants(child); });
+    };
     const category = findCategory(categoryTree, categoryId);
     if (category) collectDescendants(category);
     return descendants;
@@ -1008,12 +1074,18 @@ const MenuManagement = ({ clientId, token, realm }) => {
   const handleDeleteItem = async () => {
     try {
       const deletedItemId = deleteTarget.id;
+
+      // ✅ Send zone_config_id: 0 — backend will now delete ALL variants for this id
       await axios.post(
         `${import.meta.env.VITE_API_INVENTORY_SERVICE_URL}/${clientId}/menu/delete`,
         { id: deletedItemId, zone_config_id: 0 },
         { headers: { Authorization: `Bearer ${token}` } }
       );
-      const itemsToUpdate = menuItems.filter(item => Array.isArray(item.line_item_id) && item.line_item_id.includes(deletedItemId));
+
+      // Clean up line_item_id references in other items
+      const itemsToUpdate = menuItems.filter(
+        item => Array.isArray(item.line_item_id) && item.line_item_id.includes(deletedItemId)
+      );
       if (itemsToUpdate.length > 0) {
         await Promise.all(itemsToUpdate.map(item => axios.post(
           `${import.meta.env.VITE_API_INVENTORY_SERVICE_URL}/${clientId}/menu/update`,
@@ -1027,20 +1099,24 @@ const MenuManagement = ({ clientId, token, realm }) => {
       setAllAddonItems(items);
       setShowDeleteModal(false);
       setDeleteTarget(null);
-    } catch (error) { console.error('Error deleting item:', error); }
+    } catch (error) {
+      console.error('Error deleting item:', error);
+    }
   };
 
   const handleBulkDelete = async () => {
     if (selectedRows.length === 0) { alert('No items selected'); return; }
     if (!window.confirm(`Delete ${selectedRows.length} selected items?`)) return;
     try {
+      // ✅ Backend now deletes all zone variants — just send id + zone_config_id: 0
       await Promise.all(selectedRows.map(id => axios.post(
         `${import.meta.env.VITE_API_INVENTORY_SERVICE_URL}/${clientId}/menu/delete`,
         { id, zone_config_id: 0 },
         { headers: { Authorization: `Bearer ${token}` } }
       )));
       const itemsToUpdate = menuItems.filter(item =>
-        Array.isArray(item.line_item_id) && item.line_item_id.some(addonId => selectedRows.includes(addonId))
+        Array.isArray(item.line_item_id) &&
+        item.line_item_id.some(addonId => selectedRows.includes(addonId))
       );
       if (itemsToUpdate.length > 0) {
         await Promise.all(itemsToUpdate.map(item => axios.post(
@@ -1052,111 +1128,113 @@ const MenuManagement = ({ clientId, token, realm }) => {
       await fetchData({ silent: true });
       setSelectedRows([]);
       setSelectAllChecked(false);
-    } catch (error) { console.error('Error deleting items:', error); }
+    } catch (error) {
+      console.error('Error deleting items:', error);
+    }
   };
 
-// Find and replace the entire handleBulkUpdate function:
-const handleBulkUpdate = async () => {
-  if (selectedRows.length === 0) return;
-  try {
-    for (const id of selectedRows) {
-      const { dietary_type: ed, zonePrices: zp, ...cleanEditedData } = bulkEditData[id] || {};
-      const baseItem = menuItems.find(item => item.id === id && (item.zone_config_id === 0 || item.zone_config_id === null));
-      if (!baseItem) continue;
-      const { dietary_type: od, ...cleanOriginalItem } = baseItem;
+  // Find and replace the entire handleBulkUpdate function:
+  const handleBulkUpdate = async () => {
+    if (selectedRows.length === 0) return;
+    try {
+      for (const id of selectedRows) {
+        const { dietary_type: ed, zonePrices: zp, ...cleanEditedData } = bulkEditData[id] || {};
+        const baseItem = menuItems.find(item => item.id === id && (item.zone_config_id === 0 || item.zone_config_id === null));
+        if (!baseItem) continue;
+        const { dietary_type: od, ...cleanOriginalItem } = baseItem;
 
-      // ✅ Handle slug update when availability changes
-      let updatedSlug = cleanOriginalItem.slug;
-      if ('availability' in cleanEditedData) {
-        const currentSlug = cleanOriginalItem.slug || '';
-        const doubleUnderIdx = currentSlug.lastIndexOf('__');
-        const existingTimingPart = doubleUnderIdx !== -1
-          ? currentSlug.slice(doubleUnderIdx + 2).toLowerCase()
-          : null;
-        const baseSlug = doubleUnderIdx !== -1
-          ? currentSlug.slice(0, doubleUnderIdx)
-          : currentSlug;
+        // ✅ Handle slug update when availability changes
+        let updatedSlug = cleanOriginalItem.slug;
+        if ('availability' in cleanEditedData) {
+          const currentSlug = cleanOriginalItem.slug || '';
+          const doubleUnderIdx = currentSlug.lastIndexOf('__');
+          const existingTimingPart = doubleUnderIdx !== -1
+            ? currentSlug.slice(doubleUnderIdx + 2).toLowerCase()
+            : null;
+          const baseSlug = doubleUnderIdx !== -1
+            ? currentSlug.slice(0, doubleUnderIdx)
+            : currentSlug;
 
-        if (Number(cleanEditedData.availability) === 0) {
-          updatedSlug = `${baseSlug}__unavailable`;
-        } else {
-          if (existingTimingPart === 'unavailable') {
-            updatedSlug = baseSlug;
+          if (Number(cleanEditedData.availability) === 0) {
+            updatedSlug = `${baseSlug}__unavailable`;
+          } else {
+            if (existingTimingPart === 'unavailable') {
+              updatedSlug = baseSlug;
+            }
           }
+          cleanEditedData.slug = updatedSlug;
         }
-        cleanEditedData.slug = updatedSlug;
-      }
 
-      const mergedItem = { ...cleanOriginalItem, ...cleanEditedData, client_id: clientId };
+        const mergedItem = { ...cleanOriginalItem, ...cleanEditedData, client_id: clientId };
 
-      // ✅ Update the base record (zone_config_id = 0)
-      await axios.post(
-        `${import.meta.env.VITE_API_INVENTORY_SERVICE_URL}/${clientId}/menu/update`,
-        { ...mergedItem, zone_config_id: 0 },
-        { headers: { Authorization: `Bearer ${token}` } }
-      );
-
-      // ✅ Always sync slug + availability to ALL zone variants
-      const zoneVariants = allMenuItemsRaw.filter(
-        m => Number(m.id) === Number(id) && m.zone_config_id !== 0 && m.zone_config_id !== null
-      );
-
-      for (const zoneRecord of zoneVariants) {
-        const configId = Number(zoneRecord.zone_config_id);
-
-        // Zone price: use explicitly entered price if provided, else keep existing
-        const enteredPrice = zp?.[configId];
-        const finalPrice =
-          enteredPrice !== '' && enteredPrice !== null && enteredPrice !== undefined
-            ? parseFloat(enteredPrice)
-            : Number(zoneRecord.unit_price);
-
+        // ✅ Update the base record (zone_config_id = 0)
         await axios.post(
           `${import.meta.env.VITE_API_INVENTORY_SERVICE_URL}/${clientId}/menu/update`,
-          {
-            ...mergedItem,           // carries updated slug + availability
-            id: Number(id),
-            unit_price: finalPrice,
-            zone_config_id: configId,
-          },
+          { ...mergedItem, zone_config_id: 0 },
           { headers: { Authorization: `Bearer ${token}` } }
         );
+
+        // ✅ Always sync slug + availability to ALL zone variants
+        const zoneVariants = allMenuItemsRaw.filter(
+          m => Number(m.id) === Number(id) && m.zone_config_id !== 0 && m.zone_config_id !== null
+        );
+
+        for (const zoneRecord of zoneVariants) {
+          const configId = Number(zoneRecord.zone_config_id);
+
+          // Zone price: use explicitly entered price if provided, else keep existing
+          const enteredPrice = zp?.[configId];
+          const finalPrice =
+            enteredPrice !== '' && enteredPrice !== null && enteredPrice !== undefined
+              ? parseFloat(enteredPrice)
+              : Number(zoneRecord.unit_price);
+
+          await axios.post(
+            `${import.meta.env.VITE_API_INVENTORY_SERVICE_URL}/${clientId}/menu/update`,
+            {
+              ...mergedItem,           // carries updated slug + availability
+              id: Number(id),
+              unit_price: finalPrice,
+              zone_config_id: configId,
+            },
+            { headers: { Authorization: `Bearer ${token}` } }
+          );
+        }
+
+        // ✅ Handle any explicitly entered zone prices for zones that don't have a record yet
+        const filledZonePrices = Object.entries(zp || {}).filter(
+          ([, price]) => price !== '' && price !== null && price !== undefined
+        );
+
+        for (const [configId, price] of filledZonePrices) {
+          const alreadyUpdated = zoneVariants.some(
+            m => m.zone_config_id === Number(configId)
+          );
+          if (alreadyUpdated) continue; // already handled above
+
+          // This is a new zone record that doesn't exist yet — create it
+          await axios.post(
+            `${import.meta.env.VITE_API_INVENTORY_SERVICE_URL}/${clientId}/menu/create`,
+            {
+              ...mergedItem,
+              id: Number(id),
+              unit_price: parseFloat(price),
+              zone_config_id: Number(configId),
+            },
+            { headers: { Authorization: `Bearer ${token}` } }
+          );
+        }
       }
 
-      // ✅ Handle any explicitly entered zone prices for zones that don't have a record yet
-      const filledZonePrices = Object.entries(zp || {}).filter(
-        ([, price]) => price !== '' && price !== null && price !== undefined
-      );
-
-      for (const [configId, price] of filledZonePrices) {
-        const alreadyUpdated = zoneVariants.some(
-          m => m.zone_config_id === Number(configId)
-        );
-        if (alreadyUpdated) continue; // already handled above
-
-        // This is a new zone record that doesn't exist yet — create it
-        await axios.post(
-          `${import.meta.env.VITE_API_INVENTORY_SERVICE_URL}/${clientId}/menu/create`,
-          {
-            ...mergedItem,
-            id: Number(id),
-            unit_price: parseFloat(price),
-            zone_config_id: Number(configId),
-          },
-          { headers: { Authorization: `Bearer ${token}` } }
-        );
-      }
+      await fetchData({ silent: true });
+      setShowBulkModal(false);
+      setSelectedRows([]);
+      setBulkEditData({});
+      setSelectAllChecked(false);
+    } catch (error) {
+      console.error('Error updating items:', error);
     }
-
-    await fetchData({ silent: true });
-    setShowBulkModal(false);
-    setSelectedRows([]);
-    setBulkEditData({});
-    setSelectAllChecked(false);
-  } catch (error) {
-    console.error('Error updating items:', error);
-  }
-};
+  };
 
   const clean = (v) => (v === "" || v === undefined || v === null || (typeof v === "number" && isNaN(v)) ? null : v);
   const num = (v) => { if (v === "" || v === undefined || v === null || (typeof v === "number" && isNaN(v))) return 0; const n = Number(v); return isNaN(n) ? 0 : n; };
@@ -1236,7 +1314,9 @@ const handleBulkUpdate = async () => {
       const workbook = XLSX.utils.book_new();
       XLSX.utils.book_append_sheet(workbook, worksheet, "MenuItems");
       XLSX.writeFile(workbook, `menu_items_${new Date().toISOString().slice(0, 10)}.xlsx`);
-    } catch (err) { console.error("Export failed:", err); }
+    } catch (err) {
+      console.error("Export failed:", err);
+    }
   };
 
 
@@ -1400,8 +1480,13 @@ const handleBulkUpdate = async () => {
 
     let allMenuItems = [];
     try {
-      const res = await axios.get(`${import.meta.env.VITE_API_INVENTORY_SERVICE_URL}/${clientId}/menu/read`,
-        { headers: { Authorization: `Bearer ${token}` }, params: { inventory_id: menuConfig.menuInventoryId } });
+      const res = await axios.get(
+        `${import.meta.env.VITE_API_INVENTORY_SERVICE_URL}/${clientId}/menu/read`,
+        {
+          headers: { Authorization: `Bearer ${token}` },
+          params: { inventory_id: menuConfig.menuInventoryId }
+        }
+      );
       allMenuItems = res.data.data || [];
     } catch (err) {
       console.error("Failed to fetch full menu:", err);
@@ -1506,12 +1591,22 @@ const handleBulkUpdate = async () => {
       }
       return null;
     };
+
+    // Find the saved node
     const node = findNode(categories, saved);
     if (!node) return;
+
+    // Find its parent (first level under root)
     const findParentAtLevel = (nodes, targetId, parentNode = null, level = 0) => {
       for (const n of nodes) {
-        if (n.id === targetId) return level === 2 ? parentNode : n;
-        if (n.children?.length) { const found = findParentAtLevel(n.children, targetId, n, level + 1); if (found) return found; }
+        if (n.id === targetId) {
+          // Return the parent at level 1 (AC/Non-AC level)
+          return level === 2 ? parentNode : n;
+        }
+        if (n.children?.length) {
+          const found = findParentAtLevel(n.children, targetId, n, level + 1);
+          if (found) return found;
+        }
       }
       return null;
     };
@@ -1524,7 +1619,10 @@ const handleBulkUpdate = async () => {
   }, [categories]);
 
   useEffect(() => {
-    if (searchOpen && searchInputRef.current) { const t = setTimeout(() => searchInputRef.current.focus(), 80); return () => clearTimeout(t); }
+    if (searchOpen && searchInputRef.current) {
+      const t = setTimeout(() => searchInputRef.current.focus(), 80);
+      return () => clearTimeout(t);
+    }
   }, [searchOpen]);
 
   useEffect(() => {
@@ -1544,12 +1642,18 @@ const handleBulkUpdate = async () => {
     <div className="h-[90vh] bg-bg-primary overflow-hidden">
       <div className="mx-auto p-2">
         <div className="lg:grid lg:grid-cols-4 gap-2">
+          {/* Sidebar */}
           <div className="lg:col-span-1">
             <div className="lg:sticky lg:top-2">
               <MenuCategoryTree
-                categories={categories} selectedCategoryId={selectedCategoryId}
-                onSelectCategory={(id) => { setSelectedCategoryId(id); localStorage.setItem("menu_selected_category", id); }}
-                clientId={clientId} token={token}
+                categories={categories}
+                selectedCategoryId={selectedCategoryId}
+                onSelectCategory={(id) => {
+                  setSelectedCategoryId(id);
+                  localStorage.setItem("menu_selected_category", id);
+                }}
+                clientId={clientId}
+                token={token}
                 onCategoriesUpdate={() => fetchData({ silent: true })}
                 menuConfig={menuConfig}
               />
@@ -1558,9 +1662,27 @@ const handleBulkUpdate = async () => {
 
           <div className="lg:col-span-3 border-default border-border-default p-3 rounded-lg h-[88.5vh] flex flex-col">
             <div className="mb-3 flex flex-wrap gap-2">
-              <button onClick={() => setZoneConfigId(null)} className={`px-3 py-1 rounded-full text-sm border transition ${zoneConfigId === null ? "bg-black text-white border-black" : "bg-gray-100 text-gray-700 hover:bg-gray-200"}`}>All</button>
-              {sections.map(s => (
-                <button key={s.id} onClick={() => setZoneConfigId(s.id)} className={`px-3 py-1 rounded-full text-sm border transition ${zoneConfigId === s.id ? "bg-blue-600 text-white border-blue-600" : "bg-gray-100 text-gray-700 hover:bg-gray-200"}`}>
+              <button
+                onClick={() => setZoneConfigId(null)}
+                className={`px-3 py-1 rounded-full text-sm border transition
+    ${zoneConfigId === null
+                    ? "bg-black text-white border-black"
+                    : "bg-gray-100 text-gray-700 hover:bg-gray-200"
+                  }`}
+              >
+                All
+              </button>
+
+              {sections.map((s) => (
+                <button
+                  key={s.id}
+                  onClick={() => setZoneConfigId(s.id)}
+                  className={`px-3 py-1 rounded-full text-sm border transition
+      ${zoneConfigId === s.id
+                      ? "bg-blue-600 text-white border-blue-600"
+                      : "bg-gray-100 text-gray-700 hover:bg-gray-200"
+                    }`}
+                >
                   {s.zone} - {s.section}
                 </button>
               ))}
@@ -1607,8 +1729,14 @@ const handleBulkUpdate = async () => {
               <div className="flex flex-col gap-2 sm:flex-row sm:items-center sm:justify-end lg:flex-nowrap lg:gap-2">
                 <div className="relative w-full sm:w-56">
                   <Search size={16} className="absolute left-3 top-1/2 -translate-y-1/2 text-text-secondary" />
-                  <input ref={searchInputRef} type="text" value={searchQuery} onChange={e => setSearchQuery(e.target.value)} placeholder="Search items…"
-                    className="w-full h-9 pl-10 pr-3 rounded-lg bg-bg-tertiary border border-border-default text-sm text-text-primary placeholder:text-text-secondary focus:outline-none focus:ring-2 focus:ring-action-primary/30" />
+                  <input
+                    ref={searchInputRef}
+                    type="text"
+                    value={searchQuery}
+                    onChange={(e) => setSearchQuery(e.target.value)}
+                    placeholder="Search items…"
+                    className="w-full h-9 pl-10 pr-3 rounded-lg bg-bg-tertiary border border-border-default text-sm text-text-primary placeholder:text-text-secondary focus:outline-none focus:ring-2 focus:ring-action-primary/30"
+                  />
                 </div>
                 <div className="flex gap-2 flex-wrap justify-end">
 
@@ -1627,8 +1755,12 @@ const handleBulkUpdate = async () => {
                       <CloudUpload size={14} />
                     </button>
                     <div className="absolute right-0 mt-1 w-36 bg-bg-primary border border-border-default rounded-lg shadow-lg opacity-0 invisible group-hover:opacity-100 group-hover:visible transition-all duration-200 z-50">
-                      <button onClick={() => document.getElementById('excelInput').click()} className="w-full px-4 py-2 flex items-center gap-2 text-sm hover:bg-bg-secondary"><Upload size={14} />Import</button>
-                      <button onClick={handleExportToExcel} className="w-full px-4 py-2 flex items-center gap-2 text-sm hover:bg-bg-secondary"><Download size={14} />Export</button>
+                      <button onClick={() => document.getElementById('excelInput').click()} className="w-full px-4 py-2 flex items-center gap-2 text-sm hover:bg-bg-secondary">
+                        <Upload size={14} />Import
+                      </button>
+                      <button onClick={handleExportToExcel} className="w-full px-4 py-2 flex items-center gap-2 text-sm hover:bg-bg-secondary">
+                        <Download size={14} />Export
+                      </button>
                     </div>
                   </div>
                   <input type="file" id="excelInput" accept=".xlsx, .xls" className="hidden" onChange={handleImportFromExcel} />
@@ -1636,6 +1768,7 @@ const handleBulkUpdate = async () => {
               </div>
             </div>
 
+            {/* Items Grid */}
             <div className="flex-1 overflow-y-auto">
               <div className="grid gap-2 grid-cols-2 md:grid-cols-3 lg:grid-cols-3 xl:grid-cols-4">
                 {sortedItems.map((item) => {
@@ -1688,8 +1821,14 @@ const handleBulkUpdate = async () => {
                         </div>
                       </div>
                       <div className="absolute top-1 right-1 flex gap-1 opacity-0 group-hover:opacity-100 transition-opacity duration-200 z-20">
-                        <button className="bg-action-primary text-white p-1 rounded-full hover:scale-110" onClick={e => { e.stopPropagation(); handleItemClick(item); }}><Edit size={10} /></button>
-                        <button className="bg-action-danger text-white p-1 rounded-full hover:scale-110" onClick={e => { e.stopPropagation(); setDeleteTarget(item); setShowDeleteModal(true); }}><Trash2 size={10} /></button>
+                        <button className="bg-action-primary text-white p-1 rounded-full hover:scale-110"
+                          onClick={(e) => { e.stopPropagation(); handleItemClick(item); }}>
+                          <Edit size={10} />
+                        </button>
+                        <button className="bg-action-danger text-white p-1 rounded-full hover:scale-110"
+                          onClick={(e) => { e.stopPropagation(); setDeleteTarget(item); setShowDeleteModal(true); }}>
+                          <Trash2 size={10} />
+                        </button>
                       </div>
                     </div>
                   );
@@ -1700,11 +1839,14 @@ const handleBulkUpdate = async () => {
         </div>
       </div>
 
+      {/* Delete Modal */}
       {showDeleteModal && deleteTarget && (
         <div className="fixed inset-0 z-50 flex items-center justify-center p-4 bg-color-modalsbg">
           <div className="rounded-lg max-w-md w-full p-6 bg-bg-primary">
             <h3 className="text-xl font-semibold mb-4 text-text-primary">Confirm Delete</h3>
-            <p className="mb-6 text-text-secondary">Are you sure you want to delete <strong className="text-text-primary">{deleteTarget.name}</strong>? This action cannot be undone.</p>
+            <p className="mb-6 text-text-secondary">
+              Are you sure you want to delete <strong className="text-text-primary">{deleteTarget.name}</strong>? This action cannot be undone.
+            </p>
             <div className="flex gap-3">
               <button onClick={() => setShowDeleteModal(false)} className="flex-1 px-4 py-2 rounded-lg bg-bg-tertiary text-text-primary border border-border-default hover:bg-bg-secondary transition-colors">Cancel</button>
               <button onClick={handleDeleteItem} className="flex-1 px-4 py-2 rounded-lg bg-action-danger text-text-white hover:opacity-90 transition-opacity">Delete</button>
@@ -1907,7 +2049,7 @@ const handleBulkUpdate = async () => {
         isComboCategory={isComboCategory}
         dedupedMenuItems={dedupedMenuItems}
         categoriesFlat={categoriesFlat}
-       getAddonCategoryId={getAddonCategoryId}
+        getAddonCategoryId={getAddonCategoryId}
         normalizedRealm={normalizedRealm}
       />
 
@@ -1923,8 +2065,8 @@ const handleBulkUpdate = async () => {
         units={units}
         dedupedMenuItems={dedupedMenuItems}
         categoriesFlat={categoriesFlat}
-         getAddonCategoryId={getAddonCategoryId}
-         normalizedRealm={normalizedRealm}
+        getAddonCategoryId={getAddonCategoryId}
+        normalizedRealm={normalizedRealm}
 
       />
 

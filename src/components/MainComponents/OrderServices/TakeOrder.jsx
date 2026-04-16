@@ -264,7 +264,7 @@ const ItemStatusBadge = ({ status }) => {
 };
 
 // ─────────────────────────────────────────────────────────────────────────────
-// CancelOrderConfirmModal
+// DeleteConfirmModal
 // ─────────────────────────────────────────────────────────────────────────────
 
 const ORDER_CANCEL_REASONS = [
@@ -557,7 +557,7 @@ const TablePaymentConfirmModal = ({ isOpen, orderId, onClose, onConfirm }) => {
 };
 
 // ─────────────────────────────────────────────────────────────────────────────
-// LineItemsModal — shown when a regular item with addons is clicked
+// LineItemsModal
 // ─────────────────────────────────────────────────────────────────────────────
 
 const LineItemsModal = ({ isOpen, onClose, mainItem, lineItems, onAddWithSelectedAddons, onAddMainOnly }) => {
@@ -790,7 +790,7 @@ const printKOT = ({ counterTree, categoriesFlat, itemsToPrint, meta }) => {
     return null;
   };
 
-  // Build addon-by-parent map (addons are in itemsToPrint but only for display)
+  // Build addon map keyed by parent's frontend_unique_key
   const addonsByParentKey = {};
   itemsToPrint.forEach(item => {
     if (item.is_addon && item.parent_item_key) {
@@ -801,7 +801,7 @@ const printKOT = ({ counterTree, categoriesFlat, itemsToPrint, meta }) => {
     }
   });
 
-  // Only parent items go to KDS as main rows; addons appear indented below
+  // Only route parent / standalone items to counters
   const parentItems = itemsToPrint.filter(item => !item.is_addon);
 
   const groups = {};
@@ -914,8 +914,8 @@ const printKOT = ({ counterTree, categoriesFlat, itemsToPrint, meta }) => {
 };
 
 // ─────────────────────────────────────────────────────────────────────────────
-// OldItemRow
-// ─────────────────────────────────────────────────────────────────────────────
+// OldItemRow — previously placed items (read-only in cart)//
+//  ─────────────────────────────────────────────────────────────────────────────
 
 const OldItemRow = ({ group, clientId, token, activeDineinOrderId, onRequestDelete }) => {
   const { main, addons } = group;
@@ -980,7 +980,7 @@ const OldItemRow = ({ group, clientId, token, activeDineinOrderId, onRequestDele
 };
 
 // ─────────────────────────────────────────────────────────────────────────────
-// NewItemRow
+// NewItemRow — newly added items (editable quantity / removable)
 // ─────────────────────────────────────────────────────────────────────────────
 
 const NewItemRow = ({ group, clientId, token, onUpdateQuantity, onRemove }) => {
@@ -1127,6 +1127,8 @@ const TableReservation = ({
 
   return (
     <div className="p-4 bg-bg-primary overflow-y-auto h-[calc(100vh-4rem)]">
+
+      {/* ── Filter bar ── */}
       <div className="mb-3 sticky top-0 z-10 bg-bg-primary">
         <div className="flex flex-wrap gap-2 p-2 rounded-xl border border-border-default bg-bg-tertiary">
           <div className="flex flex-wrap items-center gap-2 p-2 rounded-xl">
@@ -1166,6 +1168,8 @@ const TableReservation = ({
               </button>
             ))} */}
           </div>
+
+          {/* Dine-in / Takeaway toggle */}
           <div className="ml-auto flex bg-bg-primary border-2 rounded-full border-action-primary p-1 shadow-sm">
             <button
               onClick={onSelectDineIn}
@@ -1189,6 +1193,7 @@ const TableReservation = ({
         </div>
       </div>
 
+      {/* ── Table grid ── */}
       {orderMode === 'dinein' && visibleZones.map(zone => {
         const sections = getSectionsByZone(zone);
         return (
@@ -1233,6 +1238,7 @@ const TableReservation = ({
                             onClick={handleCardClick}
                             className={config.clickable || hasViewableOrder ? 'cursor-pointer' : ''}
                           >
+                            {/* Card header */}
                             <div className="flex justify-between items-center px-3 py-2 bg-action-primary text-white">
                               <span className="font-bold text-lg tracking-wide">{table.table_number}</span>
                               {tableHasDraft && !hasViewableOrder && (
@@ -1252,6 +1258,7 @@ const TableReservation = ({
                               )}
                             </div>
 
+                            {/* Card body */}
                             <div
                               className={`p-3 flex items-center justify-between gap-2
                                 ${statusKey === 'occupied' ? 'text-blue-600 bg-blue-50'
@@ -1294,6 +1301,7 @@ const TableReservation = ({
                               )}
                             </div>
 
+                            {/* Elapsed time */}
                             {hasViewableOrder && elapsedTime && (
                               <div className="px-3 py-1.5 bg-gray-50 border-t border-gray-100">
                                 <div className="flex items-center justify-center gap-1 text-xs font-semibold text-gray-600">
@@ -1484,10 +1492,11 @@ const TakeawayOrdersModal = ({ isOpen, onClose, clientId, token, takeawayTableId
 // ─────────────────────────────────────────────────────────────────────────────
 
 const TakeOrder = ({ clientId, token, onOrderUpdate, realm }) => {
-
+  // ── View ──────────────────────────────────────────────────────────────────
   const [currentView, setCurrentView] = useState('floor');
   const [orderMode, setOrderMode] = useState('dinein');
 
+  // ── Remote data ───────────────────────────────────────────────────────────
   const [tables, setTables] = useState([]);
   const [tableOrders, setTableOrders] = useState({});
   const [menuItems, setMenuItems] = useState([]);
@@ -1499,6 +1508,7 @@ const TakeOrder = ({ clientId, token, onOrderUpdate, realm }) => {
   const [inventoryMap, setInventoryMap] = useState({});
   const [loading, setLoading] = useState(true);
 
+  // ── Order context ─────────────────────────────────────────────────────────
   const [selectedTable, setSelectedTable] = useState('');
   const [takeawayTables, setTakeawayTables] = useState([]);
   const [dineinTableId, setDineinTableId] = useState(null);
@@ -1506,7 +1516,7 @@ const TakeOrder = ({ clientId, token, onOrderUpdate, realm }) => {
   const [activeOrderId, setActiveOrderId] = useState(null);
   const [activeDineinOrderId, setActiveDineinOrderId] = useState(null);
   const [showTransferModal, setShowTransferModal] = useState(false);
-
+  // ── Cart ──────────────────────────────────────────────────────────────────
   const [cart, setCart] = useState([]);
   const [showCart, setShowCart] = useState(false);
   const [hasNewItems, setHasNewItems] = useState(false);
@@ -1514,6 +1524,7 @@ const TakeOrder = ({ clientId, token, onOrderUpdate, realm }) => {
   const [isPlacingOrder, setIsPlacingOrder] = useState(false);
   const isPlacingRef = useRef(false);
 
+  // ── Drafts ────────────────────────────────────────────────────────────────
   const [draftSavedAt, setDraftSavedAt] = useState(null);
   const [draftTableIds, setDraftTableIds] = useState([]);
 
@@ -1645,6 +1656,7 @@ const TakeOrder = ({ clientId, token, onOrderUpdate, realm }) => {
   // Draft helpers
   // ─────────────────────────────────────────────────────────────────────────
 
+
   const handleSaveDraft = useCallback(async () => {
     if (!selectedTable || cart.length === 0) {
       toast.warn('Nothing to save — cart is empty.');
@@ -1654,7 +1666,7 @@ const TakeOrder = ({ clientId, token, onOrderUpdate, realm }) => {
     if (ok) {
       const now = Date.now();
       setDraftSavedAt(now);
-      await fetchTables();
+      await fetchTables();                  // refreshes floor DRAFT badges
       toast.success('Draft saved! You can return to this table anytime.');
     } else {
       toast.error('Failed to save draft.');
@@ -1831,6 +1843,7 @@ const TakeOrder = ({ clientId, token, onOrderUpdate, realm }) => {
     }
   };
 
+
   const fetchTableOrders = async (tableList) => {
     try {
       const r = await axios.get(
@@ -1838,6 +1851,8 @@ const TakeOrder = ({ clientId, token, onOrderUpdate, realm }) => {
         { headers: { Authorization: `Bearer ${token}` } }
       );
       const allOrders = r.data?.data || [];
+
+      // ▼ ADD THIS ONE LINE — populates the floor DRAFT badges from server
       setDraftTableIds(getDraftTableIdsFromOrders(allOrders));
 
       const map = {};
@@ -1871,10 +1886,12 @@ const TakeOrder = ({ clientId, token, onOrderUpdate, realm }) => {
     }
   };
 
+  // REMOVE the old fetchTables and REPLACE WITH:
   const fetchTables = async () => {
     const takeawayRoots =
       (import.meta.env.VITE_EASYFOOD_TAKEAWAY_TABLE_DEFAULT_ROOT || '')
-        .split(',').map(v => v.trim().toLowerCase());
+        .split(',')
+        .map(v => v.trim().toLowerCase());
 
     const res = await axios.get(
       `${import.meta.env.VITE_API_TABLE_SERVICE_URL}/${clientId}/tables/read`,
@@ -1889,11 +1906,14 @@ const TakeOrder = ({ clientId, token, onOrderUpdate, realm }) => {
       : [];
 
     const takeaway = list.filter(t =>
-      takeawayRoots.some(root => (t.name || '').toLowerCase().startsWith(root))
-    );
+      takeawayRoots.some(root =>
+        (t.name || '').toLowerCase().startsWith(root)
+      ));
 
     setTakeawayTables(takeaway);
-    if (takeaway.length > 0) setTakeawayTableId(takeaway[0].id);
+    if (takeaway.length > 0) {
+      setTakeawayTableId(takeaway[0].id);
+    }
 
     list.sort((a, b) =>
       a.table_number.localeCompare(b.table_number, undefined, { numeric: true })
@@ -2084,12 +2104,21 @@ const TakeOrder = ({ clientId, token, onOrderUpdate, realm }) => {
   // Navigation helpers
   // ─────────────────────────────────────────────────────────────────────────
 
+
+  /**
+  * goToOrderView — switches to the order view and ensures the cart panel
+  * is always visible so the waiter sees items immediately.
+  */
   const goToOrderView = () => {
     setCurrentView('order');
     setShowCart(true);
     window.history.pushState({ view: 'order' }, '');
   };
 
+  /**
+ * goToFloor — returns to the floor view WITHOUT clearing the cart or draft.
+ * The waiter can click back to the same table and pick up right where they left off.
+ */
   const goToFloor = () => {
     setCurrentView('floor');
     setShowCart(false);
@@ -2165,6 +2194,7 @@ const TakeOrder = ({ clientId, token, onOrderUpdate, realm }) => {
     const draft = await readDraft(tableIdStr, clientId, token);
 
     if (draft) {
+      // Reconstruct cart from draft order items
       const restoredCart = (draft.items || []).flatMap(item => {
         const menuItem = menuItems.find(mi => Number(mi.id) === Number(item.item_id));
         const mainKey = item.frontend_unique_key || `${item.item_id}_restored_${Date.now()}`;
@@ -2387,7 +2417,9 @@ const TakeOrder = ({ clientId, token, onOrderUpdate, realm }) => {
       setLoading(false);
     }
   };
+
   const handleBackToTables = () => {
+    // Leave cart & draft untouched — waiter can return to same table
     goToFloor();
   };
 
@@ -3226,7 +3258,7 @@ const TakeOrder = ({ clientId, token, onOrderUpdate, realm }) => {
     : activeOrderId
       ? hasNewItems && newItems.filter(i => !i.parent_item_key).length > 0
       : selectedTable && cart.filter(i => !i.parent_item_key).length > 0;
-      
+
   const selectedCategoryName =
     categoriesFlat.find(c => c.id === selectedCategoryId)?.name || 'All Categories';
 
@@ -3477,6 +3509,7 @@ const TakeOrder = ({ clientId, token, onOrderUpdate, realm }) => {
                           <span className="text-base font-bold text-red-600">₹{getTotalPrice()}</span>
                         </div>
 
+                        {/* Draft saved indicator */}
                         {draftSavedAt && (
                           <div className="flex items-center gap-1.5 text-xs text-green-700 bg-green-50 px-2 py-1 rounded-lg">
                             <Save size={11} />
@@ -3530,6 +3563,7 @@ const TakeOrder = ({ clientId, token, onOrderUpdate, realm }) => {
                         <>
                           <div className="flex-1 overflow-y-auto mt-4 space-y-2">
 
+                            {/* Old (previously placed) items */}
                             {getGroupedCartItems(oldItems).map((group, idx) => (
                               <OldItemRow
                                 key={`old-${idx}`}
@@ -3541,6 +3575,7 @@ const TakeOrder = ({ clientId, token, onOrderUpdate, realm }) => {
                               />
                             ))}
 
+                            {/* Divider between old and new */}
                             {activeOrderId && oldItems.length > 0 && newItems.length > 0 && (
                               <div className="flex items-center gap-2 my-2">
                                 <div className="flex-1 h-px bg-gradient-to-r from-transparent via-orange-400 to-transparent" />
@@ -3549,6 +3584,7 @@ const TakeOrder = ({ clientId, token, onOrderUpdate, realm }) => {
                               </div>
                             )}
 
+                            {/* New items (editable), grouped by batch */}
                             {batchTimestamps.map((ts, bi) => (
                               <React.Fragment key={ts}>
                                 {bi > 0 && (
@@ -3576,6 +3612,8 @@ const TakeOrder = ({ clientId, token, onOrderUpdate, realm }) => {
 
                           {/* ── Action buttons ── */}
                           <div className="grid grid-cols-2 gap-2 mt-3">
+
+                            {/* Place Order */}
                             <button
                               onClick={handlePlaceOrder}
                               disabled={!canPlaceOrder || isPlacingOrder}
@@ -3587,6 +3625,7 @@ const TakeOrder = ({ clientId, token, onOrderUpdate, realm }) => {
                               {isPlacingOrder ? 'Placing...' : 'Place Order'}
                             </button>
 
+                            {/* Bill */}
                             <button
                               onClick={handleBillFromCart}
                               className="py-2 rounded-lg text-sm font-semibold bg-green-600 text-white hover:bg-green-700 flex items-center justify-center gap-1"
@@ -3594,6 +3633,7 @@ const TakeOrder = ({ clientId, token, onOrderUpdate, realm }) => {
                               <FileText size={16} /> Bill
                             </button>
 
+                            {/* Save Draft */}
                             <button
                               onClick={handleSaveDraft}
                               disabled={cart.length === 0}
@@ -3606,6 +3646,7 @@ const TakeOrder = ({ clientId, token, onOrderUpdate, realm }) => {
                               <Save size={15} /> Save
                             </button>
 
+                            {/* Clear */}
                             <button
                               onClick={handleClearCart}
                               className="py-2 border rounded-lg text-sm hover:bg-gray-100"
