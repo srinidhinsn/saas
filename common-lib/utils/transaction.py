@@ -75,9 +75,9 @@ def build_inventory_transaction(
 ) -> InventoryTransaction:
     return InventoryTransaction(
         client_id=client_id,
-        stock_item_id=stock_item_id if stock_item_id is not None else item_obj.id,
-        inventory_id=inventory_id if inventory_id is not None else item_obj.inventory_id,
-        name=name if name is not None else item_obj.name,
+        stock_item_id= item_obj.id,
+        inventory_id= item_obj.inventory_id,
+        name= item_obj.name,
         **kwargs
     )
 

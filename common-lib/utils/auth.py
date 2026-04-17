@@ -6,14 +6,9 @@ from fastapi.security import OAuth2PasswordBearer
 from models.saas_context import SaasContext, saasContext
 from models.user_model import PageDefinitionModel
 from entity.user_entity import PageDefinition
-from entity.inventory_entity import CategoryEntity, InventoryEntity, InventoryTransactionEntity
+from entity.inventory_entity import CategoryEntity
 from database.postgres import get_db
 from sqlalchemy.orm import Session
-from models.order_model import TransactionTypeEnum, MovementTypeEnum
-from decimal import Decimal
-from typing import Optional
-import uuid
-from entity.inventory_entity import InventoryEntity
 
 SECRET_KEY = "nsn"
 ALGORITHM = "HS256"

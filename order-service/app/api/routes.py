@@ -77,30 +77,22 @@ def create_order(client_id: str, order: DineinOrderModel, context: SaasContext =
 @router.post("/dinein/create-sub-order", response_model=ResponseModel[DineinOrderModel])
 def create_sub_order(
     client_id: str,
-    parent_dinein_order_id: str,
+    parent_dinein_order_id: str,   # e.g. "1001"
     order: DineinOrderModel,
     context: SaasContext = Depends(verify_token),
     db: Session = Depends(get_db),
 ):
-    root_order = (
-        db.query(Db_Order_Entity)
-        .filter(
-            Db_Order_Entity.client_id == client_id,
-            Db_Order_Entity.dinein_order_id == parent_dinein_order_id,
-        )
-        .first()
-    )
+    root_order = db.query(Db_Order_Entity).filter(
+        Db_Order_Entity.client_id == client_id,
+        Db_Order_Entity.dinein_order_id == parent_dinein_order_id,
+    ).first()
     if not root_order:
         raise HTTPException(status_code=404, detail=f"Parent order '{parent_dinein_order_id}' not found")
 
-    existing_sub_count = (
-        db.query(Db_Order_Entity)
-        .filter(
-            Db_Order_Entity.client_id == client_id,
-            Db_Order_Entity.dinein_order_id.like(f"{parent_dinein_order_id}-%"),
-        )
-        .count()
-    )
+    existing_sub_count = db.query(Db_Order_Entity).filter(
+        Db_Order_Entity.client_id == client_id,
+        Db_Order_Entity.dinein_order_id.like(f"{parent_dinein_order_id}-%"),
+    ).count()
     sub_dinein_order_id = f"{parent_dinein_order_id}-{existing_sub_count + 1}"
 
     total_price = sum(
@@ -154,72 +146,40 @@ def create_sub_order(
 
 
 @router.get("/dinein/order")
-def get_orders_for_order_id(
-    client_id: str,
-    order_id: Optional[str] = None,
-    context: SaasContext = Depends(verify_token),
-    db: Session = Depends(get_db),
-):
-    order = (
-        db.query(Db_Order_Entity)
-        .filter(
-            Db_Order_Entity.client_id == client_id,
-            Db_Order_Entity.id == order_id,
-        )
-        .first()
-    )
+def get_orders_for_order_id(client_id: str, order_id: Optional[str] = None, context: SaasContext = Depends(verify_token), db: Session = Depends(get_db)):
+    order = db.query(Db_Order_Entity).filter(
+        Db_Order_Entity.client_id == client_id,
+        Db_Order_Entity.id == order_id,
+    ).first()
     if not order:
         return ResponseModel(screen_id=context.screen_id, data=None, status="not_found")
 
-    db_items = (
-        db.query(Db_OrderItem_Entity)
-        .filter(
-            Db_OrderItem_Entity.order_id == order.id,
-            Db_OrderItem_Entity.status != OrderStatusEnum.cancelled,
-        )
-        .all()
-    )
+    db_items = db.query(Db_OrderItem_Entity).filter(Db_OrderItem_Entity.order_id == order.id, Db_OrderItem_Entity.status != OrderStatusEnum.cancelled,).all()
     item_models = [Db_OrderItem_Entity.copyToModel(item) for item in db_items]
     result = {
-        "id": order.id,
-        "dinein_order_id": order.dinein_order_id,
-        "table_id": order.table_id,
-        "client_id": order.client_id,
-        "status": order.status,
-        "created_at": order.created_at,
-        "items": [i.dict() for i in item_models],
-        "total_price": order.total_price,
+        "id": order.id, "dinein_order_id": order.dinein_order_id,
+        "table_id": order.table_id, "client_id": order.client_id,
+        "status": order.status, "created_at": order.created_at,
+        "items": [i.dict() for i in item_models], "total_price": order.total_price,
     }
     return ResponseModel(screen_id=context.screen_id, data=result)
 
 
 @router.get("/dinein/table")
-def get_orders_for_table(
-    client_id: str,
-    table_id: Optional[str] = None,
-    context: SaasContext = Depends(verify_token),
-    db: Session = Depends(get_db),
-):
+def get_orders_for_table(client_id: str, table_id: Optional[str] = None, context: SaasContext = Depends(verify_token), db: Session = Depends(get_db)):
     if table_id:
-        orders = (
-            db.query(Db_Order_Entity)
-            .filter(
-                Db_Order_Entity.client_id == client_id,
-                Db_Order_Entity.table_id == table_id,
-                Db_Order_Entity.status != OrderStatusEnum.cancelled,
-            )
-            .all()
-        )
+        orders = db.query(Db_Order_Entity).filter(
+            Db_Order_Entity.client_id == client_id,
+            Db_Order_Entity.table_id == table_id,
+            Db_Order_Entity.status != OrderStatusEnum.cancelled,
+        ).all()
     else:
-        orders = (
-            db.query(Db_Order_Entity)
-            .filter(
-                Db_Order_Entity.client_id == client_id,
-                Db_Order_Entity.status != OrderStatusEnum.cancelled,
-            )
-            .all()
-        )
+        orders = db.query(Db_Order_Entity).filter(
+            Db_Order_Entity.client_id == client_id,
+            Db_Order_Entity.status != OrderStatusEnum.cancelled,
+        ).all()
 
+    # Group root + sub-orders, return one merged entry per table group
     groups: dict = {}
     for order in orders:
         root = _root_dinein_id(order.dinein_order_id or str(order.id))
@@ -302,14 +262,10 @@ def update_order_status(
     if body.status in [OrderStatusEnum.served, OrderStatusEnum.completed]:
         root_id = _root_dinein_id(order.dinein_order_id)
 
-        related_orders = (
-            db.query(Db_Order_Entity)
-            .filter(
-                Db_Order_Entity.client_id == client_id,
-                Db_Order_Entity.dinein_order_id.like(f"{root_id}%"),
-            )
-            .all()
-        )
+        related_orders = db.query(Db_Order_Entity).filter(
+            Db_Order_Entity.client_id == client_id,
+            Db_Order_Entity.dinein_order_id.like(f"{root_id}%")
+        ).all()
 
         orders_to_deduct = []
 
@@ -355,13 +311,13 @@ def update_order_status(
         return ResponseModel(
             screen_id=context.screen_id,
             data={
-                "message": "All related orders and items marked as served",
+                "message": "All related orders marked as served",
                 "updated_count": len(related_orders),
                 "deducted_count": len(orders_to_deduct),
             },
         )
 
-    # ── Normal single-order update ─────────────────────────────────────────
+    # ✅ Normal single order update (for other statuses)
     if body.status is not None:
         order.status = body.status
 
@@ -398,6 +354,7 @@ def update_order_status(
         },
     )
 
+
 @router.post("/order_items/update")
 def update_order_items(
     client_id: str,
@@ -410,14 +367,10 @@ def update_order_items(
         raise HTTPException(status_code=400, detail="Missing order_id")
     try:
         order_id = int(order_id)
-    except Exception:
+    except:
         raise HTTPException(status_code=400, detail="Invalid order_id")
 
-    existing_items = (
-        db.query(Db_OrderItem_Entity)
-        .filter(Db_OrderItem_Entity.order_id == order_id)
-        .all()
-    )
+    existing_items = db.query(Db_OrderItem_Entity).filter(Db_OrderItem_Entity.order_id == order_id).all()
 
     existing_by_fkey = {
         item.frontend_unique_key: item
@@ -471,14 +424,9 @@ def update_order_items(
 def update_order_item(client_id: str, order_id: Optional[int] = Query(None), order_item: Optional[OrderItemModel] = None, context: SaasContext = Depends(verify_token), db: Session = Depends(get_db)):
     if not order_id or not order_item or not order_item.id:
         raise HTTPException(status_code=400, detail="Missing order_id or order_item_id")
-    existing_item = (
-        db.query(Db_OrderItem_Entity)
-        .filter(
-            Db_OrderItem_Entity.id == order_item.id,
-            Db_OrderItem_Entity.order_id == order_id,
-        )
-        .first()
-    )
+    existing_item = db.query(Db_OrderItem_Entity).filter(
+        Db_OrderItem_Entity.id == order_item.id, Db_OrderItem_Entity.order_id == order_id,
+    ).first()
     updated_item = Db_OrderItem_Entity.copyFromModel(order_item)
     for attr, value in updated_item.__dict__.items():
         if attr != "_sa_instance_state":
@@ -488,20 +436,12 @@ def update_order_item(client_id: str, order_id: Optional[int] = Query(None), ord
 
 
 @router.delete("/order_item/delete")
-def delete_order_items(
-    client_id: str,
-    order_item_id: Optional[str] = Query(None),
-    quantity: Optional[int] = Query(None),
-    reason: Optional[str] = Query(None),
-    transaction_type: Optional[str] = Query(None),
-    context: SaasContext = Depends(verify_token),
-    db: Session = Depends(get_db),
-):
+def delete_order_items( client_id: str, order_item_id: Optional[str] = Query(None), quantity: Optional[int] = Query(None), reason: Optional[str] = Query(None), transaction_type: Optional[str] = Query(None), context: SaasContext = Depends(verify_token), db: Session = Depends(get_db),):
     if not order_item_id:
         raise HTTPException(status_code=400, detail="Missing order_item_id")
     try:
         oid = int(str(order_item_id).strip())
-    except Exception:
+    except:
         raise HTTPException(status_code=400, detail="Invalid order_item_id format")
 
     tx_type: Optional[TransactionTypeEnum] = None
@@ -511,14 +451,9 @@ def delete_order_items(
         except ValueError:
             raise HTTPException(status_code=400, detail=f"Invalid transaction_type '{transaction_type}'")
 
-    item = (
-        db.query(Db_OrderItem_Entity)
-        .filter(
-            Db_OrderItem_Entity.id == oid,
-            Db_OrderItem_Entity.client_id == client_id,
-        )
-        .first()
-    )
+    item = db.query(Db_OrderItem_Entity).filter(
+        Db_OrderItem_Entity.id == oid, Db_OrderItem_Entity.client_id == client_id,
+    ).first()
 
     
     if not item:
@@ -788,10 +723,7 @@ def delete_order_items(
         )
 
     db.commit()
-    return ResponseModel(
-        screen_id=context.screen_id,
-        data={"message": "Order item cancelled (soft delete)"},
-    )
+    return ResponseModel(screen_id=context.screen_id, data={"message": "Order item deleted"})
 
 @router.post("/dinein/cancel")
 def cancel_order(
@@ -955,32 +887,23 @@ def cancel_order(
     )
 
 @router.delete("/dinein/delete")
-def delete_order(
-    client_id: str,
-    dinein_order_id: Optional[str] = Query(None),
-    reason: Optional[str] = Query(None),
-    context: SaasContext = Depends(verify_token),
-    db: Session = Depends(get_db),
+def delete_order( client_id: str, dinein_order_id: Optional[str] = Query(None), reason: Optional[str] = Query(None), context: SaasContext = Depends(verify_token), db: Session = Depends(get_db),
 ):
+    """Delete by root internal id — also deletes all sub-orders sharing the same prefix."""
     if not dinein_order_id:
         raise HTTPException(status_code=400, detail="Missing dinein_order_id")
     try:
         did_int = int(str(dinein_order_id).strip())
-    except Exception:
+    except:
         raise HTTPException(status_code=400, detail="Invalid dinein_order_id format")
 
-    root_order = (
-        db.query(Db_Order_Entity)
-        .filter(
-            Db_Order_Entity.id == did_int,
-            Db_Order_Entity.client_id == client_id,
-        )
-        .first()
-    )
+    root_order = db.query(Db_Order_Entity).filter(
+        Db_Order_Entity.id == did_int, Db_Order_Entity.client_id == client_id,
+    ).first()
     if not root_order:
         raise HTTPException(status_code=404, detail="Order not found")
     if root_order.status == OrderStatusEnum.served:
-        raise HTTPException(status_code=400, detail="Cannot cancel a served order")
+        raise HTTPException(status_code=400, detail="Cannot delete a served order")
 
     root_dinein_id = _root_dinein_id(root_order.dinein_order_id or str(root_order.id))
 
@@ -1147,32 +1070,19 @@ def delete_order(
 
     db.commit()
 
-    return ResponseModel(
-        screen_id=context.screen_id,
-        data={"message": "Order cancelled (soft delete — row retained for audit)"},
-    )
+    return ResponseModel(screen_id=context.screen_id, data={"message": "Order deleted"})
 
 @router.get("/kds/orders")
-def get_kds_orders(
-    client_id: str,
-    context: SaasContext = Depends(verify_token),
-    db: Session = Depends(get_db),
-):
-    orders = (
-        db.query(Db_Order_Entity)
-        .filter(
-            Db_Order_Entity.client_id == str(client_id),
-            Db_Order_Entity.status.in_(
-                [
-                    OrderStatusEnum.pending,
-                    OrderStatusEnum.preparing,
-                    OrderStatusEnum.ready,
-                ]
-            ),
-        )
-        .order_by(Db_Order_Entity.created_at.asc())
-        .all()
-    )
+def get_kds_orders(client_id: str, context: SaasContext = Depends(verify_token), db: Session = Depends(get_db)):
+    """
+    KDS endpoint — returns FLAT individual DB rows (root + each sub-order separately).
+    Each card on the KDS is one DB row with its own status, timer, dinein_order_id.
+    Status changes update only that row's items independently.
+    """
+    orders = db.query(Db_Order_Entity).filter(
+        Db_Order_Entity.client_id == str(client_id),
+        Db_Order_Entity.status.in_([OrderStatusEnum.pending, OrderStatusEnum.preparing, OrderStatusEnum.ready]),
+    ).order_by(Db_Order_Entity.created_at.asc()).all()
 
     result = [_order_row_to_flat(order) for order in orders]
     return ResponseModel(screen_id=context.screen_id, data=result)
