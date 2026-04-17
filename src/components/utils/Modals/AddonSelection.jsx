@@ -1,7 +1,7 @@
-import React, { useState, useEffect, useMemo } from 'react';
+import React, { useState,useEffect, useMemo } from 'react';
 import { X, Search, Check } from 'lucide-react';
 
-const AddonSelectionPopup = ({
+const AddonSelectionPopup = ({ 
   isOpen, 
   onClose, 
   selectedAddons, 
@@ -18,7 +18,7 @@ const AddonSelectionPopup = ({
     setTempSelectedAddons(selectedAddons || []);
   }, [selectedAddons]);
 
-  // Count items per subcategory — match by both ID and name
+  // ✅ Filter addons by selected subcategory
   const getItemCountForSubcategory = (subcategory) => {
     const subId = subcategory.id;
     const subName = (subcategory.name || '').trim().toLowerCase();
@@ -51,11 +51,12 @@ const AddonSelectionPopup = ({
         const code = String(item.code || '').toLowerCase();
         return name.includes(query) || code.includes(query);
       }
-
+      
       return true;
     });
   }, [selectedSubcategory, allAddonItems, searchQuery, currentItemId]);
 
+  // ✅ Toggle addon selection
   const toggleAddon = (addonId) => {
     setTempSelectedAddons(prev => {
       if (prev.includes(addonId)) {
@@ -70,7 +71,7 @@ const AddonSelectionPopup = ({
   const toggleSelectAll = () => {
     const visibleAddonIds = filteredAddonItems.map(item => item.id);
     const allSelected = visibleAddonIds.every(id => tempSelectedAddons.includes(id));
-
+    
     if (allSelected) {
       // Deselect all visible
       setTempSelectedAddons(prev => prev.filter(id => !visibleAddonIds.includes(id)));
@@ -106,7 +107,7 @@ const AddonSelectionPopup = ({
   return (
     <div className="fixed inset-0 z-50 flex items-center justify-center p-4 bg-black bg-opacity-50">
       <div className="bg-white rounded-xl w-full max-w-4xl shadow-2xl max-h-[90vh] flex flex-col">
-
+        
         {/* Header */}
         <div className="px-6 py-4 border-b border-gray-200 flex justify-between items-center">
           <div>
@@ -125,7 +126,7 @@ const AddonSelectionPopup = ({
 
         {/* Content */}
         <div className="flex-1 overflow-hidden flex">
-
+          
           {/* Left Panel - Subcategories */}
           <div className="w-64 border-r border-gray-200 overflow-y-auto bg-gray-50">
             <div className="p-4">
@@ -205,7 +206,7 @@ const AddonSelectionPopup = ({
                     <div className="grid grid-cols-1 md:grid-cols-2 gap-3">
                       {filteredAddonItems.map(addon => {
                         const isSelected = tempSelectedAddons.includes(addon.id);
-
+                        
                         return (
                           <button
                             key={addon.id}

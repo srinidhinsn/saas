@@ -193,7 +193,7 @@ async function deleteDraftFromDB(tableId, clientId, token) {
       { headers: { Authorization: `Bearer ${token}` } }
     );
   } catch (err) {
-    console.warn('deleteDraft (soft cancel) warning:', err?.response?.data || err.message);
+    console.warn('deleteDraft warning:', err?.response?.data || err.message);
   }
 }
 
@@ -914,8 +914,8 @@ const printKOT = ({ counterTree, categoriesFlat, itemsToPrint, meta }) => {
 };
 
 // ─────────────────────────────────────────────────────────────────────────────
-// OldItemRow — previously placed items (read-only in cart)//
-//  ─────────────────────────────────────────────────────────────────────────────
+// OldItemRow — previously placed items (read-only in cart)
+// ─────────────────────────────────────────────────────────────────────────────
 
 const OldItemRow = ({ group, clientId, token, activeDineinOrderId, onRequestDelete }) => {
   const { main, addons } = group;
@@ -938,7 +938,7 @@ const OldItemRow = ({ group, clientId, token, activeDineinOrderId, onRequestDele
           <div className="min-w-0 flex-1">
             <h4 className="text-sm font-semibold truncate text-gray-800">{main.name}</h4>
             <p className="text-xs font-bold text-action-primary">
-              ₹{(main.unit_price * (1 - (Number(main.discount) || 0) / 100)).toFixed(2)}
+            ₹{(main.unit_price * (1 - (Number(main.discount) || 0) / 100)).toFixed(2)}
             </p>
             <div className="flex items-center gap-1.5 mt-1 flex-wrap">
               {main.batch_label && main.batch_label !== activeDineinOrderId && (
@@ -970,7 +970,7 @@ const OldItemRow = ({ group, clientId, token, activeDineinOrderId, onRequestDele
           <span className="text-xs text-blue-600">↳</span>
           <span className="text-sm text-gray-700 truncate flex-1">{addon.name}</span>
           <span className="text-xs font-semibold text-blue-600">
-            ₹{(addon.unit_price * (1 - (Number(addon.discount) || 0) / 100)).toFixed(2)}
+          ₹{(addon.unit_price * (1 - (Number(addon.discount) || 0) / 100)).toFixed(2)}
           </span>
           <span className="text-xs text-gray-500 w-6 text-center">×{addon.quantity}</span>
         </div>
@@ -1041,7 +1041,7 @@ const NewItemRow = ({ group, clientId, token, onUpdateQuantity, onRemove }) => {
           <span className="text-xs text-orange-600">↳</span>
           <span className="text-sm text-gray-700 truncate flex-1">{addon.name}</span>
           <span className="text-xs font-semibold text-orange-600">
-            ₹{(addon.unit_price * (1 - (Number(addon.discount) || 0) / 100)).toFixed(2)}
+          ₹{(addon.unit_price * (1 - (Number(addon.discount) || 0) / 100)).toFixed(2)}
           </span>
           <span className="text-xs text-gray-500 w-6 text-center">×{addon.quantity}</span>
         </div>
@@ -1492,6 +1492,7 @@ const TakeawayOrdersModal = ({ isOpen, onClose, clientId, token, takeawayTableId
 // ─────────────────────────────────────────────────────────────────────────────
 
 const TakeOrder = ({ clientId, token, onOrderUpdate, realm }) => {
+
   // ── View ──────────────────────────────────────────────────────────────────
   const [currentView, setCurrentView] = useState('floor');
   const [orderMode, setOrderMode] = useState('dinein');
@@ -1526,10 +1527,11 @@ const TakeOrder = ({ clientId, token, onOrderUpdate, realm }) => {
 
   // ── Drafts ────────────────────────────────────────────────────────────────
   const [draftSavedAt, setDraftSavedAt] = useState(null);
-  const [draftTableIds, setDraftTableIds] = useState([]);
+  const [draftTableIds, setDraftTableIds] = useState([]);   // for floor DRAFT badges
 
   const [customerDetails, setCustomerDetails] = useState({ customer_id: '', contact_phone: '' });
 
+  // ── UI state ──────────────────────────────────────────────────────────────
   const [selectedCategoryId, setSelectedCategoryId] = useState(null);
   const [searchQuery, setSearchQuery] = useState('');
   const [showClearConfirm, setShowClearConfirm] = useState(false);
@@ -1908,7 +1910,8 @@ const TakeOrder = ({ clientId, token, onOrderUpdate, realm }) => {
     const takeaway = list.filter(t =>
       takeawayRoots.some(root =>
         (t.name || '').toLowerCase().startsWith(root)
-      ));
+      )
+    );
 
     setTakeawayTables(takeaway);
     if (takeaway.length > 0) {
@@ -2106,9 +2109,9 @@ const TakeOrder = ({ clientId, token, onOrderUpdate, realm }) => {
 
 
   /**
-  * goToOrderView — switches to the order view and ensures the cart panel
-  * is always visible so the waiter sees items immediately.
-  */
+   * goToOrderView — switches to the order view and ensures the cart panel
+   * is always visible so the waiter sees items immediately.
+   */
   const goToOrderView = () => {
     setCurrentView('order');
     setShowCart(true);
@@ -2116,9 +2119,9 @@ const TakeOrder = ({ clientId, token, onOrderUpdate, realm }) => {
   };
 
   /**
- * goToFloor — returns to the floor view WITHOUT clearing the cart or draft.
- * The waiter can click back to the same table and pick up right where they left off.
- */
+  * goToFloor — returns to the floor view WITHOUT clearing the cart or draft.
+  * The waiter can click back to the same table and pick up right where they left off.
+  */
   const goToFloor = () => {
     setCurrentView('floor');
     setShowCart(false);
@@ -2862,17 +2865,21 @@ const TakeOrder = ({ clientId, token, onOrderUpdate, realm }) => {
         const itemsPayload = buildOrderPayload(cart);
 
         if (existingDraft) {
+          // ── Promote draft → pending using existing /dinein/update ──────
+          // Step 1: replace items via existing /order_items/update
           await axios.post(
             `${import.meta.env.VITE_API_ORDER_SERVICE_URL}/${clientId}/order_items/update?order_id=${existingDraft.id}`,
             itemsPayload,
             { headers }
           );
+          // Step 2: flip status + fix dinein_order_id via /dinein/update
           await axios.post(
             `${import.meta.env.VITE_API_ORDER_SERVICE_URL}/${clientId}/dinein/update`,
             {
               id: existingDraft.id,
               status: 'pending',
               total_price: total,
+              // tells backend to reset dinein_order_id from "DRAFT-X" → "X"
               dinein_order_id: String(existingDraft.id),
             },
             { headers }
@@ -2913,6 +2920,7 @@ const TakeOrder = ({ clientId, token, onOrderUpdate, realm }) => {
         }
       }
 
+      // Clean up on success
       if (placedOrderId && (customerDetails.customer_id || customerDetails.contact_phone)) {
         const tableObj = tables.find(t => t.id.toString() === selectedTable);
         const parentItemsOnly = cart.filter(i => !i.is_addon);
@@ -2991,7 +2999,7 @@ const TakeOrder = ({ clientId, token, onOrderUpdate, realm }) => {
   };
 
   // ─────────────────────────────────────────────────────────────────────────
-  // Cancel order (soft)
+  // Delete order
   // ─────────────────────────────────────────────────────────────────────────
 
   const handleCancelOrder = async (orderId, tableId, reason) => {
@@ -3007,8 +3015,8 @@ const TakeOrder = ({ clientId, token, onOrderUpdate, realm }) => {
       toast.success('Order cancelled and transaction recorded.');
       await fetchTables();
     } catch (err) {
-      console.error('[handleCancelOrder]', err);
-      toast.error('Failed to cancel order');
+      console.error(err);
+      toast.error('Failed to delete order');
     }
   };
 

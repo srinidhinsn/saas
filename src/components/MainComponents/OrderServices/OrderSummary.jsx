@@ -1,5 +1,5 @@
 import React, { useEffect, useState } from "react";
-import axios from "axios";
+import axios from 'axios';
 import { toast } from "react-toastify";
 import Modal from "react-modal";
 import {
@@ -11,7 +11,7 @@ import { useNavigate } from "react-router-dom";
 Modal.setAppElement("#root");
 
 // ─────────────────────────────────────────────────────────────────────────────
-// Reason lists — mirrors TakeOrder exactly
+// SimpleDeleteConfirm
 // ─────────────────────────────────────────────────────────────────────────────
 
 const ORDER_CANCEL_REASONS = [
@@ -207,7 +207,7 @@ const OldItemDeleteModal = ({ isOpen, onClose, item, onRemoveOne, onRemoveAll })
 
 // ─────────────────────────────────────────────────────────────────────────────
 // LineItemsModal — add-on selection
-// // ─────────────────────────────────────────────────────────────────────────────
+// ─────────────────────────────────────────────────────────────────────────────
 
 const LineItemsModal = ({
   isOpen,
@@ -315,7 +315,8 @@ const OrderItemsViewModal = ({ isOpen, onClose, order, inventoryMap, onRequestDe
             <p className="text-sm text-text-white/70 mt-0.5">
               {order._fixedOrderMode === 'takeaway'
                 ? order.customer_name || 'Takeaway'
-                : order._tableName || order.table || order.table_id}            </p>
+                : order._tableName || order.table || order.table_id}            
+            </p>
           </div>
           <div className="flex items-center gap-4">
             <div className="text-right">
@@ -368,6 +369,7 @@ const OrderItemsViewModal = ({ isOpen, onClose, order, inventoryMap, onRequestDe
                   item.price ??
                   0;
                 const lineTotal = unitPrice * (item.quantity || 1);
+
                 const isServedItem = item.status?.toLowerCase() === 'served';
                 return (
                   <tr key={item.id || idx} className="hover:bg-bg-tertiary/50 transition-colors">
@@ -414,7 +416,7 @@ const OrderItemsViewModal = ({ isOpen, onClose, order, inventoryMap, onRequestDe
 };
 
 // ─────────────────────────────────────────────────────────────────────────────
-// Status Badge
+// Status badge
 // ─────────────────────────────────────────────────────────────────────────────
 
 const StatusBadge = ({ status }) => {
@@ -472,8 +474,6 @@ const OrderSummaryVisible = ({ clientId, token }) => {
 
   // REQ: Cancel order modal (matches TakeOrder — reason required)
   const [cancelOrderModal, setCancelOrderModal] = useState({ isOpen: false, orderId: null });
-
-  // REQ: Item delete modal (matches TakeOrder — reason + qty)
   const [itemDeleteModal, setItemDeleteModal] = useState({ isOpen: false, item: null, orderId: null });
 
   // Order detail / edit modal state (preserved)
@@ -490,7 +490,9 @@ const OrderSummaryVisible = ({ clientId, token }) => {
   const [lineItemsDetails, setLineItemsDetails] = useState([]);
   const [pendingOrderId, setPendingOrderId] = useState(null);
 
-  // ── localStorage helpers (unchanged) ──────────────────────────────────────
+// ─────────────────────────────────────────────────────────────────────────
+// localStorage helpers (preserved exactly from original)
+// ─────────────────────────────────────────────────────────────────────────
 
   const generateSlug = name => name.toLowerCase().replace(/[\s]+/g, '-');
 
@@ -587,7 +589,15 @@ const OrderSummaryVisible = ({ clientId, token }) => {
         const now = new Date(bt);
         const hh = String(now.getHours()).padStart(2, '0');
         const mm = String(now.getMinutes()).padStart(2, '0');
-        meta = { timestamp: bt, started_at: Date.now(), seq, table_slug: slugify(tableName || ''), time_label: `${hh}-${mm}`, added_count: 0 };
+        const timeLabel = `${hh}-${mm}`;
+        meta = {
+          timestamp: bt,
+          started_at: Date.now(),
+          seq,
+          table_slug: slugify(tableName || ''),
+          time_label: timeLabel,
+          added_count: 0,
+        };
         localStorage.setItem(storageKey, JSON.stringify(meta));
         localStorage.setItem(seqKey, String(seq));
       }
@@ -598,7 +608,11 @@ const OrderSummaryVisible = ({ clientId, token }) => {
   };
 
   const generateFrontendKeyFromBatch = (orderId, batchMeta) => {
-    return `${batchMeta.table_slug || 'TBL'}_${batchMeta.time_label || '00-00'}_${batchMeta.added_count || 0}_${orderId}_${batchMeta.seq || 1}`;
+    const tableSlug = batchMeta.table_slug || 'TBL';
+    const timeLabel = batchMeta.time_label || '00-00';
+    const itemsCount = batchMeta.added_count || 0;
+    const seq = batchMeta.seq || 1;
+    return `${tableSlug}_${timeLabel}_${itemsCount}_${orderId}_${seq}`;
   };
 
   // ─────────────────────────────────────────────────────────────────────────
@@ -699,6 +713,7 @@ const OrderSummaryVisible = ({ clientId, token }) => {
         storageByBatchAndItem.get(k).push(si);
       }
     });
+
     const backendUniqueKeys = new Set(
       (order.items || [])
         .filter(i => i.frontend_unique_key)
@@ -706,6 +721,7 @@ const OrderSummaryVisible = ({ clientId, token }) => {
     );
     const oldItems = [];
     const batchItemsMap = new Map();
+
     const pushToBatch = (batchTs, itemObj) => {
       if (!batchTs) return;
       const ts = Number(batchTs);
@@ -730,6 +746,7 @@ const OrderSummaryVisible = ({ clientId, token }) => {
       const backendKey = item.frontend_unique_key ? String(item.frontend_unique_key) : null;
       const itemId = item.item_id || item.inventory_id || item.id || null;
       let matchedBatch = null;
+
       if (backendKey && storageByKey.has(backendKey)) {
         const si = storageByKey.get(backendKey);
         if (si && si.batch_timestamp) matchedBatch = Number(si.batch_timestamp);
@@ -763,6 +780,7 @@ const OrderSummaryVisible = ({ clientId, token }) => {
         oldItems.push(item);
       }
     });
+
     rawNewItems.forEach(si => {
       if (!si || !si.unique_key) return;
       if (backendUniqueKeys.has(String(si.unique_key))) return;
@@ -818,6 +836,7 @@ const OrderSummaryVisible = ({ clientId, token }) => {
       seen.add(key);
       deduped.push(it);
     }
+
     return {
       ...order,
       _fixedOrderMode: order._fixedOrderMode ?? getInitialOrderMode(order),
@@ -976,7 +995,7 @@ const OrderSummaryVisible = ({ clientId, token }) => {
     });
   };
 
-  // ── Add item / batch helpers (unchanged) ──────────────────────────────────
+  // ── Add item / batch helpers (preserved from original) ────────────────────
 
   const handleItemSelection = (orderId, selectedItem) => {
     if (
@@ -1021,7 +1040,10 @@ const OrderSummaryVisible = ({ clientId, token }) => {
   const handleAddMainItemOnly = () => {
     if (!selectedMainItem || !pendingOrderId) return;
     addItemToOrder(pendingOrderId, selectedMainItem);
-    setLineItemsModalOpen(false); setSelectedMainItem(null); setLineItemsDetails([]); setPendingOrderId(null);
+    setLineItemsModalOpen(false);
+    setSelectedMainItem(null);
+    setLineItemsDetails([]);
+    setPendingOrderId(null);
   };
 
   const updateItemQuantity = (orderId, itemIdentifier, newQty) => {
@@ -1049,6 +1071,7 @@ const OrderSummaryVisible = ({ clientId, token }) => {
       batchMeta = ensured.meta;
     }
     if (!batchMeta) return;
+
     try {
       batchMeta.added_count = (batchMeta.added_count || 0) + 1;
       localStorage.setItem(batchKey, JSON.stringify(batchMeta));
@@ -1179,7 +1202,6 @@ const OrderSummaryVisible = ({ clientId, token }) => {
         }));
       });
     }
-
     const cleanedItems = updatedItemsWithStatuses
       .filter(item => typeof item.id === 'number' || item.is_new_item)
       .map(item => {
@@ -1216,6 +1238,7 @@ const OrderSummaryVisible = ({ clientId, token }) => {
       setEditOrderId(null);
       setItemSearchQuery('');
       toast.success('Items saved successfully!');
+
       const res = await axios.get(
         `${import.meta.env.VITE_API_ORDER_SERVICE_URL}/${clientId}/dinein/table`,
         { headers: { Authorization: `Bearer ${token}` } }
@@ -1249,6 +1272,7 @@ const OrderSummaryVisible = ({ clientId, token }) => {
   if (selectedOrderMode !== 'all') {
     filteredOrders = filteredOrders.filter(o => o._fixedOrderMode === selectedOrderMode);
   }
+
   switch (filterMode) {
     case 0:
       filteredOrders = [...filteredOrders].sort((a, b) => new Date(a.created_at) - new Date(b.created_at));
@@ -1272,11 +1296,30 @@ const OrderSummaryVisible = ({ clientId, token }) => {
       break;
   }
 
-  const getOrderTotal = (order) => order.items.reduce((sum, item) => { const price = inventoryMap[item.item_id]?.unit_price ?? item.unit_price ?? item.price ?? 0; return sum + price * (item.quantity || 1); }, 0);
-  const getOrderModeIcon = (mode) => { if (mode === 'takeaway') return <Package size={12} />; if (mode === 'delivery') return <Truck size={12} />; return <Users size={12} />; };
+  // ─────────────────────────────────────────────────────────────────────────
+  // Derived helpers
+  // ─────────────────────────────────────────────────────────────────────────
+
+  const getOrderTotal = (order) =>
+    order.items.reduce((sum, item) => {
+      const price =
+        inventoryMap[item.item_id]?.unit_price ??
+        item.unit_price ??
+        item.price ??
+        0;
+      return sum + price * (item.quantity || 1);
+    }, 0);
+
+  const getOrderModeIcon = (mode) => {
+    if (mode === 'takeaway') return <Package size={12} />;
+    if (mode === 'delivery') return <Truck size={12} />;
+    return <Users size={12} />;
+  };
   const getOrderModeLabel = (mode) => { if (mode === 'takeaway') return 'Takeaway'; if (mode === 'delivery') return 'Delivery'; return 'Dine In'; };
 
-  // ── Render ─────────────────────────────────────────────────────────────────
+  // ─────────────────────────────────────────────────────────────────────────
+  // Render
+  // ─────────────────────────────────────────────────────────────────────────
 
   return (
     <div className="min-h-screen bg-bg-primary">
@@ -1306,6 +1349,7 @@ const OrderSummaryVisible = ({ clientId, token }) => {
                 </button>
               ))}
             </div>
+
             <div className="w-px h-6 bg-border-default mx-1 hidden sm:block" />
 
             {/* Status filter */}
@@ -1524,8 +1568,8 @@ const OrderSummaryVisible = ({ clientId, token }) => {
         .custom-scrollbar::-webkit-scrollbar-thumb { background: var(--color-border-default); border-radius: 10px; }
         .custom-scrollbar::-webkit-scrollbar-thumb:hover { background: var(--color-action-primary); }
       `}</style>
-    </div>
-  );
+      </div>
+      );
 };
 
-export default OrderSummaryVisible;
+      export default OrderSummaryVisible;

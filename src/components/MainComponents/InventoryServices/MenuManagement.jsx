@@ -20,6 +20,7 @@ const MenuManagement = ({ clientId, token, realm }) => {
   const [allMenuItemsRaw, setAllMenuItemsRaw] = useState([]);
   const [loading, setLoading] = useState(true);
   const [inventoryIds, setInventoryIds] = useState([]);
+
   const [addonSubcategories, setAddonSubcategories] = useState([]);
   const [allAddonItems, setAllAddonItems] = useState([]);
   const [categoriesFlat, setCategoriesFlat] = useState([]);
@@ -30,6 +31,7 @@ const MenuManagement = ({ clientId, token, realm }) => {
   const [selectedCategoryId, setSelectedCategoryId] = useState(null);
   const [dieterySubCategories, setDieterySubCategories] = useState([]);
   const [sidebarCategories, setSidebarCategories] = useState([]);
+
   const savedCategoryRef = useRef(localStorage.getItem("menu_selected_category"));
   const [dietaryColorMap, setDietaryColorMap] = useState({});
   const [dietaryOptions, setDietaryOptions] = useState([]);
@@ -62,6 +64,7 @@ const MenuManagement = ({ clientId, token, realm }) => {
   const [showDeleteModal, setShowDeleteModal] = useState(false);
   const [showBulkModal, setShowBulkModal] = useState(false);
   const [units, setUnits] = useState([]);
+
   const [newItemImage, setNewItemImage] = useState(null);
   const [newItemImageUrl, setNewItemImageUrl] = useState('');
   const [editItemImage, setEditItemImage] = useState(null);
@@ -175,14 +178,21 @@ const MenuManagement = ({ clientId, token, realm }) => {
       );
       const data = res.data || [];
       setSections(data);
-      setZones([...new Set(data.map(d => d.zone))]);
-    } catch (err) { console.error("Zone config fetch failed", err); }
+      const uniqueZones = [...new Set(data.map(d => d.zone))];
+      setZones(uniqueZones);
+
+    } catch (err) {
+      console.error("Zone config fetch failed", err);
+    }
   }, [clientId, token]);
 
-  useEffect(() => { fetchZoneConfig(); }, [fetchZoneConfig]);
+  useEffect(() => {
+    fetchZoneConfig();
+  }, [fetchZoneConfig]);
 
   useEffect(() => {
     if (!selectedZone || !selectedSection) return;
+
     const found = sections.find(
       s => s.zone === selectedZone && s.section === selectedSection
     );
@@ -278,6 +288,7 @@ const MenuManagement = ({ clientId, token, realm }) => {
       ]);
 
       const addonsCategory = catRes.data.data?.[0];
+
       if (!addonsCategory) {
         // No addon category created yet
         return { subcategories: [], items: [] };
@@ -490,6 +501,7 @@ const MenuManagement = ({ clientId, token, realm }) => {
     return result;
   };
 
+  // ✅ FIXED — uses the same axios pattern as the rest of MenuManagement
   const fetchUnits = useCallback(async () => {
     try {
       const res = await axios.get(
@@ -497,11 +509,14 @@ const MenuManagement = ({ clientId, token, realm }) => {
         { headers: { Authorization: `Bearer ${token}` } }
       );
       const data = res.data?.data || [];
-      const unitsNode = Array.isArray(data) ? data.find(d => d.id === "units") : data;
+      const unitsNode = Array.isArray(data) ? data.find((d) => d.id === "units") : data;
       const subCats = unitsNode?.subCategories || [];
-      const unitList = subCats.map(u => (typeof u === "string" ? u : u.id));
+      const unitList = subCats.map(u => (typeof (u) === "string" ? u : u.id));
       setUnits(unitList.length > 0 ? unitList : ["g", "kg", "ml", "litre", "pcs"]);
-    } catch (err) { setUnits(["g", "kg", "ml", "litre", "pcs"]); }
+    } catch (err) {
+      console.error("fetchUnits failed:", err);
+      setUnits();
+    }
   }, [clientId, token]);
 
   useEffect(() => {
@@ -528,7 +543,9 @@ const MenuManagement = ({ clientId, token, realm }) => {
     }
   }, [clientId, token, menuConfig]);
 
-  useEffect(() => { fetchInventoryIds(); }, [fetchInventoryIds]);
+  useEffect(() => {
+    fetchInventoryIds();
+  }, [fetchInventoryIds]);
 
   const handleAddItem = async () => {
     try {
@@ -619,6 +636,8 @@ const MenuManagement = ({ clientId, token, realm }) => {
             { headers: { Authorization: `Bearer ${token}` } }
           );
         }
+      } else {
+        console.warn("No sections found → skipping zone creation");
       }
 
       await fetchData({ silent: true });
@@ -721,6 +740,7 @@ const MenuManagement = ({ clientId, token, realm }) => {
         id: Number(editingItem.id),
       };
 
+      // Always update base record (zone_config_id = 0)
       await axios.post(
         `${import.meta.env.VITE_API_INVENTORY_SERVICE_URL}/${clientId}/menu/update`,
         { ...basePayload, unit_price: Number(editingItem.unit_price) || 0, zone_config_id: 0 },
@@ -779,6 +799,7 @@ const MenuManagement = ({ clientId, token, realm }) => {
     return () => document.removeEventListener("mousedown", handleClickOutside);
   }, []);
 
+  // Uses menuInventoryId and root from config — not hardcoded
   const fetchData = useCallback(async (options = { silent: false }) => {
     const { silent = false } = options;
     if (!clientId || !token || !menuConfig) {
@@ -930,6 +951,7 @@ const MenuManagement = ({ clientId, token, realm }) => {
 
     const normalize = (str) => (str || '').toLowerCase().replace(/[-_\s]/g, '');
     const q = (searchQuery || '').trim().toLowerCase();
+
     let items = menuItems;
 
     // ── 1. Dietary filter — uses getDietaryFromSlug (slug-segment based) ──
@@ -1097,6 +1119,7 @@ const MenuManagement = ({ clientId, token, realm }) => {
       const { subcategories, items } = await fetchAddonData();
       setAddonSubcategories(subcategories);
       setAllAddonItems(items);
+
       setShowDeleteModal(false);
       setDeleteTarget(null);
     } catch (error) {
@@ -1107,6 +1130,7 @@ const MenuManagement = ({ clientId, token, realm }) => {
   const handleBulkDelete = async () => {
     if (selectedRows.length === 0) { alert('No items selected'); return; }
     if (!window.confirm(`Delete ${selectedRows.length} selected items?`)) return;
+
     try {
       // ✅ Backend now deletes all zone variants — just send id + zone_config_id: 0
       await Promise.all(selectedRows.map(id => axios.post(
@@ -1114,6 +1138,7 @@ const MenuManagement = ({ clientId, token, realm }) => {
         { id, zone_config_id: 0 },
         { headers: { Authorization: `Bearer ${token}` } }
       )));
+
       const itemsToUpdate = menuItems.filter(item =>
         Array.isArray(item.line_item_id) &&
         item.line_item_id.some(addonId => selectedRows.includes(addonId))
@@ -1125,6 +1150,7 @@ const MenuManagement = ({ clientId, token, realm }) => {
           { headers: { Authorization: `Bearer ${token}` } }
         )));
       }
+
       await fetchData({ silent: true });
       setSelectedRows([]);
       setSelectAllChecked(false);
@@ -1134,32 +1160,32 @@ const MenuManagement = ({ clientId, token, realm }) => {
   };
 
   // Find and replace the entire handleBulkUpdate function:
-  const handleBulkUpdate = async () => {
-    if (selectedRows.length === 0) return;
-    try {
-      for (const id of selectedRows) {
-        const { dietary_type: ed, zonePrices: zp, ...cleanEditedData } = bulkEditData[id] || {};
-        const baseItem = menuItems.find(item => item.id === id && (item.zone_config_id === 0 || item.zone_config_id === null));
-        if (!baseItem) continue;
-        const { dietary_type: od, ...cleanOriginalItem } = baseItem;
+const handleBulkUpdate = async () => {
+  if (selectedRows.length === 0) return;
+  try {
+    for (const id of selectedRows) {
+      const { dietary_type: ed, zonePrices: zp, ...cleanEditedData } = bulkEditData[id] || {};
+      const baseItem = menuItems.find(item => item.id === id && (item.zone_config_id === 0 || item.zone_config_id === null));
+      if (!baseItem) continue;
+      const { dietary_type: od, ...cleanOriginalItem } = baseItem;
 
-        // ✅ Handle slug update when availability changes
-        let updatedSlug = cleanOriginalItem.slug;
-        if ('availability' in cleanEditedData) {
-          const currentSlug = cleanOriginalItem.slug || '';
-          const doubleUnderIdx = currentSlug.lastIndexOf('__');
-          const existingTimingPart = doubleUnderIdx !== -1
-            ? currentSlug.slice(doubleUnderIdx + 2).toLowerCase()
-            : null;
-          const baseSlug = doubleUnderIdx !== -1
-            ? currentSlug.slice(0, doubleUnderIdx)
-            : currentSlug;
+      // ✅ Handle slug update when availability changes
+      let updatedSlug = cleanOriginalItem.slug;
+      if ('availability' in cleanEditedData) {
+        const currentSlug = cleanOriginalItem.slug || '';
+        const doubleUnderIdx = currentSlug.lastIndexOf('__');
+        const existingTimingPart = doubleUnderIdx !== -1
+          ? currentSlug.slice(doubleUnderIdx + 2).toLowerCase()
+          : null;
+        const baseSlug = doubleUnderIdx !== -1
+          ? currentSlug.slice(0, doubleUnderIdx)
+          : currentSlug;
 
-          if (Number(cleanEditedData.availability) === 0) {
-            updatedSlug = `${baseSlug}__unavailable`;
-          } else {
-            if (existingTimingPart === 'unavailable') {
-              updatedSlug = baseSlug;
+        if (Number(cleanEditedData.availability) === 0) {
+          updatedSlug = `${baseSlug}__unavailable`;
+        } else {
+          if (existingTimingPart === 'unavailable') {
+            updatedSlug = baseSlug;
             }
           }
           cleanEditedData.slug = updatedSlug;
@@ -1226,15 +1252,15 @@ const MenuManagement = ({ clientId, token, realm }) => {
         }
       }
 
-      await fetchData({ silent: true });
-      setShowBulkModal(false);
-      setSelectedRows([]);
-      setBulkEditData({});
-      setSelectAllChecked(false);
-    } catch (error) {
-      console.error('Error updating items:', error);
-    }
-  };
+    await fetchData({ silent: true });
+    setShowBulkModal(false);
+    setSelectedRows([]);
+    setBulkEditData({});
+    setSelectAllChecked(false);
+  } catch (error) {
+    console.error('Error updating items:', error);
+  }
+};
 
   const clean = (v) => (v === "" || v === undefined || v === null || (typeof v === "number" && isNaN(v)) ? null : v);
   const num = (v) => { if (v === "" || v === undefined || v === null || (typeof v === "number" && isNaN(v))) return 0; const n = Number(v); return isNaN(n) ? 0 : n; };
@@ -1793,12 +1819,15 @@ const MenuManagement = ({ clientId, token, realm }) => {
                       )}
                       <div className="relative w-10 h-12 md:h-16 md:w-14 rounded-lg overflow-hidden shrink-0 bg-gray-100">
                         {discountPercent && (
-                          <div className="absolute top-1 left-1 bg-action-danger text-white text-[7px] md:text-[10px] px-1 rounded z-10">{discountPercent}% OFF</div>
+                          <div className="absolute top-1 left-1 bg-action-danger text-white text-[7px] md:text-[10px] px-1 rounded z-10">
+                            {discountPercent}% OFF
+                          </div>
                         )}
                         <MenuImagePreview clientId={clientId} imageId={item.image_id} token={token} alt={item.name}
                           baseUrl={import.meta.env.VITE_API_DOCUMENT_SERVICE_URL} className="w-full h-full object-cover"
                           urlBuilder={({ baseUrl, clientId, imageId }) => `${baseUrl}/${clientId}/document/download?doc_id=${imageId}`} />
                       </div>
+
                       <div className="flex-1 min-w-0 cursor-pointer" onClick={() => handleItemClick(item)}>
                         <h3 className="text-[10px] md:text-[16px] font-semibold text-text-primary">{item.name}</h3>
                         {/* {!active && (
@@ -1820,6 +1849,7 @@ const MenuManagement = ({ clientId, token, realm }) => {
                           )}
                         </div>
                       </div>
+
                       <div className="absolute top-1 right-1 flex gap-1 opacity-0 group-hover:opacity-100 transition-opacity duration-200 z-20">
                         <button className="bg-action-primary text-white p-1 rounded-full hover:scale-110"
                           onClick={(e) => { e.stopPropagation(); handleItemClick(item); }}>
@@ -2070,8 +2100,8 @@ const MenuManagement = ({ clientId, token, realm }) => {
 
       />
 
-      <UniversalBulkUpdateModal
-        clientId={clientId} token={token} menuItems={menuItems}
+      <UniversalBulkUpdateModal clientId={clientId} 
+        token={token} menuItems={menuItems}
         showModal={showBulkModal} setShowModal={setShowBulkModal} modalType="menu"
         filteredItems={filteredItems} selectedRows={selectedRows} setSelectedRows={setSelectedRows}
         selectAllChecked={selectAllChecked} setSelectAllChecked={setSelectAllChecked}

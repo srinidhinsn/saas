@@ -88,6 +88,7 @@ const UniversalEditModal = ({
           headers: { Authorization: `Bearer ${token}` }
         }
       );
+
       setConfigs(res.data || []);
     } catch (err) {
       console.error("Config fetch error:", err);
@@ -141,7 +142,9 @@ const UniversalEditModal = ({
     }
   };
   useEffect(() => {
-    if (!showModal || !clientId || !token) return;
+    if (!showModal) return;
+    if (!clientId || !token) return;
+
     fetchConfigs();
     fetchStatuses();
     if (normalizedRealm === 'restaurant') {
@@ -201,7 +204,11 @@ const UniversalEditModal = ({
     return result;
   };
 
-  const getAddonNameById = (id) => allAddonItems?.find(item => item.id === id)?.name || 'Unknown';
+  // ✅ Get addon name by ID
+  const getAddonNameById = (id) => {
+    const addon = allAddonItems?.find(item => item.id === id);
+    return addon?.name || 'Unknown';
+  };
 
   // ✅ Remove individual addon
   const removeAddon = (addonId) => {
@@ -270,9 +277,16 @@ const UniversalEditModal = ({
 
                 {/* Item Name */}
                 <div>
-                  <label className="block text-sm font-medium mb-1 text-gray-700">{isComboItem ? 'Combo Name' : 'Item Name'} <span className="text-red-600">*</span></label>
-                  <input type="text" value={editingItem.name} onChange={e => setEditingItem({ ...editingItem, name: e.target.value })}
-                    className="w-full px-3 py-2 rounded-md border border-gray-300 text-gray-900 focus:outline-none focus:ring-2 focus:ring-blue-500" required />
+                  <label className="block text-sm font-medium mb-1 text-gray-700">
+                    {isComboItem ? 'Combo Name' : 'Item Name'} <span className="text-red-600">*</span>
+                  </label>
+                  <input
+                    type="text"
+                    value={editingItem.name}
+                    onChange={(e) => setEditingItem({ ...editingItem, name: e.target.value })}
+                    className="w-full px-3 py-2 rounded-md border border-gray-300 text-gray-900 focus:outline-none focus:ring-2 focus:ring-blue-500 focus:border-transparent"
+                    required
+                  />
                 </div>
 
                 {/* Description */}
@@ -367,13 +381,23 @@ const UniversalEditModal = ({
                     <label className="block text-sm font-medium mb-1 text-gray-700">
                       {isComboItem ? 'Combo Price (flat) *' : 'Base Price (All Zones) *'}
                     </label>
-                    <input type="number" value={editingItem.unit_price} onChange={e => setEditingItem({ ...editingItem, unit_price: e.target.value })}
-                      className="w-full px-3 py-2 rounded-md border border-gray-300 text-gray-900 focus:outline-none focus:ring-2 focus:ring-blue-500" required />
+                    <input
+                      type="number"
+                      value={editingItem.unit_price}
+                      onChange={(e) => setEditingItem({ ...editingItem, unit_price: e.target.value })}
+                      className="w-full px-3 py-2 rounded-md border border-gray-300 text-gray-900 focus:outline-none focus:ring-2 focus:ring-blue-500 focus:border-transparent"
+                      required
+                    />
                   </div>
+
                   <div>
                     <label className="block text-sm font-medium mb-1 text-gray-700">Discount</label>
-                    <input type="number" value={editingItem.discount} onChange={e => setEditingItem({ ...editingItem, discount: e.target.value })}
-                      className="w-full px-3 py-2 rounded-md border border-gray-300 text-gray-900 focus:outline-none focus:ring-2 focus:ring-blue-500" />
+                    <input
+                      type="number"
+                      value={editingItem.discount}
+                      onChange={(e) => setEditingItem({ ...editingItem, discount: e.target.value })}
+                      className="w-full px-3 py-2 rounded-md border border-gray-300 text-gray-900 focus:outline-none focus:ring-2 focus:ring-blue-500 focus:border-transparent"
+                    />
                   </div>
                 </div>
 
@@ -505,8 +529,14 @@ const UniversalEditModal = ({
                       )}
                     </div>
                   )}
-                  <div className={`relative border-2 border-dashed rounded-md p-6 transition-colors ${dragActive ? 'border-blue-500 bg-blue-50' : 'border-gray-300 bg-gray-50'}`}
-                    onDragEnter={handleEditDrag} onDragLeave={handleEditDrag} onDragOver={handleEditDrag} onDrop={handleEditDrop}>
+                  <div
+                    className={`relative border-2 border-dashed rounded-md p-6 transition-colors ${dragActive ? 'border-blue-500 bg-blue-50' : 'border-gray-300 bg-gray-50'
+                      }`}
+                    onDragEnter={handleEditDrag}
+                    onDragLeave={handleEditDrag}
+                    onDragOver={handleEditDrag}
+                    onDrop={handleEditDrop}
+                  >
                     <div className="text-center">
                       <Upload className="mx-auto mb-2 text-gray-400" size={32} />
                       <p className="text-sm text-gray-600 mb-2">
@@ -559,8 +589,11 @@ const UniversalEditModal = ({
                         </div>
                       )}
 
-                      <button type="button" onClick={() => setShowAddonPopup(true)}
-                        className="w-full px-4 py-3 rounded-lg bg-gray-50 border-2 border-dashed border-violet-300 text-violet-700 hover:border-violet-500 hover:bg-violet-50 transition-all flex items-center justify-center gap-2 font-medium">
+                      <button
+                       type="button"
+                       onClick={() => setShowAddonPopup(true)}
+                       className="w-full px-4 py-3 rounded-lg bg-gray-50 border-2 border-dashed border-gray-300 text-gray-700 hover:border-blue-500 hover:bg-blue-50 transition-all flex items-center justify-center gap-2 font-medium"
+                      >
                         <Plus size={18} />
                         <span>{editingItem.line_item_id?.length > 0 ? `Edit Combo Items (${editingItem.line_item_id.length})` : 'Select Combo Items'}</span>
                       </button>

@@ -8,6 +8,7 @@ import { Filter, Clock, Users, Package, Truck, Trash2, BarChart2, X, ChevronRigh
 
 // ─── Constants ─────────────────────────────────────────────────────────────────
 
+
 // ─── Dynamic Configuration ─────────────────────────────────────────────────────
 
 const KDS_CONFIG = {
@@ -28,8 +29,11 @@ const KDS_CONFIG = {
   TAKEAWAY_TABLE_IDS: [500], // can support multiple IDs
 
   POLL_INTERVAL_MS: 10000,
+
   DATE_FORMAT: 'en-CA',
+
   DEFAULT_TABLE_PREFIX: 'T-',
+
   DEFAULT_UNKNOWN_LABEL: 'Unknown',
   // The category_id value used in your menu data to identify combo items
   COMBO_CATEGORY_ID: 'Combos',
@@ -42,20 +46,24 @@ const ORDER_FILTER_OPTIONS = [
   { key: KDS_CONFIG.FILTERS.DELIVERY, label: 'Delivery', Icon: Truck },
 ];
 
+
 // ─── Elapsed time helper ───────────────────────────────────────────────────────
 
 const calculateElapsedTime = (createdAt) => {
   if (!createdAt) return null;
+
   const utcString =
     typeof createdAt === 'string'
       ? createdAt.replace(' ', 'T').split('.')[0] + 'Z'
       : createdAt;
+
   const diffMs = Date.now() - new Date(utcString).getTime();
   if (diffMs < 0) return '0m';
   const totalSeconds = Math.floor(diffMs / 1000);
   const totalMinutes = Math.floor(totalSeconds / 60);
   const hours = Math.floor(totalMinutes / 60);
   const minutes = totalMinutes % 60;
+
   if (totalSeconds < 60) return '< 1m';
   if (hours > 0) return `${hours}h ${minutes}m`;
   return `${totalMinutes}m`;
@@ -79,6 +87,7 @@ const isCancelledStatus = (status) => {
   return normalized === 'cancelled' || normalized === 'canceled';
 };
 
+// ─── Derive card-level status from its items ───────────────────────────────────
 const minutesElapsed = (createdAt) => {
   if (!createdAt) return 0;
   const utcString =
@@ -110,10 +119,11 @@ const isComboItem = (orderItem, menuRecord) => {
   return isComboCategoryId && hasLineItems;
 };
 
-// ─── Modals ────────────────────────────────────────────────────────────────────
+// ─── Delete item confirmation modal ───────────────────────────────────────────
 
 const DeleteItemModal = ({ isOpen, onClose, onConfirm, itemName }) => {
   if (!isOpen) return null;
+
   return (
     <div className="fixed inset-0 z-50 flex items-center justify-center bg-black bg-opacity-50">
       <div className="w-full max-w-sm rounded-xl overflow-hidden shadow-lg bg-white text-gray-900">
@@ -144,10 +154,12 @@ const DeleteItemModal = ({ isOpen, onClose, onConfirm, itemName }) => {
   );
 };
 
+
 // ─── Delete order confirmation modal ──────────────────────────────────────────
 
 const DeleteOrderModal = ({ isOpen, onClose, onConfirm, cardToDelete }) => {
   if (!isOpen) return null;
+
   return (
     <div className="fixed inset-0 z-50 flex items-center justify-center bg-black bg-opacity-50">
       <div className="w-full max-w-md rounded-xl overflow-hidden shadow-lg bg-white text-gray-900">
@@ -162,8 +174,18 @@ const DeleteOrderModal = ({ isOpen, onClose, onConfirm, cardToDelete }) => {
           </p>
         </div>
         <div className="px-6 py-4 flex justify-end gap-3 border-t">
-          <button onClick={onConfirm} className="px-4 py-2 rounded-md bg-red-500 text-white font-semibold hover:bg-red-600 transition-colors">Yes</button>
-          <button onClick={onClose} className="px-4 py-2 rounded-md bg-gray-100 text-gray-700 hover:bg-gray-200 transition-colors">No</button>
+          <button
+            onClick={onConfirm}
+            className="px-4 py-2 rounded-md bg-red-500 text-white font-semibold hover:bg-red-600 transition-colors"
+          >
+            Yes
+          </button>
+          <button
+            onClick={onClose}
+            className="px-4 py-2 rounded-md bg-gray-100 text-gray-700 hover:bg-gray-200 transition-colors"
+          >
+            No
+          </button>
         </div>
       </div>
     </div>
@@ -406,17 +428,21 @@ const KitchenCard = ({
 
       {/* ── Card header ── */}
       <div className="flex items-center justify-between px-4 py-3 bg-action-primary text-white">
-        <span className="text-sm md:text-base font-semibold">
-          {tablesMap[card.table_id] || `${KDS_CONFIG.DEFAULT_TABLE_PREFIX}${card.table_id}`}
-        </span>
-        <div className="flex items-center gap-2 text-xl font-semibold text-white">
-          <Clock size={16} />
-          <span>{elapsedTime}</span>
-        </div>
-        <div className="flex flex-col items-end">
-          <span className="text-xl font-semibold text-orange-100/80">
-            #{card.dinein_order_id}
+        <div className="flex items-center justify-between w-full">
+
+          {/* Table name */}
+          <span className="text-sm md:text-base font-semibold">
+            {tablesMap[card.table_id] || `${KDS_CONFIG.DEFAULT_TABLE_PREFIX}${card.table_id}`}
           </span>
+          <div className="flex items-center gap-2 text-xl font-semibold text-white">
+            <Clock size={16} />
+            <span>{elapsedTime}</span>
+          </div>
+          <div className="flex flex-col items-end">
+            <span className="text-xl font-semibold text-orange-100/80">
+              #{card.dinein_order_id}
+            </span>
+          </div>
         </div>
       </div>
 
@@ -555,8 +581,10 @@ const KitchenDisplay = () => {
   const [showDeleteOrderModal, setShowDeleteOrderModal] = useState(false);
   const [cardToDelete, setCardToDelete] = useState(null);
 
+  // Delete item modal state
   const [showDeleteItemModal, setShowDeleteItemModal] = useState(false);
   const [itemToDelete, setItemToDelete] = useState(null);  // { cardId, item }
+
 
   // ─── Fetch tables ────────────────────────────────────────────────────────────
 
@@ -574,6 +602,7 @@ const KitchenDisplay = () => {
       .catch(() => toast.error('Failed to fetch tables'));
   }, [clientId, token]);
 
+
   // ─── Fetch inventory ─────────────────────────────────────────────────────────
 
   useEffect(() => {
@@ -590,13 +619,18 @@ const KitchenDisplay = () => {
         });
         setMenuItemsMap(map);
       })
-      .catch((err) => {
-        console.warn('[KDS] Failed to fetch inventory for combo lookup:', err);
-      });
+      .catch(() => toast.error('Failed to fetch inventory'));
   }, [clientId, token]);
 
-  // ─── Also try the richer menu/read endpoint ───────────────────────────────
 
+  // ─── Parse /dinein/table merged response into per-sub-order cards ─────────────
+  //
+  // Backend _merge_group() returns one merged entry per table group with:
+  //   item.batch_label  = the sub-order's dinein_order_id ("1001" or "1001-2")
+  //   item.sub_order_id = the DB pk of that sub-order row
+  //   sub_orders[]      = [{id, dinein_order_id, created_at, status, total_price}, ...]
+  //
+  // We split merged items back into individual per-sub-order cards for the KDS.
   useEffect(() => {
     if (!token || !clientId) return;
     axios
@@ -632,6 +666,7 @@ const KitchenDisplay = () => {
       itemsBySubOrder[sid].push(item);
     });
 
+    // Fallback: no sub_orders metadata — treat entire group as one card
     if (subOrders.length === 0) {
       return [
         {
@@ -644,10 +679,11 @@ const KitchenDisplay = () => {
           created_at: mergedOrder.created_at,
           items: activeItems,
           is_sub_order: false,
-        }
+        },
       ];
     }
 
+    // One card per sub-order: sort strictly by created_at ascending
     return subOrders
       .slice()
       .sort((a, b) => new Date(a.created_at || 0) - new Date(b.created_at || 0))
@@ -664,10 +700,14 @@ const KitchenDisplay = () => {
       }));
   };
 
+
   // ─── Fetch & poll orders ──────────────────────────────────────────────────────
 
   const fetchOrders = useCallback(async () => {
-    if (!token || !clientId) { setLoading(false); return; }
+    if (!token || !clientId) {
+      setLoading(false);
+      return;
+    }
 
     // ── FIX 1: Skip poll entirely while any status update is still in-flight.
     //    This is the core fix for the flickering issue — we never let a stale
@@ -696,9 +736,11 @@ const KitchenDisplay = () => {
           const utc = typeof createdAt === 'string'
             ? createdAt.replace(' ', 'T').split('.')[0] + 'Z'
             : createdAt;
-          if (new Date(utc).toLocaleDateString(KDS_CONFIG.DATE_FORMAT) !== today) return;
+          const orderDate = new Date(utc).toLocaleDateString(KDS_CONFIG.DATE_FORMAT);
+          if (orderDate !== today) return;
         }
 
+        // Skip fully-served groups
         if (mergedOrder.status === KDS_CONFIG.STATUS.SERVED) return;
 
         parseIntoCards(mergedOrder).forEach((card) => {
@@ -714,7 +756,9 @@ const KitchenDisplay = () => {
       // Sort all cards by created_at ascending so newest orders appear last
       allCards.sort((a, b) => new Date(a.created_at || 0) - new Date(b.created_at || 0));
 
-      // Stabilise item order across polls
+      // Stabilise item order using a ref so positions survive refresh + navigation.
+      // On first sight of a card, record item ids in server-arrival order.
+      // On subsequent polls, reorder items to match that recorded order.
       const stableCards = allCards.map((incoming) => {
         const cardId = incoming.card_id;
         const incomingItemIds = incoming.items.map((i) => i.id);
@@ -735,6 +779,7 @@ const KitchenDisplay = () => {
           incomingItemIds.forEach((id) => {
             if (!lockedSet.has(id)) prunedLocked.push(id);
           });
+
           itemOrderRef.current[cardId] = prunedLocked;
         }
 
@@ -771,13 +816,8 @@ const KitchenDisplay = () => {
     return () => clearInterval(interval);
   }, [fetchOrders]);
 
-  // ─── Item status change ────────────────────────────────────────────────────
-  // FIX 1 — three-step pattern used in production KDS systems:
-  //   1. Optimistic local state update (instant UI feedback)
-  //   2. Increment in-flight counter (blocks polls)
-  //   3. Fire API call; decrement counter when done
-  // This means the kitchen staff sees the change immediately and the next poll
-  // only runs after the round-trip completes, so stale data never overwrites.
+
+  // ─── Item status change ───────────────────────────────────────────────────────
 
   const handleItemStatusChange = async (cardId, itemId, newStatus) => {
     const card = cards.find((c) => c.card_id === cardId);
@@ -896,8 +936,8 @@ const KitchenDisplay = () => {
     }
   };
 
-  // ─── Filter cards ──────────────────────────────────────────────────────────
 
+  // ─── Filter cards (sort already applied at fetch time) ───────────────────────
   const filteredCards = cards
     .filter((card) => {
       if (orderFilter === KDS_CONFIG.FILTERS.ALL) return true;
@@ -906,6 +946,7 @@ const KitchenDisplay = () => {
       if (orderFilter === KDS_CONFIG.FILTERS.DINEIN) return !isTakeaway;
       return true;
     });
+
 
   // ─── Render ───────────────────────────────────────────────────────────────────
 
