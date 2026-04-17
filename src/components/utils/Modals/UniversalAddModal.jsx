@@ -301,7 +301,7 @@ const UniversalAddModal = ({
                   onChange={(e) => setNewItem(prev => ({ ...(prev || {}), name: e.target.value }))}
                   className="w-full px-4 py-2 rounded-lg bg-bg-tertiary border border-border-default text-text-primary focus:outline-none focus:ring-2 focus:ring-action-primary"
                   placeholder={isComboCategory ? "e.g. Family Combo, Weekend Special" : "Enter item name"} 
-                  required 
+                  required
                 />
               </div>
 
@@ -335,8 +335,8 @@ const UniversalAddModal = ({
                             setNewItem(prev => ({ ...prev, availability_time: next }));
                           }}
                           className={`px-3 py-1.5 rounded-lg text-sm border transition-all ${selected
-                          ? 'bg-action-primary text-white border-action-primary'
-                          : 'bg-bg-tertiary border-border-default text-text-primary hover:border-action-primary'
+                              ? 'bg-action-primary text-white border-action-primary'
+                              : 'bg-bg-tertiary border-border-default text-text-primary hover:border-action-primary'
                             }`}
                         >
                           {t.name} {t.start && t.end ? `(${t.start}–${t.end})` : ''}
@@ -657,7 +657,7 @@ const UniversalAddModal = ({
                     className="w-full px-3 py-2 border rounded-lg"
                   >
                     <option value="">Select Config</option>
-                    
+
                     {loadingConfigs ? (
                       <option disabled>Loading...</option>
                     ) : configs.length === 0 ? (

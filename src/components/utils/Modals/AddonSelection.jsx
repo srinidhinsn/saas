@@ -7,7 +7,7 @@ const AddonSelectionPopup = ({
   selectedAddons, 
   onSave, 
   addonSubcategories, 
-  allAddonItems, 
+  allAddonItems,
   currentItemId // ✅ To exclude current item from selection
 }) => {
   const [selectedSubcategory, setSelectedSubcategory] = useState(null);

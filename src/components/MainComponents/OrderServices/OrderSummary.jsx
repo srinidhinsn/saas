@@ -315,7 +315,7 @@ const OrderItemsViewModal = ({ isOpen, onClose, order, inventoryMap, onRequestDe
             <p className="text-sm text-text-white/70 mt-0.5">
               {order._fixedOrderMode === 'takeaway'
                 ? order.customer_name || 'Takeaway'
-                : order._tableName || order.table || order.table_id}            
+                : order._tableName || order.table || order.table_id}  
             </p>
           </div>
           <div className="flex items-center gap-4">
@@ -468,7 +468,7 @@ const OrderSummaryVisible = ({ clientId, token }) => {
   // Single order-mode selection — NOT multi-select
   const [selectedOrderMode, setSelectedOrderMode] = useState('all');
 
-  // ── View modal ────────────────────────────────────────────────────────────  
+  // ── View modal ────────────────────────────────────────────────────────────
   const [viewOrder, setViewOrder] = useState(null);
   const [showViewModal, setShowViewModal] = useState(false);
 
@@ -476,7 +476,7 @@ const OrderSummaryVisible = ({ clientId, token }) => {
   const [cancelOrderModal, setCancelOrderModal] = useState({ isOpen: false, orderId: null });
   const [itemDeleteModal, setItemDeleteModal] = useState({ isOpen: false, item: null, orderId: null });
 
-  // Order detail / edit modal state (preserved)
+  // ── Order detail / edit modal (kept from original) ────────────────────────
   const [showOrderDetailModal, setShowOrderDetailModal] = useState(false);
   const [selectedOrder, setSelectedOrder] = useState(null);
   const [editOrderId, setEditOrderId] = useState(null);

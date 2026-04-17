@@ -1004,7 +1004,7 @@ const NewItemRow = ({ group, clientId, token, onUpdateQuantity, onRemove }) => {
           <div className="min-w-0 flex-1">
             <h4 className="text-sm font-semibold truncate text-gray-800">{main.name}</h4>
             <p className="text-xs font-bold text-action-primary">
-              ₹{(main.unit_price * (1 - (Number(main.discount) || 0) / 100)).toFixed(2)}
+            ₹{(main.unit_price * (1 - (Number(main.discount) || 0) / 100)).toFixed(2)}
             </p>
           </div>
         </div>
@@ -2119,9 +2119,9 @@ const TakeOrder = ({ clientId, token, onOrderUpdate, realm }) => {
   };
 
   /**
-  * goToFloor — returns to the floor view WITHOUT clearing the cart or draft.
-  * The waiter can click back to the same table and pick up right where they left off.
-  */
+   * goToFloor — returns to the floor view WITHOUT clearing the cart or draft.
+   * The waiter can click back to the same table and pick up right where they left off.
+   */
   const goToFloor = () => {
     setCurrentView('floor');
     setShowCart(false);
