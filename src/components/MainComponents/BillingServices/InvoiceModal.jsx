@@ -113,8 +113,7 @@ export default function InvoiceModal({
 
   const safeNum = (num) => (typeof num === "number" && !isNaN(num) ? num : 0);
 
-  // ─── Price calculations ────────────────────────────────────────────────────
-
+  // 1️⃣ Subtotal
   const orderSubtotal = Number(
     (selectedOrder?.items || []).reduce(
       (sum, item) =>
@@ -122,6 +121,7 @@ export default function InvoiceModal({
       0
     ).toFixed(2)
   );
+
   // 2️⃣ GST on subtotal
   const calculatedGST = Number(
     (orderSubtotal * (taxPercent / 100)).toFixed(2)
@@ -217,6 +217,7 @@ export default function InvoiceModal({
       );
       const invoices = res.data?.data || [];
       const customersMap = new Map();
+
       invoices.forEach((inv) => {
         if (inv.customer_id) {
           if (!customersMap.has(inv.customer_id) ||
@@ -230,11 +231,9 @@ export default function InvoiceModal({
           }
         }
       });
-      setCustomersList(
-        Array.from(customersMap.values()).sort((a, b) =>
-          a.customer_id.localeCompare(b.customer_id)
-        )
-      );
+      const uniqueCustomers = Array.from(customersMap.values())
+        .sort((a, b) => a.customer_id.localeCompare(b.customer_id));
+      setCustomersList(uniqueCustomers);
     } catch (err) {
       console.error("Failed to fetch customers:", err);
       setCustomersList([]);
@@ -273,6 +272,7 @@ export default function InvoiceModal({
   useEffect(() => {
     const loadInvoiceDraft = async () => {
       if (!initialOrder) return;
+
       const invoiceDraft = await fetchInvoiceDraft(initialOrder.id);
 
       setInvoiceDraftId(invoiceDraft?.id ?? null);
@@ -308,16 +308,17 @@ export default function InvoiceModal({
       }
 
       if (!gstManuallyEdited) {
-        setTaxPercent(
-          invoiceDraft?.tax_rate !== undefined && invoiceDraft?.tax_rate !== null
-            ? Number(invoiceDraft.tax_rate)
-            : 18
-        );
+        if (invoiceDraft?.tax_rate !== undefined && invoiceDraft?.tax_rate !== null) {
+          setTaxPercent(Number(invoiceDraft.tax_rate));
+        } else {
+          setTaxPercent(18);
+        }
       }
 
       if (invoiceDraft?.discount !== undefined && invoiceDraft?.discount !== null) {
         setDiscount(Number(invoiceDraft.discount));
-        setDiscountIsPercent(invoiceDraft.discount % 1 !== 0);
+        const hasDecimal = (invoiceDraft.discount % 1 !== 0);
+        setDiscountIsPercent(hasDecimal);
       } else if (invoiceDraft?.discount_amount !== undefined) {
         setDiscount(Number(invoiceDraft.discount_amount));
         setDiscountIsPercent(false);
@@ -326,11 +327,13 @@ export default function InvoiceModal({
         setDiscountIsPercent(true);
       }
     };
+
     loadInvoiceDraft();
   }, [initialOrder]);
 
   useEffect(() => {
     if (!selectedOrder) return;
+
     if (!splitPaymentEnabled) {
       setPaymentSplits([{ method, amount: total }]);
       setBalanceAmount(0);
@@ -340,19 +343,17 @@ export default function InvoiceModal({
         const used = splits
           .slice(0, splits.length - 1)
           .reduce((sum, s) => sum + Number(s.amount || 0), 0);
+
         splits[splits.length - 1].amount = Math.max(
           Number((total - used).toFixed(2)),
           0
         );
+
         setPaymentSplits(splits);
         updateBalance(sumSplits(splits));
       }
     }
   }, [total]);
-
-  // ─── Save invoice draft ────────────────────────────────────────────────────
-  // REQ 2: Does NOT free the table or change order status on save.
-  // Table is freed only after payment confirmation.
 
   const saveInvoiceDraft = async () => {
     if (!selectedOrder) {
@@ -372,18 +373,26 @@ export default function InvoiceModal({
       const roundedSum = Number(sumSplits(paymentSplits).toFixed(2));
       const roundedTotal = Number(total.toFixed(2));
       if (roundedSum < roundedTotal) {
-        toast.error(`Split payment total ₹${roundedSum.toFixed(2)} is less than invoice total ₹${roundedTotal.toFixed(2)}`); return;
+        toast.error(`Split payment total ₹${roundedSum.toFixed(2)} is less than invoice total ₹${roundedTotal.toFixed(2)}`);
+        return;
       }
       if (roundedSum > roundedTotal) {
-        toast.error(`Split payment total ₹${roundedSum.toFixed(2)} exceeds invoice total ₹${roundedTotal.toFixed(2)}`); return;
+        toast.error(`Split payment total ₹${roundedSum.toFixed(2)} exceeds invoice total ₹${roundedTotal.toFixed(2)}`);
+        return;
       }
     } else {
       setPaymentSplits([{ method, amount: total }]);
     }
 
-    const paymentMethodArray = splitPaymentEnabled
-      ? paymentSplits.map((p) => ({ method: p.method, amount: Number(p.amount || 0) }))
-      : [{ method, amount: total }];
+    let paymentMethodArray;
+    if (splitPaymentEnabled) {
+      paymentMethodArray = paymentSplits.map((p) => ({
+        method: p.method,
+        amount: Number(p.amount || 0),
+      }));
+    } else {
+      paymentMethodArray = [{ method, amount: total }];
+    }
 
     setSaving(true);
     try {
@@ -533,7 +542,7 @@ export default function InvoiceModal({
 
     const isOnlineMethod = (m) => m === "razorpay_upi" || m === "razorpay_card";
     const needsRazorpay = splitPaymentEnabled
-      ? paymentSplits.some((s) => isOnlineMethod(s.method))
+      ? paymentSplits.some(s => isOnlineMethod(s.method))
       : isOnlineMethod(method);
 
     if (needsRazorpay) {
@@ -562,17 +571,17 @@ export default function InvoiceModal({
     if (!currentInvoiceDraftId) {
       try {
         currentInvoiceDraftId = await saveInvoiceDraft();
-        const updatedDraft = await fetchInvoiceDraft(selectedOrder.id);
-        if (updatedDraft?.id) {
-          setInvoiceDraftId(updatedDraft.id);
-          setPaymentStatus(updatedDraft.payment_status || "Paid");
+        const updated = await fetchInvoiceDraft(selectedOrder.id);
+        if (updated?.id) {
+          setInvoiceDraftId(updated.id);
+          setPaymentStatus(updated.payment_status || "Paid");
         }
-        if (updatedDraft) {
-          setSelectedOrder((prev) => ({
+        if (updated) {
+          setSelectedOrder(prev => ({
             ...prev,
-            customer_id: updatedDraft.customer_id || prev.customer_id,
-            contact_email: updatedDraft.contact_email || prev.contact_email,
-            contact_phone: updatedDraft.contact_phone || prev.contact_phone
+            customer_id: updated.customer_id || prev.customer_id,
+            contact_email: updated.contact_email || prev.contact_email,
+            contact_phone: updated.contact_phone || prev.contact_phone
           }));
         }
       } catch {
@@ -610,6 +619,7 @@ export default function InvoiceModal({
 
       doc.setFont("helvetica", "bold");
       doc.setFontSize(26);
+
       doc.setTextColor(255, 255, 255);
       doc.text(clientId.toUpperCase(), 40, y);
 
@@ -632,11 +642,13 @@ export default function InvoiceModal({
       doc.text(localStorage.getItem("restaurant_address") || "Address not available", 40, y + 15);
 
       y += 50;
+
       doc.setDrawColor(200, 200, 200);
       doc.setLineWidth(1);
       doc.line(40, y, pageWidth - 40, y);
 
       y += 25;
+
       doc.setFont("helvetica", "bold");
       doc.setFontSize(10);
       doc.text("BILL TO", 40, y);
@@ -654,6 +666,7 @@ export default function InvoiceModal({
       doc.text(`Order #${selectedOrder.id}`, pageWidth - 180, y + 46);
 
       y += 70;
+
       doc.setFillColor(248, 250, 252);
       doc.rect(40, y - 5, pageWidth - 80, 25, 'F');
 
@@ -675,10 +688,12 @@ export default function InvoiceModal({
           doc.addPage();
           y = 50;
         }
+
         if (index % 2 === 0) {
           doc.setFillColor(249, 250, 251);
           doc.rect(40, y - 8, pageWidth - 80, 20, 'F');
         }
+        
         doc.text(item.name || "Unnamed", 45, y);
         doc.text(`${item.quantity || 0}`, pageWidth - 260, y);
         doc.text(`₹${(item.unit_price ?? 0).toFixed(2)}`, pageWidth - 180, y);
@@ -806,7 +821,7 @@ export default function InvoiceModal({
                   <div className="text-sm font-medium">Table: {tablesMap[selectedOrder.table_id]?.name}</div>
                   <div className="text-xs text-text-white/80">Order #{selectedOrder.id}</div>
                 </div>
-                <div className="text-white">
+                <div className="text-text-white">
                   <div className="text-sm font-medium">{new Date().toLocaleDateString()}</div>
                   <div className="text-xs text-text-white/80">{new Date().toLocaleTimeString([], { hour: "2-digit", minute: "2-digit" })}</div>
                 </div>
@@ -827,6 +842,7 @@ export default function InvoiceModal({
                     </h2>
                   </div>
                   <div className="p-4 space-y-2 max-h-96 overflow-y-auto">
+
                     {selectedOrder.items.map((item, idx) => (
                       <div key={idx} className="flex justify-between items-center py-3 px-4 rounded-lg bg-bg-tertiary border border-border-default hover:border-action-primary transition-all">
                         <div className="flex-1">
@@ -1025,7 +1041,7 @@ export default function InvoiceModal({
                               min="0"
                               value={split.amount}
                               onChange={(e) => updateSplitAmount(idx, e.target.value)}
-                              onBlur={onSplitAmountBlur}
+                              onBlur={() => onSplitAmountBlur()}
                               className="w-24 border border-border-default rounded-lg px-2 py-1.5 text-sm bg-bg-primary text-text-primary focus:ring-2 focus:ring-action-primary"
                             />
                             <button
@@ -1153,10 +1169,10 @@ export default function InvoiceModal({
               const paymentsToVerify = isSplit
                 ? response.completed_razorpay_payments   // array of { razorpay_payment_id, order_id, signature }
                 : [{
-                  razorpay_payment_id: response.razorpay_payment_id,
-                  razorpay_order_id: response.razorpay_order_id,
-                  razorpay_signature: response.razorpay_signature,
-                }];
+                    razorpay_payment_id: response.razorpay_payment_id,
+                    razorpay_order_id:   response.razorpay_order_id,
+                    razorpay_signature:  response.razorpay_signature,
+                  }];
 
               // ✅ Verify each Razorpay payment sequentially
               for (const p of paymentsToVerify) {
@@ -1167,10 +1183,10 @@ export default function InvoiceModal({
                 await axios.post(
                   `${import.meta.env.VITE_API_BILLING_SERVICE_URL}/${clientId}/invoice/verify?client_id=${clientId}`,
                   {
-                    document_id: Number(docId),
+                    document_id:         Number(docId),
                     razorpay_payment_id: String(p.razorpay_payment_id),
-                    razorpay_order_id: String(p.razorpay_order_id),
-                    razorpay_signature: String(p.razorpay_signature),
+                    razorpay_order_id:   String(p.razorpay_order_id),
+                    razorpay_signature:  String(p.razorpay_signature),
                   },
                   {
                     headers: {
@@ -1180,7 +1196,7 @@ export default function InvoiceModal({
                   }
                 );
               }
-
+          
               // Update order status
               await axios.post(
                 `${import.meta.env.VITE_API_ORDER_SERVICE_URL}/${clientId}/dinein/update`,
