@@ -59,6 +59,7 @@ const calculateElapsedTime = (createdAt) => {
 
   const diffMs = Date.now() - new Date(utcString).getTime();
   if (diffMs < 0) return '0m';
+
   const totalSeconds = Math.floor(diffMs / 1000);
   const totalMinutes = Math.floor(totalSeconds / 60);
   const hours = Math.floor(totalMinutes / 60);
@@ -427,7 +428,7 @@ const KitchenCard = ({
     <div className="rounded-xl shadow-md overflow-hidden border border-gray-200 bg-white transition-transform transform hover:-translate-y-0.5 flex flex-col">
 
       {/* ── Card header ── */}
-      <div className="flex items-center justify-between px-4 py-3 bg-action-primary text-white">
+      <div className="flex items-center justify-between px-4 py-3 bg-action-primary text-text-white">
         <div className="flex items-center justify-between w-full">
 
           {/* Table name */}
@@ -556,6 +557,7 @@ const KitchenCard = ({
     </div>
   );
 };
+
 
 // ─── Main KitchenDisplay component ────────────────────────────────────────────
 
@@ -963,8 +965,8 @@ const KitchenDisplay = () => {
                   key={key}
                   onClick={() => setOrderFilter(key)}
                   className={`flex items-center gap-2 px-4 py-2 rounded-lg font-medium text-sm transition-all ${orderFilter === key
-                     ? 'bg-action-primary text-text-white shadow-sm'
-                     : 'bg-bg-tertiary text-text-secondary hover:text-text-primary border border-border-default'
+                    ? 'bg-action-primary text-text-white shadow-sm'
+                    : 'bg-bg-tertiary text-text-secondary hover:text-text-primary border border-border-default'
                     }`}
                 >
                   <Icon size={16} />

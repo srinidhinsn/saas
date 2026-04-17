@@ -218,7 +218,7 @@ export default function InvoiceModal({
       const invoices = res.data?.data || [];
       const customersMap = new Map();
 
-      invoices.forEach((inv) => {
+      invoices.forEach(inv => {
         if (inv.customer_id) {
           if (!customersMap.has(inv.customer_id) ||
             new Date(inv.created_at) > new Date(customersMap.get(inv.customer_id).created_at)) {
@@ -449,10 +449,6 @@ export default function InvoiceModal({
         { headers: { Authorization: `Bearer ${token}` } }
       );
 
-      // REQ 2: Update dine-in order invoice_status column with the current payment status.
-      // Do NOT set order status to "served" here — only do that on payment confirmation.
-
-      console.log("Invoice status is", paymentStatus.toLowerCase())
       await axios.post(
         `${import.meta.env.VITE_API_ORDER_SERVICE_URL}/${clientId}/dinein/update`,
         {
@@ -464,7 +460,7 @@ export default function InvoiceModal({
       );
 
       // REQ 2: Table is NOT freed here. It is freed only after payment confirmation.
-      toast.success("Invoice saved! Confirm payment when customer pays.");
+      toast.success("Invoice saved successfully!");
       if (onSave) onSave(draftId);
       return draftId;
     } catch (err) {
@@ -796,7 +792,8 @@ export default function InvoiceModal({
           <div className="bg-action-primary px-6 py-4 shadow-lg flex-shrink-0 rounded-t-2xl">
             <div className="flex flex-col md:flex-row justify-between items-start md:items-center gap-4">
               <div className="flex items-center gap-3">
-                <div className="w-12 h-12 bg-white/20 backdrop-blur-md rounded-xl flex items-center justify-center text-text-white font-bold text-xl shadow-md border border-white/30">                  {clientId.charAt(0).toUpperCase()}
+                <div className="w-12 h-12 bg-white/20 backdrop-blur-md rounded-xl flex items-center justify-center text-text-white font-bold text-xl shadow-md border border-white/30">
+                  {clientId.charAt(0).toUpperCase()}
                 </div>
                 <div>
                   <h1 className="text-2xl font-bold text-white">{clientId.toUpperCase()}</h1>
@@ -1164,7 +1161,7 @@ export default function InvoiceModal({
                 toast.error("Invoice ID missing — save before paying");
                 return;
               }
-
+          
               const isSplit = response?.is_split_payment;
               const paymentsToVerify = isSplit
                 ? response.completed_razorpay_payments   // array of { razorpay_payment_id, order_id, signature }
@@ -1173,7 +1170,7 @@ export default function InvoiceModal({
                     razorpay_order_id:   response.razorpay_order_id,
                     razorpay_signature:  response.razorpay_signature,
                   }];
-
+          
               // ✅ Verify each Razorpay payment sequentially
               for (const p of paymentsToVerify) {
                 if (!p.razorpay_payment_id || !p.razorpay_order_id || !p.razorpay_signature) {
@@ -1208,7 +1205,7 @@ export default function InvoiceModal({
 
               setPaymentStatus("Paid");
               setShowRazorpayModal(false);
-              toast.success("Payment verified! Table is now free.");
+              toast.success("Payment verified successfully!");
               onClose();
             } catch (err) {
               console.error("VERIFY ERROR:", err.response?.data || err.message);

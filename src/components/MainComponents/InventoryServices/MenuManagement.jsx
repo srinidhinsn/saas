@@ -176,8 +176,11 @@ const MenuManagement = ({ clientId, token, realm }) => {
         `${import.meta.env.VITE_API_TABLE_SERVICE_URL}/${clientId}/tables/config`,
         { headers: { Authorization: `Bearer ${token}` } }
       );
+
       const data = res.data || [];
+
       setSections(data);
+
       const uniqueZones = [...new Set(data.map(d => d.zone))];
       setZones(uniqueZones);
 
@@ -265,12 +268,13 @@ const MenuManagement = ({ clientId, token, realm }) => {
     if (normalizedRealm === 'restaurant') fetchDietaryTypes();
   }, [fetchDietaryTypes, normalizedRealm]);
 
+  const addonsCategory= import.meta.env.VITE_ADDON_CATEGORY;
   const fetchAddonData = useCallback(async (zoneConfigIdParam = zoneConfigId) => {
     if (!menuConfig) return { subcategories: [], items: [] };
     try {
       const [catRes, itemRes] = await Promise.all([
         axios.get(
-          `${import.meta.env.VITE_API_INVENTORY_SERVICE_URL}/${clientId}/menu/read_category?category_id=addons`,
+          `${import.meta.env.VITE_API_INVENTORY_SERVICE_URL}/${clientId}/menu/read_category?category_id=addonsCategory`,
           { headers: { Authorization: `Bearer ${token}` } }
         ),
         axios.get(
@@ -511,7 +515,7 @@ const MenuManagement = ({ clientId, token, realm }) => {
       const data = res.data?.data || [];
       const unitsNode = Array.isArray(data) ? data.find((d) => d.id === "units") : data;
       const subCats = unitsNode?.subCategories || [];
-      const unitList = subCats.map(u => (typeof (u) === "string" ? u : u.id));
+      const unitList = subCats.map((u) => (typeof u === "string" ? u : u.id));
       setUnits(unitList.length > 0 ? unitList : ["g", "kg", "ml", "litre", "pcs"]);
     } catch (err) {
       console.error("fetchUnits failed:", err);
@@ -1115,6 +1119,7 @@ const MenuManagement = ({ clientId, token, realm }) => {
           { headers: { Authorization: `Bearer ${token}` } }
         )));
       }
+
       await fetchData({ silent: true });
       const { subcategories, items } = await fetchAddonData();
       setAddonSubcategories(subcategories);
@@ -1159,7 +1164,7 @@ const MenuManagement = ({ clientId, token, realm }) => {
     }
   };
 
-  // Find and replace the entire handleBulkUpdate function:
+// Find and replace the entire handleBulkUpdate function:
 const handleBulkUpdate = async () => {
   if (selectedRows.length === 0) return;
   try {
@@ -1535,6 +1540,7 @@ const handleBulkUpdate = async () => {
           { defval: "" }
         );
         if (!parsedData.length) return;
+
         const allColumns = Object.keys(parsedData[0]);
         const priceColumns = allColumns.filter(col => col.startsWith("Price_"));
         const normalize = (str) => (str || '').toLowerCase().replace(/[-_\s]/g, '');
@@ -1610,6 +1616,7 @@ const handleBulkUpdate = async () => {
     if (!categories?.length) return;
     const saved = savedCategoryRef.current;
     if (!saved) return;
+
     const findNode = (nodes, id) => {
       for (const node of nodes) {
         if (node.id === id) return node;
@@ -1662,7 +1669,9 @@ const handleBulkUpdate = async () => {
     return categoriesFlat.find(c => c.id === selectedCategoryId)?.name || 'All Categories';
   };
 
-  useEffect(() => { if (!selectedCategoryId) setSidebarCategories(categories); }, [selectedCategoryId, categories]);
+  useEffect(() => {
+    if (!selectedCategoryId) setSidebarCategories(categories);
+  }, [selectedCategoryId, categories]);
 
   return (
     <div className="h-[90vh] bg-bg-primary overflow-hidden">
@@ -1689,6 +1698,7 @@ const handleBulkUpdate = async () => {
           <div className="lg:col-span-3 border-default border-border-default p-3 rounded-lg h-[88.5vh] flex flex-col">
             <div className="mb-3 flex flex-wrap gap-2">
               <button
+
                 onClick={() => setZoneConfigId(null)}
                 className={`px-3 py-1 rounded-full text-sm border transition
     ${zoneConfigId === null
@@ -1714,6 +1724,7 @@ const handleBulkUpdate = async () => {
               ))}
             </div>
 
+            {/* Header */}
             <div className="flex flex-col gap-3 lg:flex-row lg:items-center lg:justify-between mb-4">
               <div className="flex-shrink-0 flex items-center gap-2">
                 <h2 className="text-lg lg:text-2xl font-semibold text-text-primary leading-tight">
@@ -2073,14 +2084,12 @@ const handleBulkUpdate = async () => {
         newItemImage={newItemImage} setNewItemImage={setNewItemImage}
         newItemImageUrl={newItemImageUrl} setNewItemImageUrl={setNewItemImageUrl}
         handleAddItem={handleAddItem} getCategoryIdByName={getCategoryIdByName}
-        inventoryIds={inventoryIds} fetchAddonData={fetchAddonData}
-        setAddonSubcategories={setAddonSubcategories} setAllAddonItems={setAllAddonItems}
-        units={units}
+        inventoryIds={inventoryIds} getAddonCategoryId={getAddonCategoryId}
+        fetchAddonData={fetchAddonData} setAddonSubcategories={setAddonSubcategories} setAllAddonItems={setAllAddonItems}
+        units={units} normalizedRealm={normalizedRealm}
         isComboCategory={isComboCategory}
         dedupedMenuItems={dedupedMenuItems}
         categoriesFlat={categoriesFlat}
-        getAddonCategoryId={getAddonCategoryId}
-        normalizedRealm={normalizedRealm}
       />
 
       <UniversalEditModal
@@ -2090,17 +2099,14 @@ const handleBulkUpdate = async () => {
         editItemImage={editItemImage} setEditItemImage={setEditItemImage}
         editItemImageUrl={editItemImageUrl} setEditItemImageUrl={setEditItemImageUrl}
         handleEditItem={handleEditItem} clientId={clientId} token={token}
-        inventoryIds={inventoryIds} fetchAddonData={fetchAddonData}
-        setAddonSubcategories={setAddonSubcategories} setAllAddonItems={setAllAddonItems}
-        units={units}
+        inventoryIds={inventoryIds} getAddonCategoryId={getAddonCategoryId}
+        fetchAddonData={fetchAddonData} setAddonSubcategories={setAddonSubcategories} setAllAddonItems={setAllAddonItems}
+        units={units} normalizedRealm={normalizedRealm}
         dedupedMenuItems={dedupedMenuItems}
         categoriesFlat={categoriesFlat}
-        getAddonCategoryId={getAddonCategoryId}
-        normalizedRealm={normalizedRealm}
-
       />
 
-      <UniversalBulkUpdateModal clientId={clientId} 
+      <UniversalBulkUpdateModal clientId={clientId}
         token={token} menuItems={menuItems}
         showModal={showBulkModal} setShowModal={setShowBulkModal} modalType="menu"
         filteredItems={filteredItems} selectedRows={selectedRows} setSelectedRows={setSelectedRows}
