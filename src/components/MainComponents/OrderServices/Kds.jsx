@@ -24,6 +24,7 @@ const KDS_CONFIG = {
     PREPARING: 'preparing',
     SERVED: 'served',
     READY: 'ready',
+    CANCELLED: 'cancelled',
   },
 
   TAKEAWAY_TABLE_IDS: [500], // can support multiple IDs
@@ -74,7 +75,7 @@ const deriveStatus = (items) => {
   const { PENDING, PREPARING, READY } = KDS_CONFIG.STATUS;
   const activeItems = (items || []).filter((item) => {
     const status = String(item?.status || '').toLowerCase();
-    return status !== 'cancelled' && status !== 'canceled';
+    return status !== KDS_CONFIG.STATUS.CANCELLED;
   });
   if (!activeItems.length) return PENDING;
   if (activeItems.some((i) => i.status === PENDING)) return PENDING;
@@ -85,7 +86,7 @@ const deriveStatus = (items) => {
 
 const isCancelledStatus = (status) => {
   const normalized = String(status || '').toLowerCase();
-  return normalized === 'cancelled' || normalized === 'canceled';
+  return normalized === KDS_CONFIG.STATUS.CANCELLED;
 };
 
 // ─── Derive card-level status from its items ───────────────────────────────────
@@ -965,8 +966,8 @@ const KitchenDisplay = () => {
                   key={key}
                   onClick={() => setOrderFilter(key)}
                   className={`flex items-center gap-2 px-4 py-2 rounded-lg font-medium text-sm transition-all ${orderFilter === key
-                    ? 'bg-action-primary text-text-white shadow-sm'
-                    : 'bg-bg-tertiary text-text-secondary hover:text-text-primary border border-border-default'
+                     ? 'bg-action-primary text-text-white shadow-sm'
+                     : 'bg-bg-tertiary text-text-secondary hover:text-text-primary border border-border-default'
                     }`}
                 >
                   <Icon size={16} />

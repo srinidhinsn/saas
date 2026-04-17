@@ -590,9 +590,9 @@ const UniversalEditModal = ({
                       )}
 
                       <button
-                       type="button"
-                       onClick={() => setShowAddonPopup(true)}
-                       className="w-full px-4 py-3 rounded-lg bg-gray-50 border-2 border-dashed border-gray-300 text-gray-700 hover:border-blue-500 hover:bg-blue-50 transition-all flex items-center justify-center gap-2 font-medium"
+                        type="button"
+                        onClick={() => setShowAddonPopup(true)}
+                        className="w-full px-4 py-3 rounded-lg bg-gray-50 border-2 border-dashed border-gray-300 text-gray-700 hover:border-blue-500 hover:bg-blue-50 transition-all flex items-center justify-center gap-2 font-medium"
                       >
                         <Plus size={18} />
                         <span>{editingItem.line_item_id?.length > 0 ? `Edit Combo Items (${editingItem.line_item_id.length})` : 'Select Combo Items'}</span>
@@ -695,10 +695,58 @@ const UniversalEditModal = ({
               {/* No of Seating */}
               <div>
                 <label className="block text-sm font-medium mb-1 text-gray-700">No of Seating</label>
-                <input type="number" min="1" value={table.table_type}
-                  onChange={e => handleEditChange(table.id, "table_type", Math.max(1, Number(e.target.value) || 1))}
-                  className={`w-full px-3 py-2 rounded-md border focus:outline-none focus:ring-2 focus:ring-blue-500 ${editFieldErrors?.table_type ? 'border-red-500 bg-red-50' : 'border-gray-300'}`} />
-                {editFieldErrors?.table_type && <p className="text-red-600 text-xs mt-1">{editFieldErrors.table_type}</p>}
+                
+                {/* Desktop */}
+                <input
+                  type="number"
+                  min="1"
+                  value={table.table_type}
+                  onChange={(e) => {
+                    const value = Math.max(1, Number(e.target.value) || 1);
+                    handleEditChange(table.id, "table_type", value);
+                  }}
+                  className={`hidden md:block w-full px-3 py-2 rounded-md border focus:outline-none focus:ring-2 focus:ring-blue-500 focus:border-transparent ${editFieldErrors?.table_type ? 'border-red-500 bg-red-50' : 'border-gray-300'
+                    }`}
+                />
+
+                {/* Mobile */}
+                <div className={`md:hidden flex items-center gap-2 border rounded-md ${editFieldErrors?.table_type ? 'border-red-500 bg-red-50' : 'border-gray-300'
+                  }`}>
+                  <button
+                    type="button"
+                    onClick={() => {
+                      const newValue = Math.max(1, (Number(table.table_type) || 1) - 1);
+                      handleEditChange(table.id, "table_type", newValue);
+                    }}
+                    className="px-4 py-2 text-lg font-bold text-gray-700 hover:bg-gray-100 transition-colors"
+                  >
+                    −
+                  </button>
+                  <input
+                    type="number"
+                    min="1"
+                    value={table.table_type}
+                    onChange={(e) => {
+                      const value = Math.max(1, Number(e.target.value) || 1);
+                      handleEditChange(table.id, "table_type", value);
+                    }}
+                    className="flex-1 text-center py-2 border-x border-gray-300 focus:outline-none bg-transparent font-bold"
+                  />
+                  <button
+                    type="button"
+                    onClick={() => {
+                      const newValue = (Number(table.table_type) || 1) + 1;
+                      handleEditChange(table.id, "table_type", newValue);
+                    }}
+                    className="px-4 py-2 text-lg font-bold text-gray-700 hover:bg-gray-100 transition-colors"
+                  >
+                    +
+                  </button>
+                </div>
+
+                {editFieldErrors?.table_type && (
+                  <p className="text-red-600 text-xs mt-1">{editFieldErrors.table_type}</p>
+                )}
               </div>
               <div className="">
                 <label className="block text-sm font-medium mb-1 text-gray-700">Section & Zone :</label>

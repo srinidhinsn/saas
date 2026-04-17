@@ -315,7 +315,7 @@ const OrderItemsViewModal = ({ isOpen, onClose, order, inventoryMap, onRequestDe
             <p className="text-sm text-text-white/70 mt-0.5">
               {order._fixedOrderMode === 'takeaway'
                 ? order.customer_name || 'Takeaway'
-                : order._tableName || order.table || order.table_id}  
+                : order._tableName || order.table || order.table_id}
             </p>
           </div>
           <div className="flex items-center gap-4">
@@ -490,9 +490,9 @@ const OrderSummaryVisible = ({ clientId, token }) => {
   const [lineItemsDetails, setLineItemsDetails] = useState([]);
   const [pendingOrderId, setPendingOrderId] = useState(null);
 
-// ─────────────────────────────────────────────────────────────────────────
-// localStorage helpers (preserved exactly from original)
-// ─────────────────────────────────────────────────────────────────────────
+ // ─────────────────────────────────────────────────────────────────────────
+ // localStorage helpers (preserved exactly from original)
+ // ─────────────────────────────────────────────────────────────────────────
 
   const generateSlug = name => name.toLowerCase().replace(/[\s]+/g, '-');
 
