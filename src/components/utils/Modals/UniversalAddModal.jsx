@@ -635,11 +635,35 @@ const UniversalAddModal = ({
                 key={index}
               >
                 <div>
-                  <label className="flex items-center gap-2 text-sm font-semibold mb-2 text-text-primary">Table Range *</label>
-                  <input value={row?.range ?? ''} onChange={e => handleRangeChange(index, 'range', e.target.value)}
-                    className={`w-full px-3 py-2 border rounded-lg focus:outline-none focus:ring-2 focus:ring-action-success ${fieldErrors?.[index]?.range ? 'border-bulkActions-delete bg-red-50' : 'border-border-default'}`}
-                    placeholder="S01:S10" />
-                  {fieldErrors?.[index]?.range && <div className="text-action-danger text-xs mt-1 font-medium">Enter table range</div>}
+                  <label className="flex items-center gap-2 text-sm font-semibold mb-2 text-text-primary">
+                    Table Range *
+                    <div className="relative group cursor-pointer">
+                      <span className="w-5 h-5 flex items-center justify-center rounded-full bg-blue-100 text-action-primary text-xs font-bold">
+                        i
+                      </span>
+                      <div className="absolute left-1/2 -translate-x-1/2 top-7 hidden group-hover:block w-60 p-3 bg-white border border-blue-200 rounded-lg shadow-lg z-50 text-xs text-gray-700">
+                        <div className="font-bold mb-1 text-text-primary">
+                          Table Range Examples
+                        </div>
+                        <div className="space-y-1">
+                          <div><strong>Single Table:</strong> S1</div>
+                          <div><strong>Single Range:</strong> S01:S10</div>
+                          <div><strong>Multiple Ranges:</strong> A01:A10,B01:B05</div>
+                        </div>
+                      </div>
+                    </div>
+                  </label>
+
+                  <input
+                    value={row?.range ?? ''}
+                    onChange={(e) => handleRangeChange(index, 'range', e.target.value)}
+                    className={`w-full px-3 py-2 border rounded-lg focus:outline-none focus:ring-2 focus:ring-action-success ${fieldErrors?.[index]?.range ? 'border-bulkActions-delete bg-red-50' : 'border-border-default'
+                      }`}
+                    placeholder="S01:S10"
+                  />
+                  {fieldErrors?.[index]?.range && (
+                    <div className="text-action-danger text-xs mt-1 font-medium">Enter table range</div>
+                  )}
                 </div>
                 <div>
                   <label className="block text-sm font-semibold mb-2 text-text-primary">Seats *</label>
