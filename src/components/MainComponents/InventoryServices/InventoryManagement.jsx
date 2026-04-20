@@ -274,7 +274,21 @@ export default function StockRecipeManager({ clientId: propClientId, token: prop
         `${API_CONFIG.baseMenu(clientId)}/read?client_id=${clientId}&inventory_id=menu`,
         getAuthHeaders(token)
       );
-      setMenuItems(res.data?.data || []);
+      const allItems = res.data?.data || [];
+
+      // ✅ Deduplicate — keep only base record (zone_config_id === 0) per item id
+      const seenIds = new Map();
+      allItems.forEach(item => {
+        const zid = item.zone_config_id === null || item.zone_config_id === undefined
+          ? 0 : Number(item.zone_config_id);
+        const existing = seenIds.get(item.id);
+        if (!existing) {
+          seenIds.set(item.id, { ...item, zone_config_id: zid });
+        } else if (zid === 0) {
+          seenIds.set(item.id, { ...item, zone_config_id: 0 });
+        }
+      });
+      setMenuItems(Array.from(seenIds.values()));
     } catch (err) {
       console.error("fetchMenuItems failed:", err);
     }
@@ -287,7 +301,21 @@ export default function StockRecipeManager({ clientId: propClientId, token: prop
         `${API_CONFIG.baseMenu(clientId)}/read?client_id=${clientId}&inventory_id=menu`,
         getAuthHeaders(token)
       );
-      setMenuAvailabilityList(res.data?.data || []);
+      const allItems = res.data?.data || [];
+
+      // ✅ Same dedup logic — base record wins
+      const seenIds = new Map();
+      allItems.forEach(item => {
+        const zid = item.zone_config_id === null || item.zone_config_id === undefined
+          ? 0 : Number(item.zone_config_id);
+        const existing = seenIds.get(item.id);
+        if (!existing) {
+          seenIds.set(item.id, { ...item, zone_config_id: zid });
+        } else if (zid === 0) {
+          seenIds.set(item.id, { ...item, zone_config_id: 0 });
+        }
+      });
+      setMenuAvailabilityList(Array.from(seenIds.values()));
     } catch (err) {
       console.error("fetchMenuAvailability failed:", err);
       setError("Failed to load menu items");
@@ -1713,7 +1741,7 @@ function AddStockModal({ isOpen, form, units, onChange, onSave, onClose }) {
       </div>
     </div>
   );
-} 
+}
 
 function DeductStockModal({ isOpen, form, units, onChange, onSave, onClose }) {
   if (!isOpen) return null;
