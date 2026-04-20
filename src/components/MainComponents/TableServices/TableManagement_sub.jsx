@@ -64,7 +64,7 @@ const TableManagement = ({ clientId, token, screenIds, userId, realm}) => {
         if (!clientId) return;
 
         fetchTables();
-    }, [clientId, configs]);
+    }, [clientId]);
     const [colsPerRow, setColsPerRow] = useState(getColumnsByScreen());
 
     useEffect(() => {
@@ -153,18 +153,26 @@ const TableManagement = ({ clientId, token, screenIds, userId, realm}) => {
         if (!clientId) return;
         setLoading(true);
         try {
-            const res = await axios.get(
-                `${import.meta.env.VITE_API_TABLE_SERVICE_URL}/${clientId}/tables/read`,
-                { headers: { Authorization: `Bearer ${token}` } }
-            );
+            const [tableRes, configRes] = await Promise.all([
+                axios.get(
+                    `${import.meta.env.VITE_API_TABLE_SERVICE_URL}/${clientId}/tables/read`,
+                    { headers: { Authorization: `Bearer ${token}` } }
+                ),
+                axios.get(
+                    `${import.meta.env.VITE_API_TABLE_SERVICE_URL}/${clientId}/tables/config`,
+                    { params: { client_id: clientId }, headers: { Authorization: `Bearer ${token}` } }
+                )
+            ]);
 
-            const result = res.data;
+            const result = tableRes.data;
+            const freshConfigs = configRes.data || [];
+            setConfigs(freshConfigs);
             setRequiredScreenId(result.screen_id);
 
             if (result.screen_id === "default_tables") {
                 const tableList = Array.isArray(result?.data) ? result.data : [];
                 const enrichedTables = tableList.map(t => {
-                    const matchedConfig = configs.find(
+                    const matchedConfig = freshConfigs.find(
                         c =>
                             c.section?.trim().toLowerCase() === t.section?.trim().toLowerCase() &&
                             c.zone?.trim().toLowerCase() === t.location_zone?.trim().toLowerCase()
@@ -259,6 +267,18 @@ const TableManagement = ({ clientId, token, screenIds, userId, realm}) => {
         generatingRef.current = true;
         setIsGenerating(true);
         try {
+            let freshConfigs = configs;
+            try{
+                const res = await axios.get(`${import.meta.env.VITE_API_TABLE_SERVICE_URL}/${clientId}/tables/config`,
+                    {headers:{Authorization: `Bearer ${token}`}}
+                );
+                freshConfigs = res.data || [];
+                setConfigs(freshConfigs);
+            }
+            catch(err){
+                console.log("Failed to refresh configs" , err);
+                
+            }
             for (let row of tableRanges) {
                 if (!row.range || !row.config_id || !row.table_type) {
                     generatingRef.current = false;
@@ -279,7 +299,12 @@ const TableManagement = ({ clientId, token, screenIds, userId, realm}) => {
                         alert(`Table "${tableName}" already exists!!!`)
                         continue;
                     }
-                    const config = configs.find(c => Number(c.id) === Number(row?.config_id));
+                    const config = freshConfigs.find(c => Number(c.id) === Number(row?.config_id));
+                    if (!config) {
+                        generatingRef.current= false;
+                        setIsGenerating(false);
+                        return;
+                    }
                     const payload = {
                         client_id: clientId,
                         name: tableName.trim(),
