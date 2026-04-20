@@ -192,8 +192,8 @@ def update_inventory_availability(
     return ResponseModel[Inventory](
         screen_id=context.screen_id,
         status="success",
-        message="Inventory availability updated",
-        data=InventoryEntity.copyToModel(record),
+        message="Inventory updated",
+        data=InventoryEntity.copyToModel(record)
     )
 
 @router.post("/delete", response_model=ResponseModel[Inventory])
@@ -354,9 +354,19 @@ def create_stock_item(
     context: SaasContext = Depends(verify_token),
     db: Session = Depends(get_db),
 ):
+    """
+    Creates a stock item (metadata only) in the inventory table, then records
+    the opening quantity as an IN transaction in inventory_transactions.
+ 
+    - inventory table  → name, description, category_id, unit_price, unit_cost,
+                         unit_gst, realm, code, image_id, slug … (availability
+                         is kept in sync but quantity of truth lives in transactions)
+    - inventory_transactions → quantity, unit, movement_type=IN,
+                               transaction_type=STOCK_IN, before/after stock
+    """
     if not item.inventory_id:
         raise HTTPException(status_code=400, detail="inventory_id is required")
-
+ 
     payload = item.dict()
     payload["client_id"] = client_id
 
@@ -364,10 +374,11 @@ def create_stock_item(
         result = db.execute(text("SELECT nextval('inventory_id_seq')"))
         payload["id"] = result.scalar()
 
-    # 🔹 Extract opening quantity
+    # Quantity that will go into the transaction (defaults to 0 if not provided)
     opening_qty = Decimal(str(payload.get("availability") or "0"))
 
-    # 🔹 Store item with ZERO stock (source of truth = transactions)
+    # Store the item WITHOUT the opening quantity (we track it via transactions)
+    # availability is set to 0 here; it will be re-synced after the transaction
     payload["availability"] = Decimal("0")
 
     db_item = InventoryEntity(**payload)
@@ -389,15 +400,16 @@ def create_stock_item(
 
     db.commit()
     db.refresh(db_item)
+    model = InventoryEntity.copyToModel(db_item)
 
     return ResponseModel(
         screen_id=context.screen_id,
         status="success",
         message="Stock item created with opening transaction",
-        data=InventoryEntity.copyToModel(db_item),
+        data=model,
     )
-
-
+ 
+ 
 @router.post("/stock/add", response_model=ResponseModel)
 def add_stock_quantity(
     client_id: str,
@@ -410,11 +422,16 @@ def add_stock_quantity(
     context: SaasContext = Depends(verify_token),
     db: Session = Depends(get_db),
 ):
+    """
+    Add more stock to an existing item (e.g. restocking rice after 3 days).
+    Records an IN transaction and updates availability on the inventory row.
+    Does NOT create a new inventory row.
+    """
     record = db.query(InventoryEntity).filter(
         InventoryEntity.id == stock_item_id,
         InventoryEntity.client_id == client_id,
     ).first()
-
+ 
     if not record:
         raise HTTPException(status_code=404, detail="Stock item not found")
 
@@ -437,13 +454,15 @@ def add_stock_quantity(
 
     db.commit()
     db.refresh(record)
+    model = InventoryEntity.copyToModel(record)
 
     return ResponseModel(
         screen_id=context.screen_id,
         status="success",
         message=f"Added {quantity} {unit or record.unit} to {record.name}",
-        data=InventoryEntity.copyToModel(record),
+        data=model,
     )
+
 
 @router.post("/stock/deduct", response_model=ResponseModel)
 def deduct_stock_quantity(
@@ -459,21 +478,23 @@ def deduct_stock_quantity(
     db: Session = Depends(get_db),
 ):
     """
-    Deduct stock using unified transaction logic.
+    Deduct stock from an existing item (e.g. an order used 200g of rice).
+    Records an OUT transaction and updates availability on the inventory row.
+    Raises 400 if the deduction would result in negative stock.
     """
 
     record = db.query(InventoryEntity).filter(
         InventoryEntity.id == stock_item_id,
         InventoryEntity.client_id == client_id,
     ).first()
-
+ 
     if not record:
         raise HTTPException(status_code=404, detail="Stock item not found")
-
+ 
     qty = Decimal(str(quantity))
     before_stock = Decimal(str(record.availability or 0))
     after_stock = before_stock - qty
-
+ 
     if after_stock < Decimal("0"):
         raise HTTPException(
             status_code=400,
@@ -494,12 +515,13 @@ def deduct_stock_quantity(
 
     db.commit()
     db.refresh(record)
+    model = InventoryEntity.copyToModel(record)
 
     return ResponseModel(
         screen_id=context.screen_id,
         status="success",
         message=f"Deducted {quantity} {unit or record.unit} from {record.name}",
-        data=InventoryEntity.copyToModel(record),
+        data=model,
     )
 
 @router.post("/stock/manual-deduct", response_model=ResponseModel)
@@ -534,11 +556,12 @@ def manual_deduct_stock(
     if qty <= 0:
         raise HTTPException(status_code=400, detail="Quantity must be greater than 0")
 
-    # 🔹 Unit conversion
-    input_unit = (unit or record.unit or "").strip()
-    stock_unit = (record.unit or "").strip()
+    # ── Unit conversion (same logic as _deduct_stock_for_order) ──────────────
+    input_unit = (unit or record.unit or "").strip()   # unit user typed in modal
+    stock_unit = (record.unit or "").strip()           # unit the stock is stored in
 
     if input_unit and stock_unit and input_unit != stock_unit:
+        # e.g. user enters 20ml but stock is in litre → converts to 0.02
         try:
             converted_qty = Decimal(str(_convert(float(qty), input_unit, stock_unit)))
         except ValueError as e:
@@ -547,6 +570,7 @@ def manual_deduct_stock(
                 detail=f"Unit conversion failed: {e}"
             )
     else:
+        # Same unit or no unit provided — use as-is
         converted_qty = qty
 
     before_stock = Decimal(str(record.availability or 0))
@@ -577,6 +601,7 @@ def manual_deduct_stock(
 
     db.commit()
     db.refresh(record)
+    model = InventoryEntity.copyToModel(record)
 
     return ResponseModel(
         screen_id=context.screen_id,
@@ -586,7 +611,7 @@ def manual_deduct_stock(
             + (f" ({converted_qty} {stock_unit})" if input_unit != stock_unit else "")
             + f" from {record.name}"
         ),
-        data=InventoryEntity.copyToModel(record),
+        data=model,
     )
 
 @router.post("/stock/update", response_model=ResponseModel)
@@ -597,13 +622,14 @@ def update_stock_item(
     db: Session = Depends(get_db),
 ):
     """
-    Update stock item metadata.
-    If 'availability' is provided → handled as ADJUSTMENT via create_transaction.
+    Update stock item metadata (name, description, unit_price, category_id …).
+    If 'availability' is included in the payload it is treated as an ADJUSTMENT
+    transaction (sets stock to the given absolute value) rather than a delta.
     """
 
     if not updates.id:
         raise HTTPException(status_code=400, detail="Missing item ID")
-
+ 
     record = db.query(InventoryEntity).filter(
         InventoryEntity.id == updates.id,
         InventoryEntity.client_id == client_id,
@@ -611,21 +637,21 @@ def update_stock_item(
 
     if not record:
         raise HTTPException(status_code=404, detail="Stock item not found")
-
+ 
     update_data = updates.dict(exclude_unset=True)
     new_availability = update_data.pop("availability", None)
-
-    # 🔹 Update metadata only
+ 
+    # Apply metadata updates (everything except availability)
     for key, value in update_data.items():
         if key != "client_id":
             setattr(record, key, value)
-
-    # 🔹 Handle availability via unified transaction
+ 
+    # Handle availability change as an ADJUSTMENT transaction
     if new_availability is not None:
         new_qty = Decimal(str(new_availability))
         before_stock = Decimal(str(record.availability or 0))
         delta = new_qty - before_stock
-
+ 
         if delta != Decimal("0"):
             create_transaction(
                 db=db,
@@ -640,13 +666,9 @@ def update_stock_item(
 
     db.commit()
     db.refresh(record)
+    model = InventoryEntity.copyToModel(record)
 
-    return ResponseModel(
-        screen_id=context.screen_id,
-        status="success",
-        message="Stock item updated",
-        data=InventoryEntity.copyToModel(record),
-    )
+    return ResponseModel(screen_id=context.screen_id, status="success", message="Stock item updated", data=model)
  
 @router.delete("/stock/delete_by_inventory")
 async def delete_inventory_records(client_id: str, inventory_id: str,db: Session = Depends(get_db)):

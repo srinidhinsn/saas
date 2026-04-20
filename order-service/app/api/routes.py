@@ -847,8 +847,7 @@ def cancel_order(
     )
 
 @router.delete("/dinein/delete")
-def delete_order( client_id: str, dinein_order_id: Optional[str] = Query(None), reason: Optional[str] = Query(None), context: SaasContext = Depends(verify_token), db: Session = Depends(get_db),
-):
+def delete_order(client_id: str, dinein_order_id: Optional[str] = Query(None), context: SaasContext = Depends(verify_token), db: Session = Depends(get_db),reason: Optional[str] = Query(None)):
     """Delete by root internal id — also deletes all sub-orders sharing the same prefix."""
     if not dinein_order_id:
         raise HTTPException(status_code=400, detail="Missing dinein_order_id")
@@ -1014,7 +1013,6 @@ def delete_order( client_id: str, dinein_order_id: Optional[str] = Query(None), 
             table_row.status = "vacant"
 
     db.commit()
-
     return ResponseModel(screen_id=context.screen_id, data={"message": "Order deleted"})
 
 @router.get("/kds/orders")
