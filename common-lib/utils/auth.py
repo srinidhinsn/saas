@@ -120,5 +120,3 @@ def get_page_definition(roles: list[str], module: str, client_id: str, db: Sessi
                         ).all()
 
     return page_definitions  # Returning the fetched results
-
-

@@ -11,6 +11,18 @@ from entity.inventory_entity import InventoryEntity
 # Shared transaction helpers — used by order_service and order_router
 # ─────────────────────────────────────────────────────────────────────────────
 
+UNIT_TO_BASE = {
+    "g": 1,
+    "kg": 1000,
+    "ml": 1,
+    "litre": 1000,
+    "pcs": 1,
+}
+
+WEIGHT_UNITS = {"g", "kg"}
+VOLUME_UNITS = {"ml", "litre"}
+COUNT_UNITS = {"pcs"}
+
 def _compute_current_stock(db: Session, client_id: str, stock_item_id: int) -> Decimal:
     """
     Sum all transactions for a stock item to get the live stock level.
@@ -33,20 +45,6 @@ def _compute_current_stock(db: Session, client_id: str, stock_item_id: int) -> D
             total -= qty
     return total
  
-
-
-UNIT_TO_BASE = {
-    "g": 1,
-    "kg": 1000,
-    "ml": 1,
-    "litre": 1000,
-    "pcs": 1,
-}
-
-WEIGHT_UNITS = {"g", "kg"}
-VOLUME_UNITS = {"ml", "litre"}
-COUNT_UNITS = {"pcs"}
-
 
 def _convert(recipe_qty: float, recipe_unit: str, stock_unit: str) -> float:
     ru, su = recipe_unit.strip(), stock_unit.strip()
@@ -84,8 +82,15 @@ def build_inventory_transaction(
 
 def record_transaction(
     db: Session,
+    # transaction_type
+    # saas context,
     tx_model: InventoryTransaction
 ) -> InventoryTransactionEntity:
+    # data= saas-context get data
+    # transaction model 
+    # switch(transaction_type)
+    #    case 1:
+    
     tx = InventoryTransactionEntity(**tx_model.dict())
 
     if not tx.transaction_id:
