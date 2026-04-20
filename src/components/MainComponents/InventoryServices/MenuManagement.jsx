@@ -43,6 +43,8 @@ const MenuManagement = ({ clientId, token, realm }) => {
     return getMenuConfig(clientId);
   }, [clientId]);
 
+  const { addons } = getMenuConfig(clientId);
+
   // Detect combo category: any category whose name (or any ancestor) contains "combo"
   const isComboCategory = React.useMemo(() => {
     if (!selectedCategoryId || !categoriesFlat?.length) return false;
@@ -268,13 +270,12 @@ const MenuManagement = ({ clientId, token, realm }) => {
     if (normalizedRealm === 'restaurant') fetchDietaryTypes();
   }, [fetchDietaryTypes, normalizedRealm]);
 
-  const addonsCategory= import.meta.env.VITE_ADDON_CATEGORY;
   const fetchAddonData = useCallback(async (zoneConfigIdParam = zoneConfigId) => {
     if (!menuConfig) return { subcategories: [], items: [] };
     try {
       const [catRes, itemRes] = await Promise.all([
         axios.get(
-          `${import.meta.env.VITE_API_INVENTORY_SERVICE_URL}/${clientId}/menu/read_category?category_id=addonsCategory`,
+          `${import.meta.env.VITE_API_INVENTORY_SERVICE_URL}/${clientId}/menu/read_category?category_id=${addons}`,
           { headers: { Authorization: `Bearer ${token}` } }
         ),
         axios.get(
