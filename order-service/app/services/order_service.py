@@ -5,7 +5,7 @@ from entity.order_entity import DineinOrder as Db_Order_Entity, OrderItem as Db_
 from entity.inventory_entity import InventoryEntity, InventoryTransactionEntity
 from models.order_model import TransactionTypeEnum, MovementTypeEnum
 from models.inventory_model import InventoryTransaction
-from utils.transaction import record_transaction, build_inventory_transaction
+from utils.transaction import create_transaction
 from decimal import Decimal
 
 
@@ -172,7 +172,6 @@ def _convert(recipe_qty: float, recipe_unit: str, stock_unit: str) -> float:
 
     raise ValueError(f"Incompatible unit dimensions: recipe='{ru}', stock='{su}'")
 
-
 # ── Stock deduction ──────────────────────────────────────────────────────────
 def _deduct_stock_for_order(db: Session, client_id: str, order_id: int) -> None:
     """
@@ -188,9 +187,6 @@ def _deduct_stock_for_order(db: Session, client_id: str, order_id: int) -> None:
         .all()
     )
 
-    # Fetch all item-level transaction keys already recorded for this order
-    # Key: (stock_item_id, remarks) — we use frontend_unique_key as the
-    # per-item deduplication anchor stored in remarks.
     already_deducted_keys: set[str] = set(
         row.remarks
         for row in db.query(InventoryTransactionEntity.remarks).filter(
@@ -243,30 +239,18 @@ def _deduct_stock_for_order(db: Session, client_id: str, order_id: int) -> None:
                     converted_serving = None
 
                 if converted_serving is not None:
-                    total_menu_deduction = Decimal(
-                        str(round(converted_serving * ordered_qty, 6))
-                    )
-                    before_stock = Decimal(str(menu_item.availability or 0))
-                    after_stock = max(before_stock - total_menu_deduction, Decimal("0"))
+                    total_menu_deduction = round(converted_serving * ordered_qty, 6)
 
-                    record_transaction(
-                        db,
-                        build_inventory_transaction(
-                            client_id=client_id,
-                            item_obj=menu_item,
-                            transaction_type=TransactionTypeEnum.menu_item_deduction,
-                            movement_type=MovementTypeEnum.out,
-                            quantity=total_menu_deduction,
-                            unit=stock_unit,
-                            before_stock=before_stock,
-                            after_stock=after_stock,
-                            reference_id=str(order_id),
-                            reference_type="order",
-                            remarks=menu_dedup_key,
-                        )
+                    create_transaction(
+                        db=db,
+                        client_id=client_id,
+                        item_id=menu_item.id,
+                        tx_type=TransactionTypeEnum.menu_item_deduction,
+                        ref_id=order_id,
+                        qty=total_menu_deduction,
+                        remarks=menu_dedup_key,
                     )
 
-                    menu_item.availability = after_stock
                     already_deducted_keys.add(menu_dedup_key)
 
         elif serving_qty > 0:
@@ -287,8 +271,6 @@ def _deduct_stock_for_order(db: Session, client_id: str, order_id: int) -> None:
             if not stock_item_id or recipe_qty <= 0:
                 continue
 
-            # ✅ Idempotency guard — skip if this exact item+ingredient was
-            #    already deducted for this order (handles sub-order re-serves)
             dedup_key = (
                 f"order={order_id}|"
                 f"item={order_item.item_id}|"
@@ -318,26 +300,16 @@ def _deduct_stock_for_order(db: Session, client_id: str, order_id: int) -> None:
                 print(f"[WARN] Skipping deduction for stock_item_id={stock_item_id}: {e}")
                 continue
 
-            deduction_decimal = Decimal(str(round(deduction, 6)))
-            before_stock = Decimal(str(stock_item.availability or 0))
-            after_stock = max(before_stock - deduction_decimal, Decimal("0"))
+            deduction_qty = round(deduction, 6)
 
-            record_transaction(
-                db,
-                build_inventory_transaction(
-                    client_id=client_id,
-                    item_obj=stock_item,
-                    transaction_type=TransactionTypeEnum.order_deduction,
-                    movement_type=MovementTypeEnum.out,
-                    quantity=deduction_decimal,
-                    unit=stock_unit,
-                    before_stock=before_stock,
-                    after_stock=after_stock,
-                    reference_id=str(order_id),
-                    reference_type="order",
-                    remarks=dedup_key,
-                )
+            create_transaction(
+                db=db,
+                client_id=client_id,
+                item_id=stock_item.id,
+                tx_type=TransactionTypeEnum.order_deduction,
+                ref_id=order_id,
+                qty=deduction_qty,
+                remarks=dedup_key,
             )
 
-            stock_item.availability = after_stock
             already_deducted_keys.add(dedup_key)
