@@ -3,7 +3,7 @@ from sqlalchemy.orm import Session
 from entity.order_entity import DineinOrder as DBOrder, OrderItem as DBOrderItem
 from entity.order_entity import DineinOrder as Db_Order_Entity, OrderItem as Db_OrderItem_Entity
 from entity.inventory_entity import InventoryEntity, InventoryTransactionEntity
-from models.order_model import TransactionTypeEnum, MovementTypeEnum
+from models.order_model import TransactionTypeEnum, MovementTypeEnum, OrderStatusEnum
 from models.inventory_model import InventoryTransaction
 from utils.transaction import create_transaction
 from decimal import Decimal
@@ -86,7 +86,7 @@ def _merge_group(orders: list) -> dict:
     merged_items = []
     for order in orders:
         for item in order.items:
-            if (item.status or "").lower() == "cancelled":
+            if (item.status or "").lower() == OrderStatusEnum.cancelled.value:
                 continue
             m = Db_OrderItem_Entity.copyToModel(item).dict()
             m["batch_label"] = order.dinein_order_id

@@ -918,14 +918,14 @@ def delete_order(client_id: str, dinein_order_id: Optional[str] = Query(None), c
                             before_stock = Decimal(str(menu_item.availability or 0))
                             after_stock = before_stock + reversal_qty
                             create_transaction(
-    db=db,
-    client_id=client_id,
-    item_id=menu_item.id,
-    tx_type=TransactionTypeEnum.wastage,
-    ref_id=o.id,
-    qty=reversal_qty,
-    remarks=f"[WASTAGE_ORDER_CANCELLED] Order #{o.id} — {base_remarks}",
-)
+                                db=db,
+                                client_id=client_id,                            
+                                item_id=menu_item.id,
+                                tx_type=TransactionTypeEnum.wastage,
+                                ref_id=o.id,
+                                qty=reversal_qty,
+                                remarks=f"[WASTAGE_ORDER_CANCELLED] Order #{o.id} — {base_remarks}",
+                            )
                             menu_item.availability = after_stock
                         except ValueError as exc:
                             print(
@@ -961,14 +961,14 @@ def delete_order(client_id: str, dinein_order_id: Optional[str] = Query(None), c
                             before_ing = Decimal(str(stock_item.availability or 0))
                             after_ing = before_ing + reversal_decimal
                             create_transaction(
-    db=db,
-    client_id=client_id,
-    item_id=stock_item.id,
-    tx_type=TransactionTypeEnum.wastage,
-    ref_id=o.id,
-    qty=reversal_decimal,
-    remarks=f"[INGREDIENT_REVERSAL_ORDER_CANCELLED] Order #{o.id} — {base_remarks}",
-)
+                                db=db,
+                                client_id=client_id,
+                                item_id=stock_item.id,
+                                tx_type=TransactionTypeEnum.wastage,
+                                ref_id=o.id,
+                                qty=reversal_decimal,
+                                remarks=f"[INGREDIENT_REVERSAL_ORDER_CANCELLED] Order #{o.id} — {base_remarks}",
+                            )
                             stock_item.availability = after_ing
 
             else:
@@ -983,17 +983,17 @@ def delete_order(client_id: str, dinein_order_id: Optional[str] = Query(None), c
                 if menu_item:
                     ordered_qty = it.quantity or 1
                     create_transaction(
-    db=db,
-    client_id=client_id,
-    item_id=menu_item.id,
-    tx_type=TransactionTypeEnum.item_cancelled,
-    ref_id=o.id,
-    qty=ordered_qty,
-    remarks=(
-        f"[ITEM_CANCELLED_ORDER_CANCELLED] Order #{o.id} — "
-        f"{effective_reason} | {it.item_name} x{ordered_qty}"
-    ),
-)
+                        db=db,
+                        client_id=client_id,
+                        item_id=menu_item.id,
+                        tx_type=TransactionTypeEnum.item_cancelled,
+                        ref_id=o.id,
+                        qty=ordered_qty,
+                        remarks=(
+                            f"[ITEM_CANCELLED_ORDER_CANCELLED] Order #{o.id} — "
+                            f"{effective_reason} | {it.item_name} x{ordered_qty}"
+                        ),
+                    )
 
             it.status = OrderStatusEnum.cancelled
 
