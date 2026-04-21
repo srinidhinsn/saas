@@ -6,10 +6,20 @@ from models.inventory_model import InventoryTransaction
 from decimal import Decimal
 from typing import Optional
 import uuid
+from pydantic import BaseModel
 from entity.inventory_entity import InventoryEntity
 # ─────────────────────────────────────────────────────────────────────────────
 # Shared transaction helpers — used by order_service and order_router
 # ─────────────────────────────────────────────────────────────────────────────
+class TxPayload(BaseModel):
+    item_id:        int
+    tx_type:        str
+    ref_id:         int
+    qty:            Optional[Decimal] = None
+    remarks:        Optional[str]     = None
+    after_stock:    Optional[Decimal] = None
+    movement_type:  Optional[str]     = None
+    reference_type: Optional[str]     = None
 
 UNIT_TO_BASE = {
     "g": 1,
@@ -66,14 +76,16 @@ def create_transaction(
     db: Session,
     *,
     client_id: str,
-    item_id: int,
-    tx_type,
-    ref_id: str | int,
-    qty,
-    remarks: str = "",
-    after_stock: Optional[Decimal] = None,
-    movement_type: Optional[str] = None,   # ✅ NEW
+    payload: TxPayload
 ):
+    item_id       = payload.item_id
+    tx_type       = payload.tx_type
+    ref_id        = payload.ref_id
+    qty           = payload.qty or Decimal("0")
+    remarks       = payload.remarks or ""
+    after_stock   = payload.after_stock
+    movement_type = payload.movement_type
+
     # 🔹 Fetch item
     item = db.query(InventoryEntity).filter(
         InventoryEntity.id == item_id,
@@ -205,15 +217,10 @@ def record_partial_transaction(
 
     # 🔹 ITEM CANCELLED (no stock change)
     if transaction_type == TransactionTypeEnum.item_cancelled:
-        create_transaction(
-            db=db,
-            client_id=client_id,
-            item_id=menu_item.id,
-            tx_type=TransactionTypeEnum.item_cancelled,
-            ref_id=order_id,
-            qty=remove_qty,
-            remarks=f"[ITEM_CANCELLED_PARTIAL] Order #{order_id} — {base_remarks}",
-        )
+        create_transaction(db=db, client_id=client_id,
+    payload=TxPayload(item_id=menu_item.id, tx_type=TransactionTypeEnum.item_cancelled,
+        ref_id=order_id, qty=remove_qty,
+        remarks=f"[ITEM_CANCELLED_PARTIAL] Order #{order_id} — {base_remarks}"))
 
     # 🔹 WASTAGE
     elif transaction_type == TransactionTypeEnum.wastage:
@@ -224,15 +231,10 @@ def record_partial_transaction(
                 converted = _convert(serving_qty, serving_unit, stock_unit)
                 reversal_qty = round(converted * remove_qty, 6)
 
-                create_transaction(
-                    db=db,
-                    client_id=client_id,
-                    item_id=menu_item.id,
-                    tx_type=TransactionTypeEnum.wastage,
-                    ref_id=order_id,
-                    qty=reversal_qty,
-                    remarks=f"[WASTAGE_PARTIAL] Order #{order_id} — {base_remarks}",
-                )
+                create_transaction(db=db, client_id=client_id,
+    payload=TxPayload(item_id=menu_item.id, tx_type=TransactionTypeEnum.wastage,
+        ref_id=order_id, qty=reversal_qty,
+        remarks=f"[WASTAGE_PARTIAL] Order #{order_id} — {base_remarks}"))
             except ValueError:
                 pass
 
@@ -259,14 +261,9 @@ def record_partial_transaction(
                 reversal = _convert(recipe_qty, recipe_unit, ing_stock_unit) * remove_qty
                 reversal_qty = round(reversal, 6)
 
-                create_transaction(
-                    db=db,
-                    client_id=client_id,
-                    item_id=stock_item.id,
-                    tx_type=TransactionTypeEnum.wastage,
-                    ref_id=order_id,
-                    qty=reversal_qty,
-                    remarks=f"[INGREDIENT_REVERSAL_PARTIAL] Order #{order_id} — {base_remarks}",
-                )
+                create_transaction(db=db, client_id=client_id,
+    payload=TxPayload(item_id=stock_item.id, tx_type=TransactionTypeEnum.wastage,
+        ref_id=order_id, qty=reversal_qty,
+        remarks=f"[INGREDIENT_REVERSAL_PARTIAL] Order #{order_id} — {base_remarks}"))
             except ValueError:
                 continue

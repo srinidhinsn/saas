@@ -10,7 +10,7 @@ from models.response_model import ResponseModel
 from models.saas_context import SaasContext
 from utils.auth import verify_token
 from services import service
-from utils.transaction import _compute_current_stock, create_transaction, _convert
+from utils.transaction import _compute_current_stock, create_transaction, _convert , TxPayload
 from sqlalchemy import text
 from utils.services import add_master_value , get_master_values ,delete_master_value
 
@@ -175,16 +175,9 @@ def update_inventory_availability(
 
         # Only create transaction if changed
         if new_qty != before_stock:
-            create_transaction(
-                db=db,
-                client_id=client_id,
-                item_id=record.id,
-                tx_type="MENU_AVAILABILITY_ADJUSTMENT",
-                ref_id=record.id,
-                qty=abs(new_qty - before_stock),  # for record only
-                after_stock=new_qty,              # 🔥 key change
-                remarks=f"Manual availability update for '{record.name}'",
-            )
+            create_transaction(db=db, client_id=client_id, payload=TxPayload(item_id=record.id,
+                                tx_type="MENU_AVAILABILITY_ADJUSTMENT",ref_id=record.id,qty=abs(new_qty - before_stock),
+                                after_stock=new_qty,remarks=f"Manual availability update for '{record.name}'",))
 
     db.commit()
     db.refresh(record)
@@ -387,16 +380,8 @@ def create_stock_item(
 
     # 🔥 Use unified transaction engine
     if opening_qty != Decimal("0"):
-        create_transaction(
-            db=db,
-            client_id=client_id,
-            item_id=db_item.id,
-            tx_type="STOCK_IN",
-            ref_id=db_item.id,
-            qty=opening_qty,
-            movement_type="IN",  # ✅ explicit for inventory
-            remarks="Opening stock on item creation",
-        )
+        create_transaction(db=db, client_id=client_id, payload=TxPayload(item_id=db_item.id,tx_type="STOCK_IN",
+                           ref_id=db_item.id,qty=opening_qty,movement_type="IN",remarks="Opening stock on item creation",))
 
     db.commit()
     db.refresh(db_item)
@@ -440,17 +425,8 @@ def add_stock_quantity(
     if qty <= 0:
         raise HTTPException(status_code=400, detail="Quantity must be greater than 0")
 
-    # 🔥 Unified transaction (handles before/after + stock update)
-    create_transaction(
-        db=db,
-        client_id=client_id,
-        item_id=record.id,
-        tx_type="STOCK_IN",
-        ref_id=reference_id or record.id,
-        qty=qty,
-        movement_type="IN",  # ✅ explicit for inventory
-        remarks=remarks or "Stock replenishment",
-    )
+    create_transaction(db=db, client_id=client_id, payload=TxPayload(item_id=record.id,tx_type="STOCK_IN",
+                       ref_id=reference_id or record.id,qty=qty,movement_type="IN",remarks=remarks or "Stock replenishment",))
 
     db.commit()
     db.refresh(record)
@@ -502,16 +478,9 @@ def deduct_stock_quantity(
         )
 
     # 🔥 Unified transaction
-    create_transaction(
-        db=db,
-        client_id=client_id,
-        item_id=record.id,
-        tx_type=transaction_type,
-        ref_id=reference_id or record.id,
-        qty=qty,
-        after_stock=after_stock,
-        remarks=remarks or f"Stock deduction ({transaction_type})",
-    )
+    create_transaction(db=db, client_id=client_id, payload=TxPayload(item_id=record.id,tx_type=transaction_type,
+                    ref_id=reference_id or record.id,qty=qty,after_stock=after_stock,
+                    remarks=remarks or f"Stock deduction ({transaction_type})",))
 
     db.commit()
     db.refresh(record)
@@ -588,16 +557,8 @@ def manual_deduct_stock(
         )
 
     # 🔥 Unified transaction
-    create_transaction(
-        db=db,
-        client_id=client_id,
-        item_id=record.id,
-        tx_type=tx_type,
-        ref_id=record.id,
-        qty=converted_qty,
-        after_stock=after_stock,
-        remarks=remarks or f"Manual deduction ({tx_type})",
-    )
+    create_transaction(db=db, client_id=client_id, payload=TxPayload(item_id=record.id,tx_type=tx_type,ref_id=record.id,
+                        qty=converted_qty,after_stock=after_stock,remarks=remarks or f"Manual deduction ({tx_type})",))
 
     db.commit()
     db.refresh(record)
@@ -653,16 +614,8 @@ def update_stock_item(
         delta = new_qty - before_stock
  
         if delta != Decimal("0"):
-            create_transaction(
-                db=db,
-                client_id=client_id,
-                item_id=record.id,
-                tx_type="ADJUSTMENT",
-                ref_id=record.id,
-                qty=abs(delta),
-                after_stock=new_qty,
-                remarks="Manual stock adjustment via update",
-            )
+            create_transaction(db=db, client_id=client_id, payload=TxPayload(item_id=record.id,tx_type="ADJUSTMENT",ref_id=record.id,
+                               qty=abs(delta),after_stock=new_qty,remarks="Manual stock adjustment via update",))
 
     db.commit()
     db.refresh(record)
