@@ -1141,13 +1141,17 @@ const handleBulkUpdate = async () => {
           updatedSlug = `${baseSlug}__unavailable`;
         } else {
           if (existingTimingPart === 'unavailable') {
-            updatedSlug = baseSlug;
+            updatedSlug =  existingTimingPart && existingTimingPart !== 'unavailable'
+            ? `${baseSlug}__${existingTimingPart}`
+            : baseSlug;
           }
         }
         cleanEditedData.slug = updatedSlug;
       }
 
-      const mergedItem = { ...cleanOriginalItem, ...cleanEditedData, client_id: clientId };
+      const mergedItem = { ...cleanOriginalItem, ...cleanEditedData, client_id: clientId ,availability: Number(cleanEditedData.availability ?? cleanOriginalItem.availability) || 0,
+        unit_price: Number(cleanEditedData.unit_price ?? cleanOriginalItem.unit_price) || 0,
+        discount: Number(cleanEditedData.discount ?? cleanOriginalItem.discount) || 0,};
 
       // ✅ Update the base record (zone_config_id = 0)
       await axios.post(

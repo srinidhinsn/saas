@@ -49,7 +49,7 @@ const UniversalBulkUpdateModal = ({
   const [showItemAddonPopup, setShowItemAddonPopup] = React.useState(false);
   const [currentEditingItemId, setCurrentEditingItemId] = React.useState(null);
   const [loadingConfigs, setLoadingConfigs] = useState(false);
-
+  const [bulkSearchQuery, setBulkSearchQuery] = React.useState('');
   const fetchStatuses = async () => {
     try {
       const res = await axios.get(
@@ -270,6 +270,7 @@ const UniversalBulkUpdateModal = ({
       setBulkEditData({});
       setSelectAllChecked(false);
       setGlobalAddons([]);
+      setBulkSearchQuery('');
       setShowGlobalAddonPopup(false);
       setShowItemAddonPopup(false);
       setCurrentEditingItemId(null);
@@ -357,6 +358,12 @@ const UniversalBulkUpdateModal = ({
 
             {/* Action Bar */}
             <div className="flex flex-col sm:flex-row sm:justify-between sm:items-center gap-3 px-4 sm:px-6 py-3 border-b border-gray-200 bg-gray-50 shrink-0">
+            <div className="relative w-full sm:w-64">
+              <Search size={14} className="absolute left-3 top-1/2 -translate-y-1/2 text-gray-400" />
+                   <input type="text" placeholder="Search items..." value={bulkSearchQuery}
+                           onChange={(e) => setBulkSearchQuery(e.target.value)}
+                           className="w-full pl-9 pr-3 h-8 rounded-lg border border-gray-300 text-sm focus:outline-none focus:ring-2 focus:ring-blue-500"/>
+            </div>
               <div className="flex items-center gap-4">
                 <label className="flex items-center gap-2 cursor-pointer">
                   <input
@@ -400,7 +407,9 @@ const UniversalBulkUpdateModal = ({
                     if (selectedRows.length === 0) return;
                     const updated = { ...bulkEditData };
                     selectedRows.forEach(id => {
-                      updated[id] = { ...(updated[id] || {}), availability: 999 };
+                      const original = filteredItems.find(item => item.id === id);
+                      const dbVal = original?.availability ?? '';
+                      updated[id] = { ...(updated[id] || {}), availability: dbVal || '' };
                     });
                     setBulkEditData(updated);
                   }}
@@ -446,7 +455,9 @@ const UniversalBulkUpdateModal = ({
                     </tr>
                   </thead>
                   <tbody>
-                    {filteredItems.map((item, index) => {
+                  {filteredItems.filter(item => !bulkSearchQuery.trim() || item.name?.toLowerCase().includes(bulkSearchQuery.toLowerCase()) ||
+                                                 String(item.code || '').toLowerCase().includes(bulkSearchQuery.toLowerCase()))
+                    .map((item, index) => {
                       const isSelected = selectedRows.includes(item.id);
                       const editData = bulkEditData[item.id] || {};
                       const currentAddons = editData.line_item_id !== undefined
@@ -483,7 +494,7 @@ const UniversalBulkUpdateModal = ({
                                 placeholder="Item name"
                               />
                             ) : (
-                              <span className="text-sm text-gray-900">{item.name}</span>
+                              <span className={`text-sm ${item.availability == 0 ? 'line-through text-gray-400' : 'text-gray-900'}`}>{item.name}</span>
                             )}
                           </td>
                           <td className="px-4 py-3">
@@ -625,7 +636,10 @@ const UniversalBulkUpdateModal = ({
                                   </button>
                                   <button
                                     type="button"
-                                    onClick={() => updateBulkEditData(item.id, 'availability', 999)}
+                                    onClick={() => {
+                                      const dbVal = item.availability ?? '';
+                                      updateBulkEditData(item.id, 'availability', dbVal || '');
+                                    }}
                                     className="px-2 py-0.5 rounded text-xs bg-green-100 text-green-700 hover:bg-green-200 font-semibold whitespace-nowrap"
                                   >
                                     ✓ On
@@ -692,7 +706,7 @@ const UniversalBulkUpdateModal = ({
                             onChange={() => toggleRowSelection(item.id)}
                             className="w-4 h-4 text-blue-600 border-gray-300 rounded" />
                           <div className="flex-1 min-w-0">
-                            <p className="font-semibold text-gray-900 text-sm truncate">{item.name}</p>
+                            <p className={`font-semibold text-sm truncate ${item.availability == 0 ? 'line-through text-gray-400' : 'text-gray-900'}`}>{item.name}</p>
                             <p className="text-xs text-gray-400 truncate">{item.description || '—'}</p>
                           </div>
                           <span className="text-sm font-bold text-blue-600">₹{item.unit_price}</span>
