@@ -190,74 +190,118 @@ def _deduct_stock_for_order(db: Session, client_id: str, order_id: int) -> None:
         .all()
     )
 
-    already_deducted_keys: set[str] = set(
-        row.remarks
-        for row in db.query(InventoryTransactionEntity.remarks).filter(
-            InventoryTransactionEntity.reference_id == str(order_id),
-            InventoryTransactionEntity.reference_type == "order",
-            InventoryTransactionEntity.transaction_type.in_([
-                TransactionTypeEnum.order_deduction.value,
-                TransactionTypeEnum.menu_item_deduction.value,
-            ]),
-        ).all()
-        if row.remarks
-    )
-
     for order_item in order_items:
-        menu_item = (
+
+        # 🔥 FIX: skip addons / combo children
+        if order_item.parent_item_key:
+            continue
+
+        ordered_qty = order_item.quantity or 1
+
+        all_items: dict = {}
+        recipe_items: list = []
+
+        def collect_item(item_id, label):
+
+            if item_id in all_items:
+                return
+
+            item = (
+                db.query(InventoryEntity)
+                .filter(InventoryEntity.id == int(item_id), InventoryEntity.client_id == client_id)
+                .first()
+            )
+
+            if not item:
+                return
+
+            all_items[item_id] = {
+                "item": item,
+                "label": label
+            }
+
+            for linked_id in (item.line_item_id or []):
+                collect_item(linked_id, "ADDON")
+
+        # 🔥 collect MAIN + ADDONS only
+        main_item = (
             db.query(InventoryEntity)
-            .filter(InventoryEntity.id == order_item.item_id, InventoryEntity.client_id == client_id)
+            .filter(InventoryEntity.id == int(order_item.item_id), InventoryEntity.client_id == client_id)
             .first()
         )
 
-        if not menu_item or not menu_item.recipe:
+        if not main_item:
             continue
 
-        ordered_qty  = order_item.quantity or 1
-        serving_qty  = float(menu_item.serving_quantity or 0)
-        serving_unit = (menu_item.serving_unit or "").strip()
-        stock_unit   = (menu_item.unit or "").strip()
+        collect_item(order_item.item_id, "MAIN")
 
-        # 1. Menu item self-deduction
-        if serving_qty > 0 and serving_unit and stock_unit:
-            menu_dedup_key = (
-                f"Menu item deduction Order #{order_id} — "
-                f"{order_item.item_name} x{ordered_qty} "
-                f"[key={order_item.frontend_unique_key}]"
-            )
-            if menu_dedup_key not in already_deducted_keys:
-                try:
-                    total = round(_convert(serving_qty, serving_unit, stock_unit) * ordered_qty, 6)
-                    _tx(menu_item.id, TransactionTypeEnum.menu_item_deduction, total, menu_dedup_key)
-                    already_deducted_keys.add(menu_dedup_key)
-                except ValueError as e:
-                    print(f"[WARN] Skipping menu item deduction for item_id={menu_item.id}: {e}")
-
-        # 2. Ingredient deduction
-        for ingredient in menu_item.recipe:
+        # 🔥 collect RECIPE separately (FIX)
+        for ingredient in (main_item.recipe or []):
             stock_item_id = ingredient.get("stock_item_id")
-            recipe_qty    = float(ingredient.get("quantity_required") or 0)
-            recipe_unit   = (ingredient.get("unit") or "").strip()
+            recipe_qty = float(ingredient.get("quantity_required") or 0)
+            recipe_unit = (ingredient.get("unit") or "").strip()
 
             if not stock_item_id or recipe_qty <= 0:
                 continue
 
-            dedup_key = f"order={order_id}|item={order_item.item_id}|ingredient={stock_item_id}|fkey={order_item.frontend_unique_key}"
-
-            if dedup_key in already_deducted_keys:
-                continue
-
             stock_item = (
                 db.query(InventoryEntity)
-                .filter(InventoryEntity.id == int(stock_item_id), InventoryEntity.client_id == client_id)
+                .filter(
+                    InventoryEntity.id == int(stock_item_id),
+                    InventoryEntity.client_id == client_id
+                )
                 .first()
             )
+
             if not stock_item:
                 continue
 
-            try:
-                deduction_qty = round(_convert(recipe_qty, recipe_unit, stock_item.unit.strip()) * ordered_qty, 6)
-                _tx(stock_item.id, TransactionTypeEnum.order_deduction, deduction_qty, dedup_key)
-                already_deducted_keys.add(dedup_key)
-            except ValueError as e:
-                print(f"[WARN] Skipping deduction for stock_item_id={stock_item_id}: {e}")
+            recipe_items.append({
+                "item": stock_item,
+                "qty": recipe_qty,
+                "unit": recipe_unit
+            })
+
+        # 🔥 MAIN + ADDON deduction
+        for item_id, data in all_items.items():
+
+            item = data["item"]
+            label = data["label"]
+
+            serving_qty  = float(item.serving_quantity or 0)
+            serving_unit = (item.serving_unit or "").strip()
+            stock_unit   = (item.unit or "").strip()
+
+            if serving_qty > 0 and serving_unit and stock_unit:
+                try:
+                    total = round(_convert(serving_qty, serving_unit, stock_unit) * ordered_qty, 6)
+                    _tx(item.id, TransactionTypeEnum.order_deduction, total,
+                        f"[{label}] Order #{order_id}")
+                except ValueError:
+                    _tx(item.id, TransactionTypeEnum.order_deduction, ordered_qty,
+                        f"[{label}_FALLBACK] Order #{order_id}")
+            else:
+                _tx(item.id, TransactionTypeEnum.order_deduction, ordered_qty,
+                    f"[{label}_NO_SERVING] Order #{order_id}")
+
+        # 🔥 RECIPE deduction (CORRECT FIX)
+        for r in recipe_items:
+
+            stock_item = r["item"]
+            recipe_qty = r["qty"]
+            recipe_unit = r["unit"]
+            stock_unit = (stock_item.unit or "").strip()
+
+            if recipe_qty > 0 and recipe_unit and stock_unit:
+                try:
+                    total = round(_convert(recipe_qty, recipe_unit, stock_unit) * ordered_qty, 6)
+
+                    _tx(stock_item.id, TransactionTypeEnum.order_deduction, total,
+                        f"[RECIPE] Order #{order_id}")
+
+                except ValueError:
+                    _tx(stock_item.id, TransactionTypeEnum.order_deduction, ordered_qty,
+                        f"[RECIPE_FALLBACK] Order #{order_id}")
+            else:
+                _tx(stock_item.id, TransactionTypeEnum.order_deduction, ordered_qty,
+                    f"[RECIPE_NO_QTY] Order #{order_id}")
