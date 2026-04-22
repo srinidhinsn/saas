@@ -407,15 +407,18 @@ const UniversalAddModal = ({
               </div>
               {/* Code & Unit */}
               <div className="grid grid-cols-2 gap-4">
-                <div>
-                  <label className="block text-sm font-medium mb-2 text-text-primary">Serving Quantity</label>
-                  <input
-                    type="number"
-                    value={newItem?.serving_quantity ?? ''}
-                    onChange={(e) => setNewItem(prev => ({ ...(prev || {}), serving_quantity: e.target.value }))}
+              <div>
+                  <label className="block text-sm font-medium mb-2 text-text-primary">Unit</label>
+                  <select
+                    value={newItem?.unit ?? ''}
+                    onChange={(e) => setNewItem(prev => ({ ...(prev || {}), unit: e.target.value }))}
                     className="w-full px-4 py-2 rounded-lg bg-bg-tertiary border border-border-default text-text-primary focus:outline-none focus:ring-2 focus:ring-action-primary"
-                    placeholder="0"
-                  />
+                  >
+                    <option value="">Select unit</option>
+                    {(units || []).map((u) => (
+                      <option key={u} value={u}>{u}</option>
+                    ))}
+                  </select>
                 </div>
                 <div>
                   <label className="block text-sm font-medium mb-2 text-text-primary">
@@ -448,7 +451,16 @@ const UniversalAddModal = ({
                     ))}
                   </select>
                 </div>
-
+                <div>
+                  <label className="block text-sm font-medium mb-2 text-text-primary">Serving Quantity</label>
+                  <input
+                    type="number"
+                    value={newItem?.serving_quantity ?? ''}
+                    onChange={(e) => setNewItem(prev => ({ ...(prev || {}), serving_quantity: e.target.value }))}
+                    className="w-full px-4 py-2 rounded-lg bg-bg-tertiary border border-border-default text-text-primary focus:outline-none focus:ring-2 focus:ring-action-primary"
+                    placeholder="0"
+                  />
+                </div>
 
                 <div>
                   <label className="block text-sm font-medium mb-2 text-text-primary">Code *</label>
