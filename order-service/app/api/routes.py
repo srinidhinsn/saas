@@ -694,21 +694,16 @@ def cancel_order(
 
     def _tx(item_id, tx_type, qty, remarks, ref_id=None):
         create_transaction(
-            db=db,
-            client_id=client_id,
-            payload=TxPayload(
-                item_id=item_id,
-                tx_type=tx_type,
-                ref_id=ref_id or order_id,
-                qty=qty,
-                remarks=remarks,
-            ),
+            db=db, client_id=client_id,
+            payload=TxPayload(item_id=item_id, tx_type=tx_type, ref_id=ref_id or order_id, qty=qty, remarks=remarks)
         )
 
     if not root_order:
         raise HTTPException(status_code=404, detail="Order not found")
 
-    root_dinein_id = _root_dinein_id(root_order.dinein_order_id or str(root_order.id))
+    root_dinein_id = _root_dinein_id(
+        root_order.dinein_order_id or str(root_order.id)
+    )
 
     related_orders = (
         db.query(Db_Order_Entity)
@@ -726,12 +721,8 @@ def cancel_order(
         Decimal(str(order.total_price or 0)) for order in related_orders
     )
 
-    _tx(
-        0,
-        TransactionTypeEnum.order_cancelled,
-        1,
-        f"[FULL_DINEIN_CANCELLED] Root Order #{root_order.id} | Table #{root_order.table_id} | Total Value: {total_cancel_value} | Reason: {effective_reason}",
-    )
+    _tx(0, TransactionTypeEnum.order_cancelled, 1,
+    f"[FULL_DINEIN_CANCELLED] Root Order #{root_order.id} | Table #{root_order.table_id} | Total Value: {total_cancel_value} | Reason: {effective_reason}")
 
     processed_keys = set()
 
@@ -948,7 +939,7 @@ def cancel_order(
     return ResponseModel(
         screen_id=context.screen_id,
         data={
-            "message": "Dine-in cancelled with full addon + recipe tracking",
+            "message": "Dine-in cancelled and transactions recorded",
             "cancelled_count": len(related_orders),
             "table_freed": bool(table_id),
         },

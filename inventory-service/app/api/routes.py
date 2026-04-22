@@ -175,18 +175,9 @@ def update_inventory_availability(
         before_stock = Decimal(str(records[0].availability or 0))  # take any one
 
         if new_qty != before_stock:
-            create_transaction(
-                db=db,
-                client_id=client_id,
-                payload=TxPayload(
-                    item_id=records[0].id,   # reference any one
-                    tx_type="MENU_AVAILABILITY_ADJUSTMENT",
-                    ref_id=records[0].id,
-                    qty=abs(new_qty - before_stock),
-                    after_stock=new_qty,
-                    remarks=f"Manual availability update for '{records[0].name}'",
-                ),
-            )
+            create_transaction(db=db, client_id=client_id, payload=TxPayload(item_id=record.id,
+                                tx_type="MENU_AVAILABILITY_ADJUSTMENT",ref_id=record.id,qty=abs(new_qty - before_stock),
+                                after_stock=new_qty,remarks=f"Manual availability update for '{record.name}'",))
 
         # ✅ Apply same availability to ALL zones
         for record in records:

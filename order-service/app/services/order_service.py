@@ -238,18 +238,15 @@ def _deduct_stock_for_order(db: Session, client_id: str, order_id: int) -> None:
         # 🔥 collect RECIPE separately (FIX)
         for ingredient in (main_item.recipe or []):
             stock_item_id = ingredient.get("stock_item_id")
-            recipe_qty = float(ingredient.get("quantity_required") or 0)
-            recipe_unit = (ingredient.get("unit") or "").strip()
+            recipe_qty    = float(ingredient.get("quantity_required") or 0)
+            recipe_unit   = (ingredient.get("unit") or "").strip()
 
             if not stock_item_id or recipe_qty <= 0:
                 continue
 
             stock_item = (
                 db.query(InventoryEntity)
-                .filter(
-                    InventoryEntity.id == int(stock_item_id),
-                    InventoryEntity.client_id == client_id
-                )
+                .filter(InventoryEntity.id == int(stock_item_id), InventoryEntity.client_id == client_id)
                 .first()
             )
 
