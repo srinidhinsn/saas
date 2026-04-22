@@ -131,8 +131,12 @@ def create_transaction(
     # =========================================================
     else:
         if tx_type_str in ["WASTAGE"]:
-            movement = "IN"
-            after = before + qty
+         if before <= 0:
+           movement = "NONE"
+           after = before
+         else:
+           movement = "OUT"
+           after = before
 
         elif tx_type_str in ["ITEM_CANCELLED"]:
             movement = "NONE"
@@ -146,8 +150,12 @@ def create_transaction(
             after = before + qty
 
         elif tx_type_str in ["ORDER_DEDUCTION", "STOCK_OUT", "CANCELLATION"]:
-            movement = "OUT"
-            after = before - qty
+            if before <= 0:
+             movement = "NONE"
+             after = before
+            else:
+             movement = "OUT"
+             after = before - qty
 
         else:
             # safest fallback
@@ -182,7 +190,13 @@ def create_transaction(
     db.add(tx)
 
     # 🔥 Single source of truth
-    item.availability = after
+    all_zone_items = db.query(InventoryEntity).filter(
+      InventoryEntity.id == item.id,
+      InventoryEntity.client_id == client_id,
+    ).all()
+
+    for zone_item in all_zone_items:
+     zone_item.availability = after
 
     return tx
 

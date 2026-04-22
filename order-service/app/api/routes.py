@@ -332,6 +332,7 @@ def update_order_status(
         )
 
         for item in order_items:
+           if item.status != OrderStatusEnum.cancelled:
             item.status = body.status
 
     if body.total_price is not None:
@@ -552,11 +553,8 @@ def delete_order_items( client_id: str, order_item_id: Optional[str] = Query(Non
                     try:
                         converted_serving = _convert(serving_qty, serving_unit, stock_unit)
                         reversal_qty = Decimal(str(round(converted_serving * ordered_qty, 6)))
-                        before_stock = Decimal(str(menu_item.availability or 0))
-                        after_stock = before_stock + reversal_qty
 
                         _tx(menu_item.id, TransactionTypeEnum.wastage, reversal_qty,f"[MENU_ITEM_REVERSAL] Order #{order_id} — {base_remarks}")
-                        menu_item.availability = after_stock
 
                     except ValueError as exc:
                         print(
@@ -601,7 +599,6 @@ def delete_order_items( client_id: str, order_item_id: Optional[str] = Query(Non
                         after_ing = before_ing + reversal_decimal
 
                         _tx(stock_item.id, TransactionTypeEnum.wastage, reversal_decimal,f"[INGREDIENT_REVERSAL] Order #{order_id} — {base_remarks}")
-                        stock_item.availability = after_ing
 
     item.status = OrderStatusEnum.cancelled
     item.line_total = 0
@@ -694,11 +691,13 @@ def cancel_order(
         )
         .first()
     )
+
     def _tx(item_id, tx_type, qty, remarks, ref_id=None):
         create_transaction(
             db=db, client_id=client_id,
             payload=TxPayload(item_id=item_id, tx_type=tx_type, ref_id=ref_id or order_id, qty=qty, remarks=remarks)
         )
+
     if not root_order:
         raise HTTPException(status_code=404, detail="Order not found")
 
@@ -718,7 +717,6 @@ def cancel_order(
     effective_reason = reason or "Full order cancelled"
     table_id = root_order.table_id
 
-    # 1. Main dine-in cancellation transaction
     total_cancel_value = sum(
         Decimal(str(order.total_price or 0)) for order in related_orders
     )
@@ -726,7 +724,8 @@ def cancel_order(
     _tx(0, TransactionTypeEnum.order_cancelled, 1,
     f"[FULL_DINEIN_CANCELLED] Root Order #{root_order.id} | Table #{root_order.table_id} | Total Value: {total_cancel_value} | Reason: {effective_reason}")
 
-    # 2. Item-level cancellation transactions
+    processed_keys = set()
+
     for order in related_orders:
         order.status = OrderStatusEnum.cancelled
 
@@ -740,6 +739,11 @@ def cancel_order(
         )
 
         for item in items:
+
+            # ONLY MAIN ITEM FLOW (addons handled separately)
+            if item.parent_item_key:
+                continue
+
             menu_item = (
                 db.query(InventoryEntity)
                 .filter(
@@ -749,17 +753,175 @@ def cancel_order(
                 .first()
             )
 
+            if not menu_item:
+                continue
+
             ordered_qty = item.quantity or 1
 
-            if menu_item:
-                if item.status == OrderStatusEnum.served:
-                    _tx(menu_item.id, TransactionTypeEnum.wastage, ordered_qty,f"[FULL_ORDER_CANCELLED_SERVED] Order #{order.id} | {item.item_name} x{ordered_qty} | {effective_reason}",ref_id=order.id)
+            item_key = f"{item.id}-{item.frontend_unique_key}"
+            if item_key in processed_keys:
+                continue
+            processed_keys.add(item_key)
+
+            base_remarks = (
+                f"{effective_reason} | {item.item_name} x{ordered_qty} | [key={item.frontend_unique_key}]"
+            )
+
+            # ───────────────────────────────
+            # MAIN ITEM
+            # ───────────────────────────────
+            if item.status == OrderStatusEnum.served:
+                _tx(
+                    menu_item.id,
+                    TransactionTypeEnum.wastage,
+                    ordered_qty,
+                    f"[FULL_ORDER_CANCELLED_SERVED] Order #{order.id} | {base_remarks}",
+                    ref_id=order.id,
+                )
+            else:
+                _tx(
+                    menu_item.id,
+                    TransactionTypeEnum.item_cancelled,
+                    ordered_qty,
+                    f"[FULL_ORDER_CANCELLED] Order #{order.id} | {base_remarks}",
+                    ref_id=order.id,
+                )
+
+            # ───────────────────────────────
+            # RECIPE (UNCHANGED — CORRECT)
+            # ───────────────────────────────
+            if menu_item.recipe:
+                for ingredient in menu_item.recipe:
+                    stock_item_id = ingredient.get("stock_item_id")
+                    recipe_qty = float(ingredient.get("quantity_required") or 0)
+                    recipe_unit = (ingredient.get("unit") or "").strip()
+
+                    if not stock_item_id or recipe_qty <= 0:
+                        continue
+
+                    stock_item = (
+                        db.query(InventoryEntity)
+                        .filter(
+                            InventoryEntity.id == int(stock_item_id),
+                            InventoryEntity.client_id == client_id,
+                        )
+                        .first()
+                    )
+
+                    if not stock_item:
+                        continue
+
+                    try:
+                        converted = _convert(
+                            recipe_qty, recipe_unit, stock_item.unit.strip()
+                        )
+                        total_qty = round(converted * ordered_qty, 6)
+
+                        _tx(
+                            stock_item.id,
+                            TransactionTypeEnum.wastage,
+                            total_qty,
+                            f"[RECIPE_CANCEL] Order #{order.id} | {item.item_name}",
+                            ref_id=order.id,
+                        )
+
+                    except ValueError:
+                        continue
+
+            # ───────────────────────────────
+            # ADDONS (FIXED - FROM ORDER ITEMS, NOT INVENTORY)
+            # ───────────────────────────────
+            addon_items = (
+                db.query(Db_OrderItem_Entity)
+                .filter(
+                    Db_OrderItem_Entity.parent_item_key == item.frontend_unique_key,
+                    Db_OrderItem_Entity.order_id == order.id,
+                    Db_OrderItem_Entity.client_id == client_id,
+                )
+                .all()
+            )
+
+            for addon in addon_items:
+
+                addon_menu_item = (
+                    db.query(InventoryEntity)
+                    .filter(
+                        InventoryEntity.id == addon.item_id,
+                        InventoryEntity.client_id == client_id,
+                    )
+                    .first()
+                )
+
+                if not addon_menu_item:
+                    continue
+
+                addon_key = f"{addon.id}-{item.id}"
+                if addon_key in processed_keys:
+                    continue
+                processed_keys.add(addon_key)
+
+                addon_qty = addon.quantity or 1
+
+                base_addon_remarks = (
+                    f"{effective_reason} | ADDON {addon.item_name} x{addon_qty}"
+                )
+
+                if addon.status == OrderStatusEnum.served:
+                    _tx(
+                        addon_menu_item.id,
+                        TransactionTypeEnum.wastage,
+                        addon_qty,
+                        f"[ADDON_CANCEL_SERVED] Order #{order.id} | {base_addon_remarks}",
+                        ref_id=order.id,
+                    )
                 else:
-                    _tx(menu_item.id, TransactionTypeEnum.item_cancelled, ordered_qty,f"[FULL_ORDER_CANCELLED] Order #{order.id} | {item.item_name} x{ordered_qty} | {effective_reason}",ref_id=order.id)                
+                    _tx(
+                        addon_menu_item.id,
+                        TransactionTypeEnum.item_cancelled,
+                        addon_qty,
+                        f"[ADDON_CANCEL] Order #{order.id} | {base_addon_remarks}",
+                        ref_id=order.id,
+                    )
 
-            item.status = OrderStatusEnum.cancelled
+                # ADDON RECIPE (same logic)
+                if addon_menu_item.recipe:
+                    for ingredient in addon_menu_item.recipe:
+                        stock_item_id = ingredient.get("stock_item_id")
+                        recipe_qty = float(ingredient.get("quantity_required") or 0)
+                        recipe_unit = (ingredient.get("unit") or "").strip()
 
-    # 3. Free table
+                        if not stock_item_id or recipe_qty <= 0:
+                            continue
+
+                        stock_item = (
+                            db.query(InventoryEntity)
+                            .filter(
+                                InventoryEntity.id == int(stock_item_id),
+                                InventoryEntity.client_id == client_id,
+                            )
+                            .first()
+                        )
+
+                        if not stock_item:
+                            continue
+
+                        try:
+                            converted = _convert(
+                                recipe_qty, recipe_unit, stock_item.unit.strip()
+                            )
+                            total_qty = round(converted * addon_qty, 6)
+
+                            _tx(
+                                stock_item.id,
+                                TransactionTypeEnum.wastage,
+                                total_qty,
+                                f"[ADDON_RECIPE_CANCEL] Order #{order.id}",
+                                ref_id=order.id,
+                            )
+
+                        except ValueError:
+                            continue
+
     if table_id:
         table_row = (
             db.query(DiningTable)

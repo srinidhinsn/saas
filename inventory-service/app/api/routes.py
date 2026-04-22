@@ -152,41 +152,47 @@ def update_inventory_availability(
     if not updates.id:
         raise HTTPException(status_code=400, detail="Missing item ID")
 
-    record = db.query(InventoryEntity).filter(
+    records = db.query(InventoryEntity).filter(
         InventoryEntity.id == updates.id,
         InventoryEntity.client_id == client_id,
-    ).first()
+    ).all()
 
-    if not record:
+    if not records:
         raise HTTPException(status_code=404, detail="Inventory item not found")
 
     update_data = updates.dict(exclude_unset=True)
     new_availability = update_data.pop("availability", None)
 
-    # ✅ Update metadata (no change here)
-    for key, value in update_data.items():
-        if key != "client_id":
-            setattr(record, key, value)
+    # ✅ Update metadata for ALL zones
+    for record in records:
+        for key, value in update_data.items():
+            if key != "client_id":
+                setattr(record, key, value)
 
-    # ✅ Handle availability via unified transaction
+    # ✅ SINGLE transaction logic (use first record as reference)
     if new_availability is not None:
         new_qty = Decimal(str(new_availability))
-        before_stock = Decimal(str(record.availability or 0))
+        before_stock = Decimal(str(records[0].availability or 0))  # take any one
 
-        # Only create transaction if changed
         if new_qty != before_stock:
             create_transaction(db=db, client_id=client_id, payload=TxPayload(item_id=record.id,
                                 tx_type="MENU_AVAILABILITY_ADJUSTMENT",ref_id=record.id,qty=abs(new_qty - before_stock),
                                 after_stock=new_qty,remarks=f"Manual availability update for '{record.name}'",))
 
+        # ✅ Apply same availability to ALL zones
+        for record in records:
+            record.availability = new_qty
+
     db.commit()
-    db.refresh(record)
+
+    # refresh first record just for response
+    db.refresh(records[0])
 
     return ResponseModel[Inventory](
         screen_id=context.screen_id,
         status="success",
         message="Inventory updated",
-        data=InventoryEntity.copyToModel(record)
+        data=InventoryEntity.copyToModel(records[0])
     )
 
 @router.post("/delete", response_model=ResponseModel[Inventory])
