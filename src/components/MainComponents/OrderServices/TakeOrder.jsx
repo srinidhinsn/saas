@@ -2,7 +2,7 @@ import React, { useState, useEffect, useRef, useCallback, useMemo } from 'react'
 import {
   ShoppingCart, Plus, Minus, X, Check, Search,
   Users, Package, Trash2, ArrowLeft, FileText,
-  Printer as PrinterIcon, Clock, Save,
+  Printer as PrinterIcon, Clock, Save, User, Phone,
 } from 'lucide-react';
 import { Eye, Lock, Printer } from 'lucide-react';
 import axios from 'axios';
@@ -22,7 +22,35 @@ const TABLE_STATUS_CONFIG = {
   occupied: { clickable: false, bg: 'bg-action-primary', border: 'border-action-primary', badge: 'bg-red-100 text-action-primary', viewable: true },
   served: { clickable: false, bg: 'bg-blue-50', border: 'border-blue-400', badge: 'bg-blue-100 text-blue-700', viewable: true },
   reserved: { clickable: false, bg: 'bg-yellow-50', border: 'border-yellow-400', badge: 'bg-yellow-100 text-yellow-700' },
+  cancelled: { clickable: true, bg: 'bg-action-success', border: 'border-border-default', badge: 'bg-gray-100 text-gray-500' },
 };
+
+const CANCELLATION_REASONS = [
+  'Customer changed mind',
+  'Wrong item ordered',
+  'Duplicate entry',
+  'Item out of stock',
+  'Customer left',
+  'Order placed by mistake',
+  'Allergy concern',
+  'Other',
+];
+
+const WASTAGE_REASONS = [
+  'Plate returned by customer',
+  'Quality issue / not fresh',
+  'Preparation error',
+  'Spilled / dropped',
+  'Overcooked / undercooked',
+  'Customer complaint',
+  'Expired ingredient used',
+  'Other',
+];
+
+// ─────────────────────────────────────────────────────────────────────────────
+// TransferTableModal
+// ─────────────────────────────────────────────────────────────────────────────
+
 const TransferTableModal = ({ isOpen, onClose, tables, currentTableId, onConfirm }) => {
   const [selectedNewTable, setSelectedNewTable] = useState(null);
 
@@ -85,6 +113,11 @@ const TransferTableModal = ({ isOpen, onClose, tables, currentTableId, onConfirm
     </div>
   );
 };
+
+// ─────────────────────────────────────────────────────────────────────────────
+// Draft helpers
+// ─────────────────────────────────────────────────────────────────────────────
+
 async function readDraft(tableId, clientId, token) {
   try {
     const r = await axios.get(
@@ -100,23 +133,21 @@ async function readDraft(tableId, clientId, token) {
   }
 }
 
-async function writeDraft(tableId, cart, clientId, token) {
-  // If a draft already exists for this table, delete it first then recreate.
-  // Reuses the existing DELETE + CREATE endpoints with no new API needed.
+async function writeDraft(tableId, cart, clientId, token, customerDetails = {}) {
   try {
-    // Find existing draft id to delete it
     const existing = await readDraft(tableId, clientId, token);
     if (existing) {
-      await axios.delete(
-        `${import.meta.env.VITE_API_ORDER_SERVICE_URL}/${clientId}/dinein/delete`,
-        {
-          params: { dinein_order_id: existing.id },
-          headers: { Authorization: `Bearer ${token}` },
-        }
+      await axios.post(
+        `${import.meta.env.VITE_API_ORDER_SERVICE_URL}/${clientId}/dinein/update`,
+        { id: existing.id, status: 'cancelled' },
+        { headers: { Authorization: `Bearer ${token}` } }
       );
     }
 
-    const total = cart.reduce((s, i) => s + (i.unit_price || 0) * i.quantity, 0);
+    // Only send parent (non-addon) items in the draft — addons are stored
+    // as metadata on the parent via parent_item_key so they can be restored
+    const parentItems = cart.filter(i => !i.is_addon);
+    const total = parentItems.reduce((s, i) => s + (i.unit_price || 0) * i.quantity, 0);
 
     await axios.post(
       `${import.meta.env.VITE_API_ORDER_SERVICE_URL}/${clientId}/dinein/create`,
@@ -127,8 +158,8 @@ async function writeDraft(tableId, cart, clientId, token) {
         gst: 0,
         cst: 0,
         total_price: total,
-        status: 'draft',           // ← the only new thing
-        items: cart.map(i => ({
+        status: 'draft',
+        items: parentItems.map(i => ({
           item_id: i.id,
           item_name: i.name,
           quantity: i.quantity,
@@ -137,6 +168,10 @@ async function writeDraft(tableId, cart, clientId, token) {
           status: 'draft',
           slug: i.slug || '',
           frontend_unique_key: i.frontend_unique_key,
+          // Store linked addon IDs so we can restore them on re-open
+          line_item_id: cart
+            .filter(a => a.is_addon && a.parent_item_key === i.frontend_unique_key)
+            .map(a => a.id),
         })),
       },
       { headers: { Authorization: `Bearer ${token}` } }
@@ -152,12 +187,10 @@ async function deleteDraftFromDB(tableId, clientId, token) {
   try {
     const existing = await readDraft(tableId, clientId, token);
     if (!existing) return;
-    await axios.delete(
-      `${import.meta.env.VITE_API_ORDER_SERVICE_URL}/${clientId}/dinein/delete`,
-      {
-        params: { dinein_order_id: existing.id },
-        headers: { Authorization: `Bearer ${token}` },
-      }
+    await axios.post(
+      `${import.meta.env.VITE_API_ORDER_SERVICE_URL}/${clientId}/dinein/update`,
+      { id: existing.id, status: 'cancelled' },
+      { headers: { Authorization: `Bearer ${token}` } }
     );
   } catch (err) {
     console.warn('deleteDraft warning:', err?.response?.data || err.message);
@@ -170,7 +203,45 @@ function getDraftTableIdsFromOrders(allOrders) {
     .map(o => String(o.table_id));
 }
 
+async function upsertBillingDocumentForCustomer({
+  clientId,
+  token,
+  orderId,
+  tableRef,
+  customerDetails,
+  orderSubtotal = 0,
+}) {
+  try {
+    const payload = {
+      client_id: clientId,
+      document_type: 'Invoice',
+      document_date: new Date().toISOString(),
+      order_id: orderId.toString(),
+      reference_number: tableRef || `Order ${orderId}`,
+      subtotal: orderSubtotal,
+      tax_amount: 0,
+      tax_rate: 18,
+      discount_amount: 0,
+      discount: 0,
+      total_amount: orderSubtotal,
+      payment_status: 'Pending',
+      status: 'Draft',
+      customer_id: customerDetails.customer_id || '',
+      contact_email: customerDetails.contact_email || '',
+      contact_phone: customerDetails.contact_phone || '',
+    };
 
+    const res = await axios.post(
+      `${import.meta.env.VITE_API_BILLING_SERVICE_URL}/${clientId}/invoice/create_document`,
+      payload,
+      { headers: { Authorization: `Bearer ${token}` } }
+    );
+    return res?.data?.data?.id ?? null;
+  } catch (err) {
+    console.warn('[upsertBillingDocumentForCustomer] failed:', err?.response?.data || err.message);
+    return null;
+  }
+}
 
 // ─────────────────────────────────────────────────────────────────────────────
 // ItemStatusBadge
@@ -182,6 +253,7 @@ const ItemStatusBadge = ({ status }) => {
     preparing: { bg: 'bg-orange-100', text: 'text-orange-700', label: 'Preparing' },
     ready: { bg: 'bg-green-100', text: 'text-green-700', label: 'Ready' },
     served: { bg: 'bg-gray-100', text: 'text-gray-600', label: 'Served' },
+    cancelled: { bg: 'bg-red-50', text: 'text-red-400', label: 'Cancelled' },
   }[status] || { bg: 'bg-gray-100', text: 'text-gray-500', label: status || '—' };
 
   return (
@@ -195,19 +267,275 @@ const ItemStatusBadge = ({ status }) => {
 // DeleteConfirmModal
 // ─────────────────────────────────────────────────────────────────────────────
 
-const DeleteConfirmModal = ({ isOpen, onClose, onConfirm }) => {
+const ORDER_CANCEL_REASONS = [
+  'Customer changed mind',
+  'Customer left without paying',
+  'Duplicate order',
+  'Test / mistake order',
+  'Payment issue',
+  'Kitchen unable to fulfill',
+  'Other',
+];
+
+const CancelOrderConfirmModal = ({ isOpen, onClose, onConfirm }) => {
+  const [reason, setReason] = useState('');
+  const [customReason, setCustomReason] = useState('');
+
+  useEffect(() => {
+    if (isOpen) { setReason(''); setCustomReason(''); }
+  }, [isOpen]);
+
+  if (!isOpen) return null;
+
+  const effectiveReason = reason === 'Other' ? customReason : reason;
+
+  return (
+    <div className="fixed inset-0 z-50 flex items-center justify-center p-4 bg-black/50">
+      <div className="rounded-lg w-full max-w-sm bg-white shadow-xl">
+        <div className="px-6 py-4 border-b flex justify-between items-center">
+          <h2 className="text-lg font-bold text-red-600">Cancel Order</h2>
+          <button onClick={onClose} className="text-gray-500 hover:text-gray-700">
+            <X size={20} />
+          </button>
+        </div>
+        <div className="px-6 py-5 space-y-4">
+          <p className="text-sm text-gray-600">
+            The order will be marked as <span className="font-semibold text-red-600">cancelled</span> and kept for records. Select a reason:
+          </p>
+          <div className="grid grid-cols-2 gap-1.5 max-h-52 overflow-y-auto pr-1">
+            {ORDER_CANCEL_REASONS.map(r => (
+              <button
+                key={r}
+                onClick={() => setReason(r)}
+                className={`px-2 py-2 rounded-lg text-xs font-medium border text-left transition
+                  ${reason === r
+                    ? 'bg-red-600 text-white border-red-600'
+                    : 'bg-white text-gray-600 border-gray-200 hover:border-gray-400'}`}
+              >
+                {r}
+              </button>
+            ))}
+          </div>
+          {reason === 'Other' && (
+            <input
+              value={customReason}
+              onChange={e => setCustomReason(e.target.value)}
+              placeholder="Describe the reason…"
+              className="w-full px-3 py-2 text-sm rounded-lg border border-gray-300 focus:outline-none focus:ring-2 focus:ring-red-400"
+            />
+          )}
+        </div>
+        <div className="px-6 py-4 flex gap-3 bg-gray-50 rounded-b-lg">
+          <button
+            onClick={onClose}
+            className="flex-1 py-2.5 rounded-lg font-medium text-sm border border-gray-300 bg-white text-gray-700 hover:bg-gray-50"
+          >
+            Go Back
+          </button>
+          <button
+            disabled={!reason || (reason === 'Other' && !customReason.trim())}
+            onClick={() => { onConfirm(effectiveReason); onClose(); }}
+            className={`flex-1 py-2.5 rounded-lg font-medium text-sm text-white transition
+              ${reason && !(reason === 'Other' && !customReason.trim())
+                ? 'bg-red-600 hover:bg-red-700'
+                : 'bg-gray-300 cursor-not-allowed'}`}
+          >
+            Cancel Order
+          </button>
+        </div>
+      </div>
+    </div>
+  );
+};
+
+// ─────────────────────────────────────────────────────────────────────────────
+// OldItemDeleteModal
+// ─────────────────────────────────────────────────────────────────────────────
+
+const OldItemDeleteModal = ({ isOpen, onClose, item, onRemoveOne, onRemoveAll }) => {
+  const [reason, setReason] = useState('');
+  const [customReason, setCustomReason] = useState('');
+  const [removeQty, setRemoveQty] = useState(1);
+
+  const isServed = item?.status === 'served';
+  const transactionType = isServed ? 'WASTAGE' : 'ITEM_CANCELLED';
+  const reasonList = isServed ? WASTAGE_REASONS : CANCELLATION_REASONS;
+  const typeLabel = isServed ? 'Wastage' : 'Cancellation';
+  const typeColor = isServed ? 'text-red-600' : 'text-orange-600';
+  const typeBg = isServed ? 'bg-red-50 border-red-200' : 'bg-orange-50 border-orange-200';
+  const buttonColor = isServed ? 'bg-red-600 hover:bg-red-700' : 'bg-orange-500 hover:bg-orange-600';
+
+  useEffect(() => {
+    if (isOpen) {
+      setReason('');
+      setCustomReason('');
+      setRemoveQty(1);
+    }
+  }, [isOpen]);
+
+  if (!isOpen || !item) return null;
+
+  const maxQty = item.quantity || 1;
+  const isRemoveAll = removeQty >= maxQty;
+  const effectiveReason = reason === 'Other' ? customReason : reason;
+
+  return (
+    <div className="fixed inset-0 z-50 flex items-center justify-center p-4 bg-black/50">
+      <div className="rounded-lg w-full max-w-sm bg-white shadow-xl">
+        <div className="px-6 py-4 border-b flex justify-between items-center">
+          <h2 className={`text-lg font-bold ${typeColor}`}>Remove Item</h2>
+          <button onClick={onClose} className="text-gray-500 hover:text-gray-700">
+            <X size={20} />
+          </button>
+        </div>
+
+        <div className="px-6 py-5 space-y-4">
+          <div>
+            <p className="text-sm text-gray-700 font-semibold">{item.name}</p>
+            <p className="text-sm text-gray-500 mt-0.5">
+              Ordered quantity: <span className="font-semibold">{maxQty}</span>
+            </p>
+          </div>
+
+          <div className={`flex items-center gap-2 px-3 py-2 rounded-lg border text-xs font-semibold ${typeBg} ${typeColor}`}>
+            <span className="w-2 h-2 rounded-full bg-current inline-block" />
+            {typeLabel} — {isServed
+              ? 'Item was already served. Stock will be reversed.'
+              : 'Item not yet served. No stock deduction.'}
+          </div>
+
+          {maxQty > 1 && (
+            <div>
+              <p className="text-xs font-semibold text-gray-600 mb-2">How many to remove?</p>
+              <div className="flex items-center gap-3">
+                <button
+                  onClick={() => setRemoveQty(q => Math.max(1, q - 1))}
+                  className="w-8 h-8 flex items-center justify-center rounded-lg border border-gray-300 hover:bg-gray-100 text-lg font-bold"
+                >−</button>
+                <span className="w-10 text-center text-lg font-bold text-gray-800">{removeQty}</span>
+                <button
+                  onClick={() => setRemoveQty(q => Math.min(maxQty, q + 1))}
+                  className="w-8 h-8 flex items-center justify-center rounded-lg border border-gray-300 hover:bg-gray-100 text-lg font-bold"
+                >+</button>
+                <span className="text-xs text-gray-400 ml-1">of {maxQty}</span>
+                <button
+                  onClick={() => setRemoveQty(maxQty)}
+                  className="ml-auto text-xs text-red-500 underline font-semibold"
+                >Remove all</button>
+              </div>
+              <div className="mt-1 h-1.5 bg-gray-100 rounded-full overflow-hidden">
+                <div
+                  className="h-full bg-red-400 rounded-full transition-all"
+                  style={{ width: `${(removeQty / maxQty) * 100}%` }}
+                />
+              </div>
+            </div>
+          )}
+
+          <div>
+            <p className="text-xs font-semibold text-gray-600 mb-2">Reason</p>
+            <div className="grid grid-cols-2 gap-1.5 max-h-48 overflow-y-auto pr-1">
+              {reasonList.map(r => (
+                <button
+                  key={r}
+                  onClick={() => setReason(r)}
+                  className={`px-2 py-2 rounded-lg text-xs font-medium border text-left transition
+                    ${reason === r
+                      ? isServed
+                        ? 'bg-red-600 text-white border-red-600'
+                        : 'bg-orange-500 text-white border-orange-500'
+                      : 'bg-white text-gray-600 border-gray-200 hover:border-gray-400'}`}
+                >
+                  {r}
+                </button>
+              ))}
+            </div>
+            {reason === 'Other' && (
+              <input
+                value={customReason}
+                onChange={e => setCustomReason(e.target.value)}
+                placeholder="Describe the reason…"
+                className="mt-2 w-full px-3 py-2 text-sm rounded-lg border border-gray-300 focus:outline-none focus:ring-2 focus:ring-red-400"
+              />
+            )}
+          </div>
+        </div>
+
+        <div className="px-6 py-4 flex gap-3 bg-gray-50 rounded-b-lg">
+          <button
+            onClick={onClose}
+            className="flex-1 py-2.5 rounded-lg font-medium text-sm border border-gray-300 bg-white text-gray-700 hover:bg-gray-50"
+          >
+            Cancel
+          </button>
+          <button
+            disabled={!reason || (reason === 'Other' && !customReason.trim())}
+            onClick={() => {
+              if (isRemoveAll) {
+                onRemoveAll(transactionType, effectiveReason);
+              } else {
+                onRemoveOne(transactionType, effectiveReason, removeQty);
+              }
+            }}
+            className={`flex-1 py-2.5 rounded-lg font-medium text-sm text-white transition
+              ${reason && !(reason === 'Other' && !customReason.trim())
+                ? buttonColor
+                : 'bg-gray-300 cursor-not-allowed'}`}
+          >
+            {isRemoveAll
+              ? `Remove All (${maxQty})`
+              : `Remove ${removeQty}`}
+          </button>
+        </div>
+      </div>
+    </div>
+  );
+};
+
+// ─────────────────────────────────────────────────────────────────────────────
+// CustomerCapturePanel
+// ─────────────────────────────────────────────────────────────────────────────
+
+const CustomerCapturePanel = ({ value, onChange }) => {
+  return (
+    <div className="flex items-center gap-2 px-3 py-2 rounded-xl border border-border-default bg-bg-tertiary shadow-sm">
+      <User size={15} className="text-text-secondary shrink-0" />
+      <input
+        value={value.customer_id}
+        onChange={e => onChange({ ...value, customer_id: e.target.value })}
+        placeholder="Customer name / ID (optional)"
+        className="flex-1 min-w-0 text-sm bg-transparent outline-none placeholder-text-secondary text-text-primary"
+      />
+      <div className="w-px h-5 bg-border-default shrink-0" />
+      <Phone size={15} className="text-text-secondary shrink-0" />
+      <input
+        value={value.contact_phone}
+        onChange={e => onChange({ ...value, contact_phone: e.target.value })}
+        placeholder="Phone (optional)"
+        className="w-32 text-sm bg-transparent outline-none placeholder-text-secondary text-text-primary"
+        inputMode="tel"
+      />
+    </div>
+  );
+};
+
+// ─────────────────────────────────────────────────────────────────────────────
+// TablePaymentConfirmModal
+// ─────────────────────────────────────────────────────────────────────────────
+
+const TablePaymentConfirmModal = ({ isOpen, orderId, onClose, onConfirm }) => {
   if (!isOpen) return null;
   return (
     <div className="fixed inset-0 z-50 flex items-center justify-center p-4 bg-black/50">
       <div className="rounded-lg w-full max-w-sm bg-white shadow-xl">
         <div className="px-6 py-4 border-b flex justify-between items-center">
-          <h2 className="text-lg font-bold text-red-600">Delete Order</h2>
-          <button onClick={onClose} className="text-gray-500 hover:text-gray-700">
-            <X size={20} />
-          </button>
+          <h2 className="text-lg font-bold text-green-700">Confirm Payment</h2>
+          <button onClick={onClose} className="text-gray-500 hover:text-gray-700"><X size={20} /></button>
         </div>
         <div className="px-6 py-5">
-          <p className="text-sm text-gray-700">Are you sure? This cannot be undone.</p>
+          <p className="text-sm text-gray-600">
+            Mark order <span className="font-semibold">#{orderId}</span> as paid and free the table?
+          </p>
         </div>
         <div className="px-6 py-4 flex gap-3 bg-gray-50 rounded-b-lg">
           <button
@@ -217,10 +545,10 @@ const DeleteConfirmModal = ({ isOpen, onClose, onConfirm }) => {
             Cancel
           </button>
           <button
-            onClick={() => { onConfirm(); onClose(); }}
-            className="flex-1 py-2.5 rounded-lg bg-red-600 text-white font-medium text-sm hover:bg-red-700"
+            onClick={() => { onConfirm(orderId); onClose(); }}
+            className="flex-1 py-2.5 rounded-lg font-bold text-sm bg-green-600 hover:bg-green-700 text-white"
           >
-            Delete
+            Confirm Paid
           </button>
         </div>
       </div>
@@ -309,11 +637,121 @@ const LineItemsModal = ({ isOpen, onClose, mainItem, lineItems, onAddWithSelecte
 };
 
 // ─────────────────────────────────────────────────────────────────────────────
+// ComboDetailModal — shown when a combo item is clicked
+// ─────────────────────────────────────────────────────────────────────────────
+
+const ComboDetailModal = ({ isOpen, onClose, comboItem, comboComponents, onAddCombo }) => {
+  if (!isOpen || !comboItem) return null;
+
+  const aLaCarteTotal = comboComponents.reduce(
+    (sum, c) => sum + (Number(c.unit_price) || 0), 0
+  );
+  const savings = aLaCarteTotal - Number(comboItem.unit_price);
+
+  return (
+    <div className="fixed inset-0 z-50 flex items-center justify-center p-4 bg-black/60 backdrop-blur-sm">
+      <div className="rounded-2xl w-full max-w-md bg-white shadow-2xl overflow-hidden">
+        <div className="bg-gradient-to-r from-violet-600 to-indigo-600 px-6 py-4 flex items-start justify-between">
+          <div>
+            <h3 className="text-lg font-bold text-white">{comboItem.name}</h3>
+            {comboItem.description && (
+              <p className="text-xs text-violet-200 mt-0.5">{comboItem.description}</p>
+            )}
+          </div>
+          <button onClick={onClose} className="w-7 h-7 rounded-lg bg-white/20 hover:bg-white/30 flex items-center justify-center text-white">
+            <X size={16} />
+          </button>
+        </div>
+
+        <div className="px-6 py-3 bg-violet-50 border-b border-violet-100 flex items-center justify-between">
+          <div>
+            <span className="text-2xl font-bold text-violet-700">₹{Number(comboItem.unit_price).toFixed(0)}</span>
+            {savings > 0 && (
+              <span className="ml-2 text-xs text-gray-400 line-through">₹{aLaCarteTotal.toFixed(0)}</span>
+            )}
+          </div>
+          {savings > 0 && (
+            <span className="text-xs font-bold bg-green-100 text-green-700 px-2 py-1 rounded-full">
+              Save ₹{savings.toFixed(0)}
+            </span>
+          )}
+        </div>
+
+        <div className="px-6 py-4">
+          <p className="text-xs font-semibold text-gray-500 uppercase tracking-wider mb-3">
+            What's included ({comboComponents.length} items)
+          </p>
+          <div className="space-y-2 max-h-56 overflow-y-auto pr-1">
+            {comboComponents.length === 0 ? (
+              <p className="text-sm text-gray-400 italic text-center py-4">No component details available</p>
+            ) : (
+              comboComponents.map((c, idx) => (
+                <div
+                  key={c.id || idx}
+                  className="flex items-center justify-between px-3 py-2 rounded-xl bg-violet-50 border border-violet-100"
+                >
+                  <div className="flex items-center gap-2">
+                    <span className="w-5 h-5 rounded-full bg-violet-200 text-violet-700 text-xs font-bold flex items-center justify-center shrink-0">
+                      {idx + 1}
+                    </span>
+                    <span className="text-sm font-medium text-gray-800">{c.name}</span>
+                  </div>
+                  <span className="text-xs text-violet-600 font-semibold">₹{Number(c.unit_price).toFixed(0)}</span>
+                </div>
+              ))
+            )}
+          </div>
+        </div>
+
+        <div className="px-6 py-4 border-t border-gray-100 bg-gray-50 flex gap-3">
+          <button
+            onClick={onClose}
+            className="flex-1 py-2.5 rounded-xl font-medium text-sm border border-gray-300 bg-white text-gray-700 hover:bg-gray-50"
+          >
+            Cancel
+          </button>
+          <button
+            onClick={() => { onAddCombo(); onClose(); }}
+            className="flex-1 py-2.5 rounded-xl font-bold text-sm bg-violet-600 hover:bg-violet-700 text-white transition-colors"
+          >
+            Add Combo · ₹{Number(comboItem.unit_price).toFixed(0)}
+          </button>
+        </div>
+      </div>
+    </div>
+  );
+};
+
+// ─────────────────────────────────────────────────────────────────────────────
 // printKOT
-// Addons travel with their parent — never routed independently to any counter.
+//
+// FIX: Items store category_name (e.g. "Juices") in category_id field instead
+// of the actual DB category ID (e.g. "juices_veg"). We resolve the real ID by
+// looking up the category by name in categoriesFlat before walking ancestors.
 // ─────────────────────────────────────────────────────────────────────────────
 
 const printKOT = ({ counterTree, categoriesFlat, itemsToPrint, meta }) => {
+
+  // Build a name→id map from categoriesFlat so we can resolve category names
+  // that items store in their category_id field
+  const categoryNameToId = {};
+  categoriesFlat.forEach(c => {
+    if (c.name) categoryNameToId[c.name.trim().toLowerCase()] = c.id;
+  });
+
+  // Resolve the real category ID for an item, handling both actual IDs and
+  // category names stored in the category_id field
+  const resolveRealCategoryId = (rawCategoryId) => {
+    if (!rawCategoryId) return null;
+    // Check if it already exists as a real category ID
+    const directMatch = categoriesFlat.find(c => c.id === rawCategoryId);
+    if (directMatch) return rawCategoryId;
+    // Otherwise treat it as a category name and look up the ID
+    const nameKey = String(rawCategoryId).trim().toLowerCase();
+    return categoryNameToId[nameKey] || null;
+  };
+
+  // Walk from a category ID up through all ancestor IDs (inclusive)
   const getCategoryAncestors = (categoryId) => {
     const ancestors = new Set();
     let cur = categoryId;
@@ -327,6 +765,7 @@ const printKOT = ({ counterTree, categoriesFlat, itemsToPrint, meta }) => {
     return ancestors;
   };
 
+  // Map counter id → set of assigned sub-category IDs
   const counterCategoryMap = {};
   counterTree.forEach(counter => {
     counterCategoryMap[counter.id] = new Set(
@@ -334,8 +773,14 @@ const printKOT = ({ counterTree, categoriesFlat, itemsToPrint, meta }) => {
     );
   });
 
+  // Find which counter an item belongs to by resolving its real category ID
+  // first, then walking ancestors to match against counter assignments
   const findCounterForItem = (item) => {
-    const ancestors = getCategoryAncestors(item.category_id || item.category);
+    // Resolve the actual category ID (item.category_id may be a name)
+    const realCategoryId = resolveRealCategoryId(item.category_id || item.category);
+    if (!realCategoryId) return null;
+
+    const ancestors = getCategoryAncestors(realCategoryId);
     for (const counter of counterTree) {
       const assigned = counterCategoryMap[counter.id];
       for (const catId of assigned) {
@@ -472,7 +917,7 @@ const printKOT = ({ counterTree, categoriesFlat, itemsToPrint, meta }) => {
 // OldItemRow — previously placed items (read-only in cart)
 // ─────────────────────────────────────────────────────────────────────────────
 
-const OldItemRow = ({ group, clientId, token, activeDineinOrderId }) => {
+const OldItemRow = ({ group, clientId, token, activeDineinOrderId, onRequestDelete }) => {
   const { main, addons } = group;
   return (
     <div className="space-y-1">
@@ -505,7 +950,16 @@ const OldItemRow = ({ group, clientId, token, activeDineinOrderId }) => {
             </div>
           </div>
         </div>
-        <span className="text-sm font-semibold text-gray-500 self-center">×{main.quantity}</span>
+        <div className="flex items-center gap-2 self-center">
+          <span className="text-sm font-semibold text-gray-500">×{main.quantity}</span>
+          <button
+            onClick={() => onRequestDelete && onRequestDelete(main)}
+            className="text-red-400 hover:text-red-600 transition-colors"
+            title="Remove item"
+          >
+            <Trash2 size={15} />
+          </button>
+        </div>
       </div>
 
       {addons.map(addon => (
@@ -610,8 +1064,9 @@ const TableReservation = ({
   onSelectDineIn,
   onViewOrder,
   onPrintBill,
-  onDeleteOrder,
+  onCancelOrder,
   onMarkAsServed,
+  onConfirmPayment,
 }) => {
   const [selectedSections, setSelectedSections] = useState([]);
   const [selectedZones, setSelectedZones] = useState([]);
@@ -665,6 +1120,7 @@ const TableReservation = ({
       preparing: 'bg-blue-100 text-blue-700',
       ready: 'bg-green-100 text-green-700',
       served: 'bg-purple-100 text-purple-700',
+      cancelled: 'bg-gray-100 text-gray-500',
     };
     return map[status] || 'bg-gray-100 text-gray-700';
   };
@@ -765,6 +1221,9 @@ const TableReservation = ({
                         ? `₹${Number(orderInfo.total_price).toFixed(0)}`
                         : null;
 
+                      const invoiceStatus = orderInfo?.invoice_status?.toLowerCase();
+                      const showConfirmPayment = hasViewableOrder && invoiceStatus === 'pending';
+
                       const handleCardClick = () => {
                         if (config.clickable) onSelectTable(table);
                         else if (hasViewableOrder && onViewOrder) onViewOrder(table);
@@ -832,9 +1291,9 @@ const TableReservation = ({
                                     <Printer size={22} />
                                   </button>
                                   <button
-                                    onClick={e => { e.stopPropagation(); onDeleteOrder?.(orderInfo.id, table.id); }}
+                                    onClick={e => { e.stopPropagation(); onCancelOrder?.(orderInfo.id, table.id); }}
                                     className="text-red-600 hover:scale-110 transition-transform"
-                                    title="Delete Order"
+                                    title="Cancel Order"
                                   >
                                     <Trash2 size={22} />
                                   </button>
@@ -853,8 +1312,20 @@ const TableReservation = ({
                             )}
                           </div>
 
-                          {/* Mark as Served button */}
-                          {hasViewableOrder && orderInfo.status === 'ready' && (
+                          {showConfirmPayment && (
+                            <button
+                              onClick={e => {
+                                e.stopPropagation();
+                                onConfirmPayment?.(orderInfo.id, table.id);
+                              }}
+                              className="w-full px-4 py-2 bg-green-600 text-white text-sm font-semibold hover:bg-green-700 transition-colors flex items-center justify-center gap-1"
+                            >
+                              <Check size={14} />
+                              Confirm Payment
+                            </button>
+                          )}
+
+                          {hasViewableOrder && orderInfo.status === 'ready' && !showConfirmPayment && (
                             <button
                               onClick={e => { e.stopPropagation(); onMarkAsServed?.(orderInfo.id, table.id); }}
                               className="w-full px-4 py-2 bg-green-600 text-white text-sm font-semibold hover:bg-green-700 transition-colors"
@@ -1058,17 +1529,28 @@ const TakeOrder = ({ clientId, token, onOrderUpdate, realm }) => {
   const [draftSavedAt, setDraftSavedAt] = useState(null);
   const [draftTableIds, setDraftTableIds] = useState([]);   // for floor DRAFT badges
 
+  const [customerDetails, setCustomerDetails] = useState({ customer_id: '', contact_phone: '' });
+
   // ── UI state ──────────────────────────────────────────────────────────────
   const [selectedCategoryId, setSelectedCategoryId] = useState(null);
   const [searchQuery, setSearchQuery] = useState('');
   const [showClearConfirm, setShowClearConfirm] = useState(false);
-  const [showDeleteConfirm, setShowDeleteConfirm] = useState(false);
-  const [orderToDelete, setOrderToDelete] = useState(null);
+
+  const [cancelOrderModal, setCancelOrderModal] = useState({ isOpen: false, orderId: null, tableId: null });
+  const [tablePayConfirmModal, setTablePayConfirmModal] = useState({ isOpen: false, orderId: null, tableId: null });
+
   const [lineItemsModalOpen, setLineItemsModalOpen] = useState(false);
   const [selectedMainItem, setSelectedMainItem] = useState(null);
   const [lineItemsDetails, setLineItemsDetails] = useState([]);
+
+  const [comboModalOpen, setComboModalOpen] = useState(false);
+  const [comboModalItem, setComboModalItem] = useState(null);
+  const [comboModalComponents, setComboModalComponents] = useState([]);
+
   const [invoiceModalOpen, setInvoiceModalOpen] = useState(false);
   const [invoiceOrderData, setInvoiceOrderData] = useState(null);
+
+  const [oldItemDeleteModal, setOldItemDeleteModal] = useState({ isOpen: false, item: null });
 
   const searchInputRef = useRef(null);
   const isMobile = window.matchMedia('(max-width: 1024px)').matches;
@@ -1182,7 +1664,7 @@ const TakeOrder = ({ clientId, token, onOrderUpdate, realm }) => {
       toast.warn('Nothing to save — cart is empty.');
       return;
     }
-    const ok = await writeDraft(selectedTable, cart, clientId, token);
+    const ok = await writeDraft(selectedTable, cart, clientId, token, customerDetails);
     if (ok) {
       const now = Date.now();
       setDraftSavedAt(now);
@@ -1191,9 +1673,7 @@ const TakeOrder = ({ clientId, token, onOrderUpdate, realm }) => {
     } else {
       toast.error('Failed to save draft.');
     }
-  }, [selectedTable, cart, clientId, token]);
-
-
+  }, [selectedTable, cart, clientId, token, customerDetails]);
 
   // ─────────────────────────────────────────────────────────────────────────
   // Category / tree utilities
@@ -1294,40 +1774,58 @@ const TakeOrder = ({ clientId, token, onOrderUpdate, realm }) => {
     }
     return null;
   };
-const isItemActive = useCallback((slug) => {
-  if (!slug) return true;
+  const isItemActive = useCallback((slug) => {
+    if (!slug) return true;
 
-  const doubleUnderIdx = slug.lastIndexOf('__');
-  const timingSegment = doubleUnderIdx !== -1
-    ? slug.slice(doubleUnderIdx + 2).toLowerCase()
-    : null;
+    const doubleUnderIdx = slug.lastIndexOf('__');
+    const timingSegment = doubleUnderIdx !== -1
+      ? slug.slice(doubleUnderIdx + 2).toLowerCase()
+      : null;
 
-  // ✅ Explicit unavailable flag
-  if (timingSegment === 'unavailable') return false;
+    // ✅ Explicit unavailable flag
+    if (timingSegment === 'unavailable') return false;
 
-  if (!timingOptions || timingOptions.length === 0) return true;
-  if (!timingSegment || timingSegment === 'allday') return true;
+    if (!timingOptions || timingOptions.length === 0) return true;
+    if (!timingSegment || timingSegment === 'allday') return true;
 
-  const timingKeys = timingSegment.split('+').filter(Boolean);
-  if (timingKeys.length === 0) return true;
+    const timingKeys = timingSegment.split('+').filter(Boolean);
+    if (timingKeys.length === 0) return true;
 
-  const recognizedKeys = timingKeys.filter(key => {
-    const t = timingOptions.find(o => o.name?.toLowerCase() === key);
-    return t && t.start && t.end;
-  });
+    const recognizedKeys = timingKeys.filter(key => {
+      const t = timingOptions.find(o => o.name?.toLowerCase() === key);
+      return t && t.start && t.end;
+    });
 
-  if (recognizedKeys.length === 0) return true;
+    if (recognizedKeys.length === 0) return true;
 
-  const now = new Date();
-  const currentMinutes = now.getHours() * 60 + now.getMinutes();
+    const now = new Date();
+    const currentMinutes = now.getHours() * 60 + now.getMinutes();
 
-  return recognizedKeys.some(key => {
-    const t = timingOptions.find(o => o.name?.toLowerCase() === key);
-    const [sh, sm] = t.start.split(':').map(Number);
-    const [eh, em] = t.end.split(':').map(Number);
-    return currentMinutes >= (sh * 60 + sm) && currentMinutes <= (eh * 60 + em);
-  });
-}, [timingOptions]);
+    return recognizedKeys.some(key => {
+      const t = timingOptions.find(o => o.name?.toLowerCase() === key);
+      const [sh, sm] = t.start.split(':').map(Number);
+      const [eh, em] = t.end.split(':').map(Number);
+      return currentMinutes >= (sh * 60 + sm) && currentMinutes <= (eh * 60 + em);
+    });
+  }, [timingOptions]);
+  // ─────────────────────────────────────────────────────────────────────────
+  // Determine if a category is a combo category (walks ancestors)
+  // ─────────────────────────────────────────────────────────────────────────
+
+  const isComboCategoryId = useCallback((categoryId) => {
+    if (!categoryId || !categoriesFlat.length) return false;
+    let cur = categoryId;
+    const visited = new Set();
+    while (cur && !visited.has(cur)) {
+      visited.add(cur);
+      const cat = categoriesFlat.find(c => c.id === cur);
+      if (!cat) break;
+      if ((cat.name || '').toLowerCase().includes('combo')) return true;
+      cur = cat.parentId ?? null;
+    }
+    return false;
+  }, [categoriesFlat]);
+
   // ─────────────────────────────────────────────────────────────────────────
   // Data fetching
   // ─────────────────────────────────────────────────────────────────────────
@@ -1367,7 +1865,8 @@ const isItemActive = useCallback((slug) => {
             .filter(o =>
               o.table_id === table.id &&
               o.status?.toLowerCase() !== 'completed' &&
-              o.status?.toLowerCase() !== 'draft'      // ← exclude drafts from occupied map
+              o.status?.toLowerCase() !== 'draft' &&
+              o.status?.toLowerCase() !== 'cancelled'
             )
             .sort((a, b) => new Date(b.created_at) - new Date(a.created_at))[0];
           if (o) {
@@ -1378,6 +1877,7 @@ const isItemActive = useCallback((slug) => {
               created_at: o.created_at,
               order_count: o.order_count || 1,
               total_price: o.total_price || 0,
+              invoice_status: o.invoice_status || null,
             };
           }
         }
@@ -1424,6 +1924,7 @@ const isItemActive = useCallback((slug) => {
     setTables(list);
     await fetchTableOrders(list);
   };
+
   // ─────────────────────────────────────────────────────────────────────────
   // Initial data load
   // ─────────────────────────────────────────────────────────────────────────
@@ -1606,6 +2107,7 @@ const isItemActive = useCallback((slug) => {
   // Navigation helpers
   // ─────────────────────────────────────────────────────────────────────────
 
+
   /**
    * goToOrderView — switches to the order view and ensures the cart panel
    * is always visible so the waiter sees items immediately.
@@ -1632,6 +2134,7 @@ const isItemActive = useCallback((slug) => {
   // ─────────────────────────────────────────────────────────────────────────
   // Table / order selection
   // ─────────────────────────────────────────────────────────────────────────
+
   const handleTransferTable = async (newTable) => {
     if (!activeOrderId) {
       toast.error('No active order to transfer.');
@@ -1695,9 +2198,10 @@ const isItemActive = useCallback((slug) => {
 
     if (draft) {
       // Reconstruct cart from draft order items
-      const restoredCart = (draft.items || []).map(item => {
+      const restoredCart = (draft.items || []).flatMap(item => {
         const menuItem = menuItems.find(mi => Number(mi.id) === Number(item.item_id));
-        return {
+        const mainKey = item.frontend_unique_key || `${item.item_id}_restored_${Date.now()}`;
+        const mainEntry = {
           id: Number(item.item_id),
           name: item.item_name || menuItem?.name || 'Item',
           unit_price: item.unit_price ?? menuItem?.unit_price ?? 0,
@@ -1708,21 +2212,60 @@ const isItemActive = useCallback((slug) => {
           category_id: menuItem?.category_id || null,
           quantity: item.quantity || 1,
           note: '',
-          frontend_unique_key: item.frontend_unique_key,
+          frontend_unique_key: mainKey,
           batch_timestamp: null,
           is_new_item: true,
           saved_sub_order: false,
           status: 'draft',
+          is_addon: false,
+          parent_item_key: null,
         };
+
+        // Restore linked addons that were saved as line_item_id on the draft item
+        const addonEntries = (item.line_item_id || []).map((addonId, idx) => {
+          const addonMenuItem = menuItems.find(mi => Number(mi.id) === Number(addonId));
+          if (!addonMenuItem) return null;
+          return {
+            id: Number(addonId),
+            name: addonMenuItem.name || 'Addon',
+            unit_price: addonMenuItem.unit_price ?? 0,
+            discount: addonMenuItem.discount || 0,
+            image_id: addonMenuItem.image_id,
+            slug: addonMenuItem.slug,
+            category: addonMenuItem.category_name,
+            category_id: addonMenuItem.category_id || null,
+            quantity: 1,
+            note: '',
+            frontend_unique_key: `${addonId}_addon_${mainKey}_${idx}`,
+            batch_timestamp: null,
+            is_new_item: true,
+            saved_sub_order: false,
+            status: 'draft',
+            is_addon: true,
+            parent_item_key: mainKey,
+          };
+        }).filter(Boolean);
+
+        return [mainEntry, ...addonEntries];
       });
+
       setCart(restoredCart);
       setHasNewItems(true);
       setDraftSavedAt(Date.now());
       setShowCart(true);
+      if (draft.customer_id || draft.contact_phone) {
+        setCustomerDetails({
+          customer_id: draft.customer_id || '',
+          contact_phone: draft.contact_phone || '',
+        });
+      } else {
+        setCustomerDetails({ customer_id: '', contact_phone: '' });
+      }
       toast.info('Draft restored for this table.', { autoClose: 2000 });
     } else {
       setCart([]);
       setDraftSavedAt(null);
+      setCustomerDetails({ customer_id: '', contact_phone: '' });
       setShowCart(true);
     }
 
@@ -1741,6 +2284,7 @@ const isItemActive = useCallback((slug) => {
     setActiveOrderId(null);
     setActiveDineinOrderId(null);
     setCart([]);
+    setCustomerDetails({ customer_id: '', contact_phone: '' });
     setShowCart(true);
 
     // Set takeaway zone_config_id so correct prices are fetched
@@ -1792,6 +2336,8 @@ const isItemActive = useCallback((slug) => {
           status: item.status || 'pending',
           batch_label: item.batch_label,
           sub_order_id: item.sub_order_id,
+          parent_item_key: item.parent_item_key || null,
+
         };
       });
       setCart(reconstructedCart);
@@ -1804,6 +2350,7 @@ const isItemActive = useCallback((slug) => {
     setShowCart(true);
     goToOrderView();
   };
+
   const handleViewOrder = async (table) => {
     if (menuItems.length === 0) {
       alert('Menu still loading...');
@@ -1831,6 +2378,7 @@ const isItemActive = useCallback((slug) => {
         const menuItem = menuItems.find(mi => Number(mi.id) === Number(item.item_id));
         return {
           id: Number(item.item_id),
+          order_item_id: item.id,
           name: item.item_name || menuItem?.name || 'Unnamed Item',
           unit_price: item.unit_price || menuItem?.unit_price || 0,
           quantity: item.quantity || 1,
@@ -1847,6 +2395,8 @@ const isItemActive = useCallback((slug) => {
           status: item.status || 'pending',
           batch_label: item.batch_label,
           sub_order_id: item.sub_order_id,
+          parent_item_key: item.parent_item_key || null,
+
         };
       });
 
@@ -1886,18 +2436,26 @@ const isItemActive = useCallback((slug) => {
     items.forEach(item => {
       const key = item.frontend_unique_key || item.id;
       if (processed.has(key)) return;
-      if (!item.is_addon && !item.parent_item_key) {
-        const addons = items.filter(i => i.parent_item_key === item.frontend_unique_key);
-        grouped.push({ main: { ...item }, addons });
+      if (!item.parent_item_key) {  // ← parent items have no parent_item_key
+        const children = items.filter(i => i.parent_item_key === item.frontend_unique_key);
+        grouped.push({ main: { ...item }, addons: children });
         processed.add(key);
-        addons.forEach(a => processed.add(a.frontend_unique_key || a.id));
+        children.forEach(c => processed.add(c.frontend_unique_key || c.id));
       }
     });
     return grouped;
   };
 
   const getTotalPrice = () =>
-    cart.reduce((t, i) => t + (i.unit_price || 0) * i.quantity, 0).toFixed(2);
+    cart
+      .filter(i => {
+        if (!i.parent_item_key) return true; // parent item — always include
+        // child item — only include if its parent is NOT a combo
+        const parent = cart.find(p => p.frontend_unique_key === i.parent_item_key);
+        return !isComboCategoryId(parent?.category_id);
+      })
+      .reduce((t, i) => t + (i.unit_price || 0) * i.quantity, 0)
+      .toFixed(2);
 
   const buildCartItem = (item, extra = {}) => {
     const ts = Date.now() + Math.random();
@@ -1915,6 +2473,8 @@ const isItemActive = useCallback((slug) => {
       frontend_unique_key: key,
       is_new_item: true,
       saved_sub_order: false,
+      is_addon: false,
+      parent_item_key: null,
       ...extra,
     };
   };
@@ -1941,6 +2501,22 @@ const isItemActive = useCallback((slug) => {
       batch = Date.now();
       setCurrentBatchTimestamp(batch);
     }
+
+    if (!parentItemKey) {
+      const existingIndex = cart.findIndex(
+        ci => ci.id === Number(item.id) && ci.is_new_item && !ci.saved_sub_order && !ci.is_addon
+      );
+      if (existingIndex !== -1) {
+        setCart(prev =>
+          prev.map((ci, idx) =>
+            idx === existingIndex ? { ...ci, quantity: ci.quantity + 1 } : ci
+          )
+        );
+        if (!isMobile) setShowCart(true);
+        return cart[existingIndex].frontend_unique_key;
+      }
+    }
+
     const newItem = buildCartItem(item, {
       batch_timestamp: batch,
       parent_item_key: parentItemKey,
@@ -1979,10 +2555,191 @@ const isItemActive = useCallback((slug) => {
   };
 
   // ─────────────────────────────────────────────────────────────────────────
-  // Item click — opens addon modal or directly adds to cart
+  // Old-item delete
+  // ─────────────────────────────────────────────────────────────────────────
+
+  const handleOldItemRequestDelete = (item) => {
+    setOldItemDeleteModal({ isOpen: true, item });
+  };
+
+  const reloadCartFromServer = useCallback(async (orderId) => {
+    try {
+      const r = await axios.get(
+        `${import.meta.env.VITE_API_ORDER_SERVICE_URL}/${clientId}/dinein/table`,
+        { headers: { Authorization: `Bearer ${token}` } }
+      );
+      const allOrders = r.data?.data || [];
+      const order = allOrders.find(o => o.id === orderId);
+
+      if (!order || !order.items?.length) {
+        setCart([]);
+        setActiveOrderId(null);
+        setActiveDineinOrderId(null);
+        setHasNewItems(false);
+        await fetchTables();
+        goToFloor();
+        toast.info('All items removed — order closed.');
+        return;
+      }
+
+      const rebuiltOldItems = order.items.map(item => {
+        const menuItem = menuItems.find(mi => Number(mi.id) === Number(item.item_id));
+        return {
+          id: Number(item.item_id),
+          order_item_id: item.id,
+          name: item.item_name || menuItem?.name || 'Unnamed Item',
+          unit_price: item.unit_price || menuItem?.unit_price || 0,
+          quantity: item.quantity || 1,
+          note: item.note || '',
+          image_id: menuItem?.image_id,
+          discount: menuItem?.discount || 0,
+          slug: item.slug || menuItem?.slug,
+          category: menuItem?.category_name,
+          category_id: menuItem?.category_id || null,
+          frontend_unique_key: item.frontend_unique_key || String(item.id),
+          batch_timestamp: null,
+          is_new_item: false,
+          saved_sub_order: true,
+          status: item.status || 'pending',
+          batch_label: item.batch_label,
+          sub_order_id: item.sub_order_id,
+          parent_item_key: item.parent_item_key || null,
+        };
+      });
+
+      setCart(prev => {
+        const unsavedNew = prev.filter(ci => ci.is_new_item && !ci.saved_sub_order);
+        return [...rebuiltOldItems, ...unsavedNew];
+      });
+      await fetchTables();
+    } catch (err) {
+      console.error('[reloadCartFromServer] failed:', err);
+      toast.error('Failed to refresh cart after item change.');
+    }
+  }, [clientId, token, menuItems]);
+
+  const handleOldItemRemoveOne = async (transactionType, reason, removeQty = 1) => {
+    const item = oldItemDeleteModal.item;
+    setOldItemDeleteModal({ isOpen: false, item: null });
+
+    if (!item || !item.order_item_id) {
+      toast.error('Cannot update — item has no DB reference.');
+      return;
+    }
+
+    try {
+      setLoading(true);
+
+      await axios.delete(
+        `${import.meta.env.VITE_API_ORDER_SERVICE_URL}/${clientId}/order_item/delete`,
+        {
+          params: {
+            client_id: clientId,
+            order_item_id: item.order_item_id,
+            quantity: removeQty,
+            transaction_type: transactionType,
+            reason: reason || undefined,
+          },
+          headers: { Authorization: `Bearer ${token}` },
+        }
+      );
+
+      const newQty = item.quantity - removeQty;
+
+      // ✅ FIX: after main item delete, if qty hit zero cascade to children
+      if (newQty <= 0 && !item.parent_item_key) {
+        const childItems = cart.filter(
+          i => i.order_item_id &&
+            i.parent_item_key === item.frontend_unique_key
+        );
+        if (childItems.length > 0) {
+          await Promise.all(childItems.map(child =>
+            axios.delete(
+              `${import.meta.env.VITE_API_ORDER_SERVICE_URL}/${clientId}/order_item/delete`,
+              {
+                params: {
+                  client_id: clientId,
+                  order_item_id: child.order_item_id,
+                  transaction_type: transactionType,
+                  reason: reason || undefined,
+                },
+                headers: { Authorization: `Bearer ${token}` },
+              }
+            )
+          ));
+        }
+      }
+      toast.success(
+        newQty > 0
+          ? `Quantity reduced to ${newQty}. (${transactionType})`
+          : 'Item removed.'
+      );
+      await reloadCartFromServer(activeOrderId);
+    } catch (err) {
+      console.error('[handleOldItemRemoveOne] failed:', err);
+      toast.error('Failed to update item quantity.');
+    } finally {
+      setLoading(false);
+    }
+  };
+
+  const handleOldItemRemoveAll = async (transactionType, reason) => {
+    const item = oldItemDeleteModal.item;
+    setOldItemDeleteModal({ isOpen: false, item: null });
+    if (!item || !item.order_item_id) {
+      toast.error('Cannot delete — item has no DB reference.');
+      return;
+    }
+
+    try {
+      setLoading(true);
+
+      // ✅ FIX: if this is a parent, find all saved children by parent_item_key
+      const itemsToDelete = item.parent_item_key
+        ? [item]   // it's a child itself — only delete it
+        : [
+          item,
+          ...cart.filter(
+            i => i.order_item_id &&
+              i.parent_item_key === item.frontend_unique_key
+          ),
+        ];
+
+      await Promise.all(itemsToDelete.map(targetItem =>
+        axios.delete(
+          `${import.meta.env.VITE_API_ORDER_SERVICE_URL}/${clientId}/order_item/delete`,
+          {
+            params: {
+              client_id: clientId,
+              order_item_id: targetItem.order_item_id,
+              transaction_type: transactionType,
+              reason: reason || undefined,
+            },
+            headers: { Authorization: `Bearer ${token}` },
+          }
+        )
+      ));
+
+      toast.success('Item removed.');
+      await reloadCartFromServer(activeOrderId);
+    } catch (err) {
+      console.error('[handleOldItemRemoveAll] failed:', err);
+      toast.error('Failed to remove item.');
+    } finally {
+      setLoading(false);
+    }
+  };
+  // ─────────────────────────────────────────────────────────────────────────
+  // Item click — addon/combo detection
   // ─────────────────────────────────────────────────────────────────────────
 
   const handleItemClick = (item) => {
+
+    // if (item.category_id === 'Combos') {
+    //   // Add the item to the cart directly
+    //   addToCart(item);
+    //   return; // Exit early without opening the modal
+    // }
     const hasLineItems =
       item.line_item_id &&
       Array.isArray(item.line_item_id) &&
@@ -1993,34 +2750,27 @@ const isItemActive = useCallback((slug) => {
       return;
     }
 
-    const addonCatId = getAddonCategoryId(item.category_id);
+    const isCombo = isComboCategoryId(item.category_id);
 
-    const getAddonDescendantIds = (rootId) => {
-      const ids = new Set([rootId]);
-      const addChildren = (parentId) => {
-        categoriesFlat
-          .filter(c => c.parentId === parentId)
-          .forEach(c => { ids.add(c.id); addChildren(c.id); });
-      };
-      addChildren(rootId);
-      return ids;
-    };
-    const validAddonCategoryIds = getAddonDescendantIds(addonCatId);
-
-    const lineItems = item.line_item_id
-      .map(id => {
-        const ai = menuItems.find(i => i.id === id);
-        if (!ai) return null;
-        return validAddonCategoryIds.has(ai.category_id) ? ai : null;
-      })
+    // Resolve component / addon items directly by ID
+    const linkedItems = item.line_item_id
+      .map(id => menuItems.find(mi => Number(mi.id) === Number(id)))
       .filter(Boolean);
 
-    if (lineItems.length > 0) {
-      setSelectedMainItem(item);
-      setLineItemsDetails(lineItems);
-      setLineItemsModalOpen(true);
+    if (isCombo) {
+      // Show the combo detail modal — combo goes to KDS as a single item
+      setComboModalItem(item);
+      setComboModalComponents(linkedItems);
+      setComboModalOpen(true);
     } else {
-      addToCart(item);
+      // Show addon picker
+      if (linkedItems.length > 0) {
+        setSelectedMainItem(item);
+        setLineItemsDetails(linkedItems);
+        setLineItemsModalOpen(true);
+      } else {
+        addToCart(item);
+      }
     }
   };
 
@@ -2034,11 +2784,9 @@ const isItemActive = useCallback((slug) => {
 
     const mainKey = addToCart(selectedMainItem);
 
-    // Attach each selected addon to the main item via parent_item_key
     lineItemsDetails
       .filter(i => selectedAddonIds.includes(i.id))
       .forEach(addon => {
-        const ts = Date.now() + Math.random();
         const addonEntry = buildCartItem(addon, {
           batch_timestamp: batch,
           parent_item_key: mainKey,
@@ -2064,6 +2812,12 @@ const isItemActive = useCallback((slug) => {
 
   // ─────────────────────────────────────────────────────────────────────────
   // Place order
+  //
+  // FIX: Addons (is_addon: true) are displayed in the cart but must NOT be
+  // sent as separate order items to the API. They are visual-only sub-rows
+  // that belong to their parent item. Only parent items go in the payload.
+  // Combos likewise go as a single item — their components are on the menu
+  // record (line_item_id) and are shown by KDS via that reference.
   // ─────────────────────────────────────────────────────────────────────────
 
   const handlePlaceOrder = async () => {
@@ -2071,43 +2825,44 @@ const isItemActive = useCallback((slug) => {
     isPlacingRef.current = true;
     setIsPlacingOrder(true);
 
+    // For KOT printing we want both parent items and their addon rows
+    // (addons print indented below the parent on the slip)
+    const itemsToPrintKOT = newItems.length > 0 ? [...newItems] : [...cart];
+
+    // For the order API we only send parent (non-addon) items
+    const buildOrderPayload = (items) =>
+      items.map(i => ({
+        item_id: i.id,
+        item_name: i.name,
+        quantity: i.quantity,
+        unit_price: i.unit_price,
+        line_total: i.unit_price * i.quantity,
+        status: 'pending',
+        slug: i.slug || '',
+        frontend_unique_key: i.frontend_unique_key,
+        is_addon: i.is_addon || false,
+        parent_item_key: i.parent_item_key || null,
+      }));
     try {
       const headers = { Authorization: `Bearer ${token}` };
+      let placedOrderId = null;
 
       if (activeOrderId && activeDineinOrderId) {
-        // Append new items as a sub-order
         const newOnly = cart.filter(i => i.is_new_item && !i.saved_sub_order);
         if (newOnly.length > 0) {
           const r = await axios.post(
             `${import.meta.env.VITE_API_ORDER_SERVICE_URL}/${clientId}/dinein/create-sub-order`,
-            {
-              items: newOnly.map(i => ({
-                item_id: i.id,
-                item_name: i.name,
-                quantity: i.quantity,
-                unit_price: i.unit_price,
-                line_total: i.unit_price * i.quantity,
-                slug: i.slug,
-                frontend_unique_key: i.frontend_unique_key,
-              })),
-            },
+            { items: buildOrderPayload(newOnly) },
             { headers, params: { client_id: clientId, parent_dinein_order_id: activeDineinOrderId } }
           );
+          placedOrderId = activeOrderId;
           toast.success(`Sub-order ${r.data.data.dinein_order_id} created!`);
         }
       } else {
         const existingDraft = await readDraft(selectedTable, clientId, token);
-        const total = cart.reduce((s, i) => s + (i.unit_price || 0) * i.quantity, 0);
-        const itemsPayload = cart.map(i => ({
-          item_id: i.id,
-          item_name: i.name,
-          quantity: i.quantity,
-          unit_price: i.unit_price,
-          line_total: i.unit_price * i.quantity,
-          status: 'pending',
-          slug: i.slug || '',
-          frontend_unique_key: i.frontend_unique_key,
-        }));
+        const parentItemsOnly = cart.filter(i => !i.is_addon);
+        const total = parentItemsOnly.reduce((s, i) => s + (i.unit_price || 0) * i.quantity, 0);
+        const itemsPayload = buildOrderPayload(cart);
 
         if (existingDraft) {
           // ── Promote draft → pending using existing /dinein/update ──────
@@ -2129,9 +2884,9 @@ const isItemActive = useCallback((slug) => {
             },
             { headers }
           );
+          placedOrderId = existingDraft.id;
         } else {
-          // No draft — create fresh as before (unchanged)
-          await axios.post(
+          const createRes = await axios.post(
             `${import.meta.env.VITE_API_ORDER_SERVICE_URL}/${clientId}/dinein/create`,
             {
               client_id: clientId,
@@ -2145,6 +2900,7 @@ const isItemActive = useCallback((slug) => {
             },
             { headers }
           );
+          placedOrderId = createRes?.data?.data?.id;
         }
 
         if (orderMode !== 'takeaway') {
@@ -2165,8 +2921,42 @@ const isItemActive = useCallback((slug) => {
       }
 
       // Clean up on success
+      if (placedOrderId && (customerDetails.customer_id || customerDetails.contact_phone)) {
+        const tableObj = tables.find(t => t.id.toString() === selectedTable);
+        const parentItemsOnly = cart.filter(i => !i.is_addon);
+        const orderSubtotal = parentItemsOnly.reduce((s, i) => s + (i.unit_price || 0) * i.quantity, 0);
+        await upsertBillingDocumentForCustomer({
+          clientId,
+          token,
+          orderId: placedOrderId,
+          tableRef: tableObj?.table_number || `Table ${selectedTable}`,
+          customerDetails,
+          orderSubtotal,
+        });
+      }
+
       await deleteDraftFromDB(selectedTable, clientId, token);
       await fetchTables();
+
+      // Enrich items for KOT with real category_id from menu data
+      const enrichedForKOT = itemsToPrintKOT.map(ci => {
+        if (ci.category_id) return ci;
+        const mi = menuItems.find(m => Number(m.id) === Number(ci.id));
+        return { ...ci, category_id: mi?.category_id || null };
+      });
+      const tableObj = tables.find(t => t.id.toString() === selectedTable);
+      printKOT({
+        counterTree,
+        categoriesFlat,
+        itemsToPrint: enrichedForKOT,
+        meta: {
+          tableNumber: tableObj?.table_number || selectedTable,
+          orderMode,
+          dineinOrderId: activeDineinOrderId,
+          timestamp: new Date(),
+        },
+      });
+
       setCart([]);
       setActiveOrderId(null);
       setActiveDineinOrderId(null);
@@ -2174,6 +2964,7 @@ const isItemActive = useCallback((slug) => {
       setCurrentView('floor');
       setCurrentBatchTimestamp(null);
       setHasNewItems(false);
+      setCustomerDetails({ customer_id: '', contact_phone: '' });
       toast.success('Order placed!');
     } catch (err) {
       console.error('ORDER ERROR:', err);
@@ -2204,40 +2995,25 @@ const isItemActive = useCallback((slug) => {
     setActiveDineinOrderId(null);
     setCurrentBatchTimestamp(null);
     setHasNewItems(false);
+    setCustomerDetails({ customer_id: '', contact_phone: '' });
   };
 
   // ─────────────────────────────────────────────────────────────────────────
   // Delete order
   // ─────────────────────────────────────────────────────────────────────────
 
-  const handleDeleteOrder = async (orderId, tableId) => {
+  const handleCancelOrder = async (orderId, tableId, reason) => {
     try {
-      await axios.delete(
-        `${import.meta.env.VITE_API_ORDER_SERVICE_URL}/${clientId}/dinein/delete`,
-        {
-          params: { dinein_order_id: orderId, client_id: clientId },
-          headers: { Authorization: `Bearer ${token}` },
-        }
+      const headers = { Authorization: `Bearer ${token}` };
+
+      await axios.post(
+        `${import.meta.env.VITE_API_ORDER_SERVICE_URL}/${clientId}/dinein/cancel?order_id=${orderId}&reason=${encodeURIComponent(reason || '')}`,
+        {},
+        { headers }
       );
-      const tableObj = tables.find(t => t.id === tableId);
-      if (tableObj) {
-        await axios.post(
-          `${import.meta.env.VITE_API_TABLE_SERVICE_URL}/${clientId}/tables/update`,
-          {
-            id: tableId,
-            client_id: clientId,
-            name: tableObj.name,
-            table_type: tableObj.table_type,
-            status: 'vacant',
-            location_zone: tableObj.location_zone,
-          },
-          { headers: { Authorization: `Bearer ${token}` } }
-        );
-      }
-      toast.success('Order deleted');
+
+      toast.success('Order cancelled and transaction recorded.');
       await fetchTables();
-      setShowDeleteConfirm(false);
-      setOrderToDelete(null);
     } catch (err) {
       console.error(err);
       toast.error('Failed to delete order');
@@ -2264,6 +3040,68 @@ const isItemActive = useCallback((slug) => {
   };
 
   // ─────────────────────────────────────────────────────────────────────────
+  // Confirm payment from the table grid
+  // ─────────────────────────────────────────────────────────────────────────
+
+  const handleConfirmPaymentFromGrid = async (orderId, tableId) => {
+    try {
+      setLoading(true);
+      const headers = { Authorization: `Bearer ${token}` };
+
+      const docsRes = await axios.get(
+        `${import.meta.env.VITE_API_BILLING_SERVICE_URL}/${clientId}/invoice/read_document`,
+        { headers, params: { client_id: clientId } }
+      );
+      const invoices = (docsRes.data?.data || []).filter(
+        d => d.order_id?.toString() === orderId?.toString()
+      );
+      if (invoices.length > 0) {
+        invoices.sort(
+          (a, b) =>
+            (b.document_version || 1) - (a.document_version || 1) ||
+            new Date(b.updated_at || b.created_at || 0) - new Date(a.updated_at || a.created_at || 0)
+        );
+        const latestDoc = invoices[0];
+        await axios.post(
+          `${import.meta.env.VITE_API_BILLING_SERVICE_URL}/${clientId}/invoice/update_document`,
+          { id: latestDoc.id, client_id: clientId, payment_status: 'Paid', status: 'Issued' },
+          { headers }
+        );
+      }
+
+      await axios.post(
+        `${import.meta.env.VITE_API_ORDER_SERVICE_URL}/${clientId}/dinein/update`,
+        { id: orderId, status: 'served', invoice_status: 'paid' },
+        { headers }
+      );
+
+      const tableObj = tables.find(t => t.id === tableId);
+      if (tableObj) {
+        await axios.post(
+          `${import.meta.env.VITE_API_TABLE_SERVICE_URL}/${clientId}/tables/update`,
+          {
+            id: tableId,
+            client_id: clientId,
+            name: tableObj.name || `Table ${tableId}`,
+            table_type: String(tableObj.table_type || 'Regular'),
+            status: 'Vacant',
+            location_zone: tableObj.location_zone || 'Main',
+          },
+          { headers }
+        );
+      }
+
+      toast.success('Payment confirmed! Table is now free.');
+      await fetchTables();
+    } catch (err) {
+      console.error('[handleConfirmPaymentFromGrid]', err);
+      toast.error('Failed to confirm payment');
+    } finally {
+      setLoading(false);
+    }
+  };
+
+  // ─────────────────────────────────────────────────────────────────────────
   // Bill / Invoice
   // ─────────────────────────────────────────────────────────────────────────
 
@@ -2275,6 +3113,30 @@ const isItemActive = useCallback((slug) => {
       else m.set(k, { ...item });
     });
     return Array.from(m.values());
+  };
+
+  const fetchBillingDocumentForOrder = async (orderId) => {
+    try {
+      const res = await axios.get(
+        `${import.meta.env.VITE_API_BILLING_SERVICE_URL}/${clientId}/invoice/read_document`,
+        {
+          headers: { Authorization: `Bearer ${token}` },
+          params: { client_id: clientId },
+        }
+      );
+      const invoices = (res.data?.data || []).filter(
+        d => d.order_id?.toString() === orderId?.toString()
+      );
+      if (!invoices.length) return null;
+      invoices.sort(
+        (a, b) =>
+          (b.document_version || 1) - (a.document_version || 1) ||
+          new Date(b.updated_at || b.created_at || 0) - new Date(a.updated_at || a.created_at || 0)
+      );
+      return invoices[0];
+    } catch {
+      return null;
+    }
   };
 
   const handlePrintBill = async (orderId) => {
@@ -2294,7 +3156,16 @@ const isItemActive = useCallback((slug) => {
           name: item.item_name ?? inv.name ?? 'Unnamed Item',
         };
       });
-      setInvoiceOrderData({ ...order, items: combineDuplicateItems(enriched) });
+
+      const billingDoc = await fetchBillingDocumentForOrder(orderId);
+
+      setInvoiceOrderData({
+        ...order,
+        items: combineDuplicateItems(enriched),
+        customer_id: billingDoc?.customer_id || order.customer_id || '',
+        contact_phone: billingDoc?.contact_phone || order.contact_phone || '',
+        contact_email: billingDoc?.contact_email || order.contact_email || '',
+      });
       setInvoiceModalOpen(true);
     } catch (e) {
       console.error(e);
@@ -2322,7 +3193,16 @@ const isItemActive = useCallback((slug) => {
           name: item.item_name ?? inv.name ?? 'Unnamed',
         };
       });
-      setInvoiceOrderData({ ...order, items: combineDuplicateItems(enriched) });
+
+      const billingDoc = await fetchBillingDocumentForOrder(activeOrderId);
+
+      setInvoiceOrderData({
+        ...order,
+        items: combineDuplicateItems(enriched),
+        customer_id: customerDetails.customer_id || billingDoc?.customer_id || order.customer_id || '',
+        contact_phone: customerDetails.contact_phone || billingDoc?.contact_phone || order.contact_phone || '',
+        contact_email: billingDoc?.contact_email || order.contact_email || '',
+      });
       setInvoiceModalOpen(true);
     } catch (e) {
       console.error(e);
@@ -2330,35 +3210,6 @@ const isItemActive = useCallback((slug) => {
     } finally {
       setLoading(false);
     }
-  };
-
-  // ─────────────────────────────────────────────────────────────────────────
-  // KOT
-  // ─────────────────────────────────────────────────────────────────────────
-
-  const handlePrintKOT = () => {
-    const itemsToPrint = newItems.length > 0 ? newItems : cart;
-    if (itemsToPrint.length === 0) {
-      toast.warn('No items to print KOT for.');
-      return;
-    }
-    const enriched = itemsToPrint.map(ci => {
-      if (ci.category_id) return ci;
-      const mi = menuItems.find(m => Number(m.id) === Number(ci.id));
-      return { ...ci, category_id: mi?.category_id || null };
-    });
-    const tableObj = tables.find(t => t.id.toString() === selectedTable);
-    printKOT({
-      counterTree,
-      categoriesFlat,
-      itemsToPrint: enriched,
-      meta: {
-        tableNumber: tableObj?.table_number || selectedTable,
-        orderMode,
-        dineinOrderId: activeDineinOrderId,
-        timestamp: new Date(),
-      },
-    });
   };
 
   // ─────────────────────────────────────────────────────────────────────────
@@ -2399,6 +3250,7 @@ const isItemActive = useCallback((slug) => {
       String(i.code || '').toLowerCase().includes(q)
     );
   }, [menuItems, selectedCategoryId, searchQuery, selectedDietary, timingOptions, isItemActive, getCategoryAndChildrenIds]);
+
   const oldItems = cart.filter(i => !i.is_new_item || i.saved_sub_order);
   const newItems = cart.filter(i => i.is_new_item && !i.saved_sub_order);
   const groupedNewItems = newItems.reduce((acc, item) => {
@@ -2410,10 +3262,10 @@ const isItemActive = useCallback((slug) => {
   const batchTimestamps = Object.keys(groupedNewItems).sort();
 
   const canPlaceOrder = orderMode === 'takeaway'
-    ? cart.length > 0
+    ? cart.filter(i => !i.parent_item_key).length > 0
     : activeOrderId
-      ? hasNewItems && newItems.length > 0
-      : selectedTable && cart.length > 0;
+      ? hasNewItems && newItems.filter(i => !i.parent_item_key).length > 0
+      : selectedTable && cart.filter(i => !i.parent_item_key).length > 0;
 
   const selectedCategoryName =
     categoriesFlat.find(c => c.id === selectedCategoryId)?.name || 'All Categories';
@@ -2437,11 +3289,13 @@ const isItemActive = useCallback((slug) => {
           onSelectDineIn={() => setOrderMode('dinein')}
           onViewOrder={handleViewOrder}
           onPrintBill={handlePrintBill}
-          onDeleteOrder={(orderId, tableId) => {
-            setOrderToDelete({ orderId, tableId });
-            setShowDeleteConfirm(true);
-          }}
+          onCancelOrder={(orderId, tableId) =>
+            setCancelOrderModal({ isOpen: true, orderId, tableId })
+          }
           onMarkAsServed={handleMarkAsServed}
+          onConfirmPayment={(orderId, tableId) =>
+            setTablePayConfirmModal({ isOpen: true, orderId, tableId })
+          }
         />
       )}
 
@@ -2594,8 +3448,11 @@ const isItemActive = useCallback((slug) => {
                             </p>
                           )}
                           {ac > 0 && (
-                            <span className="text-xs bg-blue-100 text-blue-700 px-2 py-0.5 rounded-full font-semibold">
-                              +{ac} addon{ac > 1 ? 's' : ''}
+                            <span className={`text-xs px-2 py-0.5 rounded-full font-semibold
+                              ${isComboCategoryId(item.category_id)
+                                ? 'bg-violet-100 text-violet-700'
+                                : 'bg-blue-100 text-blue-700'}`}>
+                              {isComboCategoryId(item.category_id) ? `${ac} items` : `+${ac} addon${ac > 1 ? 's' : ''}`}
                             </span>
                           )}
                         </div>
@@ -2722,6 +3579,7 @@ const isItemActive = useCallback((slug) => {
                                 clientId={clientId}
                                 token={token}
                                 activeDineinOrderId={activeDineinOrderId}
+                                onRequestDelete={handleOldItemRequestDelete}
                               />
                             ))}
 
@@ -2803,18 +3661,6 @@ const isItemActive = useCallback((slug) => {
                             >
                               Clear
                             </button>
-
-                            {/* Print KOT — spans both columns */}
-                            <button
-                              onClick={handlePrintKOT}
-                              disabled={cart.length === 0}
-                              className={`col-span-2 py-2 border rounded-lg text-sm flex items-center justify-center gap-1 transition-colors
-                                ${cart.length > 0
-                                  ? 'hover:bg-gray-100 text-gray-700'
-                                  : 'opacity-40 cursor-not-allowed text-gray-400'}`}
-                            >
-                              <PrinterIcon size={16} /> Print KOT
-                            </button>
                           </div>
                         </>
                       )}
@@ -2877,15 +3723,60 @@ const isItemActive = useCallback((slug) => {
         onAddWithSelectedAddons={handleAddMainItemWithSelectedAddons}
       />
 
-      <DeleteConfirmModal
-        isOpen={showDeleteConfirm}
-        onClose={() => { setShowDeleteConfirm(false); setOrderToDelete(null); }}
-        onConfirm={() => {
-          if (orderToDelete) {
-            handleDeleteOrder(orderToDelete.orderId, orderToDelete.tableId);
+      <ComboDetailModal
+        isOpen={comboModalOpen}
+        onClose={() => {
+          setComboModalOpen(false);
+          setComboModalItem(null);
+          setComboModalComponents([]);
+        }}
+        comboItem={comboModalItem}
+        comboComponents={comboModalComponents}
+        onAddCombo={() => {
+          if (!comboModalItem) return;
+          let batch = currentBatchTimestamp;
+          if (!batch) { batch = Date.now(); setCurrentBatchTimestamp(batch); }
+          const mainKey = addToCart(comboModalItem);
+          // Add each combo component as a child entry (is_addon=true, parent_item_key=mainKey)
+          comboModalComponents.forEach((comp, idx) => {
+            const addonEntry = buildCartItem(comp, {
+              batch_timestamp: batch,
+              parent_item_key: mainKey,
+              is_addon: true,
+            });
+            setCart(prev => [...prev, addonEntry]);
+          });
+          setHasNewItems(true);
+        }}
+      />
+
+      <CancelOrderConfirmModal
+        isOpen={cancelOrderModal.isOpen}
+        onClose={() => setCancelOrderModal({ isOpen: false, orderId: null, tableId: null })}
+        onConfirm={(reason) => {
+          if (cancelOrderModal.orderId) {
+            handleCancelOrder(cancelOrderModal.orderId, cancelOrderModal.tableId, reason);
           }
         }}
       />
+
+      <TablePaymentConfirmModal
+        isOpen={tablePayConfirmModal.isOpen}
+        orderId={tablePayConfirmModal.orderId}
+        onClose={() => setTablePayConfirmModal({ isOpen: false, orderId: null, tableId: null })}
+        onConfirm={(orderId) => {
+          handleConfirmPaymentFromGrid(orderId, tablePayConfirmModal.tableId);
+        }}
+      />
+
+      <OldItemDeleteModal
+        isOpen={oldItemDeleteModal.isOpen}
+        item={oldItemDeleteModal.item}
+        onClose={() => setOldItemDeleteModal({ isOpen: false, item: null })}
+        onRemoveOne={handleOldItemRemoveOne}
+        onRemoveAll={handleOldItemRemoveAll}
+      />
+
       <TransferTableModal
         isOpen={showTransferModal}
         onClose={() => setShowTransferModal(false)}

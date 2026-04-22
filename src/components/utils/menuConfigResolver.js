@@ -16,6 +16,11 @@ export function getMenuConfig(clientId) {
     import.meta.env.VITE_MENU_DEFAULT_ROOT ??
     "dietery";
 
+  const addons =
+    import.meta.env[`VITE_${prefix}_ADDON_CATEGORY`] ??
+    import.meta.env.VITE_ADDON_CATEGORY ??
+    "addons";
+
   // .env: VITE_MENU_HIERARCHY_LEVEL=2
   //   OR  VITE_{PREFIX}_MENU_HIERARCHY_LEVEL=2
   const level =
@@ -45,5 +50,8 @@ export function getMenuConfig(clientId) {
     level,
     menuInventoryId,
     inventoryCategoryRoot,
+    addons,
   };
 }
+
+export default getMenuConfig;

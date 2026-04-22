@@ -3,8 +3,86 @@ import axios from "axios";
 import { toast } from "react-toastify";
 import jsPDF from "jspdf";
 import CustomerAutocomplete from './CustomerAutocomplete';
-import { X, Save, Printer } from 'lucide-react';
+import { X, Save, Printer, CreditCard, CheckCircle } from 'lucide-react';
 import RazorpayPayment from "../../Constants/RazorPay/RazorpayPayment";
+
+// ─────────────────────────────────────────────────────────────────────────────
+// REQ 2 helpers
+// ─────────────────────────────────────────────────────────────────────────────
+
+// Free the table — called ONLY after payment is confirmed as "Paid"
+async function freeTable({ clientId, token, tableId, tablesMap }) {
+  if (!tableId) return;
+  try {
+    const tableData = tablesMap[tableId];
+    await axios.post(
+      `${import.meta.env.VITE_API_TABLE_SERVICE_URL}/${clientId}/tables/update`,
+      {
+        id: tableId,
+        client_id: clientId,
+        name: tableData?.name || `Table ${tableId}`,
+        table_type: tableData?.table_type || "Regular",
+        status: 'Vacant',
+        location_zone: tableData?.location_zone || "Main",
+      },
+      { headers: { Authorization: `Bearer ${token}` } }
+    );
+  } catch (err) {
+    console.error("[freeTable] failed:", err?.response?.data || err.message);
+  }
+}
+
+// ─────────────────────────────────────────────────────────────────────────────
+// REQ 2: PaymentConfirmModal
+// Shown when user clicks "Confirm Payment" for a saved-but-unpaid invoice.
+// ─────────────────────────────────────────────────────────────────────────────
+
+const PaymentConfirmModal = ({ isOpen, total, onConfirm, onClose }) => {
+  if (!isOpen) return null;
+  return (
+    <div className="fixed inset-0 z-50 flex items-center justify-center bg-black/60 p-4">
+      <div className="bg-white rounded-2xl shadow-2xl w-full max-w-sm">
+        <div className="px-6 py-5 border-b">
+          <h3 className="text-lg font-bold text-gray-800 flex items-center gap-2">
+            <CreditCard size={20} className="text-green-600" />
+            Confirm Payment
+          </h3>
+        </div>
+        <div className="px-6 py-5 space-y-3">
+          <p className="text-sm text-gray-600">
+            Confirm that the customer has paid the full amount?
+          </p>
+          <div className="bg-green-50 border border-green-200 rounded-xl px-4 py-3 text-center">
+            <p className="text-xs text-green-600 font-semibold uppercase tracking-wide mb-1">Amount Due</p>
+            <p className="text-3xl font-bold text-green-700">₹{Number(total).toFixed(2)}</p>
+          </div>
+          <p className="text-xs text-gray-400 text-center">
+            This will mark the invoice as <span className="font-semibold text-green-600">Paid</span> and free the table.
+          </p>
+        </div>
+        <div className="px-6 py-4 flex gap-3 bg-gray-50 rounded-b-2xl">
+          <button
+            onClick={onClose}
+            className="flex-1 py-2.5 rounded-xl font-medium text-sm border border-gray-300 bg-white text-gray-700 hover:bg-gray-50"
+          >
+            Cancel
+          </button>
+          <button
+            onClick={onConfirm}
+            className="flex-1 py-2.5 rounded-xl font-bold text-sm bg-green-600 hover:bg-green-700 text-white flex items-center justify-center gap-2 transition-colors"
+          >
+            <CheckCircle size={16} />
+            Confirm Paid
+          </button>
+        </div>
+      </div>
+    </div>
+  );
+};
+
+// ─────────────────────────────────────────────────────────────────────────────
+// Main InvoiceModal
+// ─────────────────────────────────────────────────────────────────────────────
 
 export default function InvoiceModal({
   clientId,
@@ -31,12 +109,9 @@ export default function InvoiceModal({
   const [customersList, setCustomersList] = useState([]);
   const [gstManuallyEdited, setGstManuallyEdited] = useState(false);
   const [showRazorpayModal, setShowRazorpayModal] = useState(false);
-  const safeNum = (num) => (typeof num === "number" && !isNaN(num) ? num : 0);
+  const [showPayConfirm, setShowPayConfirm] = useState(false); // REQ 2
 
-  const updateBalance = (sumOfPayments) => {
-    const bal = total - sumOfPayments;
-    setBalanceAmount(bal < 0 ? 0 : Number(bal.toFixed(2)));
-  };
+  const safeNum = (num) => (typeof num === "number" && !isNaN(num) ? num : 0);
 
   // 1️⃣ Subtotal
   const orderSubtotal = Number(
@@ -61,15 +136,20 @@ export default function InvoiceModal({
   const calculatedDiscount = discountIsPercent
     ? Number(((amountAfterTax * discount) / 100).toFixed(2))
     : Number(discount);
-
-  // 5️⃣ Final Total
   const calculatedTotal = Number(
     (amountAfterTax - calculatedDiscount).toFixed(2)
   );
 
   const total = calculatedTotal;
 
+  // ─── Split payment helpers ─────────────────────────────────────────────────
+
   const sumSplits = (splits) => splits.reduce((sum, s) => sum + Number(s.amount), 0);
+
+  const updateBalance = (sumOfPayments) => {
+    const bal = total - sumOfPayments;
+    setBalanceAmount(bal < 0 ? 0 : Number(bal.toFixed(2)));
+  };
 
   const updateSplitAmount = (index, value) => {
     let newAmount = Number(value);
@@ -78,12 +158,12 @@ export default function InvoiceModal({
     splits[index].amount = newAmount;
     if (splits.length > 1) {
       const sumOthers = splits.filter((_, idx) => idx !== splits.length - 1).reduce((sum, s) => sum + Number(s.amount), 0);
-      let remainder = Number((total - sumOthers).toFixed(2));
+      const remainder = Number((total - sumOthers).toFixed(2));
       splits[splits.length - 1].amount = remainder >= 0 ? remainder : 0;
     }
     let sumTotal = sumSplits(splits);
     while (sumTotal > total) {
-      let excess = sumTotal - total;
+      const excess = sumTotal - total;
       if (splits[splits.length - 1].amount >= excess) {
         splits[splits.length - 1].amount -= excess;
       } else {
@@ -105,8 +185,8 @@ export default function InvoiceModal({
   const removeSplitRow = (index) => {
     if (paymentSplits.length <= 1) return;
     let updated = paymentSplits.filter((_, idx) => idx !== index);
-    let sum = sumSplits(updated);
-    let remainder = Number((total - sum).toFixed(2));
+    const sum = sumSplits(updated);
+    const remainder = Number((total - sum).toFixed(2));
     if (updated.length > 0) updated[updated.length - 1].amount += remainder;
     setPaymentSplits(updated);
     setBalanceAmount(Number((total - sumSplits(updated)).toFixed(2)));
@@ -116,13 +196,15 @@ export default function InvoiceModal({
     let splits = [...paymentSplits];
     if (splits.length > 1) {
       const sumOthers = splits.filter((_, idx) => idx !== splits.length - 1).reduce((sum, s) => sum + Number(s.amount), 0);
-      let remainder = Number((total - sumOthers).toFixed(2));
+      const remainder = Number((total - sumOthers).toFixed(2));
       splits[splits.length - 1].amount = remainder >= 0 ? remainder : 0;
     }
     setPaymentSplits(splits);
     updateBalance(sumSplits(splits));
     setBalanceAmount(Number((total - sumSplits(splits)).toFixed(2)));
   };
+
+  // ─── Fetch customers & invoice draft ──────────────────────────────────────
 
   const fetchUniqueCustomers = async () => {
     try {
@@ -133,7 +215,6 @@ export default function InvoiceModal({
           params: { client_id: clientId }
         }
       );
-
       const invoices = res.data?.data || [];
       const customersMap = new Map();
 
@@ -150,10 +231,8 @@ export default function InvoiceModal({
           }
         }
       });
-
       const uniqueCustomers = Array.from(customersMap.values())
         .sort((a, b) => a.customer_id.localeCompare(b.customer_id));
-
       setCustomersList(uniqueCustomers);
     } catch (err) {
       console.error("Failed to fetch customers:", err);
@@ -291,11 +370,8 @@ export default function InvoiceModal({
         toast.error("Add at least two payment methods for split payment");
         return;
       }
-
-      const sumPayments = paymentSplits.reduce((sum, p) => sum + Number(p.amount), 0);
-      const roundedSum = Number(sumPayments.toFixed(2));
+      const roundedSum = Number(sumSplits(paymentSplits).toFixed(2));
       const roundedTotal = Number(total.toFixed(2));
-
       if (roundedSum < roundedTotal) {
         toast.error(`Split payment total ₹${roundedSum.toFixed(2)} is less than invoice total ₹${roundedTotal.toFixed(2)}`);
         return;
@@ -373,38 +449,19 @@ export default function InvoiceModal({
         { headers: { Authorization: `Bearer ${token}` } }
       );
 
-          await axios.post(
+      await axios.post(
         `${import.meta.env.VITE_API_ORDER_SERVICE_URL}/${clientId}/dinein/update`,
         {
           id: selectedOrder.id,
-          status: "served",
+          // REQ 2: Only update invoice_status; do not change order status to served yet.
           invoice_status: paymentStatus.toLowerCase(),
         },
         { headers: { Authorization: `Bearer ${token}` } }
       );
 
-      // Update table status to vacant after saving invoice
-      if (selectedOrder.table_id) {
-        try {
-          const tableData = tablesMap[selectedOrder.table_id];
-          await axios.post(
-            `${import.meta.env.VITE_API_TABLE_SERVICE_URL}/${clientId}/tables/update`,
-            {
-              id: selectedOrder.table_id,
-              client_id: clientId,
-              name: tableData?.name || `Table ${selectedOrder.table_id}`,
-              table_type: tableData?.table_type || "Regular",
-              status: 'Vacant',
-              location_zone: tableData?.location_zone || "Main"
-            },
-            { headers: { Authorization: `Bearer ${token}` } }
-          );
-        } catch (tableErr) {
-          console.error("Failed to update table status:", tableErr.response?.data || tableErr.message);
-        }
-      }
-
+      // REQ 2: Table is NOT freed here. It is freed only after payment confirmation.
       toast.success("Invoice saved successfully!");
+      if (onSave) onSave(draftId);
       return draftId;
     } catch (err) {
       console.error(err);
@@ -415,41 +472,88 @@ export default function InvoiceModal({
     }
   };
 
-  const handlePaymentClick = async () => {
-    // Run validation + save — if validation fails, saveInvoiceDraft returns undefined
-    let draftId = invoiceDraftId;
+  // ─── REQ 2: Confirm payment ────────────────────────────────────────────────
+  // Called when the "Confirm Payment" button is clicked.
+  // Sets invoice payment_status to "Paid", marks order as "served",
+  // and THEN frees the table.
 
-    if (!draftId) {
-      try {
-        draftId = await saveInvoiceDraft();
-      } catch {
-        // saveInvoiceDraft threw — error toast already shown inside
-        return;
+  const handleConfirmPayment = async () => {
+    setShowPayConfirm(false);
+    setSaving(true);
+    try {
+      // 1. Update the billing document payment_status to Paid
+      if (invoiceDraftId) {
+        await axios.post(
+          `${import.meta.env.VITE_API_BILLING_SERVICE_URL}/${clientId}/invoice/update_document`,
+          {
+            id: invoiceDraftId,
+            client_id: clientId,
+            payment_status: "Paid",
+            status: "Issued",
+          },
+          { headers: { Authorization: `Bearer ${token}` } }
+        );
       }
-    } else {
-      // Draft exists but we still need to validate + update with latest values
-      try {
-        await saveInvoiceDraft();
-      } catch {
-        return;
-      }
+
+      // 2. Mark dine-in order as served and invoice_status as paid
+      await axios.post(
+        `${import.meta.env.VITE_API_ORDER_SERVICE_URL}/${clientId}/dinein/update`,
+        {
+          id: selectedOrder.id,
+          status: "served",
+          invoice_status: "paid",
+        },
+        { headers: { Authorization: `Bearer ${token}` } }
+      );
+
+      // 3. Free the table (REQ 2: only HERE, not on save)
+      await freeTable({
+        clientId,
+        token,
+        tableId: selectedOrder.table_id,
+        tablesMap,
+      });
+
+      setPaymentStatus("Paid");
+      toast.success("Payment confirmed! Table is now free.");
+      onClose();
+    } catch (err) {
+      console.error("[handleConfirmPayment]", err);
+      toast.error("Failed to confirm payment");
+    } finally {
+      setSaving(false);
     }
+  };
 
-    // If draftId is still null/undefined, validation blocked the save
+  // ─── handlePaymentClick ────────────────────────────────────────────────────
+
+  const handlePaymentClick = async () => {
+    let draftId = invoiceDraftId;
+    try {
+      draftId = await saveInvoiceDraft();
+    } catch {
+      return;
+    }
     if (!draftId) return;
 
-    const isOnlineMethod = (m) =>
-      m === "razorpay_upi" || m === "razorpay_card";
-
+    const isOnlineMethod = (m) => m === "razorpay_upi" || m === "razorpay_card";
     const needsRazorpay = splitPaymentEnabled
       ? paymentSplits.some(s => isOnlineMethod(s.method))
       : isOnlineMethod(method);
+
     if (needsRazorpay) {
       setShowRazorpayModal(true);
     } else {
-      toast.success("Payment saved successfully!");
+      // REQ 2: For non-Razorpay, show payment confirmation before clearing table
+      if (paymentStatus !== "Paid") {
+        setShowPayConfirm(true);
+      } else {
+        await handleConfirmPayment();
+      }
     }
   };
+
+  // ─── Print invoice ─────────────────────────────────────────────────────────
 
   const printInvoice = async () => {
     if (!selectedOrder || !selectedOrder.items?.length) {
@@ -511,6 +615,7 @@ export default function InvoiceModal({
 
       doc.setFont("helvetica", "bold");
       doc.setFontSize(26);
+
       doc.setTextColor(255, 255, 255);
       doc.text(clientId.toUpperCase(), 40, y);
 
@@ -524,7 +629,6 @@ export default function InvoiceModal({
       doc.text(`Time: ${new Date().toLocaleTimeString([], { hour: "2-digit", minute: "2-digit" })}`, pageWidth - 40, y + 35, { align: "right" });
 
       y = 140;
-
       doc.setTextColor(0, 0, 0);
       doc.setFont("helvetica", "bold");
       doc.setFontSize(10);
@@ -571,7 +675,6 @@ export default function InvoiceModal({
       doc.text("AMOUNT", pageWidth - 80, y + 10);
 
       y += 30;
-
       doc.setFont("helvetica", "normal");
       doc.setFontSize(9);
       doc.setTextColor(0, 0, 0);
@@ -586,7 +689,7 @@ export default function InvoiceModal({
           doc.setFillColor(249, 250, 251);
           doc.rect(40, y - 8, pageWidth - 80, 20, 'F');
         }
-
+        
         doc.text(item.name || "Unnamed", 45, y);
         doc.text(`${item.quantity || 0}`, pageWidth - 260, y);
         doc.text(`₹${(item.unit_price ?? 0).toFixed(2)}`, pageWidth - 180, y);
@@ -595,7 +698,6 @@ export default function InvoiceModal({
       });
 
       y += 15;
-
       doc.setDrawColor(200, 200, 200);
       doc.line(40, y, pageWidth - 40, y);
       y += 20;
@@ -625,7 +727,6 @@ export default function InvoiceModal({
       doc.text(`₹${total.toFixed(2)}`, pageWidth - 80, y, { align: "right" });
 
       y += 40;
-
       doc.setTextColor(0, 0, 0);
       doc.setFont("helvetica", "bold");
       doc.setFontSize(10);
@@ -655,7 +756,6 @@ export default function InvoiceModal({
 
       doc.setDrawColor(200, 200, 200);
       doc.line(40, pageHeight - 80, pageWidth - 40, pageHeight - 80);
-
       doc.setFont("helvetica", "italic");
       doc.setFontSize(10);
       doc.setTextColor(100, 116, 139);
@@ -670,6 +770,12 @@ export default function InvoiceModal({
       toast.error("Failed to generate invoice PDF");
     }
   };
+
+  // ─── Render ────────────────────────────────────────────────────────────────
+
+  // REQ 2: Determine if invoice is saved but not yet paid
+  const isInvoiceSavedButUnpaid =
+    !!invoiceDraftId && paymentStatus !== "Paid";
 
   return (
     <div className="fixed inset-0 bg-black/60 backdrop-blur-sm flex items-center justify-center z-50 p-4">
@@ -690,11 +796,23 @@ export default function InvoiceModal({
                   {clientId.charAt(0).toUpperCase()}
                 </div>
                 <div>
-                  <h1 className="text-2xl font-bold text-text-white">{clientId.toUpperCase()}</h1>
-                  <p className="text-text-white/80 text-sm">Invoice #{documentNumber || "Draft"}</p>
+                  <h1 className="text-2xl font-bold text-white">{clientId.toUpperCase()}</h1>
+                  <p className="text-white/80 text-sm">
+                    Invoice #{documentNumber || "Draft"}
+                    {/* REQ 2: Show payment status badge in header */}
+                    {invoiceDraftId && (
+                      <span
+                        className={`ml-2 text-xs px-2 py-0.5 rounded-full font-semibold
+                          ${paymentStatus === 'Paid'
+                            ? 'bg-green-300 text-green-900'
+                            : 'bg-yellow-300 text-yellow-900'}`}
+                      >
+                        {paymentStatus}
+                      </span>
+                    )}
+                  </p>
                 </div>
               </div>
-
               <div className="flex flex-col md:flex-row items-start md:items-center gap-4">
                 <div className="text-text-white">
                   <div className="text-sm font-medium">Table: {tablesMap[selectedOrder.table_id]?.name}</div>
@@ -720,8 +838,8 @@ export default function InvoiceModal({
                       📦 Order Items
                     </h2>
                   </div>
-
                   <div className="p-4 space-y-2 max-h-96 overflow-y-auto">
+
                     {selectedOrder.items.map((item, idx) => (
                       <div key={idx} className="flex justify-between items-center py-3 px-4 rounded-lg bg-bg-tertiary border border-border-default hover:border-action-primary transition-all">
                         <div className="flex-1">
@@ -968,22 +1086,44 @@ export default function InvoiceModal({
                 </div>
 
                 {/* Action Buttons */}
-                <div className="flex gap-3">
-                  <button
-                    onClick={handlePaymentClick}
-                    disabled={saving}
-                    className="flex-1 bg-action-primary hover:bg-action-primary/90 text-text-white px-4 py-3 rounded-xl font-bold shadow-lg transition-all disabled:opacity-50 flex items-center justify-center gap-2"
-                  >
-                    <Save size={18} />
-                    {saving ? "Saving..." : "Save"}
-                  </button>
-                  <button
-                    onClick={printInvoice}
-                    className="flex-1 bg-bg-primary border-2 border-action-primary hover:bg-action-primary/10 text-text-primary px-4 py-3 rounded-xl font-bold transition-all shadow-md flex items-center justify-center gap-2"
-                  >
-                    <Printer size={18} />
-                    Print
-                  </button>
+                <div className="space-y-2">
+                  <div className="flex gap-3">
+                    <button
+                      onClick={handlePaymentClick}
+                      disabled={saving}
+                      className="flex-1 bg-action-primary hover:bg-action-primary/90 text-white px-4 py-3 rounded-xl font-bold shadow-lg transition-all disabled:opacity-50 flex items-center justify-center gap-2"
+                    >
+                      <Save size={18} />
+                      {saving ? "Saving..." : "Save"}
+                    </button>
+                    <button
+                      onClick={printInvoice}
+                      className="flex-1 bg-bg-primary border-2 border-action-primary hover:bg-action-primary/10 text-text-primary px-4 py-3 rounded-xl font-bold transition-all shadow-md flex items-center justify-center gap-2"
+                    >
+                      <Printer size={18} />
+                      Print
+                    </button>
+                  </div>
+
+                  {/* REQ 2: "Confirm Payment" button — shown when invoice saved but not paid */}
+                  {isInvoiceSavedButUnpaid && (
+                    <button
+                      onClick={() => setShowPayConfirm(true)}
+                      disabled={saving}
+                      className="w-full bg-green-600 hover:bg-green-700 text-white px-4 py-3 rounded-xl font-bold shadow-lg transition-all disabled:opacity-50 flex items-center justify-center gap-2"
+                    >
+                      <CheckCircle size={18} />
+                      Confirm Payment · ₹{total.toFixed(2)}
+                    </button>
+                  )}
+
+                  {/* REQ 2: Already paid indicator */}
+                  {invoiceDraftId && paymentStatus === "Paid" && (
+                    <div className="flex items-center justify-center gap-2 py-3 rounded-xl bg-green-50 border border-green-200 text-green-700 font-semibold text-sm">
+                      <CheckCircle size={18} className="text-green-600" />
+                      Payment Confirmed — Table Freed
+                    </div>
+                  )}
                 </div>
 
               </div>
@@ -991,6 +1131,16 @@ export default function InvoiceModal({
           </div>
         </div>
       </div>
+
+      {/* ── REQ 2: Payment confirmation modal ── */}
+      <PaymentConfirmModal
+        isOpen={showPayConfirm}
+        total={total}
+        onClose={() => setShowPayConfirm(false)}
+        onConfirm={handleConfirmPayment}
+      />
+
+      {/* ── Razorpay modal ── */}
       {showRazorpayModal && (
         <RazorpayPayment
           amount={total}
@@ -1050,32 +1200,13 @@ export default function InvoiceModal({
                 { id: selectedOrder.id, status: "served", invoice_status: "paid" },
                 { headers: { Authorization: `Bearer ${token}` } }
               );
-          
-              // Free the table
-              if (selectedOrder.table_id) {
-                try {
-                  const tableData = tablesMap[selectedOrder.table_id];
-                  await axios.post(
-                    `${import.meta.env.VITE_API_TABLE_SERVICE_URL}/${clientId}/tables/update`,
-                    {
-                      id:            selectedOrder.table_id,
-                      client_id:     clientId,
-                      name:          tableData?.name || `Table ${selectedOrder.table_id}`,
-                      table_type:    tableData?.table_type || "Regular",
-                      status:        "vacant",
-                      location_zone: tableData?.location_zone || "Main",
-                    },
-                    { headers: { Authorization: `Bearer ${token}` } }
-                  );
-                } catch (tableErr) {
-                  console.error("Table update failed:", tableErr.response?.data || tableErr.message);
-                }
-              }
-          
+
+              await freeTable({ clientId, token, tableId: selectedOrder.table_id, tablesMap });
+
               setPaymentStatus("Paid");
               setShowRazorpayModal(false);
               toast.success("Payment verified successfully!");
-          
+              onClose();
             } catch (err) {
               console.error("VERIFY ERROR:", err.response?.data || err.message);
               toast.error("Verification failed: " + (err.response?.data?.detail || err.message));

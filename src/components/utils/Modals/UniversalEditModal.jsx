@@ -2,6 +2,7 @@ import React, { useState, useEffect } from 'react';
 import { X, Upload, Plus } from 'lucide-react';
 import MenuImagePreview from '../../MainComponents/InventoryServices/Tree&CategoryManage/MenuImagePreview';
 import AddonSelectionPopup from './AddonSelection';
+import ComboSelectionPopup from './CombosSelectionPopup';
 import axios from 'axios';
 
 const UniversalEditModal = ({
@@ -24,6 +25,9 @@ const UniversalEditModal = ({
   clientId,
   token,
   inventoryIds,
+  fetchAddonData, setAddonSubcategories, setAllAddonItems, units,
+  // Combo props
+  dedupedMenuItems, categoriesFlat,
 
   // Table-specific props
   editRowId,
@@ -40,6 +44,23 @@ const UniversalEditModal = ({
   const [loadingConfigs, setLoadingConfigs] = useState(false);
   const [dietaryOptions, setDietaryOptions] = useState([]);
   const [timingOptions, setTimingOptions] = useState([]);
+
+  const isComboItem = React.useMemo(() => {
+    if (!editingItem?.category_id || !categoriesFlat?.length) return false;
+    // editingItem.isCombo is pre-computed by handleItemClick in MenuManagement
+    if (editingItem.isCombo !== undefined) return editingItem.isCombo;
+    let currentId = editingItem.category_id;
+    const visited = new Set();
+    while (currentId && !visited.has(currentId)) {
+      visited.add(currentId);
+      const cat = categoriesFlat.find(c => c.id === currentId);
+      if (!cat) break;
+      if ((cat.name || '').toLowerCase().includes('combo')) return true;
+      currentId = cat.parentId ?? null;
+    }
+    return false;
+  }, [editingItem, categoriesFlat]);
+
   const fetchStatuses = async () => {
     try {
       const res = await axios.get(
@@ -55,6 +76,7 @@ const UniversalEditModal = ({
       setStatusOptions([]);
     }
   };
+
   const fetchConfigs = async () => {
     try {
       setLoadingConfigs(true);
@@ -132,6 +154,14 @@ const UniversalEditModal = ({
   }, [showModal, clientId, token, normalizedRealm]);
 
   // Menu Modal Functions
+  useEffect(() => {
+    if (!showModal || modalType !== 'menu' || !fetchAddonData) return;
+    fetchAddonData().then(({ subcategories, items }) => {
+      setAddonSubcategories?.(subcategories);
+      setAllAddonItems?.(items);
+    });
+  }, [showModal, modalType]);
+
   const handleEditDrag = (e) => {
     e.preventDefault();
     e.stopPropagation();
@@ -210,12 +240,15 @@ const UniversalEditModal = ({
 
             {/* Header */}
             <div className="px-6 py-4 border-b border-gray-200 flex justify-between items-center">
-              <h2 className="text-xl font-semibold text-gray-900">Edit Menu Item</h2>
-              <button
-                onClick={handleClose}
-                className="p-1.5 rounded-lg bg-action-primary text-text-white hover:opacity-90 transition-opacity">
-                <X className="w-5 h-5" />
-              </button>
+              <div>
+                <h2 className="text-xl font-semibold text-gray-900">
+                  {isComboItem ? 'Edit Combo' : 'Edit Menu Item'}
+                </h2>
+                {isComboItem && (
+                  <p className="text-xs text-violet-600 mt-0.5">Combo price is fixed — component items are informational</p>
+                )}
+              </div>
+              <button onClick={handleClose} className="p-1.5 rounded-lg bg-action-primary text-text-white hover:opacity-90"><X className="w-5 h-5" /></button>
             </div>
 
             {/* Content */}
@@ -223,6 +256,7 @@ const UniversalEditModal = ({
               <div className="space-y-4">
                 {/* Category Selector */}
                 <div>
+                  <label className="block text-sm font-medium mb-1 text-gray-700">Category <span className="text-red-600">*</span></label>
                   <label className="block text-sm font-medium mb-1 text-gray-700">
                     Category <span className="text-red-600">*</span>
                   </label>
@@ -244,7 +278,7 @@ const UniversalEditModal = ({
                 {/* Item Name */}
                 <div>
                   <label className="block text-sm font-medium mb-1 text-gray-700">
-                    Item Name <span className="text-red-600">*</span>
+                    {isComboItem ? 'Combo Name' : 'Item Name'} <span className="text-red-600">*</span>
                   </label>
                   <input
                     type="text"
@@ -345,7 +379,7 @@ const UniversalEditModal = ({
                 <div className="grid grid-cols-2 gap-4">
                   <div>
                     <label className="block text-sm font-medium mb-1 text-gray-700">
-                      Base Price (All Zones) <span className="text-red-600">*</span>
+                      {isComboItem ? 'Combo Price (flat) *' : 'Base Price (All Zones) *'}
                     </label>
                     <input
                       type="number"
@@ -366,6 +400,7 @@ const UniversalEditModal = ({
                     />
                   </div>
                 </div>
+
                 {/* Zone-wise pricing */}
                 {configs.length > 0 && (
                   <div>
@@ -448,11 +483,17 @@ const UniversalEditModal = ({
                   </div>
                 </div>
 
-                {/* Item Image Upload */}
+                {/* Serving Quantity */}
+                <div>
+                  <label className="block text-sm font-medium mb-1 text-gray-700">Serving Quantity</label>
+                  <input type="number" value={editingItem.serving_quantity ?? ''} onChange={e => setEditingItem({ ...editingItem, serving_quantity: e.target.value })}
+                    className="w-full px-3 py-2 rounded-md border border-gray-300 text-gray-900 focus:outline-none focus:ring-2 focus:ring-blue-500" placeholder="0" />
+                </div>
+
+                {/* Image */}
                 <div>
                   <label className="block text-sm font-medium mb-1 text-gray-700">Item Image</label>
-
-                  {editItemImageUrl || editingItem.image_id ? (
+                  {(editItemImageUrl || editingItem.image_id) && (
                     <div className="mb-3">
                       <p className="text-xs text-gray-600 mb-1">Current Image:</p>
                       {editItemImageUrl ? (
@@ -487,8 +528,7 @@ const UniversalEditModal = ({
                         />
                       )}
                     </div>
-                  ) : null}
-
+                  )}
                   <div
                     className={`relative border-2 border-dashed rounded-md p-6 transition-colors ${dragActive ? 'border-blue-500 bg-blue-50' : 'border-gray-300 bg-gray-50'
                       }`}
@@ -519,46 +559,65 @@ const UniversalEditModal = ({
                   </div>
                 </div>
 
-                {/* ✅ Add-ons with Popup */}
+                {/* ── Combo items OR Addon picker ── */}
                 <div>
-                  <label className="block text-sm font-medium mb-2 text-gray-700">
-                    Add-ons
-                  </label>
+                  {isComboItem ? (
+                    <>
+                      <label className="block text-sm font-medium mb-2 text-gray-700">
+                        Combo Items
+                        <span className="ml-1 text-xs text-gray-400 font-normal">(what's included — price is fixed above)</span>
+                      </label>
 
-                  {/* Selected Addons Display */}
-                  {editingItem.line_item_id && editingItem.line_item_id.length > 0 && (
-                    <div className="mb-3 flex flex-wrap gap-2">
-                      {editingItem.line_item_id.map(addonId => (
-                        <div
-                          key={addonId}
-                          className="flex items-center gap-2 bg-blue-100 text-blue-700 px-3 py-1.5 rounded-lg text-sm"
-                        >
-                          <span>{getAddonNameById(addonId)}</span>
-                          <button
-                            type="button"
-                            onClick={() => removeAddon(addonId)}
-                            className="hover:bg-blue-200 rounded-full p-0.5 transition-colors"
-                          >
-                            <X size={14} />
-                          </button>
+                      {editingItem.line_item_id?.length > 0 && (
+                        <div className="mb-3 p-3 bg-violet-50 border border-violet-200 rounded-xl space-y-1.5 max-h-36 overflow-y-auto">
+                          {editingItem.line_item_id.map(id => {
+                            const it = dedupedMenuItems?.find(i => i.id === id);
+                            return it ? (
+                              <div key={id} className="flex items-center justify-between text-sm">
+                                <span className="font-medium text-violet-800 truncate">{it.name}</span>
+                                <div className="flex items-center gap-2 shrink-0 ml-2">
+                                  <span className="text-xs text-violet-500 font-semibold">₹{Number(it.unit_price).toFixed(0)}</span>
+                                  <button type="button"
+                                    onClick={() => setEditingItem(prev => ({ ...prev, line_item_id: prev.line_item_id.filter(x => x !== id) }))}
+                                    className="w-4 h-4 rounded-full bg-red-100 hover:bg-red-200 flex items-center justify-center">
+                                    <X size={9} className="text-red-600" />
+                                  </button>
+                                </div>
+                              </div>
+                            ) : null;
+                          })}
                         </div>
-                      ))}
-                    </div>
-                  )}
+                      )}
 
-                  {/* Select Addons Button */}
-                  <button
-                    type="button"
-                    onClick={() => setShowAddonPopup(true)}
-                    className="w-full px-4 py-3 rounded-lg bg-gray-50 border-2 border-dashed border-gray-300 text-gray-700 hover:border-blue-500 hover:bg-blue-50 transition-all flex items-center justify-center gap-2 font-medium"
-                  >
-                    <Plus size={18} />
-                    <span>
-                      {editingItem.line_item_id && editingItem.line_item_id.length > 0
-                        ? `Manage Add-ons (${editingItem.line_item_id.length} selected)`
-                        : 'Select Add-ons'}
-                    </span>
-                  </button>
+                      <button
+                        type="button"
+                        onClick={() => setShowAddonPopup(true)}
+                        className="w-full px-4 py-3 rounded-lg bg-gray-50 border-2 border-dashed border-gray-300 text-gray-700 hover:border-blue-500 hover:bg-blue-50 transition-all flex items-center justify-center gap-2 font-medium"
+                      >
+                        <Plus size={18} />
+                        <span>{editingItem.line_item_id?.length > 0 ? `Edit Combo Items (${editingItem.line_item_id.length})` : 'Select Combo Items'}</span>
+                      </button>
+                    </>
+                  ) : (
+                    <>
+                      <label className="block text-sm font-medium mb-2 text-gray-700">Add-ons</label>
+                      {editingItem.line_item_id?.length > 0 && (
+                        <div className="mb-3 flex flex-wrap gap-2">
+                          {editingItem.line_item_id.map(addonId => (
+                            <div key={addonId} className="flex items-center gap-2 bg-blue-100 text-blue-700 px-3 py-1.5 rounded-lg text-sm">
+                              <span>{getAddonNameById(addonId)}</span>
+                              <button type="button" onClick={() => removeAddon(addonId)} className="hover:bg-blue-200 rounded-full p-0.5"><X size={14} /></button>
+                            </div>
+                          ))}
+                        </div>
+                      )}
+                      <button type="button" onClick={() => setShowAddonPopup(true)}
+                        className="w-full px-4 py-3 rounded-lg bg-gray-50 border-2 border-dashed border-gray-300 text-gray-700 hover:border-blue-500 hover:bg-blue-50 transition-all flex items-center justify-center gap-2 font-medium">
+                        <Plus size={18} />
+                        <span>{editingItem.line_item_id?.length > 0 ? `Manage Add-ons (${editingItem.line_item_id.length} selected)` : 'Select Add-ons'}</span>
+                      </button>
+                    </>
+                  )}
                 </div>
               </div>
             </div>
@@ -581,18 +640,28 @@ const UniversalEditModal = ({
           </div>
         </div>
 
-        {/* ✅ Addon Selection Popup */}
-        <AddonSelectionPopup
-          isOpen={showAddonPopup}
-          onClose={() => setShowAddonPopup(false)}
-          selectedAddons={editingItem?.line_item_id || []}
-          onSave={(selectedAddons) => {
-            setEditingItem(prev => ({ ...prev, line_item_id: selectedAddons }));
-          }}
-          addonSubcategories={addonSubcategories || []}
-          allAddonItems={allAddonItems || []}
-          currentItemId={editingItem?.id}
-        />
+        {/* Combo picker OR Addon picker */}
+        {isComboItem ? (
+          <ComboSelectionPopup
+            isOpen={showAddonPopup}
+            onClose={() => setShowAddonPopup(false)}
+            selectedComponents={editingItem?.line_item_id || []}
+            onSave={ids => setEditingItem(prev => ({ ...prev, line_item_id: ids }))}
+            allMenuItems={dedupedMenuItems || []}
+            categoriesFlat={categoriesFlat || []}
+            currentItemId={editingItem?.id}
+          />
+        ) : (
+          <AddonSelectionPopup
+            isOpen={showAddonPopup}
+            onClose={() => setShowAddonPopup(false)}
+            selectedAddons={editingItem?.line_item_id || []}
+            onSave={selectedAddons => setEditingItem(prev => ({ ...prev, line_item_id: selectedAddons }))}
+            addonSubcategories={addonSubcategories || []}
+            allAddonItems={allAddonItems || []}
+            currentItemId={editingItem?.id}
+          />
+        )}
       </>
     );
   }
@@ -626,7 +695,7 @@ const UniversalEditModal = ({
               {/* No of Seating */}
               <div>
                 <label className="block text-sm font-medium mb-1 text-gray-700">No of Seating</label>
-
+                
                 {/* Desktop */}
                 <input
                   type="number"

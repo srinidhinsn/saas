@@ -3,8 +3,8 @@ import axios from 'axios';
 import { toast } from "react-toastify";
 import Modal from "react-modal";
 import {
-  X, Trash2, Filter, ShoppingBag, Clock,
-  Users, Package, Truck, Eye, ChevronDown, ChevronUp,
+  X, Trash2, Filter, ShoppingBag,
+  Users, Package, Truck, Eye, AlertTriangle,
 } from 'lucide-react';
 import { useNavigate } from "react-router-dom";
 
@@ -14,42 +14,191 @@ Modal.setAppElement("#root");
 // SimpleDeleteConfirm
 // ─────────────────────────────────────────────────────────────────────────────
 
-const SimpleDeleteConfirm = ({
-  isOpen,
-  onClose,
-  onConfirm,
-  title = 'Delete',
-  message = 'Are you sure?',
-}) => {
+const ORDER_CANCEL_REASONS = [
+  'Customer changed mind',
+  'Customer left without paying',
+  'Duplicate order',
+  'Test / mistake order',
+  'Payment issue',
+  'Kitchen unable to fulfill',
+  'Other',
+];
+
+const CANCELLATION_REASONS = [
+  'Customer changed mind',
+  'Wrong item ordered',
+  'Duplicate entry',
+  'Item out of stock',
+  'Customer left',
+  'Order placed by mistake',
+  'Allergy concern',
+  'Other',
+];
+
+const WASTAGE_REASONS = [
+  'Plate returned by customer',
+  'Quality issue / not fresh',
+  'Preparation error',
+  'Spilled / dropped',
+  'Overcooked / undercooked',
+  'Customer complaint',
+  'Expired ingredient used',
+  'Other',
+];
+
+// ─────────────────────────────────────────────────────────────────────────────
+// CancelOrderConfirmModal — mirrors TakeOrder
+// ─────────────────────────────────────────────────────────────────────────────
+
+const CancelOrderConfirmModal = ({ isOpen, onClose, onConfirm }) => {
+  const [reason, setReason] = useState('');
+  const [customReason, setCustomReason] = useState('');
+
+  useEffect(() => {
+    if (isOpen) { setReason(''); setCustomReason(''); }
+  }, [isOpen]);
+
   if (!isOpen) return null;
+
+  const effectiveReason = reason === 'Other' ? customReason : reason;
+
   return (
-    <div className="fixed inset-0 z-50 flex items-center justify-center p-4 bg-color-modalsbg">
-      <div className="rounded-lg w-full max-w-sm bg-bg-primary border border-border-default shadow-card">
-        <div className="px-6 py-4 border-b border-border-default flex justify-between items-center">
-          <h2 className="text-lg font-bold text-action-danger">{title}</h2>
-          <button
-            onClick={onClose}
-            className="text-text-secondary hover:text-gray-700 transition-colors"
-          >
-            <X size={20} />
-          </button>
+    <div className="fixed inset-0 z-50 flex items-center justify-center p-4 bg-black/50">
+      <div className="rounded-lg w-full max-w-sm bg-white shadow-xl">
+        <div className="px-6 py-4 border-b flex justify-between items-center">
+          <h2 className="text-lg font-bold text-red-600">Cancel Order</h2>
+          <button onClick={onClose} className="text-gray-500 hover:text-gray-700"><X size={20} /></button>
         </div>
-        <div className="px-6 py-5">
-          <p className="text-sm text-text-primary">{message}</p>
+        <div className="px-6 py-5 space-y-4">
+          <p className="text-sm text-gray-600">
+            The order will be marked as <span className="font-semibold text-red-600">cancelled</span> and kept for records. Select a reason:
+          </p>
+          <div className="grid grid-cols-2 gap-1.5 max-h-52 overflow-y-auto pr-1">
+            {ORDER_CANCEL_REASONS.map(r => (
+              <button
+                key={r}
+                onClick={() => setReason(r)}
+                className={`px-2 py-2 rounded-lg text-xs font-medium border text-left transition
+                  ${reason === r ? 'bg-red-600 text-white border-red-600' : 'bg-white text-gray-600 border-gray-200 hover:border-gray-400'}`}
+              >{r}</button>
+            ))}
+          </div>
+          {reason === 'Other' && (
+            <input
+              value={customReason}
+              onChange={e => setCustomReason(e.target.value)}
+              placeholder="Describe the reason…"
+              className="w-full px-3 py-2 text-sm rounded-lg border border-gray-300 focus:outline-none focus:ring-2 focus:ring-red-400"
+            />
+          )}
         </div>
-        <div className="px-6 py-4 rounded-b-lg flex gap-3 bg-bg-tertiary border-t border-border-default">
+        <div className="px-6 py-4 flex gap-3 bg-gray-50 rounded-b-lg">
+          <button onClick={onClose} className="flex-1 py-2.5 rounded-lg font-medium text-sm border border-gray-300 bg-white text-gray-700 hover:bg-gray-50">Go Back</button>
           <button
-            onClick={onClose}
-            className="flex-1 py-2.5 rounded-lg font-medium text-sm bg-bg-primary border border-border-default text-text-primary"
-          >
-            Cancel
-          </button>
+            disabled={!reason || (reason === 'Other' && !customReason.trim())}
+            onClick={() => { onConfirm(effectiveReason); onClose(); }}
+            className={`flex-1 py-2.5 rounded-lg font-medium text-sm text-white transition
+              ${reason && !(reason === 'Other' && !customReason.trim()) ? 'bg-red-600 hover:bg-red-700' : 'bg-gray-300 cursor-not-allowed'}`}
+          >Cancel Order</button>
+        </div>
+      </div>
+    </div>
+  );
+};
+
+// ─────────────────────────────────────────────────────────────────────────────
+// OldItemDeleteModal — mirrors TakeOrder exactly
+// ─────────────────────────────────────────────────────────────────────────────
+
+const OldItemDeleteModal = ({ isOpen, onClose, item, onRemoveOne, onRemoveAll }) => {
+  const [reason, setReason] = useState('');
+  const [customReason, setCustomReason] = useState('');
+  const [removeQty, setRemoveQty] = useState(1);
+
+  const isServed = item?.status === 'served';
+  const transactionType = isServed ? 'WASTAGE' : 'ITEM_CANCELLED';
+  const reasonList = isServed ? WASTAGE_REASONS : CANCELLATION_REASONS;
+  const typeLabel = isServed ? 'Wastage' : 'Cancellation';
+  const typeColor = isServed ? 'text-red-600' : 'text-orange-600';
+  const typeBg = isServed ? 'bg-red-50 border-red-200' : 'bg-orange-50 border-orange-200';
+  const buttonColor = isServed ? 'bg-red-600 hover:bg-red-700' : 'bg-orange-500 hover:bg-orange-600';
+
+  useEffect(() => {
+    if (isOpen) { setReason(''); setCustomReason(''); setRemoveQty(1); }
+  }, [isOpen]);
+
+  if (!isOpen || !item) return null;
+
+  const maxQty = item.quantity || 1;
+  const isRemoveAll = removeQty >= maxQty;
+  const effectiveReason = reason === 'Other' ? customReason : reason;
+
+  return (
+    <div className="fixed inset-0 z-50 flex items-center justify-center p-4 bg-black/50">
+      <div className="rounded-lg w-full max-w-sm bg-white shadow-xl">
+        <div className="px-6 py-4 border-b flex justify-between items-center">
+          <h2 className={`text-lg font-bold ${typeColor}`}>Remove Item</h2>
+          <button onClick={onClose} className="text-gray-500 hover:text-gray-700"><X size={20} /></button>
+        </div>
+        <div className="px-6 py-5 space-y-4">
+          <div>
+            <p className="text-sm text-gray-700 font-semibold">{item.item_name || item.name}</p>
+            <p className="text-sm text-gray-500 mt-0.5">Ordered quantity: <span className="font-semibold">{maxQty}</span></p>
+          </div>
+          <div className={`flex items-center gap-2 px-3 py-2 rounded-lg border text-xs font-semibold ${typeBg} ${typeColor}`}>
+            <span className="w-2 h-2 rounded-full bg-current inline-block" />
+            {typeLabel} — {isServed ? 'Item was already served. Stock will be reversed.' : 'Item not yet served. No stock deduction.'}
+          </div>
+          {maxQty > 1 && (
+            <div>
+              <p className="text-xs font-semibold text-gray-600 mb-2">How many to remove?</p>
+              <div className="flex items-center gap-3">
+                <button onClick={() => setRemoveQty(q => Math.max(1, q - 1))} className="w-8 h-8 flex items-center justify-center rounded-lg border border-gray-300 hover:bg-gray-100 text-lg font-bold">−</button>
+                <span className="w-10 text-center text-lg font-bold text-gray-800">{removeQty}</span>
+                <button onClick={() => setRemoveQty(q => Math.min(maxQty, q + 1))} className="w-8 h-8 flex items-center justify-center rounded-lg border border-gray-300 hover:bg-gray-100 text-lg font-bold">+</button>
+                <span className="text-xs text-gray-400 ml-1">of {maxQty}</span>
+                <button onClick={() => setRemoveQty(maxQty)} className="ml-auto text-xs text-red-500 underline font-semibold">Remove all</button>
+              </div>
+              <div className="mt-1 h-1.5 bg-gray-100 rounded-full overflow-hidden">
+                <div className="h-full bg-red-400 rounded-full transition-all" style={{ width: `${(removeQty / maxQty) * 100}%` }} />
+              </div>
+            </div>
+          )}
+          <div>
+            <p className="text-xs font-semibold text-gray-600 mb-2">Reason</p>
+            <div className="grid grid-cols-2 gap-1.5 max-h-48 overflow-y-auto pr-1">
+              {reasonList.map(r => (
+                <button
+                  key={r}
+                  onClick={() => setReason(r)}
+                  className={`px-2 py-2 rounded-lg text-xs font-medium border text-left transition
+                    ${reason === r
+                      ? isServed ? 'bg-red-600 text-white border-red-600' : 'bg-orange-500 text-white border-orange-500'
+                      : 'bg-white text-gray-600 border-gray-200 hover:border-gray-400'}`}
+                >{r}</button>
+              ))}
+            </div>
+            {reason === 'Other' && (
+              <input
+                value={customReason}
+                onChange={e => setCustomReason(e.target.value)}
+                placeholder="Describe the reason…"
+                className="mt-2 w-full px-3 py-2 text-sm rounded-lg border border-gray-300 focus:outline-none focus:ring-2 focus:ring-red-400"
+              />
+            )}
+          </div>
+        </div>
+        <div className="px-6 py-4 flex gap-3 bg-gray-50 rounded-b-lg">
+          <button onClick={onClose} className="flex-1 py-2.5 rounded-lg font-medium text-sm border border-gray-300 bg-white text-gray-700 hover:bg-gray-50">Cancel</button>
           <button
-            onClick={() => { onConfirm(); onClose(); }}
-            className="flex-1 py-2.5 rounded-lg bg-action-danger text-text-white font-medium text-sm"
-          >
-            Delete
-          </button>
+            disabled={!reason || (reason === 'Other' && !customReason.trim())}
+            onClick={() => {
+              if (isRemoveAll) onRemoveAll(transactionType, effectiveReason);
+              else onRemoveOne(transactionType, effectiveReason, removeQty);
+            }}
+            className={`flex-1 py-2.5 rounded-lg font-medium text-sm text-white transition
+              ${reason && !(reason === 'Other' && !customReason.trim()) ? buttonColor : 'bg-gray-300 cursor-not-allowed'}`}
+          >{isRemoveAll ? `Remove All (${maxQty})` : `Remove ${removeQty}`}</button>
         </div>
       </div>
     </div>
@@ -126,7 +275,7 @@ const LineItemsModal = ({
 // OrderItemsViewModal — read-only view of all items for an order
 // ─────────────────────────────────────────────────────────────────────────────
 
-const OrderItemsViewModal = ({ isOpen, onClose, order, inventoryMap }) => {
+const OrderItemsViewModal = ({ isOpen, onClose, order, inventoryMap, onRequestDeleteItem }) => {
   if (!isOpen || !order) return null;
 
   const getItemStatusStyle = (status) => {
@@ -221,50 +370,30 @@ const OrderItemsViewModal = ({ isOpen, onClose, order, inventoryMap }) => {
                   0;
                 const lineTotal = unitPrice * (item.quantity || 1);
 
+                const isServedItem = item.status?.toLowerCase() === 'served';
                 return (
-                  <React.Fragment key={item.id || idx}>
-                    {/* Batch divider for new items */}
-                    {item._isBatchStart && (
-                      <tr>
-                        <td colSpan={6} className="px-4 py-2">
-                          <div className="flex items-center gap-2">
-                            <div className="flex-1 h-px bg-gradient-to-r from-transparent via-action-primary to-transparent" />
-                            <span className="text-xs font-bold text-action-primary px-3 py-1 rounded-full bg-action-primary/10 border border-action-primary/20">
-                              New Items
-                            </span>
-                            <div className="flex-1 h-px bg-gradient-to-r from-action-primary via-transparent to-transparent" />
-                          </div>
-                        </td>
-                      </tr>
-                    )}
-                    <tr className="hover:bg-bg-tertiary/50 transition-colors">
-                      <td className="px-5 py-3 text-text-secondary text-xs">{idx + 1}</td>
-                      <td className="px-4 py-3 font-medium text-text-primary">
-                        {item.item_name || 'Unnamed Item'}
-                        {item.is_new_item && (
-                          <span className="ml-2 text-[10px] font-bold text-action-primary bg-action-primary/10 px-1.5 py-0.5 rounded-full">
-                            NEW
-                          </span>
-                        )}
-                      </td>
-                      <td className="px-4 py-3 text-center font-semibold text-text-primary">
-                        {item.quantity || 1}
-                      </td>
-                      <td className="px-4 py-3 text-right text-text-secondary">
-                        ₹{unitPrice.toFixed(2)}
-                      </td>
-                      <td className="px-4 py-3 text-right font-bold text-text-primary">
-                        ₹{lineTotal.toFixed(2)}
-                      </td>
-                      <td className="px-4 py-3 text-center">
-                        <span
-                          className={`text-xs font-semibold px-2.5 py-1 rounded-full ${getItemStatusStyle(item.status)}`}
-                        >
-                          {item.status || 'pending'}
-                        </span>
-                      </td>
-                    </tr>
-                  </React.Fragment>
+                  <tr key={item.id || idx} className="hover:bg-bg-tertiary/50 transition-colors">
+                    <td className="px-5 py-3 text-text-secondary text-xs">{idx + 1}</td>
+                    <td className="px-4 py-3 font-medium text-text-primary">{item.item_name || 'Unnamed Item'}</td>
+                    <td className="px-4 py-3 text-center font-semibold text-text-primary">{item.quantity || 1}</td>
+                    <td className="px-4 py-3 text-right text-text-secondary">₹{unitPrice.toFixed(2)}</td>
+                    <td className="px-4 py-3 text-right font-bold text-text-primary">₹{lineTotal.toFixed(2)}</td>
+                    <td className="px-4 py-3 text-center">
+                      <span className={`text-xs font-semibold px-2.5 py-1 rounded-full ${getItemStatusStyle(item.status)}`}>{item.status || 'pending'}</span>
+                    </td>
+                    <td className="px-4 py-3 text-center">
+                      <button
+                        onClick={() => onRequestDeleteItem(item)}
+                        className={`p-1.5 rounded-lg transition-colors
+                          ${isServedItem
+                            ? 'bg-orange-100 text-orange-600 hover:bg-orange-500 hover:text-white'
+                            : 'bg-action-danger/10 text-action-danger hover:bg-action-danger hover:text-text-white'}`}
+                        title={isServedItem ? 'Delete served item (records wastage)' : 'Delete item'}
+                      >
+                        <Trash2 size={14} />
+                      </button>
+                    </td>
+                  </tr>
                 );
               })}
             </tbody>
@@ -343,11 +472,9 @@ const OrderSummaryVisible = ({ clientId, token }) => {
   const [viewOrder, setViewOrder] = useState(null);
   const [showViewModal, setShowViewModal] = useState(false);
 
-  // ── Delete ────────────────────────────────────────────────────────────────
-  const [showDeleteModal, setShowDeleteModal] = useState(false);
-  const [orderToDelete, setOrderToDelete] = useState(null);
-  const [showDeleteModals, setShowDeleteModals] = useState(false);
-  const [deleteTarget, setDeleteTarget] = useState({ orderId: null, itemBackendId: null });
+  // REQ: Cancel order modal (matches TakeOrder — reason required)
+  const [cancelOrderModal, setCancelOrderModal] = useState({ isOpen: false, orderId: null });
+  const [itemDeleteModal, setItemDeleteModal] = useState({ isOpen: false, item: null, orderId: null });
 
   // ── Order detail / edit modal (kept from original) ────────────────────────
   const [showOrderDetailModal, setShowOrderDetailModal] = useState(false);
@@ -362,11 +489,10 @@ const OrderSummaryVisible = ({ clientId, token }) => {
   const [selectedMainItem, setSelectedMainItem] = useState(null);
   const [lineItemsDetails, setLineItemsDetails] = useState([]);
   const [pendingOrderId, setPendingOrderId] = useState(null);
-  const [visibleOrderId, setVisibleOrderId] = useState(null);
 
-  // ─────────────────────────────────────────────────────────────────────────
-  // localStorage helpers (preserved exactly from original)
-  // ─────────────────────────────────────────────────────────────────────────
+ // ─────────────────────────────────────────────────────────────────────────
+ // localStorage helpers (preserved exactly from original)
+ // ─────────────────────────────────────────────────────────────────────────
 
   const generateSlug = name => name.toLowerCase().replace(/[\s]+/g, '-');
 
@@ -593,7 +719,6 @@ const OrderSummaryVisible = ({ clientId, token }) => {
         .filter(i => i.frontend_unique_key)
         .map(i => String(i.frontend_unique_key))
     );
-
     const oldItems = [];
     const batchItemsMap = new Map();
 
@@ -751,15 +876,16 @@ const OrderSummaryVisible = ({ clientId, token }) => {
   // Actions (preserved from original)
   // ─────────────────────────────────────────────────────────────────────────
 
-  const handleStatusChange = async (orderId, newStatus) => {
+  const handleCancelOrder = async (orderId, reason) => {
     const order = orders.find(o => o.id === orderId);
-    if (!order || order.status === 'served') return;
-    const tableObj = tables.find(t => t.id === order.table_id);
+    const tableObj = tables.find(t => t.id === order?.table_id);
     try {
-      await axios.post(
-        `${import.meta.env.VITE_API_ORDER_SERVICE_URL}/${clientId}/dinein/update`,
-        { id: orderId, client_id: clientId, status: newStatus },
-        { headers: { Authorization: `Bearer ${token}` } }
+      await axios.delete(
+        `${import.meta.env.VITE_API_ORDER_SERVICE_URL}/${clientId}/dinein/delete`,
+        {
+          params: { dinein_order_id: orderId, client_id: clientId, reason },
+          headers: { Authorization: `Bearer ${token}` },
+        }
       );
       if (tableObj) {
         await axios.post(
@@ -775,138 +901,92 @@ const OrderSummaryVisible = ({ clientId, token }) => {
           { headers: { Authorization: `Bearer ${token}` } }
         );
       }
-      toast.success('Order status updated');
-      setOrders(prev =>
-        prev.map(o =>
-          o.id === orderId
-            ? { ...o, status: newStatus, has_new_items: newStatus === 'served' ? false : o.has_new_items }
-            : o
-        )
-      );
-      if (selectedOrder?.id === orderId) {
-        setSelectedOrder(prev => ({
-          ...prev,
-          status: newStatus,
-          has_new_items: newStatus === 'served' ? false : prev.has_new_items,
-        }));
-      }
-      if (newStatus === 'served') setEditOrderId(null);
-    } catch {
-      toast.error('Failed to update order status.');
-    }
+      setOrders(prev => prev.filter(o => o.id !== orderId));
+      toast.success('Order cancelled and table freed.');
+      fetchTables();
+    } catch { toast.error('Failed to cancel order'); }
   };
 
-  const cancelItem = async (orderId, itemBackendId) => {
-    const order = orders.find(o => o.id === orderId);
-    const item = order?.items.find(i => i.id === itemBackendId);
-    if (!item) return;
+  // ── REQ: Item delete — now matches TakeOrder (reason + qty + transaction) ──
+
+  const handleItemRemoveOne = async (transactionType, reason, removeQty) => {
+    const { item, orderId } = itemDeleteModal;
+    setItemDeleteModal({ isOpen: false, item: null, orderId: null });
+    if (!item?.id) { toast.error('Cannot update — item has no DB reference.'); return; }
     try {
-      if (
-        typeof itemBackendId === 'string' &&
-        (itemBackendId.startsWith('temp_') || !itemBackendId.includes('_'))
-      ) {
-        localStorage.removeItem(`order_${orderId}_new_item_${item.frontend_unique_key}`);
-        const updated = orders.map(o => {
-          if (o.id !== orderId) return o;
-          const updatedItems = o.items.filter(i => i.id !== itemBackendId);
-          return { ...o, items: updatedItems, has_new_items: updatedItems.some(i => i.is_new_item) };
-        });
-        setOrders(updated);
-        if (selectedOrder?.id === orderId) setSelectedOrder(updated.find(o => o.id === orderId));
-        toast.success('Item removed');
-        return;
-      }
       await axios.delete(
         `${import.meta.env.VITE_API_ORDER_SERVICE_URL}/${clientId}/order_item/delete`,
         {
-          params: { order_item_id: itemBackendId, client_id: clientId },
+          params: { client_id: clientId, order_item_id: item.id, quantity: removeQty, transaction_type: transactionType, reason: reason || undefined },
           headers: { Authorization: `Bearer ${token}` },
         }
       );
-      if (item.is_new_item && item.frontend_unique_key) {
-        localStorage.removeItem(`order_${orderId}_new_item_${item.frontend_unique_key}`);
+      const newQty = item.quantity - removeQty;
+      toast.success(newQty > 0 ? `Quantity reduced to ${newQty}.` : 'Item removed.');
+      // Refresh orders from server
+      const res = await axios.get(`${import.meta.env.VITE_API_ORDER_SERVICE_URL}/${clientId}/dinein/table`, { headers: { Authorization: `Bearer ${token}` } });
+      const allOrders = res.data?.data || [];
+      const fresh = allOrders.find(o => o.id === orderId);
+      if (!fresh) {
+        setOrders(prev => prev.filter(o => o.id !== orderId));
+        if (viewOrder?.id === orderId) { setViewOrder(null); setShowViewModal(false); }
+        toast.info('All items removed — order closed.');
+        return;
       }
-      const updated = orders.map(o => {
-        if (o.id !== orderId) return o;
-        const updatedItems = o.items.filter(i => i.id !== itemBackendId);
-        const newTotal = updatedItems.reduce((sum, it) => {
-          const price = inventoryMap[it.item_id]?.unit_price || it.price || 0;
-          return sum + (it.quantity || 1) * price;
-        }, 0);
-        return { ...o, items: updatedItems, total_price: newTotal, has_new_items: updatedItems.some(i => i.is_new_item) };
-      });
-      setOrders(updated);
-      if (selectedOrder?.id === orderId) setSelectedOrder(updated.find(o => o.id === orderId));
-      toast.success('Item cancelled');
-    } catch {
-      toast.error('Failed to cancel item.');
-    }
+      const processed = processOrder(fresh);
+      setOrders(prev => prev.map(o => o.id === orderId ? processed : o));
+      if (viewOrder?.id === orderId) setViewOrder({ ...processed, _tableName: tablesMap[processed.table_id] || String(processed.table_id) });
+      if (selectedOrder?.id === orderId) setSelectedOrder(processed);
+    } catch { toast.error('Failed to update item.'); }
   };
 
-  const updateItemQuantity = (orderId, itemIdentifier, newQty) => {
-    setOrders(prev =>
-      prev.map(o => {
-        if (o.id !== orderId) return o;
-        const updatedItems = o.items.map(item => {
-          const itemKey = item.id || item.frontend_unique_key;
-          if (itemKey === itemIdentifier) return { ...item, quantity: newQty > 0 ? newQty : 1 };
-          return item;
-        });
-        const newTotal = updatedItems.reduce(
-          (s, it) =>
-            s + ((inventoryMap[it.item_id]?.unit_price || it.unit_price || it.price || 0) * (it.quantity || 1)),
-          0
-        );
-        return { ...o, items: updatedItems, total_price: newTotal };
-      })
-    );
-    if (selectedOrder?.id === orderId) {
-      setSelectedOrder(prev => ({
-        ...prev,
-        items: prev.items.map(item => {
-          const itemKey = item.id || item.frontend_unique_key;
-          if (itemKey === itemIdentifier) return { ...item, quantity: newQty > 0 ? newQty : 1 };
-          return item;
-        }),
-      }));
-    }
-  };
-
-  const confirmDeleteOrder = async () => {
-    if (!orderToDelete) return;
+  const handleItemRemoveAll = async (transactionType, reason) => {
+    const { item, orderId } = itemDeleteModal;
+    setItemDeleteModal({ isOpen: false, item: null, orderId: null });
+    if (!item?.id) { toast.error('Cannot delete — item has no DB reference.'); return; }
     try {
       await axios.delete(
-        `${import.meta.env.VITE_API_ORDER_SERVICE_URL}/${clientId}/dinein/delete`,
+        `${import.meta.env.VITE_API_ORDER_SERVICE_URL}/${clientId}/order_item/delete`,
         {
-          params: { dinein_order_id: orderToDelete, client_id: clientId },
+          params: { client_id: clientId, order_item_id: item.id, transaction_type: transactionType, reason: reason || undefined },
           headers: { Authorization: `Bearer ${token}` },
         }
       );
-      const deletedOrder = orders.find(o => o.id === orderToDelete);
-      const tableIdOfDel = deletedOrder?.table_id;
-      if (tableIdOfDel) {
-        const tableObj = tables.find(t => t.id === tableIdOfDel);
-        await axios.post(
-          `${import.meta.env.VITE_API_TABLE_SERVICE_URL}/${clientId}/tables/update`,
-          {
-            id: tableIdOfDel,
-            client_id: clientId,
-            name: tableObj?.name || '',
-            table_type: tableObj?.table_type || '',
-            status: 'vacant',
-            location_zone: tableObj?.location_zone || '',
-          },
-          { headers: { Authorization: `Bearer ${token}` } }
-        );
+      toast.success('Item removed.');
+      const res = await axios.get(`${import.meta.env.VITE_API_ORDER_SERVICE_URL}/${clientId}/dinein/table`, { headers: { Authorization: `Bearer ${token}` } });
+      const allOrders = res.data?.data || [];
+      const fresh = allOrders.find(o => o.id === orderId);
+      if (!fresh) {
+        setOrders(prev => prev.filter(o => o.id !== orderId));
+        if (viewOrder?.id === orderId) { setViewOrder(null); setShowViewModal(false); }
+        toast.info('All items removed — order closed.');
+        return;
       }
-      setOrders(prev => prev.filter(o => o.id !== orderToDelete));
-      setShowDeleteModal(false);
-      setOrderToDelete(null);
-      toast.success('Order deleted and table marked vacant.');
-      fetchTables();
-    } catch {
-      toast.error('Failed to delete order');
-    }
+      const processed = processOrder(fresh);
+      setOrders(prev => prev.map(o => o.id === orderId ? processed : o));
+      if (viewOrder?.id === orderId) setViewOrder({ ...processed, _tableName: tablesMap[processed.table_id] || String(processed.table_id) });
+      if (selectedOrder?.id === orderId) setSelectedOrder(processed);
+    } catch { toast.error('Failed to remove item.'); }
+  };
+
+  const handleRequestDeleteItem = (item, orderId) => {
+    setItemDeleteModal({ isOpen: true, item, orderId });
+  };
+
+  // ── Status change (unchanged) ──────────────────────────────────────────────
+
+  const handleStatusChange = async (orderId, newStatus) => {
+    const order = orders.find(o => o.id === orderId);
+    if (!order || order.status === 'served') return;
+    const tableObj = tables.find(t => t.id === order.table_id);
+    try {
+      await axios.post(`${import.meta.env.VITE_API_ORDER_SERVICE_URL}/${clientId}/dinein/update`, { id: orderId, client_id: clientId, status: newStatus }, { headers: { Authorization: `Bearer ${token}` } });
+      if (tableObj) await axios.post(`${import.meta.env.VITE_API_TABLE_SERVICE_URL}/${clientId}/tables/update`, { id: order.table_id, client_id: clientId, name: tableObj.name, table_type: tableObj.table_type, status: 'vacant', location_zone: tableObj.location_zone }, { headers: { Authorization: `Bearer ${token}` } });
+      toast.success('Order status updated');
+      setOrders(prev => prev.map(o => o.id === orderId ? { ...o, status: newStatus, has_new_items: newStatus === 'served' ? false : o.has_new_items } : o));
+      if (selectedOrder?.id === orderId) setSelectedOrder(prev => ({ ...prev, status: newStatus }));
+      if (newStatus === 'served') setEditOrderId(null);
+    } catch { toast.error('Failed to update order status.'); }
   };
 
   const handleGenerateBill = (order) => {
@@ -964,6 +1044,16 @@ const OrderSummaryVisible = ({ clientId, token }) => {
     setSelectedMainItem(null);
     setLineItemsDetails([]);
     setPendingOrderId(null);
+  };
+
+  const updateItemQuantity = (orderId, itemIdentifier, newQty) => {
+    setOrders(prev => prev.map(o => {
+      if (o.id !== orderId) return o;
+      const updatedItems = o.items.map(item => { const itemKey = item.id || item.frontend_unique_key; if (itemKey === itemIdentifier) return { ...item, quantity: newQty > 0 ? newQty : 1 }; return item; });
+      const newTotal = updatedItems.reduce((s, it) => s + ((inventoryMap[it.item_id]?.unit_price || it.unit_price || it.price || 0) * (it.quantity || 1)), 0);
+      return { ...o, items: updatedItems, total_price: newTotal };
+    }));
+    if (selectedOrder?.id === orderId) setSelectedOrder(prev => ({ ...prev, items: prev.items.map(item => { const itemKey = item.id || item.frontend_unique_key; if (itemKey === itemIdentifier) return { ...item, quantity: newQty > 0 ? newQty : 1 }; return item; }) }));
   };
 
   const addItemToOrderWithBatch = (orderId, selectedItem, forcedBatchTimestamp, isMainItem = false) => {
@@ -1055,7 +1145,6 @@ const OrderSummaryVisible = ({ clientId, token }) => {
       });
       if (!newItemsByBatch.has(batchMeta.timestamp)) newItemsByBatch.set(batchMeta.timestamp, []);
       newItemsByBatch.get(batchMeta.timestamp).push(newItem);
-
       const combined = [...oldItems];
       Array.from(newItemsByBatch.keys()).sort((a, b) => a - b).forEach(ts => {
         const batch = (newItemsByBatch.get(ts) || []).map(it => ({ ...it }));
@@ -1226,12 +1315,7 @@ const OrderSummaryVisible = ({ clientId, token }) => {
     if (mode === 'delivery') return <Truck size={12} />;
     return <Users size={12} />;
   };
-
-  const getOrderModeLabel = (mode) => {
-    if (mode === 'takeaway') return 'Takeaway';
-    if (mode === 'delivery') return 'Delivery';
-    return 'Dine In';
-  };
+  const getOrderModeLabel = (mode) => { if (mode === 'takeaway') return 'Takeaway'; if (mode === 'delivery') return 'Delivery'; return 'Dine In'; };
 
   // ─────────────────────────────────────────────────────────────────────────
   // Render
@@ -1299,430 +1383,186 @@ const OrderSummaryVisible = ({ clientId, token }) => {
               {filteredOrders.length} order{filteredOrders.length !== 1 ? 's' : ''}
             </div>
           </div>
-          </div>
-
-          {/* ── Orders table ── */}
-          {loading ? (
-            <div className="flex items-center justify-center py-24">
-              <div className="w-8 h-8 border-2 border-action-primary border-t-transparent rounded-full animate-spin" />
-            </div>
-          ) : filteredOrders.length === 0 ? (
-            <div className="rounded-xl p-16 text-center bg-bg-primary border border-border-default shadow-card">
-              <ShoppingBag
-                size={40}
-                className="mx-auto mb-3 text-text-secondary opacity-40"
-              />
-              <p className="text-text-secondary text-base font-medium">No orders found</p>
-            </div>
-          ) : (
-            <div className="rounded-xl overflow-hidden border border-border-default shadow-card bg-bg-primary">
-              <table className="w-full">
-
-                {/* Table head */}
-                <thead className="bg-bg-tertiary border-b border-border-default">
-                  <tr>
-                    <th className="px-6 py-4 text-left text-xs font-bold text-text-primary uppercase tracking-wider">
-                      Order #
-                    </th>
-                    <th className="px-6 py-4 text-left text-xs font-bold text-text-primary uppercase tracking-wider">
-                      Table / Customer
-                    </th>
-                    <th className="px-6 py-4 text-left text-xs font-bold text-text-primary uppercase tracking-wider">
-                      Mode
-                    </th>
-                    <th className="px-6 py-4 text-left text-xs font-bold text-text-primary uppercase tracking-wider">
-                      Items
-                    </th>
-                    <th className="px-6 py-4 text-left text-xs font-bold text-text-primary uppercase tracking-wider">
-                      Total Price
-                    </th>
-                    <th className="px-6 py-4 text-left text-xs font-bold text-text-primary uppercase tracking-wider">
-                      Status
-                    </th>
-                    <th className="px-6 py-4 text-left text-xs font-bold text-text-primary uppercase tracking-wider">
-                      Actions
-                    </th>
-                  </tr>
-                </thead>
-
-                {/* Table body */}
-                <tbody className="divide-y divide-border-default">
-                  {filteredOrders.map((order, rowIdx) => {
-                    const status = order.status?.toLowerCase();
-                    const orderTotal = getOrderTotal(order);
-                    const isEven = rowIdx % 2 === 0;
-
-                    return (
-                      <tr
-                        key={order.id}
-                        className={`hover:bg-bg-tertiary transition-colors
-                        ${isEven ? 'bg-bg-primary' : 'bg-bg-tertiary'}`}
-                      >
-                        {/* Order # */}
-                        <td className="px-6 py-4 whitespace-nowrap">
-                          <div className="flex items-center gap-1.5">
-                            <span className="font-bold text-action-primary">#{order.id}</span>
-                            {order.has_new_items && (
-                              <span className="text-[9px] font-bold text-text-white bg-action-primary px-1.5 py-0.5 rounded-full uppercase">
-                                New
-                              </span>
-                            )}
-                          </div>
-                        </td>
-
-                        {/* Table / Customer */}
-                        <td className="px-6 py-4 whitespace-nowrap">
-                          {order._fixedOrderMode === 'takeaway'
-                            ? order.customer_name || 'Takeaway'
-                            : tablesMap[order.table_id] ||
-                            order.table ||
-                            String(order.table_id)}
-                        </td>
-
-                        {/* Mode */}
-                        <td className="px-6 py-4 whitespace-nowrap">
-                          <span className="inline-flex items-center gap-1 px-2.5 py-1 rounded-full text-xs font-semibold bg-bg-tertiary text-text-secondary border border-border-default">
-                            {getOrderModeIcon(order._fixedOrderMode)}
-                            {getOrderModeLabel(order._fixedOrderMode)}
-                          </span>
-                        </td>
-
-                        {/* Items count */}
-                        <td className="px-6 py-4 whitespace-nowrap">
-                          {order.items.length}
-                        </td>
-
-                        {/* Total price — computed from backend items via inventoryMap */}
-                        <td className="px-6 py-4 whitespace-nowrap">
-                          ₹{orderTotal.toFixed(2)}
-                        </td>
-
-                        {/* Status */}
-                        <td className="px-6 py-4 whitespace-nowrap">
-                          <StatusBadge status={order.status} />
-                        </td>
-
-                        {/* Actions */}
-                        <td className="px-6 py-4 whitespace-nowrap">
-                          <div className="flex items-center justify-center gap-4 flex-wrap">
-
-                            {/* View items */}
-                            <button
-                              onClick={() => {
-                                setViewOrder({
-                                  ...order,
-                                  _tableName:
-                                    tablesMap[order.table_id] ||
-                                    order.table ||
-                                    String(order.table_id),
-                                });
-                                setShowViewModal(true);
-                              }}
-                              className="p-1.5 rounded-lg bg-action-primary/10 text-action-primary hover:bg-action-primary hover:text-text-white transition-colors"
-                              title="View items"
-                            >
-                              <Eye size={15} />
-                            </button>
-
-                            {/* Mark as Served */}
-                            {status === 'ready' && (
-                              <button
-                                onClick={() => handleStatusChange(order.id, 'served')}
-                                className="px-2.5 py-1 rounded-lg bg-action-success text-text-white text-xs font-semibold hover:opacity-90 transition-colors whitespace-nowrap"
-                              >
-                                Mark As Served
-                              </button>
-                            )}
-
-                            {/* Generate Bill */}
-                            {status === 'served' && (
-                              <button
-                                onClick={() => handleGenerateBill(order)}
-                                className="px-2.5 py-1 rounded-lg bg-green-700 text-text-white text-xs font-semibold hover:bg-green-800 transition-colors whitespace-nowrap"
-                              >
-                                Generate Bill
-                              </button>
-                            )}
-
-                            {/* Delete */}
-                            <button
-                              onClick={() => {
-                                setOrderToDelete(order.id);
-                                setShowDeleteModal(true);
-                              }}
-                              className="p-1.5 rounded-lg bg-action-danger/10 text-action-danger hover:bg-action-danger hover:text-text-white transition-colors"
-                              title="Delete order"
-                            >
-                              <Trash2 size={15} />
-                            </button>
-                          </div>
-                        </td>
-                      </tr>
-                    );
-                  })}
-                </tbody>
-              </table>
-            </div>
-          )}
         </div>
 
-        {/* ── Order detail / edit modal (preserved from original) ── */}
-        {showOrderDetailModal && selectedOrder && (
-          <div
-            className="fixed inset-0 z-50 flex items-center justify-center p-4 bg-color-modalsbg backdrop-blur-sm"
-            onClick={() => {
-              setShowOrderDetailModal(false);
-              setEditOrderId(null);
-              setActiveTab('items');
-            }}
-          >
-            <div
-              className="rounded-xl w-full max-w-3xl max-h-[90vh] flex flex-col bg-bg-primary shadow-card border border-border-default"
-              onClick={e => e.stopPropagation()}
-            >
-              {/* Header */}
-              <div className="px-4 sm:px-6 py-4 border-b border-border-default bg-bg-tertiary rounded-t-xl">
-                <div className="flex items-center justify-between gap-4">
-                  <div>
-                    <h3 className="text-lg sm:text-xl font-bold text-text-primary">
-                      {tablesMap[selectedOrder.table_id] ||
-                        selectedOrder.table ||
-                        selectedOrder.table_id}
-                    </h3>
-                    <span className="text-2xl font-extrabold text-text-primary">
-                      {selectedOrder.items.length} items
-                    </span>
-                  </div>
-                  <div className="flex items-center gap-3">
-                    <div className="text-right bg-action-primary/10 px-4 py-2 rounded-xl border border-action-primary/20">
-                      <div className="text-xs font-semibold text-text-secondary uppercase">Total</div>
-                      <div className="text-xl font-bold text-action-primary">
-                        ₹{selectedOrder.items
-                          .reduce(
-                            (sum, item) =>
-                              sum +
-                              ((inventoryMap[item.item_id]?.unit_price ||
-                                item.unit_price ||
-                                item.price ||
-                                0) *
-                                (item.quantity || 1)),
-                            0
-                          )
-                          .toFixed(2)}
-                      </div>
-                    </div>
-                    <button
-                      className="p-2 rounded-xl hover:bg-bg-tertiary"
-                      onClick={() => {
-                        setShowOrderDetailModal(false);
-                        setEditOrderId(null);
-                        setActiveTab('items');
-                      }}
-                    >
-                      <X size={20} />
-                    </button>
-                  </div>
-                </div>
-              </div>
-
-              {/* Mobile tabs */}
-              <div className="lg:hidden border-b border-border-default bg-bg-tertiary">
-                <div className="flex">
-                  <button
-                    className={`flex-1 py-3 text-sm font-semibold
-                    ${activeTab === 'items'
-                        ? 'text-action-primary border-b-2 border-action-primary bg-bg-primary'
-                        : 'text-text-secondary'}`}
-                    onClick={() => setActiveTab('items')}
-                  >
-                    Items
-                  </button>
-                  <button
-                    className={`flex-1 py-3 text-sm font-semibold
-                    ${activeTab === 'available'
-                        ? 'text-action-primary border-b-2 border-action-primary bg-bg-primary'
-                        : 'text-text-secondary'}`}
-                    onClick={() => setActiveTab('available')}
-                  >
-                    Add Items
-                  </button>
-                </div>
-              </div>
-
-              {/* Content */}
-              <div className="flex-1 flex flex-col lg:flex-row overflow-hidden">
-
-                {/* Available items (add) */}
-                <div
-                  className={`w-full lg:w-2/5 border-r border-border-default bg-bg-tertiary flex flex-col
-                  ${activeTab === 'available' ? 'block' : 'hidden lg:flex'}`}
-                >
-                  <div className="p-4 border-b border-border-default bg-bg-primary shrink-0">
-                    <input
-                      type="text"
-                      className="w-full px-4 py-2 rounded-xl border border-border-default bg-bg-primary text-text-primary"
-                      placeholder="Search items..."
-                      value={itemSearchQuery}
-                      onChange={e => setItemSearchQuery(e.target.value)}
-                    />
-                  </div>
-                  <div className="flex-1 overflow-y-auto p-4 space-y-2">
-                    {(itemSearchResults.length > 0 ? itemSearchResults : allInventoryItems).map(item => (
-                      <div
-                        key={item.id}
-                        className="p-3 rounded-xl bg-bg-primary border border-border-default cursor-pointer hover:border-action-primary transition-colors"
-                        onClick={() => {
-                          handleItemSelection(selectedOrder.id, item);
-                          setActiveTab('items');
-                        }}
-                      >
-                        <div className="font-semibold text-text-primary">{item.name}</div>
-                        <div className="text-sm font-bold text-action-primary">₹{item.unit_price}</div>
-                      </div>
-                    ))}
-                  </div>
-                </div>
-
-                {/* Order items */}
-                <div
-                  className={`w-full lg:w-3/5 bg-bg-primary
-                  ${activeTab === 'items' ? 'block' : 'hidden lg:block'}`}
-                >
-                  <div className="p-4 space-y-2 overflow-y-auto max-h-[calc(90vh-200px)]">
-                    {selectedOrder.items.map((item, idx) => {
-                      const prev = selectedOrder.items[idx - 1];
-                      const showDivider =
-                        item._isBatchStart ||
-                        (item.is_new_item &&
-                          (!prev ||
-                            (prev.batch_timestamp || null) !== (item.batch_timestamp || null)));
-
-                      return (
-                        <div key={item.id || idx}>
-                          {showDivider && (
-                            <div className="flex items-center my-4">
-                              <div className="flex-1 h-px bg-gradient-to-r from-transparent via-action-primary to-transparent" />
-                              <span className="px-3 py-1.5 text-action-primary bg-action-primary/10 text-xs font-bold rounded-full mx-3 border border-action-primary/30">
-                                New Items
-                              </span>
-                              <div className="flex-1 h-px bg-gradient-to-r from-transparent via-action-primary to-transparent" />
-                            </div>
-                          )}
-                          <div className="flex items-center justify-between p-3 rounded-xl bg-bg-tertiary border border-border-default">
-                            <div className="font-semibold text-sm text-text-primary">
-                              {item.item_name || item.item_id}
-                            </div>
-                            <div className="flex items-center gap-2">
-                              <button
-                                onClick={() =>
-                                  updateItemQuantity(
-                                    selectedOrder.id,
-                                    item.id || item.frontend_unique_key,
-                                    Math.max(1, item.quantity - 1)
-                                  )
-                                }
-                                className="px-3 py-1 rounded-lg border border-border-default bg-bg-primary text-text-primary"
-                              >
-                                −
-                              </button>
-                              <span className="px-3 font-bold text-text-primary">{item.quantity}</span>
-                              <button
-                                onClick={() =>
-                                  updateItemQuantity(
-                                    selectedOrder.id,
-                                    item.id || item.frontend_unique_key,
-                                    item.quantity + 1
-                                  )
-                                }
-                                className="px-3 py-1 rounded-lg border border-border-default bg-bg-primary text-text-primary"
-                              >
-                                +
-                              </button>
-                              <button
-                                className="p-2 rounded-lg bg-action-danger/10 text-action-danger"
-                                onClick={() => {
-                                  setDeleteTarget({
-                                    orderId: selectedOrder.id,
-                                    itemBackendId: item.id,
-                                  });
-                                  setShowDeleteModals(true);
-                                }}
-                              >
-                                <Trash2 size={16} />
-                              </button>
-                            </div>
-                          </div>
+        {loading ? (
+          <div className="flex items-center justify-center py-24"><div className="w-8 h-8 border-2 border-action-primary border-t-transparent rounded-full animate-spin" /></div>
+        ) : filteredOrders.length === 0 ? (
+          <div className="rounded-xl p-16 text-center bg-bg-primary border border-border-default shadow-card"><ShoppingBag size={40} className="mx-auto mb-3 text-text-secondary opacity-40" /><p className="text-text-secondary text-base font-medium">No orders found</p></div>
+        ) : (
+          <div className="rounded-xl overflow-hidden border border-border-default shadow-card bg-bg-primary">
+            <table className="w-full">
+              <thead className="bg-bg-tertiary border-b border-border-default">
+                <tr>
+                  {['Order #', 'Table / Customer', 'Mode', 'Items', 'Total Price', 'Status', 'Actions'].map(h => (
+                    <th key={h} className="px-6 py-4 text-left text-xs font-bold text-text-primary uppercase tracking-wider">{h}</th>
+                  ))}
+                </tr>
+              </thead>
+              <tbody className="divide-y divide-border-default">
+                {filteredOrders.map((order, rowIdx) => {
+                  const status = order.status?.toLowerCase();
+                  const orderTotal = getOrderTotal(order);
+                  return (
+                    <tr key={order.id} className={`hover:bg-bg-tertiary transition-colors ${rowIdx % 2 === 0 ? 'bg-bg-primary' : 'bg-bg-tertiary'}`}>
+                      <td className="px-6 py-4 whitespace-nowrap">
+                        <div className="flex items-center gap-1.5">
+                          <span className="font-bold text-action-primary">#{order.id}</span>
+                          {order.has_new_items && <span className="text-[9px] font-bold text-text-white bg-action-primary px-1.5 py-0.5 rounded-full uppercase">New</span>}
                         </div>
-                      );
-                    })}
-                  </div>
-                </div>
-              </div>
-
-              {/* Footer */}
-              <div className="p-4 border-t border-border-default bg-bg-tertiary flex gap-3 rounded-b-xl">
-                <button
-                  className="flex-1 bg-action-primary text-text-white py-3 rounded-xl font-semibold"
-                  onClick={() => {
-                    updateOrderItems(selectedOrder.id, selectedOrder.items);
-                    setShowOrderDetailModal(false);
-                    setEditOrderId(null);
-                  }}
-                >
-                  Save Changes
-                </button>
-                <button
-                  className="flex-1 bg-bg-primary border border-border-default py-3 rounded-xl font-semibold text-text-primary"
-                  onClick={() => {
-                    setShowOrderDetailModal(false);
-                    setEditOrderId(null);
-                    setActiveTab('items');
-                  }}
-                >
-                  Cancel
-                </button>
-              </div>
-            </div>
+                      </td>
+                      <td className="px-6 py-4 whitespace-nowrap">{order._fixedOrderMode === 'takeaway' ? order.customer_name || 'Takeaway' : tablesMap[order.table_id] || order.table || String(order.table_id)}</td>
+                      <td className="px-6 py-4 whitespace-nowrap">
+                        <span className="inline-flex items-center gap-1 px-2.5 py-1 rounded-full text-xs font-semibold bg-bg-tertiary text-text-secondary border border-border-default">{getOrderModeIcon(order._fixedOrderMode)}{getOrderModeLabel(order._fixedOrderMode)}</span>
+                      </td>
+                      <td className="px-6 py-4 whitespace-nowrap">{order.items.length}</td>
+                      <td className="px-6 py-4 whitespace-nowrap">₹{orderTotal.toFixed(2)}</td>
+                      <td className="px-6 py-4 whitespace-nowrap"><StatusBadge status={order.status} /></td>
+                      <td className="px-6 py-4 whitespace-nowrap">
+                        <div className="flex items-center justify-center gap-4 flex-wrap">
+                          <button
+                            onClick={() => { setViewOrder({ ...order, _tableName: tablesMap[order.table_id] || order.table || String(order.table_id) }); setShowViewModal(true); }}
+                            className="p-1.5 rounded-lg bg-action-primary/10 text-action-primary hover:bg-action-primary hover:text-text-white transition-colors" title="View items"
+                          ><Eye size={15} /></button>
+                          {status === 'ready' && (
+                            <button onClick={() => handleStatusChange(order.id, 'served')} className="px-2.5 py-1 rounded-lg bg-action-success text-text-white text-xs font-semibold hover:opacity-90 transition-colors whitespace-nowrap">Mark As Served</button>
+                          )}
+                          {status === 'served' && (
+                            <button onClick={() => handleGenerateBill(order)} className="px-2.5 py-1 rounded-lg bg-green-700 text-text-white text-xs font-semibold hover:bg-green-800 transition-colors whitespace-nowrap">Generate Bill</button>
+                          )}
+                          {/* REQ: trash now opens CancelOrderConfirmModal */}
+                          <button
+                            onClick={() => setCancelOrderModal({ isOpen: true, orderId: order.id })}
+                            className="p-1.5 rounded-lg bg-action-danger/10 text-action-danger hover:bg-action-danger hover:text-text-white transition-colors" title="Cancel order"
+                          ><Trash2 size={15} /></button>
+                        </div>
+                      </td>
+                    </tr>
+                  );
+                })}
+              </tbody>
+            </table>
           </div>
         )}
+      </div>
 
-        {/* ── Modals ── */}
-        <OrderItemsViewModal
-          isOpen={showViewModal}
-          onClose={() => { setShowViewModal(false); setViewOrder(null); }}
-          order={viewOrder}
-          inventoryMap={inventoryMap}
-        />
+      {/* Order detail / edit modal (unchanged structure, delete button now uses new handler) */}
+      {showOrderDetailModal && selectedOrder && (
+        <div className="fixed inset-0 z-50 flex items-center justify-center p-4 bg-color-modalsbg backdrop-blur-sm" onClick={() => { setShowOrderDetailModal(false); setEditOrderId(null); setActiveTab('items'); }}>
+          <div className="rounded-xl w-full max-w-3xl max-h-[90vh] flex flex-col bg-bg-primary shadow-card border border-border-default" onClick={e => e.stopPropagation()}>
+            <div className="px-4 sm:px-6 py-4 border-b border-border-default bg-bg-tertiary rounded-t-xl">
+              <div className="flex items-center justify-between gap-4">
+                <div>
+                  <h3 className="text-lg sm:text-xl font-bold text-text-primary">{tablesMap[selectedOrder.table_id] || selectedOrder.table || selectedOrder.table_id}</h3>
+                  <span className="text-2xl font-extrabold text-text-primary">{selectedOrder.items.length} items</span>
+                </div>
+                <div className="flex items-center gap-3">
+                  <div className="text-right bg-action-primary/10 px-4 py-2 rounded-xl border border-action-primary/20">
+                    <div className="text-xs font-semibold text-text-secondary uppercase">Total</div>
+                    <div className="text-xl font-bold text-action-primary">₹{selectedOrder.items.reduce((sum, item) => sum + ((inventoryMap[item.item_id]?.unit_price || item.unit_price || item.price || 0) * (item.quantity || 1)), 0).toFixed(2)}</div>
+                  </div>
+                  <button className="p-2 rounded-xl hover:bg-bg-tertiary" onClick={() => { setShowOrderDetailModal(false); setEditOrderId(null); setActiveTab('items'); }}><X size={20} /></button>
+                </div>
+              </div>
+            </div>
+            <div className="lg:hidden border-b border-border-default bg-bg-tertiary">
+              <div className="flex">
+                <button className={`flex-1 py-3 text-sm font-semibold ${activeTab === 'items' ? 'text-action-primary border-b-2 border-action-primary bg-bg-primary' : 'text-text-secondary'}`} onClick={() => setActiveTab('items')}>Items</button>
+                <button className={`flex-1 py-3 text-sm font-semibold ${activeTab === 'available' ? 'text-action-primary border-b-2 border-action-primary bg-bg-primary' : 'text-text-secondary'}`} onClick={() => setActiveTab('available')}>Add Items</button>
+              </div>
+            </div>
+            <div className="flex-1 flex flex-col lg:flex-row overflow-hidden">
+              <div className={`w-full lg:w-2/5 border-r border-border-default bg-bg-tertiary flex flex-col ${activeTab === 'available' ? 'block' : 'hidden lg:flex'}`}>
+                <div className="p-4 border-b border-border-default bg-bg-primary shrink-0">
+                  <input type="text" className="w-full px-4 py-2 rounded-xl border border-border-default bg-bg-primary text-text-primary" placeholder="Search items..." value={itemSearchQuery} onChange={e => setItemSearchQuery(e.target.value)} />
+                </div>
+                <div className="flex-1 overflow-y-auto p-4 space-y-2">
+                  {(itemSearchResults.length > 0 ? itemSearchResults : allInventoryItems).map(item => (
+                    <div key={item.id} className="p-3 rounded-xl bg-bg-primary border border-border-default cursor-pointer hover:border-action-primary transition-colors" onClick={() => { handleItemSelection(selectedOrder.id, item); setActiveTab('items'); }}>
+                      <div className="font-semibold text-text-primary">{item.name}</div>
+                      <div className="text-sm font-bold text-action-primary">₹{item.unit_price}</div>
+                    </div>
+                  ))}
+                </div>
+              </div>
+              <div className={`w-full lg:w-3/5 bg-bg-primary ${activeTab === 'items' ? 'block' : 'hidden lg:block'}`}>
+                <div className="p-4 space-y-2 overflow-y-auto max-h-[calc(90vh-200px)]">
+                  {selectedOrder.items.map((item, idx) => {
+                    const prev = selectedOrder.items[idx - 1];
+                    const showDivider = item._isBatchStart || (item.is_new_item && (!prev || (prev.batch_timestamp || null) !== (item.batch_timestamp || null)));
+                    const isServedItem = item.status?.toLowerCase() === 'served';
+                    return (
+                      <div key={item.id || idx}>
+                        {showDivider && (
+                          <div className="flex items-center my-4">
+                            <div className="flex-1 h-px bg-gradient-to-r from-transparent via-action-primary to-transparent" />
+                            <span className="px-3 py-1.5 text-action-primary bg-action-primary/10 text-xs font-bold rounded-full mx-3 border border-action-primary/30">New Items</span>
+                            <div className="flex-1 h-px bg-gradient-to-r from-transparent via-action-primary to-transparent" />
+                          </div>
+                        )}
+                        <div className={`flex items-center justify-between p-3 rounded-xl border ${isServedItem ? 'bg-gray-50 border-gray-200' : 'bg-bg-tertiary border-border-default'}`}>
+                          <div>
+                            <div className="font-semibold text-sm text-text-primary">{item.item_name || item.item_id}</div>
+                            {isServedItem && <span className="text-[10px] font-semibold text-gray-500 bg-gray-100 px-1.5 py-0.5 rounded-full mt-0.5 inline-block">served</span>}
+                          </div>
+                          <div className="flex items-center gap-2">
+                            {!isServedItem && (
+                              <>
+                                <button onClick={() => updateItemQuantity(selectedOrder.id, item.id || item.frontend_unique_key, Math.max(1, item.quantity - 1))} className="px-3 py-1 rounded-lg border border-border-default bg-bg-primary text-text-primary">−</button>
+                                <span className="px-3 font-bold text-text-primary">{item.quantity}</span>
+                                <button onClick={() => updateItemQuantity(selectedOrder.id, item.id || item.frontend_unique_key, item.quantity + 1)} className="px-3 py-1 rounded-lg border border-border-default bg-bg-primary text-text-primary">+</button>
+                              </>
+                            )}
+                            {/* REQ: now opens OldItemDeleteModal with reason + qty */}
+                            <button
+                              className={`p-2 rounded-lg transition-colors ${isServedItem ? 'bg-orange-100 text-orange-600 hover:bg-orange-500 hover:text-white' : 'bg-action-danger/10 text-action-danger hover:bg-action-danger hover:text-text-white'}`}
+                              title={isServedItem ? 'Delete served item (records wastage)' : 'Delete item'}
+                              onClick={() => handleRequestDeleteItem(item, selectedOrder.id)}
+                            ><Trash2 size={16} /></button>
+                          </div>
+                        </div>
+                      </div>
+                    );
+                  })}
+                </div>
+              </div>
+            </div>
+            <div className="p-4 border-t border-border-default bg-bg-tertiary flex gap-3 rounded-b-xl">
+              <button className="flex-1 bg-action-primary text-text-white py-3 rounded-xl font-semibold" onClick={() => { updateOrderItems(selectedOrder.id, selectedOrder.items); setShowOrderDetailModal(false); setEditOrderId(null); }}>Save Changes</button>
+              <button className="flex-1 bg-bg-primary border border-border-default py-3 rounded-xl font-semibold text-text-primary" onClick={() => { setShowOrderDetailModal(false); setEditOrderId(null); setActiveTab('items'); }}>Cancel</button>
+            </div>
+          </div>
+        </div>
+      )}
 
-        <LineItemsModal
-          isOpen={lineItemsModalOpen}
-          onClose={() => setLineItemsModalOpen(false)}
-          mainItem={selectedMainItem}
-          lineItems={lineItemsDetails}
-          onAddMainOnly={handleAddMainItemOnly}
-          onAddWithAddons={handleAddMainItemWithLineItems}
-        />
+      {/* Modals */}
+      <OrderItemsViewModal
+        isOpen={showViewModal}
+        onClose={() => { setShowViewModal(false); setViewOrder(null); }}
+        order={viewOrder}
+        inventoryMap={inventoryMap}
+        onRequestDeleteItem={(item) => handleRequestDeleteItem(item, viewOrder?.id)}
+      />
 
-        <SimpleDeleteConfirm
-          isOpen={showDeleteModal}
-          onClose={() => setShowDeleteModal(false)}
-          onConfirm={confirmDeleteOrder}
-          title="Delete Order"
-          message="Want to delete this order?"
-        />
+      <LineItemsModal isOpen={lineItemsModalOpen} onClose={() => setLineItemsModalOpen(false)} mainItem={selectedMainItem} lineItems={lineItemsDetails} onAddMainOnly={handleAddMainItemOnly} onAddWithAddons={handleAddMainItemWithLineItems} />
 
-        <SimpleDeleteConfirm
-          isOpen={showDeleteModals}
-          onClose={() => setShowDeleteModals(false)}
-          onConfirm={() => {
-            cancelItem(deleteTarget.orderId, deleteTarget.itemBackendId);
-            setShowDeleteModals(false);
-          }}
-          title="Delete Item"
-          message="Are you sure you want to delete this item?"
-        />
+      {/* REQ: Cancel order — now requires reason (matches TakeOrder) */}
+      <CancelOrderConfirmModal
+        isOpen={cancelOrderModal.isOpen}
+        onClose={() => setCancelOrderModal({ isOpen: false, orderId: null })}
+        onConfirm={(reason) => { if (cancelOrderModal.orderId) handleCancelOrder(cancelOrderModal.orderId, reason); }}
+      />
 
-        <style>{`
+      {/* REQ: Item delete — now has reason + qty (matches TakeOrder) */}
+      <OldItemDeleteModal
+        isOpen={itemDeleteModal.isOpen}
+        item={itemDeleteModal.item}
+        onClose={() => setItemDeleteModal({ isOpen: false, item: null, orderId: null })}
+        onRemoveOne={handleItemRemoveOne}
+        onRemoveAll={handleItemRemoveAll}
+      />
+
+      <style>{`
         .custom-scrollbar::-webkit-scrollbar { width: 8px; }
         .custom-scrollbar::-webkit-scrollbar-track { background: var(--color-bg-tertiary); border-radius: 10px; }
         .custom-scrollbar::-webkit-scrollbar-thumb { background: var(--color-border-default); border-radius: 10px; }
