@@ -6,7 +6,7 @@ from pathlib import Path
 
 ENV = os.getenv("ENV", "development")
 
-// BASE_DIR = os.path.abspath(os.path.join(os.getcwd(), ".."))
+# BASE_DIR = os.path.abspath(os.path.join(os.getcwd(), ".."))
 BASE_DIR = os.getcwd()
 env_file = os.path.join(BASE_DIR, f".env.{ENV}")
 
