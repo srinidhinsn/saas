@@ -1,4 +1,4 @@
-import { useState, useEffect, useCallback, useMemo } from "react";
+import { useState, useEffect, useCallback, useMemo, useRef } from "react";
 import { createPortal } from "react-dom";
 import MenuTreeNode from "./MenuTreeNode";
 import { Plus, X, Edit, Trash2 } from 'lucide-react';
@@ -147,11 +147,25 @@ const generateCategoryId = (name, parentName) => {
     }
     return null;
   };
+  const hasInitializedExpanded = useRef(false)
+
   useEffect(() => {
     if (!displayCategories.length) return;
-    // Only expand top-level categories
+    
     const topLevelIds = displayCategories.map(cat => cat.id);
-    setExpandedCategories(topLevelIds);
+    
+    if (!hasInitializedExpanded.current) {
+      // First load — set top-level only
+      setExpandedCategories(topLevelIds);
+      hasInitializedExpanded.current = true;
+    } else {
+      // Zone changed — preserve existing expanded state,
+      // just ensure top-level ids are still in the list
+      setExpandedCategories(prev => {
+        const merged = new Set([...prev, ...topLevelIds]);
+        return Array.from(merged);
+      });
+    }
   }, [displayCategories]);
   // useEffect(() => {
   //   if (!displayCategories.length) return;
