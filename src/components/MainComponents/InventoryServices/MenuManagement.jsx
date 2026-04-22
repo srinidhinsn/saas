@@ -598,6 +598,7 @@ const MenuManagement = ({ clientId, token, realm }) => {
         serving_quantity: newItem.serving_quantity
           ? parseFloat(newItem.serving_quantity)
           : null,
+          unit: newItem.unit || null,
         serving_unit: newItem.serving_unit || null,
         availability: parseFloat(newItem.availability) || 0,
         created_by,
