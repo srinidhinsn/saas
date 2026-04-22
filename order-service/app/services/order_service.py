@@ -3,54 +3,13 @@ from sqlalchemy.orm import Session
 from entity.order_entity import DineinOrder as DBOrder, OrderItem as DBOrderItem
 from entity.order_entity import DineinOrder as Db_Order_Entity, OrderItem as Db_OrderItem_Entity
 from entity.inventory_entity import InventoryEntity, InventoryTransactionEntity
+from models.order_model import TransactionTypeEnum, MovementTypeEnum, OrderStatusEnum
+from models.inventory_model import InventoryTransaction
+from utils.transaction import create_transaction , TxPayload
 from decimal import Decimal
-import uuid
-
-
-# # from .billing_client import push_order_to_billing
-# from billing_client import push_order_to_billing_public
-
-# def build_billing_payload_from_order(order: DBOrder, items: List[DBOrderItem]) -> Dict[str, Any]:
-#     """
-#     Maps your order + items to a compact payload understood by billing-service.
-#     """
-#     return {
-#         "client_id": order.client_id,
-#         "order_id": str(order.id),
-#         "table_id": order.table_id,
-#         "totals": {
-#             "price":       float(order.price or 0.0),
-#             "gst":         float(order.gst or 0.0),
-#             "cst":         float(order.cst or 0.0),
-#             "discount":    float(order.discount or 0.0),
-#             "total_price": float(order.total_price or 0.0),
-#         },
-#         "items": [
-#             {
-#                 "item_id":   itm.item_id,
-#                 "item_name": getattr(itm, "item_name", None),
-#                 "slug":      itm.slug,
-#                 "quantity":  int(itm.quantity or 0),
-#             } for itm in items
-#         ],
-#     }
-
-# def sync_served_order_to_billing(order: DBOrder) -> dict:
-#     """
-#     Builds payload from the given order and pushes it to billing-service.
-#     Safe to call right after you mark an order as 'served'.
-#     Returns billing response or raises on HTTP errors.
-#     """
-#     items = list(order.items)  # relationship
-#     payload = build_billing_payload_from_order(order, items)
-#     return push_order_to_billing(payload)
-
 
 
 def build_billing_payload_from_order(order: DBOrder, items: List[DBOrderItem]) -> Dict[str, Any]:
-    """
-    Map order-service DB entities to billing intake payload.
-    """
     return {
         "client_id": order.client_id,
         "order_id": str(order.id),
@@ -74,6 +33,7 @@ def build_billing_payload_from_order(order: DBOrder, items: List[DBOrderItem]) -
         ],
     }
 
+
 def sync_served_order_to_billing_public(order: DBOrder, user_jwt: str) -> dict:
     """
     Build payload and call billing public endpoint with the user's JWT.
@@ -82,7 +42,7 @@ def sync_served_order_to_billing_public(order: DBOrder, user_jwt: str) -> dict:
     return push_order_to_billing_public(order.client_id, user_jwt, payload)
 
 
-# ── Private helpers ─────────────────────────────────────────────────────────
+# ── Private helpers ──────────────────────────────────────────────────────────
 
 def _root_dinein_id(dinein_order_id: str) -> str:
     """Return the root part of a dinein_order_id.  "1001-2" → "1001" """
@@ -126,9 +86,13 @@ def _merge_group(orders: list) -> dict:
     merged_items = []
     for order in orders:
         for item in order.items:
+            if (item.status or "").lower() == OrderStatusEnum.cancelled.value:
+                continue
             m = Db_OrderItem_Entity.copyToModel(item).dict()
             m["batch_label"] = order.dinein_order_id
             m["sub_order_id"] = order.id
+            # ✅ FIX: explicitly carry parent_item_key so frontend can re-group
+            m["parent_item_key"] = getattr(item, "parent_item_key", None)
             merged_items.append(m)
 
     statuses = [o.status for o in orders if o.status]
@@ -146,11 +110,11 @@ def _merge_group(orders: list) -> dict:
         for o in orders
     ]
 
-    # Total price = sum of all items' unit_price * quantity (no GST/CST)
+    # ✅ FIX: only sum parent items (no parent_item_key) to avoid double-counting
     total_price = sum(
-        (item.unit_price or 0) * (item.quantity or 1)
-        for order in orders
-        for item in order.items
+        (item.get("unit_price") or 0) * (item.get("quantity") or 1)
+        for item in merged_items
+        if not item.get("parent_item_key")
     )
 
     return {
@@ -208,54 +172,15 @@ def _convert(recipe_qty: float, recipe_unit: str, stock_unit: str) -> float:
 
     raise ValueError(f"Incompatible unit dimensions: recipe='{ru}', stock='{su}'")
 
-
-# -------------------- STOCK DEDUCTION --------------------
-
-def _record_transaction(
-    db: Session,
-    *,
-    client_id: str,
-    stock_item_id: int,
-    inventory_id: Optional[str],
-    name: Optional[str],
-    transaction_type: str,
-    movement_type: str,
-    quantity: Decimal,
-    unit: Optional[str],
-    before_stock: Decimal,
-    after_stock: Decimal,
-    reference_id: Optional[str] = None,
-    reference_type: Optional[str] = None,
-    created_by: Optional[str] = None,
-    remarks: Optional[str] = None,
-) -> InventoryTransactionEntity:
-    tx = InventoryTransactionEntity(
-        transaction_id=str(uuid.uuid4()),
-        client_id=client_id,
-        stock_item_id=stock_item_id,
-        inventory_id=inventory_id,
-        name=name,
-        transaction_type=transaction_type,
-        movement_type=movement_type,
-        quantity=quantity,
-        unit=unit,
-        before_stock=before_stock,
-        after_stock=after_stock,
-        reference_id=reference_id,
-        reference_type=reference_type,
-        created_by=created_by,
-        remarks=remarks,
-    )
-    db.add(tx)
-    return tx
- 
-
-
+# ── Stock deduction ──────────────────────────────────────────────────────────
 def _deduct_stock_for_order(db: Session, client_id: str, order_id: int) -> None:
-    """
-    Called exactly once when the whole order transitions to 'served'.
-    For every order item → recipe JSONB → convert units → deduct stock.
-    """
+
+    def _tx(item_id, tx_type, qty, remarks):
+        create_transaction(
+            db=db, client_id=client_id,
+            payload=TxPayload(item_id=item_id, tx_type=tx_type, ref_id=order_id, qty=qty, remarks=remarks)
+        )
+
     order_items = (
         db.query(Db_OrderItem_Entity)
         .filter(
@@ -265,15 +190,15 @@ def _deduct_stock_for_order(db: Session, client_id: str, order_id: int) -> None:
         .all()
     )
 
-    # Fetch all item-level transaction keys already recorded for this order
-    # Key: (stock_item_id, remarks) — we use frontend_unique_key as the
-    # per-item deduplication anchor stored in remarks.
     already_deducted_keys: set[str] = set(
         row.remarks
         for row in db.query(InventoryTransactionEntity.remarks).filter(
             InventoryTransactionEntity.reference_id == str(order_id),
             InventoryTransactionEntity.reference_type == "order",
-            InventoryTransactionEntity.transaction_type == "ORDER_DEDUCTION",
+            InventoryTransactionEntity.transaction_type.in_([
+                TransactionTypeEnum.order_deduction.value,
+                TransactionTypeEnum.menu_item_deduction.value,
+            ]),
         ).all()
         if row.remarks
     )
@@ -281,18 +206,34 @@ def _deduct_stock_for_order(db: Session, client_id: str, order_id: int) -> None:
     for order_item in order_items:
         menu_item = (
             db.query(InventoryEntity)
-            .filter(
-                InventoryEntity.id == order_item.item_id,
-                InventoryEntity.client_id == client_id,
-            )
+            .filter(InventoryEntity.id == order_item.item_id, InventoryEntity.client_id == client_id)
             .first()
         )
 
         if not menu_item or not menu_item.recipe:
             continue
 
-        ordered_qty = order_item.quantity or 1
+        ordered_qty  = order_item.quantity or 1
+        serving_qty  = float(menu_item.serving_quantity or 0)
+        serving_unit = (menu_item.serving_unit or "").strip()
+        stock_unit   = (menu_item.unit or "").strip()
 
+        # 1. Menu item self-deduction
+        if serving_qty > 0 and serving_unit and stock_unit:
+            menu_dedup_key = (
+                f"Menu item deduction Order #{order_id} — "
+                f"{order_item.item_name} x{ordered_qty} "
+                f"[key={order_item.frontend_unique_key}]"
+            )
+            if menu_dedup_key not in already_deducted_keys:
+                try:
+                    total = round(_convert(serving_qty, serving_unit, stock_unit) * ordered_qty, 6)
+                    _tx(menu_item.id, TransactionTypeEnum.menu_item_deduction, total, menu_dedup_key)
+                    already_deducted_keys.add(menu_dedup_key)
+                except ValueError as e:
+                    print(f"[WARN] Skipping menu item deduction for item_id={menu_item.id}: {e}")
+
+        # 2. Ingredient deduction
         for ingredient in menu_item.recipe:
             stock_item_id = ingredient.get("stock_item_id")
             recipe_qty    = float(ingredient.get("quantity_required") or 0)
@@ -301,56 +242,22 @@ def _deduct_stock_for_order(db: Session, client_id: str, order_id: int) -> None:
             if not stock_item_id or recipe_qty <= 0:
                 continue
 
-            # ✅ Idempotency guard — skip if this exact item+ingredient was
-            #    already deducted for this order (handles sub-order re-serves)
-            dedup_key = (
-                f"Order #{order_id} served — "
-                f"{order_item.item_name} x{ordered_qty} "
-                f"[key={order_item.frontend_unique_key}]"
-            )
+            dedup_key = f"order={order_id}|item={order_item.item_id}|ingredient={stock_item_id}|fkey={order_item.frontend_unique_key}"
+
             if dedup_key in already_deducted_keys:
                 continue
 
             stock_item = (
                 db.query(InventoryEntity)
-                .filter(
-                    InventoryEntity.id == int(stock_item_id),
-                    InventoryEntity.client_id == client_id,
-                )
+                .filter(InventoryEntity.id == int(stock_item_id), InventoryEntity.client_id == client_id)
                 .first()
             )
-
             if not stock_item:
                 continue
 
-            stock_unit = (stock_item.unit or "").strip()
-
             try:
-                deduction = _convert(recipe_qty, recipe_unit, stock_unit) * ordered_qty
+                deduction_qty = round(_convert(recipe_qty, recipe_unit, stock_item.unit.strip()) * ordered_qty, 6)
+                _tx(stock_item.id, TransactionTypeEnum.order_deduction, deduction_qty, dedup_key)
+                already_deducted_keys.add(dedup_key)
             except ValueError as e:
                 print(f"[WARN] Skipping deduction for stock_item_id={stock_item_id}: {e}")
-                continue
-
-            deduction_decimal = Decimal(str(round(deduction, 6)))
-            before_stock = Decimal(str(stock_item.availability or 0))
-            after_stock = max(before_stock - deduction_decimal, Decimal("0"))
-
-            _record_transaction(
-                db,
-                client_id=client_id,
-                stock_item_id=stock_item.id,
-                inventory_id=stock_item.inventory_id,
-                name=stock_item.name,
-                transaction_type="ORDER_DEDUCTION",
-                movement_type="OUT",
-                quantity=deduction_decimal,
-                unit=stock_unit,
-                before_stock=before_stock,
-                after_stock=after_stock,
-                reference_id=str(order_id),
-                reference_type="order",
-                # ✅ remarks now includes frontend_unique_key for dedup
-                remarks=dedup_key,
-            )
-
-            stock_item.availability = after_stock

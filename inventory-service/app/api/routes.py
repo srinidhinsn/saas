@@ -1,5 +1,6 @@
 from fastapi import APIRouter, Depends, HTTPException, Query
 from sqlalchemy.orm import Session
+from sqlalchemy import text
 from typing import List, Optional, Dict, Any
 from decimal import Decimal, getcontext
 from database.postgres import get_db
@@ -9,9 +10,10 @@ from models.response_model import ResponseModel
 from models.saas_context import SaasContext
 from utils.auth import verify_token
 from services import service
-from services.service import _compute_current_stock, _record_transaction, _convert
+from utils.transaction import _compute_current_stock, create_transaction, _convert , TxPayload
 from sqlalchemy import text
 from utils.services import add_master_value , get_master_values ,delete_master_value
+
 # -------------------- CONFIG --------------------
 router = APIRouter()
 getcontext().prec = 18  # increase decimal precision
@@ -66,6 +68,7 @@ def create_inventory(item: Inventory, client_id: str, context: SaasContext = Dep
 
     model = InventoryEntity.copyToModel(saved)
     return ResponseModel[Inventory](screen_id=context.screen_id,status="success",message="Inventory item created",data=model)
+
 
 @router.post("/update", response_model=ResponseModel[Inventory])
 def update_inventory(
@@ -133,11 +136,59 @@ def update_inventory(
     db.refresh(record)
 
     return ResponseModel(
+    screen_id=context.screen_id,
+    status="success",
+    message="Inventory updated successfully",
+    data=InventoryEntity.copyToModel(record)
+    )
+
+@router.post("/update/avail", response_model=ResponseModel[Inventory])
+def update_inventory_availability(
+    client_id: str,
+    updates: Inventory,
+    context: SaasContext = Depends(verify_token),
+    db: Session = Depends(get_db),
+):
+    if not updates.id:
+        raise HTTPException(status_code=400, detail="Missing item ID")
+
+    record = db.query(InventoryEntity).filter(
+        InventoryEntity.id == updates.id,
+        InventoryEntity.client_id == client_id,
+    ).first()
+
+    if not record:
+        raise HTTPException(status_code=404, detail="Inventory item not found")
+
+    update_data = updates.dict(exclude_unset=True)
+    new_availability = update_data.pop("availability", None)
+
+    # ✅ Update metadata (no change here)
+    for key, value in update_data.items():
+        if key != "client_id":
+            setattr(record, key, value)
+
+    # ✅ Handle availability via unified transaction
+    if new_availability is not None:
+        new_qty = Decimal(str(new_availability))
+        before_stock = Decimal(str(record.availability or 0))
+
+        # Only create transaction if changed
+        if new_qty != before_stock:
+            create_transaction(db=db, client_id=client_id, payload=TxPayload(item_id=record.id,
+                                tx_type="MENU_AVAILABILITY_ADJUSTMENT",ref_id=record.id,qty=abs(new_qty - before_stock),
+                                after_stock=new_qty,remarks=f"Manual availability update for '{record.name}'",))
+
+    db.commit()
+    db.refresh(record)
+
+    return ResponseModel[Inventory](
         screen_id=context.screen_id,
         status="success",
         message="Inventory updated",
         data=InventoryEntity.copyToModel(record)
     )
+
 @router.post("/delete", response_model=ResponseModel[Inventory])
 def delete_inventory(
     client_id: str,
@@ -197,6 +248,7 @@ def delete_all_inventory( client_id: str, context: SaasContext = Depends(verify_
 
     return ResponseModel[str]( screen_id=context.screen_id, status="success", message="All inventory items deleted", data="All inventory items deleted successfully")
 # -------------------- CATEGORY ROUTES --------------------
+
 
 @router.get("/read_category", response_model=ResponseModel)
 def read_categories(client_id: str, category_id: Optional[str] = Query(None), context: SaasContext = Depends(verify_token), db: Session = Depends(get_db)):
@@ -310,49 +362,31 @@ def create_stock_item(
  
     payload = item.dict()
     payload["client_id"] = client_id
+
     if not payload.get("id"):
         result = db.execute(text("SELECT nextval('inventory_id_seq')"))
         payload["id"] = result.scalar()
- 
+
     # Quantity that will go into the transaction (defaults to 0 if not provided)
     opening_qty = Decimal(str(payload.get("availability") or "0"))
-    unit = payload.get("unit")
- 
+
     # Store the item WITHOUT the opening quantity (we track it via transactions)
     # availability is set to 0 here; it will be re-synced after the transaction
     payload["availability"] = Decimal("0")
- 
+
     db_item = InventoryEntity(**payload)
     db.add(db_item)
-    db.flush()  # get the auto-generated id before committing
- 
-    # Record the opening stock as an IN transaction (even if 0)
-    before_stock = Decimal("0")
-    after_stock = before_stock + opening_qty
- 
-    _record_transaction(
-        db,
-        client_id=client_id,
-        stock_item_id=db_item.id,
-        inventory_id=db_item.inventory_id,
-        name=db_item.name,
-        transaction_type="STOCK_IN",
-        movement_type="IN",
-        quantity=opening_qty,
-        unit=unit,
-        before_stock=before_stock,
-        after_stock=after_stock,
-        created_by=getattr(context, "user_id", None),
-        remarks="Opening stock on item creation",
-    )
- 
-    # Sync availability back onto the inventory row
-    db_item.availability = after_stock
- 
+    db.flush()  # get ID before transaction
+
+    # 🔥 Use unified transaction engine
+    if opening_qty != Decimal("0"):
+        create_transaction(db=db, client_id=client_id, payload=TxPayload(item_id=db_item.id,tx_type="STOCK_IN",
+                           ref_id=db_item.id,qty=opening_qty,movement_type="IN",remarks="Opening stock on item creation",))
+
     db.commit()
     db.refresh(db_item)
     model = InventoryEntity.copyToModel(db_item)
- 
+
     return ResponseModel(
         screen_id=context.screen_id,
         status="success",
@@ -385,42 +419,27 @@ def add_stock_quantity(
  
     if not record:
         raise HTTPException(status_code=404, detail="Stock item not found")
- 
-    before_stock = _compute_current_stock(db, client_id, stock_item_id)
-    after_stock = before_stock + Decimal(str(quantity))
- 
-    _record_transaction(
-        db,
-        client_id=client_id,
-        stock_item_id=stock_item_id,
-        inventory_id=record.inventory_id,
-        name=record.name,
-        transaction_type="STOCK_IN",
-        movement_type="IN",
-        quantity=Decimal(str(quantity)),
-        unit=unit or record.unit,
-        before_stock=before_stock,
-        after_stock=after_stock,
-        reference_id=reference_id,
-        reference_type=reference_type,
-        created_by=getattr(context, "user_id", None),
-        remarks=remarks or "Stock replenishment",
-    )
- 
-    # Sync availability
-    record.availability = after_stock
+
+    qty = Decimal(str(quantity))
+
+    if qty <= 0:
+        raise HTTPException(status_code=400, detail="Quantity must be greater than 0")
+
+    create_transaction(db=db, client_id=client_id, payload=TxPayload(item_id=record.id,tx_type="STOCK_IN",
+                       ref_id=reference_id or record.id,qty=qty,movement_type="IN",remarks=remarks or "Stock replenishment",))
+
     db.commit()
     db.refresh(record)
     model = InventoryEntity.copyToModel(record)
- 
+
     return ResponseModel(
         screen_id=context.screen_id,
         status="success",
         message=f"Added {quantity} {unit or record.unit} to {record.name}",
         data=model,
     )
- 
- 
+
+
 @router.post("/stock/deduct", response_model=ResponseModel)
 def deduct_stock_quantity(
     client_id: str,
@@ -439,6 +458,7 @@ def deduct_stock_quantity(
     Records an OUT transaction and updates availability on the inventory row.
     Raises 400 if the deduction would result in negative stock.
     """
+
     record = db.query(InventoryEntity).filter(
         InventoryEntity.id == stock_item_id,
         InventoryEntity.client_id == client_id,
@@ -448,7 +468,7 @@ def deduct_stock_quantity(
         raise HTTPException(status_code=404, detail="Stock item not found")
  
     qty = Decimal(str(quantity))
-    before_stock = _compute_current_stock(db, client_id, stock_item_id)
+    before_stock = Decimal(str(record.availability or 0))
     after_stock = before_stock - qty
  
     if after_stock < Decimal("0"):
@@ -456,38 +476,22 @@ def deduct_stock_quantity(
             status_code=400,
             detail=f"Insufficient stock. Available: {before_stock}, Requested: {qty}",
         )
- 
-    _record_transaction(
-        db,
-        client_id=client_id,
-        stock_item_id=stock_item_id,
-        inventory_id=record.inventory_id,
-        name=record.name,
-        transaction_type=transaction_type,
-        movement_type="OUT",
-        quantity=qty,
-        unit=unit or record.unit,
-        before_stock=before_stock,
-        after_stock=after_stock,
-        reference_id=reference_id,
-        reference_type=reference_type,
-        created_by=getattr(context, "user_id", None),
-        remarks=remarks,
-    )
- 
-    # Sync availability
-    record.availability = after_stock
+
+    # 🔥 Unified transaction
+    create_transaction(db=db, client_id=client_id, payload=TxPayload(item_id=record.id,tx_type=transaction_type,
+                    ref_id=reference_id or record.id,qty=qty,after_stock=after_stock,
+                    remarks=remarks or f"Stock deduction ({transaction_type})",))
+
     db.commit()
     db.refresh(record)
     model = InventoryEntity.copyToModel(record)
- 
+
     return ResponseModel(
         screen_id=context.screen_id,
         status="success",
         message=f"Deducted {quantity} {unit or record.unit} from {record.name}",
         data=model,
     )
- 
 
 @router.post("/stock/manual-deduct", response_model=ResponseModel)
 def manual_deduct_stock(
@@ -501,7 +505,9 @@ def manual_deduct_stock(
     db: Session = Depends(get_db),
 ):
     allowed_types = {"RETURN", "CANCELLATION"}
-    if transaction_type.upper() not in allowed_types:
+    tx_type = transaction_type.upper()
+
+    if tx_type not in allowed_types:
         raise HTTPException(
             status_code=400,
             detail=f"transaction_type must be one of: {', '.join(allowed_types)}"
@@ -535,9 +541,8 @@ def manual_deduct_stock(
     else:
         # Same unit or no unit provided — use as-is
         converted_qty = qty
-    # ─────────────────────────────────────────────────────────────────────────
 
-    before_stock = _compute_current_stock(db, client_id, stock_item_id)
+    before_stock = Decimal(str(record.availability or 0))
     after_stock = before_stock - converted_qty
 
     if after_stock < Decimal("0"):
@@ -551,23 +556,10 @@ def manual_deduct_stock(
             ),
         )
 
-    _record_transaction(
-        db,
-        client_id=client_id,
-        stock_item_id=stock_item_id,
-        inventory_id=record.inventory_id,
-        name=record.name,
-        transaction_type=transaction_type.upper(),
-        movement_type="OUT",
-        quantity=converted_qty,          # store in stock's native unit
-        unit=stock_unit,                 # always store native unit in transaction
-        before_stock=before_stock,
-        after_stock=after_stock,
-        created_by=getattr(context, "user_id", None),
-        remarks=remarks or None,
-    )
+    # 🔥 Unified transaction
+    create_transaction(db=db, client_id=client_id, payload=TxPayload(item_id=record.id,tx_type=tx_type,ref_id=record.id,
+                        qty=converted_qty,after_stock=after_stock,remarks=remarks or f"Manual deduction ({tx_type})",))
 
-    record.availability = after_stock
     db.commit()
     db.refresh(record)
     model = InventoryEntity.copyToModel(record)
@@ -595,6 +587,7 @@ def update_stock_item(
     If 'availability' is included in the payload it is treated as an ADJUSTMENT
     transaction (sets stock to the given absolute value) rather than a delta.
     """
+
     if not updates.id:
         raise HTTPException(status_code=400, detail="Missing item ID")
  
@@ -617,35 +610,18 @@ def update_stock_item(
     # Handle availability change as an ADJUSTMENT transaction
     if new_availability is not None:
         new_qty = Decimal(str(new_availability))
-        before_stock = _compute_current_stock(db, client_id, record.id)
+        before_stock = Decimal(str(record.availability or 0))
         delta = new_qty - before_stock
  
         if delta != Decimal("0"):
-            movement = "IN" if delta > 0 else "OUT"
-            _record_transaction(
-                db,
-                client_id=client_id,
-                stock_item_id=record.id,
-                inventory_id=record.inventory_id,
-                name=record.name,
-                transaction_type="ADJUSTMENT",
-                movement_type=movement,
-                quantity=abs(delta),
-                unit=record.unit,
-                before_stock=before_stock,
-                after_stock=new_qty,
-                created_by=getattr(context, "user_id", None),
-                remarks="Manual stock adjustment via update",
-            )
- 
-        record.availability = new_qty
- 
+            create_transaction(db=db, client_id=client_id, payload=TxPayload(item_id=record.id,tx_type="ADJUSTMENT",ref_id=record.id,
+                               qty=abs(delta),after_stock=new_qty,remarks="Manual stock adjustment via update",))
+
     db.commit()
     db.refresh(record)
     model = InventoryEntity.copyToModel(record)
- 
+
     return ResponseModel(screen_id=context.screen_id, status="success", message="Stock item updated", data=model)
- 
  
 @router.delete("/stock/delete_by_inventory")
 async def delete_inventory_records(client_id: str, inventory_id: str,db: Session = Depends(get_db)):
