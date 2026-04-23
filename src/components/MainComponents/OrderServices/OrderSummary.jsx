@@ -288,7 +288,9 @@ const OrderItemsViewModal = ({ isOpen, onClose, order, inventoryMap, onRequestDe
     }
   };
 
-  const grandTotal = order.items.reduce((sum, item) => {
+  const grandTotal = order.items
+  .filter(item => !item.parent_item_key)
+  .reduce((sum, item) => {
     const price =
       inventoryMap[item.item_id]?.unit_price ??
       item.unit_price ??
@@ -362,7 +364,7 @@ const OrderItemsViewModal = ({ isOpen, onClose, order, inventoryMap, onRequestDe
               </tr>
             </thead>
             <tbody className="divide-y divide-border-default">
-              {order.items.map((item, idx) => {
+            {order.items.filter(item => !item.parent_item_key).map((item, idx) => {
                 const unitPrice =
                   inventoryMap[item.item_id]?.unit_price ??
                   item.unit_price ??
@@ -1301,14 +1303,16 @@ const OrderSummaryVisible = ({ clientId, token }) => {
   // ─────────────────────────────────────────────────────────────────────────
 
   const getOrderTotal = (order) =>
-    order.items.reduce((sum, item) => {
-      const price =
-        inventoryMap[item.item_id]?.unit_price ??
-        item.unit_price ??
-        item.price ??
-        0;
-      return sum + price * (item.quantity || 1);
-    }, 0);
+    order.items
+      .filter(item => !item.parent_item_key)
+      .reduce((sum, item) => {
+        const price =
+          inventoryMap[item.item_id]?.unit_price ??
+          item.unit_price ??
+          item.price ??
+          0;
+        return sum + price * (item.quantity || 1);
+      }, 0);
 
   const getOrderModeIcon = (mode) => {
     if (mode === 'takeaway') return <Package size={12} />;
@@ -1459,7 +1463,10 @@ const OrderSummaryVisible = ({ clientId, token }) => {
                 <div className="flex items-center gap-3">
                   <div className="text-right bg-action-primary/10 px-4 py-2 rounded-xl border border-action-primary/20">
                     <div className="text-xs font-semibold text-text-secondary uppercase">Total</div>
-                    <div className="text-xl font-bold text-action-primary">₹{selectedOrder.items.reduce((sum, item) => sum + ((inventoryMap[item.item_id]?.unit_price || item.unit_price || item.price || 0) * (item.quantity || 1)), 0).toFixed(2)}</div>
+                    <div className="text-xl font-bold text-action-primary">₹{selectedOrder.items
+  .filter(item => !item.parent_item_key)
+  .reduce((sum, item) => sum + ((inventoryMap[item.item_id]?.unit_price || item.unit_price || item.price || 0) * (item.quantity || 1)), 0)
+  .toFixed(2)}</div>
                   </div>
                   <button className="p-2 rounded-xl hover:bg-bg-tertiary" onClick={() => { setShowOrderDetailModal(false); setEditOrderId(null); setActiveTab('items'); }}><X size={20} /></button>
                 </div>

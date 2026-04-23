@@ -3158,10 +3158,10 @@ const TakeOrder = ({ clientId, token, onOrderUpdate, realm }) => {
       });
 
       const billingDoc = await fetchBillingDocumentForOrder(orderId);
-
+      const parentItemsOnly = enriched.filter(item => !item.parent_item_key);
       setInvoiceOrderData({
         ...order,
-        items: combineDuplicateItems(enriched),
+        items: combineDuplicateItems(parentItemsOnly),
         customer_id: billingDoc?.customer_id || order.customer_id || '',
         contact_phone: billingDoc?.contact_phone || order.contact_phone || '',
         contact_email: billingDoc?.contact_email || order.contact_email || '',
@@ -3195,10 +3195,11 @@ const TakeOrder = ({ clientId, token, onOrderUpdate, realm }) => {
       });
 
       const billingDoc = await fetchBillingDocumentForOrder(activeOrderId);
+      const parentItemsOnly = enriched.filter(item => !item.parent_item_key);
 
       setInvoiceOrderData({
         ...order,
-        items: combineDuplicateItems(enriched),
+        items: combineDuplicateItems(parentItemsOnly),
         customer_id: customerDetails.customer_id || billingDoc?.customer_id || order.customer_id || '',
         contact_phone: customerDetails.contact_phone || billingDoc?.contact_phone || order.contact_phone || '',
         contact_email: billingDoc?.contact_email || order.contact_email || '',
