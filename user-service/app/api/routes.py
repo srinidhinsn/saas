@@ -2,7 +2,7 @@ from fastapi import Depends, HTTPException, APIRouter, Request
 from sqlalchemy.orm import Session
 from database.postgres import get_db
 from entity.user_entity import User, Person, PageDefinition
-from entity.client_entity import Client
+from entity.client_entity import Client, Address
 from utils.auth import hash_password, verify_password, create_access_token, verify_token, SECRET_KEY, ALGORITHM
 from models.saas_context import SaasContext
 from models.user_model import UserModel, ResetpasswordRequest, LoginRequest, PersonModel
@@ -19,9 +19,9 @@ from services.add_users import create_user_and_person, getting_screen_id, get_us
 from jose import jwt
 import uuid
 from sqlalchemy import func
-
+from models.client_model import AddressModel 
+from utils.services import add_master_value , get_master_values ,delete_master_value
 router = APIRouter()
-
 # ================== ADD USER ==================
 @router.post("/add")
 async def add_user(client_id: str, userReq: UserModel, context: SaasContext = Depends(verify_token), db: Session = Depends(get_db)):
@@ -625,3 +625,89 @@ def save_role_config(client_id: str, role: str, payload: dict, context: SaasCont
 
     db.commit()
     return ResponseModel(screen_id=context.screen_id, message="Role configuration saved")
+
+
+@router.post("/address")
+async def save_address(client_id: str,add: AddressModel,context: SaasContext = Depends(verify_token),db: Session = Depends(get_db)):
+    try:
+        user_uuid = uuid.UUID(str(context.user_id))
+    except ValueError:
+        raise HTTPException(status_code=400, detail="Invalid user id")
+    person = db.query(Person).filter(Person.id == user_uuid).first()
+    if not person:
+        raise HTTPException(status_code=404, detail="Person not found")
+    # If user already has address → UPDATE
+    if person.saved_address_ids and len(person.saved_address_ids) > 0:
+        address = db.query(Address).filter(
+            Address.id == person.saved_address_ids[0]
+        ).first()
+        
+        if address:
+            address.address_line1 = add.address_line1
+            address.address_line2 = add.address_line2
+            address.name = add.name
+            address.city = add.city
+            address.state = add.state
+            address.country = add.country
+            address.pincode = add.pincode
+            address.contact_name = add.contact_name
+            address.contact_number = add.contact_number
+
+            db.commit()
+
+            return ResponseModel(screen_id=context.screen_id,
+                data={"message": "Address updated successfully","address_id": address.id})
+
+    # Otherwise CREATE
+    new_address = Address(
+        address_line1=add.address_line1,
+        address_line2=add.address_line2,
+        name=add.name,
+        city=add.city,
+        state=add.state,
+        country=add.country,
+        pincode=add.pincode,
+        contact_name=add.contact_name,
+        contact_number=add.contact_number
+    )
+
+    db.add(new_address)
+    db.flush()
+
+    if not person.saved_address_ids:
+        person.saved_address_ids = []
+    person.saved_address_ids.append(new_address.id)
+    db.commit()
+    return ResponseModel(screen_id=context.screen_id,
+    data={"message": "Address added successfully","address_id": new_address.id}
+    )
+
+@router.get("/address")
+async def get_addresses(client_id: str, context: SaasContext = Depends(verify_token), db: Session = Depends(get_db)):
+    person = db.query(Person).filter(Person.id == context.user_id).first()
+
+    if not person or not person.saved_address_ids:
+        return ResponseModel(screen_id=context.screen_id, data={"addresses": []})
+
+    addresses = db.query(Address).filter(Address.id.in_(person.saved_address_ids)).all()
+    address_models = [Address.copyToModel(a) for a in addresses]
+
+    return ResponseModel(screen_id=context.screen_id,data={"addresses": address_models})
+
+@router.get("/roles")
+def get_roles(client_id: str, category_id: str,context: SaasContext = Depends(verify_token),db: Session = Depends(get_db)):
+    data = get_master_values(db, client_id, category_id)
+
+    return ResponseModel(screen_id=context.screen_id,status="success",message="Roles fetched",data=data)
+
+@router.post("/roles")
+def add_role(client_id: str, category_id: str, value: str,context: SaasContext = Depends(verify_token),db: Session = Depends(get_db)):
+    data = add_master_value(db, client_id, category_id, value)
+
+    return ResponseModel(screen_id=context.screen_id,status="success",message="Role added",data=data)
+
+@router.delete("/roles")
+def delete_role(client_id: str, category_id: str, value: str,context: SaasContext = Depends(verify_token),db: Session = Depends(get_db)):
+    data = delete_master_value(db, client_id, category_id, value)
+
+    return ResponseModel(screen_id=context.screen_id,status="success",message="Role deleted",data=data)

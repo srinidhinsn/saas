@@ -14,6 +14,7 @@ class Inventory(BaseModel):
     name: Optional[str] = None
     description: Optional[str] = None
     category_id: Optional[str] = None
+    zone_config_id: Optional[int] = None
     realm: Optional[str] = None 
     serving_quantity: Optional[float] = None
     serving_unit: Optional[str] = None
@@ -54,3 +55,27 @@ class Category(BaseModel, Generic[Q]):
 
     class Config:
         orm_mode = True
+
+
+
+class InventoryTransaction(BaseModel):
+    id: Optional[int] = None
+    transaction_id: Optional[str] = None
+    client_id: str
+    stock_item_id: int
+    inventory_id: Optional[str] = None
+    name: Optional[str] = None
+    transaction_type: str                   # STOCK_IN | ORDER_DEDUCTION | ADJUSTMENT | STOCK_OUT
+    movement_type: str                      # IN | OUT
+    quantity: float
+    unit: Optional[str] = None
+    before_stock: float
+    after_stock: float
+    reference_id: Optional[str] = None
+    reference_type: Optional[str] = None
+    created_by: Optional[str] = None
+    created_at: Optional[datetime] = None
+    remarks: Optional[str] = None
+ 
+    class Config:
+        from_attributes = True

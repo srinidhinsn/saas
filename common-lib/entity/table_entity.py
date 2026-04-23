@@ -33,8 +33,19 @@ class DiningTable(Base):
         return model
 
     @staticmethod
-    def copyToModels(tables):
+    def copyToModels(tables):        
         models = [Table(**table.__dict__) for table in tables]
         for m in models:
             m.__dict__.pop("_sa_instance_state", None)
         return models
+
+class Tables(Base):
+    __tablename__ = "zone_config"
+    id = Column(BigInteger, primary_key=True, autoincrement=True)
+    client_id = Column(Text, nullable=False)
+    realm = Column(Text, nullable=False)
+    section = Column(Text)
+    zone = Column(Text)
+    __table_args__ = (
+        UniqueConstraint("client_id", "section", "zone", name="uq_section_zone"),
+    )

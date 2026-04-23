@@ -1,52 +1,15 @@
-from typing import List, Dict, Any
+from typing import List, Dict, Any, Optional
 from sqlalchemy.orm import Session
 from entity.order_entity import DineinOrder as DBOrder, OrderItem as DBOrderItem
 from entity.order_entity import DineinOrder as Db_Order_Entity, OrderItem as Db_OrderItem_Entity
-
-# # from .billing_client import push_order_to_billing
-# from billing_client import push_order_to_billing_public
-
-# def build_billing_payload_from_order(order: DBOrder, items: List[DBOrderItem]) -> Dict[str, Any]:
-#     """
-#     Maps your order + items to a compact payload understood by billing-service.
-#     """
-#     return {
-#         "client_id": order.client_id,
-#         "order_id": str(order.id),
-#         "table_id": order.table_id,
-#         "totals": {
-#             "price":       float(order.price or 0.0),
-#             "gst":         float(order.gst or 0.0),
-#             "cst":         float(order.cst or 0.0),
-#             "discount":    float(order.discount or 0.0),
-#             "total_price": float(order.total_price or 0.0),
-#         },
-#         "items": [
-#             {
-#                 "item_id":   itm.item_id,
-#                 "item_name": getattr(itm, "item_name", None),
-#                 "slug":      itm.slug,
-#                 "quantity":  int(itm.quantity or 0),
-#             } for itm in items
-#         ],
-#     }
-
-# def sync_served_order_to_billing(order: DBOrder) -> dict:
-#     """
-#     Builds payload from the given order and pushes it to billing-service.
-#     Safe to call right after you mark an order as 'served'.
-#     Returns billing response or raises on HTTP errors.
-#     """
-#     items = list(order.items)  # relationship
-#     payload = build_billing_payload_from_order(order, items)
-#     return push_order_to_billing(payload)
-
+from entity.inventory_entity import InventoryEntity, InventoryTransactionEntity
+from models.order_model import TransactionTypeEnum, MovementTypeEnum, OrderStatusEnum
+from models.inventory_model import InventoryTransaction
+from utils.transaction import create_transaction , TxPayload
+from decimal import Decimal
 
 
 def build_billing_payload_from_order(order: DBOrder, items: List[DBOrderItem]) -> Dict[str, Any]:
-    """
-    Map order-service DB entities to billing intake payload.
-    """
     return {
         "client_id": order.client_id,
         "order_id": str(order.id),
@@ -70,6 +33,7 @@ def build_billing_payload_from_order(order: DBOrder, items: List[DBOrderItem]) -
         ],
     }
 
+
 def sync_served_order_to_billing_public(order: DBOrder, user_jwt: str) -> dict:
     """
     Build payload and call billing public endpoint with the user's JWT.
@@ -78,7 +42,7 @@ def sync_served_order_to_billing_public(order: DBOrder, user_jwt: str) -> dict:
     return push_order_to_billing_public(order.client_id, user_jwt, payload)
 
 
-# ── Private helpers ─────────────────────────────────────────────────────────
+# ── Private helpers ──────────────────────────────────────────────────────────
 
 def _root_dinein_id(dinein_order_id: str) -> str:
     """Return the root part of a dinein_order_id.  "1001-2" → "1001" """
@@ -122,9 +86,13 @@ def _merge_group(orders: list) -> dict:
     merged_items = []
     for order in orders:
         for item in order.items:
+            if (item.status or "").lower() == OrderStatusEnum.cancelled.value:
+                continue
             m = Db_OrderItem_Entity.copyToModel(item).dict()
             m["batch_label"] = order.dinein_order_id
             m["sub_order_id"] = order.id
+            # ✅ FIX: explicitly carry parent_item_key so frontend can re-group
+            m["parent_item_key"] = getattr(item, "parent_item_key", None)
             merged_items.append(m)
 
     statuses = [o.status for o in orders if o.status]
@@ -142,11 +110,11 @@ def _merge_group(orders: list) -> dict:
         for o in orders
     ]
 
-    # Total price = sum of all items' unit_price * quantity (no GST/CST)
+    # ✅ FIX: only sum parent items (no parent_item_key) to avoid double-counting
     total_price = sum(
-        (item.unit_price or 0) * (item.quantity or 1)
-        for order in orders
-        for item in order.items
+        (item.get("unit_price") or 0) * (item.get("quantity") or 1)
+        for item in merged_items
+        if not item.get("parent_item_key")
     )
 
     return {
@@ -164,3 +132,173 @@ def _merge_group(orders: list) -> dict:
     }
 
 # ───────────────────────────────────────────────────────────────────────────
+
+
+UNIT_TO_BASE = {
+    "g":     1,
+    "kg":    1000,
+    "ml":    1,
+    "litre": 1000,
+    "pcs":   1,
+}
+
+WEIGHT_UNITS  = {"g", "kg"}
+VOLUME_UNITS  = {"ml", "litre"}
+COUNT_UNITS   = {"pcs"}
+
+
+def _convert(recipe_qty: float, recipe_unit: str, stock_unit: str) -> float:
+    """
+    Convert recipe_qty from recipe_unit into stock_unit.
+
+    Examples:
+      30g   → kg  : (30 * 1) / 1000  = 0.03
+      500ml → litre: (500 * 1) / 1000 = 0.5
+      2kg   → g   : (2 * 1000) / 1    = 2000
+      5pcs  → pcs : 5
+    """
+    ru, su = recipe_unit.strip(), stock_unit.strip()
+
+    if ru == su:
+        return recipe_qty
+
+    # Both units must be known and in the same dimension
+    if ru not in UNIT_TO_BASE or su not in UNIT_TO_BASE:
+        raise ValueError(f"Unknown unit: recipe='{ru}', stock='{su}'")
+
+    for group in (WEIGHT_UNITS, VOLUME_UNITS, COUNT_UNITS):
+        if ru in group and su in group:
+            return (recipe_qty * UNIT_TO_BASE[ru]) / UNIT_TO_BASE[su]
+
+    raise ValueError(f"Incompatible unit dimensions: recipe='{ru}', stock='{su}'")
+
+# ── Stock deduction ──────────────────────────────────────────────────────────
+def _deduct_stock_for_order(db: Session, client_id: str, order_id: int) -> None:
+
+    def _tx(item_id, tx_type, qty, remarks):
+        create_transaction(
+            db=db, client_id=client_id,
+            payload=TxPayload(item_id=item_id, tx_type=tx_type, ref_id=order_id, qty=qty, remarks=remarks)
+        )
+
+    order_items = (
+        db.query(Db_OrderItem_Entity)
+        .filter(
+            Db_OrderItem_Entity.order_id == order_id,
+            Db_OrderItem_Entity.client_id == client_id,
+        )
+        .all()
+    )
+
+    for order_item in order_items:
+
+        # 🔥 FIX: skip addons / combo children
+        if order_item.parent_item_key:
+            continue
+
+        ordered_qty = order_item.quantity or 1
+
+        all_items: dict = {}
+        recipe_items: list = []
+
+        def collect_item(item_id, label):
+
+            if item_id in all_items:
+                return
+
+            item = (
+                db.query(InventoryEntity)
+                .filter(InventoryEntity.id == int(item_id), InventoryEntity.client_id == client_id)
+                .first()
+            )
+
+            if not item:
+                return
+
+            all_items[item_id] = {
+                "item": item,
+                "label": label
+            }
+
+            for linked_id in (item.line_item_id or []):
+                collect_item(linked_id, "ADDON")
+
+        # 🔥 collect MAIN + ADDONS only
+        main_item = (
+            db.query(InventoryEntity)
+            .filter(InventoryEntity.id == int(order_item.item_id), InventoryEntity.client_id == client_id)
+            .first()
+        )
+
+        if not main_item:
+            continue
+
+        collect_item(order_item.item_id, "MAIN")
+
+        # 🔥 collect RECIPE separately (FIX)
+        for ingredient in (main_item.recipe or []):
+            stock_item_id = ingredient.get("stock_item_id")
+            recipe_qty    = float(ingredient.get("quantity_required") or 0)
+            recipe_unit   = (ingredient.get("unit") or "").strip()
+
+            if not stock_item_id or recipe_qty <= 0:
+                continue
+
+            stock_item = (
+                db.query(InventoryEntity)
+                .filter(InventoryEntity.id == int(stock_item_id), InventoryEntity.client_id == client_id)
+                .first()
+            )
+
+            if not stock_item:
+                continue
+
+            recipe_items.append({
+                "item": stock_item,
+                "qty": recipe_qty,
+                "unit": recipe_unit
+            })
+
+        # 🔥 MAIN + ADDON deduction
+        for item_id, data in all_items.items():
+
+            item = data["item"]
+            label = data["label"]
+
+            serving_qty  = float(item.serving_quantity or 0)
+            serving_unit = (item.serving_unit or "").strip()
+            stock_unit   = (item.unit or "").strip()
+
+            if serving_qty > 0 and serving_unit and stock_unit:
+                try:
+                    total = round(_convert(serving_qty, serving_unit, stock_unit) * ordered_qty, 6)
+                    _tx(item.id, TransactionTypeEnum.order_deduction, total,
+                        f"[{label}] Order #{order_id}")
+                except ValueError:
+                    _tx(item.id, TransactionTypeEnum.order_deduction, ordered_qty,
+                        f"[{label}_FALLBACK] Order #{order_id}")
+            else:
+                _tx(item.id, TransactionTypeEnum.order_deduction, ordered_qty,
+                    f"[{label}_NO_SERVING] Order #{order_id}")
+
+        # 🔥 RECIPE deduction (CORRECT FIX)
+        for r in recipe_items:
+
+            stock_item = r["item"]
+            recipe_qty = r["qty"]
+            recipe_unit = r["unit"]
+            stock_unit = (stock_item.unit or "").strip()
+
+            if recipe_qty > 0 and recipe_unit and stock_unit:
+                try:
+                    total = round(_convert(recipe_qty, recipe_unit, stock_unit) * ordered_qty, 6)
+
+                    _tx(stock_item.id, TransactionTypeEnum.order_deduction, total,
+                        f"[RECIPE] Order #{order_id}")
+
+                except ValueError:
+                    _tx(stock_item.id, TransactionTypeEnum.order_deduction, ordered_qty,
+                        f"[RECIPE_FALLBACK] Order #{order_id}")
+            else:
+                _tx(stock_item.id, TransactionTypeEnum.order_deduction, ordered_qty,
+                    f"[RECIPE_NO_QTY] Order #{order_id}")

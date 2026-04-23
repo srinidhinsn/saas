@@ -3,11 +3,12 @@ from sqlalchemy.orm import Session
 from typing import List
 from uuid import UUID
 from database.postgres import get_db
-from models.table_model import Table
-from entity.table_entity import DiningTable
+from models.table_model import Table , TablesModel
+from entity.table_entity import DiningTable , Tables
 from models.response_model import ResponseModel 
 from models.saas_context import SaasContext
 from utils.auth import verify_token
+from utils.services import add_master_value , get_master_values ,delete_master_value
 
 router = APIRouter()
 
@@ -76,4 +77,60 @@ def delete_table(client_id: str, table: Table, context: SaasContext = Depends(ve
     return response
 
 
+@router.post("/config")
+def create_config(data: TablesModel, db: Session = Depends(get_db)):
 
+    existing = db.query(Tables).filter(
+        Tables.client_id == data.client_id,
+        Tables.section == data.section,
+        Tables.zone == data.zone
+    ).first()
+
+    if existing:
+        raise HTTPException(status_code=409, detail="Already exists")
+
+    new_config = Tables(**data.dict())
+    db.add(new_config)
+    db.commit()
+    db.refresh(new_config)
+
+    return new_config
+
+@router.get("/config")
+def get_configs(client_id: str, db: Session = Depends(get_db)):
+    return db.query(Tables).filter(Tables.client_id == client_id).all()
+
+@router.delete("/config/{id}")
+def delete_config(id: int, client_id: str, db: Session = Depends(get_db)):
+
+    config = db.query(Tables).filter(
+        Tables.id == id,
+        Tables.client_id == client_id
+    ).first()
+
+    if not config:
+        raise HTTPException(404, "Not found")
+
+    db.delete(config)
+    db.commit()
+
+    return {"message": "Deleted"}
+
+
+@router.get("/table-types")
+def get_table_types(client_id: str, category_id: str,context: SaasContext = Depends(verify_token),db: Session = Depends(get_db)):
+    data = get_master_values(db, client_id, category_id)
+
+    return ResponseModel(screen_id=context.screen_id,status="success",message="Config fetched",data=data)
+    
+@router.post("/table-types")
+def add_table_type(client_id: str, category_id: str, value: str,context: SaasContext = Depends(verify_token),db: Session = Depends(get_db)):
+    data = add_master_value(db, client_id, category_id, value)
+
+    return ResponseModel(screen_id=context.screen_id,status="success",message="Config added",data=data)
+
+@router.delete("/table-types")
+def delete_table_type(client_id: str, category_id: str, value: str,context: SaasContext = Depends(verify_token),db: Session = Depends(get_db)):
+    data = delete_master_value(db, client_id, category_id, value)
+
+    return ResponseModel(screen_id=context.screen_id,status="success",message="Config deleted",data=data)
