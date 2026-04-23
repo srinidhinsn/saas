@@ -1,0 +1,21 @@
+version: "3.9"
+
+services:
+  document-service:
+    build: .
+    image: document-service:v1
+    container_name: document-service-v1-qa
+    ports:
+      - "8006:8006"
+    volumes:
+      - upload_nfs:/app/uploads
+    restart: unless-stopped
+    command: ["uvicorn", "main:app", "--host", "0.0.0.0", "--port", "8006"]
+
+volumes:
+  upload_nfs:
+    driver: local
+    driver_opts:
+      type: "nfs"
+      o: "addr=172.25.1.21,nfsvers=4,rw"
+      device: ":/saas/qa/upload"
