@@ -257,9 +257,6 @@ const UniversalEditModal = ({
                 {/* Category Selector */}
                 <div>
                   <label className="block text-sm font-medium mb-1 text-gray-700">Category <span className="text-red-600">*</span></label>
-                  <label className="block text-sm font-medium mb-1 text-gray-700">
-                    Category <span className="text-red-600">*</span>
-                  </label>
                   <select
                     value={editingItem.category_id || ''}
                     onChange={(e) => setEditingItem({ ...editingItem, category_id: e.target.value })}
@@ -474,20 +471,31 @@ const UniversalEditModal = ({
                   </div>
                   <div>
                     <label className="block text-sm font-medium mb-1 text-gray-700">Unit</label>
-                    <input
-                      type="text"
-                      value={editingItem.unit}
+                    <select value={editingItem.unit}
                       onChange={(e) => setEditingItem({ ...editingItem, unit: e.target.value })}
-                      className="w-full px-3 py-2 rounded-md border border-gray-300 text-gray-900 focus:outline-none focus:ring-2 focus:ring-blue-500 focus:border-transparent"
-                    />
+                      className="w-full px-4 py-2 rounded-lg bg-bg-tertiary border border-border-default text-text-primary focus:outline-none focus:ring-2 focus:ring-action-primary">
+                    <option value="">Select unit</option>
+                    {(units || []).map((u) => (
+                      <option key={u} value={u}>{u}</option>
+                    ))}
+                    </select>
                   </div>
-                </div>
-
-                {/* Serving Quantity */}
-                <div>
+                  <div>
                   <label className="block text-sm font-medium mb-1 text-gray-700">Serving Quantity</label>
                   <input type="number" value={editingItem.serving_quantity ?? ''} onChange={e => setEditingItem({ ...editingItem, serving_quantity: e.target.value })}
                     className="w-full px-3 py-2 rounded-md border border-gray-300 text-gray-900 focus:outline-none focus:ring-2 focus:ring-blue-500" placeholder="0" />
+                </div>
+                <div>
+                    <label className="block text-sm font-medium mb-1 text-gray-700">Serving Unit</label>
+                    <select value={editingItem.serving_unit}
+                      onChange={(e) => setEditingItem({ ...editingItem, serving_unit: e.target.value })}
+                      className="w-full px-4 py-2 rounded-lg bg-bg-tertiary border border-border-default text-text-primary focus:outline-none focus:ring-2 focus:ring-action-primary">
+                    <option value="">Select unit</option>
+                    {(units || []).map((u) => (
+                      <option key={u} value={u}>{u}</option>
+                    ))}
+                    </select>
+                  </div>
                 </div>
 
                 {/* Image */}

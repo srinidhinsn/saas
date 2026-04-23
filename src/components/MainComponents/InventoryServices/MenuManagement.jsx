@@ -440,7 +440,9 @@ const MenuManagement = ({ clientId, token, realm }) => {
   const handleItemClick = (item) => {
     // Use allMenuItemsRaw to get ALL zone variants for this item
     const allSiblings = allMenuItemsRaw.filter(m => Number(m.id) === Number(item.id));
-    const baseRecord = allSiblings.find(m => m.zone_config_id === 0) || item;
+    const baseRecord = allSiblings.find(m => m.zone_config_id === 0)
+  ?? allSiblings.find(m => m.zone_config_id === null)
+  ?? item;
 
     const zonePrices = {};
     allSiblings
@@ -598,6 +600,7 @@ const MenuManagement = ({ clientId, token, realm }) => {
         serving_quantity: newItem.serving_quantity
           ? parseFloat(newItem.serving_quantity)
           : null,
+          unit: newItem.unit || null,
         serving_unit: newItem.serving_unit || null,
         availability: parseFloat(newItem.availability) || 0,
         created_by,
@@ -723,7 +726,8 @@ const MenuManagement = ({ clientId, token, realm }) => {
       })();
 
       // console.log(`[Edit] slug="${slug}" dietary="${dietary_type}" timing="${editingItem.availability_time}"`);
-
+      const created_by =
+      currentUserId || localStorage.getItem("user_id") || "system";
       const basePayload = {
         name: editingItem.name,
         description: editingItem.description || null,
@@ -738,6 +742,7 @@ const MenuManagement = ({ clientId, token, realm }) => {
           ? editingItem.line_item_id : null,
         realm: editingItem.realm || 'restaurant',
         availability: Number(editingItem.availability) || 0,
+        created_by:created_by,
         updated_by: currentUserId,
         slug,  // ✅ uses new slug with dietary + timing
         client_id: clientId,
@@ -771,19 +776,25 @@ const MenuManagement = ({ clientId, token, realm }) => {
               ? Number(existingZoneRecord.unit_price)
               : Number(editingItem.unit_price) || 0;
 
-        if (existingZoneRecord) {
-          await axios.post(
-            `${import.meta.env.VITE_API_INVENTORY_SERVICE_URL}/${clientId}/menu/update`,
-            { ...basePayload, unit_price: finalPrice, zone_config_id: configId },
-            { headers: { Authorization: `Bearer ${token}` } }
-          );
-        } else {
-          await axios.post(
-            `${import.meta.env.VITE_API_INVENTORY_SERVICE_URL}/${clientId}/menu/create`,
-            { ...basePayload, unit_price: finalPrice, zone_config_id: configId },
-            { headers: { Authorization: `Bearer ${token}` } }
-          );
-        }
+              if (existingZoneRecord) {
+                await axios.post(
+                  `${import.meta.env.VITE_API_INVENTORY_SERVICE_URL}/${clientId}/menu/update`,
+                  { ...basePayload, unit_price: finalPrice, zone_config_id: configId },
+                  { headers: { Authorization: `Bearer ${token}` } }
+                );
+              } else {
+                const enteredPrice = zp?.[configId];
+                const hasExplicitPrice =
+                  enteredPrice !== '' && enteredPrice !== null && enteredPrice !== undefined;
+              
+                if (hasExplicitPrice) {
+                  await axios.post(
+                    `${import.meta.env.VITE_API_INVENTORY_SERVICE_URL}/${clientId}/menu/create`,
+                    { ...basePayload, unit_price: parseFloat(enteredPrice), zone_config_id: configId },
+                    { headers: { Authorization: `Bearer ${token}` } }
+                  );
+                }
+              }
       }
 
       await fetchData({ silent: true });
@@ -815,7 +826,7 @@ const MenuManagement = ({ clientId, token, realm }) => {
     try {
       if (!silent) setLoading(true);
 
-      const [catRes, itemRes] = await Promise.all([
+      const [catRes, itemRes, allItemsRes] = await Promise.all([
         axios.get(
           `${import.meta.env.VITE_API_INVENTORY_SERVICE_URL}/${clientId}/menu/read_category?category_id=${menuConfig.root}`,
           { headers: { Authorization: `Bearer ${token}` } }
@@ -828,6 +839,13 @@ const MenuManagement = ({ clientId, token, realm }) => {
               inventory_id: menuConfig.menuInventoryId,
               ...(zoneConfigId && { zone_config_id: zoneConfigId })
             }
+          }
+        ),
+        axios.get(
+          `${import.meta.env.VITE_API_INVENTORY_SERVICE_URL}/${clientId}/menu/read`,
+          {
+            headers: { Authorization: `Bearer ${token}` },
+            params: { inventory_id: menuConfig.menuInventoryId }
           }
         )
       ]);
@@ -846,8 +864,8 @@ const MenuManagement = ({ clientId, token, realm }) => {
 
       const rawItems = itemRes.data.data;
 
-      // Store ALL raw records (including all zone variants) for edit operations
-      setAllMenuItemsRaw(rawItems.map(item => ({
+      const allRawItems = allItemsRes.data.data || [];
+      setAllMenuItemsRaw(allRawItems.map(item => ({
         ...item,
         zone_config_id: item.zone_config_id === null || item.zone_config_id === undefined
           ? 0
@@ -1612,8 +1630,9 @@ const handleBulkUpdate = async () => {
     if (!selectAllChecked) { setSelectedRows(filteredItems.map(item => item.id)); setSelectAllChecked(true); }
     else { setSelectedRows([]); setSelectAllChecked(false); }
   };
-
+  const hasRestoredRef = useRef(false);
   useEffect(() => {
+    if (hasRestoredRef.current) return; 
     if (!categories?.length) return;
     const saved = savedCategoryRef.current;
     if (!saved) return;
@@ -1648,7 +1667,7 @@ const handleBulkUpdate = async () => {
     if (parentCategory) {
       setSelectedCategoryId(parentCategory.id);
       localStorage.setItem("menu_selected_category", parentCategory.id);
-      setSidebarCategories([parentCategory]);
+      setSidebarCategories([parentCategory]);hasRestoredRef.current = true;
     }
   }, [categories]);
 
@@ -2108,7 +2127,7 @@ const handleBulkUpdate = async () => {
       />
 
       <UniversalBulkUpdateModal clientId={clientId}
-        token={token} menuItems={menuItems}
+        token={token} menuItems={allMenuItemsRaw}
         showModal={showBulkModal} setShowModal={setShowBulkModal} modalType="menu"
         filteredItems={filteredItems} selectedRows={selectedRows} setSelectedRows={setSelectedRows}
         selectAllChecked={selectAllChecked} setSelectAllChecked={setSelectAllChecked}

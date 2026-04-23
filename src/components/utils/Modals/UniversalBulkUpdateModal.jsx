@@ -373,14 +373,14 @@ const UniversalBulkUpdateModal = ({
               </div>
 
               <div className="flex gap-2 w-full sm:w-auto flex-wrap">
-                <button
+                {/* <button
                   onClick={handleBulkUpdate}
                   disabled={selectedRows.length === 0}
                   className="flex-1 sm:flex-none flex items-center justify-center gap-2 px-4 py-2 rounded-lg bg-blue-600 text-white hover:bg-blue-700 transition-colors disabled:bg-gray-300 disabled:cursor-not-allowed font-medium text-sm"
                 >
                   <Edit className="w-4 h-4" />
                   Update Selected
-                </button>
+                </button> */}
                 <button
                   onClick={() => {
                     if (selectedRows.length === 0) return;
@@ -547,7 +547,9 @@ const UniversalBulkUpdateModal = ({
                                       type="number"
                                       min="0"
                                       placeholder={item.unit_price || "0.00"}
-                                      value={editData.zonePrices?.[c.id] ?? ''}
+                                      value={editData.zonePrices?.[c.id] ?? 
+                                        menuItems?.find(m => Number(m.id) === Number(item.id) && Number(m.zone_config_id) === Number(c.id))?.unit_price ?? ''}
+                                      
                                       onChange={e => updateBulkEditData(item.id, 'zonePrices', {
                                         ...(editData.zonePrices || {}),
                                         [c.id]: e.target.value
@@ -562,13 +564,11 @@ const UniversalBulkUpdateModal = ({
                                 {(() => {
                                   if (!menuItems || !configs.length) return <span className="text-xs text-gray-400">-</span>;
 
-                                  // ✅ Match by BOTH id AND non-zero zone_config_id — not by name
                                   const zoneVariants = menuItems.filter(
-                                    m => m.id === item.id &&
+                                    m => Number(m.id) === Number(item.id) &&
                                       m.zone_config_id !== null &&
                                       m.zone_config_id !== 0
                                   );
-
                                   if (!zoneVariants.length) return <span className="text-xs text-gray-400">-</span>;
 
                                   return zoneVariants.map(s => {
@@ -769,7 +769,8 @@ const UniversalBulkUpdateModal = ({
                                       <span className="text-xs text-gray-400">₹</span>
                                       <input type="number" min="0"
                                         placeholder={item.unit_price || "0.00"}
-                                        value={editData.zonePrices?.[c.id] ?? ''}
+                                        value={editData.zonePrices?.[c.id] ?? 
+                                          menuItems?.find(m => Number(m.id) === Number(item.id) && Number(m.zone_config_id) === Number(c.id))?.unit_price ?? ''}
                                         onChange={e => updateBulkEditData(item.id, 'zonePrices', {
                                           ...(editData.zonePrices || {}), [c.id]: e.target.value
                                         })}
@@ -812,6 +813,14 @@ const UniversalBulkUpdateModal = ({
                 <p className="text-sm text-gray-600">
                   💡 Use the global add-ons section at the top to apply add-ons to all selected items at once, or edit individual items below
                 </p>
+                <button
+                  onClick={handleBulkUpdate}
+                  disabled={selectedRows.length === 0}
+                  className="flex-1 sm:flex-none flex items-center justify-center gap-2 px-4 py-2 rounded-lg bg-action-success text-text-white transition-colors disabled:bg-gray-300 disabled:cursor-not-allowed font-medium text-sm"
+                >
+                  <Edit className="w-4 h-4" />
+                  Update Selected
+                </button>
                 <button
                   onClick={handleClose}
                   className="px-6 py-2 rounded-md bg-white text-gray-700 border border-gray-300 hover:bg-gray-50 font-medium text-sm"
