@@ -10,7 +10,7 @@ COPY . .
 
 # 👇 This is the key
 ARG MODE=qa
-RUN npm run build -- --mode=$MODE
+RUN npm run build -- --mode=qa
 
 # Stage 2: Serve using nginx
 FROM nginx:alpine

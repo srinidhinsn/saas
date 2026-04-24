@@ -10,7 +10,7 @@ COPY . .
 
 # 👇 This is the key
 ARG MODE=prod
-RUN npm run build -- --mode=$MODE
+RUN npm run build -- --mode=prod
 
 # Stage 2: Serve using nginx
 FROM nginx:alpine
