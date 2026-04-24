@@ -1,56 +1,28 @@
-from sqlalchemy import create_engine, Column, Integer, String
-from sqlalchemy.ext.declarative import declarative_base
-from sqlalchemy.orm import sessionmaker, session
+from sqlalchemy import create_engine
+from sqlalchemy.orm import sessionmaker, declarative_base
 from dotenv import load_dotenv
 import os
+from pathlib import Path
 
-load_dotenv()
+ENV = os.getenv("ENV", "development")
+
+# BASE_DIR = os.path.abspath(os.path.join(os.getcwd(), ".."))
+BASE_DIR = os.getcwd()
+env_file = os.path.join(BASE_DIR, f".env.{ENV}")
+
+print("ENV:", ENV)
+print("CWD:", BASE_DIR)
+print("Looking for:", env_file)
+
+if os.path.exists(env_file):
+    load_dotenv(env_file)
+
 DATABASE_URL = os.getenv("DATABASE_URL")
 
+if not DATABASE_URL:
+    raise ValueError(f"DATABASE_URL is not set for ENV={ENV}")
+
 engine = create_engine(DATABASE_URL)
-
-SessionLocal = sessionmaker(autocommit=False, autoflush=False, bind=engine)
-
-Base = declarative_base()
-
-
-def get_db():
-    db = SessionLocal()
-    try:
-        yield db  Yields session instance for request
-    finally:
-        db.close()  Ensures session is closed after use
-
-
-
-
-
-
-'''
-from sqlalchemy import create_engine
-from sqlalchemy.ext.declarative import declarative_base
-from sqlalchemy.orm import sessionmaker
-from dotenv import load_dotenv
-import os
-
-Load .env
-load_dotenv()
-
-Read credentials
-DB_USER = os.getenv("DB_USER")
-DB_PASSWORD = os.getenv("DB_PASSWORD")
-DB_HOST = os.getenv("DB_HOST")
-DB_PORT = os.getenv("DB_PORT", "5432")
-DB_NAME = os.getenv("DB_NAME")
-
-Build DATABASE_URL
-DATABASE_URL = (
-    f"postgresql://{DB_USER}:{DB_PASSWORD}"
-    f"@{DB_HOST}:{DB_PORT}/{DB_NAME}"
-)
-
-SQLAlchemy setup
-engine = create_engine(DATABASE_URL, pool_pre_ping=True)
 
 SessionLocal = sessionmaker(
     autocommit=False,
@@ -61,11 +33,9 @@ SessionLocal = sessionmaker(
 Base = declarative_base()
 
 
-Dependency
 def get_db():
     db = SessionLocal()
     try:
         yield db
     finally:
-        db.close()  Ensures session is closed after use
-'''
+        db.close()

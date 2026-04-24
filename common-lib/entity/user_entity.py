@@ -1,6 +1,6 @@
 import uuid
 from database.postgres import Base
-from sqlalchemy import Column , Integer, String, ARRAY, UUID, event, Date,TIMESTAMP,func,DateTime
+from sqlalchemy import Column , Integer, String, ARRAY, UUID, event, Date,TIMESTAMP,func,DateTime,BigInteger
 from models.user_model import UserModel, PageDefinitionModel,PersonModel
 
 
@@ -13,6 +13,7 @@ class Person(Base):
     dob = Column(Date, nullable=True)
     email = Column(String, nullable=True)
     phone = Column(String, nullable=True)
+    saved_address_ids = Column(ARRAY(BigInteger), nullable=True)
     created_at = Column(TIMESTAMP, server_default=func.now())
     updated_at = Column(
         TIMESTAMP, server_default=func.now(), onupdate=func.now())
@@ -20,7 +21,7 @@ class Person(Base):
 
     def generate_uuid(first_name: str, client_id: str) -> uuid.UUID:
         namespace = uuid.UUID("6ba7b810-9dad-11d1-80b4-00c04fd430c8")  # DNS namespace
-        combined_key = f"{username}-{client_id}"
+        combined_key = f"{first_name}-{client_id}"
         return uuid.uuid5(namespace, combined_key)
     @staticmethod
     def copyToModel(person):

@@ -75,6 +75,7 @@ class OrderItem(Base):
     line_total = Column(Float, nullable=True)   
     status = Column(String, nullable=True)
     frontend_unique_key = Column(String, nullable=True)
+    parent_item_key = Column(String, nullable=True)
 
     @staticmethod
     def copyToModel(orderItem):

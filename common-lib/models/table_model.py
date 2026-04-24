@@ -26,3 +26,10 @@ class Table(BaseModel):
         orm_mode=True
         extend_existing=True
         from_attribute = True
+
+class TablesModel(BaseModel):
+    id:            Optional[int] = None
+    client_id:     Optional[str] = None
+    realm:          Optional[str] = None
+    zone:    Optional[str]
+    section:       Optional[str] = None

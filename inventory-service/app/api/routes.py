@@ -1,14 +1,18 @@
 from fastapi import APIRouter, Depends, HTTPException, Query
 from sqlalchemy.orm import Session
+from sqlalchemy import text
 from typing import List, Optional, Dict, Any
 from decimal import Decimal, getcontext
 from database.postgres import get_db
-from models.inventory_model import Inventory, Category
-from entity.inventory_entity import InventoryEntity, CategoryEntity
+from models.inventory_model import Inventory, Category, InventoryTransaction
+from entity.inventory_entity import InventoryEntity, CategoryEntity, InventoryTransactionEntity
 from models.response_model import ResponseModel
 from models.saas_context import SaasContext
 from utils.auth import verify_token
 from services import service
+from utils.transaction import _compute_current_stock, create_transaction, _convert , TxPayload
+from sqlalchemy import text
+from utils.services import add_master_value , get_master_values ,delete_master_value
 
 # -------------------- CONFIG --------------------
 router = APIRouter()
@@ -19,6 +23,7 @@ getcontext().prec = 18  # increase decimal precision
 def read_inventory(
     client_id: str,
     inventory_id: str | None = Query(default=None),
+    zone_config_id: Optional[str] = Query(default=None),
     context: SaasContext = Depends(verify_token),
     db: Session = Depends(get_db),
 ):
@@ -26,7 +31,8 @@ def read_inventory(
 
     if inventory_id:
         query = query.filter(InventoryEntity.inventory_id == inventory_id)
-
+    if zone_config_id:
+        query = query.filter(InventoryEntity.zone_config_id == zone_config_id)
     records = query.all()
     models = InventoryEntity.copyToModels(records)
 
@@ -40,50 +46,193 @@ def read_inventory(
 
 @router.post("/create", response_model=ResponseModel[Inventory])
 def create_inventory(item: Inventory, client_id: str, context: SaasContext = Depends(verify_token), db: Session = Depends(get_db)):
-    db_item = InventoryEntity(**item.dict())
+    payload = item.dict()
+    payload["client_id"] = client_id
+
+    if not payload.get("id"):
+        result = db.execute(text("SELECT nextval('inventory_id_seq')"))
+        payload["id"] = result.scalar()
+    zone_id = payload.get("zone_config_id")
+    if zone_id in [None, "", "null"] or str(zone_id) == "nan":
+        payload["zone_config_id"] = 0
+
+    db_item = InventoryEntity(**payload)
     db.add(db_item)
     db.commit()
-    db.refresh(db_item)
-    model = InventoryEntity.copyToModel(db_item)
-    return ResponseModel[Inventory](screen_id=context.screen_id, status="success", message="Inventory item created", data=model)
+
+    saved = db.query(InventoryEntity).filter(
+        InventoryEntity.id == db_item.id,
+        InventoryEntity.zone_config_id == db_item.zone_config_id,
+        InventoryEntity.client_id == client_id
+    ).first()
+
+    model = InventoryEntity.copyToModel(saved)
+    return ResponseModel[Inventory](screen_id=context.screen_id,status="success",message="Inventory item created",data=model)
+
 
 @router.post("/update", response_model=ResponseModel[Inventory])
-def update_inventory(client_id: str, updates: Inventory, context: SaasContext = Depends(verify_token), db: Session = Depends(get_db)):
+def update_inventory(
+    client_id: str,
+    updates: Inventory,
+    context: SaasContext = Depends(verify_token),
+    db: Session = Depends(get_db)
+):
     if not updates.id:
         raise HTTPException(status_code=400, detail="Missing item ID")
-    
+
+    payload = updates.dict(exclude_unset=True)
+    payload["client_id"] = client_id
+
+    zone_id = payload.get("zone_config_id")
+    if zone_id in [None, "", "null"] or str(zone_id) == "nan":
+        zone_id = 0
+    else:
+        zone_id = int(zone_id)
+
+    payload["zone_config_id"] = zone_id
+
+    # ✅ Image-only path: ONLY when image_id is real AND unit_price is truly absent
+    # unit_price=0 is a valid price — must NOT trigger image-only path
+    image_id_val = payload.get("image_id")
+    has_real_image = image_id_val and str(image_id_val).strip() not in ("", "null", "None")
+    has_unit_price = "unit_price" in payload  # key present = price update intended
+
+    if has_real_image and not has_unit_price:
+        records = db.query(InventoryEntity).filter(
+            InventoryEntity.id == updates.id,
+            InventoryEntity.client_id == client_id
+        ).all()
+
+        if not records:
+            raise HTTPException(status_code=404, detail="Inventory item not found")
+
+        for record in records:
+            record.image_id = image_id_val
+
+        db.commit()
+
+        return ResponseModel(
+            screen_id=context.screen_id,
+            status="success",
+            message="Image updated for all zones",
+            data=InventoryEntity.copyToModel(records[0])
+        )
+
+    # Normal update path — find the specific zone record
     record = db.query(InventoryEntity).filter(
-        InventoryEntity.id == updates.id, 
+        InventoryEntity.id == updates.id,
+        InventoryEntity.zone_config_id == zone_id,
         InventoryEntity.client_id == client_id
     ).first()
-    
-    if not record:
-        raise HTTPException(status_code=404, detail="Inventory item not found")
-    
-    for key, value in updates.dict(exclude_unset=True).items():
-        setattr(record, key, value)
-    
+
+    if record:
+        for key, value in payload.items():
+            setattr(record, key, value)
+    else:
+        record = InventoryEntity(**payload)
+        db.add(record)
+
     db.commit()
     db.refresh(record)
-    model = InventoryEntity.copyToModel(record)
-    
-    return ResponseModel[Inventory](screen_id=context.screen_id, status="success", message="Inventory item updated", data=model)
+
+    return ResponseModel(
+    screen_id=context.screen_id,
+    status="success",
+    message="Inventory updated successfully",
+    data=InventoryEntity.copyToModel(record)
+    )
+
+@router.post("/update/avail", response_model=ResponseModel[Inventory])
+def update_inventory_availability(
+    client_id: str,
+    updates: Inventory,
+    context: SaasContext = Depends(verify_token),
+    db: Session = Depends(get_db),
+):
+    if not updates.id:
+        raise HTTPException(status_code=400, detail="Missing item ID")
+
+    records = db.query(InventoryEntity).filter(
+        InventoryEntity.id == updates.id,
+        InventoryEntity.client_id == client_id,
+    ).all()
+
+    if not records:
+        raise HTTPException(status_code=404, detail="Inventory item not found")
+
+    update_data = updates.dict(exclude_unset=True)
+    new_availability = update_data.pop("availability", None)
+
+    # ✅ Update metadata for ALL zones
+    for record in records:
+        for key, value in update_data.items():
+            if key != "client_id":
+                setattr(record, key, value)
+
+    # ✅ SINGLE transaction logic (use first record as reference)
+    if new_availability is not None:
+        new_qty = Decimal(str(new_availability))
+        before_stock = Decimal(str(records[0].availability or 0))  # take any one
+
+        if new_qty != before_stock:
+            create_transaction(db=db, client_id=client_id, payload=TxPayload(item_id=record.id,
+                                tx_type="MENU_AVAILABILITY_ADJUSTMENT",ref_id=record.id,qty=abs(new_qty - before_stock),
+                                after_stock=new_qty,remarks=f"Manual availability update for '{record.name}'",))
+
+        # ✅ Apply same availability to ALL zones
+        for record in records:
+            record.availability = new_qty
+
+    db.commit()
+
+    # refresh first record just for response
+    db.refresh(records[0])
+
+    return ResponseModel[Inventory](
+        screen_id=context.screen_id,
+        status="success",
+        message="Inventory updated",
+        data=InventoryEntity.copyToModel(records[0])
+    )
 
 @router.post("/delete", response_model=ResponseModel[Inventory])
-def delete_inventory(client_id: str, item: Inventory, context: SaasContext = Depends(verify_token), db: Session = Depends(get_db)):
-    record = db.query(InventoryEntity).filter(
-        InventoryEntity.id == item.id, 
+def delete_inventory(
+    client_id: str,
+    item: Inventory,
+    context: SaasContext = Depends(verify_token),
+    db: Session = Depends(get_db)
+):
+    if not item.id:
+        raise HTTPException(status_code=400, detail="Missing item ID")
+
+    # ✅ Fetch ALL records with this id (base + all zone variants)
+    records = db.query(InventoryEntity).filter(
+        InventoryEntity.id == item.id,
         InventoryEntity.client_id == client_id
-    ).first()
-    
-    if not record:
+    ).all()
+
+    if not records:
         raise HTTPException(status_code=404, detail="Inventory item not found")
-    
-    db.delete(record)
+
+    # Return the base record as the response model
+    base_record = next(
+        (r for r in records if r.zone_config_id == 0 or r.zone_config_id is None),
+        records[0]
+    )
+    model = InventoryEntity.copyToModel(base_record)
+
+    # ✅ Delete ALL zone variants together
+    for record in records:
+        db.delete(record)
+
     db.commit()
-    model = InventoryEntity.copyToModel(record)
-    
-    return ResponseModel[Inventory](screen_id=context.screen_id, status="success", message="Inventory item deleted", data=model)
+
+    return ResponseModel[Inventory](
+        screen_id=context.screen_id,
+        status="success",
+        message="Inventory item and all zone variants deleted",
+        data=model
+    )
 
 @router.delete("/delete_all", response_model=ResponseModel[str])
 def delete_all_inventory( client_id: str, context: SaasContext = Depends(verify_token), db: Session = Depends(get_db)):
@@ -104,9 +253,8 @@ def delete_all_inventory( client_id: str, context: SaasContext = Depends(verify_
     db.commit()
 
     return ResponseModel[str]( screen_id=context.screen_id, status="success", message="All inventory items deleted", data="All inventory items deleted successfully")
-
-
 # -------------------- CATEGORY ROUTES --------------------
+
 
 @router.get("/read_category", response_model=ResponseModel)
 def read_categories(client_id: str, category_id: Optional[str] = Query(None), context: SaasContext = Depends(verify_token), db: Session = Depends(get_db)):
@@ -182,61 +330,305 @@ def delete_category(client_id: str, category: Category, context: SaasContext = D
 
 
 # -------------------- STOCK ROUTES --------------------
+
 @router.get("/stock", response_model=ResponseModel)
 def get_stock_items(client_id: str,inventory_id: Optional[str] = Query(None),context: SaasContext = Depends(verify_token),db: Session = Depends(get_db),):
     query = db.query(InventoryEntity).filter(
         InventoryEntity.client_id == client_id
     )
-    
+ 
     if inventory_id:
         query = query.filter(InventoryEntity.inventory_id == inventory_id)
-    
+
     records = query.all()
     models = InventoryEntity.copyToModels(records)
-    
+ 
     return ResponseModel(screen_id=context.screen_id, status="success", message="Fetched stock items", data=models)
-
+ 
+ 
 @router.post("/stock/create", response_model=ResponseModel)
-def create_stock_item( item: Inventory, client_id: str, context: SaasContext = Depends(verify_token), db: Session = Depends(get_db),):
+def create_stock_item(
+    item: Inventory,
+    client_id: str,
+    context: SaasContext = Depends(verify_token),
+    db: Session = Depends(get_db),
+):
+    """
+    Creates a stock item (metadata only) in the inventory table, then records
+    the opening quantity as an IN transaction in inventory_transactions.
+ 
+    - inventory table  → name, description, category_id, unit_price, unit_cost,
+                         unit_gst, realm, code, image_id, slug … (availability
+                         is kept in sync but quantity of truth lives in transactions)
+    - inventory_transactions → quantity, unit, movement_type=IN,
+                               transaction_type=STOCK_IN, before/after stock
+    """
+    if not item.inventory_id:
+        raise HTTPException(status_code=400, detail="inventory_id is required")
+ 
     payload = item.dict()
     payload["client_id"] = client_id
-    
-    if not payload.get("inventory_id"):
-        raise HTTPException(status_code=400, detail="inventory_id is required")
-    
+
+    if not payload.get("id"):
+        result = db.execute(text("SELECT nextval('inventory_id_seq')"))
+        payload["id"] = result.scalar()
+
+    # Quantity that will go into the transaction (defaults to 0 if not provided)
+    opening_qty = Decimal(str(payload.get("availability") or "0"))
+
+    # Store the item WITHOUT the opening quantity (we track it via transactions)
+    # availability is set to 0 here; it will be re-synced after the transaction
+    payload["availability"] = Decimal("0")
+
     db_item = InventoryEntity(**payload)
     db.add(db_item)
+    db.flush()  # get ID before transaction
+
+    # 🔥 Use unified transaction engine
+    if opening_qty != Decimal("0"):
+        create_transaction(db=db, client_id=client_id, payload=TxPayload(item_id=db_item.id,tx_type="STOCK_IN",
+                           ref_id=db_item.id,qty=opening_qty,movement_type="IN",remarks="Opening stock on item creation",))
+
     db.commit()
     db.refresh(db_item)
     model = InventoryEntity.copyToModel(db_item)
-    
-    return ResponseModel(screen_id=context.screen_id, status="success", message="Stock item created", data=model)
 
-
-@router.post("/stock/update", response_model=ResponseModel)
-def update_stock_item( updates: Inventory, client_id: str, context: SaasContext = Depends(verify_token), db: Session = Depends(get_db),):
-    if not updates.id:
-        raise HTTPException(status_code=400, detail="Missing item ID")
-
+    return ResponseModel(
+        screen_id=context.screen_id,
+        status="success",
+        message="Stock item created with opening transaction",
+        data=model,
+    )
+ 
+ 
+@router.post("/stock/add", response_model=ResponseModel)
+def add_stock_quantity(
+    client_id: str,
+    stock_item_id: int,
+    quantity: Decimal,
+    unit: Optional[str] = None,
+    remarks: Optional[str] = None,
+    reference_id: Optional[str] = None,
+    reference_type: Optional[str] = None,
+    context: SaasContext = Depends(verify_token),
+    db: Session = Depends(get_db),
+):
+    """
+    Add more stock to an existing item (e.g. restocking rice after 3 days).
+    Records an IN transaction and updates availability on the inventory row.
+    Does NOT create a new inventory row.
+    """
     record = db.query(InventoryEntity).filter(
-        InventoryEntity.id == updates.id,
+        InventoryEntity.id == stock_item_id,
         InventoryEntity.client_id == client_id,
     ).first()
-    
+ 
     if not record:
         raise HTTPException(status_code=404, detail="Stock item not found")
 
-    for key, value in updates.dict(exclude_unset=True).items():
-        if key != "client_id":
-            setattr(record, key, value)
+    qty = Decimal(str(quantity))
+
+    if qty <= 0:
+        raise HTTPException(status_code=400, detail="Quantity must be greater than 0")
+
+    create_transaction(db=db, client_id=client_id, payload=TxPayload(item_id=record.id,tx_type="STOCK_IN",
+                       ref_id=reference_id or record.id,qty=qty,movement_type="IN",remarks=remarks or "Stock replenishment",))
 
     db.commit()
     db.refresh(record)
     model = InventoryEntity.copyToModel(record)
-    
+
+    return ResponseModel(
+        screen_id=context.screen_id,
+        status="success",
+        message=f"Added {quantity} {unit or record.unit} to {record.name}",
+        data=model,
+    )
+
+
+@router.post("/stock/deduct", response_model=ResponseModel)
+def deduct_stock_quantity(
+    client_id: str,
+    stock_item_id: int,
+    quantity: Decimal,
+    unit: Optional[str] = None,
+    transaction_type: str = "ORDER_DEDUCTION",
+    reference_id: Optional[str] = None,
+    reference_type: Optional[str] = None,
+    remarks: Optional[str] = None,
+    context: SaasContext = Depends(verify_token),
+    db: Session = Depends(get_db),
+):
+    """
+    Deduct stock from an existing item (e.g. an order used 200g of rice).
+    Records an OUT transaction and updates availability on the inventory row.
+    Raises 400 if the deduction would result in negative stock.
+    """
+
+    record = db.query(InventoryEntity).filter(
+        InventoryEntity.id == stock_item_id,
+        InventoryEntity.client_id == client_id,
+    ).first()
+ 
+    if not record:
+        raise HTTPException(status_code=404, detail="Stock item not found")
+ 
+    qty = Decimal(str(quantity))
+    before_stock = Decimal(str(record.availability or 0))
+    after_stock = before_stock - qty
+ 
+    if after_stock < Decimal("0"):
+        raise HTTPException(
+            status_code=400,
+            detail=f"Insufficient stock. Available: {before_stock}, Requested: {qty}",
+        )
+
+    # 🔥 Unified transaction
+    create_transaction(db=db, client_id=client_id, payload=TxPayload(item_id=record.id,tx_type=transaction_type,
+                    ref_id=reference_id or record.id,qty=qty,after_stock=after_stock,
+                    remarks=remarks or f"Stock deduction ({transaction_type})",))
+
+    db.commit()
+    db.refresh(record)
+    model = InventoryEntity.copyToModel(record)
+
+    return ResponseModel(
+        screen_id=context.screen_id,
+        status="success",
+        message=f"Deducted {quantity} {unit or record.unit} from {record.name}",
+        data=model,
+    )
+
+@router.post("/stock/manual-deduct", response_model=ResponseModel)
+def manual_deduct_stock(
+    client_id: str,
+    stock_item_id: int,
+    quantity: Decimal,
+    transaction_type: str,
+    unit: Optional[str] = None,
+    remarks: Optional[str] = None,
+    context: SaasContext = Depends(verify_token),
+    db: Session = Depends(get_db),
+):
+    allowed_types = {"RETURN", "CANCELLATION"}
+    tx_type = transaction_type.upper()
+
+    if tx_type not in allowed_types:
+        raise HTTPException(
+            status_code=400,
+            detail=f"transaction_type must be one of: {', '.join(allowed_types)}"
+        )
+
+    record = db.query(InventoryEntity).filter(
+        InventoryEntity.id == stock_item_id,
+        InventoryEntity.client_id == client_id,
+    ).first()
+
+    if not record:
+        raise HTTPException(status_code=404, detail="Stock item not found")
+
+    qty = Decimal(str(quantity))
+    if qty <= 0:
+        raise HTTPException(status_code=400, detail="Quantity must be greater than 0")
+
+    # ── Unit conversion (same logic as _deduct_stock_for_order) ──────────────
+    input_unit = (unit or record.unit or "").strip()   # unit user typed in modal
+    stock_unit = (record.unit or "").strip()           # unit the stock is stored in
+
+    if input_unit and stock_unit and input_unit != stock_unit:
+        # e.g. user enters 20ml but stock is in litre → converts to 0.02
+        try:
+            converted_qty = Decimal(str(_convert(float(qty), input_unit, stock_unit)))
+        except ValueError as e:
+            raise HTTPException(
+                status_code=400,
+                detail=f"Unit conversion failed: {e}"
+            )
+    else:
+        # Same unit or no unit provided — use as-is
+        converted_qty = qty
+
+    before_stock = Decimal(str(record.availability or 0))
+    after_stock = before_stock - converted_qty
+
+    if after_stock < Decimal("0"):
+        raise HTTPException(
+            status_code=400,
+            detail=(
+                f"Insufficient stock. "
+                f"Available: {before_stock} {stock_unit}, "
+                f"Requested: {qty} {input_unit}"
+                + (f" = {converted_qty} {stock_unit}" if input_unit != stock_unit else "")
+            ),
+        )
+
+    # 🔥 Unified transaction
+    create_transaction(db=db, client_id=client_id, payload=TxPayload(item_id=record.id,tx_type=tx_type,ref_id=record.id,
+                        qty=converted_qty,after_stock=after_stock,remarks=remarks or f"Manual deduction ({tx_type})",))
+
+    db.commit()
+    db.refresh(record)
+    model = InventoryEntity.copyToModel(record)
+
+    return ResponseModel(
+        screen_id=context.screen_id,
+        status="success",
+        message=(
+            f"Deducted {qty} {input_unit}"
+            + (f" ({converted_qty} {stock_unit})" if input_unit != stock_unit else "")
+            + f" from {record.name}"
+        ),
+        data=model,
+    )
+
+@router.post("/stock/update", response_model=ResponseModel)
+def update_stock_item(
+    updates: Inventory,
+    client_id: str,
+    context: SaasContext = Depends(verify_token),
+    db: Session = Depends(get_db),
+):
+    """
+    Update stock item metadata (name, description, unit_price, category_id …).
+    If 'availability' is included in the payload it is treated as an ADJUSTMENT
+    transaction (sets stock to the given absolute value) rather than a delta.
+    """
+
+    if not updates.id:
+        raise HTTPException(status_code=400, detail="Missing item ID")
+ 
+    record = db.query(InventoryEntity).filter(
+        InventoryEntity.id == updates.id,
+        InventoryEntity.client_id == client_id,
+    ).first()
+
+    if not record:
+        raise HTTPException(status_code=404, detail="Stock item not found")
+ 
+    update_data = updates.dict(exclude_unset=True)
+    new_availability = update_data.pop("availability", None)
+ 
+    # Apply metadata updates (everything except availability)
+    for key, value in update_data.items():
+        if key != "client_id":
+            setattr(record, key, value)
+ 
+    # Handle availability change as an ADJUSTMENT transaction
+    if new_availability is not None:
+        new_qty = Decimal(str(new_availability))
+        before_stock = Decimal(str(record.availability or 0))
+        delta = new_qty - before_stock
+ 
+        if delta != Decimal("0"):
+            create_transaction(db=db, client_id=client_id, payload=TxPayload(item_id=record.id,tx_type="ADJUSTMENT",ref_id=record.id,
+                               qty=abs(delta),after_stock=new_qty,remarks="Manual stock adjustment via update",))
+
+    db.commit()
+    db.refresh(record)
+    model = InventoryEntity.copyToModel(record)
+
     return ResponseModel(screen_id=context.screen_id, status="success", message="Stock item updated", data=model)
-
-
+ 
 @router.delete("/stock/delete_by_inventory")
 async def delete_inventory_records(client_id: str, inventory_id: str,db: Session = Depends(get_db)):
     deleted_count = (
@@ -248,9 +640,105 @@ async def delete_inventory_records(client_id: str, inventory_id: str,db: Session
         .delete(synchronize_session=False)
     )
     db.commit()
-
+ 
     return { "status": "success", "deleted": deleted_count, "message": f"Deleted {deleted_count} records for inventory_id='{inventory_id}'"}
-
+ 
+ 
+# -------------------- TRANSACTION ROUTES --------------------
+ 
+@router.get("/transactions", response_model=ResponseModel[List[InventoryTransaction]])
+def get_transactions(
+    client_id: str,
+    stock_item_id: Optional[int] = Query(None),
+    inventory_id: Optional[str] = Query(None),
+    movement_type: Optional[str] = Query(None),   # IN | OUT
+    transaction_type: Optional[str] = Query(None),
+    limit: int = Query(default=100, le=500),
+    offset: int = Query(default=0),
+    context: SaasContext = Depends(verify_token),
+    db: Session = Depends(get_db),
+):
+    """
+    Fetch transaction history with optional filters.
+    Results are ordered newest-first.
+    """
+    query = db.query(InventoryTransactionEntity).filter(
+        InventoryTransactionEntity.client_id == client_id
+    )
+ 
+    if stock_item_id:
+        query = query.filter(InventoryTransactionEntity.stock_item_id == stock_item_id)
+    if inventory_id:
+        query = query.filter(InventoryTransactionEntity.inventory_id == inventory_id)
+    if movement_type:
+        query = query.filter(InventoryTransactionEntity.movement_type == movement_type.upper())
+    if transaction_type:
+        query = query.filter(InventoryTransactionEntity.transaction_type == transaction_type.upper())
+ 
+    total = query.count()
+    records = (
+        query.order_by(InventoryTransactionEntity.created_at.desc())
+        .offset(offset)
+        .limit(limit)
+        .all()
+    )
+    models = InventoryTransactionEntity.copyToModels(records)
+ 
+    return ResponseModel[List[InventoryTransaction]](
+        screen_id=context.screen_id,
+        status="success",
+        message=f"Fetched {len(models)} of {total} transactions",
+        data=models,
+    )
+ 
+ 
+@router.get("/transactions/summary", response_model=ResponseModel)
+def get_stock_summary(
+    client_id: str,
+    stock_item_id: int,
+    context: SaasContext = Depends(verify_token),
+    db: Session = Depends(get_db),
+):
+    """
+    Returns a summary for a single stock item:
+    total IN, total OUT, and current computed stock level.
+    """
+    record = db.query(InventoryEntity).filter(
+        InventoryEntity.id == stock_item_id,
+        InventoryEntity.client_id == client_id,
+    ).first()
+ 
+    if not record:
+        raise HTTPException(status_code=404, detail="Stock item not found")
+ 
+    rows = (
+        db.query(InventoryTransactionEntity)
+        .filter(
+            InventoryTransactionEntity.client_id == client_id,
+            InventoryTransactionEntity.stock_item_id == stock_item_id,
+        )
+        .all()
+    )
+ 
+    total_in = sum(Decimal(str(r.quantity)) for r in rows if r.movement_type == "IN")
+    total_out = sum(Decimal(str(r.quantity)) for r in rows if r.movement_type == "OUT")
+    current_stock = total_in - total_out
+ 
+    return ResponseModel(
+        screen_id=context.screen_id,
+        status="success",
+        message="Stock summary",
+        data={
+            "stock_item_id": stock_item_id,
+            "name": record.name,
+            "unit": record.unit,
+            "total_in": float(total_in),
+            "total_out": float(total_out),
+            "current_stock": float(current_stock),
+            "availability_on_row": float(record.availability or 0),
+            "transaction_count": len(rows),
+        },
+    )
 
 # -------------------- RECIPE ROUTES --------------------
 @router.get("/recipe/{menu_item_id}", response_model=ResponseModel)
@@ -326,79 +814,20 @@ def update_recipe_for_menu(
         data=model
     )
 
-# ============================================= Add Role ======================================================== #
-@router.post("/roles", response_model=ResponseModel)
-def add_role(client_id: str,category_id: str,value: str,context: SaasContext = Depends(verify_token),db: Session = Depends(get_db)):
-    role = value.strip().lower()
-    
-    if not role:
-        raise HTTPException(status_code=400, detail="Role name is required")
+@router.get("/item-types")
+def get_item_types(client_id: str, category_id: str,context: SaasContext = Depends(verify_token),db: Session = Depends(get_db)):
+    data = get_master_values(db, client_id, category_id)
 
-    category = db.query(CategoryEntity).filter(
-        CategoryEntity.id == category_id,
-        CategoryEntity.client_id == client_id
-    ).first()
+    return ResponseModel(screen_id=context.screen_id,status="success",message="Config fetched",data=data)
 
-    if not category:
-        raise HTTPException(status_code=404, detail="Category not found")
+@router.post("/item-types")
+def add_item_type(client_id: str, category_id: str, value: str,context: SaasContext = Depends(verify_token),db: Session = Depends(get_db)):
+    data = add_master_value(db, client_id, category_id, value)
 
-    items = category.sub_categories or []
+    return ResponseModel(screen_id=context.screen_id,status="success",message="Config added",data=data)
 
-    if role in [r.lower() for r in items]:
-        raise HTTPException(status_code=409, detail="Role already exists")
+@router.delete("/item-types")
+def delete_item_type(client_id: str, category_id: str, value: str,context: SaasContext = Depends(verify_token),db: Session = Depends(get_db)):
+    data = delete_master_value(db, client_id, category_id, value)
 
-    category.sub_categories = items + [role]
-
-    existing_role_row = db.query(CategoryEntity).filter(
-        CategoryEntity.id == role,
-        CategoryEntity.client_id == client_id
-    ).first()
-
-    if not existing_role_row:
-        db.add(
-            CategoryEntity(
-                id=role,
-                client_id=client_id,
-                name=role.capitalize(),
-                description=f"Role {role}",
-                sub_categories=None,
-                slug=f"_Role_{role}",
-            )
-        )
-
-    db.commit()
-    db.refresh(category)
-
-    return ResponseModel(screen_id=context.screen_id,status="success",message="Role added successfully",data=category.sub_categories)
-
-@router.delete("/roles", response_model=ResponseModel)
-def delete_role(client_id: str,category_id: str,value: str,context: SaasContext = Depends(verify_token),db: Session = Depends(get_db)):
-    role = value.strip().lower()
-
-    category = db.query(CategoryEntity).filter(
-        CategoryEntity.id == category_id,
-        CategoryEntity.client_id == client_id
-    ).first()
-
-    if not category:
-        raise HTTPException(status_code=404, detail="Category not found")
-
-    items = category.sub_categories or []
-
-    if role not in [i.lower() for i in items]:
-        raise HTTPException(status_code=404, detail="Role not found")
-
-    category.sub_categories = [i for i in items if i.lower() != role]
-
-    role_row = db.query(CategoryEntity).filter(
-        CategoryEntity.id == role,
-        CategoryEntity.client_id == client_id
-    ).first()
-
-    if role_row:
-        db.delete(role_row)
-
-    db.commit()
-    db.refresh(category)
-
-    return ResponseModel(screen_id=context.screen_id,status="success",message="Role deleted successfully",data=category.sub_categories)
+    return ResponseModel(screen_id=context.screen_id,status="success",message="Config deleted",data=data)
