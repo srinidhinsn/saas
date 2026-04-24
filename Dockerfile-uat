@@ -9,7 +9,7 @@ RUN npm install
 COPY . .
 
 # 👇 This is the key
-ARG MODE=production
+ARG MODE=uat
 RUN npm run build -- --mode=$MODE
 
 # Stage 2: Serve using nginx
