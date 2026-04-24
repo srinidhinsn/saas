@@ -16,7 +16,7 @@ const MenuTreeNode = ({
   onDrop,
   onDragEnd,
   isDragging,
-  dragOverPosition,
+  dragOverPosition, onReorderByIndex
 }) => {
   const [hovered, setHovered] = useState(false);
   const canEdit = category.id !== "dietery" && category.name !== "All Categories";
@@ -96,6 +96,25 @@ const MenuTreeNode = ({
               >
                 <Trash2 size={12} />
               </button>
+              {canEdit && hovered && (
+                <input
+                  type="number"
+                  min="1"
+                  placeholder="#"
+                  className="w-12 text-xs px-1 py-0.5 border rounded no-spinner"
+                  onClick={(e) => e.stopPropagation()}
+                  onKeyDown={(e) => {
+                    e.stopPropagation();
+                    if (e.key === "Enter") {
+                      const index = Number(e.target.value);
+                      if (!index) return;
+
+                      onReorderByIndex(category, index);
+                      e.target.value = "";
+                    }
+                  }}
+                />
+              )}
             </div>
           )}
         </div>

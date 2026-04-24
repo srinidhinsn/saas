@@ -2,6 +2,8 @@ import React, { useEffect, useState } from "react";
 import axios from "axios";
 
 const API = import.meta.env.VITE_API_INVENTORY_SERVICE_URL;
+const defaultRoot = import.meta.env.VITE_MENU_DEFAULT_ROOT;
+const counterCategory = import.meta.env.VITE_MENU_COUNTER;
 
 export default function CounterManager({ clientId, token }) {
   const [counters, setCounters] = useState([]);
@@ -27,7 +29,7 @@ export default function CounterManager({ clientId, token }) {
       const res = await axios.get(`${BASE}/read_category`, {
         params: {
           client_id: clientId,
-          category_id: "counter",
+          category_id: counterCategory,
         },
         headers,
       });
@@ -43,17 +45,17 @@ export default function CounterManager({ clientId, token }) {
   const fetchAllCategories = async () => {
     try {
       const res = await axios.get(
-        `${API}/${clientId}/inventory/read_category`,
+        `${API}/${clientId}/inventory/read_category?category_id=defaultRoot`,
         {
           params: {
             client_id: clientId,
-            category_id: "ac",
           },
           headers,
         }
       );
 
       const acRoot = res.data.data?.[0];
+      console.log("catgeories are",acRoot)
 
       if (!acRoot) {
         setAllCategories([]);
@@ -62,6 +64,7 @@ export default function CounterManager({ clientId, token }) {
 
       // Keep levelOne as groups (veg, non_veg, etc)
       const levelOne = acRoot.subCategories || [];
+      console.log("The categories are",levelOne)
 
       setAllCategories(levelOne);
 

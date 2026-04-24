@@ -1,19 +1,28 @@
-# Stage 1: Build the React app
+# Stage 1: Build React app
 FROM node:20-alpine AS build
 
-# Set working directory
 WORKDIR /
 
-# Copy package.json and install dependencies
 COPY package.json package-lock.json ./
 RUN npm install
 
-# Copy the rest of the application code
 COPY . .
 
-# Build the React app
-RUN npm run build
+# 👇 This is the key
+ARG MODE=production
+RUN npm run build -- --mode=$MODE
 
-EXPOSE 8007
-CMD ["npm", "run", "dev", "--", "--host", "0.0.0.0", "--port", "8007"]
-#RUN npm run dev -- --host 0.0.0.0 --port 8007
+# Stage 2: Serve using nginx
+FROM nginx:alpine
+
+COPY --from=build /dist /usr/share/nginx/html
+
+EXPOSE 80
+
+CMD ["nginx", "-g", "daemon off;"]
+
+
+# Nginx → a fast web server used to serve websites
+# Alpine Linux → a very small Linux OS
+
+# A lightweight container with Nginx installed

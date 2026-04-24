@@ -8,7 +8,7 @@ import UniversalBulkDeleteModal from "../../utils/Modals/UniversalBulkDeleteModa
 import AccessGuard from "../../utils/Interceptors/ProtectedRoute";
 import TableConfigModal from "../../utils/Modals/TableConfigModal";
 
-const CounterManagement = ({ clientId, token, screenIds, userId }) => {
+const TableManagement = ({ clientId, token, screenIds, userId, realm}) => {
 
     const [searchTerm, setSearchTerm] = useState("");
     const [tableRanges, setTableRanges] = useState([]);
@@ -34,7 +34,7 @@ const CounterManagement = ({ clientId, token, screenIds, userId }) => {
     const [bulkUpdateGlobal, setBulkUpdateGlobal] = useState({
         table_type: "",
         status: "",
-        location_zone: ""
+        config_id: ""
     });
 
     // Bulk Delete States
@@ -43,9 +43,9 @@ const CounterManagement = ({ clientId, token, screenIds, userId }) => {
     const [selectedDeleteTables, setSelectedDeleteTables] = useState([]);
     const [showFirstDeleteConfirm, setShowFirstDeleteConfirm] = useState(false);
     const [showSecondDeleteConfirm, setShowSecondDeleteConfirm] = useState(false);
-
-    const [zones, setZones] = useState([]);
-    const [sections, setSections] = useState([]);
+    const [configs, setConfigs] = useState([]);
+    const zones = [...new Set(configs.map(c => c.zone))];
+    const sections = [...new Set(configs.map(c => c.section))];
     const [showConfig, setShowConfig] = useState(false);
     const [editTable, setEditTable] = useState(null);
     const editRef = useRef(null);
@@ -61,7 +61,9 @@ const CounterManagement = ({ clientId, token, screenIds, userId }) => {
         return 2;                    // mobile
     };
     useEffect(() => {
-        if (clientId) fetchTables();
+        if (!clientId) return;
+
+        fetchTables();
     }, [clientId]);
     const [colsPerRow, setColsPerRow] = useState(getColumnsByScreen());
 
@@ -151,19 +153,39 @@ const CounterManagement = ({ clientId, token, screenIds, userId }) => {
         if (!clientId) return;
         setLoading(true);
         try {
-            const res = await axios.get(
-                `${import.meta.env.VITE_API_TABLE_SERVICE_URL}/${clientId}/tables/read`,
-                { headers: { Authorization: `Bearer ${token}` } }
-            );
+            const [tableRes, configRes] = await Promise.all([
+                axios.get(
+                    `${import.meta.env.VITE_API_TABLE_SERVICE_URL}/${clientId}/tables/read`,
+                    { headers: { Authorization: `Bearer ${token}` } }
+                ),
+                axios.get(
+                    `${import.meta.env.VITE_API_TABLE_SERVICE_URL}/${clientId}/tables/config`,
+                    { params: { client_id: clientId }, headers: { Authorization: `Bearer ${token}` } }
+                )
+            ]);
 
-            const result = res.data;
+            const result = tableRes.data;
+            const freshConfigs = configRes.data || [];
+            setConfigs(freshConfigs);
             setRequiredScreenId(result.screen_id);
 
             if (result.screen_id === "default_tables") {
                 const tableList = Array.isArray(result?.data) ? result.data : [];
-                setTables(tableList);
-                setOriginalTables(structuredClone(tableList));
+                const enrichedTables = tableList.map(t => {
+                    const matchedConfig = freshConfigs.find(
+                        c =>
+                            c.section?.trim().toLowerCase() === t.section?.trim().toLowerCase() &&
+                            c.zone?.trim().toLowerCase() === t.location_zone?.trim().toLowerCase()
+                    );
 
+                    return {
+                        ...t,
+                        config_id: matchedConfig?.id || null
+                    };
+                });
+
+                setTables(enrichedTables);
+                setOriginalTables(structuredClone(enrichedTables));
 
             }
         } catch (error) {
@@ -172,7 +194,22 @@ const CounterManagement = ({ clientId, token, screenIds, userId }) => {
             setLoading(false);
         }
     };
+    const fetchConfigs = async () => {
+        try {
+            const res = await axios.get(
+                `${import.meta.env.VITE_API_TABLE_SERVICE_URL}/${clientId}/tables/config`,
+                {
+                    params: { client_id: clientId },
+                    headers: { Authorization: `Bearer ${token}` }
+                }
+            );
 
+            setConfigs(res.data || []);
+        } catch (err) {
+            console.error("Error fetching configs", err);
+            setConfigs([]);
+        }
+    };
     const fetchMasterValues = async (categoryId, setter) => {
         try {
             const res = await axios.get(
@@ -192,13 +229,10 @@ const CounterManagement = ({ clientId, token, screenIds, userId }) => {
     };
 
 
-
     useEffect(() => {
         if (!clientId || !token) return;
 
-        fetchMasterValues("zone", setZones);
-        fetchMasterValues("section", setSections);
-
+        fetchConfigs();
     }, [clientId, token]);
 
     const parseTableRangeFlexible = (input) => {
@@ -215,6 +249,7 @@ const CounterManagement = ({ clientId, token, screenIds, userId }) => {
                 const numStart = parseInt(start.match(/\d+/)?.[0]);
                 const numEnd = parseInt(end.match(/\d+/)?.[0]);
                 if (!numStart || !numEnd || prefixStart !== prefixEnd) continue;
+
                 // Always pad to 2 digits
                 for (let i = numStart; i <= numEnd; i++) {
                     tables.push(prefixStart + String(i).padStart(2, "0"));
@@ -232,8 +267,20 @@ const CounterManagement = ({ clientId, token, screenIds, userId }) => {
         generatingRef.current = true;
         setIsGenerating(true);
         try {
+            let freshConfigs = configs;
+            try{
+                const res = await axios.get(`${import.meta.env.VITE_API_TABLE_SERVICE_URL}/${clientId}/tables/config`,
+                    {headers:{Authorization: `Bearer ${token}`}}
+                );
+                freshConfigs = res.data || [];
+                setConfigs(freshConfigs);
+            }
+            catch(err){
+                console.log("Failed to refresh configs" , err);
+                
+            }
             for (let row of tableRanges) {
-                if (!row.range || !row.section || !row.location_zone || !row.table_type) {
+                if (!row.range || !row.config_id || !row.table_type) {
                     generatingRef.current = false;
                     setIsGenerating(false);
                     return;
@@ -252,13 +299,19 @@ const CounterManagement = ({ clientId, token, screenIds, userId }) => {
                         alert(`Table "${tableName}" already exists!!!`)
                         continue;
                     }
+                    const config = freshConfigs.find(c => Number(c.id) === Number(row?.config_id));
+                    if (!config) {
+                        generatingRef.current= false;
+                        setIsGenerating(false);
+                        return;
+                    }
                     const payload = {
                         client_id: clientId,
                         name: tableName.trim(),
                         table_type: row.table_type.toString(),
                         status: row.remark || "vacant",
-                        section: row.section,
-                        location_zone: row.location_zone,
+                        section: config?.section,
+                        location_zone: config?.zone,
                         description: "",
                         sort_order: null,
                         is_active: true,
@@ -331,8 +384,7 @@ const CounterManagement = ({ clientId, token, screenIds, userId }) => {
 
         const hasChanged =
             normalize(original?.table_type) !== normalize(table.table_type) ||
-            normalize(original?.location_zone) !== normalize(table.location_zone) ||
-            normalize(original?.section) !== normalize(table.section) ||
+            normalize(original?.config_id) !== normalize(table.config_id) ||
             normalize(original?.status) !== normalize(table.status);
 
         if (!hasChanged) {
@@ -344,10 +396,16 @@ const CounterManagement = ({ clientId, token, screenIds, userId }) => {
         }
 
         try {
+            // 🔥 map config_id → section + zone
+            const config = configs.find(c => Number(c.id) === Number(table?.config_id));
+
             const payload = {
                 ...table,
                 table_type: table.table_type.toString(),
-                status: table.status.trim()  // Keep exact casing from dropdown
+                status: table.status.trim(),
+
+                section: config?.section || table.section,
+                location_zone: config?.zone || table.location_zone
             };
 
             console.log("Sending update payload:", payload);
@@ -403,14 +461,14 @@ const CounterManagement = ({ clientId, token, screenIds, userId }) => {
         setBulkUpdateGlobal({
             table_type: "",
             status: "",
-            location_zone: ""
+            config_id: ""
         });
 
         const initialData = {};
         tables.forEach(table => {
             initialData[table.id] = {
                 table_type: table.table_type,
-                location_zone: table.location_zone,
+                config_id: table.config_id,
                 status: table.status
             };
         });
@@ -467,25 +525,25 @@ const CounterManagement = ({ clientId, token, screenIds, userId }) => {
                     finalStatus = bulkUpdateGlobal.status;
                 }
 
-                let finalZone = table.location_zone;
-                if (tableUpdates.location_zone && tableUpdates.location_zone !== table.location_zone) {
-                    finalZone = tableUpdates.location_zone;
-                } else if (bulkUpdateGlobal.location_zone) {
-                    finalZone = bulkUpdateGlobal.location_zone;
-                }
-                let finalSection = table.section;
-                if (tableUpdates.section && tableUpdates.section !== table.section) {
-                    finalSection = tableUpdates.section;
-                } else if (bulkUpdateGlobal.section) {
-                    finalSection = bulkUpdateGlobal.section;
+                // ✅ NEW CONFIG LOGIC
+                let finalConfigId = table.config_id;
+
+                if (tableUpdates.config_id && tableUpdates.config_id !== table.config_id) {
+                    finalConfigId = tableUpdates.config_id;
+                } else if (bulkUpdateGlobal.config_id) {
+                    finalConfigId = bulkUpdateGlobal.config_id;
                 }
 
+                // 🔥 find config
+                const config = configs.find(c => Number(c.id) === Number(finalConfigId));
                 const updatedFields = {
                     ...table,
                     table_type: finalTableType.toString(),
                     status: (finalStatus || "").toLowerCase().trim(),
-                    location_zone: finalZone,
-                    section: finalSection,
+
+                    // ✅ send what backend expects
+                    section: config?.section || table.section,
+                    location_zone: config?.zone || table.location_zone
                 };
 
                 await axios.post(
@@ -504,7 +562,7 @@ const CounterManagement = ({ clientId, token, screenIds, userId }) => {
             setBulkUpdateGlobal({
                 table_type: "",
                 status: "",
-                location_zone: "",
+                config_id: ""
             });
 
             await fetchTables();
@@ -553,7 +611,6 @@ const CounterManagement = ({ clientId, token, screenIds, userId }) => {
                     client_id: clientId,
                     name: "",
                     table_type: "",
-                    location_zone: "",
                 }, { headers: { Authorization: `Bearer ${token}` } });
             }
             await fetchTables();
@@ -686,75 +743,106 @@ const CounterManagement = ({ clientId, token, screenIds, userId }) => {
                     </div>
 
                     {/* Table Grid */}
-                    <div className="grid grid-cols-2 sm:grid-cols-4 lg:grid-cols-6 xl:grid-cols-6 2xl:grid-cols-8 gap-2 sm:gap-3">
-                        {filteredTables.map(table => {
+                    {/* Table Grid - grouped by section */}
+                    {(() => {
+                        // Group filtered tables by section
+                        const groupedBySection = filteredTables.reduce((acc, table) => {
+                            const config = configs.find(c => Number(c.id) === Number(table?.config_id));
+                            const sectionKey = config?.section?.toUpperCase() || table.section?.toUpperCase() || "Unassigned";
+                            if (!acc[sectionKey]) acc[sectionKey] = [];
+                            acc[sectionKey].push(table);
+                            return acc;
+                        }, {});
+
+                        const sectionEntries = Object.entries(groupedBySection);
+
+                        if (sectionEntries.length === 0) {
                             return (
-                                <div
-                                    key={table.id}
-                                    className={`border-2 rounded-lg overflow-hidden shadow-sm hover:shadow-md transition
-    ${table.status === "vacant" ? "border-border-default" :
-                                            table.status === "Occupied" ? "border-red-400" :
-                                                "border-blue-400"}`}
-                                >
-
-                                    {/* HEADER */}
-                                    <div className={`flex justify-between items-center px-3 py-2 text-sm font-bold
-    ${table.status === "vacant" ? "bg-action-primary text-white" :
-                                            table.status === "Occupied" ? "bg-action-primary text-white" :
-                                                "bg-action-primary text-white"}`}>
-
-                                        <span>{table.name}</span>
-
-                                        <div className="flex gap-3 items-center text-xs font-semibold">
-                                            <span className="capitalize font-semibold">
-                                                {table.status}
-                                            </span>
-
-                                        </div>
+                                <div className="bg-bg-primary rounded-xl shadow-sm p-12 text-center border border-border-default">
+                                    <div className="text-text-secondary mb-3">
+                                        <FaSearch className="text-5xl mx-auto" />
                                     </div>
+                                    <p className="text-text-secondary text-lg font-medium">No tables found</p>
+                                    <p className="text-text-secondary text-sm mt-1">Try adjusting your search or filter criteria</p>
+                                </div>
+                            );
+                        }
 
-                                    {/* BODY */}
-                                    <div className="px-3 py-3 text-sm text-text-primary flex justify-between">
-                                        <div className=""> <div className="font-medium">{table.location_zone}</div>
-                                            <div className="text-xs text-text-secondary mt-1">
-                                                Seats: <span className="font-bold">{table.table_type}</span>
-                                            </div>
-                                        </div>
-                                        <div className="">
-                                            <span className="text-md font-semibold">{table.section}</span>
-                                        </div>
-
-                                    </div>
-
-                                    {/* FOOTER */}
-                                    <div className="grid grid-cols-2 border-t text-xs font-semibold">
-                                        <button
-                                            onClick={() => {
-                                                const copy = structuredClone(table);
-                                                editRef.current = copy;   // ⭐ IMPORTANT
-                                                setEditTable(copy);
-                                                setEditRowId(copy.id);
-                                            }}
-
-                                            className="py-2 hover:bg-bg-tertiary transition"
-                                        >
-                                            EDIT
-                                        </button>
-                                        <button
-                                            onClick={() => {
-                                                setDeleteTableId(table.id);
-                                                setShowConfirmDelete(true);
-                                            }}
-                                            className="py-2 text-action-danger hover:bg-red-50 transition border-l"
-                                        >
-                                            DELETE
-                                        </button>
-                                    </div>
+                        return sectionEntries.map(([sectionName, sectionTables]) => (
+                            <div key={sectionName} className="mb-6">
+                                {/* Section Header */}
+                                <div className="flex items-center gap-3 mb-3">
+                                    <h2 className="text-base font-bold text-text-primary uppercase tracking-wide">
+                                        {sectionName}
+                                    </h2>
+                                    <span className="text-xs font-semibold px-2 py-0.5 rounded-full bg-action-primary/10 text-action-primary border border-action-primary/20">
+                                        {sectionTables.length} table{sectionTables.length !== 1 ? 's' : ''}
+                                    </span>
                                 </div>
 
-                            );
-                        })}
-                    </div>
+                                {/* Tables in this section */}
+                                <div className="grid grid-cols-2 sm:grid-cols-4 lg:grid-cols-6 xl:grid-cols-6 2xl:grid-cols-8 gap-2 sm:gap-3">
+                                    {sectionTables.map(table => {
+                                        const config = configs.find(c => Number(c.id) === Number(table?.config_id));
+                                        return (
+                                            <div
+                                                key={table.id}
+                                                className={`border-2 rounded-lg overflow-hidden shadow-sm hover:shadow-md transition
+                ${table.status === "vacant" ? "border-border-default" :
+                                                        table.status === "Occupied" ? "border-red-400" :
+                                                            "border-blue-400"}`}
+                                            >
+                                                {/* HEADER */}
+                                                <div className="flex justify-between items-center px-3 py-2 text-sm font-bold bg-action-primary text-white">
+                                                    <span>{table.name}</span>
+                                                    <span className="capitalize font-semibold text-xs">{table.status}</span>
+                                                </div>
+
+                                                {/* BODY */}
+                                                <div className="px-3 py-3 text-sm text-text-primary flex justify-between">
+                                                    <div>
+                                                        <div className="text-xs text-text-secondary mt-1">
+                                                            <div className="font-medium">{config?.zone?.toUpperCase() || "-"}</div>
+                                                            Seats: <span className="font-bold">{table.table_type}</span>
+                                                        </div>
+                                                    </div>
+                                                    <span className="text-[10px] font-semibold">
+                                                        {config?.section?.toUpperCase() || "-"}
+                                                    </span>
+                                                </div>
+
+                                                {/* FOOTER */}
+                                                <div className="grid grid-cols-2 border-t text-xs font-semibold">
+                                                    <button
+                                                        onClick={() => {
+                                                            const copy = structuredClone(table);
+                                                            editRef.current = copy;
+                                                            setEditTable(copy);
+                                                            setEditRowId(copy.id);
+                                                        }}
+                                                        className="py-2 hover:bg-bg-tertiary transition"
+                                                    >
+                                                        EDIT
+                                                    </button>
+                                                    <button
+                                                        onClick={() => {
+                                                            setDeleteTableId(table.id);
+                                                            setShowConfirmDelete(true);
+                                                        }}
+                                                        className="py-2 text-action-danger hover:bg-red-50 transition border-l"
+                                                    >
+                                                        DELETE
+                                                    </button>
+                                                </div>
+                                            </div>
+                                        );
+                                    })}
+                                </div>
+                            </div>
+                        ));
+                    })()}
+
+                    {/* Remove the old standalone empty state since it's handled inside the grouping above */}
 
                     {filteredTables.length === 0 && (
                         <div className="bg-bg-primary rounded-xl shadow-sm p-12 text-center border border-border-default">
@@ -848,10 +936,8 @@ const CounterManagement = ({ clientId, token, screenIds, userId }) => {
                         onClose={() => setShowConfig(false)}
                         clientId={clientId}
                         token={token}
-                        refresh={() => {
-                            fetchMasterValues("zone", setZones);
-                            fetchMasterValues("section", setSections);
-                        }}
+                        refresh={() => { fetchConfigs(); }}
+                        realm={realm}
                     />
 
                     {/* First Delete Confirmation */}
@@ -964,4 +1050,4 @@ const CounterManagement = ({ clientId, token, screenIds, userId }) => {
     );
 };
 
-export default CounterManagement;
+export default TableManagement;

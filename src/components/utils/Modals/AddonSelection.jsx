@@ -17,19 +17,33 @@ const AddonSelectionPopup = ({
   useEffect(() => {
     setTempSelectedAddons(selectedAddons || []);
   }, [selectedAddons]);
-  
 
   // ✅ Filter addons by selected subcategory
+  const getItemCountForSubcategory = (subcategory) => {
+    const subId = subcategory.id;
+    const subName = (subcategory.name || '').trim().toLowerCase();
+    return allAddonItems.filter(item => {
+      const catVal = (item.category_id || '').trim().toLowerCase();
+      return catVal === subId || catVal === subName;
+    }).length;
+  };
+
+  // Filter addons by selected subcategory — match by both ID and name
   const filteredAddonItems = useMemo(() => {
     if (!selectedSubcategory) return [];
-    
+
+    const subId = selectedSubcategory.id;
+    const subName = (selectedSubcategory.name || '').trim().toLowerCase();
+
     return allAddonItems.filter(item => {
       // Exclude current item
       if (currentItemId && item.id === currentItemId) return false;
-      
-      // Filter by subcategory
-      if (item.category_id !== selectedSubcategory.id) return false;
-      
+
+      // Match by subcategory ID or name (DB stores category_id as name string)
+      const catVal = (item.category_id || '').trim().toLowerCase();
+      const matchesCategory = catVal === subId || catVal === subName;
+      if (!matchesCategory) return false;
+
       // Filter by search query
       if (searchQuery) {
         const query = searchQuery.toLowerCase();
@@ -133,7 +147,7 @@ const AddonSelectionPopup = ({
                   >
                     <div className="font-medium text-sm">{subcategory.name}</div>
                     <div className="text-xs opacity-75 mt-0.5">
-                      {allAddonItems.filter(item => item.category_id === subcategory.id).length} items
+                      {getItemCountForSubcategory(subcategory)} items
                     </div>
                   </button>
                 ))}
@@ -173,7 +187,7 @@ const AddonSelectionPopup = ({
                       disabled={filteredAddonItems.length === 0}
                       className="px-4 py-2 bg-gray-100 text-gray-700 rounded-lg hover:bg-gray-200 transition-colors text-sm font-medium disabled:opacity-50 disabled:cursor-not-allowed whitespace-nowrap"
                     >
-                      {filteredAddonItems.every(item => tempSelectedAddons.includes(item.id))
+                      {filteredAddonItems.length > 0 && filteredAddonItems.every(item => tempSelectedAddons.includes(item.id))
                         ? 'Deselect All'
                         : 'Select All'}
                     </button>
