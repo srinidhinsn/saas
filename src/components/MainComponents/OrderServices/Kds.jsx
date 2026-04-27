@@ -8,7 +8,12 @@ import { Filter, Clock, Users, Package, Truck, Trash2, BarChart2, X, ChevronRigh
 
 // ─── Constants ─────────────────────────────────────────────────────────────────
 
-
+const getItemType = (frontendUniqueKey = '') => {
+  if (frontendUniqueKey.startsWith('addon_')) return 'addon';
+  if (frontendUniqueKey.startsWith('combo_')) return 'combo';
+  if (frontendUniqueKey.startsWith('cchild_')) return 'cchild';
+  return 'main';
+};
 // ─── Dynamic Configuration ─────────────────────────────────────────────────────
 
 const KDS_CONFIG = {
@@ -107,18 +112,12 @@ const isComboItem = (orderItem, menuRecord) => {
   if (orderItem?.is_addon) return false;
   if (!menuRecord) return false;
 
-  // Must have category_id matching 'Combos' — this is what separates combos
-  // from addons, which also carry line_item_id but belong to a different category.
-  const isComboCategoryId =
-    String(menuRecord.category_id || '').toLowerCase() ===
-    KDS_CONFIG.COMBO_CATEGORY_ID.toLowerCase();
-
-  // Must also have line items to actually display
   const hasLineItems =
-    Array.isArray(menuRecord.line_item_id) && menuRecord.line_item_id.length > 0;
+    Array.isArray(menuRecord.line_item_id) &&
+    menuRecord.line_item_id.length > 0;
 
-  // AND — both conditions required
-  return isComboCategoryId && hasLineItems;
+  // ✅ THIS is the real condition
+  return hasLineItems;
 };
 
 // ─── Delete item confirmation modal ───────────────────────────────────────────
@@ -328,65 +327,116 @@ const AggregatePanel = ({ cards, tablesMap, onClose }) => {
 // Industry standard KDS pattern: always-visible, indented, read-only sub-list.
 
 // ─── Item status icon button ───────────────────────────────────────────────────
-const ComboComponentsList = ({ menuRecord, menuItemsMap }) => {
+const ComboComponentsList = ({
+  menuRecord,
+  menuItemsMap,
+  orderItems,
+  comboQty
+}) => {
   const componentIds = menuRecord?.line_item_id;
-  if (!componentIds || !Array.isArray(componentIds) || componentIds.length === 0) return null;
-
-  const components = componentIds
-    .map((id) => menuItemsMap[Number(id)] || menuItemsMap[String(id)])
-    .filter(Boolean);
+  if (!componentIds || !Array.isArray(componentIds)) return null;
 
   return (
     <div className="mt-1.5 ml-1 space-y-0.5">
-      {components.length > 0 ? (
-        components.map((comp, idx) => (
+      {componentIds.map((id, idx) => {
+        const comp =
+          menuItemsMap[Number(id)] || menuItemsMap[String(id)];
+
+        if (!comp) return null;
+
+        const manualQty = (orderItems || []).reduce((sum, item) => {
+          const key = item.frontend_unique_key || "";
+
+          // ❌ skip combo-generated children
+          if (key.startsWith("cchild")) return sum;
+
+          // ❌ skip combo parent
+          const menuRec =
+            menuItemsMap[item.item_id] ||
+            menuItemsMap[String(item.item_id)];
+
+          const isCombo =
+            menuRec?.line_item_id && menuRec.line_item_id.length > 0;
+
+          if (isCombo) return sum;
+
+          // ❌ IMPORTANT: skip items that belong to combo via same key pattern
+          if (key.includes("combo")) return sum;
+
+          // ✅ ONLY real manual + addon
+          if (String(item.item_id) === String(id)) {
+            return sum + (item.quantity || 1);
+          }
+
+          return sum;
+        }, 0);
+
+        // ✅ FINAL TOTAL
+        const totalQty = comboQty;
+
+        return (
           <div
             key={comp.id || idx}
             className="flex items-center gap-1.5 pl-3 border-l-2 border-violet-300 py-0.5"
           >
-            <ChevronRight size={10} className="text-violet-400 flex-shrink-0" />
-            <span className="text-[11px] text-violet-700 font-medium leading-tight">
-              {comp.name || comp.item_name || `Item #${comp.id}`}
+            <ChevronRight size={10} className="text-violet-400" />
+            <span className="text-[11px] text-violet-700 font-medium">
+              {totalQty} x {comp.name || comp.item_name}
             </span>
           </div>
-        ))
-      ) : (
-        // IDs present but not resolved in map — show count as safe fallback
-        <div className="pl-3 border-l-2 border-violet-200 py-0.5">
-          <span className="text-[11px] text-violet-500 font-medium">
-            {componentIds.length} included item{componentIds.length !== 1 ? 's' : ''}
-          </span>
-        </div>
-      )}
+        );
+      })}
     </div>
   );
 };
 
 // ─── KDS card ─────────────────────────────────────────────────────────────────
+// const groupItemsWithAddons = (items = []) => {
+//   const grouped = [];
+//   const usedAddonKeys = new Set();
 
-const groupItemsWithAddons = (items) => {
-  const grouped = [];
+//   // ✅ Build set of valid parent keys (real main items only)
+//   const parentKeys = new Set(
+//     items
+//       .filter(i => getItemType(i.frontend_unique_key || '') !== 'addon')
+//       .map(i => i.frontend_unique_key)
+//   );
 
-  const mainItems = (items || []).filter(
-    (item) => !item.parent_item_key
-  );
+//   items.forEach((item) => {
+//     const type = getItemType(item.frontend_unique_key || '');
 
-  mainItems.forEach((main) => {
-    const addons = (items || []).filter(
-      (item) =>
-        item.parent_item_key &&
-        item.parent_item_key.startsWith(`${main.item_id}_`)
-    );
+//     // ❌ skip addons as main
+//     if (type === 'addon') return;
 
-    grouped.push({
-      main,
-      addons,
-    });
-  });
+//     const parentKey = item.frontend_unique_key;
 
-  return grouped;
-};
+//     const addons = items.filter(a => {
+//       const aType = getItemType(a.frontend_unique_key || '');
 
+//       // ✅ must be addon
+//       if (aType !== 'addon') return false;
+
+//       // ✅ must have parent
+//       if (!a.parent_item_key) return false;
+
+//       // ✅ parent must exist
+//       if (!parentKeys.has(a.parent_item_key)) return false;
+
+//       // ✅ attach only to correct parent
+//       const match = a.parent_item_key === parentKey;
+
+//       if (match) {
+//         usedAddonKeys.add(a.frontend_unique_key);
+//       }
+
+//       return match;
+//     });
+
+//     grouped.push({ main: item, addons });
+//   });
+
+//   return { grouped, usedAddonKeys };
+// };
 const KitchenCard = ({
   card,
   tablesMap,
@@ -424,7 +474,25 @@ const KitchenCard = ({
       });
     }
   };
-
+  const groupSameItems = (items = []) => {
+    const map = new Map();
+  
+    items.forEach(item => {
+      const type = getItemType(item.frontend_unique_key || '');
+  
+      // 👉 group by name + type (important)
+      const key = `${type}_${item.item_name}`;
+  
+      if (!map.has(key)) {
+        map.set(key, { ...item });
+      } else {
+        const existing = map.get(key);
+        existing.quantity += item.quantity || 1;
+      }
+    });
+  
+    return Array.from(map.values());
+  };
   return (
     <div className="rounded-xl shadow-md overflow-hidden border border-gray-200 bg-white transition-transform transform hover:-translate-y-0.5 flex flex-col">
 
@@ -450,103 +518,61 @@ const KitchenCard = ({
 
       {/* ── Card body — item list ── */}
       <div className="bg-bg-primary px-4 py-4 space-y-3 flex-1">
-        {groupItemsWithAddons(card.items).map(({ main, addons }, idx) => {
-          const item = main;
-          const menuRecord =
-            menuItemsMap[Number(item.item_id)] || menuItemsMap[String(item.item_id)];
+        {(() => {
+        const cleanedItems = (card.items || []).filter(item => {
+          const type = getItemType(item.frontend_unique_key || '');
+          return type !== 'cchild';
+        });
+        
+        // ✅ GROUP HERE
+        const groupedItems = groupSameItems(cleanedItems);
 
-          // Use category_name === 'Combos' as the primary signal (your requirement)
-          const combo = isComboItem(item, menuRecord);
-          const isPending = pendingItemIds.has(item.id);
-          const isCancelled = isCancelledStatus(item.status);
+          return groupedItems.map((item, idx) => {
+            const type = getItemType(item.frontend_unique_key || '');
 
-          return (
-            <div key={item.id || idx} className="flex flex-col w-full rounded-lg bg-white">
-              <div className="flex items-center w-full">
-                <div className="flex-1 min-w-0">
-                  <div className="flex items-center gap-1.5 flex-wrap">
-                    <span className="font-medium text-sm">
-                      <span className="mr-1">{item.quantity} x</span>
-                      <span>{item.item_name || 'Unnamed Item'}</span>
+            const isAddon = type === 'addon';
+            const isCombo = type === 'combo';
+
+            return (
+              <div
+                key={item.id || idx}
+                className={`flex flex-col w-full rounded-lg px-2 py-1
+          ${isAddon ? 'ml-4' : ''}`}
+              >
+                <div className="flex items-center gap-2 flex-wrap">
+
+                  {isCombo && (
+                    <span className="text-[10px] bg-violet-600 text-white px-2 py-0.5 rounded-full font-bold">
+                      COMBO
                     </span>
-                    {/* Combo badge */}
-                    {/* {combo && (
-                      <span className="text-[10px] bg-violet-100 text-violet-700 font-bold px-1.5 py-0.5 rounded-full leading-none">
-                        COMBO
-                      </span>
-                    )} */}
-                  </div>
+                  )}
+
+                  {isAddon && (
+                    <span className="text-blue-500 text-xs font-bold">↳</span>
+                  )}
+
+                  <span className={`font-medium text-sm
+            ${isAddon ? 'text-blue-700' : ''}`}>
+                    {item.quantity} x {item.item_name}
+                  </span>
                 </div>
 
-                {/* Status buttons */}
-                <div className="flex items-center gap-1 ml-3">
-                  <button
-                    type="button"
-                    disabled={isPending || isCancelled}
-                    onClick={() => handleStatusClick(card.card_id, item.id, KDS_CONFIG.STATUS.PENDING)}
-                    title="Mark as Pending"
-                    className={`p-2 rounded-md hover:bg-gray-100 transition-colors ${isPending || isCancelled ? 'opacity-40 cursor-not-allowed' : ''}`}
-                  >
-                    <FaClock
-                      size={20}
-                      className={item.status === 'pending' ? 'text-blue-600' : 'text-gray-400'}
-                    />
-                  </button>
-
-                  <button
-                    type="button"
-                    disabled={isPending || isCancelled}
-                    onClick={() => handleStatusClick(card.card_id, item.id, KDS_CONFIG.STATUS.PREPARING)}
-                    title="Mark as Preparing"
-                    className={`p-2 rounded-md hover:bg-gray-100 transition-colors ${isPending || isCancelled ? 'opacity-40 cursor-not-allowed' : ''}`}
-                  >
-                    <FaHourglassHalf
-                      size={20}
-                      className={item.status === 'preparing' ? 'text-orange-500' : 'text-gray-400'}
-                    />
-                  </button>
-
-                  <button
-                    type="button"
-                    disabled={isPending || isCancelled}
-                    onClick={() => handleStatusClick(card.card_id, item.id, KDS_CONFIG.STATUS.READY)}
-                    title="Mark as Ready"
-                    className={`p-2 rounded-md hover:bg-gray-100 transition-colors ${isPending || isCancelled ? 'opacity-40 cursor-not-allowed' : ''}`}
-                  >
-                    <FaCheckCircle
-                      size={20}
-                      className={item.status === 'ready' ? 'text-green-500' : 'text-gray-400'}
-                    />
-                  </button>
-                </div>
+                {/* Combo components only */}
+                {isCombo && (
+                  <ComboComponentsList
+                    menuRecord={
+                      menuItemsMap[item.item_id] ||
+                      menuItemsMap[String(item.item_id)]
+                    }
+                    menuItemsMap={menuItemsMap}
+                    orderItems={card.items}
+                    comboQty={item.quantity}
+                  />
+                )}
               </div>
-
-              {/* Combo line items — always visible, indented below the main item */}
-              {/* {combo && (
-                <ComboComponentsList
-                  menuRecord={menuRecord}
-                  menuItemsMap={menuItemsMap}
-                />
-              )} */}
-
-              {addons.length > 0 && (
-                <div className="mt-1.5 ml-1 space-y-0.5">
-                  {addons.map((addon, addonIdx) => (
-                    <div
-                      key={addon.id || addonIdx}
-                      className="flex items-center gap-1.5 pl-3 border-l-2 border-blue-300 py-0.5"
-                    >
-                      <ChevronRight size={10} className="text-blue-400 flex-shrink-0" />
-                      <span className="text-[11px] text-blue-700 font-medium leading-tight">
-                        {addon.quantity} x {addon.item_name}
-                      </span>
-                    </div>
-                  ))}
-                </div>
-              )}
-            </div>
-          );
-        })}
+            );
+          });
+        })()}
       </div>
 
       {/* ── Card footer — status label ── */}
@@ -966,8 +992,8 @@ const KitchenDisplay = () => {
                   key={key}
                   onClick={() => setOrderFilter(key)}
                   className={`flex items-center gap-2 px-4 py-2 rounded-lg font-medium text-sm transition-all ${orderFilter === key
-                     ? 'bg-action-primary text-text-white shadow-sm'
-                     : 'bg-bg-tertiary text-text-secondary hover:text-text-primary border border-border-default'
+                    ? 'bg-action-primary text-text-white shadow-sm'
+                    : 'bg-bg-tertiary text-text-secondary hover:text-text-primary border border-border-default'
                     }`}
                 >
                   <Icon size={16} />

@@ -113,9 +113,22 @@ export default function InvoiceModal({
 
   const safeNum = (num) => (typeof num === "number" && !isNaN(num) ? num : 0);
 
+
+  const getItemType = (frontendUniqueKey = '') => {
+    if (frontendUniqueKey.startsWith('addon_'))  return 'addon';
+    if (frontendUniqueKey.startsWith('combo_'))  return 'combo';
+    if (frontendUniqueKey.startsWith('cchild_')) return 'cchild';
+    return 'main'; 
+  };
+
+  const billingItems = (selectedOrder?.items || []).filter(item => {
+    const type = getItemType(item.frontend_unique_key || '');
+    return type !== 'cchild'; 
+  });
+
   // 1️⃣ Subtotal
   const orderSubtotal = Number(
-    (selectedOrder?.items || []).reduce(
+    billingItems.reduce(
       (sum, item) =>
         sum + (Number(item.unit_price) || 0) * (Number(item.quantity) || 0),
       0
@@ -434,15 +447,14 @@ export default function InvoiceModal({
           { headers: { Authorization: `Bearer ${token}` } }
         );
       }
-
-      const itemsPayload = selectedOrder.items.map((item) => ({
+      const itemsPayload = billingItems.map((item) => ({
         item_ref_id: item.item_id?.toString(),
         description: item.description || "",
         quantity: item.quantity || 0,
         unit_price: item.unit_price || 0,
         total: (item.unit_price || 0) * (item.quantity || 0),
+        frontend_unique_key: item.frontend_unique_key || '',  // preserve for re-open
       }));
-
       await axios.post(
         `${import.meta.env.VITE_API_BILLING_SERVICE_URL}/${clientId}/invoice/create?document_id=${draftId}&client_id=${clientId}`,
         itemsPayload,
@@ -679,22 +691,54 @@ export default function InvoiceModal({
       doc.setFontSize(9);
       doc.setTextColor(0, 0, 0);
 
-      selectedOrder.items.forEach((item, index) => {
+      let printIndex = 0;
+      billingItems.forEach((item) => {
         if (y > pageHeight - 150) {
           doc.addPage();
           y = 50;
         }
 
-        if (index % 2 === 0) {
+        const pdfType = getItemType(item.frontend_unique_key || '');
+        const pdfIsAddon  = pdfType === 'addon';
+        const pdfIsCombo  = pdfType === 'combo';
+        const pdfHasLinked = Array.isArray(item.line_item_id) && item.line_item_id.length > 0;
+        const pdfShowPrice = pdfIsCombo || pdfIsAddon || !pdfHasLinked;
+        const pdfXOffset = pdfIsAddon ? 12 : 0; // indent addons
+
+        if (printIndex % 2 === 0) {
           doc.setFillColor(249, 250, 251);
           doc.rect(40, y - 8, pageWidth - 80, 20, 'F');
         }
-        
-        doc.text(item.name || "Unnamed", 45, y);
+
+        doc.setFont("helvetica", pdfIsAddon ? "normal" : "normal");
+        doc.setFontSize(pdfIsAddon ? 8 : 9);
+        doc.setTextColor(pdfIsAddon ? 80 : pdfIsCombo ? 88 : 0,
+                         pdfIsAddon ? 100 : pdfIsCombo ? 58 : 0,
+                         pdfIsAddon ? 160 : pdfIsCombo ? 180 : 0);
+
+        const displayName = pdfIsAddon
+          ? `  ↳ ${item.name || "Addon"}`
+          : pdfIsCombo
+          ? `[COMBO] ${item.name || "Combo"}`
+          : item.name || "Unnamed";
+
+        doc.text(displayName, 45 + pdfXOffset, y);
         doc.text(`${item.quantity || 0}`, pageWidth - 260, y);
-        doc.text(`₹${(item.unit_price ?? 0).toFixed(2)}`, pageWidth - 180, y);
-        doc.text(`₹${((item.unit_price ?? 0) * (item.quantity ?? 0)).toFixed(2)}`, pageWidth - 80, y);
+
+        if (pdfShowPrice) {
+          doc.text(`₹${(item.unit_price ?? 0).toFixed(2)}`, pageWidth - 180, y);
+          doc.text(`₹${((item.unit_price ?? 0) * (item.quantity ?? 0)).toFixed(2)}`, pageWidth - 80, y);
+        } else {
+          doc.setTextColor(150, 150, 150);
+          doc.text("included", pageWidth - 180, y);
+          doc.text("-", pageWidth - 80, y);
+          doc.setTextColor(0, 0, 0);
+        }
+
+        doc.setTextColor(0, 0, 0);
+        doc.setFontSize(9);
         y += 20;
+        printIndex++;
       });
 
       y += 15;
@@ -839,23 +883,62 @@ export default function InvoiceModal({
                     </h2>
                   </div>
                   <div className="p-4 space-y-2 max-h-96 overflow-y-auto">
+                    {billingItems.map((item, idx) => {
+                      const type = getItemType(item.frontend_unique_key || '');
+                      const isAddon  = type === 'addon';
+                      const isCombo  = type === 'combo';
+                      // Main items that have line_item_id had addons picked separately —
+                      // show "base item" label but no extra price (addons carry price).
+                      const hasLinkedItems = Array.isArray(item.line_item_id) && item.line_item_id.length > 0;
+                      const showPrice = isCombo || isAddon || !hasLinkedItems;
 
-                    {selectedOrder.items.map((item, idx) => (
-                      <div key={idx} className="flex justify-between items-center py-3 px-4 rounded-lg bg-bg-tertiary border border-border-default hover:border-action-primary transition-all">
-                        <div className="flex-1">
-                          <div className="font-semibold text-text-primary">{item.name}</div>
-                          <div className="text-sm text-text-secondary mt-1 flex items-center gap-2">
-                            <span className="inline-flex items-center px-2 py-0.5 rounded-md bg-bg-primary text-text-primary font-medium text-xs">
-                              {item.quantity}x
-                            </span>
-                            <span>@ ₹{item.unit_price?.toFixed(2)}</span>
+                      return (
+                        <div
+                          key={idx}
+                          className={`flex justify-between items-center py-3 px-4 rounded-lg border transition-all
+                            ${isAddon
+                              ? 'ml-6 bg-blue-50 border-blue-200 hover:border-blue-400'
+                              : isCombo
+                              ? 'bg-violet-50 border-violet-200 hover:border-violet-400'
+                              : 'bg-bg-tertiary border-border-default hover:border-action-primary'}`}
+                        >
+                          <div className="flex-1 min-w-0">
+                            <div className="flex items-center gap-2 flex-wrap">
+                              {isAddon && (
+                                <span className="text-blue-400 text-xs font-bold flex-shrink-0">↳</span>
+                              )}
+                              {isCombo && (
+                                <span className="text-xs font-bold bg-violet-200 text-violet-800 px-1.5 py-0.5 rounded-full flex-shrink-0">
+                                  COMBO
+                                </span>
+                              )}
+                              <span className={`font-semibold truncate
+                                ${isAddon ? 'text-blue-800 text-sm' : 'text-text-primary'}`}>
+                                {item.name}
+                              </span>
+                            </div>
+                            <div className="text-sm text-text-secondary mt-1 flex items-center gap-2">
+                              <span className="inline-flex items-center px-2 py-0.5 rounded-md bg-bg-primary text-text-primary font-medium text-xs">
+                                {item.quantity}x
+                              </span>
+                              {showPrice && (
+                                <span>@ ₹{(item.unit_price ?? 0).toFixed(2)}</span>
+                              )}
+                              {!showPrice && (
+                                <span className="text-xs text-gray-400 italic">base item</span>
+                              )}
+                            </div>
+                          </div>
+                          <div className={`font-bold text-lg flex-shrink-0 ml-3
+                            ${isAddon ? 'text-blue-700' : isCombo ? 'text-violet-700' : 'text-text-primary'}`}>
+                            {showPrice
+                              ? `₹${((item.unit_price || 0) * (item.quantity || 0)).toFixed(2)}`
+                              : <span className="text-xs text-gray-400 italic font-normal">included</span>
+                            }
                           </div>
                         </div>
-                        <div className="font-bold text-text-primary text-lg">
-                          ₹{((item.unit_price || 0) * (item.quantity || 0)).toFixed(2)}
-                        </div>
-                      </div>
-                    ))}
+                      );
+                    })}
                   </div>
 
                   {/* Totals */}

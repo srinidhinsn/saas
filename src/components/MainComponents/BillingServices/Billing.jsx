@@ -1265,19 +1265,32 @@ export default function BillingPage({ clientId, token }) {
     setFilteredOrders(filtered);
   }, [searchQuery, dateFilter, orders, tablesMap]);
 
-  const combineDuplicateItems = (items) => {
-    const itemsMap = new Map();
-    items.forEach(item => {
-      const key = item.item_id.toString();
-      if (itemsMap.has(key)) {
-        const existing = itemsMap.get(key);
-        existing.quantity = (existing.quantity || 0) + (item.quantity || 0);
-      } else {
-        itemsMap.set(key, { ...item });
-      }
-    });
-    return Array.from(itemsMap.values());
-  };
+// NEW — deduplicates only true duplicates (same item_id AND same type prefix),
+// preserves frontend_unique_key for getItemType() in InvoiceModal,
+// never merges cchild_ rows with their combo parent
+const combineDuplicateItems = (items) => {
+  const itemsMap = new Map();
+  items.forEach(item => {
+    const fkey = item.frontend_unique_key || '';
+    // Use frontend_unique_key prefix as part of merge key so that
+    // combo parents (combo_) and their children (cchild_) never collapse,
+    // and addon_ rows are kept separate from main_ rows even if same item_id.
+    const typePrefix = fkey.startsWith('addon_')  ? 'addon'
+                     : fkey.startsWith('combo_')  ? 'combo'
+                     : fkey.startsWith('cchild_') ? 'cchild'
+                     : 'main';
+    const key = `${typePrefix}_${item.item_id}`;
+    if (itemsMap.has(key)) {
+      // Only merge same-type same-item duplicates (e.g. same main item ordered twice)
+      const existing = itemsMap.get(key);
+      existing.quantity = (existing.quantity || 0) + (item.quantity || 0);
+      // Keep the frontend_unique_key of the first occurrence
+    } else {
+      itemsMap.set(key, { ...item });
+    }
+  });
+  return Array.from(itemsMap.values());
+};
 
   const handleSelectOrder = async (order) => {
     if (!order) return;

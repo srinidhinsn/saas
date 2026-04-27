@@ -737,7 +737,7 @@ const printKOT = ({ counterTree, categoriesFlat, itemsToPrint, meta }) => {
   const categoryNameToId = {};
   categoriesFlat.forEach(c => {
     if (c.name) categoryNameToId[c.name.trim().toLowerCase()] = c.id;
-  });
+  }); 
 
   // Resolve the real category ID for an item, handling both actual IDs and
   // category names stored in the category_id field
@@ -1854,30 +1854,31 @@ const TakeOrder = ({ clientId, token, onOrderUpdate, realm }) => {
       );
       const allOrders = r.data?.data || [];
 
-      // ▼ ADD THIS ONE LINE — populates the floor DRAFT badges from server
       setDraftTableIds(getDraftTableIdsFromOrders(allOrders));
 
       const map = {};
       tableList.forEach(table => {
         const s = table.status?.toLowerCase();
         if (s === 'occupied' || s === 'served') {
-          const o = allOrders
-            .filter(o =>
-              o.table_id === table.id &&
-              o.status?.toLowerCase() !== 'completed' &&
-              o.status?.toLowerCase() !== 'draft' &&
-              o.status?.toLowerCase() !== 'cancelled'
-            )
-            .sort((a, b) => new Date(b.created_at) - new Date(a.created_at))[0];
-          if (o) {
+          // /dinein/table already returns ONE merged entry per root order group.
+          // Filter to active non-draft groups for this table, pick the latest.
+          const activeGroups = allOrders.filter(o =>
+            o.table_id === table.id &&
+            o.status?.toLowerCase() !== 'completed' &&
+            o.status?.toLowerCase() !== 'draft' &&
+            o.status?.toLowerCase() !== 'cancelled'
+          ).sort((a, b) => new Date(b.created_at) - new Date(a.created_at));
+
+          if (activeGroups.length > 0) {
+            const group = activeGroups[0]; // already merged by backend
             map[table.id] = {
-              id: o.id,
-              dinein_order_id: o.dinein_order_id,
-              status: o.status,
-              created_at: o.created_at,
-              order_count: o.order_count || 1,
-              total_price: o.total_price || 0,
-              invoice_status: o.invoice_status || null,
+              id: group.id,
+              dinein_order_id: group.dinein_order_id,
+              status: group.status,
+              created_at: group.created_at,
+              order_count: group.order_count || 1,
+              total_price: group.total_price || 0,  // already the correct group total
+              invoice_status: group.invoice_status || null,
             };
           }
         }
@@ -2457,27 +2458,29 @@ const TakeOrder = ({ clientId, token, onOrderUpdate, realm }) => {
       .reduce((t, i) => t + (i.unit_price || 0) * i.quantity, 0)
       .toFixed(2);
 
-  const buildCartItem = (item, extra = {}) => {
-    const ts = Date.now() + Math.random();
-    const key = `${item.id}_${ts}`;
-    return {
-      id: Number(item.id),
-      name: item.name,
-      image_id: item.image_id,
-      unit_price: (item.unit_price || 0) * (1 - (Number(item.discount) || 0) / 100),
-      slug: item.slug,
-      category: item.category_name,
-      category_id: item.category_id || null,
-      quantity: 1,
-      note: '',
-      frontend_unique_key: key,
-      is_new_item: true,
-      saved_sub_order: false,
-      is_addon: false,
-      parent_item_key: null,
-      ...extra,
-    };
-  };
+      const buildCartItem = (item, extra = {}) => {
+        const ts = Date.now() + Math.random();
+        const typePrefix = extra._item_type || 'main';
+        const key = `${typePrefix}_${item.id}_${ts}`;
+        const { _item_type, ...cleanExtra } = extra; // don't leak _item_type into cart item
+        return {
+          id: Number(item.id),
+          name: item.name,
+          image_id: item.image_id,
+          unit_price: (item.unit_price || 0) * (1 - (Number(item.discount) || 0) / 100),
+          slug: item.slug,
+          category: item.category_name,
+          category_id: item.category_id || null,
+          quantity: 1,
+          note: '',
+          frontend_unique_key: key,
+          is_new_item: true,
+          saved_sub_order: false,
+          is_addon: false,
+          parent_item_key: null,
+          ...cleanExtra,
+        };
+      };
 
   const addToCart = (item, parentItemKey = null) => {
     // Count how many of this item are already in the new (unsaved) cart
@@ -2521,6 +2524,7 @@ const TakeOrder = ({ clientId, token, onOrderUpdate, realm }) => {
       batch_timestamp: batch,
       parent_item_key: parentItemKey,
       is_addon: !!parentItemKey,
+      _item_type: 'main',
     });
     setCart(prev => [...prev, newItem]);
     if (!isMobile) setShowCart(true);
@@ -2785,13 +2789,14 @@ const TakeOrder = ({ clientId, token, onOrderUpdate, realm }) => {
     const mainKey = addToCart(selectedMainItem);
 
     lineItemsDetails
-      .filter(i => selectedAddonIds.includes(i.id))
-      .forEach(addon => {
-        const addonEntry = buildCartItem(addon, {
-          batch_timestamp: batch,
-          parent_item_key: mainKey,
-          is_addon: true,
-        });
+    .filter(i => selectedAddonIds.includes(i.id))
+    .forEach(addon => {
+      const addonEntry = buildCartItem(addon, {
+        batch_timestamp: batch,
+        parent_item_key: mainKey,
+        is_addon: true,
+        _item_type: 'addon',
+      });
         setCart(prev => [...prev, addonEntry]);
       });
 
@@ -3108,9 +3113,17 @@ const TakeOrder = ({ clientId, token, onOrderUpdate, realm }) => {
   const combineDuplicateItems = (items) => {
     const m = new Map();
     items.forEach(item => {
-      const k = item.item_id.toString();
-      if (m.has(k)) m.get(k).quantity += item.quantity || 0;
-      else m.set(k, { ...item });
+      const fkey = item.frontend_unique_key || '';
+      const typePrefix = fkey.startsWith('addon_')  ? 'addon'
+                       : fkey.startsWith('combo_')  ? 'combo'
+                       : fkey.startsWith('cchild_') ? 'cchild'
+                       : 'main';
+      const k = `${typePrefix}_${item.item_id}`;
+      if (m.has(k)) {
+        m.get(k).quantity += item.quantity || 0;
+      } else {
+        m.set(k, { ...item });
+      }
     });
     return Array.from(m.values());
   };
@@ -3736,17 +3749,28 @@ const TakeOrder = ({ clientId, token, onOrderUpdate, realm }) => {
           if (!comboModalItem) return;
           let batch = currentBatchTimestamp;
           if (!batch) { batch = Date.now(); setCurrentBatchTimestamp(batch); }
-          const mainKey = addToCart(comboModalItem);
-          // Add each combo component as a child entry (is_addon=true, parent_item_key=mainKey)
-          comboModalComponents.forEach((comp, idx) => {
-            const addonEntry = buildCartItem(comp, {
-              batch_timestamp: batch,
-              parent_item_key: mainKey,
-              is_addon: true,
-            });
-            setCart(prev => [...prev, addonEntry]);
+
+          // Build combo parent directly (bypass addToCart's dedup logic for combos)
+          const comboParentEntry = buildCartItem(comboModalItem, {
+            batch_timestamp: batch,
+            is_addon: false,
+            parent_item_key: null,
+            _item_type: 'combo',
           });
+          setCart(prev => [...prev, comboParentEntry]);
           setHasNewItems(true);
+          if (!isMobile) setShowCart(true);
+
+          // Add combo components as cchild_ entries — visible in cart, hidden in billing
+          comboModalComponents.forEach((comp) => {
+            const childEntry = buildCartItem(comp, {
+              batch_timestamp: batch,
+              parent_item_key: comboParentEntry.frontend_unique_key,
+              is_addon: true,
+              _item_type: 'cchild',
+            });
+            setCart(prev => [...prev, childEntry]);
+          });
         }}
       />
 
