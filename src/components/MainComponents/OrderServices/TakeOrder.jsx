@@ -2336,8 +2336,6 @@ const TakeOrder = ({ clientId, token, onOrderUpdate, realm }) => {
           status: item.status || 'pending',
           batch_label: item.batch_label,
           sub_order_id: item.sub_order_id,
-          parent_item_key: item.parent_item_key || null,
-
         };
       });
       setCart(reconstructedCart);
@@ -2395,8 +2393,6 @@ const TakeOrder = ({ clientId, token, onOrderUpdate, realm }) => {
           status: item.status || 'pending',
           batch_label: item.batch_label,
           sub_order_id: item.sub_order_id,
-          parent_item_key: item.parent_item_key || null,
-
         };
       });
 
@@ -2840,8 +2836,6 @@ const TakeOrder = ({ clientId, token, onOrderUpdate, realm }) => {
         status: 'pending',
         slug: i.slug || '',
         frontend_unique_key: i.frontend_unique_key,
-        is_addon: i.is_addon || false,
-        parent_item_key: i.parent_item_key || null,
       }));
     try {
       const headers = { Authorization: `Bearer ${token}` };
@@ -3734,20 +3728,7 @@ const TakeOrder = ({ clientId, token, onOrderUpdate, realm }) => {
         comboItem={comboModalItem}
         comboComponents={comboModalComponents}
         onAddCombo={() => {
-          if (!comboModalItem) return;
-          let batch = currentBatchTimestamp;
-          if (!batch) { batch = Date.now(); setCurrentBatchTimestamp(batch); }
-          const mainKey = addToCart(comboModalItem);
-          // Add each combo component as a child entry (is_addon=true, parent_item_key=mainKey)
-          comboModalComponents.forEach((comp, idx) => {
-            const addonEntry = buildCartItem(comp, {
-              batch_timestamp: batch,
-              parent_item_key: mainKey,
-              is_addon: true,
-            });
-            setCart(prev => [...prev, addonEntry]);
-          });
-          setHasNewItems(true);
+          if (comboModalItem) addToCart(comboModalItem);
         }}
       />
 
