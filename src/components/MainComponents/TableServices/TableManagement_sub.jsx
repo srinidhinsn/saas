@@ -790,7 +790,7 @@ const TableManagement = ({ clientId, token, screenIds, userId, realm}) => {
                                                 className={`border-2 rounded-lg overflow-hidden shadow-sm hover:shadow-md transition
                 ${table.status === "vacant" ? "border-border-default" :
                                                         table.status === "Occupied" ? "border-red-400" :
-                                                            "border-blue-400"}`}
+                                                            "border-border-default"}`}
                                             >
                                                 {/* HEADER */}
                                                 <div className="flex justify-between items-center px-3 py-2 text-sm font-bold bg-action-primary text-white">

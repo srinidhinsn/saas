@@ -1343,7 +1343,6 @@ const handleBulkUpdate = async () => {
             Code: item.code != null ? String(item.code) : "",
             Serving_Quantity: item.serving_quantity ?? "",
             Serving_Unit: item.serving_unit ?? "",
-            Line_Item_IDs: Array.isArray(item.line_item_id) ? item.line_item_id.join(", ") : "",
           };
 
           zoneColumns.forEach(col => {
@@ -1356,7 +1355,7 @@ const handleBulkUpdate = async () => {
       const headers = [
         "Name", "Description", "Category", "Dietary_Type", "Availability_Timing",
         "Image", "Unit", "Unit_Price", "Discount", "Availability", "Code",
-        "Serving_Quantity", "Serving_Unit", "Line_Item_IDs",
+        "Serving_Quantity", "Serving_Unit", 
         ...zoneColumns.map(c => `Price_${c}`)
       ];
 
