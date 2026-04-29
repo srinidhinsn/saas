@@ -3763,29 +3763,60 @@ const buildOrderPayload = (items) =>
         }}
         comboItem={comboModalItem}
         comboComponents={comboModalComponents}
-       onAddCombo={() => {
+  onAddCombo={() => {
   if (!comboModalItem) return;
   let batch = currentBatchTimestamp;
   if (!batch) { batch = Date.now(); setCurrentBatchTimestamp(batch); }
 
-  const comboParentEntry = buildCartItem(comboModalItem, {
-    batch_timestamp: batch,
-    is_addon: false,
-    _item_type: 'combo',
+  setCart(prev => {
+    // Check if this combo already exists in the new (unsaved) cart
+    const existingCombo = prev.find(
+      i => i.id === Number(comboModalItem.id) &&
+           i.is_new_item &&
+           !i.saved_sub_order &&
+           !i.is_addon &&
+           (i.frontend_unique_key || '').startsWith('combo_')
+    );
+
+    if (existingCombo) {
+      // Increment combo parent quantity
+      const updated = prev.map(i => {
+        if (i.frontend_unique_key === existingCombo.frontend_unique_key) {
+          return { ...i, quantity: i.quantity + 1 };
+        }
+        // Increment each child that belongs to this combo parent
+        if (
+          i.parent_item_key === existingCombo.frontend_unique_key &&
+          i.is_addon
+        ) {
+          return { ...i, quantity: i.quantity + 1 };
+        }
+        return i;
+      });
+      return updated;
+    }
+
+    // First time adding this combo — create parent + children
+    const comboParentEntry = buildCartItem(comboModalItem, {
+      batch_timestamp: batch,
+      is_addon: false,
+      _item_type: 'combo',
+    });
+
+    const childEntries = comboModalComponents.map(comp =>
+      buildCartItem(comp, {
+        batch_timestamp: batch,
+        parent_item_key: comboParentEntry.frontend_unique_key,
+        is_addon: true,
+        _item_type: 'cchild',
+      })
+    );
+
+    return [...prev, comboParentEntry, ...childEntries];
   });
-  setCart(prev => [...prev, comboParentEntry]);
+
   setHasNewItems(true);
   if (!isMobile) setShowCart(true);
-
-  comboModalComponents.forEach(comp => {
-    const childEntry = buildCartItem(comp, {
-      batch_timestamp: batch,
-      parent_item_key: comboParentEntry.frontend_unique_key,
-      is_addon: true,
-      _item_type: 'cchild',
-    });
-    setCart(prev => [...prev, childEntry]);
-  });
 }}
       />
 

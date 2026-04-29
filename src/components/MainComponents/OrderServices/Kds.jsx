@@ -325,7 +325,7 @@ const AggregatePanel = ({ cards, tablesMap, onClose }) => {
 // Industry standard KDS pattern: always-visible, indented, read-only sub-list.
 
 // ─── Item status icon button ───────────────────────────────────────────────────
-const ComboComponentsList = ({ menuRecord, menuItemsMap }) => {
+const ComboComponentsList = ({ menuRecord, menuItemsMap, parentQuantity = 1 }) => {
   const componentIds = menuRecord?.line_item_id;
   if (!componentIds || !Array.isArray(componentIds) || componentIds.length === 0) return null;
 
@@ -343,14 +343,17 @@ const ComboComponentsList = ({ menuRecord, menuItemsMap }) => {
           >
             <ChevronRight size={10} className="text-violet-400 flex-shrink-0" />
             <span className="text-[11px] text-violet-700 font-medium leading-tight">
+              {parentQuantity > 1 && (
+                <span className="font-bold mr-1">{parentQuantity}×</span>
+              )}
               {comp.name || comp.item_name || `Item #${comp.id}`}
             </span>
           </div>
         ))
       ) : (
-        // IDs present but not resolved in map — show count as safe fallback
         <div className="pl-3 border-l-2 border-violet-200 py-0.5">
           <span className="text-[11px] text-violet-500 font-medium">
+            {parentQuantity > 1 ? `${parentQuantity}× ` : ''}
             {componentIds.length} included item{componentIds.length !== 1 ? 's' : ''}
           </span>
         </div>
@@ -512,7 +515,7 @@ const KitchenCard = ({
               </div>
 
               {/* Combo components list — unchanged */}
-              {combo && <ComboComponentsList menuRecord={menuRecord} menuItemsMap={menuItemsMap} />}
+              {combo && <ComboComponentsList menuRecord={menuRecord} menuItemsMap={menuItemsMap} parentQuantity={item.quantity || 1}  />}
 
               {/* Addon rows — identified by "addon_" prefix on frontend_unique_key */}
               {/* Addon rows */}
