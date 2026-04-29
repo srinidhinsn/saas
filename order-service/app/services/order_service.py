@@ -172,16 +172,13 @@ def _convert(recipe_qty: float, recipe_unit: str, stock_unit: str) -> float:
 
     raise ValueError(f"Incompatible unit dimensions: recipe='{ru}', stock='{su}'")
 
-
+# ── Stock deduction ──────────────────────────────────────────────────────────
 def _deduct_stock_for_order(db: Session, client_id: str, order_id: int) -> None:
 
     def _tx(item_id, tx_type, qty, remarks):
         create_transaction(
             db=db, client_id=client_id,
-            payload=TxPayload(
-                item_id=item_id, tx_type=tx_type,
-                ref_id=order_id, qty=qty, remarks=remarks
-            )
+            payload=TxPayload(item_id=item_id, tx_type=tx_type, ref_id=order_id, qty=qty, remarks=remarks)
         )
 
     def _deduct_single_item(menu_item, ordered_qty, label):
@@ -268,10 +265,7 @@ def _deduct_stock_for_order(db: Session, client_id: str, order_id: int) -> None:
 
         menu_item = (
             db.query(InventoryEntity)
-            .filter(
-                InventoryEntity.id == int(order_item.item_id),
-                InventoryEntity.client_id == client_id,
-            )
+            .filter(InventoryEntity.id == int(order_item.item_id), InventoryEntity.client_id == client_id)
             .first()
         )
 
