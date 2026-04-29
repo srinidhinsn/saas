@@ -1305,12 +1305,12 @@ const OrderSummaryVisible = ({ clientId, token }) => {
   const getOrderTotal = (order) =>
     order.items.reduce((sum, item) => {
         const price =
-          inventoryMap[item.item_id]?.unit_price ??
-          item.unit_price ??
-          item.price ??
-          0;
-        return sum + price * (item.quantity || 1);
-      }, 0);
+        inventoryMap[item.item_id]?.unit_price ??
+        item.unit_price ??
+        item.price ??
+        0;
+      return sum + price * (item.quantity || 1);
+    }, 0);
 
   const getOrderModeIcon = (mode) => {
     if (mode === 'takeaway') return <Package size={12} />;

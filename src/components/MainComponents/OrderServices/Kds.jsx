@@ -472,7 +472,9 @@ const KitchenCard = ({
                   </div>
                 </div>
                 <div className="flex items-center gap-1 ml-3">
-                  <button type="button" disabled={isPending || isCancelled}
+                  <button
+                    type="button"
+                    disabled={isPending || isCancelled}
                     onClick={() => handleStatusClick(card.card_id, item.id, KDS_CONFIG.STATUS.PENDING)}
                     title="Mark as Pending"
                     className={`p-2 rounded-md hover:bg-gray-100 transition-colors ${isPending || isCancelled ? 'opacity-40 cursor-not-allowed' : ''}`}
@@ -482,7 +484,9 @@ const KitchenCard = ({
                       className={item.status === 'pending' ? 'text-blue-600' : 'text-gray-400'}
                     />
                   </button>
-                  <button type="button" disabled={isPending || isCancelled}
+                  <button
+                    type="button"
+                    disabled={isPending || isCancelled}
                     onClick={() => handleStatusClick(card.card_id, item.id, KDS_CONFIG.STATUS.PREPARING)}
                     title="Mark as Preparing"
                     className={`p-2 rounded-md hover:bg-gray-100 transition-colors ${isPending || isCancelled ? 'opacity-40 cursor-not-allowed' : ''}`}
@@ -492,7 +496,9 @@ const KitchenCard = ({
                       className={item.status === 'preparing' ? 'text-orange-500' : 'text-gray-400'}
                     />
                   </button>
-                  <button type="button" disabled={isPending || isCancelled}
+                  <button
+                    type="button"
+                    disabled={isPending || isCancelled}
                     onClick={() => handleStatusClick(card.card_id, item.id, KDS_CONFIG.STATUS.READY)}
                     title="Mark as Ready"
                     className={`p-2 rounded-md hover:bg-gray-100 transition-colors ${isPending || isCancelled ? 'opacity-40 cursor-not-allowed' : ''}`}

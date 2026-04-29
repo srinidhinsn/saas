@@ -1208,16 +1208,16 @@ const addons = items.filter(i =>
                 toast.error("Invoice ID missing — save before paying");
                 return;
               }
-
+      
               const isSplit = response?.is_split_payment;
               const paymentsToVerify = isSplit
                 ? response.completed_razorpay_payments   // array of { razorpay_payment_id, order_id, signature }
                 : [{
-                  razorpay_payment_id: response.razorpay_payment_id,
-                  razorpay_order_id: response.razorpay_order_id,
-                  razorpay_signature: response.razorpay_signature,
-                }];
-
+                    razorpay_payment_id: response.razorpay_payment_id,
+                    razorpay_order_id:   response.razorpay_order_id,
+                    razorpay_signature:  response.razorpay_signature,
+                  }];
+          
               // ✅ Verify each Razorpay payment sequentially
               for (const p of paymentsToVerify) {
                 if (!p.razorpay_payment_id || !p.razorpay_order_id || !p.razorpay_signature) {
@@ -1227,10 +1227,10 @@ const addons = items.filter(i =>
                 await axios.post(
                   `${import.meta.env.VITE_API_BILLING_SERVICE_URL}/${clientId}/invoice/verify?client_id=${clientId}`,
                   {
-                    document_id: Number(docId),
+                    document_id:         Number(docId),
                     razorpay_payment_id: String(p.razorpay_payment_id),
-                    razorpay_order_id: String(p.razorpay_order_id),
-                    razorpay_signature: String(p.razorpay_signature),
+                    razorpay_order_id:   String(p.razorpay_order_id),
+                    razorpay_signature:  String(p.razorpay_signature),
                   },
                   {
                     headers: {
@@ -1240,7 +1240,7 @@ const addons = items.filter(i =>
                   }
                 );
               }
-
+          
               // Update order status
               await axios.post(
                 `${import.meta.env.VITE_API_ORDER_SERVICE_URL}/${clientId}/dinein/update`,
