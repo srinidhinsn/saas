@@ -364,7 +364,7 @@ const OrderItemsViewModal = ({ isOpen, onClose, order, inventoryMap, onRequestDe
               </tr>
             </thead>
             <tbody className="divide-y divide-border-default">
-            {order.items.filter(item => !item.parent_item_key).map((item, idx) => {
+             {order.items.map((item, idx) => {
                 const unitPrice =
                   inventoryMap[item.item_id]?.unit_price ??
                   item.unit_price ??
@@ -1303,9 +1303,7 @@ const OrderSummaryVisible = ({ clientId, token }) => {
   // ─────────────────────────────────────────────────────────────────────────
 
   const getOrderTotal = (order) =>
-    order.items
-      .filter(item => !item.parent_item_key)
-      .reduce((sum, item) => {
+    order.items.reduce((sum, item) => {
         const price =
           inventoryMap[item.item_id]?.unit_price ??
           item.unit_price ??
@@ -1464,7 +1462,6 @@ const OrderSummaryVisible = ({ clientId, token }) => {
                   <div className="text-right bg-action-primary/10 px-4 py-2 rounded-xl border border-action-primary/20">
                     <div className="text-xs font-semibold text-text-secondary uppercase">Total</div>
                     <div className="text-xl font-bold text-action-primary">₹{selectedOrder.items
-  .filter(item => !item.parent_item_key)
   .reduce((sum, item) => sum + ((inventoryMap[item.item_id]?.unit_price || item.unit_price || item.price || 0) * (item.quantity || 1)), 0)
   .toFixed(2)}</div>
                   </div>

@@ -1281,7 +1281,11 @@ export default function BillingPage({ clientId, token }) {
 
   const handleSelectOrder = async (order) => {
     if (!order) return;
+<<<<<<< HEAD
   
+=======
+
+>>>>>>> ebe5751f61788938de25e3997646094ee115e47a
     const enrichedItems = (order.items || []).map((item) => {
       const inv = inventoryMap[item.item_id] || {};
       return {
