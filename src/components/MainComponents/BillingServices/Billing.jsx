@@ -30,14 +30,14 @@ export default function BillingPage({ clientId, token }) {
           axios.get(`${import.meta.env.VITE_API_TABLE_SERVICE_URL}/${clientId}/tables/read`, { headers: { Authorization: `Bearer ${token}` } }),
           axios.get(`${import.meta.env.VITE_API_INVENTORY_SERVICE_URL}/${clientId}/inventory/read`, { headers: { Authorization: `Bearer ${token}` } }),
         ]);
-
+        
         const allOrders = ordersRes.data?.data || [];
         setOrders(allOrders);
-
+        
         const tMap = {};
         (tablesRes.data?.data || []).forEach((t) => (tMap[t.id] = t));
         setTablesMap(tMap);
-
+        
         const iMap = {};
         (invRes.data?.data || []).forEach((i) => (iMap[i.id] = i));
         setInventoryMap(iMap);
@@ -124,14 +124,14 @@ export default function BillingPage({ clientId, token }) {
       ...order,
       items: deduplicatedItems,
     };
-  
+
     setSelectedOrder(updatedOrder);
     setInvoiceModalOpen(true);
   };
   // Auto-open invoice when orderId is in URL params
   useEffect(() => {
     const orderIdFromUrl = searchParams.get('orderId');
-
+    
     if (orderIdFromUrl && orders.length > 0 && !selectedOrder && !loading) {
       const matchingOrder = orders.find(order => order.id.toString() === orderIdFromUrl.toString());
       if (matchingOrder) {
@@ -220,8 +220,8 @@ export default function BillingPage({ clientId, token }) {
                     const orderTotal = Number(order.total_price ?? 0);
 
                     return (
-                      <tr
-                        key={order.id}
+                      <tr 
+                        key={order.id} 
                         className="hover:bg-bg-tertiary transition-colors"
                       >
                         <td className="px-6 py-4 whitespace-nowrap">
