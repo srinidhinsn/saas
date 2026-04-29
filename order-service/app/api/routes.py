@@ -61,9 +61,9 @@ def create_order(client_id: str, order: DineinOrderModel, context: SaasContext =
             continue
         effective_price = item.unit_price or 0
         db_item = Db_OrderItem_Entity(
-            order_id=db_order.id, client_id=client_id, item_id=item.item_id,
-            item_name=item.item_name, slug=item.slug, quantity=item.quantity,
-            unit_price=effective_price,   line_total=effective_price * (item.quantity or 1),
+           order_id=db_order.id, client_id=client_id, item_id=item.item_id,
+           item_name=item.item_name, slug=item.slug, quantity=item.quantity,
+           unit_price=effective_price,   line_total=effective_price * (item.quantity or 1),
         frontend_unique_key=item.frontend_unique_key, status=item.status,
         )
         db.add(db_item)
