@@ -2833,17 +2833,19 @@ const TakeOrder = ({ clientId, token, onOrderUpdate, realm }) => {
     const itemsToPrintKOT = newItems.length > 0 ? [...newItems] : [...cart];
 
     // For the order API we only send parent (non-addon) items
-    const buildOrderPayload = (items) =>
-      items.map(i => ({
-        item_id: i.id,
-        item_name: i.name,
-        quantity: i.quantity,
-        unit_price: i.unit_price,
-        line_total: i.unit_price * i.quantity,
-        status: 'pending',
-        slug: i.slug || '',
-        frontend_unique_key: i.frontend_unique_key,
-      }));
+const buildOrderPayload = (items) =>
+  items
+    .filter(i => !(i.frontend_unique_key || '').startsWith('cchild_'))
+    .map(i => ({
+      item_id: i.id,
+      item_name: i.name,
+      quantity: i.quantity,
+      unit_price: i.unit_price,
+      line_total: i.unit_price * i.quantity,
+      status: 'pending',
+      slug: i.slug || '',
+      frontend_unique_key: i.frontend_unique_key,
+    }));
     try {
       const headers = { Authorization: `Bearer ${token}` };
       let placedOrderId = null;
