@@ -466,7 +466,10 @@ const KitchenCard = ({
                     title="Mark as Pending"
                     className={`p-2 rounded-md hover:bg-gray-100 transition-colors ${isPending || isCancelled ? 'opacity-40 cursor-not-allowed' : ''}`}
                   >
-                    <FaClock size={20} className={item.status === 'pending' ? 'text-blue-600' : 'text-gray-400'} />
+                    <FaClock
+                      size={20}
+                      className={item.status === 'pending' ? 'text-blue-600' : 'text-gray-400'}
+                    />
                   </button>
                   <button
                     type="button"
@@ -475,7 +478,10 @@ const KitchenCard = ({
                     title="Mark as Preparing"
                     className={`p-2 rounded-md hover:bg-gray-100 transition-colors ${isPending || isCancelled ? 'opacity-40 cursor-not-allowed' : ''}`}
                   >
-                    <FaHourglassHalf size={20} className={item.status === 'preparing' ? 'text-orange-500' : 'text-gray-400'} />
+                    <FaHourglassHalf
+                      size={20}
+                      className={item.status === 'preparing' ? 'text-orange-500' : 'text-gray-400'}
+                    />
                   </button>
                   <button
                     type="button"
@@ -484,12 +490,15 @@ const KitchenCard = ({
                     title="Mark as Ready"
                     className={`p-2 rounded-md hover:bg-gray-100 transition-colors ${isPending || isCancelled ? 'opacity-40 cursor-not-allowed' : ''}`}
                   >
-                    <FaCheckCircle size={20} className={item.status === 'ready' ? 'text-green-500' : 'text-gray-400'} />
+                    <FaCheckCircle
+                      size={20}
+                      className={item.status === 'ready' ? 'text-green-500' : 'text-gray-400'}
+                    />
                   </button>
                 </div>
               </div>
 
-              {/* Combo components — always visible below combo items */}
+              {/* Combo line items — always visible, indented below the main item */}
               {combo && (
                 <ComboComponentsList
                   menuRecord={menuRecord}
@@ -846,10 +855,10 @@ const KitchenDisplay = () => {
       setCards((prev) =>
         prev.map((c) => {
           if (c.card_id !== cardId) return c;
-          const rolledBack = c.items.map((i) =>
+          const rolledBackItems  = c.items.map((i) =>
             String(i.id) === String(itemId) ? { ...i, status: previousStatus } : i
           );
-          return { ...c, items: rolledBack, status: deriveStatus(rolledBack) };
+          return { ...c, items: rolledBackItems, status: deriveStatus(rolledBackItems) };
         })
       );
     } finally {
@@ -884,8 +893,8 @@ const KitchenDisplay = () => {
                   key={key}
                   onClick={() => setOrderFilter(key)}
                   className={`flex items-center gap-2 px-4 py-2 rounded-lg font-medium text-sm transition-all ${orderFilter === key
-                    ? 'bg-action-primary text-text-white shadow-sm'
-                    : 'bg-bg-tertiary text-text-secondary hover:text-text-primary border border-border-default'
+                     ? 'bg-action-primary text-text-white shadow-sm'
+                     : 'bg-bg-tertiary text-text-secondary hover:text-text-primary border border-border-default'
                     }`}
                 >
                   <Icon size={16} />

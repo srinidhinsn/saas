@@ -1282,7 +1282,7 @@ export default function BillingPage({ clientId, token }) {
   const handleSelectOrder = async (order) => {
     if (!order) return;
 
-    const enrichedItems = (order.items || [])  .filter(item => !item.parent_item_key) .map((item) => {
+    const enrichedItems = (order.items || []).map((item) => {
       const inv = inventoryMap[item.item_id] || {};
       return {
         ...item,
