@@ -362,10 +362,27 @@ const ComboComponentsList = ({ menuRecord, menuItemsMap }) => {
 // ─── KDS card ─────────────────────────────────────────────────────────────────
 
 const groupItemsWithAddons = (items) => {
-  return (items || []).map((item) => ({
-    main: item,
-    addons: [],
-  }));
+  const groups = [];
+  const processed = new Set();
+
+  (items || []).forEach(item => {
+    if (processed.has(item.id)) return;
+
+    const fkey = item.frontend_unique_key || '';
+    const isChild = fkey.startsWith('addon_') || fkey.startsWith('cchild_');
+
+    if (!isChild) {
+      // Find addon children: their key starts with "addon_{thisItemsKey}_"
+      const addonPrefix = `addon_${fkey}_`;
+      const addons = (items || []).filter(
+        a => (a.frontend_unique_key || '').startsWith(addonPrefix)
+      );
+      groups.push({ main: item, addons });
+      processed.add(item.id);
+      addons.forEach(a => processed.add(a.id));
+    }
+  });
+  return groups;
 };
 
 const KitchenCard = ({
@@ -431,17 +448,15 @@ const KitchenCard = ({
 
       {/* ── Card body — item list ── */}
       <div className="bg-bg-primary px-4 py-4 space-y-3 flex-1">
-        {groupItemsWithAddons(card.items).map(({ main }, idx) => {
-          const item = main;
-          const menuRecord =
-            menuItemsMap[Number(item.item_id)] || menuItemsMap[String(item.item_id)];
-
+        {groupItemsWithAddons(card.items).map(({ main: item, addons }, idx) => {
+          const menuRecord = menuItemsMap[Number(item.item_id)] || menuItemsMap[String(item.item_id)];
           const combo = isComboItem(item, menuRecord);
           const isPending = pendingItemIds.has(item.id);
           const isCancelled = isCancelledStatus(item.status);
 
           return (
             <div key={item.id || idx} className="flex flex-col w-full rounded-lg bg-white">
+              {/* Main item row — unchanged */}
               <div className="flex items-center w-full">
                 <div className="flex-1 min-w-0">
                   <div className="flex items-center gap-1.5 flex-wrap">
@@ -450,51 +465,69 @@ const KitchenCard = ({
                       <span>{item.item_name || 'Unnamed Item'}</span>
                     </span>
                     {combo && (
-                      <span className="text-[10px] bg-violet-100 text-violet-700 font-bold px-1.5 py-0.5 rounded-full leading-none">
+                      <span className="text-[10px] bg-violet-100 text-violet-700 font-bold px-1.5 py-0.5 rounded-full">
                         COMBO
                       </span>
                     )}
                   </div>
                 </div>
-
-                {/* Status buttons */}
                 <div className="flex items-center gap-1 ml-3">
-                  <button
-                    type="button"
-                    disabled={isPending || isCancelled}
+                  <button type="button" disabled={isPending || isCancelled}
                     onClick={() => handleStatusClick(card.card_id, item.id, KDS_CONFIG.STATUS.PENDING)}
-                    title="Mark as Pending"
-                    className={`p-2 rounded-md hover:bg-gray-100 transition-colors ${isPending || isCancelled ? 'opacity-40 cursor-not-allowed' : ''}`}
-                  >
+                    className={`p-2 rounded-md hover:bg-gray-100 ${isPending || isCancelled ? 'opacity-40 cursor-not-allowed' : ''}`}>
                     <FaClock size={20} className={item.status === 'pending' ? 'text-blue-600' : 'text-gray-400'} />
                   </button>
-                  <button
-                    type="button"
-                    disabled={isPending || isCancelled}
+                  <button type="button" disabled={isPending || isCancelled}
                     onClick={() => handleStatusClick(card.card_id, item.id, KDS_CONFIG.STATUS.PREPARING)}
-                    title="Mark as Preparing"
-                    className={`p-2 rounded-md hover:bg-gray-100 transition-colors ${isPending || isCancelled ? 'opacity-40 cursor-not-allowed' : ''}`}
-                  >
+                    className={`p-2 rounded-md hover:bg-gray-100 ${isPending || isCancelled ? 'opacity-40 cursor-not-allowed' : ''}`}>
                     <FaHourglassHalf size={20} className={item.status === 'preparing' ? 'text-orange-500' : 'text-gray-400'} />
                   </button>
-                  <button
-                    type="button"
-                    disabled={isPending || isCancelled}
+                  <button type="button" disabled={isPending || isCancelled}
                     onClick={() => handleStatusClick(card.card_id, item.id, KDS_CONFIG.STATUS.READY)}
-                    title="Mark as Ready"
-                    className={`p-2 rounded-md hover:bg-gray-100 transition-colors ${isPending || isCancelled ? 'opacity-40 cursor-not-allowed' : ''}`}
-                  >
+                    className={`p-2 rounded-md hover:bg-gray-100 ${isPending || isCancelled ? 'opacity-40 cursor-not-allowed' : ''}`}>
                     <FaCheckCircle size={20} className={item.status === 'ready' ? 'text-green-500' : 'text-gray-400'} />
                   </button>
                 </div>
               </div>
 
-              {/* Combo components — always visible below combo items */}
-              {combo && (
-                <ComboComponentsList
-                  menuRecord={menuRecord}
-                  menuItemsMap={menuItemsMap}
-                />
+              {/* Combo components list — unchanged */}
+              {combo && <ComboComponentsList menuRecord={menuRecord} menuItemsMap={menuItemsMap} />}
+
+              {/* Addon rows — identified by "addon_" prefix on frontend_unique_key */}
+              {/* Addon rows */}
+              {addons.length > 0 && (
+                <div className="mt-1 ml-1 space-y-0.5">
+                  {addons.map((addon, ai) => {
+                    const isAddonPending = pendingItemIds.has(addon.id);
+                    const isAddonCancelled = isCancelledStatus(addon.status);
+                    return (
+                      <div key={addon.id || ai}
+                        className="flex items-center gap-1.5 pl-3 border-l-2 border-blue-300 py-0.5">
+                        <ChevronRight size={10} className="text-blue-400 flex-shrink-0" />
+                        <span className="text-[11px] text-blue-700 font-medium leading-tight flex-1">
+                          {addon.quantity} × {addon.item_name || 'Addon'}
+                        </span>
+                        <div className="flex items-center gap-1">
+                          <button type="button" disabled={isAddonPending || isAddonCancelled}
+                            onClick={() => handleStatusClick(card.card_id, addon.id, KDS_CONFIG.STATUS.PENDING)}
+                            className={`p-1 rounded hover:bg-gray-100 ${isAddonPending || isAddonCancelled ? 'opacity-40 cursor-not-allowed' : ''}`}>
+                            <FaClock size={14} className={addon.status === 'pending' ? 'text-blue-600' : 'text-gray-400'} />
+                          </button>
+                          <button type="button" disabled={isAddonPending || isAddonCancelled}
+                            onClick={() => handleStatusClick(card.card_id, addon.id, KDS_CONFIG.STATUS.PREPARING)}
+                            className={`p-1 rounded hover:bg-gray-100 ${isAddonPending || isAddonCancelled ? 'opacity-40 cursor-not-allowed' : ''}`}>
+                            <FaHourglassHalf size={14} className={addon.status === 'preparing' ? 'text-orange-500' : 'text-gray-400'} />
+                          </button>
+                          <button type="button" disabled={isAddonPending || isAddonCancelled}
+                            onClick={() => handleStatusClick(card.card_id, addon.id, KDS_CONFIG.STATUS.READY)}
+                            className={`p-1 rounded hover:bg-gray-100 ${isAddonPending || isAddonCancelled ? 'opacity-40 cursor-not-allowed' : ''}`}>
+                            <FaCheckCircle size={14} className={addon.status === 'ready' ? 'text-green-500' : 'text-gray-400'} />
+                          </button>
+                        </div>
+                      </div>
+                    );
+                  })}
+                </div>
               )}
             </div>
           );

@@ -57,14 +57,14 @@
 //           axios.get(`${import.meta.env.VITE_API_TABLE_SERVICE_URL}/${clientId}/tables/read`, { headers: { Authorization: `Bearer ${token}` } }),
 //           axios.get(`${import.meta.env.VITE_API_INVENTORY_SERVICE_URL}/${clientId}/inventory/read`, { headers: { Authorization: `Bearer ${token}` } }),
 //         ]);
-        
+
 //         const allOrders = ordersRes.data?.data || [];
 //         setOrders(allOrders);
-        
+
 //         const tMap = {};
 //         (tablesRes.data?.data || []).forEach((t) => (tMap[t.id] = t));
 //         setTablesMap(tMap);
-        
+
 //         const iMap = {};
 //         (invRes.data?.data || []).forEach((i) => (iMap[i.id] = i));
 //         setInventoryMap(iMap);
@@ -148,7 +148,7 @@
 //   // Auto-open invoice when orderId is in URL params
 //   useEffect(() => {
 //     const orderIdFromUrl = searchParams.get('orderId');
-    
+
 //     if (orderIdFromUrl && orders.length > 0 && !selectedOrder && !loading) {
 //       const matchingOrder = orders.find(order => order.id.toString() === orderIdFromUrl.toString());
 //       if (matchingOrder) {
@@ -384,132 +384,132 @@
 //     }
 //   };
 
-  // const saveInvoiceDraft = async () => {
-  //   if (!selectedOrder) {
-  //     toast.error("Select an order first");
-  //     return;
-  //   }
-  //   if (!selectedOrder.items || selectedOrder.items.length === 0) {
-  //     toast.error("Selected order has no items");
-  //     return;
-  //   }
-  //   if (splitPaymentEnabled) {
-  //     const sumPayments = paymentSplits.reduce((sum, p) => sum + Number(p.amount), 0);
-  //     if (Number(sumPayments.toFixed(2)) !== Number(total.toFixed(2))) {
-  //       toast.error("Split payment amounts do not sum up to the total");
-  //       return;
-  //     }
-  //     if (paymentSplits.length < 2) {
-  //       toast.error("Add at least two payment methods for split payment");
-  //       return;
-  //     }
-  //   }
+// const saveInvoiceDraft = async () => {
+//   if (!selectedOrder) {
+//     toast.error("Select an order first");
+//     return;
+//   }
+//   if (!selectedOrder.items || selectedOrder.items.length === 0) {
+//     toast.error("Selected order has no items");
+//     return;
+//   }
+//   if (splitPaymentEnabled) {
+//     const sumPayments = paymentSplits.reduce((sum, p) => sum + Number(p.amount), 0);
+//     if (Number(sumPayments.toFixed(2)) !== Number(total.toFixed(2))) {
+//       toast.error("Split payment amounts do not sum up to the total");
+//       return;
+//     }
+//     if (paymentSplits.length < 2) {
+//       toast.error("Add at least two payment methods for split payment");
+//       return;
+//     }
+//   }
 
-  //   let paymentMethodArray;
-  //   if (splitPaymentEnabled) {
-  //     paymentMethodArray = paymentSplits.map((p) => ({
-  //       method: p.method,
-  //       amount: Number(p.amount || 0),
-  //     }));
-  //   } else {
-  //     paymentMethodArray = [{ method, amount: Number(total) }];
-  //   }
+//   let paymentMethodArray;
+//   if (splitPaymentEnabled) {
+//     paymentMethodArray = paymentSplits.map((p) => ({
+//       method: p.method,
+//       amount: Number(p.amount || 0),
+//     }));
+//   } else {
+//     paymentMethodArray = [{ method, amount: Number(total) }];
+//   }
 
-  //   setSaving(true);
-  //   try {
-  //     const payload = {
-  //       client_id: clientId,
-  //       document_type: "Invoice",
-  //       document_date: new Date().toISOString(),
-  //       order_id: selectedOrder.id.toString(),
-  //       reference_number: tablesMap[selectedOrder.table_id]?.name || `Table ${selectedOrder.table_id}`,
-  //       subtotal: orderSubtotal,
-  //       tax_amount: calculatedGST,
-  //       tax_rate: taxPercent,
-  //       discount_amount: calculatedDiscount,
-  //       discount: discountIsPercent ? discount : calculatedDiscount,
-  //       total_amount: calculatedTotal,
-  //       payment_status: paymentStatus,
-  //       payment_method: paymentMethodArray,
-  //       single_payment_amount: splitPaymentEnabled ? null : Number(total.toFixed(2)),
-  //       status: status,
-  //       customer_id: selectedOrder.customer_id || "",
-  //       contact_email: selectedOrder.contact_email || "",
-  //       contact_phone: selectedOrder.contact_phone || "",
-  //     };
+//   setSaving(true);
+//   try {
+//     const payload = {
+//       client_id: clientId,
+//       document_type: "Invoice",
+//       document_date: new Date().toISOString(),
+//       order_id: selectedOrder.id.toString(),
+//       reference_number: tablesMap[selectedOrder.table_id]?.name || `Table ${selectedOrder.table_id}`,
+//       subtotal: orderSubtotal,
+//       tax_amount: calculatedGST,
+//       tax_rate: taxPercent,
+//       discount_amount: calculatedDiscount,
+//       discount: discountIsPercent ? discount : calculatedDiscount,
+//       total_amount: calculatedTotal,
+//       payment_status: paymentStatus,
+//       payment_method: paymentMethodArray,
+//       single_payment_amount: splitPaymentEnabled ? null : Number(total.toFixed(2)),
+//       status: status,
+//       customer_id: selectedOrder.customer_id || "",
+//       contact_email: selectedOrder.contact_email || "",
+//       contact_phone: selectedOrder.contact_phone || "",
+//     };
 
-  //     let draftId = invoiceDraftId;
-  //     if (!draftId) {
-  //       const res = await axios.post(
-  //         `${import.meta.env.VITE_API_BILLING_SERVICE_URL}/${clientId}/invoice/create_document`,
-  //         payload,
-  //         { headers: { Authorization: `Bearer ${token}` } }
-  //       );
-  //       draftId = res?.data?.data?.id;
-  //       if (!draftId) throw new Error("Draft creation failed");
-  //       setInvoiceDraftId(draftId);
-  //     } else {
-  //       await axios.post(
-  //         `${import.meta.env.VITE_API_BILLING_SERVICE_URL}/${clientId}/invoice/update_document`,
-  //         { id: draftId, ...payload },
-  //         { headers: { Authorization: `Bearer ${token}` } }
-  //       );
-  //     }
+//     let draftId = invoiceDraftId;
+//     if (!draftId) {
+//       const res = await axios.post(
+//         `${import.meta.env.VITE_API_BILLING_SERVICE_URL}/${clientId}/invoice/create_document`,
+//         payload,
+//         { headers: { Authorization: `Bearer ${token}` } }
+//       );
+//       draftId = res?.data?.data?.id;
+//       if (!draftId) throw new Error("Draft creation failed");
+//       setInvoiceDraftId(draftId);
+//     } else {
+//       await axios.post(
+//         `${import.meta.env.VITE_API_BILLING_SERVICE_URL}/${clientId}/invoice/update_document`,
+//         { id: draftId, ...payload },
+//         { headers: { Authorization: `Bearer ${token}` } }
+//       );
+//     }
 
-  //     const itemsPayload = selectedOrder.items.map((item) => ({
-  //       item_ref_id: item.item_id?.toString(),
-  //       description: item.description || "",
-  //       quantity: item.quantity || 0,
-  //       unit_price: item.unit_price || 0,
-  //       total: (item.unit_price || 0) * (item.quantity || 0),
-  //     }));
+//     const itemsPayload = selectedOrder.items.map((item) => ({
+//       item_ref_id: item.item_id?.toString(),
+//       description: item.description || "",
+//       quantity: item.quantity || 0,
+//       unit_price: item.unit_price || 0,
+//       total: (item.unit_price || 0) * (item.quantity || 0),
+//     }));
 
-  //     await axios.post(
-  //       `${import.meta.env.VITE_API_BILLING_SERVICE_URL}/${clientId}/invoice/create?document_id=${draftId}&client_id=${clientId}`,
-  //       itemsPayload,
-  //       { headers: { Authorization: `Bearer ${token}` } }
-  //     );
-  //     // await axios.post(
-  //     //   `${import.meta.env.VITE_API_ORDER_SERVICE_URL}/${clientId}/dinein/update`,
-  //     //   {
-  //     //     id: selectedOrder.id,
-  //     //     status: "served",
-  //     //     invoice_status: paymentStatus.toLowerCase(),
-  //     //   },
-  //     //   { headers: { Authorization: `Bearer ${token}` } }
-  //     // );
+//     await axios.post(
+//       `${import.meta.env.VITE_API_BILLING_SERVICE_URL}/${clientId}/invoice/create?document_id=${draftId}&client_id=${clientId}`,
+//       itemsPayload,
+//       { headers: { Authorization: `Bearer ${token}` } }
+//     );
+//     // await axios.post(
+//     //   `${import.meta.env.VITE_API_ORDER_SERVICE_URL}/${clientId}/dinein/update`,
+//     //   {
+//     //     id: selectedOrder.id,
+//     //     status: "served",
+//     //     invoice_status: paymentStatus.toLowerCase(),
+//     //   },
+//     //   { headers: { Authorization: `Bearer ${token}` } }
+//     // );
 
-  //     // Update table status to vacant after saving invoice
-  //     if (selectedOrder.table_id) {
-  //       try {
-  //         const tableData = tablesMap[selectedOrder.table_id];
-  //         await axios.post(
-  //           `${import.meta.env.VITE_API_TABLE_SERVICE_URL}/${clientId}/tables/update`,
-  //           {
-  //             id: selectedOrder.table_id,
-  //             client_id: clientId,
-  //             name: tableData?.name || `Table ${selectedOrder.table_id}`,
-  //             table_type: tableData?.table_type || "Regular",
-  //             status: 'Vacant',
-  //             location_zone: tableData?.location_zone || "Main"
-  //           },
-  //           { headers: { Authorization: `Bearer ${token}` } }
-  //         );
-  //       } catch (tableErr) {
-  //         console.error("Failed to update table status:", tableErr.response?.data || tableErr.message);
-  //       }
-  //     }
+//     // Update table status to vacant after saving invoice
+//     if (selectedOrder.table_id) {
+//       try {
+//         const tableData = tablesMap[selectedOrder.table_id];
+//         await axios.post(
+//           `${import.meta.env.VITE_API_TABLE_SERVICE_URL}/${clientId}/tables/update`,
+//           {
+//             id: selectedOrder.table_id,
+//             client_id: clientId,
+//             name: tableData?.name || `Table ${selectedOrder.table_id}`,
+//             table_type: tableData?.table_type || "Regular",
+//             status: 'Vacant',
+//             location_zone: tableData?.location_zone || "Main"
+//           },
+//           { headers: { Authorization: `Bearer ${token}` } }
+//         );
+//       } catch (tableErr) {
+//         console.error("Failed to update table status:", tableErr.response?.data || tableErr.message);
+//       }
+//     }
 
-  //     toast.success("Invoice saved successfully!");
-  //     return draftId;
-  //   } catch (err) {
-  //     console.error(err);
-  //     toast.error("Failed to save invoice");
-  //     throw err;
-  //   } finally {
-  //     setSaving(false);
-  //   }
-  // };
+//     toast.success("Invoice saved successfully!");
+//     return draftId;
+//   } catch (err) {
+//     console.error(err);
+//     toast.error("Failed to save invoice");
+//     throw err;
+//   } finally {
+//     setSaving(false);
+//   }
+// };
 
 //   const printInvoice = async () => {
 //     if (!selectedOrder || !selectedOrder.items?.length) {
@@ -758,7 +758,7 @@
 //       {/* Content */}
 //       <div className="flex-1 overflow-y-auto p-6">
 //         <div className="grid grid-cols-1 xl:grid-cols-3 gap-6">
-          
+
 //           {/* LEFT - Items (2/3 width on xl) */}
 //           <div className="xl:col-span-2 space-y-6">
 //             <div className="bg-bg-primary rounded-xl shadow-lg border border-border-default">
@@ -1080,8 +1080,8 @@
 //               </div>
 //             </div>
 //             <div className="text-text-white text-right">
-              
-              
+
+
 //             </div>
 //           </div>
 //         </div>
@@ -1136,7 +1136,7 @@
 //                         <td className="px-6 py-4 whitespace-nowrap">
 //                           <div className="text-sm font-bold text-action-primary">₹{orderTotal.toFixed(2)}</div>
 //                         </td>
-                        
+
 //                         {/* <td className="px-6 py-4 whitespace-nowrap">
 //                           <span className="inline-flex items-center px-2.5 py-1 rounded-full text-xs font-semibold bg-action-primary/10 text-action-primary">
 //                             {order.status || "Served"}
@@ -1220,14 +1220,14 @@ export default function BillingPage({ clientId, token }) {
           axios.get(`${import.meta.env.VITE_API_TABLE_SERVICE_URL}/${clientId}/tables/read`, { headers: { Authorization: `Bearer ${token}` } }),
           axios.get(`${import.meta.env.VITE_API_INVENTORY_SERVICE_URL}/${clientId}/inventory/read`, { headers: { Authorization: `Bearer ${token}` } }),
         ]);
-        
+
         const allOrders = ordersRes.data?.data || [];
         setOrders(allOrders);
-        
+
         const tMap = {};
         (tablesRes.data?.data || []).forEach((t) => (tMap[t.id] = t));
         setTablesMap(tMap);
-        
+
         const iMap = {};
         (invRes.data?.data || []).forEach((i) => (iMap[i.id] = i));
         setInventoryMap(iMap);
@@ -1281,8 +1281,8 @@ export default function BillingPage({ clientId, token }) {
 
   const handleSelectOrder = async (order) => {
     if (!order) return;
-
-    const enrichedItems = (order.items || [])  .filter(item => !item.parent_item_key) .map((item) => {
+  
+    const enrichedItems = (order.items || []).map((item) => {
       const inv = inventoryMap[item.item_id] || {};
       return {
         ...item,
@@ -1291,22 +1291,36 @@ export default function BillingPage({ clientId, token }) {
         name: item.item_name ?? inv.name ?? "Unnamed Item",
       };
     });
-
-    const combinedItems = combineDuplicateItems(enrichedItems);
-
+  
+    // Deduplicate by frontend_unique_key — same item across sub-orders should appear once
+    // For items without a fkey, fall back to a composite key
+    const seen = new Map();
+    const deduplicatedItems = [];
+  
+    enrichedItems.forEach(item => {
+      const fkey = item.frontend_unique_key || `${item.item_id}_${item.unit_price}`;
+      if (seen.has(fkey)) {
+        // Accumulate quantity for duplicate entries
+        seen.get(fkey).quantity += (item.quantity || 1);
+      } else {
+        const copy = { ...item };
+        seen.set(fkey, copy);
+        deduplicatedItems.push(copy);
+      }
+    });
+  
     const updatedOrder = {
       ...order,
-      items: combinedItems,
+      items: deduplicatedItems,
     };
-
+  
     setSelectedOrder(updatedOrder);
     setInvoiceModalOpen(true);
   };
-
   // Auto-open invoice when orderId is in URL params
   useEffect(() => {
     const orderIdFromUrl = searchParams.get('orderId');
-    
+
     if (orderIdFromUrl && orders.length > 0 && !selectedOrder && !loading) {
       const matchingOrder = orders.find(order => order.id.toString() === orderIdFromUrl.toString());
       if (matchingOrder) {
@@ -1395,8 +1409,8 @@ export default function BillingPage({ clientId, token }) {
                     const orderTotal = Number(order.total_price ?? 0);
 
                     return (
-                      <tr 
-                        key={order.id} 
+                      <tr
+                        key={order.id}
                         className="hover:bg-bg-tertiary transition-colors"
                       >
                         <td className="px-6 py-4 whitespace-nowrap">
