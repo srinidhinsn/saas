@@ -474,10 +474,6 @@ const KitchenCard = ({
                 <div className="flex items-center gap-1 ml-3">
                   <button type="button" disabled={isPending || isCancelled}
                     onClick={() => handleStatusClick(card.card_id, item.id, KDS_CONFIG.STATUS.PENDING)}
-<<<<<<< HEAD
-                    className={`p-2 rounded-md hover:bg-gray-100 ${isPending || isCancelled ? 'opacity-40 cursor-not-allowed' : ''}`}>
-                    <FaClock size={20} className={item.status === 'pending' ? 'text-blue-600' : 'text-gray-400'} />
-=======
                     title="Mark as Pending"
                     className={`p-2 rounded-md hover:bg-gray-100 transition-colors ${isPending || isCancelled ? 'opacity-40 cursor-not-allowed' : ''}`}
                   >
@@ -485,14 +481,9 @@ const KitchenCard = ({
                       size={20}
                       className={item.status === 'pending' ? 'text-blue-600' : 'text-gray-400'}
                     />
->>>>>>> ebe5751f61788938de25e3997646094ee115e47a
                   </button>
                   <button type="button" disabled={isPending || isCancelled}
                     onClick={() => handleStatusClick(card.card_id, item.id, KDS_CONFIG.STATUS.PREPARING)}
-<<<<<<< HEAD
-                    className={`p-2 rounded-md hover:bg-gray-100 ${isPending || isCancelled ? 'opacity-40 cursor-not-allowed' : ''}`}>
-                    <FaHourglassHalf size={20} className={item.status === 'preparing' ? 'text-orange-500' : 'text-gray-400'} />
-=======
                     title="Mark as Preparing"
                     className={`p-2 rounded-md hover:bg-gray-100 transition-colors ${isPending || isCancelled ? 'opacity-40 cursor-not-allowed' : ''}`}
                   >
@@ -500,14 +491,9 @@ const KitchenCard = ({
                       size={20}
                       className={item.status === 'preparing' ? 'text-orange-500' : 'text-gray-400'}
                     />
->>>>>>> ebe5751f61788938de25e3997646094ee115e47a
                   </button>
                   <button type="button" disabled={isPending || isCancelled}
                     onClick={() => handleStatusClick(card.card_id, item.id, KDS_CONFIG.STATUS.READY)}
-<<<<<<< HEAD
-                    className={`p-2 rounded-md hover:bg-gray-100 ${isPending || isCancelled ? 'opacity-40 cursor-not-allowed' : ''}`}>
-                    <FaCheckCircle size={20} className={item.status === 'ready' ? 'text-green-500' : 'text-gray-400'} />
-=======
                     title="Mark as Ready"
                     className={`p-2 rounded-md hover:bg-gray-100 transition-colors ${isPending || isCancelled ? 'opacity-40 cursor-not-allowed' : ''}`}
                   >
@@ -515,12 +501,10 @@ const KitchenCard = ({
                       size={20}
                       className={item.status === 'ready' ? 'text-green-500' : 'text-gray-400'}
                     />
->>>>>>> ebe5751f61788938de25e3997646094ee115e47a
                   </button>
                 </div>
               </div>
 
-<<<<<<< HEAD
               {/* Combo components list — unchanged */}
               {combo && <ComboComponentsList menuRecord={menuRecord} menuItemsMap={menuItemsMap} />}
 
@@ -559,14 +543,6 @@ const KitchenCard = ({
                     );
                   })}
                 </div>
-=======
-              {/* Combo line items — always visible, indented below the main item */}
-              {combo && (
-                <ComboComponentsList
-                  menuRecord={menuRecord}
-                  menuItemsMap={menuItemsMap}
-                />
->>>>>>> ebe5751f61788938de25e3997646094ee115e47a
               )}
             </div>
           );
