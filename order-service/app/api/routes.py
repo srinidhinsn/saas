@@ -19,7 +19,7 @@ from models.saas_context import SaasContext
 from typing import Optional
 from entity.inventory_entity import InventoryEntity, CategoryEntity
 from models.inventory_model import InventoryTransaction
-from ..services.order_service import (
+from services.order_service import (
     _root_dinein_id,
     _order_row_to_flat,
     STATUS_PRIORITY,
@@ -140,6 +140,7 @@ def create_sub_order(
         screen_id=context.screen_id, data=sub_order_model,
         message=f"Sub-order {sub_dinein_order_id} created successfully",
     )
+
     
 @router.get("/dinein/order")
 def get_orders_for_order_id(client_id: str, order_id: Optional[str] = None, context: SaasContext = Depends(verify_token), db: Session = Depends(get_db)):
@@ -419,15 +420,7 @@ def update_order_item(client_id: str, order_id: Optional[int] = Query(None), ord
 
 
 @router.delete("/order_item/delete")
-def delete_order_items(
-    client_id: str,
-    order_item_id: Optional[str] = Query(None),
-    quantity: Optional[int] = Query(None),
-    reason: Optional[str] = Query(None),
-    transaction_type: Optional[str] = Query(None),
-    context: SaasContext = Depends(verify_token),
-    db: Session = Depends(get_db),
-):
+def delete_order_items( client_id: str, order_item_id: Optional[str] = Query(None), quantity: Optional[int] = Query(None), reason: Optional[str] = Query(None), transaction_type: Optional[str] = Query(None), context: SaasContext = Depends(verify_token), db: Session = Depends(get_db),):
     if not order_item_id:
         raise HTTPException(status_code=400, detail="Missing order_item_id")
     try:
@@ -453,8 +446,8 @@ def delete_order_items(
     ordered_qty       = item.quantity or 1
     inventory_item_id = item.item_id
 
+    remove_qty = quantity if (quantity and 0 < quantity < ordered_qty) else None
     effective_reason  = resolve_reason(reason, tx_type)
-    remove_qty        = quantity if (quantity and 0 < quantity < ordered_qty) else None
 
     def _tx(item_id, tx_type, qty, tag, name):
         create_transaction(
@@ -482,12 +475,15 @@ def delete_order_items(
                 order_id=order_id,
             )
 
-        item.quantity   = new_qty
+        item.quantity = new_qty
         item.line_total = (item.unit_price or 0) * new_qty
 
         order_row = (
             db.query(Db_Order_Entity)
-            .filter(Db_Order_Entity.id == order_id, Db_Order_Entity.client_id == client_id)
+            .filter(
+                Db_Order_Entity.id == order_id,
+                Db_Order_Entity.client_id == client_id,
+            )
             .first()
         )
         if order_row:
@@ -514,7 +510,10 @@ def delete_order_items(
     if tx_type in (TransactionTypeEnum.wastage, TransactionTypeEnum.item_cancelled):
         menu_item = (
             db.query(InventoryEntity)
-            .filter(InventoryEntity.id == inventory_item_id, InventoryEntity.client_id == client_id)
+            .filter(
+                InventoryEntity.id == inventory_item_id,
+                InventoryEntity.client_id == client_id,
+            )
             .first()
         )
 
@@ -605,43 +604,54 @@ def delete_order_items(
 
     order_row = (
         db.query(Db_Order_Entity)
-        .filter(Db_Order_Entity.id == order_id, Db_Order_Entity.client_id == client_id)
+        .filter(
+            Db_Order_Entity.id == order_id,
+            Db_Order_Entity.client_id == client_id,
+        )
         .first()
     )
 
     if not remaining_active:
-        if order_row:
-            root_dinein_id = _root_dinein_id(order_row.dinein_order_id or str(order_row.id))
+      if order_row:
+        root_dinein_id = _root_dinein_id(order_row.dinein_order_id or str(order_row.id))
 
-            order_row.status      = OrderStatusEnum.cancelled
-            order_row.total_price = 0
-            db.flush()
+        # Cancel THIS order
+        order_row.status = OrderStatusEnum.cancelled
+        order_row.total_price = 0
+        db.flush()
 
-            all_group_orders = (
-                db.query(Db_Order_Entity)
-                .filter(
-                    Db_Order_Entity.client_id == client_id,
-                    Db_Order_Entity.dinein_order_id.like(f"{root_dinein_id}%"),
-                    Db_Order_Entity.status != OrderStatusEnum.cancelled,
+        # Check if any sibling order still has active items
+        all_group_orders = (
+            db.query(Db_Order_Entity)
+            .filter(
+                Db_Order_Entity.client_id == client_id,
+                Db_Order_Entity.dinein_order_id.like(f"{root_dinein_id}%"),
+                Db_Order_Entity.status != OrderStatusEnum.cancelled,
                 )
                 .all()
             )
 
-            if not all_group_orders:
-                table_id = order_row.table_id
-                if table_id:
-                    table_row = (
-                        db.query(DiningTable)
-                        .filter(DiningTable.id == table_id, DiningTable.client_id == client_id)
-                        .first()
-                    )
-                    if table_row:
-                        table_row.status = "vacant"
+            # Only free the table when the ENTIRE group is cancelled
+        if not all_group_orders:
+            table_id = order_row.table_id
+            if table_id:
+                table_row = (
+                    db.query(DiningTable)
+                    .filter(
+                        DiningTable.id == table_id,
+                        DiningTable.client_id == client_id, 
+                        
+                    ).first()
+                )
+                if table_row:
+                    table_row.status = "vacant"
 
             db.commit()
             return ResponseModel(
                 screen_id=context.screen_id,
-                data={"message": "Last active item cancelled — order marked cancelled and table freed"},
+                data={
+                    "message": "Last active item cancelled — order marked cancelled and table freed"
+                },
             )
 
     if order_row:
@@ -663,7 +673,10 @@ def cancel_order(
 ):
     root_order = (
         db.query(Db_Order_Entity)
-        .filter(Db_Order_Entity.id == order_id, Db_Order_Entity.client_id == client_id)
+        .filter(
+            Db_Order_Entity.id == order_id,
+            Db_Order_Entity.client_id == client_id,
+        )
         .first()
     )
 
@@ -675,16 +688,12 @@ def cancel_order(
     def _tx(item_id, tx_type, qty, tag, name, ref_id=None):
         create_transaction(
             db=db, client_id=client_id,
-            payload=TxPayload(
-                item_id=item_id,
-                tx_type=tx_type,
-                ref_id=ref_id or order_id,
-                qty=qty,
-                remarks=build_remark(tag, ref_id or order_id, name, qty, effective_reason),
-            ),
+            payload=TxPayload(item_id=item_id, tx_type=tx_type, ref_id=ref_id or order_id, qty=qty, remarks=build_remark(tag, ref_id or order_id, name, qty, effective_reason))
         )
 
-    root_dinein_id = _root_dinein_id(root_order.dinein_order_id or str(root_order.id))
+    root_dinein_id = _root_dinein_id(
+        root_order.dinein_order_id or str(root_order.id)
+    )
 
     related_orders = (
         db.query(Db_Order_Entity)
@@ -695,7 +704,9 @@ def cancel_order(
         .all()
     )
 
-    total_cancel_value = sum(Decimal(str(o.total_price or 0)) for o in related_orders)
+    total_cancel_value = sum(
+        Decimal(str(order.total_price or 0)) for order in related_orders
+    )
 
     processed_keys = set()
 
@@ -737,7 +748,10 @@ def cancel_order(
 
         items = (
             db.query(Db_OrderItem_Entity)
-            .filter(Db_OrderItem_Entity.order_id == order.id, Db_OrderItem_Entity.client_id == client_id)
+            .filter(
+                Db_OrderItem_Entity.order_id == order.id,
+                Db_OrderItem_Entity.client_id == client_id,
+            )
             .all()
         )
 
@@ -749,9 +763,13 @@ def cancel_order(
 
             menu_item = (
                 db.query(InventoryEntity)
-                .filter(InventoryEntity.id == item.item_id, InventoryEntity.client_id == client_id)
+                .filter(
+                    InventoryEntity.id == item.item_id,
+                    InventoryEntity.client_id == client_id,
+                )
                 .first()
             )
+            
             if not menu_item:
                 continue
 
@@ -769,7 +787,10 @@ def cancel_order(
                 for child_id in (menu_item.line_item_id or []):
                     child_item = (
                         db.query(InventoryEntity)
-                        .filter(InventoryEntity.id == int(child_id), InventoryEntity.client_id == client_id)
+                        .filter(
+                            InventoryEntity.id == int(child_id),
+                            InventoryEntity.client_id == client_id,
+                        )
                         .first()
                     )
                     if not child_item:
@@ -781,7 +802,10 @@ def cancel_order(
     if root_order.table_id:
         table_row = (
             db.query(DiningTable)
-            .filter(DiningTable.id == root_order.table_id, DiningTable.client_id == client_id)
+            .filter(
+                DiningTable.id == root_order.table_id,
+                DiningTable.client_id == client_id,
+            )
             .first()
         )
         if table_row:
