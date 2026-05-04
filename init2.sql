@@ -306,20 +306,27 @@ ALTER TABLE public.dinein_order ALTER COLUMN id ADD GENERATED ALWAYS AS IDENTITY
 --
 
 CREATE TABLE public.document (
-    id text NOT NULL,
-    client_id text NOT NULL,
-    category_id text NOT NULL,
-    name text,
-    description text,
-    is_protected boolean,
-    realm text,
-    url text,
-    path text,
-    is_active boolean,
-    created_by text,
-    last_read_by text,
-    created_date_time timestamp without time zone DEFAULT CURRENT_TIMESTAMP,
-    last_read_date_time timestamp without time zone DEFAULT CURRENT_TIMESTAMP
+ id UUID PRIMARY KEY DEFAULT gen_random_uuid(),
+    client_id TEXT,
+    category_id TEXT,
+    name TEXT,
+    description TEXT,
+    realm TEXT,
+    filetype TEXT,
+    extension TEXT,
+    size_kb TEXT,
+    is_protected BOOLEAN,
+    is_active BOOLEAN,
+    uuid_name TEXT,
+    path TEXT,
+    storage_type TEXT,
+    checksum_md5 TEXT,
+    created_by TEXT,
+    last_read_by TEXT,
+    created_date_time TIMESTAMP DEFAULT now(),
+    last_read_date_time TIMESTAMP DEFAULT now(),
+    deleted BOOLEAN,
+    deleted_at TIMESTAMP
 );
 
 
