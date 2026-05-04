@@ -85,7 +85,7 @@ def _compute_current_stock(db: Session, client_id: str, stock_item_id: int) -> D
             total -= qty
     return total
 
-
+ 
 def _convert(recipe_qty: float, recipe_unit: str, stock_unit: str) -> float:
     ru, su = recipe_unit.strip(), stock_unit.strip()
 
@@ -127,9 +127,9 @@ def create_transaction(
 
     qty = Decimal(str(qty or 0))
     before = Decimal(str(item.availability or 0))
-    
+
     tx_type_str = str(tx_type).upper()
-    
+
     # =========================================================
     # ✅ 1. PRIORITY: Explicit after_stock (used in adjustments)
     # =========================================================
@@ -147,25 +147,25 @@ def create_transaction(
     # =========================================================
     elif movement_type:
         movement = movement_type.upper()
-        
+
         if movement == "IN":
             after = before + qty
         elif movement == "OUT":
             after = before - qty
         else:
             after = before
-            
+       
     # =========================================================
     # ✅ 3. FALLBACK: Order-service logic (existing behavior)
     # =========================================================
     else:
         if tx_type_str in ["WASTAGE"]:
-            if before <= 0:
-              movement = "NONE"
-              after = before
-            else:
-              movement = "OUT"
-              after = before
+         if before <= 0:
+             movement = "NONE"
+             after = before
+         else:
+             movement = "OUT"
+             after = before
 
         elif tx_type_str in ["ITEM_CANCELLED"]:
             movement = "NONE"
@@ -201,22 +201,22 @@ def create_transaction(
         
         inventory_id=item.inventory_id,
         name=item.name,
-        
+
         transaction_type=tx_type_str,
         movement_type=movement,
         quantity=qty,
         unit=item.unit or "pcs",
-        
+
         before_stock=before,
         after_stock=after,
-        
+
         reference_id=str(ref_id),
         reference_type="order",  # you can override later if needed
         remarks=remarks or tx_type_str,
     )
 
     db.add(tx)
-    
+
     # 🔥 Single source of truth
     all_zone_items = db.query(InventoryEntity).filter(
       InventoryEntity.id == item.id,
@@ -238,7 +238,7 @@ def record_partial_transaction(
     reason: Optional[str],
     order_id: int,
 ) -> None:
-    
+
     menu_item = db.query(InventoryEntity).filter(
         InventoryEntity.id == item.item_id,
         InventoryEntity.client_id == client_id,
@@ -264,13 +264,13 @@ def record_partial_transaction(
 
     # 🔹 WASTAGE
     elif transaction_type == TransactionTypeEnum.wastage:
-        
+
         # 🔸 Menu item reversal (serving based)
         if serving_qty > 0 and serving_unit and stock_unit:
             try:
                 converted = _convert(serving_qty, serving_unit, stock_unit)
                 reversal_qty = round(converted * remove_qty, 6)
-                
+
                 create_transaction(db=db, client_id=client_id,
     payload=TxPayload(item_id=menu_item.id, tx_type=TransactionTypeEnum.wastage,
         ref_id=order_id, qty=reversal_qty,
@@ -300,7 +300,7 @@ def record_partial_transaction(
             try:
                 reversal = _convert(recipe_qty, recipe_unit, ing_stock_unit) * remove_qty
                 reversal_qty = round(reversal, 6)
-                
+
                 create_transaction(db=db, client_id=client_id,
     payload=TxPayload(item_id=stock_item.id, tx_type=TransactionTypeEnum.wastage,
         ref_id=order_id, qty=reversal_qty,

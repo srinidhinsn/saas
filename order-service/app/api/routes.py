@@ -141,7 +141,7 @@ def create_sub_order(
         message=f"Sub-order {sub_dinein_order_id} created successfully",
     )
 
-    
+  
 @router.get("/dinein/order")
 def get_orders_for_order_id(client_id: str, order_id: Optional[str] = None, context: SaasContext = Depends(verify_token), db: Session = Depends(get_db)):
     order = db.query(Db_Order_Entity).filter(
@@ -443,7 +443,7 @@ def delete_order_items( client_id: str, order_item_id: Optional[str] = Query(Non
         raise HTTPException(status_code=404, detail="Order item not found")
 
     order_id          = item.order_id
-    ordered_qty       = item.quantity or 1
+    ordered_qty       = item.quantity
     inventory_item_id = item.item_id
 
     remove_qty = quantity if (quantity and 0 < quantity < ordered_qty) else None
@@ -631,7 +631,7 @@ def delete_order_items( client_id: str, order_item_id: Optional[str] = Query(Non
                 .all()
             )
 
-            # Only free the table when the ENTIRE group is cancelled
+        # Only free the table when the ENTIRE group is cancelled
         if not all_group_orders:
             table_id = order_row.table_id
             if table_id:
@@ -639,20 +639,20 @@ def delete_order_items( client_id: str, order_item_id: Optional[str] = Query(Non
                     db.query(DiningTable)
                     .filter(
                         DiningTable.id == table_id,
-                        DiningTable.client_id == client_id, 
-                        
-                    ).first()
+                        DiningTable.client_id == client_id,
+                    )
+                    .first()
                 )
                 if table_row:
                     table_row.status = "vacant"
 
-            db.commit()
-            return ResponseModel(
-                screen_id=context.screen_id,
-                data={
-                    "message": "Last active item cancelled — order marked cancelled and table freed"
-                },
-            )
+        db.commit()
+        return ResponseModel(
+            screen_id=context.screen_id,
+            data={
+                "message": "Last active item cancelled — order marked cancelled and table freed"
+            },
+        )
 
     if order_row:
         order_row.total_price = sum(
@@ -769,7 +769,7 @@ def cancel_order(
                 )
                 .first()
             )
-            
+
             if not menu_item:
                 continue
 
