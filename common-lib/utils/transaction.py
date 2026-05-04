@@ -85,7 +85,6 @@ def _compute_current_stock(db: Session, client_id: str, stock_item_id: int) -> D
             total -= qty
     return total
 
- 
 def _convert(recipe_qty: float, recipe_unit: str, stock_unit: str) -> float:
     ru, su = recipe_unit.strip(), stock_unit.strip()
 
@@ -135,6 +134,7 @@ def create_transaction(
     # =========================================================
     if after_stock is not None:
         after = Decimal(str(after_stock))
+
         if after > before:
             movement = "IN"
         elif after < before:
@@ -154,18 +154,18 @@ def create_transaction(
             after = before - qty
         else:
             after = before
-       
+
     # =========================================================
     # ✅ 3. FALLBACK: Order-service logic (existing behavior)
     # =========================================================
     else:
         if tx_type_str in ["WASTAGE"]:
          if before <= 0:
-             movement = "NONE"
-             after = before
+           movement = "NONE"
+           after = before
          else:
-             movement = "OUT"
-             after = before
+           movement = "OUT"
+           after = before
 
         elif tx_type_str in ["ITEM_CANCELLED"]:
             movement = "NONE"
@@ -196,14 +196,15 @@ def create_transaction(
     # =========================================================
     tx = InventoryTransactionEntity(
         transaction_id=str(uuid.uuid4()),
+
         client_id=client_id,
         stock_item_id=item.id,
-        
         inventory_id=item.inventory_id,
         name=item.name,
 
         transaction_type=tx_type_str,
         movement_type=movement,
+
         quantity=qty,
         unit=item.unit or "pcs",
 
