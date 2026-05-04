@@ -877,15 +877,15 @@ const OrderSummaryVisible = ({ clientId, token }) => {
   // ─────────────────────────────────────────────────────────────────────────
   // Actions (preserved from original)
   // ─────────────────────────────────────────────────────────────────────────
-
   const handleCancelOrder = async (orderId, reason) => {
     const order = orders.find(o => o.id === orderId);
     const tableObj = tables.find(t => t.id === order?.table_id);
     try {
-      await axios.delete(
-        `${import.meta.env.VITE_API_ORDER_SERVICE_URL}/${clientId}/dinein/delete`,
+      await axios.post(
+        `${import.meta.env.VITE_API_ORDER_SERVICE_URL}/${clientId}/dinein/cancel`,
+        {},
         {
-          params: { dinein_order_id: orderId, client_id: clientId, reason },
+          params: { order_id: orderId, reason: reason || '' },
           headers: { Authorization: `Bearer ${token}` },
         }
       );
@@ -908,7 +908,6 @@ const OrderSummaryVisible = ({ clientId, token }) => {
       fetchTables();
     } catch { toast.error('Failed to cancel order'); }
   };
-
   // ── REQ: Item delete — now matches TakeOrder (reason + qty + transaction) ──
 
   const handleItemRemoveOne = async (transactionType, reason, removeQty) => {
