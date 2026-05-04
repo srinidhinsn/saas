@@ -305,7 +305,7 @@ ALTER TABLE public.dinein_order ALTER COLUMN id ADD GENERATED ALWAYS AS IDENTITY
 -- Name: document; Type: TABLE; Schema: public; Owner: postgres
 --
 
-CREATE TABLE public.document (
+CREATE TABLE public.documents (
  id UUID PRIMARY KEY DEFAULT gen_random_uuid(),
     client_id TEXT,
     category_id TEXT,
