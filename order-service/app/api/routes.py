@@ -35,17 +35,10 @@ router = APIRouter()
 
 @router.post("/dinein/create", response_model=ResponseModel[DineinOrderModel])
 def create_order(client_id: str, order: DineinOrderModel, context: SaasContext = Depends(verify_token), db: Session = Depends(get_db)):
-    def _is_child_item(fkey: str) -> bool:
-       return (fkey or "").startswith("cchild_")
-    billable_total = sum(
-    (item.unit_price or 0) * (item.quantity or 1)
-    for item in order.items
-    if not (item.frontend_unique_key or "").startswith("cchild_")
-)
     db_order = Db_Order_Entity(
         client_id=client_id, table_id=order.table_id, status=order.status,
         price=order.price, gst=order.gst, cst=order.cst, discount=order.discount,
-        invoice_status=order.invoice_status, total_price=billable_total,
+        invoice_status=order.invoice_status, total_price=order.total_price,
         invoice_id=order.invoice_id, dinein_order_id=None,
         handler_id=order.handler_id, created_by=order.created_by, updated_by=order.updated_by,
     )
@@ -56,14 +49,10 @@ def create_order(client_id: str, order: DineinOrderModel, context: SaasContext =
     db_order.dinein_order_id = str(db_order.id)
 
     for item in order.items:
-        fkey = item.frontend_unique_key or ""
-        if fkey.startswith("cchild_"):
-            continue
-        effective_price = item.unit_price or 0
         db_item = Db_OrderItem_Entity(
            order_id=db_order.id, client_id=client_id, item_id=item.item_id,
            item_name=item.item_name, slug=item.slug, quantity=item.quantity,
-           unit_price=effective_price,   line_total=effective_price * (item.quantity),
+           unit_price=item.unit_price,   line_total=item.line_total,
         frontend_unique_key=item.frontend_unique_key, status=item.status,
         )
         db.add(db_item)
@@ -94,14 +83,6 @@ def create_sub_order(
     context: SaasContext = Depends(verify_token),
     db: Session = Depends(get_db),
 ):
-    def _is_child_item(fkey: str) -> bool:
-            return (fkey or "").startswith("cchild_")
-
-    total_price = sum(
-    (item.unit_price or 0) * (item.quantity or 1)
-    for item in order.items
-    if not _is_child_item(item.frontend_unique_key or "")
-) 
     root_order = db.query(Db_Order_Entity).filter(
         Db_Order_Entity.client_id == client_id,
         Db_Order_Entity.dinein_order_id == parent_dinein_order_id,
@@ -120,22 +101,18 @@ def create_sub_order(
         dinein_order_id=sub_dinein_order_id,
         table_id=root_order.table_id,
         status=OrderStatusEnum.pending,
-        price=total_price, gst=0, cst=0, total_price=total_price,
+        price=root_order.price, gst=0, cst=0, total_price=root_order.total_price,
         created_by=order.created_by, invoice_id=None, invoice_status=None,
     )
     db.add(db_sub_order)
     db.flush()
 
     for item in order.items:
-        fkey = item.frontend_unique_key or ""
-        if _is_child_item(fkey):
-            continue
-        effective_price = 0.0 if _is_child_item(item.frontend_unique_key or "") else (item.unit_price or 0)
         db_item = Db_OrderItem_Entity(
             order_id=db_sub_order.id, client_id=client_id,
             item_id=item.item_id, item_name=item.item_name, slug=item.slug,
-            quantity=item.quantity, unit_price=effective_price,
-             line_total=effective_price * (item.quantity or 1),  
+            quantity=item.quantity, unit_price=item.unit_price,
+             line_total=item.line_total,  
             status=OrderStatusEnum.pending,
             frontend_unique_key=item.frontend_unique_key,
         )
