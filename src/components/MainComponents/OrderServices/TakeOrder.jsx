@@ -1658,7 +1658,32 @@ const TakeOrder = ({ clientId, token, onOrderUpdate, realm }) => {
   // Draft helpers
   // ─────────────────────────────────────────────────────────────────────────
 
-
+  const deduplicateOrderItems = (items) => {
+    const uniqueKeyToItemMap = new Map();
+    const result = [];
+  
+    items.forEach(item => {
+      // Prefer frontend_unique_key, then DB id, then warn and include as-is
+      const fkey = item.frontend_unique_key || (item.id ? String(item.id) : null);
+  
+      if (!fkey) {
+        console.warn(`Item ${item.item_id} has no unique key or DB id — included without dedup`);
+        result.push({ ...item });
+        return;
+      }
+  
+      if (uniqueKeyToItemMap.has(fkey)) {
+        // Same logical item appearing in multiple sub-orders — accumulate quantity
+        uniqueKeyToItemMap.get(fkey).quantity += (item.quantity ?? 0);
+      } else {
+        const copy = { ...item };
+        uniqueKeyToItemMap.set(fkey, copy);
+        result.push(copy);
+      }
+    });
+  
+    return result;
+  };
   const handleSaveDraft = useCallback(async () => {
     if (!selectedTable || cart.length === 0) {
       toast.warn('Nothing to save — cart is empty.');
@@ -2045,15 +2070,15 @@ const TakeOrder = ({ clientId, token, onOrderUpdate, realm }) => {
 
         // Deduplicate: prefer base record (zone_config_id === 0) when no zone match
         const allItems = itemRes.data.data || [];
-        const seen = new Map();
+        const uniqueKeyToItemMap = new Map();
         allItems.forEach(item => {
-          const existing = seen.get(item.id);
+          const existing = uniqueKeyToItemMap.get(item.id);
           if (!existing || item.zone_config_id === zoneConfigId) {
-            seen.set(item.id, item);
+            uniqueKeyToItemMap.set(item.id, item);
           }
         });
 
-        const enriched = Array.from(seen.values()).map(item => {
+        const enriched = Array.from(uniqueKeyToItemMap.values()).map(item => {
           const cat = categoriesFlat.find(c => c.id === item.category_id);
           return { ...item, category_name: cat?.name || 'Uncategorized' };
         });
@@ -3161,19 +3186,7 @@ const buildOrderPayload = (items) =>
         };
       });
   
-      // Deduplicate by frontend_unique_key — same item across sub-orders appears once
-      const seen = new Map();
-      const deduplicatedItems = [];
-      enriched.forEach(item => {
-        const fkey = item.frontend_unique_key || `${item.item_id}_${item.unit_price}`;
-        if (seen.has(fkey)) {
-          seen.get(fkey).quantity += (item.quantity || 1);
-        } else {
-          const copy = { ...item };
-          seen.set(fkey, copy);
-          deduplicatedItems.push(copy);
-        }
-      });
+      const deduplicatedItems = deduplicateOrderItems(enriched);
   
       const billingDoc = await fetchBillingDocumentForOrder(orderId);
       setInvoiceOrderData({
@@ -3212,19 +3225,7 @@ const buildOrderPayload = (items) =>
         };
       });
   
-      // Deduplicate by frontend_unique_key
-      const seen = new Map();
-      const deduplicatedItems = [];
-      enriched.forEach(item => {
-        const fkey = item.frontend_unique_key || `${item.item_id}_${item.unit_price}`;
-        if (seen.has(fkey)) {
-          seen.get(fkey).quantity += (item.quantity || 1);
-        } else {
-          const copy = { ...item };
-          seen.set(fkey, copy);
-          deduplicatedItems.push(copy);
-        }
-      });
+      const deduplicatedItems = deduplicateOrderItems(enriched);
   
       const billingDoc = await fetchBillingDocumentForOrder(activeOrderId);
       setInvoiceOrderData({

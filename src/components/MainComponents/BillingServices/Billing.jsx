@@ -105,17 +105,17 @@ export default function BillingPage({ clientId, token }) {
   
     // Deduplicate by frontend_unique_key — same item across sub-orders should appear once
     // For items without a fkey, fall back to a composite key
-    const seen = new Map();
+    const uniqueKeyToItemMap  = new Map();
     const deduplicatedItems = [];
   
     enrichedItems.forEach(item => {
-      const fkey = item.frontend_unique_key || `${item.item_id}_${item.unit_price}`;
-      if (seen.has(fkey)) {
+      const fkey = item.frontend_unique_key || `${item.item_id}_${item.unit_price}_${item.sub_order_id ?? ''}`;
+      if (uniqueKeyToItemMap .has(fkey)) {
         // Accumulate quantity for duplicate entries
-        seen.get(fkey).quantity += (item.quantity || 1);
+        uniqueKeyToItemMap.get(fkey).quantity += (item.quantity ?? 0);
       } else {
         const copy = { ...item };
-        seen.set(fkey, copy);
+        uniqueKeyToItemMap .set(fkey, copy);
         deduplicatedItems.push(copy);
       }
     });

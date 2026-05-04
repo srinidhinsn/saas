@@ -452,7 +452,7 @@ const KitchenCard = ({
       {/* ── Card body — item list ── */}
       <div className="bg-bg-primary px-4 py-4 space-y-3 flex-1">
         {groupItemsWithAddons(card.items).map(({ main: item, addons }, idx) => {
-          const menuRecord = menuItemsMap[Number(item.item_id)] || menuItemsMap[String(item.item_id)];
+          const menuRecord = menuItemsMap[String(item.item_id)];
           const combo = isComboItem(item, menuRecord);
           const isPending = pendingItemIds.has(item.id);
           const isCancelled = isCancelledStatus(item.status);
@@ -515,7 +515,7 @@ const KitchenCard = ({
               </div>
 
               {/* Combo components list — unchanged */}
-              {combo && <ComboComponentsList menuRecord={menuRecord} menuItemsMap={menuItemsMap} parentQuantity={item.quantity || 1}  />}
+              {combo && <ComboComponentsList menuRecord={menuRecord} menuItemsMap={menuItemsMap} parentQuantity={item.quantity ?? 1}  />}
 
               {/* Addon rows — identified by "addon_" prefix on frontend_unique_key */}
               {/* Addon rows */}
