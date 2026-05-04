@@ -14,12 +14,12 @@ from models.order_model import (
     MovementTypeEnum,
 )
 from utils.auth import verify_token
-from utils.transaction import record_partial_transaction, create_transaction , TxPayload
+from utils.transaction import record_partial_transaction, create_transaction , TxPayload, resolve_reason, build_remark
 from models.saas_context import SaasContext
 from typing import Optional
 from entity.inventory_entity import InventoryEntity, CategoryEntity
 from models.inventory_model import InventoryTransaction
-from services.order_service import (
+from ..services.order_service import (
     _root_dinein_id,
     _order_row_to_flat,
     STATUS_PRIORITY,
@@ -63,7 +63,7 @@ def create_order(client_id: str, order: DineinOrderModel, context: SaasContext =
         db_item = Db_OrderItem_Entity(
            order_id=db_order.id, client_id=client_id, item_id=item.item_id,
            item_name=item.item_name, slug=item.slug, quantity=item.quantity,
-           unit_price=effective_price,   line_total=effective_price * (item.quantity or 1),
+           unit_price=effective_price,   line_total=effective_price * (item.quantity),
         frontend_unique_key=item.frontend_unique_key, status=item.status,
         )
         db.add(db_item)
@@ -442,18 +442,22 @@ def update_order_item(client_id: str, order_id: Optional[int] = Query(None), ord
 
 
 @router.delete("/order_item/delete")
-def delete_order_items( client_id: str, order_item_id: Optional[str] = Query(None), quantity: Optional[int] = Query(None), reason: Optional[str] = Query(None), transaction_type: Optional[str] = Query(None), context: SaasContext = Depends(verify_token), db: Session = Depends(get_db),):
+def delete_order_items(
+    client_id: str,
+    order_item_id: Optional[str] = Query(None),
+    quantity: Optional[int] = Query(None),
+    reason: Optional[str] = Query(None),
+    transaction_type: Optional[str] = Query(None),
+    context: SaasContext = Depends(verify_token),
+    db: Session = Depends(get_db),
+):
     if not order_item_id:
         raise HTTPException(status_code=400, detail="Missing order_item_id")
     try:
         oid = int(str(order_item_id).strip())
     except:
         raise HTTPException(status_code=400, detail="Invalid order_item_id format")
-    def _tx(item_id, tx_type, qty, remarks):
-        create_transaction(
-            db=db, client_id=client_id,
-            payload=TxPayload(item_id=item_id, tx_type=tx_type, ref_id=order_id, qty=qty, remarks=remarks)
-        )
+
     tx_type: Optional[TransactionTypeEnum] = None
     if transaction_type:
         try:
@@ -465,17 +469,27 @@ def delete_order_items( client_id: str, order_item_id: Optional[str] = Query(Non
         Db_OrderItem_Entity.id == oid, Db_OrderItem_Entity.client_id == client_id,
     ).first()
 
-    
     if not item:
         raise HTTPException(status_code=404, detail="Order item not found")
 
-    order_id = item.order_id
-    ordered_qty = item.quantity or 1
-    item_name = item.item_name or ""
-    frontend_unique_key = item.frontend_unique_key or ""
+    order_id          = item.order_id
+    ordered_qty       = item.quantity or 1
     inventory_item_id = item.item_id
 
-    remove_qty = quantity if (quantity and 0 < quantity < ordered_qty) else None
+    effective_reason  = resolve_reason(reason, tx_type)
+    remove_qty        = quantity if (quantity and 0 < quantity < ordered_qty) else None
+
+    def _tx(item_id, tx_type, qty, tag, name):
+        create_transaction(
+            db=db, client_id=client_id,
+            payload=TxPayload(
+                item_id=item_id,
+                tx_type=tx_type,
+                ref_id=order_id,
+                qty=qty,
+                remarks=build_remark(tag, order_id, name, qty, effective_reason),
+            ),
+        )
 
     if remove_qty:
         new_qty = ordered_qty - remove_qty
@@ -491,15 +505,12 @@ def delete_order_items( client_id: str, order_item_id: Optional[str] = Query(Non
                 order_id=order_id,
             )
 
-        item.quantity = new_qty
+        item.quantity   = new_qty
         item.line_total = (item.unit_price or 0) * new_qty
 
         order_row = (
             db.query(Db_Order_Entity)
-            .filter(
-                Db_Order_Entity.id == order_id,
-                Db_Order_Entity.client_id == client_id,
-            )
+            .filter(Db_Order_Entity.id == order_id, Db_Order_Entity.client_id == client_id)
             .first()
         )
         if order_row:
@@ -526,10 +537,7 @@ def delete_order_items( client_id: str, order_item_id: Optional[str] = Query(Non
     if tx_type in (TransactionTypeEnum.wastage, TransactionTypeEnum.item_cancelled):
         menu_item = (
             db.query(InventoryEntity)
-            .filter(
-                InventoryEntity.id == inventory_item_id,
-                InventoryEntity.client_id == client_id,
-            )
+            .filter(InventoryEntity.id == inventory_item_id, InventoryEntity.client_id == client_id)
             .first()
         )
 
@@ -541,53 +549,26 @@ def delete_order_items( client_id: str, order_item_id: Optional[str] = Query(Non
             )
             is_combo = category and (category.name or "").lower().startswith("combo")
 
-            def _record_item_transaction(inv_item, qty, label):
-                effective_reason = reason or (
-                    "Wastage — served item deleted"
-                    if tx_type == TransactionTypeEnum.wastage
-                    else "Item cancelled before serving"
-                )
-                base_remarks = (
-                    f"{effective_reason} | {inv_item.name} x{qty} | [{label}]"
-                )
-
+            def _record_item_transaction(inv_item, qty, is_combo_child=False):
                 if tx_type == TransactionTypeEnum.item_cancelled:
-                    _tx(
-                        inv_item.id,
-                        TransactionTypeEnum.item_cancelled,
-                        qty,
-                        f"[ITEM_CANCELLED] Order #{order_id} — {base_remarks}",
-                    )
+                    tag = "COMBO_CHILD_CANCELLED" if is_combo_child else "ITEM_CANCELLED"
+                    _tx(inv_item.id, TransactionTypeEnum.item_cancelled, qty, tag, inv_item.name)
 
                 elif tx_type == TransactionTypeEnum.wastage:
-                    serving_qty  = float(inv_item.serving_quantity or 0)
+                    tag = "COMBO_CHILD_WASTAGE" if is_combo_child else "WASTAGE"
+                    serving_qty  = float(inv_item.serving_quantity)
                     serving_unit = (inv_item.serving_unit or "").strip()
                     stock_unit   = (inv_item.unit or "").strip()
 
                     if serving_qty > 0 and serving_unit and stock_unit:
                         try:
-                            converted = _convert(serving_qty, serving_unit, stock_unit)
+                            converted    = _convert(serving_qty, serving_unit, stock_unit)
                             reversal_qty = Decimal(str(round(converted * qty, 6)))
-                            _tx(
-                                inv_item.id,
-                                TransactionTypeEnum.wastage,
-                                reversal_qty,
-                                f"[WASTAGE] Order #{order_id} — {base_remarks}",
-                            )
+                            _tx(inv_item.id, TransactionTypeEnum.wastage, reversal_qty, tag, inv_item.name)
                         except ValueError:
-                            _tx(
-                                inv_item.id,
-                                TransactionTypeEnum.wastage,
-                                qty,
-                                f"[WASTAGE_FALLBACK] Order #{order_id} — {base_remarks}",
-                            )
+                            _tx(inv_item.id, TransactionTypeEnum.wastage, qty, tag, inv_item.name)
                     else:
-                        _tx(
-                            inv_item.id,
-                            TransactionTypeEnum.wastage,
-                            qty,
-                            f"[WASTAGE_NO_SERVING] Order #{order_id} — {base_remarks}",
-                        )
+                        _tx(inv_item.id, TransactionTypeEnum.wastage, qty, tag, inv_item.name)
 
                 for ingredient in (inv_item.recipe or []):
                     stock_item_id_raw = ingredient.get("stock_item_id")
@@ -599,10 +580,7 @@ def delete_order_items( client_id: str, order_item_id: Optional[str] = Query(Non
 
                     stock_item = (
                         db.query(InventoryEntity)
-                        .filter(
-                            InventoryEntity.id == int(stock_item_id_raw),
-                            InventoryEntity.client_id == client_id,
-                        )
+                        .filter(InventoryEntity.id == int(stock_item_id_raw), InventoryEntity.client_id == client_id)
                         .first()
                     )
                     if not stock_item:
@@ -615,7 +593,8 @@ def delete_order_items( client_id: str, order_item_id: Optional[str] = Query(Non
                             stock_item.id,
                             TransactionTypeEnum.wastage,
                             Decimal(str(round(reversal, 6))),
-                            f"[INGREDIENT_REVERSAL] Order #{order_id} — {base_remarks}",
+                            "INGREDIENT_REVERSAL",
+                            inv_item.name,
                         )
                     except ValueError:
                         continue
@@ -624,19 +603,16 @@ def delete_order_items( client_id: str, order_item_id: Optional[str] = Query(Non
                 for child_id in (menu_item.line_item_id or []):
                     child_item = (
                         db.query(InventoryEntity)
-                        .filter(
-                            InventoryEntity.id == int(child_id),
-                            InventoryEntity.client_id == client_id,
-                        )
+                        .filter(InventoryEntity.id == int(child_id), InventoryEntity.client_id == client_id)
                         .first()
                     )
                     if not child_item:
                         continue
-                    _record_item_transaction(child_item, ordered_qty, "COMBO_CHILD")
+                    _record_item_transaction(child_item, ordered_qty, is_combo_child=True)
             else:
-                _record_item_transaction(menu_item, ordered_qty, "ITEM")
+                _record_item_transaction(menu_item, ordered_qty)
 
-    item.status = OrderStatusEnum.cancelled
+    item.status     = OrderStatusEnum.cancelled
     item.line_total = 0
     db.flush()
 
@@ -652,56 +628,44 @@ def delete_order_items( client_id: str, order_item_id: Optional[str] = Query(Non
 
     order_row = (
         db.query(Db_Order_Entity)
-        .filter(
-            Db_Order_Entity.id == order_id,
-            Db_Order_Entity.client_id == client_id,
-        )
+        .filter(Db_Order_Entity.id == order_id, Db_Order_Entity.client_id == client_id)
         .first()
     )
 
-    # AFTER:
     if not remaining_active:
-      if order_row:
-        root_dinein_id = _root_dinein_id(order_row.dinein_order_id or str(order_row.id))
+        if order_row:
+            root_dinein_id = _root_dinein_id(order_row.dinein_order_id or str(order_row.id))
 
-        # Cancel THIS order
-        order_row.status = OrderStatusEnum.cancelled
-        order_row.total_price = 0
-        db.flush()
+            order_row.status      = OrderStatusEnum.cancelled
+            order_row.total_price = 0
+            db.flush()
 
-        # Check if any sibling order still has active items
-        all_group_orders = (
-            db.query(Db_Order_Entity)
-            .filter(
-                Db_Order_Entity.client_id == client_id,
-                Db_Order_Entity.dinein_order_id.like(f"{root_dinein_id}%"),
-                Db_Order_Entity.status != OrderStatusEnum.cancelled,
-            )
-            .all()
-        )
-
-        # Only free the table when the ENTIRE group is cancelled
-        if not all_group_orders:
-            table_id = order_row.table_id
-            if table_id:
-                table_row = (
-                    db.query(DiningTable)
-                    .filter(
-                        DiningTable.id == table_id,
-                        DiningTable.client_id == client_id,
-                    )
-                    .first()
+            all_group_orders = (
+                db.query(Db_Order_Entity)
+                .filter(
+                    Db_Order_Entity.client_id == client_id,
+                    Db_Order_Entity.dinein_order_id.like(f"{root_dinein_id}%"),
+                    Db_Order_Entity.status != OrderStatusEnum.cancelled,
                 )
-                if table_row:
-                    table_row.status = "vacant"
+                .all()
+            )
 
-        db.commit()
-        return ResponseModel(
-            screen_id=context.screen_id,
-            data={
-                "message": "Last active item cancelled — order marked cancelled and table freed"
-            },
-        )
+            if not all_group_orders:
+                table_id = order_row.table_id
+                if table_id:
+                    table_row = (
+                        db.query(DiningTable)
+                        .filter(DiningTable.id == table_id, DiningTable.client_id == client_id)
+                        .first()
+                    )
+                    if table_row:
+                        table_row.status = "vacant"
+
+            db.commit()
+            return ResponseModel(
+                screen_id=context.screen_id,
+                data={"message": "Last active item cancelled — order marked cancelled and table freed"},
+            )
 
     if order_row:
         order_row.total_price = sum(
@@ -722,25 +686,28 @@ def cancel_order(
 ):
     root_order = (
         db.query(Db_Order_Entity)
-        .filter(
-            Db_Order_Entity.id == order_id,
-            Db_Order_Entity.client_id == client_id,
-        )
+        .filter(Db_Order_Entity.id == order_id, Db_Order_Entity.client_id == client_id)
         .first()
     )
-
-    def _tx(item_id, tx_type, qty, remarks, ref_id=None):
-        create_transaction(
-            db=db, client_id=client_id,
-            payload=TxPayload(item_id=item_id, tx_type=tx_type, ref_id=ref_id or order_id, qty=qty, remarks=remarks)
-        )
 
     if not root_order:
         raise HTTPException(status_code=404, detail="Order not found")
 
-    root_dinein_id = _root_dinein_id(
-        root_order.dinein_order_id or str(root_order.id)
-    )
+    effective_reason = resolve_reason(reason, TransactionTypeEnum.order_cancelled)
+
+    def _tx(item_id, tx_type, qty, tag, name, ref_id=None):
+        create_transaction(
+            db=db, client_id=client_id,
+            payload=TxPayload(
+                item_id=item_id,
+                tx_type=tx_type,
+                ref_id=ref_id or order_id,
+                qty=qty,
+                remarks=build_remark(tag, ref_id or order_id, name, qty, effective_reason),
+            ),
+        )
+
+    root_dinein_id = _root_dinein_id(root_order.dinein_order_id or str(root_order.id))
 
     related_orders = (
         db.query(Db_Order_Entity)
@@ -751,73 +718,40 @@ def cancel_order(
         .all()
     )
 
-    effective_reason = reason or "Full order cancelled"
-    table_id = root_order.table_id
-
-    total_cancel_value = sum(
-        Decimal(str(order.total_price or 0)) for order in related_orders
-    )
-
-    _tx(0, TransactionTypeEnum.order_cancelled, 1,
-    f"[FULL_DINEIN_CANCELLED] Root Order #{root_order.id} | Table #{root_order.table_id} | Total Value: {total_cancel_value} | Reason: {effective_reason}")
+    total_cancel_value = sum(Decimal(str(o.total_price or 0)) for o in related_orders)
 
     processed_keys = set()
 
-    def _record_cancel_item(inv_item, qty, order_ref_id, served, base_label):
-        base_remarks = (
-            f"{effective_reason} | {inv_item.name} x{qty} | [{base_label}]"
-        )
-
-        if served:
-            _tx(
-                inv_item.id,
-                TransactionTypeEnum.wastage,
-                qty,
-                f"[{base_label}_SERVED] Order #{order_ref_id} | {base_remarks}",
-                ref_id=order_ref_id,
-            )
+    def _record_cancel_item(inv_item, qty, order_ref_id, is_served, is_combo_child=False):
+        if is_served:
+            tag = "COMBO_CHILD_WASTAGE" if is_combo_child else "WASTAGE"
+            tx  = TransactionTypeEnum.wastage
         else:
-            _tx(
-                inv_item.id,
-                TransactionTypeEnum.item_cancelled,
-                qty,
-                f"[{base_label}] Order #{order_ref_id} | {base_remarks}",
-                ref_id=order_ref_id,
-            )
+            tag = "COMBO_CHILD_CANCELLED" if is_combo_child else "ITEM_CANCELLED"
+            tx  = TransactionTypeEnum.item_cancelled
+
+        _tx(inv_item.id, tx, qty, tag, inv_item.name, ref_id=order_ref_id)
 
         for ingredient in (inv_item.recipe or []):
             stock_item_id = ingredient.get("stock_item_id")
-            recipe_qty = float(ingredient.get("quantity_required") or 0)
-            recipe_unit = (ingredient.get("unit") or "").strip()
+            recipe_qty    = float(ingredient.get("quantity_required") or 0)
+            recipe_unit   = (ingredient.get("unit") or "").strip()
 
             if not stock_item_id or recipe_qty <= 0:
                 continue
 
             stock_item = (
                 db.query(InventoryEntity)
-                .filter(
-                    InventoryEntity.id == int(stock_item_id),
-                    InventoryEntity.client_id == client_id,
-                )
+                .filter(InventoryEntity.id == int(stock_item_id), InventoryEntity.client_id == client_id)
                 .first()
             )
-
             if not stock_item:
                 continue
 
             try:
-                converted = _convert(
-                    recipe_qty, recipe_unit, stock_item.unit.strip()
-                )
+                converted = _convert(recipe_qty, recipe_unit, stock_item.unit.strip())
                 total_qty = round(converted * qty, 6)
-
-                _tx(
-                    stock_item.id,
-                    TransactionTypeEnum.wastage,
-                    total_qty,
-                    f"[RECIPE_CANCEL] Order #{order_ref_id} | {inv_item.name}",
-                    ref_id=order_ref_id,
-                )
+                _tx(stock_item.id, TransactionTypeEnum.wastage, total_qty, "RECIPE_CANCEL", inv_item.name, ref_id=order_ref_id)
             except ValueError:
                 continue
 
@@ -826,34 +760,26 @@ def cancel_order(
 
         items = (
             db.query(Db_OrderItem_Entity)
-            .filter(
-                Db_OrderItem_Entity.order_id == order.id,
-                Db_OrderItem_Entity.client_id == client_id,
-            )
+            .filter(Db_OrderItem_Entity.order_id == order.id, Db_OrderItem_Entity.client_id == client_id)
             .all()
         )
 
         for item in items:
-            menu_item = (
-                db.query(InventoryEntity)
-                .filter(
-                    InventoryEntity.id == item.item_id,
-                    InventoryEntity.client_id == client_id,
-                )
-                .first()
-            )
-
-            if not menu_item:
-                continue
-
-            ordered_qty = item.quantity or 1
-
             item_key = f"{order.id}-{item.id}"
             if item_key in processed_keys:
                 continue
             processed_keys.add(item_key)
 
-            is_served = item.status == OrderStatusEnum.served
+            menu_item = (
+                db.query(InventoryEntity)
+                .filter(InventoryEntity.id == item.item_id, InventoryEntity.client_id == client_id)
+                .first()
+            )
+            if not menu_item:
+                continue
+
+            ordered_qty = item.quantity or 1
+            is_served   = item.status == OrderStatusEnum.served
 
             category = (
                 db.query(CategoryEntity)
@@ -866,25 +792,19 @@ def cancel_order(
                 for child_id in (menu_item.line_item_id or []):
                     child_item = (
                         db.query(InventoryEntity)
-                        .filter(
-                            InventoryEntity.id == int(child_id),
-                            InventoryEntity.client_id == client_id,
-                        )
+                        .filter(InventoryEntity.id == int(child_id), InventoryEntity.client_id == client_id)
                         .first()
                     )
                     if not child_item:
                         continue
-                    _record_cancel_item(child_item, ordered_qty, order.id, is_served, "COMBO_CHILD_CANCEL")
+                    _record_cancel_item(child_item, ordered_qty, order.id, is_served, is_combo_child=True)
             else:
-                _record_cancel_item(menu_item, ordered_qty, order.id, is_served, "ITEM_CANCEL")
+                _record_cancel_item(menu_item, ordered_qty, order.id, is_served)
 
-    if table_id:
+    if root_order.table_id:
         table_row = (
             db.query(DiningTable)
-            .filter(
-                DiningTable.id == table_id,
-                DiningTable.client_id == client_id,
-            )
+            .filter(DiningTable.id == root_order.table_id, DiningTable.client_id == client_id)
             .first()
         )
         if table_row:
@@ -897,161 +817,161 @@ def cancel_order(
         data={
             "message": "Dine-in cancelled and transactions recorded",
             "cancelled_count": len(related_orders),
-            "table_freed": bool(table_id),
+            "table_freed": bool(root_order.table_id),
         },
     )
+    
+# @router.delete("/dinein/delete")
+# def delete_order(client_id: str, dinein_order_id: Optional[str] = Query(None), context: SaasContext = Depends(verify_token), db: Session = Depends(get_db),reason: Optional[str] = Query(None)):
+#     """Delete by root internal id — also deletes all sub-orders sharing the same prefix."""
+#     if not dinein_order_id:
+#         raise HTTPException(status_code=400, detail="Missing dinein_order_id")
+#     try:
+#         did_int = int(str(dinein_order_id).strip())
+#     except:
+#         raise HTTPException(status_code=400, detail="Invalid dinein_order_id format")
 
-@router.delete("/dinein/delete")
-def delete_order(client_id: str, dinein_order_id: Optional[str] = Query(None), context: SaasContext = Depends(verify_token), db: Session = Depends(get_db),reason: Optional[str] = Query(None)):
-    """Delete by root internal id — also deletes all sub-orders sharing the same prefix."""
-    if not dinein_order_id:
-        raise HTTPException(status_code=400, detail="Missing dinein_order_id")
-    try:
-        did_int = int(str(dinein_order_id).strip())
-    except:
-        raise HTTPException(status_code=400, detail="Invalid dinein_order_id format")
+#     root_order = db.query(Db_Order_Entity).filter(
+#         Db_Order_Entity.id == did_int, Db_Order_Entity.client_id == client_id,
+#     ).first()
+#     if not root_order:
+#         raise HTTPException(status_code=404, detail="Order not found")
+#     if root_order.status == OrderStatusEnum.served:
+#         raise HTTPException(status_code=400, detail="Cannot delete a served order")
 
-    root_order = db.query(Db_Order_Entity).filter(
-        Db_Order_Entity.id == did_int, Db_Order_Entity.client_id == client_id,
-    ).first()
-    if not root_order:
-        raise HTTPException(status_code=404, detail="Order not found")
-    if root_order.status == OrderStatusEnum.served:
-        raise HTTPException(status_code=400, detail="Cannot delete a served order")
+#     root_dinein_id = _root_dinein_id(root_order.dinein_order_id or str(root_order.id))
+#     def _tx(item_id, tx_type, qty, remarks, ref_id):
+#         create_transaction(
+#             db=db, client_id=client_id,
+#             payload=TxPayload(item_id=item_id, tx_type=tx_type, ref_id=ref_id, qty=qty, remarks=remarks)
+#         )
+#     related_orders = (
+#         db.query(Db_Order_Entity)
+#         .filter(
+#             Db_Order_Entity.client_id == client_id,
+#             Db_Order_Entity.dinein_order_id.like(f"{root_dinein_id}%"),
+#         )
+#         .all()
+#     )
 
-    root_dinein_id = _root_dinein_id(root_order.dinein_order_id or str(root_order.id))
-    def _tx(item_id, tx_type, qty, remarks, ref_id):
-        create_transaction(
-            db=db, client_id=client_id,
-            payload=TxPayload(item_id=item_id, tx_type=tx_type, ref_id=ref_id, qty=qty, remarks=remarks)
-        )
-    related_orders = (
-        db.query(Db_Order_Entity)
-        .filter(
-            Db_Order_Entity.client_id == client_id,
-            Db_Order_Entity.dinein_order_id.like(f"{root_dinein_id}%"),
-        )
-        .all()
-    )
+#     table_id = root_order.table_id
+#     effective_reason = reason or "Order cancelled"
 
-    table_id = root_order.table_id
-    effective_reason = reason or "Order cancelled"
+#     for o in related_orders:
+#         o.status = OrderStatusEnum.cancelled
+#         items = (
+#             db.query(Db_OrderItem_Entity)
+#             .filter(
+#                 Db_OrderItem_Entity.order_id == o.id,
+#                 Db_OrderItem_Entity.client_id == client_id,
+#             )
+#             .all()
+#         )
+#         for it in items:
+#             if it.status == OrderStatusEnum.served:
+#                 menu_item = (
+#                     db.query(InventoryEntity)
+#                     .filter(
+#                         InventoryEntity.id == it.item_id,
+#                         InventoryEntity.client_id == client_id,
+#                     )
+#                     .first()
+#                 )
+#                 if menu_item:
+#                     ordered_qty = it.quantity or 1
+#                     base_remarks = (
+#                         f"{effective_reason} | order cancelled | "
+#                         f"{it.item_name} x{ordered_qty} | "
+#                         f"[key={it.frontend_unique_key or ''}]"
+#                     )
+#                     serving_qty = float(menu_item.serving_quantity or 0)
+#                     serving_unit = (menu_item.serving_unit or "").strip()
+#                     stock_unit = (menu_item.unit or "").strip()
 
-    for o in related_orders:
-        o.status = OrderStatusEnum.cancelled
-        items = (
-            db.query(Db_OrderItem_Entity)
-            .filter(
-                Db_OrderItem_Entity.order_id == o.id,
-                Db_OrderItem_Entity.client_id == client_id,
-            )
-            .all()
-        )
-        for it in items:
-            if it.status == OrderStatusEnum.served:
-                menu_item = (
-                    db.query(InventoryEntity)
-                    .filter(
-                        InventoryEntity.id == it.item_id,
-                        InventoryEntity.client_id == client_id,
-                    )
-                    .first()
-                )
-                if menu_item:
-                    ordered_qty = it.quantity or 1
-                    base_remarks = (
-                        f"{effective_reason} | order cancelled | "
-                        f"{it.item_name} x{ordered_qty} | "
-                        f"[key={it.frontend_unique_key or ''}]"
-                    )
-                    serving_qty = float(menu_item.serving_quantity or 0)
-                    serving_unit = (menu_item.serving_unit or "").strip()
-                    stock_unit = (menu_item.unit or "").strip()
+#                     if serving_qty > 0 and serving_unit and stock_unit:
+#                         try:
+#                             converted_serving = _convert(serving_qty, serving_unit, stock_unit)
+#                             reversal_qty = Decimal(
+#                                 str(round(converted_serving * ordered_qty, 6))
+#                             )
+#                             before_stock = Decimal(str(menu_item.availability or 0))
+#                             after_stock = before_stock + reversal_qty
+#                             _tx(menu_item.id, TransactionTypeEnum.wastage, reversal_qty,
+#     f"[WASTAGE_ORDER_CANCELLED] Order #{o.id} — {base_remarks}", ref_id=o.id)
 
-                    if serving_qty > 0 and serving_unit and stock_unit:
-                        try:
-                            converted_serving = _convert(serving_qty, serving_unit, stock_unit)
-                            reversal_qty = Decimal(
-                                str(round(converted_serving * ordered_qty, 6))
-                            )
-                            before_stock = Decimal(str(menu_item.availability or 0))
-                            after_stock = before_stock + reversal_qty
-                            _tx(menu_item.id, TransactionTypeEnum.wastage, reversal_qty,
-    f"[WASTAGE_ORDER_CANCELLED] Order #{o.id} — {base_remarks}", ref_id=o.id)
+#                             menu_item.availability = after_stock
+#                         except ValueError as exc:
+#                             print(
+#                                 f"[WARN] Skipping reversal for item_id={menu_item.id}: {exc}"
+#                             )
 
-                            menu_item.availability = after_stock
-                        except ValueError as exc:
-                            print(
-                                f"[WARN] Skipping reversal for item_id={menu_item.id}: {exc}"
-                            )
+#                     if menu_item.recipe:
+#                         for ingredient in menu_item.recipe:
+#                             stock_item_id_raw = ingredient.get("stock_item_id")
+#                             recipe_qty = float(ingredient.get("quantity_required") or 0)
+#                             recipe_unit = (ingredient.get("unit") or "").strip()
+#                             if not stock_item_id_raw or recipe_qty <= 0:
+#                                 continue
+#                             stock_item = (
+#                                 db.query(InventoryEntity)
+#                                 .filter(
+#                                     InventoryEntity.id == int(stock_item_id_raw),
+#                                     InventoryEntity.client_id == client_id,
+#                                 )
+#                                 .first()
+#                             )
+#                             if not stock_item:
+#                                 continue
+#                             ing_stock_unit = (stock_item.unit or "").strip()
+#                             try:
+#                                 reversal = (
+#                                     _convert(recipe_qty, recipe_unit, ing_stock_unit)
+#                                     * ordered_qty
+#                                 )
+#                             except ValueError:
+#                                 continue
+#                             reversal_decimal = Decimal(str(round(reversal, 6)))
+#                             before_ing = Decimal(str(stock_item.availability or 0))
+#                             after_ing = before_ing + reversal_decimal
+#                             _tx(stock_item.id, TransactionTypeEnum.wastage, reversal_decimal,
+#     f"[INGREDIENT_REVERSAL_ORDER_CANCELLED] Order #{o.id} — {base_remarks}", ref_id=o.id)
 
-                    if menu_item.recipe:
-                        for ingredient in menu_item.recipe:
-                            stock_item_id_raw = ingredient.get("stock_item_id")
-                            recipe_qty = float(ingredient.get("quantity_required") or 0)
-                            recipe_unit = (ingredient.get("unit") or "").strip()
-                            if not stock_item_id_raw or recipe_qty <= 0:
-                                continue
-                            stock_item = (
-                                db.query(InventoryEntity)
-                                .filter(
-                                    InventoryEntity.id == int(stock_item_id_raw),
-                                    InventoryEntity.client_id == client_id,
-                                )
-                                .first()
-                            )
-                            if not stock_item:
-                                continue
-                            ing_stock_unit = (stock_item.unit or "").strip()
-                            try:
-                                reversal = (
-                                    _convert(recipe_qty, recipe_unit, ing_stock_unit)
-                                    * ordered_qty
-                                )
-                            except ValueError:
-                                continue
-                            reversal_decimal = Decimal(str(round(reversal, 6)))
-                            before_ing = Decimal(str(stock_item.availability or 0))
-                            after_ing = before_ing + reversal_decimal
-                            _tx(stock_item.id, TransactionTypeEnum.wastage, reversal_decimal,
-    f"[INGREDIENT_REVERSAL_ORDER_CANCELLED] Order #{o.id} — {base_remarks}", ref_id=o.id)
+#                             stock_item.availability = after_ing
 
-                            stock_item.availability = after_ing
+#             else:
+#                 menu_item = (
+#                     db.query(InventoryEntity)
+#                     .filter(
+#                         InventoryEntity.id == it.item_id,
+#                         InventoryEntity.client_id == client_id,
+#                     )
+#                     .first()
+#                 )
+#                 if menu_item:
+#                     ordered_qty = it.quantity or 1
+#                     _tx(menu_item.id, TransactionTypeEnum.item_cancelled, ordered_qty,
+#     f"[ITEM_CANCELLED_ORDER_CANCELLED] Order #{o.id} — {effective_reason} | {it.item_name} x{ordered_qty}",
+#     ref_id=o.id)
 
-            else:
-                menu_item = (
-                    db.query(InventoryEntity)
-                    .filter(
-                        InventoryEntity.id == it.item_id,
-                        InventoryEntity.client_id == client_id,
-                    )
-                    .first()
-                )
-                if menu_item:
-                    ordered_qty = it.quantity or 1
-                    _tx(menu_item.id, TransactionTypeEnum.item_cancelled, ordered_qty,
-    f"[ITEM_CANCELLED_ORDER_CANCELLED] Order #{o.id} — {effective_reason} | {it.item_name} x{ordered_qty}",
-    ref_id=o.id)
+#             it.status = OrderStatusEnum.cancelled
 
-            it.status = OrderStatusEnum.cancelled
+#     root_order.status = OrderStatusEnum.cancelled
+#     db.flush()
 
-    root_order.status = OrderStatusEnum.cancelled
-    db.flush()
+#     if table_id:
+#         table_row = (
+#             db.query(DiningTable)
+#             .filter(
+#                 DiningTable.id == table_id,
+#                 DiningTable.client_id == client_id,
+#             )
+#             .first()
+#         )
+#         if table_row:
+#             table_row.status = "vacant"
 
-    if table_id:
-        table_row = (
-            db.query(DiningTable)
-            .filter(
-                DiningTable.id == table_id,
-                DiningTable.client_id == client_id,
-            )
-            .first()
-        )
-        if table_row:
-            table_row.status = "vacant"
-
-    db.commit()
-    return ResponseModel(screen_id=context.screen_id, data={"message": "Order deleted"})
+#     db.commit()
+#     return ResponseModel(screen_id=context.screen_id, data={"message": "Order deleted"})
 
 @router.get("/kds/orders")
 def get_kds_orders(client_id: str, context: SaasContext = Depends(verify_token), db: Session = Depends(get_db)):
