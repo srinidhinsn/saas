@@ -288,14 +288,7 @@ const OrderItemsViewModal = ({ isOpen, onClose, order, inventoryMap, onRequestDe
     }
   };
 
-  const grandTotal = order.items.reduce((sum, item) => {
-    const price =
-      inventoryMap[item.item_id]?.unit_price ??
-      item.unit_price ??
-      item.price ??
-      0;
-    return sum + price * (item.quantity || 1);
-  }, 0);
+  const grandTotal = getOrderTotal(order);
 
   return (
     <div
@@ -362,7 +355,7 @@ const OrderItemsViewModal = ({ isOpen, onClose, order, inventoryMap, onRequestDe
               </tr>
             </thead>
             <tbody className="divide-y divide-border-default">
-              {order.items.map((item, idx) => {
+             {order.items.map((item, idx) => {
                 const unitPrice =
                   inventoryMap[item.item_id]?.unit_price ??
                   item.unit_price ??
@@ -445,7 +438,16 @@ const getInitialOrderMode = (order) => {
   if (Number(order.table_id) === 500) return 'takeaway';
   return 'dinein';
 };
-
+const normaliseItem = (item) => {
+  if (item.quantity == null) {
+    console.warn(`Item ${item.item_id} has no quantity`);
+  }
+  return {
+    ...item,
+    quantity: item.quantity ?? 0,
+    unit_price: item.unit_price ?? item.price ?? 0,
+  };
+};
 // ─────────────────────────────────────────────────────────────────────────────
 // Main component
 // ─────────────────────────────────────────────────────────────────────────────
@@ -840,7 +842,7 @@ const OrderSummaryVisible = ({ clientId, token }) => {
     return {
       ...order,
       _fixedOrderMode: order._fixedOrderMode ?? getInitialOrderMode(order),
-      items: deduped,
+      items: deduped.map(normaliseItem),
       has_new_items: batchItemsMap.size > 0,
     };
   };
@@ -875,15 +877,15 @@ const OrderSummaryVisible = ({ clientId, token }) => {
   // ─────────────────────────────────────────────────────────────────────────
   // Actions (preserved from original)
   // ─────────────────────────────────────────────────────────────────────────
-
   const handleCancelOrder = async (orderId, reason) => {
     const order = orders.find(o => o.id === orderId);
     const tableObj = tables.find(t => t.id === order?.table_id);
     try {
-      await axios.delete(
-        `${import.meta.env.VITE_API_ORDER_SERVICE_URL}/${clientId}/dinein/delete`,
+      await axios.post(
+        `${import.meta.env.VITE_API_ORDER_SERVICE_URL}/${clientId}/dinein/cancel`,
+        {},
         {
-          params: { dinein_order_id: orderId, client_id: clientId, reason },
+          params: { order_id: orderId, reason: reason || '' },
           headers: { Authorization: `Bearer ${token}` },
         }
       );
@@ -906,7 +908,6 @@ const OrderSummaryVisible = ({ clientId, token }) => {
       fetchTables();
     } catch { toast.error('Failed to cancel order'); }
   };
-
   // ── REQ: Item delete — now matches TakeOrder (reason + qty + transaction) ──
 
   const handleItemRemoveOne = async (transactionType, reason, removeQty) => {
@@ -1049,7 +1050,11 @@ const OrderSummaryVisible = ({ clientId, token }) => {
   const updateItemQuantity = (orderId, itemIdentifier, newQty) => {
     setOrders(prev => prev.map(o => {
       if (o.id !== orderId) return o;
-      const updatedItems = o.items.map(item => { const itemKey = item.id || item.frontend_unique_key; if (itemKey === itemIdentifier) return { ...item, quantity: newQty > 0 ? newQty : 1 }; return item; });
+      if (newQty <= 0) {
+        handleRequestDeleteItem(item, orderId);
+        return;
+      }
+      const updatedItems = o.items.map(item => { const itemKey = item.id || item.frontend_unique_key; if (itemKey === itemIdentifier) return { ...item,quantity: newQty }; return item; });
       const newTotal = updatedItems.reduce((s, it) => s + ((inventoryMap[it.item_id]?.unit_price || it.unit_price || it.price || 0) * (it.quantity || 1)), 0);
       return { ...o, items: updatedItems, total_price: newTotal };
     }));
@@ -1301,14 +1306,9 @@ const OrderSummaryVisible = ({ clientId, token }) => {
   // ─────────────────────────────────────────────────────────────────────────
 
   const getOrderTotal = (order) =>
-    order.items.reduce((sum, item) => {
-      const price =
-        inventoryMap[item.item_id]?.unit_price ??
-        item.unit_price ??
-        item.price ??
-        0;
-      return sum + price * (item.quantity || 1);
-    }, 0);
+    (order.items || [])
+      .filter(item => !item.parent_item_key)
+      .reduce((sum, item) => sum + item.unit_price * item.quantity, 0);
 
   const getOrderModeIcon = (mode) => {
     if (mode === 'takeaway') return <Package size={12} />;
@@ -1459,7 +1459,7 @@ const OrderSummaryVisible = ({ clientId, token }) => {
                 <div className="flex items-center gap-3">
                   <div className="text-right bg-action-primary/10 px-4 py-2 rounded-xl border border-action-primary/20">
                     <div className="text-xs font-semibold text-text-secondary uppercase">Total</div>
-                    <div className="text-xl font-bold text-action-primary">₹{selectedOrder.items.reduce((sum, item) => sum + ((inventoryMap[item.item_id]?.unit_price || item.unit_price || item.price || 0) * (item.quantity || 1)), 0).toFixed(2)}</div>
+                    <div className="text-xl font-bold text-action-primary">₹{getOrderTotal(selectedOrder).toFixed(2)}</div>
                   </div>
                   <button className="p-2 rounded-xl hover:bg-bg-tertiary" onClick={() => { setShowOrderDetailModal(false); setEditOrderId(null); setActiveTab('items'); }}><X size={20} /></button>
                 </div>
