@@ -775,24 +775,38 @@ def cancel_order(
 
                 for ingredient in (inv_item.recipe or []):
                     stock_item_id = ingredient.get("stock_item_id")
-                    recipe_qty    = float(ingredient.get("quantity_required") or 0)
-                    recipe_unit   = (ingredient.get("unit") or "").strip()
+                    recipe_qty = float(ingredient.get("quantity_required") or 0)
+                    recipe_unit = (ingredient.get("unit") or "").strip()
 
                     if not stock_item_id or recipe_qty <= 0:
                         continue
 
                     stock_item = (
                         db.query(InventoryEntity)
-                        .filter(InventoryEntity.id == int(stock_item_id), InventoryEntity.client_id == client_id)
+                        .filter(
+                            InventoryEntity.id == int(stock_item_id),
+                            InventoryEntity.client_id == client_id,
+                        )
                         .first()
                     )
                     if not stock_item:
                         continue
 
                     try:
-                        converted = _convert(recipe_qty, recipe_unit, stock_item.unit.strip())
+                        converted = _convert(
+                            recipe_qty, recipe_unit, stock_item.unit.strip()
+                        )
                         total_qty = round(converted * ordered_qty, 6)
-                        _tx(stock_item.id, TransactionTypeEnum.wastage, total_qty, TransactionTypeEnum.recipe_cancel.value, inv_item.name, ref_id=order.id)
+                        
+                        _tx(
+                            stock_item.id,
+                            TransactionTypeEnum.wastage,
+                            total_qty,
+                            TransactionTypeEnum.recipe_cancel.value,
+                            inv_item.name,
+                            ref_id=order.id,
+                        )
+
                     except ValueError:
                         continue
 
