@@ -1163,6 +1163,10 @@ ALTER TABLE ONLY public."user"
     ADD CONSTRAINT user_client_fk FOREIGN KEY (client_id) REFERENCES public.client(id) ON DELETE CASCADE;
 
 
+ALTER TABLE inventory
+ADD CONSTRAINT inventory_pk PRIMARY KEY (id, inventory_id, client_id, category_id, zone_config_id);
+
+
 -- Completed on 2026-04-23 12:45:14
 
 --
