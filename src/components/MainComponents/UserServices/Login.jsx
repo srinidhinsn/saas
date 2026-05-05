@@ -9,8 +9,7 @@ const screenRouteMap = {
   ecommerce_user_v1:"home"
 };
  
-export default function LoginPage({ onLoginSuccess }) {
-  const { clientId } = useParams()
+export default function LoginPage({ onLoginSuccess ,clientId}) {
   const [form, setForm] = useState({ username: '', password: '' });
   const [error, setError] = useState('');
   const [loading, setLoading] = useState(false);
