@@ -527,7 +527,7 @@ def delete_order_items( client_id: str, order_item_id: Optional[str] = Query(Non
 
             def _record_item_transaction(inv_item, qty, is_combo_child=False):
                 if tx_type == TransactionTypeEnum.item_cancelled:
-                    tag = "COMBO_CHILD_CANCELLED" if is_combo_child else "ITEM_CANCELLED"
+                    tag = TransactionTypeEnum.combo_child_cancelled if is_combo_child else TransactionTypeEnum.item_cancelled
                     _tx(inv_item.id, TransactionTypeEnum.item_cancelled, qty, tag, inv_item.name)
 
                 elif tx_type == TransactionTypeEnum.wastage:
@@ -569,7 +569,7 @@ def delete_order_items( client_id: str, order_item_id: Optional[str] = Query(Non
                             stock_item.id,
                             TransactionTypeEnum.wastage,
                             Decimal(str(round(reversal, 6))),
-                            "INGREDIENT_REVERSAL",
+                            TransactionTypeEnum.ingredient_reversal,
                             inv_item.name,
                         )
                     except ValueError:

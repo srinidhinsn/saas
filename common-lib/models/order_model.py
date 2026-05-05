@@ -23,6 +23,7 @@ class TransactionTypeEnum(str, Enum):
     combo_child_wastage = "COMBO_CHILD_WASTAGE"
     combo_child_cancelled = "COMBO_CHILD_CANCELLED"
     recipe_cancel = "RECIPE_CANCEL"
+    ingredient_reversal = "INGREDIENT_REVERSAL"
 
 
 class MovementTypeEnum(str, Enum):
