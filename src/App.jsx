@@ -95,9 +95,9 @@ const FallbackPreserveClient = () => {
 // ─── Root App ─────────────────────────────────────────────────────────────────
 const App = () => {
   const [authState, setAuthState] = useState(() => {
-    localStorage.setItem('access_token', accessToken);
-    localStorage.setItem('screen_id', screenId || '');
-    localStorage.setItem('client_id', clientId);
+   const token= localStorage.getItem('access_token');
+   const screenId= localStorage.getItem('screen_id');
+   const clientId= localStorage.getItem('client_id');
     return {
       token,
       screenId,
