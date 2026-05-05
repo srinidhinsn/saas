@@ -56,9 +56,16 @@ const InnerAuthenticatedApp = ({ token, onLogout }) => {
 
   return (
     <>
-      <HeaderSwitcher clientId={finalClientId} onLogout={onLogout} />
+      <HeaderSwitcher
+        clientId={finalClientId}
+        onLogout={onLogout}
+      />
+
       <main>
-        <RoutesManager token={token} clientId={finalClientId} />
+        <RoutesManager
+          token={token}
+          clientId={finalClientId}
+        />
       </main>
     </>
   );
