@@ -159,8 +159,8 @@ const App = () => {
           />
 
           <Route path="/saas/:clientId/register" element={<div className="p-8">Register (placeholder)</div>} />
-          <Route path="/saas/:clientId/forgot"  element={<div className="p-8">Forgot Password (placeholder)</div>} />
-          <Route path="/saas/:clientId/reset"  element={<div className="p-8">Reset Password (placeholder)</div>} />
+          <Route path="/saas/:clientId/forgot" element={<div className="p-8">Forgot Password (placeholder)</div>} />
+          <Route path="/saas/:clientId/reset" element={<div className="p-8">Reset Password (placeholder)</div>} />
 
           <Route
             path="/saas/:clientId/*"
