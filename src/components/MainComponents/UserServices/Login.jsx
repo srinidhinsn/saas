@@ -40,8 +40,13 @@ export default function LoginPage({ onLoginSuccess ,clientId}) {
         `${import.meta.env.VITE_API_USER_SERVICE_URL}/${clientId}/users/login`,
         {
           method: 'POST',
-          headers: { 'Content-Type': 'application/json' },
-          body: JSON.stringify({ username: form.username, password: form.password }),
+          headers: {
+            'Content-Type': 'application/json',
+          },
+          body: JSON.stringify({
+            username: form.username,
+            password: form.password,
+          }),
         }
       );
 

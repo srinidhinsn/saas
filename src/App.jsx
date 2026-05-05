@@ -33,13 +33,19 @@ const NavigateAfterLogin = ({ authState }) => {
   return <Navigate to={`/saas/${finalClientId}/${route}`} replace />;
 };
 
-// ─── Header switcher based on screen_id ──────────────────────────────────────
 const HeaderSwitcher = ({ clientId, onLogout }) => {
   const screenId = localStorage.getItem('screen_id');
 
-  if (screenId === 'ecommerce_user_v1') return <Headers_V1 clientId={clientId} onLogout={onLogout} />;
-  if (screenId === 'super_admin_v1')    return <Super_Admin_Header clientId={clientId} onLogout={onLogout} />;
-  if (screenId === 'super_user_v1')     return <Header_Super_User clientId={clientId} onLogout={onLogout} />;
+  if (screenId === 'ecommerce_user_v1') {
+    return <Headers_V1 clientId={clientId} onLogout={onLogout} />;
+  }
+  if (screenId === 'super_admin_v1') {
+    return <Super_Admin_Header clientId={clientId} onLogout={onLogout} />;
+  }
+  if (screenId === 'super_user_v1') {
+    return <Header_Super_User clientId={clientId} onLogout={onLogout} />;
+  }
+  // default fallback
   return <HeaderShared clientId={clientId} onLogout={onLogout} />;
 };
 
@@ -82,9 +88,9 @@ const FallbackPreserveClient = () => {
 // ─── Root App ─────────────────────────────────────────────────────────────────
 const App = () => {
   const [authState, setAuthState] = useState(() => {
-    const token    = localStorage.getItem('access_token');
-    const screenId = localStorage.getItem('screen_id');
-    const clientId = localStorage.getItem('client_id');
+    localStorage.setItem('access_token', accessToken);
+    localStorage.setItem('screen_id', screenId || '');
+    localStorage.setItem('client_id', clientId);
     return {
       token,
       screenId,
@@ -146,8 +152,8 @@ const App = () => {
           />
 
           <Route path="/saas/:clientId/register" element={<div className="p-8">Register (placeholder)</div>} />
-          <Route path="/saas/:clientId/forgot"   element={<div className="p-8">Forgot Password (placeholder)</div>} />
-          <Route path="/saas/:clientId/reset"    element={<div className="p-8">Reset Password (placeholder)</div>} />
+          <Route path="/saas/:clientId/forgot"  element={<div className="p-8">Forgot Password (placeholder)</div>} />
+          <Route path="/saas/:clientId/reset"  element={<div className="p-8">Reset Password (placeholder)</div>} />
 
           <Route
             path="/saas/:clientId/*"
