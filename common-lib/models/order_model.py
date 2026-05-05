@@ -20,6 +20,9 @@ class TransactionTypeEnum(str, Enum):
     item_cancelled = "ITEM_CANCELLED"
     wastage = "WASTAGE"
     order_cancelled = "ORDER_CANCELLED"
+    combo_child_wastage = "COMBO_CHILD_WASTAGE"
+    combo_child_cancelled = "COMBO_CHILD_CANCELLED"
+    recipe_cancel = "RECIPE_CANCEL"
 
 
 class MovementTypeEnum(str, Enum):

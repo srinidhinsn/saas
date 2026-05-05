@@ -531,7 +531,7 @@ def delete_order_items( client_id: str, order_item_id: Optional[str] = Query(Non
                     _tx(inv_item.id, TransactionTypeEnum.item_cancelled, qty, tag, inv_item.name)
 
                 elif tx_type == TransactionTypeEnum.wastage:
-                    tag = "COMBO_CHILD_WASTAGE" if is_combo_child else "WASTAGE"
+                    tag = TransactionTypeEnum.combo_child_wastage if is_combo_child else TransactionTypeEnum.wastage
                     serving_qty  = float(inv_item.serving_quantity)
                     serving_unit = (inv_item.serving_unit or "").strip()
                     stock_unit   = (inv_item.unit or "").strip()
@@ -710,39 +710,6 @@ def cancel_order(
 
     processed_keys = set()
 
-    def _record_cancel_item(inv_item, qty, order_ref_id, is_served, is_combo_child=False):
-        if is_served:
-            tag = "COMBO_CHILD_WASTAGE" if is_combo_child else "WASTAGE"
-            tx  = TransactionTypeEnum.wastage
-        else:
-            tag = "COMBO_CHILD_CANCELLED" if is_combo_child else "ITEM_CANCELLED"
-            tx  = TransactionTypeEnum.item_cancelled
-
-        _tx(inv_item.id, tx, qty, tag, inv_item.name, ref_id=order_ref_id)
-
-        for ingredient in (inv_item.recipe or []):
-            stock_item_id = ingredient.get("stock_item_id")
-            recipe_qty    = float(ingredient.get("quantity_required") or 0)
-            recipe_unit   = (ingredient.get("unit") or "").strip()
-
-            if not stock_item_id or recipe_qty <= 0:
-                continue
-
-            stock_item = (
-                db.query(InventoryEntity)
-                .filter(InventoryEntity.id == int(stock_item_id), InventoryEntity.client_id == client_id)
-                .first()
-            )
-            if not stock_item:
-                continue
-
-            try:
-                converted = _convert(recipe_qty, recipe_unit, stock_item.unit.strip())
-                total_qty = round(converted * qty, 6)
-                _tx(stock_item.id, TransactionTypeEnum.wastage, total_qty, "RECIPE_CANCEL", inv_item.name, ref_id=order_ref_id)
-            except ValueError:
-                continue
-
     for order in related_orders:
         order.status = OrderStatusEnum.cancelled
 
@@ -751,6 +718,7 @@ def cancel_order(
             .filter(
                 Db_OrderItem_Entity.order_id == order.id,
                 Db_OrderItem_Entity.client_id == client_id,
+                Db_OrderItem_Entity.status != OrderStatusEnum.cancelled,
             )
             .all()
         )
@@ -760,6 +728,7 @@ def cancel_order(
             if item_key in processed_keys:
                 continue
             processed_keys.add(item_key)
+            item.status = OrderStatusEnum.cancelled
 
             menu_item = (
                 db.query(InventoryEntity)
@@ -775,6 +744,7 @@ def cancel_order(
 
             ordered_qty = item.quantity or 1
             is_served   = item.status == OrderStatusEnum.served
+            tx_type     = TransactionTypeEnum.wastage if is_served else TransactionTypeEnum.item_cancelled
 
             category = (
                 db.query(CategoryEntity)
@@ -783,6 +753,7 @@ def cancel_order(
             )
             is_combo = category and (category.name or "").lower().startswith("combo")
 
+            targets = []
             if is_combo:
                 for child_id in (menu_item.line_item_id or []):
                     child_item = (
@@ -793,11 +764,37 @@ def cancel_order(
                         )
                         .first()
                     )
-                    if not child_item:
-                        continue
-                    _record_cancel_item(child_item, ordered_qty, order.id, is_served, is_combo_child=True)
+                    if child_item:
+                        targets.append((child_item, True))
             else:
-                _record_cancel_item(menu_item, ordered_qty, order.id, is_served)
+                targets.append((menu_item, False))
+
+            for inv_item, is_combo_child in targets:
+                tag = (TransactionTypeEnum.combo_child_wastage.value if is_served else TransactionTypeEnum.combo_child_cancelled.value) if is_combo_child else (TransactionTypeEnum.wastage.value if is_served else TransactionTypeEnum.item_cancelled.value)
+                _tx(inv_item.id, tx_type, ordered_qty, tag, inv_item.name, ref_id=order.id)
+
+                for ingredient in (inv_item.recipe or []):
+                    stock_item_id = ingredient.get("stock_item_id")
+                    recipe_qty    = float(ingredient.get("quantity_required") or 0)
+                    recipe_unit   = (ingredient.get("unit") or "").strip()
+
+                    if not stock_item_id or recipe_qty <= 0:
+                        continue
+
+                    stock_item = (
+                        db.query(InventoryEntity)
+                        .filter(InventoryEntity.id == int(stock_item_id), InventoryEntity.client_id == client_id)
+                        .first()
+                    )
+                    if not stock_item:
+                        continue
+
+                    try:
+                        converted = _convert(recipe_qty, recipe_unit, stock_item.unit.strip())
+                        total_qty = round(converted * ordered_qty, 6)
+                        _tx(stock_item.id, TransactionTypeEnum.wastage, total_qty, TransactionTypeEnum.recipe_cancel.value, inv_item.name, ref_id=order.id)
+                    except ValueError:
+                        continue
 
     if root_order.table_id:
         table_row = (
@@ -821,7 +818,7 @@ def cancel_order(
             "table_freed": bool(root_order.table_id),
         },
     )
-    
+
 # @router.delete("/dinein/delete")
 # def delete_order(client_id: str, dinein_order_id: Optional[str] = Query(None), context: SaasContext = Depends(verify_token), db: Session = Depends(get_db),reason: Optional[str] = Query(None)):
 #     """Delete by root internal id — also deletes all sub-orders sharing the same prefix."""

@@ -161,7 +161,7 @@ def create_transaction(
     else:
         if tx_type_str in ["WASTAGE"]:
          if before <= 0:
-           movement = "NONE"
+           movement = "out"
            after = before
          else:
            movement = "OUT"
@@ -259,7 +259,7 @@ def record_partial_transaction(
         create_transaction(db=db, client_id=client_id,
     payload=TxPayload(item_id=menu_item.id, tx_type=TransactionTypeEnum.item_cancelled,
         ref_id=order_id, qty=remove_qty,
-        remarks=build_remark("ITEM_CANCELLED_PARTIAL", order_id, item.item_name, remove_qty, effective_reason),
+        remarks=build_remark(TransactionTypeEnum.item_cancelled, order_id, item.item_name, remove_qty, effective_reason),
             ),
         )
 
@@ -275,7 +275,7 @@ def record_partial_transaction(
                 create_transaction(db=db, client_id=client_id,
     payload=TxPayload(item_id=menu_item.id, tx_type=TransactionTypeEnum.wastage,
         ref_id=order_id, qty=reversal_qty,
-            remarks=build_remark("WASTAGE_PARTIAL", order_id, item.item_name, remove_qty, effective_reason),
+            remarks=build_remark(TransactionTypeEnum.wastage, order_id, item.item_name, remove_qty, effective_reason),
                     ),
                 )
             except ValueError:
@@ -305,7 +305,7 @@ def record_partial_transaction(
                 create_transaction(db=db, client_id=client_id,
     payload=TxPayload(item_id=stock_item.id, tx_type=TransactionTypeEnum.wastage,
         ref_id=order_id, qty=reversal_qty,
-        remarks=build_remark("INGREDIENT_REVERSAL_PARTIAL", order_id, item.item_name, remove_qty, effective_reason),
+        remarks=build_remark(TransactionTypeEnum.wastage, order_id, item.item_name, remove_qty, effective_reason),
                     ),
                 )
             except ValueError:
