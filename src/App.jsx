@@ -121,8 +121,8 @@ const App = () => {
 
   const handleLoginSuccess = (accessToken, screenId, clientId) => {
     localStorage.setItem('access_token', accessToken);
-    localStorage.setItem('screen_id',    screenId || '');
-    localStorage.setItem('client_id',    clientId);
+    localStorage.setItem('screen_id', screenId || '');
+    localStorage.setItem('client_id', clientId);
 
     setAuthState({
       token: accessToken,
