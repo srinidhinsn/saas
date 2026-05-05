@@ -83,7 +83,10 @@ const PaymentConfirmModal = ({ isOpen, total, onConfirm, onClose }) => {
 // ─────────────────────────────────────────────────────────────────────────────
 // Main InvoiceModal
 // ─────────────────────────────────────────────────────────────────────────────
-
+const _isChildItem = (fkey) => {
+  const k = fkey || '';
+  return k.startsWith('cchild_') || k.startsWith('addon_');
+};
 export default function InvoiceModal({
   clientId,
   token,
@@ -94,6 +97,12 @@ export default function InvoiceModal({
   onSave
 }) {
   const [selectedOrder, setSelectedOrder] = useState(initialOrder);
+  useEffect(() => {
+    console.log('ORDER ITEMS:', (selectedOrder?.items || []).map(i => ({
+      name: i.name || i.item_name,
+      fkey: i.frontend_unique_key,
+    })));
+  }, [selectedOrder]);
   const [invoiceDraftId, setInvoiceDraftId] = useState(null);
   const [taxPercent, setTaxPercent] = useState(18);
   const [discount, setDiscount] = useState(0);
@@ -115,11 +124,12 @@ export default function InvoiceModal({
 
   // 1️⃣ Subtotal
   const orderSubtotal = Number(
-    (selectedOrder?.items || []).reduce(
-      (sum, item) =>
-        sum + (Number(item.unit_price) || 0) * (Number(item.quantity) || 0),
-      0
-    ).toFixed(2)
+    (selectedOrder?.items || [])
+      .filter(item => !(item.frontend_unique_key || '').startsWith('cchild_'))
+      .reduce(
+        (sum, item) => sum + (Number(item.unit_price) || 0) * (Number(item.quantity) || 0),
+        0
+      ).toFixed(2)
   );
 
   // 2️⃣ GST on subtotal
@@ -572,7 +582,7 @@ export default function InvoiceModal({
           setInvoiceDraftId(updated.id);
           setPaymentStatus(updated.payment_status || "Paid");
         }
-        if (updatedDraft) {
+        if (updated) {
           setSelectedOrder(prev => ({
             ...prev,
             customer_id: updatedDraft.customer_id || prev.customer_id,
@@ -679,22 +689,32 @@ export default function InvoiceModal({
       doc.setFontSize(9);
       doc.setTextColor(0, 0, 0);
 
-      selectedOrder.items.forEach((item, index) => {
-        if (y > pageHeight - 150) {
-          doc.addPage();
-          y = 50;
-        }
-
+      const parentItems = (selectedOrder.items || []).filter(i => !_isChildItem(i.frontend_unique_key));
+      parentItems.forEach((item, index) => {
+        if (y > pageHeight - 150) { doc.addPage(); y = 50; }
         if (index % 2 === 0) {
           doc.setFillColor(249, 250, 251);
           doc.rect(40, y - 8, pageWidth - 80, 20, 'F');
         }
-        
         doc.text(item.name || "Unnamed", 45, y);
         doc.text(`${item.quantity || 0}`, pageWidth - 260, y);
         doc.text(`₹${(item.unit_price ?? 0).toFixed(2)}`, pageWidth - 180, y);
         doc.text(`₹${((item.unit_price ?? 0) * (item.quantity ?? 0)).toFixed(2)}`, pageWidth - 80, y);
         y += 20;
+
+        // Print addons indented below
+        const addons = (selectedOrder.items || []).filter(a =>
+          (a.frontend_unique_key || '').startsWith(`addon_${item.frontend_unique_key}_`)
+        );
+        addons.forEach(addon => {
+          doc.setTextColor(100, 100, 200);
+          doc.text(`  ↳ ${addon.name}`, 55, y);
+          doc.text(`${addon.quantity || 0}`, pageWidth - 260, y);
+          doc.text(`₹${(addon.unit_price ?? 0).toFixed(2)}`, pageWidth - 180, y);
+          doc.text(`+₹${((addon.unit_price ?? 0) * (addon.quantity ?? 0)).toFixed(2)}`, pageWidth - 80, y);
+          y += 16;
+          doc.setTextColor(0, 0, 0);
+        });
       });
 
       y += 15;
@@ -840,22 +860,49 @@ export default function InvoiceModal({
                   </div>
                   <div className="p-4 space-y-2 max-h-96 overflow-y-auto">
 
-                    {selectedOrder.items.map((item, idx) => (
-                      <div key={idx} className="flex justify-between items-center py-3 px-4 rounded-lg bg-bg-tertiary border border-border-default hover:border-action-primary transition-all">
-                        <div className="flex-1">
-                          <div className="font-semibold text-text-primary">{item.name}</div>
-                          <div className="text-sm text-text-secondary mt-1 flex items-center gap-2">
-                            <span className="inline-flex items-center px-2 py-0.5 rounded-md bg-bg-primary text-text-primary font-medium text-xs">
-                              {item.quantity}x
-                            </span>
-                            <span>@ ₹{item.unit_price?.toFixed(2)}</span>
+                    {(() => {
+                      const items = selectedOrder.items || [];
+                      const parents = items.filter(i => !_isChildItem(i.frontend_unique_key));
+                      return parents.map((item, idx) => {
+       
+const addons = items.filter(i =>
+  (i.frontend_unique_key || '').startsWith(`addon_${item.frontend_unique_key}_`)
+);  console.log('parent fkey:', item.frontend_unique_key, '| addons:', addons.map(a => a.frontend_unique_key));
+
+                        return (
+                          <div key={idx}>
+                            {/* Main item row */}
+                            <div className="flex justify-between items-center py-3 px-4 rounded-lg bg-bg-tertiary border border-border-default hover:border-action-primary transition-all">
+                              <div className="flex-1">
+                                <div className="font-semibold text-text-primary">{item.name}</div>
+                                <div className="text-sm text-text-secondary mt-1 flex items-center gap-2">
+                                  <span className="inline-flex items-center px-2 py-0.5 rounded-md bg-bg-primary text-text-primary font-medium text-xs">
+                                    {item.quantity}x
+                                  </span>
+                                  <span>@ ₹{item.unit_price?.toFixed(2)}</span>
+                                </div>
+                              </div>
+                              <div className="font-bold text-text-primary text-lg">
+                                ₹{((item.unit_price || 0) * (item.quantity || 0)).toFixed(2)}
+                              </div>
+                            </div>
+                            {/* Addon rows indented below */}
+                            {addons.map((addon, ai) => (
+                              <div key={ai} className="flex justify-between items-center py-1.5 px-4 pl-8 rounded-lg bg-blue-50/50 border border-dashed border-blue-200 mt-0.5 ml-3">
+                                <div className="flex items-center gap-2 flex-1">
+                                  <span className="text-blue-400 text-xs">↳</span>
+                                  <span className="text-sm text-blue-700">{addon.name}</span>
+                                  <span className="text-xs text-blue-500">×{addon.quantity}</span>
+                                </div>
+                                <span className="text-xs font-semibold text-blue-600">
+                                  +₹{((addon.unit_price || 0) * (addon.quantity || 0)).toFixed(2)}
+                                </span>
+                              </div>
+                            ))}
                           </div>
-                        </div>
-                        <div className="font-bold text-text-primary text-lg">
-                          ₹{((item.unit_price || 0) * (item.quantity || 0)).toFixed(2)}
-                        </div>
-                      </div>
-                    ))}
+                        );
+                      });
+                    })()}
                   </div>
 
                   {/* Totals */}
@@ -1161,7 +1208,7 @@ export default function InvoiceModal({
                 toast.error("Invoice ID missing — save before paying");
                 return;
               }
-          
+      
               const isSplit = response?.is_split_payment;
               const paymentsToVerify = isSplit
                 ? response.completed_razorpay_payments   // array of { razorpay_payment_id, order_id, signature }

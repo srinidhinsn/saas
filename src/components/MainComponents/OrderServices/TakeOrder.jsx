@@ -1658,7 +1658,32 @@ const TakeOrder = ({ clientId, token, onOrderUpdate, realm }) => {
   // Draft helpers
   // ─────────────────────────────────────────────────────────────────────────
 
-
+  const deduplicateOrderItems = (items) => {
+    const uniqueKeyToItemMap = new Map();
+    const result = [];
+  
+    items.forEach(item => {
+      // Prefer frontend_unique_key, then DB id, then warn and include as-is
+      const fkey = item.frontend_unique_key || (item.id ? String(item.id) : null);
+  
+      if (!fkey) {
+        console.warn(`Item ${item.item_id} has no unique key or DB id — included without dedup`);
+        result.push({ ...item });
+        return;
+      }
+  
+      if (uniqueKeyToItemMap.has(fkey)) {
+        // Same logical item appearing in multiple sub-orders — accumulate quantity
+        uniqueKeyToItemMap.get(fkey).quantity += (item.quantity ?? 0);
+      } else {
+        const copy = { ...item };
+        uniqueKeyToItemMap.set(fkey, copy);
+        result.push(copy);
+      }
+    });
+  
+    return result;
+  };
   const handleSaveDraft = useCallback(async () => {
     if (!selectedTable || cart.length === 0) {
       toast.warn('Nothing to save — cart is empty.');
@@ -2045,15 +2070,15 @@ const TakeOrder = ({ clientId, token, onOrderUpdate, realm }) => {
 
         // Deduplicate: prefer base record (zone_config_id === 0) when no zone match
         const allItems = itemRes.data.data || [];
-        const seen = new Map();
+        const uniqueKeyToItemMap = new Map();
         allItems.forEach(item => {
-          const existing = seen.get(item.id);
+          const existing = uniqueKeyToItemMap.get(item.id);
           if (!existing || item.zone_config_id === zoneConfigId) {
-            seen.set(item.id, item);
+            uniqueKeyToItemMap.set(item.id, item);
           }
         });
 
-        const enriched = Array.from(seen.values()).map(item => {
+        const enriched = Array.from(uniqueKeyToItemMap.values()).map(item => {
           const cat = categoriesFlat.find(c => c.id === item.category_id);
           return { ...item, category_name: cat?.name || 'Uncategorized' };
         });
@@ -2336,8 +2361,6 @@ const TakeOrder = ({ clientId, token, onOrderUpdate, realm }) => {
           status: item.status || 'pending',
           batch_label: item.batch_label,
           sub_order_id: item.sub_order_id,
-          parent_item_key: item.parent_item_key || null,
-
         };
       });
       setCart(reconstructedCart);
@@ -2395,8 +2418,6 @@ const TakeOrder = ({ clientId, token, onOrderUpdate, realm }) => {
           status: item.status || 'pending',
           batch_label: item.batch_label,
           sub_order_id: item.sub_order_id,
-          parent_item_key: item.parent_item_key || null,
-
         };
       });
 
@@ -2457,27 +2478,34 @@ const TakeOrder = ({ clientId, token, onOrderUpdate, realm }) => {
       .reduce((t, i) => t + (i.unit_price || 0) * i.quantity, 0)
       .toFixed(2);
 
-  const buildCartItem = (item, extra = {}) => {
-    const ts = Date.now() + Math.random();
-    const key = `${item.id}_${ts}`;
-    return {
-      id: Number(item.id),
-      name: item.name,
-      image_id: item.image_id,
-      unit_price: (item.unit_price || 0) * (1 - (Number(item.discount) || 0) / 100),
-      slug: item.slug,
-      category: item.category_name,
-      category_id: item.category_id || null,
-      quantity: 1,
-      note: '',
-      frontend_unique_key: key,
-      is_new_item: true,
-      saved_sub_order: false,
-      is_addon: false,
-      parent_item_key: null,
-      ...extra,
-    };
-  };
+      const buildCartItem = (item, extra = {}) => {
+        const ts = Date.now() + Math.random();
+        const { _item_type, ...cleanExtra } = extra;
+
+        const typePrefix = _item_type || 'main';
+        const parentKey = cleanExtra.parent_item_key || '';
+        const key = parentKey
+          ? `${typePrefix}_${parentKey}_${item.id}_${ts}`
+          : `${typePrefix}_${item.id}_${ts}`;
+      
+        return {
+          id: Number(item.id),
+          name: item.name,
+          image_id: item.image_id,
+          unit_price: (item.unit_price || 0) * (1 - (Number(item.discount) || 0) / 100),
+          slug: item.slug,
+          category: item.category_name,
+          category_id: item.category_id || null,
+          quantity: 1,
+          note: '',
+          frontend_unique_key: key,
+          is_new_item: true,
+          saved_sub_order: false,
+          is_addon: false,
+          parent_item_key: null,
+          ...cleanExtra,
+        };
+      };
 
   const addToCart = (item, parentItemKey = null) => {
     // Count how many of this item are already in the new (unsaved) cart
@@ -2790,7 +2818,7 @@ const TakeOrder = ({ clientId, token, onOrderUpdate, realm }) => {
         const addonEntry = buildCartItem(addon, {
           batch_timestamp: batch,
           parent_item_key: mainKey,
-          is_addon: true,
+          is_addon: true, _item_type: 'addon', 
         });
         setCart(prev => [...prev, addonEntry]);
       });
@@ -2830,19 +2858,19 @@ const TakeOrder = ({ clientId, token, onOrderUpdate, realm }) => {
     const itemsToPrintKOT = newItems.length > 0 ? [...newItems] : [...cart];
 
     // For the order API we only send parent (non-addon) items
-    const buildOrderPayload = (items) =>
-      items.map(i => ({
-        item_id: i.id,
-        item_name: i.name,
-        quantity: i.quantity,
-        unit_price: i.unit_price,
-        line_total: i.unit_price * i.quantity,
-        status: 'pending',
-        slug: i.slug || '',
-        frontend_unique_key: i.frontend_unique_key,
-        is_addon: i.is_addon || false,
-        parent_item_key: i.parent_item_key || null,
-      }));
+const buildOrderPayload = (items) =>
+  items
+    .filter(i => !(i.frontend_unique_key || '').startsWith('cchild_'))
+    .map(i => ({
+      item_id: i.id,
+      item_name: i.name,
+      quantity: i.quantity,
+      unit_price: i.unit_price,
+      line_total: i.unit_price * i.quantity,
+      status: 'pending',
+      slug: i.slug || '',
+      frontend_unique_key: i.frontend_unique_key,
+    }));
     try {
       const headers = { Authorization: `Bearer ${token}` };
       let placedOrderId = null;
@@ -3148,6 +3176,7 @@ const TakeOrder = ({ clientId, token, onOrderUpdate, realm }) => {
       );
       const order = (r.data?.data || []).find(o => o.id === orderId);
       if (!order) { toast.error('Order not found'); return; }
+  
       const enriched = (order.items || []).map(item => {
         const inv = inventoryMap[item.item_id] || {};
         return {
@@ -3156,12 +3185,13 @@ const TakeOrder = ({ clientId, token, onOrderUpdate, realm }) => {
           name: item.item_name ?? inv.name ?? 'Unnamed Item',
         };
       });
-
+  
+      const deduplicatedItems = deduplicateOrderItems(enriched);
+  
       const billingDoc = await fetchBillingDocumentForOrder(orderId);
-
       setInvoiceOrderData({
         ...order,
-        items: combineDuplicateItems(enriched),
+        items: deduplicatedItems,
         customer_id: billingDoc?.customer_id || order.customer_id || '',
         contact_phone: billingDoc?.contact_phone || order.contact_phone || '',
         contact_email: billingDoc?.contact_email || order.contact_email || '',
@@ -3185,6 +3215,7 @@ const TakeOrder = ({ clientId, token, onOrderUpdate, realm }) => {
       );
       const order = (r.data?.data || []).find(o => o.id === activeOrderId);
       if (!order) { toast.error('Order not found'); return; }
+  
       const enriched = (order.items || []).map(item => {
         const inv = inventoryMap[item.item_id] || {};
         return {
@@ -3193,12 +3224,13 @@ const TakeOrder = ({ clientId, token, onOrderUpdate, realm }) => {
           name: item.item_name ?? inv.name ?? 'Unnamed',
         };
       });
-
+  
+      const deduplicatedItems = deduplicateOrderItems(enriched);
+  
       const billingDoc = await fetchBillingDocumentForOrder(activeOrderId);
-
       setInvoiceOrderData({
         ...order,
-        items: combineDuplicateItems(enriched),
+        items: deduplicatedItems,
         customer_id: customerDetails.customer_id || billingDoc?.customer_id || order.customer_id || '',
         contact_phone: customerDetails.contact_phone || billingDoc?.contact_phone || order.contact_phone || '',
         contact_email: billingDoc?.contact_email || order.contact_email || '',
@@ -3732,22 +3764,61 @@ const TakeOrder = ({ clientId, token, onOrderUpdate, realm }) => {
         }}
         comboItem={comboModalItem}
         comboComponents={comboModalComponents}
-        onAddCombo={() => {
-          if (!comboModalItem) return;
-          let batch = currentBatchTimestamp;
-          if (!batch) { batch = Date.now(); setCurrentBatchTimestamp(batch); }
-          const mainKey = addToCart(comboModalItem);
-          // Add each combo component as a child entry (is_addon=true, parent_item_key=mainKey)
-          comboModalComponents.forEach((comp, idx) => {
-            const addonEntry = buildCartItem(comp, {
-              batch_timestamp: batch,
-              parent_item_key: mainKey,
-              is_addon: true,
-            });
-            setCart(prev => [...prev, addonEntry]);
-          });
-          setHasNewItems(true);
-        }}
+  onAddCombo={() => {
+  if (!comboModalItem) return;
+  let batch = currentBatchTimestamp;
+  if (!batch) { batch = Date.now(); setCurrentBatchTimestamp(batch); }
+
+  setCart(prev => {
+    // Check if this combo already exists in the new (unsaved) cart
+    const existingCombo = prev.find(
+      i => i.id === Number(comboModalItem.id) &&
+           i.is_new_item &&
+           !i.saved_sub_order &&
+           !i.is_addon &&
+           (i.frontend_unique_key || '').startsWith('combo_')
+    );
+
+    if (existingCombo) {
+      // Increment combo parent quantity
+      const updated = prev.map(i => {
+        if (i.frontend_unique_key === existingCombo.frontend_unique_key) {
+          return { ...i, quantity: i.quantity + 1 };
+        }
+        // Increment each child that belongs to this combo parent
+        if (
+          i.parent_item_key === existingCombo.frontend_unique_key &&
+          i.is_addon
+        ) {
+          return { ...i, quantity: i.quantity + 1 };
+        }
+        return i;
+      });
+      return updated;
+    }
+
+    // First time adding this combo — create parent + children
+    const comboParentEntry = buildCartItem(comboModalItem, {
+      batch_timestamp: batch,
+      is_addon: false,
+      _item_type: 'combo',
+    });
+
+    const childEntries = comboModalComponents.map(comp =>
+      buildCartItem(comp, {
+        batch_timestamp: batch,
+        parent_item_key: comboParentEntry.frontend_unique_key,
+        is_addon: true,
+        _item_type: 'cchild',
+      })
+    );
+
+    return [...prev, comboParentEntry, ...childEntries];
+  });
+
+  setHasNewItems(true);
+  if (!isMobile) setShowCart(true);
+}}
       />
 
       <CancelOrderConfirmModal
