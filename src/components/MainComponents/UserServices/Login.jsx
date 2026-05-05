@@ -41,13 +41,8 @@ export default function LoginPage({ onLoginSuccess }) {
         `${import.meta.env.VITE_API_USER_SERVICE_URL}/${clientId}/users/login`,
         {
           method: 'POST',
-          headers: {
-            'Content-Type': 'application/json',
-          },
-          body: JSON.stringify({
-            username: form.username,
-            password: form.password,
-          }),
+          headers: { 'Content-Type': 'application/json' },
+          body: JSON.stringify({ username: form.username, password: form.password }),
         }
       );
 
@@ -60,26 +55,19 @@ export default function LoginPage({ onLoginSuccess }) {
       const token = data.data.access_token;
       const screen_id = data.screen_id || 'default_user';
 
-      console.log('Login successful', { token, screen_id });
-
-      // Call the onLoginSuccess callback to update parent state
+      // ✅ Just call the callback — App.jsx will handle navigation
       if (onLoginSuccess) {
-        onLoginSuccess(token, screen_id,clientId);
-        setShowAnimation(true);
+        onLoginSuccess(token, screen_id, clientId);
       }
-      const route = screenRouteMap[screen_id] || "home";
 
-      setTimeout(() => {
-        navigate(`/${APP_ROOT}/${clientId}/${route}`, { replace: true });
-      }, 1000);
-      
+      setShowAnimation(true);
+
     } catch (err) {
-      console.error('Login failed:', err);
       setError(err.message || 'Login failed. Please try again.');
     } finally {
       setLoading(false);
     }
-  };
+};
 
   const handleKeyPress = (e) => {
     if (e.key === 'Enter' && form.username && form.password && !loading) {
