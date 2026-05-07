@@ -22,7 +22,6 @@ logger = logging.getLogger(__name__)
 origins = os.getenv("ALLOWED_ORIGINS", "")
 ALLOWED_ORIGINS = [origin.strip() for origin in origins.split(",") if origin]
 
-app.include_router(routes.router, prefix="/saas/{client_id}/invoice")
 
 app.add_middleware(
     CORSMiddleware,
@@ -31,6 +30,7 @@ app.add_middleware(
     allow_methods=["*"],
     allow_headers=["*"]
 )
+app.include_router(routes.router, prefix="/saas/{client_id}/invoice")
 
 
 @app.get('/')

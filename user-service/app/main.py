@@ -20,7 +20,6 @@ origins = os.getenv("ALLOWED_ORIGINS", "")
 ALLOWED_ORIGINS = [origin.strip() for origin in origins.split(",") if origin]
 
 
-app.include_router(routes.router, prefix="/saas/{client_id}/users")
 app.add_middleware(
     CORSMiddleware,
     allow_origins=ALLOWED_ORIGINS,
@@ -28,6 +27,7 @@ app.add_middleware(
     allow_methods=["*"],
     allow_headers=["*"],
 )
+app.include_router(routes.router, prefix="/saas/{client_id}/users")
 
 
 @app.get('/')
