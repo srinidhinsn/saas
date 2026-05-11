@@ -1379,12 +1379,10 @@ const handleBulkUpdate = async () => {
     currentCategoriesFlat, currentSelectedCategoryId, currentSections,
   }) => {
     for (const row of parsedData) {
-      if (!row.Name?.trim()) continue;
-
+      if (!row.Name?.trim()) continue;  
       const existingRecords = allMenuItems.filter(
         item => item.name?.trim().toLowerCase() === row.Name?.trim().toLowerCase()
-      );
-
+      ); 
       const categoryId =
         currentCategoriesFlat.find(
           c => c.name.trim().toLowerCase() === (row.Category || '').trim().toLowerCase()
@@ -1459,12 +1457,23 @@ const handleBulkUpdate = async () => {
 
       if (existingBase) {
         sharedId = existingBase.id;
+  
         await axios.post(
-          `${import.meta.env.VITE_API_INVENTORY_SERVICE_URL}/${clientId}/menu/update`,
-          { ...basePayload, id: Number(sharedId), unit_price: baseUnitPrice, zone_config_id: 0 },
+          `${import.meta.env.VITE_API_INVENTORY_SERVICE_URL}/${clientId}/menu/delete`,
+          { id: sharedId, zone_config_id: 0 },
           { headers: { Authorization: `Bearer ${token}` } }
         );
+  
+        // ✅ Recreate base record fresh
+        const res = await axios.post(
+          `${import.meta.env.VITE_API_INVENTORY_SERVICE_URL}/${clientId}/menu/create`,
+          { ...basePayload, id: sharedId, unit_price: baseUnitPrice, zone_config_id: 0 },
+          { headers: { Authorization: `Bearer ${token}` } }
+        );
+        sharedId = res.data.data.id;
+  
       } else {
+        // ✅ No existing record — create fresh
         const res = await axios.post(
           `${import.meta.env.VITE_API_INVENTORY_SERVICE_URL}/${clientId}/menu/create`,
           { ...basePayload, unit_price: baseUnitPrice, zone_config_id: 0 },
@@ -1472,44 +1481,29 @@ const handleBulkUpdate = async () => {
         );
         sharedId = res.data.data.id;
       }
-
-      const zonePriceMap = {};
-      for (const col of priceColumns) {
-        const priceVal = row[col];
-        if (priceVal === "" || priceVal === null || priceVal === undefined) continue;
-        const label = col.replace("Price_", "").trim().toLowerCase();
-        const matchedSection = currentSections.find(s => sectionLabel(s) === label);
-        if (!matchedSection) continue;
-        const sid = Number(matchedSection.id);
-        if (!sid || sid === 0) continue;
-        zonePriceMap[sid] = Number(priceVal);
-      }
-
+  
+      // ✅ Recreate all zone records fresh — no conflicts possible
       for (const section of currentSections) {
         const configId = Number(section.id);
         if (!configId || configId === 0) continue;
-        const existingZone = existingRecords.find(item => item.zone_config_id === configId);
+  
+        const priceCol = priceColumns.find(
+          col => col.replace("Price_", "").trim().toLowerCase() === sectionLabel(section)
+        );
+        const priceVal = priceCol ? row[priceCol] : undefined;
         const finalPrice =
-          zonePriceMap[configId] !== undefined
-            ? zonePriceMap[configId]
-            : existingZone ? Number(existingZone.unit_price) : baseUnitPrice;
-
-        if (existingZone) {
-          await axios.post(
-            `${import.meta.env.VITE_API_INVENTORY_SERVICE_URL}/${clientId}/menu/update`,
-            { ...basePayload, id: Number(existingZone.id), unit_price: finalPrice, zone_config_id: configId },
-            { headers: { Authorization: `Bearer ${token}` } }
-          );
-        } else {
-          await axios.post(
-            `${import.meta.env.VITE_API_INVENTORY_SERVICE_URL}/${clientId}/menu/create`,
-            { ...basePayload, id: sharedId, unit_price: finalPrice, zone_config_id: configId },
-            { headers: { Authorization: `Bearer ${token}` } }
-          );
-        }
+          priceVal !== "" && priceVal !== null && priceVal !== undefined
+            ? Number(priceVal)
+            : baseUnitPrice;
+  
+        await axios.post(
+          `${import.meta.env.VITE_API_INVENTORY_SERVICE_URL}/${clientId}/menu/create`,
+          { ...basePayload, id: sharedId, unit_price: finalPrice, zone_config_id: configId },
+          { headers: { Authorization: `Bearer ${token}` } }
+        );
       }
     }
-
+  
     await fetchData({ silent: false });
     setImportSuccess(true);
     setTimeout(() => setImportSuccess(false), 3000);
