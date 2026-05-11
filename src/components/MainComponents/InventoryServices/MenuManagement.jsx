@@ -1380,22 +1380,22 @@ const handleBulkUpdate = async () => {
   }) => {
     for (const row of parsedData) {
       if (!row.Name?.trim()) continue;
-
+  
       const existingRecords = allMenuItems.filter(
         item => item.name?.trim().toLowerCase() === row.Name?.trim().toLowerCase()
       );
-
+  
       const categoryId =
         currentCategoriesFlat.find(
           c => c.name.trim().toLowerCase() === (row.Category || '').trim().toLowerCase()
         )?.id || currentSelectedCategoryId;
-
+  
       const categoryName = currentCategoriesFlat.find(c => c.id === categoryId)?.name || null;
       if (!categoryName) {
         console.warn(`[Import] Skipping "${row.Name}" — category not found: "${row.Category}"`);
         continue;
       }
-
+  
       const rawDietary = (row.Dietary_Type || "").trim().toLowerCase().replace(/[-_\s]/g, '');
       const matchedDietaryOption = dietaryOptions.find(
         d => d.toLowerCase().replace(/[-_\s]/g, '') === rawDietary
@@ -1403,10 +1403,10 @@ const handleBulkUpdate = async () => {
       const importedDietary = matchedDietaryOption
         ? matchedDietaryOption.toLowerCase().replace(/[-_\s]/g, '')
         : rawDietary;
-
+  
       const rawTiming = (row.Availability_Timing || "").trim().toLowerCase();
       const timingPart = rawTiming || null;
-
+  
       const slug = (() => {
         const parts = [];
         let currentId = categoryId;
@@ -1430,7 +1430,7 @@ const handleBulkUpdate = async () => {
         const base = nameParts.filter(Boolean).join('_');
         return timingPart ? `${base}__${timingPart}` : base;
       })();
-
+  
       const basePayload = {
         client_id: clientId,
         inventory_id: menuConfig.menuInventoryId,
@@ -1452,19 +1452,31 @@ const handleBulkUpdate = async () => {
         created_by,
         updated_by,
       };
-
+  
       const baseUnitPrice = Number(row.Unit_Price) || 0;
       let sharedId;
       const existingBase = existingRecords.find(item => item.zone_config_id === 0);
-
+  
       if (existingBase) {
         sharedId = existingBase.id;
+  
+        // ✅ Single delete call — backend deletes ALL zone variants for this id
         await axios.post(
-          `${import.meta.env.VITE_API_INVENTORY_SERVICE_URL}/${clientId}/menu/update`,
-          { ...basePayload, id: Number(sharedId), unit_price: baseUnitPrice, zone_config_id: 0 },
+          `${import.meta.env.VITE_API_INVENTORY_SERVICE_URL}/${clientId}/menu/delete`,
+          { id: sharedId, zone_config_id: 0 },
           { headers: { Authorization: `Bearer ${token}` } }
         );
+  
+        // ✅ Recreate base record fresh
+        const res = await axios.post(
+          `${import.meta.env.VITE_API_INVENTORY_SERVICE_URL}/${clientId}/menu/create`,
+          { ...basePayload, id: sharedId, unit_price: baseUnitPrice, zone_config_id: 0 },
+          { headers: { Authorization: `Bearer ${token}` } }
+        );
+        sharedId = res.data.data.id;
+  
       } else {
+        // ✅ No existing record — create fresh
         const res = await axios.post(
           `${import.meta.env.VITE_API_INVENTORY_SERVICE_URL}/${clientId}/menu/create`,
           { ...basePayload, unit_price: baseUnitPrice, zone_config_id: 0 },
@@ -1472,44 +1484,29 @@ const handleBulkUpdate = async () => {
         );
         sharedId = res.data.data.id;
       }
-
-      const zonePriceMap = {};
-      for (const col of priceColumns) {
-        const priceVal = row[col];
-        if (priceVal === "" || priceVal === null || priceVal === undefined) continue;
-        const label = col.replace("Price_", "").trim().toLowerCase();
-        const matchedSection = currentSections.find(s => sectionLabel(s) === label);
-        if (!matchedSection) continue;
-        const sid = Number(matchedSection.id);
-        if (!sid || sid === 0) continue;
-        zonePriceMap[sid] = Number(priceVal);
-      }
-
+  
+      // ✅ Recreate all zone records fresh — no conflicts possible
       for (const section of currentSections) {
         const configId = Number(section.id);
         if (!configId || configId === 0) continue;
-        const existingZone = existingRecords.find(item => item.zone_config_id === configId);
+  
+        const priceCol = priceColumns.find(
+          col => col.replace("Price_", "").trim().toLowerCase() === sectionLabel(section)
+        );
+        const priceVal = priceCol ? row[priceCol] : undefined;
         const finalPrice =
-          zonePriceMap[configId] !== undefined
-            ? zonePriceMap[configId]
-            : existingZone ? Number(existingZone.unit_price) : baseUnitPrice;
-
-        if (existingZone) {
-          await axios.post(
-            `${import.meta.env.VITE_API_INVENTORY_SERVICE_URL}/${clientId}/menu/update`,
-            { ...basePayload, id: Number(existingZone.id), unit_price: finalPrice, zone_config_id: configId },
-            { headers: { Authorization: `Bearer ${token}` } }
-          );
-        } else {
-          await axios.post(
-            `${import.meta.env.VITE_API_INVENTORY_SERVICE_URL}/${clientId}/menu/create`,
-            { ...basePayload, id: sharedId, unit_price: finalPrice, zone_config_id: configId },
-            { headers: { Authorization: `Bearer ${token}` } }
-          );
-        }
+          priceVal !== "" && priceVal !== null && priceVal !== undefined
+            ? Number(priceVal)
+            : baseUnitPrice;
+  
+        await axios.post(
+          `${import.meta.env.VITE_API_INVENTORY_SERVICE_URL}/${clientId}/menu/create`,
+          { ...basePayload, id: sharedId, unit_price: finalPrice, zone_config_id: configId },
+          { headers: { Authorization: `Bearer ${token}` } }
+        );
       }
     }
-
+  
     await fetchData({ silent: false });
     setImportSuccess(true);
     setTimeout(() => setImportSuccess(false), 3000);
