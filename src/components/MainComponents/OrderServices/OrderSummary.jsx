@@ -275,7 +275,7 @@ const LineItemsModal = ({
 // OrderItemsViewModal — read-only view of all items for an order
 // ─────────────────────────────────────────────────────────────────────────────
 
-const OrderItemsViewModal = ({ isOpen, onClose, order, inventoryMap, onRequestDeleteItem }) => {
+const OrderItemsViewModal = ({ isOpen, onClose, order, inventoryMap, onRequestDeleteItem,getOrderTotal }) => {
   if (!isOpen || !order) return null;
 
   const getItemStatusStyle = (status) => {
@@ -1542,6 +1542,7 @@ const OrderSummaryVisible = ({ clientId, token }) => {
         order={viewOrder}
         inventoryMap={inventoryMap}
         onRequestDeleteItem={(item) => handleRequestDeleteItem(item, viewOrder?.id)}
+        getOrderTotal={getOrderTotal}
       />
 
       <LineItemsModal isOpen={lineItemsModalOpen} onClose={() => setLineItemsModalOpen(false)} mainItem={selectedMainItem} lineItems={lineItemsDetails} onAddMainOnly={handleAddMainItemOnly} onAddWithAddons={handleAddMainItemWithLineItems} />
