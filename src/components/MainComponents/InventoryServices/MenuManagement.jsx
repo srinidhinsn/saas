@@ -1387,13 +1387,13 @@ const handleBulkUpdate = async () => {
         currentCategoriesFlat.find(
           c => c.name.trim().toLowerCase() === (row.Category || '').trim().toLowerCase()
         )?.id || currentSelectedCategoryId;
-      
+  
       const categoryName = currentCategoriesFlat.find(c => c.id === categoryId)?.name || null;
       if (!categoryName) {
         console.warn(`[Import] Skipping "${row.Name}" — category not found: "${row.Category}"`);
         continue;
       }
-      
+  
       const rawDietary = (row.Dietary_Type || "").trim().toLowerCase().replace(/[-_\s]/g, '');
       const matchedDietaryOption = dietaryOptions.find(
         d => d.toLowerCase().replace(/[-_\s]/g, '') === rawDietary
@@ -1401,10 +1401,10 @@ const handleBulkUpdate = async () => {
       const importedDietary = matchedDietaryOption
         ? matchedDietaryOption.toLowerCase().replace(/[-_\s]/g, '')
         : rawDietary;
-      
+  
       const rawTiming = (row.Availability_Timing || "").trim().toLowerCase();
       const timingPart = rawTiming || null;
-      
+  
       const slug = (() => {
         const parts = [];
         let currentId = categoryId;
@@ -1428,7 +1428,7 @@ const handleBulkUpdate = async () => {
         const base = nameParts.filter(Boolean).join('_');
         return timingPart ? `${base}__${timingPart}` : base;
       })();
-      
+  
       const basePayload = {
         client_id: clientId,
         inventory_id: menuConfig.menuInventoryId,
@@ -1450,11 +1450,11 @@ const handleBulkUpdate = async () => {
         created_by,
         updated_by,
       };
-      
+  
       const baseUnitPrice = Number(row.Unit_Price) || 0;
       let sharedId;
       const existingBase = existingRecords.find(item => item.zone_config_id === 0);
-      
+  
       if (existingBase) {
         sharedId = existingBase.id;
   
