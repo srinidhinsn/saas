@@ -95,14 +95,14 @@ const FallbackPreserveClient = () => {
 // ─── Root App ─────────────────────────────────────────────────────────────────
 const App = () => {
   const [authState, setAuthState] = useState(() => {
+   const token= localStorage.getItem('access_token');
+   const screenId= localStorage.getItem('screen_id');
    const clientId= localStorage.getItem('client_id');
-   localStorage.removeItem('access_token');
-   localStorage.removeItem('screen_id');
     return {
-      token:null,
-      screenId:null,
+      token,
+      screenId,
       clientId,
-      isAuthenticated: false,
+      isAuthenticated: !!token,
     };
   });
 
