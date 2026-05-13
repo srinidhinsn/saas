@@ -728,6 +728,7 @@ def cancel_order(
             if item_key in processed_keys:
                 continue
             processed_keys.add(item_key)
+            is_served   = item.status == OrderStatusEnum.served
             item.status = OrderStatusEnum.cancelled
 
             menu_item = (
@@ -743,7 +744,6 @@ def cancel_order(
                 continue
 
             ordered_qty = item.quantity or 1
-            is_served   = item.status == OrderStatusEnum.served
             tx_type     = TransactionTypeEnum.wastage if is_served else TransactionTypeEnum.item_cancelled
 
             category = (
