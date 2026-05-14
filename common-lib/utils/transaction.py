@@ -297,8 +297,8 @@ def record_partial_transaction(
 
                 create_transaction(db=db, client_id=client_id,
                     payload=TxPayload(item_id=stock_item.id, tx_type=TransactionTypeEnum.wastage,
-                        ref_id=order_id, qty=reversal_qty,
-                        remarks=build_remark(TransactionTypeEnum.wastage.value, order_id, item.item_name, remove_qty, effective_reason),
+        ref_id=order_id, qty=reversal_qty,
+        remarks=build_remark(TransactionTypeEnum.wastage.value, order_id, item.item_name, remove_qty, effective_reason),
                     ),
                 )
             except ValueError:
