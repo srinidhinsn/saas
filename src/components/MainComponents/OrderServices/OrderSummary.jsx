@@ -357,9 +357,9 @@ const OrderItemsViewModal = ({ isOpen, onClose, order, inventoryMap, onRequestDe
             <tbody className="divide-y divide-border-default">
              {order.items.map((item, idx) => {
                 const unitPrice =
-                  inventoryMap[item.item_id]?.unit_price ??
                   item.unit_price ??
                   item.price ??
+                  inventoryMap[item.item_id]?.unit_price ??
                   0;
                 const lineTotal = unitPrice * (item.quantity || 1);
 
