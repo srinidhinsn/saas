@@ -15,6 +15,7 @@ from entity.inventory_entity import CategoryEntity
 from entity.order_entity import DineinOrder
 import random
 from datetime import datetime, timedelta
+from zoneinfo import ZoneInfo
 from services.add_users import create_user_and_person, getting_screen_id, get_user_perms, has_user_permission
 from jose import jwt
 import uuid
@@ -166,7 +167,7 @@ async def forgot_password(client_id: str, req_data: ResetpasswordRequest, db: Se
     if not req_data.otp and not req_data.new_password:
         otp = str(random.randint(100000, 999999))
         otp_store[userModel.id] = {
-            "otp": otp, "expires": datetime.utcnow() + timedelta(minutes=10)}
+            "otp": otp, "expires": datetime.now(ZoneInfo("Asia/Kolkata")) + timedelta(minutes=10)}
 
         metadata = {"username": userModel.username,
                     "clientId": client_id, "otp": otp}
@@ -186,7 +187,7 @@ async def forgot_password(client_id: str, req_data: ResetpasswordRequest, db: Se
             raise HTTPException(status_code=400, detail="OTP not requested")
         if otp_data["otp"] != req_data.otp:
             raise HTTPException(status_code=400, detail="Invalid OTP")
-        if datetime.utcnow() > otp_data["expires"]:
+        if datetime.now(ZoneInfo("Asia/Kolkata")) > otp_data["expires"]:
             raise HTTPException(status_code=400, detail="OTP expired")
         if req_data.new_password != req_data.confirm_password:
             raise HTTPException(
@@ -424,7 +425,7 @@ async def delegate_access(
     client_model = Client.copyToModel(client)
 
     # 4️⃣ Create delegated token
-    expire = datetime.utcnow() + timedelta(minutes=1)
+    expire = datetime.now(ZoneInfo("Asia/Kolkata")) + timedelta(minutes=1)
     payload = {
         "sub": str(requester.id),
         "roles": admin.roles,
