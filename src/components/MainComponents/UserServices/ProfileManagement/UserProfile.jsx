@@ -700,7 +700,7 @@ export default function UserProfile({ clientId, token }) {
     try {
       const res = await axios.post(
         `${import.meta.env.VITE_API_USER_SERVICE_URL}/${clientId}/users/reset-password`,
-        { username: passwordForm.username, otp: "", old_password: "", new_password: "", confirm_password: "" },
+        { username: passwordForm.username },
         { headers: { Authorization: `Bearer ${token}` } }
       );
       toast.success(res.data.message || "OTP sent!");
