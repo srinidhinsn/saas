@@ -22,7 +22,7 @@ async function freeTable({ clientId, token, tableId, tablesMap }) {
         client_id: clientId,
         name: tableData?.name || `Table ${tableId}`,
         table_type: tableData?.table_type || "Regular",
-        status: 'Vacant',
+        status: 'vacant',
         location_zone: tableData?.location_zone || "Main",
       },
       { headers: { Authorization: `Bearer ${token}` } }
