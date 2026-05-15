@@ -47,13 +47,6 @@ const ORDER_FILTER_OPTIONS = [
   { key: KDS_CONFIG.FILTERS.DELIVERY, label: 'Delivery', Icon: Truck },
 ];
 
-
-// ─── IST timestamp parser ──────────────────────────────────────────────────────
-// Server stores timestamps as IST wall-clock time without a timezone marker
-// (e.g. "2025-01-15 14:30:00"). Appending 'Z' would parse them as UTC, making
-// every order appear 5h30m ahead of actual time. We subtract the IST offset
-// (UTC+5:30) to recover the correct epoch milliseconds.
-
 const IST_OFFSET_MS = 5.5 * 60 * 60 * 1000;
 
 const parseISTTimestamp = (createdAt) => {
