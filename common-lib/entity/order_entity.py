@@ -1,6 +1,6 @@
 from sqlalchemy import Column, Integer, String, Float, DateTime, ForeignKey, ARRAY,BigInteger
 from sqlalchemy.orm import declarative_base, relationship
-import datetime
+from datetime import datetime
 from models.order_model import OrderItemModel, DineinOrderModel
 from zoneinfo import ZoneInfo
 import os
