@@ -669,9 +669,8 @@ export default function UserProfile({ clientId, token }) {
         `${import.meta.env.VITE_API_USER_SERVICE_URL}/${clientId}/users/person-details`,
         profileForm, { headers: { Authorization: `Bearer ${token}` } }
       );
-      toast.success("Personal info saved!");
       setSavedSections(s => ({ ...s, personal: true }));
-    } catch (e) { toast.error(e?.response?.data?.detail || "Failed to save"); }
+    } catch (e) { console.log(e?.response?.data?.detail || "Failed to save"); }
     finally { setProfileLoading(false); }
   };
 
@@ -682,14 +681,12 @@ export default function UserProfile({ clientId, token }) {
       const headers = { Authorization: `Bearer ${token}` };
       if (addressForm.id) {
         await axios.put(`${import.meta.env.VITE_API_USER_SERVICE_URL}/${clientId}/users/address/${addressForm.id}`, addressForm, { headers });
-        toast.success("Address updated!");
       } else {
         const res = await axios.post(`${import.meta.env.VITE_API_USER_SERVICE_URL}/${clientId}/users/address`, addressForm, { headers });
-        toast.success("Address saved!");
         if (res.data?.data?.address_id) setAddressForm(prev => ({ ...prev, id: res.data.data.address_id }));
       }
       setSavedSections(s => ({ ...s, address: true }));
-    } catch (e) { toast.error(e?.response?.data?.detail || "Failed to save"); }
+    } catch (e) { console.log(e?.response?.data?.detail || "Failed to save"); }
     finally { setAddressLoading(false); }
   };
 
@@ -700,12 +697,12 @@ export default function UserProfile({ clientId, token }) {
     try {
       const res = await axios.post(
         `${import.meta.env.VITE_API_USER_SERVICE_URL}/${clientId}/users/reset-password`,
-        { username: passwordForm.username, otp: "", old_password: "", new_password: "", confirm_password: "" },
+        { username: passwordForm.username },
         { headers: { Authorization: `Bearer ${token}` } }
       );
-      toast.success(res.data.message || "OTP sent!");
+      console.log(res.data.message || "OTP sent!")
       setOtpSent(true);
-    } catch (e) { toast.error(e?.response?.data?.detail || "Failed to send OTP"); }
+    } catch (e) { console.log(e?.response?.data?.detail || "Failed to send OTP"); }
     finally { setPasswordLoading(false); }
   };
 
@@ -959,7 +956,7 @@ export default function UserProfile({ clientId, token }) {
                 <div className="inline-flex bg-zinc-100 rounded-xl p-1 mb-5 gap-1">
                   {[["otp", "OTP Verification"], ["old_password", "Old Password"]].map(([m, lbl]) => (
                     <button key={m}
-                      onClick={() => { setResetMethod(m); setPasswordForm(p => ({ ...p, otp: "", old_password: "" })); setOtpSent(m === "old_password"); }}
+                      onClick={() => { setResetMethod(m); setPasswordForm(p => ({ ...p, otp: "", old_password: "" })); setOtpSent(false); }}
                       className={`px-4 py-1.5 rounded-lg text-xs font-semibold transition-all
                         ${resetMethod === m ? "bg-white text-violet-600 shadow-sm" : "text-zinc-400 hover:text-zinc-600"}`}>
                       {lbl}
@@ -971,7 +968,7 @@ export default function UserProfile({ clientId, token }) {
                   <div className="sm:col-span-2">
                     <Label icon={<User size={10} />}>Username</Label>
                     <input className={inp} value={passwordForm.username}
-                      onChange={e => setPasswordForm({ ...passwordForm, username: e.target.value })} placeholder="Your username" />
+                      onChange={e => setPasswordForm({ ...passwordForm, username: e.target.value })} placeholder="Your username"disabled={otpSent}  />
                   </div>
 
                   {resetMethod === "otp" && !otpSent && (

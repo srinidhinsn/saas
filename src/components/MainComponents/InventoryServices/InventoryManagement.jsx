@@ -431,7 +431,7 @@ export default function StockRecipeManager({ clientId: propClientId, token: prop
   };
 
   // Stock CRUD
-  const openStockModal = (stock = null) => {
+  const openStockModal = (stock = null, prefilledInventoryId = null) => {
     if (stock) {
       setStockForm({
         id: stock.id,
@@ -445,15 +445,17 @@ export default function StockRecipeManager({ clientId: propClientId, token: prop
       });
       setIsEditingStock(true);
     } else {
+      const inventoryId = prefilledInventoryId || "";
+      const selectedInventory = inventoryCategories.find(inv => inv.id === inventoryId);
       setStockForm({
         id: null,
         name: "",
         description: "",
-        category: "",
+        category: selectedInventory?.name || "",
         availability: "",
         unit: "",
         unit_price: "",
-        inventory_id: "",
+        inventory_id: inventoryId,
       });
       setIsEditingStock(false);
     }
@@ -812,10 +814,7 @@ export default function StockRecipeManager({ clientId: propClientId, token: prop
                 loading={loading}
                 searchQuery={searchQuery}
                 onSearchChange={setSearchQuery}
-                onAddNew={() => {
-                  setStockForm(prev => ({ ...prev, inventory_id: activeTab }));
-                  openStockModal();
-                }}
+                onAddNew={() => openStockModal(null, activeTab)}
                 onEdit={openStockModal}
                 onDelete={deleteStock}
                 allCategories={allCategories}

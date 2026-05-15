@@ -1,1359 +1,1229 @@
-// import React, { useEffect, useState, useRef } from 'react';
-// import { FaHamburger } from "react-icons/fa";
-// import { RiMoneyRupeeCircleLine } from "react-icons/ri";
-// import { PiHamburgerThin } from "react-icons/pi";
-// // import { useTheme } from "../ThemeChangerComponent/ThemeProvider";
-// import { MdDeliveryDining } from "react-icons/md";
-// import { BsPersonCheck } from "react-icons/bs";
-// import { MdOutlineTableBar } from "react-icons/md";
-// import { GoPackageDependents } from "react-icons/go";
-// import { MdOutlineSoupKitchen } from "react-icons/md";
-// import { TbToolsKitchen3 } from "react-icons/tb"; 
-// import {
-//   LineChart, Line, XAxis, YAxis, CartesianGrid, Tooltip, ResponsiveContainer, BarChart, Bar
-// } from 'recharts';
-
-// import { useNavigate, useParams } from 'react-router-dom';
-// import axios from 'axios';
-// // import PopupNotification from '../Main_Components/Notification_Services_Components/Popup_Notifications';
-
-// const DashBoardPage = () => {
-//   const nav = useNavigate();
-//   const { clientId } = useParams();
-
-//   const [showDropdown, setShowDropdown] = useState(false);
-//   const dropdownRef = useRef(null);
-
-//   const [totalOrders, setTotalOrders] = useState(0);
-//   const [pendingOrders, setPendingOrders] = useState(0);
-//   const [totalEarnings, setTotalEarnings] = useState(0);
-//   const [totalCustomers, setTotalCustomers] = useState(0);
-//   const [newOrders, setNewOrders] = useState(0);
-//   const [preparingOrders, setPreparingOrders] = useState(0);
-//   const [servedOrders, setServedOrders] = useState(0);
-//   const [chartData, setChartData] = useState([]);
-//   const [timeFilter, setTimeFilter] = useState("Daily");
-//   const token = localStorage.getItem("access_token");
-//   const [topItemsData, setTopItemsData] = useState([]);
-
-//   const [tableId, setTableId] = useState(null)
-//   useEffect(() => {
-//     if (tableId) {
-//       document.body.classList.add("sidebar-minimized");
-//     } else {
-//       document.body.classList.remove("sidebar-minimized");
-//     }
-//   }, [tableId]);
-// //   useEffect(() => {
-// //     const body = document.body;
-// //     if (darkMode) {
-// //       body.classList.add("theme-dark");
-// //     } else {
-// //       body.classList.remove("theme-dark");
-// //     }
-// //   }, [darkMode]);
-
-//   useEffect(() => {
-//     const handleClickOutside = (e) => {
-//       if (dropdownRef.current && !dropdownRef.current.contains(e.target)) {
-//         setShowDropdown(false);
-//       }
-//     };
-//     document.addEventListener("mousedown", handleClickOutside);
-//     return () => document.removeEventListener("mousedown", handleClickOutside);
-//   }, []);
-
-//   // ----------------------------------------------------- //
-
-//   // Fetch and process top ordered items
-//   useEffect(() => {
-//     const fetchTopItems = async () => {
-//       if (!clientId) return;
-//       try {
-//         const response = await axios.get(`${import.meta.env.VITE_API_ORDER_SERVICE_URL}/${clientId}/dinein/table`, {
-//           headers: { Authorization: `Bearer ${token}` }
-//         });
-//         const allOrders = response.data?.data || [];
-
-//         // Aggregate orders by item name
-//         const itemCounts = {};
-//         allOrders.forEach(order => {
-//           if (!order.items) return; // safeguard if no items array
-//           order.items.forEach(item => {
-//             const name = item.name || item.itemName || "Unknown";
-//             const quantity = item.quantity ? parseInt(item.quantity, 10) : 1;
-//             if (!itemCounts[name]) {
-//               itemCounts[name] = 0;
-//             }
-//             itemCounts[name] += quantity;
-//           });
-//         });
-
-//         // Convert to array and sort descending by quantity
-//         const sortedItems = Object.entries(itemCounts)
-//           .map(([itemName, orders]) => ({ itemName, orders }))
-//           .sort((a, b) => b.orders - a.orders);
-
-//         // Pick top 5 items
-//         const topFiveItems = sortedItems.slice(0, 5);
-
-//         setTopItemsData(topFiveItems);
-
-//       } catch (error) {
-//         console.error("Failed to fetch top ordered items:", error);
-//       }
-//     };
-
-//     fetchTopItems();
-//   }, [clientId]);
-
-//   // ----------------------------------------------------- //
-
-//   useEffect(() => {
-//     const fetchStats = async () => {
-//       if (!token || !clientId) return;
-
-//       try {
-//         const res = await axios.get(`${import.meta.env.VITE_API_ORDER_SERVICE_URL}/${clientId}/dinein/table`, {
-//           headers: { Authorization: `Bearer ${token}` }
-//         });
-
-//         const allOrders = res.data?.data || [];
-//         const startDate = getStartDate(timeFilter);
-//         const filteredOrders = allOrders.filter(o => new Date(o.created_at) >= startDate);
-
-//         setTotalOrders(filteredOrders.length);
-//         setPendingOrders(filteredOrders.filter(o => o.status === "pending" || o.status === "preparing").length);
-//         setTotalEarnings(Math.round(filteredOrders.reduce((sum, o) => sum + (parseFloat(o.total_price) || 0), 0)));
-//         setTotalCustomers(filteredOrders.length);
-//         setNewOrders(filteredOrders.filter(o => o.status === "new").length);
-//         setPreparingOrders(filteredOrders.filter(o => o.status === "preparing").length);
-//         setServedOrders(filteredOrders.filter(o => o.status === "served").length);
-
-//         // Group orders by hour for daily, else group by day
-//         const ordersByGroup = {};
-//         filteredOrders.forEach(order => {
-//           const dateObj = new Date(order.created_at);
-
-//           let groupKey;
-//           if (timeFilter === 'Daily') {
-//             // Format hour label e.g. "9 AM"
-//             const hour = dateObj.getHours();
-//             groupKey = `${hour}:00`;
-//           } else {
-//             // Format date label e.g. "Jul 12"
-//             groupKey = dateObj.toLocaleDateString('en-US', { month: 'short', day: 'numeric' });
-//           }
-
-//           if (!ordersByGroup[groupKey]) {
-//             ordersByGroup[groupKey] = { date: groupKey, sales: 0, count: 0 };
-//           }
-//           ordersByGroup[groupKey].sales += parseFloat(order.total_price) || 0;
-//           ordersByGroup[groupKey].count += 1;
-//         });
-
-//         // Sort keys properly: hours numeric order for daily, date order for others
-//         let sortedData;
-//         if (timeFilter === 'Daily') {
-//           sortedData = Object.values(ordersByGroup).sort((a, b) => {
-//             return parseInt(a.date) - parseInt(b.date);
-//           });
-//         } else {
-//           sortedData = Object.values(ordersByGroup).sort((a, b) => {
-//             return new Date(a.date + ", " + new Date().getFullYear()) - new Date(b.date + ", " + new Date().getFullYear());
-//           });
-//         }
-
-//         setChartData(sortedData);
-
-//       } catch (err) {
-//         console.error("❌ Failed to fetch dashboard stats:", err);
-//       }
-//     };
-
-
-//     fetchStats();
-//   }, [clientId, timeFilter, token]);
-
-//   const getStartDate = (filter) => {
-//     const now = new Date();
-//     switch (filter) {
-//       case "Daily":
-//         return new Date(now.setHours(0, 0, 0, 0));
-//       case "Weekly":
-//         return new Date(now.setDate(now.getDate() - 7));
-//       case "Monthly":
-//         return new Date(now.setMonth(now.getMonth() - 1));
-//       case "Quarterly":
-//         return new Date(now.setMonth(now.getMonth() - 3));
-//       case "Half Yearly":
-//         return new Date(now.setMonth(now.getMonth() - 6));
-//       case "Yearly":
-//         return new Date(now.setFullYear(now.getFullYear() - 1));
-//       default:
-//         return new Date(now.setHours(0, 0, 0, 0));
-//     }
-//   };
-//   const getSalesLabel = () => {
-//     switch (timeFilter) {
-//       case "Daily":
-//         return "Sales today";
-//       case "Weekly":
-//         return "Sales this week";
-//       case "Monthly":
-//         return "Sales this month";
-//       case "Quarterly":
-//         return "Sales this quarter";
-//       case "Half Yearly":
-//         return "Sales last 6 months";
-//       case "Yearly":
-//         return "Sales this year";
-//       default:
-//         return "Sales";
-//     }
-//   };
-
-//   const getOrdersLabel = () => {
-//     switch (timeFilter) {
-//       case "Daily":
-//         return "Orders today";
-//       case "Weekly":
-//         return "Orders this week";
-//       case "Monthly":
-//         return "Orders this month";
-//       case "Quarterly":
-//         return "Orders this quarter";
-//       case "Half Yearly":
-//         return "Orders last 6 months";
-//       case "Yearly":
-//         return "Orders this year";
-//       default:
-//         return "Orders";
-//     }
-//   };
-
-//   return (
-//     <div className="min-h-screen bg-gray-50 p-4 lg:p-6">
-//       <main className="max-w-7xl mx-auto space-y-6">
-
-//         {/* Header */}
-//         <div className="flex flex-col md:flex-row items-start md:items-center justify-between gap-4">
-//           <div>
-//             <h1 className="text-3xl lg:text-4xl font-serif italic">Dashboard</h1>
-//             <p className="text-sm text-gray-600 mt-1">Overview of orders, sales and kitchen activity</p>
-//           </div>
-
-//           <div className="flex items-center gap-3">
-//             <label className="text-sm text-gray-700">Range</label>
-//             <select
-//               value={timeFilter}
-//               onChange={(e) => setTimeFilter(e.target.value)}
-//               className="px-3 py-2 border border-gray-300 rounded-lg focus:outline-none focus:ring-2 focus:ring-orange-500 bg-white"
-//             >
-//               <option value="Daily">Daily</option>
-//               <option value="Weekly">Weekly</option>
-//               <option value="Monthly">Monthly</option>
-//               <option value="Quarterly">Quarterly</option>
-//               <option value="Half Yearly">Half Yearly</option>
-//               <option value="Yearly">Yearly</option>
-//             </select>
-//           </div>
-//         </div>
-
-//         {/* KPI Cards */}
-//         <div className="grid grid-cols-1 sm:grid-cols-2 lg:grid-cols-4 gap-6">
-//           <div className="bg-white rounded-xl shadow p-4 flex items-center gap-4">
-//             <div className="w-12 h-12 bg-orange-100 text-orange-600 rounded-lg flex items-center justify-center text-xl">
-//               <FaHamburger />
-//             </div>
-//             <div className="flex-1">
-//               <div className="text-2xl font-semibold">{totalOrders}</div>
-//               <div className="text-sm text-gray-500">Total Orders</div>
-//             </div>
-//           </div>
-
-//           <div className="bg-white rounded-xl shadow p-4 flex items-center gap-4">
-//             <div className="w-12 h-12 bg-yellow-100 text-yellow-600 rounded-lg flex items-center justify-center text-xl">
-//               <PiHamburgerThin />
-//             </div>
-//             <div className="flex-1">
-//               <div className="text-2xl font-semibold">{pendingOrders}</div>
-//               <div className="text-sm text-gray-500">Pending Orders</div>
-//             </div>
-//           </div>
-
-//           <div className="bg-white rounded-xl shadow p-4 flex items-center gap-4">
-//             <div className="w-12 h-12 bg-green-100 text-green-600 rounded-lg flex items-center justify-center text-xl">
-//               <RiMoneyRupeeCircleLine />
-//             </div>
-//             <div className="flex-1">
-//               <div className="text-2xl font-semibold">₹{totalEarnings}</div>
-//               <div className="text-sm text-gray-500">Total Earnings</div>
-//             </div>
-//           </div>
-
-//           <div className="bg-white rounded-xl shadow p-4 flex items-center gap-4">
-//             <div className="w-12 h-12 bg-indigo-100 text-indigo-600 rounded-lg flex items-center justify-center text-xl">
-//               <BsPersonCheck />
-//             </div>
-//             <div className="flex-1">
-//               <div className="text-2xl font-semibold">{totalCustomers}</div>
-//               <div className="text-sm text-gray-500">Our Customers</div>
-//             </div>
-//           </div>
-
-//           {/* Second row of KPI cards */}
-//           <div className="bg-white rounded-xl shadow p-4 flex items-center gap-4">
-//             <div className="w-12 h-12 bg-pink-100 text-pink-600 rounded-lg flex items-center justify-center text-xl">
-//               <MdOutlineTableBar />
-//             </div>
-//             <div className="flex-1">
-//               <div className="text-2xl font-semibold">{newOrders}</div>
-//               <div className="text-sm text-gray-500">New Orders</div>
-//             </div>
-//           </div>
-
-//           <div className="bg-white rounded-xl shadow p-4 flex items-center gap-4">
-//             <div className="w-12 h-12 bg-amber-100 text-amber-600 rounded-lg flex items-center justify-center text-xl">
-//               <MdOutlineSoupKitchen />
-//             </div>
-//             <div className="flex-1">
-//               <div className="text-2xl font-semibold">{preparingOrders}</div>
-//               <div className="text-sm text-gray-500">Preparing Orders</div>
-//             </div>
-//           </div>
-
-//           <div className="bg-white rounded-xl shadow p-4 flex items-center gap-4">
-//             <div className="w-12 h-12 bg-teal-100 text-teal-600 rounded-lg flex items-center justify-center text-xl">
-//               <TbToolsKitchen3 />
-//             </div>
-//             <div className="flex-1">
-//               <div className="text-2xl font-semibold">{servedOrders}</div>
-//               <div className="text-sm text-gray-500">Served Orders</div>
-//             </div>
-//           </div>
-
-//           <div className="bg-white rounded-xl shadow p-4 flex items-center gap-4">
-//             <div className="w-12 h-12 bg-gray-100 text-gray-700 rounded-lg flex items-center justify-center text-xl">
-//               <GoPackageDependents />
-//             </div>
-//             <div className="flex-1">
-//               <div className="text-2xl font-semibold">Under Progress</div>
-//               <div className="text-sm text-gray-500">Take away</div>
-//             </div>
-//           </div>
-
-//           <div className="bg-white rounded-xl shadow p-4 flex items-center gap-4">
-//             <div className="w-12 h-12 bg-gray-100 text-gray-700 rounded-lg flex items-center justify-center text-xl">
-//               <MdDeliveryDining />
-//             </div>
-//             <div className="flex-1">
-//               <div className="text-2xl font-semibold">Under Progress</div>
-//               <div className="text-sm text-gray-500">Delivery</div>
-//             </div>
-//           </div>
-//         </div>
-
-//         {/* Charts Section */}
-//         <div className="grid grid-cols-1 lg:grid-cols-2 gap-6">
-//           {/* Sales Value Card */}
-//           <div className="bg-white rounded-xl shadow p-5 flex flex-col">
-//             <div className="flex items-center justify-between">
-//               <div>
-//                 <h3 className="text-lg font-semibold">Sales value</h3>
-//                 <p className="text-sm text-gray-500 mt-1">{getSalesLabel()}</p>
-//               </div>
-//               <input className="px-3 py-2 border border-gray-300 rounded-lg focus:outline-none focus:ring-2 focus:ring-orange-500" type="date" />
-//             </div>
-
-//             <div className="mt-4 flex items-end justify-between">
-//               <div>
-//                 <div className="text-3xl font-bold">₹{totalEarnings}</div>
-//                 <div className="text-sm text-gray-500 mt-1">Total</div>
-//               </div>
-//               <div className="text-sm text-green-600 font-semibold">Growth</div>
-//             </div>
-
-//             <div className="mt-4 h-40">
-//               <ResponsiveContainer width="100%" height="100%">
-//                 <BarChart data={chartData}>
-//                   <CartesianGrid strokeDasharray="3 3" />
-//                   <XAxis
-//                     dataKey="date"
-//                     tick={{ fontSize: 12 }}
-//                     tickLine={false}
-//                     padding={{ left: 10, right: 10 }}
-//                   />
-//                   <YAxis
-//                     tick={{ fontSize: 12 }}
-//                     tickLine={false}
-//                     domain={['auto', 'auto']}
-//                     allowDecimals={false}
-//                   />
-//                   <Tooltip formatter={(value) => `₹${value}`} />
-//                   <Bar dataKey="sales" fill="#f97316" radius={[6,6,0,0]} />
-//                 </BarChart>
-//               </ResponsiveContainer>
-//             </div>
-//           </div>
-
-//           {/* Order Sales Card */}
-//           <div className="bg-white rounded-xl shadow p-5 flex flex-col">
-//             <div className="flex items-center justify-between">
-//               <div>
-//                 <h3 className="text-lg font-semibold">Order sales</h3>
-//                 <p className="text-sm text-gray-500 mt-1">{getOrdersLabel()}</p>
-//               </div>
-//               <input className="px-3 py-2 border border-gray-300 rounded-lg focus:outline-none focus:ring-2 focus:ring-orange-500" type="date" />
-//             </div>
-
-//             <div className="mt-4 flex items-end justify-between">
-//               <div>
-//                 <div className="text-3xl font-bold">#{totalOrders} order(s)</div>
-//                 <div className="text-sm text-gray-500 mt-1">Total</div>
-//               </div>
-//               <div className="text-sm text-green-600 font-semibold">Trend</div>
-//             </div>
-
-//             <div className="mt-4 h-40">
-//               <ResponsiveContainer width="100%" height="100%">
-//                 <LineChart data={chartData}>
-//                   <CartesianGrid strokeDasharray="3 3" />
-//                   <XAxis
-//                     dataKey="date"
-//                     tick={{ fontSize: 12 }}
-//                     tickLine={false}
-//                     padding={{ left: 10, right: 10 }}
-//                   />
-//                   <YAxis
-//                     tick={{ fontSize: 12 }}
-//                     tickLine={false}
-//                     domain={['auto', 'auto']}
-//                     allowDecimals={false}
-//                   />
-//                   <Tooltip />
-//                   <Line
-//                     type="monotone"
-//                     dataKey="count"
-//                     stroke="#f97316"
-//                     strokeWidth={2}
-//                     dot={{ r: 3 }}
-//                     activeDot={{ r: 6 }}
-//                   />
-//                 </LineChart>
-//               </ResponsiveContainer>
-//             </div>
-//           </div>
-//         </div>
-
-//         {/* <div className="grid grid-cols-1 lg:grid-cols-2 gap-6">\
-//           <div className="bg-white rounded-xl shadow p-5">
-//             <div className="flex items-center justify-between">
-//               <h3 className="text-lg font-semibold">Top Ordered Items</h3>
-//             </div>
-
-//             <div className="mt-4 space-y-3">
-//               {topItemsData.length > 0 ? (
-//                 topItemsData.map((it, idx) => (
-//                   <div key={it.itemName || idx} className="flex items-center justify-between p-3 rounded-lg bg-gray-50">
-//                     <div>
-//                       <div className="font-medium">{it.itemName}</div>
-//                       <div className="text-xs text-gray-500">Orders: {it.orders}</div>
-//                     </div>
-//                     <div className="text-sm font-semibold text-orange-500">{it.orders}</div>
-//                   </div>
-//                 ))
-//               ) : (
-//                 <div className="text-center text-gray-500 py-8">No data to display</div>
-//               )}
-//             </div>
-//           </div>
-
-
-//           <div className="bg-white rounded-xl shadow p-5">
-//             <div className="flex items-center justify-between">
-//               <h3 className="text-lg font-semibold">Order sales</h3>
-//               <input className="px-3 py-2 border border-gray-300 rounded-lg focus:outline-none focus:ring-2 focus:ring-orange-500" type="date" />
-//             </div>
-
-//             <div className="mt-4 flex items-end justify-between">
-//               <div>
-//                 <div className="text-2xl font-bold">#{totalOrders} order(s)</div>
-//                 <div className="text-sm text-gray-500 mt-1">{getOrdersLabel()}</div>
-//               </div>
-//               <div className="text-sm text-green-600 font-semibold">Trend</div>
-//             </div>
-
-//             <div className="mt-4 h-40">
-//               <ResponsiveContainer width="100%" height="100%">
-//                 <LineChart data={chartData}>
-//                   <CartesianGrid strokeDasharray="3 3" />
-//                   <XAxis
-//                     dataKey="date"
-//                     tick={{ fontSize: 12 }}
-//                     tickLine={false}
-//                     padding={{ left: 10, right: 10 }}
-//                   />
-//                   <YAxis
-//                     tick={{ fontSize: 12 }}
-//                     tickLine={false}
-//                     domain={['auto', 'auto']}
-//                     allowDecimals={false}
-//                   />
-//                   <Tooltip />
-//                   <Line
-//                     type="monotone"
-//                     dataKey="count"
-//                     stroke="#f97316"
-//                     strokeWidth={2}
-//                     dot={{ r: 3 }}
-//                     activeDot={{ r: 6 }}
-//                   />
-//                 </LineChart>
-//               </ResponsiveContainer>
-//             </div>
-//           </div>
-//         </div> */}
-
-//       </main>
-
-//       {/* <PopupNotification /> */}
-//     </div>
-//   );
-// };
-
-// export default DashBoardPage;
-
-
-import React, { useEffect, useState, useRef } from 'react';
-import { FaHamburger } from "react-icons/fa";
+import React, { useEffect, useState, useMemo } from 'react';
 import { RiMoneyRupeeCircleLine } from "react-icons/ri";
+import { FaHamburger } from "react-icons/fa";
 import { PiHamburgerThin } from "react-icons/pi";
-import { MdDeliveryDining } from "react-icons/md";
-import { BsPersonCheck } from "react-icons/bs";
-import { MdOutlineTableBar } from "react-icons/md";
-import { GoPackageDependents } from "react-icons/go";
 import { MdOutlineSoupKitchen } from "react-icons/md";
 import { TbToolsKitchen3 } from "react-icons/tb";
+import { GoPackageDependents } from "react-icons/go";
 import {
-  LineChart, Line, XAxis, YAxis, CartesianGrid, Tooltip, ResponsiveContainer, BarChart, Bar, PieChart, Pie, Cell, Legend
+  AreaChart, Area, XAxis, YAxis, CartesianGrid, Tooltip, ResponsiveContainer,
+  BarChart, Bar, PieChart, Pie, Cell,
+  RadarChart, Radar, PolarGrid, PolarAngleAxis, PolarRadiusAxis,
+  LineChart, Line, Legend,
 } from 'recharts';
-
-import { useNavigate, useParams } from 'react-router-dom';
-import axios from 'axios'; import resolveConfig from "tailwindcss/resolveConfig";
+import { useParams } from 'react-router-dom';
+import axios from 'axios';
+import resolveConfig from "tailwindcss/resolveConfig";
 import tailwindConfig from "../../../../tailwind.config";
 
 const fullConfig = resolveConfig(tailwindConfig);
-const ACTION_PRIMARY = fullConfig.theme.colors.action.primary;
+const ACTION_PRIMARY = fullConfig.theme.colors.action?.primary || "#f97316";
 
+const PIE_COLORS = ["#a855f7", "#f59e0b", "#10b981"];
+const ITEM_COLORS = ["#f97316", "#fb923c", "#fbbf24", "#34d399", "#60a5fa"];
+const DINEIN_COLOR = "#f97316";
+const TAKEAWAY_COLOR = "#8b5cf6";
 
-/*
-  Redesigned Dashboard (white + orange theme)
-  - Keeps your original logic & axios calls (option 1)
-  - Improved layout, spacing, typography and additional visual components
-  - Uses existing `chartData` and `topItemsData` from your original effects
-*/
+const fmt = (n) => `₹${Number(n).toLocaleString('en-IN')}`;
+const pct = (a, b) => (b ? Math.round((a / b) * 100) : 0);
 
-const KPICard = ({ icon, bg, value, label, accent }) => (
-  <div className="bg-bg-primary rounded-2xl shadow-sm p-4 flex items-center gap-4 border border-transparent hover:shadow-lg transition-shadow duration-200">
-    <div className={`w-14 h-14 rounded-lg flex items-center justify-center ${bg} text-action-primary text-2xl`}>
-      {icon}
+// ─── Section heading ──────────────────────────────────────────────────────────
+function SectionHeading({ label, sub }) {
+  return (
+    <div className="flex items-center gap-3 mb-5">
+      <div className="w-1 h-7 rounded-full bg-action-primary shrink-0" />
+      <div>
+        <h2 className="text-[15px] font-bold text-gray-900 leading-tight">{label}</h2>
+        {sub && <p className="text-xs text-gray-400 mt-0.5">{sub}</p>}
+      </div>
     </div>
-    <div className="flex-1">
-      <div className="text-2xl font-semibold text-gray-800">{value}</div>
-      <div className="text-sm text-gray-500">{label}</div>
+  );
+}
+
+// ─── Sales KPI card ───────────────────────────────────────────────────────────
+function SalesKPI({ icon, value, label, sub }) {
+  return (
+    <div className="relative overflow-hidden bg-white rounded-2xl border border-gray-100 shadow-sm p-5 flex flex-col gap-3">
+      <div className="absolute -right-4 -top-4 w-24 h-24 rounded-full bg-orange-50 pointer-events-none" />
+      <div className="w-10 h-10 rounded-xl bg-orange-50 flex items-center justify-center text-action-primary text-xl relative z-10">
+        {icon}
+      </div>
+      <div className="relative z-10">
+        <div className="text-[22px] font-extrabold text-gray-900 leading-none tracking-tight">{value}</div>
+        <div className="text-sm font-medium text-gray-600 mt-1">{label}</div>
+        {sub && <div className="text-xs text-gray-400 mt-0.5">{sub}</div>}
+      </div>
     </div>
-    {accent && <div className="text-sm font-medium text-action-primary">{accent}</div>}
-  </div>
-);
+  );
+}
 
-const SmallStat = ({ title, value }) => (
-  <div className="bg-bg-primary rounded-lg p-3 text-center shadow-sm">
-    <div className="text-sm text-gray-500">{title}</div>
-    <div className="text-lg font-semibold text-gray-800">{value}</div>
-  </div>
-);
+// ─── Ops stat card ────────────────────────────────────────────────────────────
+function OpsCard({ icon, value, label, bg, color }) {
+  return (
+    <div className="bg-white rounded-2xl border border-gray-100 shadow-sm p-4 flex items-center gap-4">
+      <div className={`w-11 h-11 rounded-xl flex items-center justify-center text-[20px] shrink-0 ${bg} ${color}`}>
+        {icon}
+      </div>
+      <div>
+        <div className="text-xl font-bold text-gray-900">{value}</div>
+        <div className="text-xs text-gray-500 font-medium">{label}</div>
+      </div>
+    </div>
+  );
+}
 
-const COLORS = ["#fb923c", "#f97316", "#fb7185", "#34d399", "#60a5fa"];
+// ─── Split KPI card ───────────────────────────────────────────────────────────
+function SplitKPI({ label, dinein, takeaway, icon, sub }) {
+  return (
+    <div className="bg-white rounded-2xl border border-gray-100 shadow-sm p-4">
+      <div className="flex items-center gap-2 mb-3">
+        <span className="text-action-primary text-lg">{icon}</span>
+        <span className="text-xs font-bold text-gray-500 uppercase tracking-wider">{label}</span>
+      </div>
+      <div className="grid grid-cols-2 gap-3">
+        <div className="bg-orange-50 rounded-xl p-3">
+          <div className="text-[11px] font-bold text-orange-500 uppercase tracking-wider mb-1">Dine-in</div>
+          <div className="text-lg font-extrabold text-gray-900">{dinein}</div>
+        </div>
+        <div className="bg-purple-50 rounded-xl p-3">
+          <div className="text-[11px] font-bold text-purple-500 uppercase tracking-wider mb-1">Takeaway</div>
+          <div className="text-lg font-extrabold text-gray-900">{takeaway}</div>
+        </div>
+      </div>
+      {sub && <div className="text-xs text-gray-400 mt-2">{sub}</div>}
+    </div>
+  );
+}
 
-// const COLORS = Object.values(fullConfig.theme.colors.action);
+// ─── Tooltip shell ────────────────────────────────────────────────────────────
+function TT({ children }) {
+  return (
+    <div style={{
+      background: "#fff", border: "1px solid #f3f4f6", borderRadius: 12,
+      padding: "8px 12px", fontSize: 12, boxShadow: "0 4px 16px rgba(0,0,0,0.08)",
+    }}>
+      {children}
+    </div>
+  );
+}
 
+function SalesTooltip({ active, payload, label }) {
+  if (!active || !payload?.length) return null;
+  return (
+    <TT>
+      <p style={{ fontWeight: 600, color: "#374151", marginBottom: 2 }}>{label}</p>
+      <p style={{ color: ACTION_PRIMARY, fontWeight: 700 }}>{fmt(payload[0].value)}</p>
+    </TT>
+  );
+}
 
+function AreaTooltip({ active, payload, label }) {
+  if (!active || !payload?.length) return null;
+  return (
+    <TT>
+      <p style={{ fontWeight: 600, color: "#374151", marginBottom: 2 }}>{label}</p>
+      <p style={{ color: "#8b5cf6", fontWeight: 700 }}>{payload[0].value} orders</p>
+    </TT>
+  );
+}
+
+function SplitLineTooltip({ active, payload, label }) {
+  if (!active || !payload?.length) return null;
+  return (
+    <TT>
+      <p style={{ fontWeight: 600, color: "#374151", marginBottom: 4 }}>{label}</p>
+      {payload.map((p, i) => (
+        <p key={i} style={{ color: p.color, fontWeight: 700, marginBottom: 2 }}>
+          {p.name}: {p.value}
+        </p>
+      ))}
+    </TT>
+  );
+}
+
+function RadarTooltip({ active, payload }) {
+  if (!active || !payload?.length) return null;
+  const d = payload[0].payload;
+  return (
+    <TT>
+      <p style={{ fontWeight: 600, color: "#374151", marginBottom: 2 }}>{d.fullName}</p>
+      <p style={{ color: ACTION_PRIMARY, fontWeight: 700 }}>{d.orders} orders</p>
+    </TT>
+  );
+}
+
+// ─── Transaction row ───────────────────────────────────────────────────────────
+function TxRow({ tx }) {
+  const isOut = tx.movement_type === "OUT";
+  const typeColors = {
+    ORDER_DEDUCTION: "bg-blue-100 text-blue-700",
+    STOCK_IN: "bg-green-100 text-green-700",
+    ADJUSTMENT: "bg-yellow-100 text-yellow-700",
+    WASTAGE: "bg-red-100 text-red-700",
+    ITEM_CANCELLED: "bg-orange-100 text-orange-700",
+    ORDER_CANCELLED: "bg-red-100 text-red-700",
+    item_cancelled: "bg-orange-100 text-orange-700",
+    wastage: "bg-red-100 text-red-700",
+  };
+  const typeKey = tx.transaction_type || tx.type || "";
+  const colorClass = typeColors[typeKey] || "bg-gray-100 text-gray-600";
+
+  return (
+    <div className="flex items-center gap-3 py-2.5 border-b border-gray-50 last:border-0">
+      <div className={`w-2 h-2 rounded-full shrink-0 ${isOut ? "bg-red-400" : "bg-green-400"}`} />
+      <div className="flex-1 min-w-0">
+        <div className="text-xs font-semibold text-gray-800 truncate">
+          {tx.remarks || tx.item_name || typeKey || "Transaction"}
+        </div>
+        <div className="text-[10px] text-gray-400 mt-0.5">
+          {tx.created_at ? new Date(tx.created_at).toLocaleString() : "—"}
+        </div>
+      </div>
+      <span className={`text-[10px] font-bold px-2 py-0.5 rounded-full shrink-0 ${colorClass}`}>
+        {typeKey.replace(/_/g, " ")}
+      </span>
+      <span className={`text-sm font-bold shrink-0 ${isOut ? "text-red-500" : "text-green-600"}`}>
+        {isOut ? "−" : "+"}{Number(tx.quantity || 0).toFixed(1)}
+      </span>
+    </div>
+  );
+}
+
+// ─── Cancellation row ──────────────────────────────────────────────────────────
+function CancelRow({ order }) {
+  return (
+    <div className="flex items-center gap-3 py-2.5 border-b border-gray-50 last:border-0">
+      <div className="w-2 h-2 rounded-full bg-red-400 shrink-0" />
+      <div className="flex-1 min-w-0">
+        <div className="text-xs font-semibold text-gray-800">
+          Order #{order.dinein_order_id || order.id}
+        </div>
+        <div className="text-[10px] text-gray-400 mt-0.5">
+          {order.created_at ? new Date(order.created_at).toLocaleString() : "—"}
+          {order.table_id ? ` · Table ${order.table_id}` : ""}
+        </div>
+      </div>
+      <span className="text-[10px] font-bold px-2 py-0.5 rounded-full bg-red-100 text-red-600 shrink-0">
+        Cancelled
+      </span>
+      <span className="text-sm font-bold text-red-500 shrink-0">
+        {fmt(order.total_price || 0)}
+      </span>
+    </div>
+  );
+}
+
+// ─── 2hr Sales card ────────────────────────────────────────────────────────────
+function TwoHrSalesCard({
+  dineinSales,
+  takeawaySales,
+  salesDuration,
+  setSalesDuration
+}) {
+  const total = dineinSales + takeawaySales || 1;
+
+  return (
+    <div className="card">
+      <div className="flex items-center justify-between mb-2">
+        <div>
+          <p className="card-title">Sales Record</p>
+          <p className="card-sub">Revenue based on selected timing</p>
+        </div>
+
+        <select
+          value={salesDuration}
+          onChange={(e) => setSalesDuration(Number(e.target.value))}
+          className="border border-gray-200 rounded-lg px-3 py-1.5 text-xs font-semibold bg-white outline-none"
+        >
+          <option value={1}>Last 1 Hour</option>
+          <option value={2}>Last 2 Hours</option>
+          <option value={3}>Last 3 Hours</option>
+          <option value={4}>Last 4 Hours</option>
+          <option value={5}>Last 5 Hours</option>
+          <option value={6}>Last 6 Hours</option>
+          <option value={12}>Last 12 Hours</option>
+          <option value={24}>Last 24 Hours</option>
+        </select>
+      </div>
+
+      <div className="grid grid-cols-2 gap-4 mb-4">
+        <div className="bg-orange-50 rounded-xl p-4">
+          <div className="text-[10px] font-bold text-orange-500 uppercase tracking-wider mb-1">
+            Dine-in
+          </div>
+
+          <div className="text-2xl font-extrabold text-gray-900">
+            {fmt(Math.round(dineinSales))}
+          </div>
+
+          <div className="text-xs text-gray-400 mt-1">
+            {pct(dineinSales, total)}% of total
+          </div>
+
+          <div className="prog-track mt-2">
+            <div
+              className="prog-fill"
+              style={{
+                width: `${pct(dineinSales, total)}%`,
+                background: DINEIN_COLOR
+              }}
+            />
+          </div>
+        </div>
+
+        <div className="bg-purple-50 rounded-xl p-4">
+          <div className="text-[10px] font-bold text-purple-500 uppercase tracking-wider mb-1">
+            Takeaway
+          </div>
+
+          <div className="text-2xl font-extrabold text-gray-900">
+            {fmt(Math.round(takeawaySales))}
+          </div>
+
+          <div className="text-xs text-gray-400 mt-1">
+            {pct(takeawaySales, total)}% of total
+          </div>
+
+          <div className="prog-track mt-2">
+            <div
+              className="prog-fill"
+              style={{
+                width: `${pct(takeawaySales, total)}%`,
+                background: TAKEAWAY_COLOR
+              }}
+            />
+          </div>
+        </div>
+      </div>
+
+      <div className="flex items-center justify-between text-xs text-gray-500 border-t border-gray-50 pt-3">
+        <span>Total Revenue</span>
+
+        <span className="font-extrabold text-gray-900 text-base">
+          {fmt(Math.round(dineinSales + takeawaySales))}
+        </span>
+      </div>
+    </div>
+  );
+}
+function InventoryInsightRow({ tx }) {
+
+  const type = String(tx.transaction_type || "TRANSACTION");
+
+  // auto-format label from DB value
+  const formattedLabel = type
+    .replace(/_/g, " ")
+    .toLowerCase()
+    .replace(/\b\w/g, c => c.toUpperCase());
+
+  // dynamic color generation
+  const getTypeStyles = (value) => {
+
+    const v = value.toLowerCase();
+
+    if (v.includes("cancel")) {
+      return {
+        bg: "bg-red-100",
+        text: "text-red-700",
+        dot: "bg-red-500",
+      };
+    }
+
+    if (v.includes("wast")) {
+      return {
+        bg: "bg-yellow-100",
+        text: "text-yellow-700",
+        dot: "bg-yellow-500",
+      };
+    }
+
+    if (v.includes("stock") || v.includes("in")) {
+      return {
+        bg: "bg-green-100",
+        text: "text-green-700",
+        dot: "bg-green-500",
+      };
+    }
+
+    if (v.includes("deduction") || v.includes("order")) {
+      return {
+        bg: "bg-blue-100",
+        text: "text-blue-700",
+        dot: "bg-blue-500",
+      };
+    }
+
+    return {
+      bg: "bg-gray-100",
+      text: "text-gray-700",
+      dot: "bg-gray-400",
+    };
+  };
+
+  const styles = getTypeStyles(type);
+
+  return (
+    <div className="flex items-start gap-3 py-3 border-b border-gray-50 last:border-0">
+
+      <div className={`w-2.5 h-2.5 rounded-full mt-2 shrink-0 ${styles.dot}`} />
+
+      <div className="flex-1 min-w-0">
+
+        {/* header */}
+        <div className="flex items-center justify-between gap-2 flex-wrap">
+
+          <div className="flex items-center gap-2 flex-wrap">
+
+            <span
+              className={`text-[10px] font-bold px-2 py-1 rounded-full ${styles.bg} ${styles.text}`}
+            >
+              {formattedLabel}
+            </span>
+
+            <span className="text-[10px] text-gray-400">
+              {tx.created_at
+                ? new Date(tx.created_at).toLocaleString()
+                : "—"}
+            </span>
+
+          </div>
+
+          <div className="text-xs font-bold text-gray-700">
+            {Number(tx.quantity || 0).toFixed(2)}
+            {tx.unit ? ` ${tx.unit}` : ""}
+          </div>
+
+        </div>
+
+        {/* item name */}
+        <div className="mt-1 text-xs font-semibold text-gray-800">
+          {tx.name || "Inventory Item"}
+        </div>
+
+        {/* remarks */}
+        {tx.remarks && (
+          <div className="mt-1 text-[11px] text-gray-500 break-words leading-relaxed">
+            {tx.remarks}
+          </div>
+        )}
+
+      </div>
+    </div>
+  );
+}
+// ─── Main ─────────────────────────────────────────────────────────────────────
 const DashBoardPage = () => {
-  const nav = useNavigate();
   const { clientId } = useParams();
+  const token = localStorage.getItem("access_token");
 
-  const [showDropdown, setShowDropdown] = useState(false);
-  const dropdownRef = useRef(null);
-
+  const [timeFilter, setTimeFilter] = useState("Daily");
   const [totalOrders, setTotalOrders] = useState(0);
   const [pendingOrders, setPendingOrders] = useState(0);
   const [totalEarnings, setTotalEarnings] = useState(0);
-  const [totalCustomers, setTotalCustomers] = useState(0);
-  const [newOrders, setNewOrders] = useState(0);
   const [preparingOrders, setPreparingOrders] = useState(0);
   const [servedOrders, setServedOrders] = useState(0);
   const [chartData, setChartData] = useState([]);
-  const [timeFilter, setTimeFilter] = useState("Daily");
-  const token = localStorage.getItem("access_token");
   const [topItemsData, setTopItemsData] = useState([]);
 
-  const [tableId, setTableId] = useState(null);
-  useEffect(() => {
-    if (tableId) {
-      document.body.classList.add("sidebar-minimized");
-    } else {
-      document.body.classList.remove("sidebar-minimized");
-    }
-  }, [tableId]);
+  // Split dine-in / takeaway state
+  const [dineinOrders, setDineinOrders] = useState(0);
+  const [takeawayOrders, setTakeawayOrders] = useState(0);
+  const [dineinSales, setDineinSales] = useState(0);
+  const [takeawaySales, setTakeawaySales] = useState(0);
+  const [dineinPending, setDineinPending] = useState(0);
+  const [dineinPreparing, setDineinPreparing] = useState(0);
+  const [dineinServed, setDineinServed] = useState(0);
+  const [takeawayPending, setTakeawayPending] = useState(0);
+  const [takeawayPreparing, setTakeawayPreparing] = useState(0);
+  const [takeawayServed, setTakeawayServed] = useState(0);
+  const [splitChartData, setSplitChartData] = useState([]);
 
-  useEffect(() => {
-    const handleClickOutside = (e) => {
-      if (dropdownRef.current && !dropdownRef.current.contains(e.target)) {
-        setShowDropdown(false);
-      }
-    };
-    document.addEventListener("mousedown", handleClickOutside);
-    return () => document.removeEventListener("mousedown", handleClickOutside);
-  }, []);
+  // Insights split
+  const [topDineinItems, setTopDineinItems] = useState([]);
+  const [topTakeawayItems, setTopTakeawayItems] = useState([]);
 
-  // ----------------------------------------------------- //
-  // Fetch and process top ordered items (kept as-is)
-  useEffect(() => {
-    const fetchTopItems = async () => {
-      if (!clientId) return;
-      try {
-        const response = await axios.get(`${import.meta.env.VITE_API_ORDER_SERVICE_URL}/${clientId}/dinein/table`, {
-          headers: { Authorization: `Bearer ${token}` }
-        });
-        const allOrders = response.data?.data || [];
+  // Timed sales
+  const [salesDuration, setSalesDuration] = useState(2);
 
-        const itemCounts = {};
-        allOrders.forEach(order => {
-          if (!order.items) return;
-          order.items.forEach(item => {
-            const name = item.name || item.itemName || "Unknown";
-            const quantity = item.quantity ? parseInt(item.quantity, 10) : 1;
-            if (!itemCounts[name]) {
-              itemCounts[name] = 0;
-            }
-            itemCounts[name] += quantity;
-          });
-        });
+  const [twoHrDineinSales, setTwoHrDineinSales] = useState(0);
+  const [twoHrTakeawaySales, setTwoHrTakeawaySales] = useState(0);
+  // 2hr sales
+  // const [twoHrDineinSales, setTwoHrDineinSales]     = useState(0);
+  // const [twoHrTakeawaySales, setTwoHrTakeawaySales] = useState(0);
 
-        const sortedItems = Object.entries(itemCounts)
-          .map(([itemName, orders]) => ({ itemName, orders }))
-          .sort((a, b) => b.orders - a.orders);
+  // Cancellations & transactions
+  const [cancelledOrders, setCancelledOrders] = useState([]);
+  const [inventoryInsights, setInventoryInsights] = useState([]); const [loadingTx, setLoadingTx] = useState(false);
+  const [txTab, setTxTab] = useState("cancellations"); // "cancellations" | "transactions"
 
-        const topFiveItems = sortedItems.slice(0, 5);
-
-        setTopItemsData(topFiveItems);
-
-      } catch (error) {
-        console.error("Failed to fetch top ordered items:", error);
-      }
-    };
-
-    fetchTopItems();
-  }, [clientId]);
-
-  // ----------------------------------------------------- //
-  // Fetch stats (kept as-is)
-  useEffect(() => {
-    const fetchStats = async () => {
-      if (!token || !clientId) return;
-
-      try {
-        // Fetch orders for order counts
-        const ordersRes = await axios.get(`${import.meta.env.VITE_API_ORDER_SERVICE_URL}/${clientId}/dinein/table`, {
-          headers: { Authorization: `Bearer ${token}` }
-        });
-
-        // Fetch invoices for earnings
-        const billingRes = await axios.get(`${import.meta.env.VITE_API_BILLING_SERVICE_URL}/${clientId}/invoice/read_document`, {
-          headers: { Authorization: `Bearer ${token}` },
-          params: { client_id: clientId }
-        });
-
-        const allOrders = ordersRes.data?.data || [];
-        const allInvoices = billingRes.data?.data || [];
-
-        const startDate = getStartDate(timeFilter);
-        const filteredOrders = allOrders.filter(o => new Date(o.created_at) >= startDate);
-        const filteredInvoices = allInvoices.filter(inv => new Date(inv.document_date || inv.created_at) >= startDate);
-
-        // Calculate total earnings from invoices (only Paid/Issued invoices)
-        const earnings = filteredInvoices
-          .filter(inv => inv.payment_status?.toLowerCase() === "paid" || inv.status?.toLowerCase() === "issued")
-          .reduce((sum, inv) => sum + (parseFloat(inv.total_amount) || 0), 0);
-
-        setTotalOrders(filteredOrders.length);
-        setPendingOrders(filteredOrders.filter(o => o.status === "pending" || o.status === "preparing").length);
-        setTotalEarnings(Math.round(earnings)); // Now from billing service
-        setTotalCustomers(filteredOrders.length);
-        setNewOrders(filteredOrders.filter(o => o.status === "new").length);
-        setPreparingOrders(filteredOrders.filter(o => o.status === "preparing").length);
-        setServedOrders(filteredOrders.filter(o => o.status === "served").length);
-
-        const ordersByGroup = {};
-        filteredOrders.forEach(order => {
-          const dateObj = new Date(order.created_at);
-
-          let groupKey;
-          if (timeFilter === 'Daily') {
-            const hour = dateObj.getHours();
-            groupKey = `${hour}:00`;
-          } else {
-            groupKey = dateObj.toLocaleDateString('en-US', { month: 'short', day: 'numeric' });
-          }
-
-          if (!ordersByGroup[groupKey]) {
-            ordersByGroup[groupKey] = { date: groupKey, sales: 0, count: 0 };
-          }
-          ordersByGroup[groupKey].sales += parseFloat(order.total_price) || 0;
-          ordersByGroup[groupKey].count += 1;
-        });
-
-        let sortedData;
-        if (timeFilter === 'Daily') {
-          sortedData = Object.values(ordersByGroup).sort((a, b) => {
-            return parseInt(a.date) - parseInt(b.date);
-          });
-        } else {
-          sortedData = Object.values(ordersByGroup).sort((a, b) => {
-            return new Date(a.date + ", " + new Date().getFullYear()) - new Date(b.date + ", " + new Date().getFullYear());
-          });
-        }
-
-        setChartData(sortedData);
-
-      } catch (err) {
-        console.error("❌ Failed to fetch dashboard stats:", err);
-      }
-    };
-
-    fetchStats();
-  }, [clientId, timeFilter, token]);
+  // Takeaway table IDs (loaded once)
+  const [takeawayTableIds, setTakeawayTableIds] = useState(new Set());
 
   const getStartDate = (filter) => {
     const now = new Date();
     switch (filter) {
-      case "Daily":
-        return new Date(now.setHours(0, 0, 0, 0));
-      case "Weekly":
-        return new Date(now.setDate(now.getDate() - 7));
-      case "Monthly":
-        return new Date(now.setMonth(now.getMonth() - 1));
-      case "Quarterly":
-        return new Date(now.setMonth(now.getMonth() - 3));
-      case "Half Yearly":
-        return new Date(now.setMonth(now.getMonth() - 6));
-      case "Yearly":
-        return new Date(now.setFullYear(now.getFullYear() - 1));
-      default:
-        return new Date(now.setHours(0, 0, 0, 0));
+      case "Daily": return new Date(now.setHours(0, 0, 0, 0));
+      case "Weekly": return new Date(now.setDate(now.getDate() - 7));
+      case "Monthly": return new Date(now.setMonth(now.getMonth() - 1));
+      case "Quarterly": return new Date(now.setMonth(now.getMonth() - 3));
+      case "Half Yearly": return new Date(now.setMonth(now.getMonth() - 6));
+      case "Yearly": return new Date(now.setFullYear(now.getFullYear() - 1));
+      default: return new Date(now.setHours(0, 0, 0, 0));
     }
   };
 
-  const getSalesLabel = () => {
-    switch (timeFilter) {
-      case "Daily":
-        return "Sales today";
-      case "Weekly":
-        return "Sales this week";
-      case "Monthly":
-        return "Sales this month";
-      case "Quarterly":
-        return "Sales this quarter";
-      case "Half Yearly":
-        return "Sales last 6 months";
-      case "Yearly":
-        return "Sales this year";
-      default:
-        return "Sales";
-    }
-  };
+  // ── Fetch takeaway table IDs ──────────────────────────────────────────────
+  useEffect(() => {
+    if (!clientId || !token) return;
+    const run = async () => {
+      try {
+        const res = await axios.get(
+          `${import.meta.env.VITE_API_TABLE_SERVICE_URL}/${clientId}/tables/read`,
+          { headers: { Authorization: `Bearer ${token}` } }
+        );
+        const takeawayRoots = (import.meta.env.VITE_EASYFOOD_TAKEAWAY_TABLE_DEFAULT_ROOT || "takeaway")
+          .split(",").map(v => v.trim().toLowerCase()).filter(Boolean);
+        const ids = new Set(
+          (res.data?.data || [])
+            .filter(t => takeawayRoots.some(r => (t.name || "").toLowerCase().startsWith(r)))
+            .map(t => String(t.id))
+        );
+        setTakeawayTableIds(ids);
+      } catch (e) {
+        console.error("Table fetch failed:", e);
+      }
+    };
+    run();
+  }, [clientId, token]);
 
-  const getOrdersLabel = () => {
-    switch (timeFilter) {
-      case "Daily":
-        return "Orders today";
-      case "Weekly":
-        return "Orders this week";
-      case "Monthly":
-        return "Orders this month";
-      case "Quarterly":
-        return "Orders this quarter";
-      case "Half Yearly":
-        return "Orders last 6 months";
-      case "Yearly":
-        return "Orders this year";
-      default:
-        return "Orders";
-    }
-  };
+  // ── Fetch top ordered items (split dine-in / takeaway) ───────────────────
+  useEffect(() => {
+    if (!clientId) return;
+    const run = async () => {
+      try {
+        const res = await axios.get(
+          `${import.meta.env.VITE_API_ORDER_SERVICE_URL}/${clientId}/dinein/table`,
+          { headers: { Authorization: `Bearer ${token}` } }
+        );
+        const allOrders = res.data?.data || [];
+        const dineinCounts = {};
+        const takeawayCounts = {};
 
-  // Derived pie data from your status counters (keeps logic local)
-  const statusPieData = [
-    { name: 'New', value: newOrders },
-    { name: 'Preparing', value: preparingOrders },
-    { name: 'Pending', value: pendingOrders },
-    { name: 'Served', value: servedOrders },
+        allOrders.forEach(order => {
+          const isTakeaway = takeawayTableIds.has(String(order.table_id));
+          const counts = isTakeaway ? takeawayCounts : dineinCounts;
+          (order.items || []).forEach(item => {
+            const name = item.item_name || item.name || item.itemName || "Unknown";
+            const qty = parseInt(item.quantity, 10) || 1;
+            counts[name] = (counts[name] || 0) + qty;
+          });
+        });
+
+        const sortTop5 = (counts) =>
+          Object.entries(counts)
+            .map(([itemName, orders]) => ({ itemName, orders }))
+            .sort((a, b) => b.orders - a.orders)
+            .slice(0, 5);
+
+        setTopDineinItems(sortTop5(dineinCounts));
+        setTopTakeawayItems(sortTop5(takeawayCounts));
+
+        // combined for existing topItemsData
+        const combined = {};
+        [...Object.entries(dineinCounts), ...Object.entries(takeawayCounts)].forEach(([k, v]) => {
+          combined[k] = (combined[k] || 0) + v;
+        });
+        setTopItemsData(sortTop5(combined));
+      } catch (e) {
+        console.error("Top items fetch failed:", e);
+      }
+    };
+    run();
+    // eslint-disable-next-line react-hooks/exhaustive-deps
+  }, [clientId, takeawayTableIds]);
+
+  // ── Fetch stats + chart data ──────────────────────────────────────────────
+  useEffect(() => {
+    if (!token || !clientId) return;
+    const run = async () => {
+      try {
+        const [ordersRes, billingRes] = await Promise.all([
+          axios.get(
+            `${import.meta.env.VITE_API_ORDER_SERVICE_URL}/${clientId}/dinein/table`,
+            { headers: { Authorization: `Bearer ${token}` } }
+          ),
+          axios.get(
+            `${import.meta.env.VITE_API_BILLING_SERVICE_URL}/${clientId}/invoice/read_document`,
+            { headers: { Authorization: `Bearer ${token}` }, params: { client_id: clientId } }
+          ),
+        ]);
+
+        const allOrders = ordersRes.data?.data || [];
+        const allInvoices = billingRes.data?.data || [];
+        const startDate = getStartDate(timeFilter);
+
+        const filteredOrders = allOrders.filter(o => new Date(o.created_at) >= startDate);
+        const filteredInvoices = allInvoices.filter(inv =>
+          new Date(inv.document_date || inv.created_at) >= startDate
+        );
+
+        // ── Split dine-in vs takeaway ──────────────────────────────────────
+        const isDinein = (o) => !takeawayTableIds.has(String(o.table_id));
+        const isTakeaway = (o) => takeawayTableIds.has(String(o.table_id));
+
+        const dineinFiltered = filteredOrders.filter(isDinein);
+        const takeawayFiltered = filteredOrders.filter(isTakeaway);
+
+        setDineinOrders(dineinFiltered.length);
+        setTakeawayOrders(takeawayFiltered.length);
+
+        // Cancelled orders for records section
+        const cancelledFiltered = allOrders.filter(o =>
+          o.status?.toLowerCase() === "cancelled" &&
+          new Date(o.created_at) >= startDate
+        );
+        setCancelledOrders(cancelledFiltered.sort((a, b) => new Date(b.created_at) - new Date(a.created_at)));
+
+        // Ops stats split
+        setDineinPending(dineinFiltered.filter(o => o.status === "pending").length);
+        setDineinPreparing(dineinFiltered.filter(o => o.status === "preparing").length);
+        setDineinServed(dineinFiltered.filter(o => o.status === "served").length);
+        setTakeawayPending(takeawayFiltered.filter(o => o.status === "pending").length);
+        setTakeawayPreparing(takeawayFiltered.filter(o => o.status === "preparing").length);
+        setTakeawayServed(takeawayFiltered.filter(o => o.status === "served").length);
+
+        // Sales from invoices
+        const earnings = filteredInvoices
+          .filter(inv =>
+            inv.payment_status?.toLowerCase() === "paid" ||
+            inv.status?.toLowerCase() === "issued"
+          )
+          .reduce((sum, inv) => sum + (parseFloat(inv.total_amount) || 0), 0);
+
+        // Approximate split by summing order total_price
+        const dSales = dineinFiltered.reduce((s, o) => s + (parseFloat(o.total_price) || 0), 0);
+        const tSales = takeawayFiltered.reduce((s, o) => s + (parseFloat(o.total_price) || 0), 0);
+        const splitRatio = (dSales + tSales) > 0 ? dSales / (dSales + tSales) : 0.5;
+        setDineinSales(earnings * splitRatio);
+        setTakeawaySales(earnings * (1 - splitRatio));
+
+        setTotalOrders(filteredOrders.length);
+        setPendingOrders(filteredOrders.filter(o => o.status === "pending").length);
+        setTotalEarnings(Math.round(earnings));
+        setPreparingOrders(filteredOrders.filter(o => o.status === "preparing").length);
+        setServedOrders(filteredOrders.filter(o => o.status === "served").length);
+
+        // ── 2-hour sales ──────────────────────────────────────────────────
+        // ── Timed sales ──────────────────────────────────────────────────
+        const selectedTimeAgo = new Date(Date.now() - salesDuration * 60 * 60 * 1000);
+
+        const twoHrDinein = dineinFiltered
+          .filter(o => new Date(o.created_at) >= selectedTimeAgo)
+          .reduce((s, o) => s + (parseFloat(o.total_price) || 0), 0);
+
+        const twoHrTakeaway = takeawayFiltered
+          .filter(o => new Date(o.created_at) >= selectedTimeAgo)
+          .reduce((s, o) => s + (parseFloat(o.total_price) || 0), 0);
+
+        setTwoHrDineinSales(twoHrDinein);
+        setTwoHrTakeawaySales(twoHrTakeaway);
+
+        // ── Build chart groups ────────────────────────────────────────────
+
+      const groups = {};
+
+      filteredOrders.forEach(order => {
+
+      const d = new Date(order.created_at);
+
+      let key = "";
+      if (timeFilter === "Daily") {
+
+         const hh = String(d.getHours()).padStart(2, "0");
+         const mm = String(d.getMinutes()).padStart(2, "0");
+         key = `${hh}:${mm}`;
+        }
+      if (!groups[key]) {
+         groups[key] = {
+             date: key,
+             sales: 0,
+             count: 0,
+             dinein: 0,
+             takeaway: 0,
+             sortTime: d.getTime(),
+            };
+          }
+
+        groups[key].sales += parseFloat(order.total_price) || 0;
+        groups[key].count += 1;
+
+      if (isTakeaway(order)) {
+        groups[key].takeaway += 1;
+      } else {
+        groups[key].dinein += 1;
+      }
+    });
+
+// proper sorting
+    const sorted = Object.values(groups).sort(
+      (a, b) => a.sortTime - b.sortTime);
+
+    setChartData(sorted);
+    setSplitChartData(sorted);
+  } catch (e) {console.error("Stats fetch failed:", e);
+      }
+    };
+    run();
+  }, [clientId, timeFilter, token, takeawayTableIds, salesDuration]);
+
+  // ── Fetch transactions ────────────────────────────────────────────────────
+  useEffect(() => {
+    if (!clientId || !token) return;
+  
+    const run = async () => {
+      setLoadingTx(true);
+  
+      try {
+  
+        const res = await axios.get(
+          `${import.meta.env.VITE_API_ORDER_SERVICE_URL}/${clientId}/dinein/table`,
+          {
+            headers: {
+              Authorization: `Bearer ${token}`
+            }
+          }
+        );
+  
+        const orders = res.data?.data || [];
+  
+        const insights = [];
+  
+        orders.forEach(order => {
+  
+          // cancelled orders
+          if (
+            String(order.status || "").toLowerCase() === "cancelled"
+          ) {
+            insights.push({
+              transaction_type: "ORDER_CANCELLED",
+              movement_type: "OUT",
+              quantity: order.total_price || 0,
+              unit: "₹",
+              name: `Order #${order.dinein_order_id || order.id}`,
+              remarks: "Customer cancelled order",
+              created_at: order.created_at,
+            });
+          }
+  
+          // cancelled items
+          (order.items || []).forEach(item => {
+  
+            if (
+              String(item.status || "").toLowerCase() === "cancelled"
+            ) {
+              insights.push({
+                transaction_type: "ITEM_CANCELLED",
+                movement_type: "OUT",
+                quantity: item.quantity || 0,
+                unit: "qty",
+                name: item.item_name,
+                remarks: "Item removed from order",
+                created_at: order.created_at,
+              });
+            }
+  
+          });
+  
+        });
+  
+        setInventoryInsights(
+          insights.sort(
+            (a, b) =>
+              new Date(b.created_at) - new Date(a.created_at)
+          )
+        );
+  
+      } catch (e) {
+        console.error("Insights fetch failed:", e);
+      } finally {
+        setLoadingTx(false);
+      }
+    };
+  
+    run();
+  
+  }, [clientId, token]);
+
+  // ── Derived ──────────────────────────────────────────────────────────────
+  const totalActive = preparingOrders + pendingOrders + servedOrders || 1;
+  const dineinActive = dineinPending + dineinPreparing + dineinServed || 1;
+  const takeawayActive = takeawayPending + takeawayPreparing + takeawayServed || 1;
+
+  const pieData = [
+    { name: "Preparing", value: preparingOrders },
+    { name: "Pending", value: pendingOrders },
+    { name: "Served", value: servedOrders },
   ];
 
+  const radarData = topItemsData.map(it => ({
+    subject: it.itemName.length > 11 ? it.itemName.slice(0, 11) + "…" : it.itemName,
+    fullName: it.itemName,
+    orders: it.orders,
+  }));
+
+  const maxDineinItem = topDineinItems[0]?.orders || 1;
+  const maxTakeawayItem = topTakeawayItems[0]?.orders || 1;
+
+  const filterLabel = {
+    Daily: "today", Weekly: "this week", Monthly: "this month",
+    Quarterly: "this quarter", "Half Yearly": "last 6 months", Yearly: "this year",
+  }[timeFilter] || "";
+// ── Cancellation insights ─────────────────────────────
+const cancellationCount = cancelledOrders.length;
+
+const cancellationRate = totalOrders
+  ? ((cancellationCount / totalOrders) * 100).toFixed(1)
+  : 0;
+
+const cancellationLoss = cancelledOrders.reduce(
+  (sum, o) => sum + (parseFloat(o.total_price) || 0),
+  0
+);
+
+const latestCancellation =
+  cancelledOrders[0]?.dinein_order_id ||
+  cancelledOrders[0]?.id;
   return (
-    <div className="min-h-screen bg-gray-50 p-6 lg:p-10">
-      <main className="max-w-7xl mx-auto space-y-8">
+    <>
+      <style>{`
+        @import url('https://fonts.googleapis.com/css2?family=Plus+Jakarta+Sans:wght@400;500;600;700;800&display=swap');
+        .dash-root * { font-family: 'Plus Jakarta Sans', sans-serif !important; }
 
-        {/* Top header */}
-        <div className="flex flex-col md:flex-row items-start md:items-center justify-between gap-4">
-          <div>
-            <h1 className="text-3xl lg:text-4xl font-semibold text-gray-900">Dashboard</h1>
-            <p className="text-sm text-gray-500 mt-1">Clean overview of orders, sales and kitchen performance</p>
+        @keyframes fadeUp {
+          from { opacity:0; transform:translateY(14px); }
+          to   { opacity:1; transform:translateY(0); }
+        }
+        .s1{animation:fadeUp .36s .03s both;}
+        .s2{animation:fadeUp .36s .09s both;}
+        .s3{animation:fadeUp .36s .15s both;}
+        .s4{animation:fadeUp .36s .22s both;}
+        .s5{animation:fadeUp .36s .28s both;}
+
+        .live-dot {
+          display:inline-block; width:7px; height:7px; border-radius:50%;
+          background:#10b981; box-shadow:0 0 0 0 rgba(16,185,129,.5);
+          animation:ring 1.8s ease-out infinite;
+        }
+        @keyframes ring {
+          0%  { box-shadow:0 0 0 0   rgba(16,185,129,.5); }
+          70% { box-shadow:0 0 0 7px rgba(16,185,129,0);  }
+          100%{ box-shadow:0 0 0 0   rgba(16,185,129,0);  }
+        }
+
+        .filter-strip {
+          display:inline-flex; border-radius:999px;
+          border:1px solid #e5e7eb; background:#f9fafb; padding:3px;
+          flex-wrap:wrap; gap:2px;
+        }
+        .filter-strip button {
+          padding:4px 12px; font-size:11px; font-weight:600; cursor:pointer;
+          border:none; border-radius:999px; color:#6b7280;
+          background:transparent; transition:all .15s;
+          white-space:nowrap;
+        }
+        .filter-strip button.active { background:#f97316; color:#fff; }
+
+        .prog-track { height:6px; border-radius:4px; background:#f3f4f6; overflow:hidden; flex:1; }
+        .prog-fill  { height:100%; border-radius:4px; transition:width .5s ease; }
+
+        .card {
+          background:#fff; border-radius:16px;
+          border:1px solid #f3f4f6;
+          box-shadow:0 1px 3px rgba(0,0,0,.05);
+          padding:20px;
+        }
+        .card-title { font-size:13px; font-weight:700; color:#111827; }
+        .card-sub   { font-size:11px; color:#9ca3af; margin-top:2px; margin-bottom:14px; }
+
+        .tab-btn { padding:6px 14px; font-size:12px; font-weight:600; border-radius:999px; border:none; cursor:pointer; transition:all .15s; }
+        .tab-btn.active { background:#f97316; color:#fff; }
+        .tab-btn:not(.active) { background:#f3f4f6; color:#6b7280; }
+        .tab-btn:not(.active):hover { background:#e5e7eb; }
+      `}</style>
+
+      <div className="dash-root bg-gray-50 min-h-[calc(100vh-64px)] p-5 lg:p-7">
+        <div className="max-w-7xl mx-auto space-y-8">
+
+          {/* ── Top bar ─────────────────────────────────────────── */}
+          <div className="s1 flex flex-wrap items-center justify-between gap-4">
+            <div>
+              <div className="flex items-center gap-2 mb-1">
+                <span className="live-dot" />
+                <span className="text-[11px] font-bold text-emerald-600 uppercase tracking-wider">Live</span>
+              </div>
+              <h1 className="text-2xl lg:text-3xl font-extrabold text-gray-900 tracking-tight leading-none">
+                Restaurant Dashboard
+              </h1>
+              <p className="text-sm text-gray-400 mt-1">
+                Showing data for&nbsp;
+                <span className="font-semibold text-gray-700">{filterLabel}</span>
+              </p>
+            </div>
+
+            <div className="filter-strip">
+              {["Daily", "Weekly", "Monthly", "Quarterly", "Half Yearly", "Yearly"].map(f => (
+                <button key={f} className={timeFilter === f ? "active" : ""} onClick={() => setTimeFilter(f)}>
+                  {f}
+                </button>
+              ))}
+            </div>
           </div>
 
-          <div className="flex items-center gap-3">
-            <div className="hidden sm:flex items-center gap-2">
-              <SmallStat title={getSalesLabel()} value={`₹${totalEarnings}`} />
-              <SmallStat title={getOrdersLabel()} value={`${totalOrders} orders`} />
-            </div>
+          {/* ══════════════════════════════════════════════════
+               SECTION 1 — SALES
+          ══════════════════════════════════════════════════ */}
+          <section className="s2">
+            <SectionHeading label="Sales" sub="Revenue and earnings overview" />
 
-            <label className="text-sm text-gray-700">Range</label>
-            <select
-              value={timeFilter}
-              onChange={(e) => setTimeFilter(e.target.value)}
-              className="px-3 py-2 border border-gray-200 rounded-lg focus:outline-none focus:ring-2 focus:ring-action-primary bg-white"
-            >
-              <option value="Daily">Daily</option>
-              <option value="Weekly">Weekly</option>
-              <option value="Monthly">Monthly</option>
-              <option value="Quarterly">Quarterly</option>
-              <option value="Half Yearly">Half Yearly</option>
-              <option value="Yearly">Yearly</option>
-            </select>
-          </div>
-        </div>
-
-        {/* KPI Grid */}
-        <div className="grid grid-cols-1 sm:grid-cols-2 lg:grid-cols-4 gap-6">
-          <KPICard icon={<FaHamburger />} bg="bg-cardBackgrounds-bg1" value={totalOrders} label="Total Orders" accent={null} />
-          <KPICard icon={<PiHamburgerThin />} bg="bg-cardBackgrounds-bg2" value={pendingOrders} label="Pending Orders" accent={null} />
-          <KPICard icon={<RiMoneyRupeeCircleLine />} bg="bg-cardBackgrounds-bg1" value={`₹${totalEarnings}`} label="Total Earnings" accent="Updated" />
-          <KPICard icon={<BsPersonCheck />} bg="bg-cardBackgrounds-bg3" value={totalCustomers} label="Customers" accent={null} />
-
-          <KPICard icon={<MdOutlineTableBar />} bg="bg-cardBackgrounds-bg4" value={newOrders} label="New Orders" />
-          <KPICard icon={<MdOutlineSoupKitchen />} bg="bg-cardBackgrounds-bg5" value={preparingOrders} label="Preparing" />
-          <KPICard icon={<TbToolsKitchen3 />} bg="bg-cardBackgrounds-bg6" value={servedOrders} label="Served" />
-          <KPICard icon={<GoPackageDependents />} bg="bg-cardBackgrounds-bg7" value={'—'} label="Takeaway" />
-        </div>
-
-        {/* Charts Row */}
-        <div className="grid grid-cols-1 lg:grid-cols-3 gap-6">
-          {/* Sales Bar Chart */}
-          <div className="col-span-2 bg-white rounded-2xl shadow p-5">
-            <div className="flex items-center justify-between">
-              <div>
-                <h3 className="text-lg font-semibold text-gray-800">Sales value</h3>
-                <p className="text-sm text-gray-500 mt-1">{getSalesLabel()}</p>
+            {/* KPI row */}
+            <div className="grid grid-cols-1 sm:grid-cols-2 lg:grid-cols-4 gap-4 mb-5">
+              <SalesKPI
+                icon={<RiMoneyRupeeCircleLine />}
+                value={fmt(totalEarnings)}
+                label="Total Earnings"
+                sub={`Revenue ${filterLabel}`}
+              />
+              <SalesKPI
+                icon={<FaHamburger />}
+                value={totalOrders}
+                label="Total Orders"
+                sub={`Orders ${filterLabel}`}
+              />
+              {/* Avg Order Value */}
+              <div className="card flex flex-col justify-between gap-3">
+                <p className="text-[10px] font-bold text-gray-400 uppercase tracking-widest">Avg Order Value</p>
+                <div>
+                  <div className="text-[22px] font-extrabold text-gray-900 tracking-tight">
+                    {totalOrders ? fmt(Math.round(totalEarnings / totalOrders)) : "₹0"}
+                  </div>
+                  <div className="text-xs text-gray-400 mt-1">Per order</div>
+                </div>
               </div>
-              <div className="flex items-center gap-2">
-                <input className="px-3 py-2 border border-gray-200 rounded-lg focus:outline-none focus:ring-2 focus:ring-orange-400" type="date" />
-                <button className="px-3 py-2 rounded-lg bg-white border border-gray-200 text-sm">Export</button>
-              </div>
-            </div>
-
-            <div className="mt-4 flex items-end justify-between">
-              <div>
-                <div className="text-3xl font-bold text-gray-900">₹{totalEarnings}</div>
-                <div className="text-sm text-gray-500 mt-1">Total</div>
-              </div>
-              <div className="text-sm text-green-600 font-semibold">Growth</div>
-            </div>
-
-            <div className="mt-4 h-56">
-              <ResponsiveContainer width="100%" height="100%">
-                <BarChart data={chartData}>
-                  <CartesianGrid strokeDasharray="3 3" />
-                  <XAxis dataKey="date" tick={{ fontSize: 12 }} tickLine={false} padding={{ left: 10, right: 10 }} />
-                  <YAxis tick={{ fontSize: 12 }} tickLine={false} domain={["auto", "auto"]} allowDecimals={false} />
-                  <Tooltip formatter={(value) => `₹${value}`} />
-                  <Bar dataKey="sales" fill={ACTION_PRIMARY} radius={[8, 8, 0, 0]} />
-                </BarChart>
-              </ResponsiveContainer>
-            </div>
-          </div>
-
-          {/* Status Pie + Top Items */}
-          <div className="bg-bg-primary rounded-2xl shadow p-5 flex flex-col gap-4">
-            <div className="flex items-center justify-between">
-              <h3 className="text-lg font-semibold text-gray-800">Order Status</h3>
-              <div className="text-sm text-gray-500">Realtime</div>
-            </div>
-
-            <div className="flex-1 grid grid-cols-1 gap-4">
-              <div className="h-40">
-                <ResponsiveContainer width="100%" height="100%">
-                  <PieChart>
-                    <Pie data={statusPieData} dataKey="value" nameKey="name" cx="50%" cy="50%" outerRadius={60} innerRadius={28}>
-                      {statusPieData.map((entry, index) => (
-                        <Cell key={`cell-${index}`} fill={COLORS[index % COLORS.length]} />
-                      ))}
-                    </Pie>
-                    <Legend layout="vertical" verticalAlign="middle" align="right" />
-                  </PieChart>
-                </ResponsiveContainer>
-              </div>
-
-              <div>
-                <h4 className="text-sm font-medium text-gray-700 mb-2">Top Items</h4>
-                <div className="space-y-2">
-                  {topItemsData.length > 0 ? (
-                    topItemsData.map((it, idx) => (
-                      <div key={it.itemName || idx} className="flex items-center justify-between p-3 rounded-lg bg-gray-50">
-                        <div>
-                          <div className="font-medium text-gray-800">{it.itemName}</div>
-                          <div className="text-xs text-gray-500">Orders: {it.orders}</div>
-                        </div>
-                        <div className="text-sm font-semibold text-action-primary">{it.orders}</div>
-                      </div>
-                    ))
-                  ) : (
-                    <div className="text-center text-gray-500 py-8">No data to display</div>
-                  )}
+              {/* Served Rate */}
+              <div className="card flex flex-col justify-between gap-3">
+                <p className="text-[10px] font-bold text-gray-400 uppercase tracking-widest">Served Rate</p>
+                <div>
+                  <div className="text-[22px] font-extrabold text-gray-900 tracking-tight">
+                    {pct(servedOrders, totalOrders)}%
+                  </div>
+                  <div className="prog-track mt-2">
+                    <div
+                      className="prog-fill"
+                      style={{ width: `${pct(servedOrders, totalOrders)}%`, background: ACTION_PRIMARY }}
+                    />
+                  </div>
                 </div>
               </div>
             </div>
-          </div>
-        </div>
 
-        {/* Orders Line chart + small widgets */}
-        <div className="grid grid-cols-1 lg:grid-cols-2 gap-6">
-          <div className="bg-bg-primary rounded-2xl shadow p-5">
-            <div className="flex items-center justify-between">
-              <div>
-                <h3 className="text-lg font-semibold text-gray-800">Order sales</h3>
-                <p className="text-sm text-gray-500 mt-1">{getOrdersLabel()}</p>
+            {/* Sales charts */}
+            <div className="grid grid-cols-1 lg:grid-cols-2 gap-5">
+              {/* Revenue — bar chart */}
+              <div className="card">
+                <p className="card-title">Revenue Trend</p>
+                <p className="card-sub">Sales value {filterLabel}</p>
+                <div style={{ height: 220 }}>
+                  <ResponsiveContainer width="100%" height="100%">
+                    <BarChart data={chartData} barSize={26}>
+                      <CartesianGrid strokeDasharray="3 3" stroke="#f3f4f6" vertical={false} />
+                      <XAxis dataKey="date" tick={{ fontSize: 11, fill: "#9ca3af" }} tickLine={false} axisLine={false} />
+                      <YAxis
+                        tick={{ fontSize: 11, fill: "#9ca3af" }} tickLine={false} axisLine={false}
+                        tickFormatter={v => v >= 1000 ? `₹${(v / 1000).toFixed(0)}k` : `₹${v}`}
+                      />
+                      <Tooltip content={<SalesTooltip />} cursor={{ fill: "#fff7ed", radius: 6 }} />
+                      <Bar dataKey="sales" fill={ACTION_PRIMARY} radius={[6, 6, 0, 0]} />
+                    </BarChart>
+                  </ResponsiveContainer>
+                </div>
               </div>
-              <input className="px-3 py-2 border border-gray-200 rounded-lg focus:outline-none focus:ring-2 focus:ring-action-primary" type="date" />
-            </div>
 
-            <div className="mt-4 h-64">
-              <ResponsiveContainer width="100%" height="100%">
-                <LineChart data={chartData}>
-                  <CartesianGrid strokeDasharray="3 3" />
-                  <XAxis dataKey="date" tick={{ fontSize: 12 }} tickLine={false} padding={{ left: 10, right: 10 }} />
-                  <YAxis tick={{ fontSize: 12 }} tickLine={false} domain={["auto", "auto"]} allowDecimals={false} />
-                  <Tooltip />
-                  <Line type="monotone" dataKey="count" stroke={ACTION_PRIMARY} strokeWidth={2} dot={{ r: 3 }} activeDot={{ r: 6 }} />
-                </LineChart>
-              </ResponsiveContainer>
-            </div>
-          </div>
-
-          <div className="bg-white rounded-2xl shadow p-5 space-y-4">
-            <h3 className="text-lg font-semibold text-gray-800">Quick Insights</h3>
-            <div className="grid grid-cols-2 gap-3">
-              <SmallStat title="New Orders" value={newOrders} />
-              <SmallStat title="Preparing" value={preparingOrders} />
-              <SmallStat title="Pending" value={pendingOrders} />
-              <SmallStat title="Served" value={servedOrders} />
-            </div>
-
-            <div>
-              <h4 className="text-sm font-medium text-gray-700 mb-2">Occupancy</h4>
-              <div className="w-full bg-gray-100 rounded-full h-4 overflow-hidden">
-                <div className="h-4 rounded-full bg-gradient-to-r bg-action-primary" style={{ width: `${Math.min(100, (totalOrders || 0) % 100)}%` }}></div>
+              {/* Order count — smooth area chart */}
+              <div className="card">
+                <p className="card-title">Order Volume</p>
+                <p className="card-sub">Count of orders {filterLabel}</p>
+                <div style={{ height: 220 }}>
+                  <ResponsiveContainer width="100%" height="100%">
+                    <AreaChart data={chartData} margin={{ top: 4, right: 4, left: 0, bottom: 0 }}>
+                      <defs>
+                        <linearGradient id="areaGrad" x1="0" y1="0" x2="0" y2="1">
+                          <stop offset="5%" stopColor="#8b5cf6" stopOpacity={0.2} />
+                          <stop offset="95%" stopColor="#8b5cf6" stopOpacity={0} />
+                        </linearGradient>
+                      </defs>
+                      <CartesianGrid strokeDasharray="3 3" stroke="#f3f4f6" vertical={false} />
+                      <XAxis dataKey="date" tick={{ fontSize: 11, fill: "#9ca3af" }} tickLine={false} axisLine={false} />
+                      <YAxis tick={{ fontSize: 11, fill: "#9ca3af" }} tickLine={false} axisLine={false} allowDecimals={false} />
+                      <Tooltip content={<AreaTooltip />} />
+                      <Area
+                        type="monotone" dataKey="count"
+                        stroke="#8b5cf6" strokeWidth={2.5}
+                        fill="url(#areaGrad)"
+                        dot={{ r: 3, fill: "#8b5cf6", strokeWidth: 0 }}
+                        activeDot={{ r: 5, fill: "#8b5cf6" }}
+                      />
+                    </AreaChart>
+                  </ResponsiveContainer>
+                </div>
               </div>
-              <div className="text-xs text-gray-500 mt-2">Current active tables: {totalOrders}</div>
+            </div>
+          </section>
+
+          {/* ══════════════════════════════════════════════════
+               SECTION 2 — OPERATIONS  (with dine-in / takeaway split)
+          ══════════════════════════════════════════════════ */}
+          <section className="s3">
+            <SectionHeading label="Operations" sub="Live kitchen and order status — Dine-in vs Takeaway" />
+
+            {/* Split KPI row */}
+            <div className="grid grid-cols-1 sm:grid-cols-2 lg:grid-cols-3 gap-4 mb-5">
+              <SplitKPI
+                label="Orders"
+                icon={<FaHamburger />}
+                dinein={dineinOrders}
+                takeaway={takeawayOrders}
+                sub={`Total orders ${filterLabel}`}
+              />
+              <SplitKPI
+                label="Revenue (approx)"
+                icon={<RiMoneyRupeeCircleLine />}
+                dinein={fmt(Math.round(dineinSales))}
+                takeaway={fmt(Math.round(takeawaySales))}
+                sub="Based on order totals"
+              />
+              <SplitKPI
+                label="Served"
+                icon={<TbToolsKitchen3 />}
+                dinein={dineinServed}
+                takeaway={takeawayServed}
+                sub="Completed orders"
+              />
             </div>
 
-            <div className="flex gap-2 mt-2">
-              <button className="flex-1 px-3 py-2 rounded-lg bg-white border border-gray-200">Details</button>
-              <button className="flex-1 px-3 py-2 rounded-lg bg-gradient-to-r bg-action-primary text-white">View Reports</button>
+            {/* Ops KPI row (overall) */}
+            <div className="grid grid-cols-2 lg:grid-cols-3 gap-4 mb-5">
+              <OpsCard icon={<MdOutlineSoupKitchen />} value={preparingOrders} label="Total Preparing"
+                bg="bg-purple-50" color="text-purple-500" />
+              <OpsCard icon={<PiHamburgerThin />} value={pendingOrders} label="Total Pending"
+                bg="bg-amber-50" color="text-amber-500" />
+              <OpsCard icon={<TbToolsKitchen3 />} value={servedOrders} label="Total Served"
+                bg="bg-emerald-50" color="text-emerald-500" />
             </div>
-          </div>
+
+            {/* Ops charts */}
+            <div className="grid grid-cols-1 lg:grid-cols-2 gap-5">
+
+              {/* Split order volume line chart */}
+              <div className="card">
+                <p className="card-title">Dine-in vs Takeaway Orders</p>
+                <p className="card-sub">Order count split over time</p>
+                <div style={{ height: 220 }}>
+                  <ResponsiveContainer width="100%" height="100%">
+                    <LineChart data={splitChartData} margin={{ top: 4, right: 4, left: 0, bottom: 0 }}>
+                      <CartesianGrid strokeDasharray="3 3" stroke="#f3f4f6" vertical={false} />
+                      <XAxis dataKey="date" tick={{ fontSize: 11, fill: "#9ca3af" }} tickLine={false} axisLine={false} />
+                      <YAxis tick={{ fontSize: 11, fill: "#9ca3af" }} tickLine={false} axisLine={false} allowDecimals={false} />
+                      <Tooltip content={<SplitLineTooltip />} />
+                      <Legend
+                        wrapperStyle={{ fontSize: 11, paddingTop: 8 }}
+                        formatter={(value) => value === "dinein" ? "Dine-in" : "Takeaway"}
+                      />
+                      <Line type="monotone" dataKey="dinein" stroke={DINEIN_COLOR} strokeWidth={2.5}
+                        dot={{ r: 3, fill: DINEIN_COLOR }} activeDot={{ r: 5 }} name="dinein" />
+                      <Line type="monotone" dataKey="takeaway" stroke={TAKEAWAY_COLOR} strokeWidth={2.5}
+                        dot={{ r: 3, fill: TAKEAWAY_COLOR }} activeDot={{ r: 5 }} name="takeaway" />
+                    </LineChart>
+                  </ResponsiveContainer>
+                </div>
+              </div>
+
+              {/* Side-by-side kitchen load for dine-in and takeaway */}
+              <div className="card">
+                <p className="card-title">Kitchen Load Split</p>
+                <p className="card-sub">Status breakdown — Dine-in & Takeaway</p>
+                <div className="grid grid-cols-2 gap-4">
+                  {/* Dine-in side */}
+                  <div>
+                    <div className="flex items-center gap-1.5 mb-3">
+                      <span className="w-2.5 h-2.5 rounded-full bg-orange-400" />
+                      <span className="text-xs font-bold text-orange-600">Dine-in</span>
+                    </div>
+                    <div className="space-y-3">
+                      {[
+                        { label: "Preparing", value: dineinPreparing, color: "#a855f7" },
+                        { label: "Pending", value: dineinPending, color: "#f59e0b" },
+                        { label: "Served", value: dineinServed, color: "#10b981" },
+                      ].map(({ label, value, color }) => (
+                        <div key={label}>
+                          <div className="flex justify-between text-xs mb-1">
+                            <span className="font-medium text-gray-600">{label}</span>
+                            <span className="font-bold" style={{ color }}>{value} ({pct(value, dineinActive)}%)</span>
+                          </div>
+                          <div className="prog-track">
+                            <div className="prog-fill" style={{ width: `${pct(value, dineinActive)}%`, background: color }} />
+                          </div>
+                        </div>
+                      ))}
+                    </div>
+                  </div>
+                  {/* Takeaway side */}
+                  <div>
+                    <div className="flex items-center gap-1.5 mb-3">
+                      <span className="w-2.5 h-2.5 rounded-full bg-purple-400" />
+                      <span className="text-xs font-bold text-purple-600">Takeaway</span>
+                    </div>
+                    <div className="space-y-3">
+                      {[
+                        { label: "Preparing", value: takeawayPreparing, color: "#a855f7" },
+                        { label: "Pending", value: takeawayPending, color: "#f59e0b" },
+                        { label: "Served", value: takeawayServed, color: "#10b981" },
+                      ].map(({ label, value, color }) => (
+                        <div key={label}>
+                          <div className="flex justify-between text-xs mb-1">
+                            <span className="font-medium text-gray-600">{label}</span>
+                            <span className="font-bold" style={{ color }}>{value} ({pct(value, takeawayActive)}%)</span>
+                          </div>
+                          <div className="prog-track">
+                            <div className="prog-fill" style={{ width: `${pct(value, takeawayActive)}%`, background: color }} />
+                          </div>
+                        </div>
+                      ))}
+                    </div>
+                  </div>
+                </div>
+
+                {/* Pie donut below */}
+                <div className="mt-5 pt-4 border-t border-gray-50">
+                  <p className="text-xs font-bold text-gray-400 mb-2">Overall Status Distribution</p>
+                  <div className="flex items-center gap-4">
+                    <div style={{ height: 110, flex: 1 }}>
+                      <ResponsiveContainer width="100%" height="100%">
+                        <PieChart>
+                          <Pie data={pieData} dataKey="value" nameKey="name"
+                            cx="50%" cy="50%" outerRadius={50} innerRadius={28} strokeWidth={2} stroke="#fff">
+                            {pieData.map((_, i) => <Cell key={i} fill={PIE_COLORS[i]} />)}
+                          </Pie>
+                          <Tooltip formatter={(v, n) => [v, n]}
+                            contentStyle={{ borderRadius: 10, border: "1px solid #f3f4f6", fontSize: 11 }} />
+                        </PieChart>
+                      </ResponsiveContainer>
+                    </div>
+                    <div className="flex flex-col gap-2 shrink-0">
+                      {pieData.map((d, i) => (
+                        <div key={d.name} className="flex items-center gap-2">
+                          <span className="w-2.5 h-2.5 rounded-sm shrink-0" style={{ background: PIE_COLORS[i] }} />
+                          <span className="text-xs text-gray-500 w-14">{d.name}</span>
+                          <span className="text-xs font-bold text-gray-800">{d.value}</span>
+                          <span className="text-[10px] text-gray-400">({pct(d.value, totalActive)}%)</span>
+                        </div>
+                      ))}
+                    </div>
+                  </div>
+                </div>
+              </div>
+            </div>
+          </section>
+
+          {/* ══════════════════════════════════════════════════
+               SECTION 3 — INSIGHTS  (split dine-in + takeaway top items)
+          ══════════════════════════════════════════════════ */}
+          <section className="s4">
+            <SectionHeading label="Insights" sub="Most ordered items — Dine-in & Takeaway" />
+
+            {/* Split top items */}
+            <div className="grid grid-cols-1 lg:grid-cols-2 gap-5 mb-5">
+
+              {/* Dine-in top items */}
+              <div className="card">
+                <div className="flex items-center gap-2 mb-1">
+                  <span className="w-2.5 h-2.5 rounded-full bg-orange-400" />
+                  <p className="card-title">Dine-in Top Items</p>
+                </div>
+                <p className="card-sub">Top 5 most ordered in dine-in</p>
+                {topDineinItems.length > 0 ? (
+                  <div className="space-y-3 mt-1">
+                    {topDineinItems.map((item, idx) => (
+                      <div key={item.itemName} className="flex items-center gap-3">
+                        <span className="w-6 h-6 rounded-lg flex items-center justify-center text-white text-[10px] font-bold shrink-0"
+                          style={{ background: ITEM_COLORS[idx] }}>
+                          {idx + 1}
+                        </span>
+                        <div className="flex-1 min-w-0">
+                          <div className="flex justify-between text-xs mb-1.5">
+                            <span className="font-semibold text-gray-800 truncate pr-2">{item.itemName}</span>
+                            <span className="font-bold shrink-0" style={{ color: ITEM_COLORS[idx] }}>{item.orders}</span>
+                          </div>
+                          <div className="prog-track">
+                            <div className="prog-fill"
+                              style={{ width: `${pct(item.orders, maxDineinItem)}%`, background: ITEM_COLORS[idx] }} />
+                          </div>
+                        </div>
+                      </div>
+                    ))}
+                  </div>
+                ) : (
+                  <div className="h-32 flex items-center justify-center text-sm text-gray-400">No data available</div>
+                )}
+              </div>
+
+              {/* Takeaway top items */}
+              <div className="card">
+                <div className="flex items-center gap-2 mb-1">
+                  <span className="w-2.5 h-2.5 rounded-full bg-purple-400" />
+                  <p className="card-title">Takeaway Top Items</p>
+                </div>
+                <p className="card-sub">Top 5 most ordered in takeaway</p>
+                {topTakeawayItems.length > 0 ? (
+                  <div className="space-y-3 mt-1">
+                    {topTakeawayItems.map((item, idx) => (
+                      <div key={item.itemName} className="flex items-center gap-3">
+                        <span className="w-6 h-6 rounded-lg flex items-center justify-center text-white text-[10px] font-bold shrink-0"
+                          style={{ background: ITEM_COLORS[idx] }}>
+                          {idx + 1}
+                        </span>
+                        <div className="flex-1 min-w-0">
+                          <div className="flex justify-between text-xs mb-1.5">
+                            <span className="font-semibold text-gray-800 truncate pr-2">{item.itemName}</span>
+                            <span className="font-bold shrink-0" style={{ color: ITEM_COLORS[idx] }}>{item.orders}</span>
+                          </div>
+                          <div className="prog-track">
+                            <div className="prog-fill"
+                              style={{ width: `${pct(item.orders, maxTakeawayItem)}%`, background: ITEM_COLORS[idx] }} />
+                          </div>
+                        </div>
+                      </div>
+                    ))}
+                  </div>
+                ) : (
+                  <div className="h-32 flex items-center justify-center text-sm text-gray-400">No data available</div>
+                )}
+              </div>
+            </div>
+
+            {/* Radar chart (combined) */}
+            <div className="grid grid-cols-1 lg:grid-cols-2 gap-5 mb-5">
+
+              {/* 2-hour sales snapshot */}
+              <TwoHrSalesCard dineinSales={twoHrDineinSales} takeawaySales={twoHrTakeawaySales} salesDuration={salesDuration}
+                setSalesDuration={setSalesDuration} />
+                
+            </div>
+          </section>
+
         </div>
-
-      </main>
-    </div>
+      </div>
+    </>
   );
 };
 
 export default DashBoardPage;
-
-
-
-// import React, { useEffect, useState, useRef, useMemo } from 'react';
-// import { FaHamburger } from "react-icons/fa";
-// import { RiMoneyRupeeCircleLine } from "react-icons/ri";
-// import { PiHamburgerThin } from "react-icons/pi";
-// import { MdDeliveryDining } from "react-icons/md";
-// import { BsPersonCheck } from "react-icons/bs";
-// import { MdOutlineTableBar } from "react-icons/md";
-// import { GoPackageDependents } from "react-icons/go";
-// import { MdOutlineSoupKitchen } from "react-icons/md";
-// import { TbToolsKitchen3 } from "react-icons/tb";
-// import {
-//   LineChart, Line, XAxis, YAxis, CartesianGrid, Tooltip, ResponsiveContainer, BarChart, Bar, PieChart, Pie, Cell, Legend
-// } from 'recharts';
-
-// import { useNavigate, useParams } from 'react-router-dom';
-// import axios from 'axios';
-
-// /*
-//   Professional Dashboard — white + orange theme
-//   - Keeps your original data logic (API calls and derived values) intact
-//   - Adds a modern layout, refined KPIs, charts, table, and export/search utilities
-//   - Tailwind-first styling, responsive, accessible
-// */
-
-// const COLORS = ["#ff7a00", "#ff9a3c", "#f97316", "#fb923c", "#ffb37a"];
-
-// const IconCircle = ({ children, className = 'bg-orange-50 text-orange-600' }) => (
-//   <div className={`w-12 h-12 rounded-lg flex items-center justify-center ${className} shadow-sm`}>{children}</div>
-// );
-
-// const KPI = ({ title, value, sub, icon }) => (
-//   <div className="bg-white rounded-2xl p-4 shadow-sm hover:shadow-md transition-shadow duration-200 border border-gray-50">
-//     <div className="flex items-start gap-4">
-//       {icon}
-//       <div className="flex-1">
-//         <div className="text-xs text-gray-500">{title}</div>
-//         <div className="text-xl font-semibold text-gray-900 mt-1">{value}</div>
-//         {sub && <div className="text-xs text-gray-400 mt-1">{sub}</div>}
-//       </div>
-//     </div>
-//   </div>
-// );
-
-// const TinyBadge = ({ children }) => (
-//   <span className="inline-block px-2 py-0.5 text-xs rounded-full bg-orange-50 text-orange-600 font-medium">{children}</span>
-// );
-
-// const formatCurrency = (v) => `₹${v.toLocaleString()}`;
-
-// const DashBoardPage = () => {
-//   const nav = useNavigate();
-//   const { clientId } = useParams();
-
-//   // states (kept from original)
-//   const [totalOrders, setTotalOrders] = useState(0);
-//   const [pendingOrders, setPendingOrders] = useState(0);
-//   const [totalEarnings, setTotalEarnings] = useState(0);
-//   const [totalCustomers, setTotalCustomers] = useState(0);
-//   const [newOrders, setNewOrders] = useState(0);
-//   const [preparingOrders, setPreparingOrders] = useState(0);
-//   const [servedOrders, setServedOrders] = useState(0);
-//   const [chartData, setChartData] = useState([]);
-//   const [timeFilter, setTimeFilter] = useState('Daily');
-//   const token = localStorage.getItem('access_token');
-//   const [topItemsData, setTopItemsData] = useState([]);
-
-//   const [query, setQuery] = useState('');
-//   const [showOnlyAvailable, setShowOnlyAvailable] = useState(false);
-
-//   useEffect(() => {
-//     // top items fetch — same logic
-//     const fetchTopItems = async () => {
-//       if (!clientId) return;
-//       try {
-//         const response = await axios.get(`${import.meta.env.VITE_API_ORDER_SERVICE_URL}/${clientId}/dinein/table`, {
-//           headers: { Authorization: `Bearer ${token}` }
-//         });
-//         const allOrders = response.data?.data || [];
-
-//         const itemCounts = {};
-//         allOrders.forEach(order => {
-//           if (!order.items) return;
-//           order.items.forEach(item => {
-//             const name = item.name || item.itemName || 'Unknown';
-//             const quantity = item.quantity ? parseInt(item.quantity, 10) : 1;
-//             if (!itemCounts[name]) itemCounts[name] = 0;
-//             itemCounts[name] += quantity;
-//           });
-//         });
-
-//         const sortedItems = Object.entries(itemCounts)
-//           .map(([itemName, orders]) => ({ itemName, orders }))
-//           .sort((a, b) => b.orders - a.orders)
-//           .slice(0, 10);
-
-//         setTopItemsData(sortedItems);
-//       } catch (err) {
-//         console.error('Top items fetch failed', err);
-//       }
-//     };
-
-//     fetchTopItems();
-//   }, [clientId]);
-
-//   useEffect(() => {
-//     const fetchStats = async () => {
-//       if (!token || !clientId) return;
-//       try {
-//         const res = await axios.get(`${import.meta.env.VITE_API_ORDER_SERVICE_URL}/${clientId}/dinein/table`, {
-//           headers: { Authorization: `Bearer ${token}` }
-//         });
-//         const allOrders = res.data?.data || [];
-//         const startDate = getStartDate(timeFilter);
-//         const filteredOrders = allOrders.filter(o => new Date(o.created_at) >= startDate);
-
-//         setTotalOrders(filteredOrders.length);
-//         setPendingOrders(filteredOrders.filter(o => o.status === 'pending' || o.status === 'preparing').length);
-//         setTotalEarnings(Math.round(filteredOrders.reduce((sum, o) => sum + (parseFloat(o.total_price) || 0), 0)));
-//         setTotalCustomers(filteredOrders.length);
-//         setNewOrders(filteredOrders.filter(o => o.status === 'new').length);
-//         setPreparingOrders(filteredOrders.filter(o => o.status === 'preparing').length);
-//         setServedOrders(filteredOrders.filter(o => o.status === 'served').length);
-
-//         // prepare grouped chart data
-//         const ordersByGroup = {};
-//         filteredOrders.forEach(order => {
-//           const dateObj = new Date(order.created_at);
-//           let groupKey;
-//           if (timeFilter === 'Daily') {
-//             const hour = dateObj.getHours();
-//             groupKey = `${hour}:00`;
-//           } else {
-//             groupKey = dateObj.toLocaleDateString('en-US', { month: 'short', day: 'numeric' });
-//           }
-//           if (!ordersByGroup[groupKey]) ordersByGroup[groupKey] = { date: groupKey, sales: 0, count: 0 };
-//           ordersByGroup[groupKey].sales += parseFloat(order.total_price) || 0;
-//           ordersByGroup[groupKey].count += 1;
-//         });
-
-//         let sortedData;
-//         if (timeFilter === 'Daily') {
-//           sortedData = Object.values(ordersByGroup).sort((a, b) => parseInt(a.date) - parseInt(b.date));
-//         } else {
-//           sortedData = Object.values(ordersByGroup).sort((a, b) => new Date(a.date + ', ' + new Date().getFullYear()) - new Date(b.date + ', ' + new Date().getFullYear()));
-//         }
-//         setChartData(sortedData);
-//       } catch (err) {
-//         console.error('Stats fetch failed', err);
-//       }
-//     };
-//     fetchStats();
-//   }, [clientId, timeFilter, token]);
-
-//   const getStartDate = (filter) => {
-//     const now = new Date();
-//     switch (filter) {
-//       case 'Daily': return new Date(now.setHours(0,0,0,0));
-//       case 'Weekly': return new Date(now.setDate(now.getDate() - 7));
-//       case 'Monthly': return new Date(now.setMonth(now.getMonth() - 1));
-//       case 'Quarterly': return new Date(now.setMonth(now.getMonth() - 3));
-//       case 'Half Yearly': return new Date(now.setMonth(now.getMonth() - 6));
-//       case 'Yearly': return new Date(now.setFullYear(now.getFullYear() - 1));
-//       default: return new Date(now.setHours(0,0,0,0));
-//     }
-//   };
-
-//   // Pie data
-//   const statusPieData = useMemo(() => ([
-//     { name: 'New', value: newOrders },
-//     { name: 'Preparing', value: preparingOrders },
-//     { name: 'Pending', value: pendingOrders },
-//     { name: 'Served', value: servedOrders },
-//   ]), [newOrders, preparingOrders, pendingOrders, servedOrders]);
-
-//   // Export CSV helper
-//   const exportTopItemsCSV = () => {
-//     const headers = ['Item', 'Orders'];
-//     const rows = topItemsData.map(r => [r.itemName, r.orders]);
-//     const csvContent = [headers, ...rows].map(e => e.join(',')).join('');
-//     const blob = new Blob([csvContent], { type: 'text/csv' });
-//     const url = URL.createObjectURL(blob);
-//     const a = document.createElement('a');
-//     a.href = url; a.download = `top_items_${new Date().toISOString().slice(0,10)}.csv`; a.click();
-//     URL.revokeObjectURL(url);
-//   };
-
-//   // filtered top items for search
-//   const filteredTopItems = topItemsData.filter(t => t.itemName.toLowerCase().includes(query.toLowerCase()));
-
-//   return (
-//     <div className="min-h-screen bg-gray-50 p-6 lg:p-10">
-//       <main className="max-w-7xl mx-auto space-y-8">
-
-//         {/* Header */}
-//         <div className="flex flex-col md:flex-row items-start md:items-center justify-between gap-4">
-//           <div>
-//             <div className="flex items-center gap-3">
-//               <div className="w-2.5 h-8 rounded bg-gradient-to-b from-orange-400 to-orange-600"></div>
-//               <h1 className="text-3xl font-extrabold text-gray-900">Business Dashboard</h1>
-//             </div>
-//             <p className="text-sm text-gray-500 mt-1">Actionable metrics for operations — updated live from your orders</p>
-//           </div>
-
-//           <div className="flex items-center gap-3 w-full sm:w-auto">
-//             <div className="flex items-center gap-2 bg-white rounded-lg px-3 py-2 shadow-sm border border-gray-100">
-//               <input value={query} onChange={(e) => setQuery(e.target.value)} placeholder="Search top items..." className="outline-none text-sm" />
-//               <button onClick={() => setQuery('')} className="text-sm text-gray-400">Clear</button>
-//             </div>
-
-//             <select value={timeFilter} onChange={(e) => setTimeFilter(e.target.value)} className="px-3 py-2 border border-gray-200 rounded-lg bg-white focus:ring-2 focus:ring-orange-300">
-//               <option value="Daily">Daily</option>
-//               <option value="Weekly">Weekly</option>
-//               <option value="Monthly">Monthly</option>
-//               <option value="Quarterly">Quarterly</option>
-//               <option value="Half Yearly">Half Yearly</option>
-//               <option value="Yearly">Yearly</option>
-//             </select>
-
-//             <button className="px-4 py-2 bg-gradient-to-r from-orange-500 to-orange-400 text-white rounded-lg shadow" onClick={exportTopItemsCSV}>Export</button>
-//           </div>
-//         </div>
-
-//         {/* KPI strip */}
-//         <div className="grid grid-cols-1 sm:grid-cols-2 lg:grid-cols-4 gap-4">
-//           <KPI title="Total Orders" value={totalOrders} sub="All orders in period" icon={<IconCircle><FaHamburger /></IconCircle>} />
-//           <KPI title="Pending / Preparing" value={`${pendingOrders} / ${preparingOrders}`} sub="Need attention" icon={<IconCircle className='bg-yellow-50 text-yellow-600'><PiHamburgerThin /></IconCircle>} />
-//           <KPI title="Earnings" value={formatCurrency(totalEarnings)} sub="Gross sales" icon={<IconCircle className='bg-orange-50 text-orange-700'><RiMoneyRupeeCircleLine /></IconCircle>} />
-//           <KPI title="Customers" value={totalCustomers} sub="Unique customers" icon={<IconCircle className='bg-indigo-50 text-indigo-600'><BsPersonCheck /></IconCircle>} />
-//         </div>
-
-//         {/* Main content: charts + side panel */}
-//         <div className="grid grid-cols-1 lg:grid-cols-3 gap-6">
-//           {/* Sales (big) */}
-//           <div className="lg:col-span-2 bg-white rounded-2xl p-5 shadow-sm border border-gray-50">
-//             <div className="flex items-center justify-between">
-//               <div>
-//                 <h3 className="text-lg font-semibold text-gray-800">Revenue & Orders</h3>
-//                 <p className="text-sm text-gray-500 mt-0.5">{timeFilter === 'Daily' ? 'Hourly breakdown' : 'Period breakdown'}</p>
-//               </div>
-//               <div className="flex items-center gap-2">
-//                 <TinyBadge>Live</TinyBadge>
-//                 <div className="text-sm text-gray-500">Compare</div>
-//               </div>
-//             </div>
-
-//             <div className="mt-4 flex items-center justify-between">
-//               <div>
-//                 <div className="text-3xl font-bold text-gray-900">{formatCurrency(totalEarnings)}</div>
-//                 <div className="text-sm text-gray-500 mt-1">Total sales in selected range</div>
-//               </div>
-
-//               <div className="space-y-1 text-right">
-//                 <div className="text-sm text-gray-500">Orders</div>
-//                 <div className="text-xl font-semibold">{totalOrders}</div>
-//               </div>
-//             </div>
-
-//             <div className="mt-6 h-64">
-//               <ResponsiveContainer width="100%" height="100%">
-//                 <BarChart data={chartData} margin={{ left: -10, right: 10 }}>
-//                   <CartesianGrid strokeDasharray="3 3" />
-//                   <XAxis dataKey="date" tick={{ fontSize: 12 }} tickLine={false} />
-//                   <YAxis tickLine={false} />
-//                   <Tooltip formatter={(val) => formatCurrency(Math.round(val))} />
-//                   <Bar dataKey="sales" fill="#ff8a00" radius={[8,8,0,0]} />
-//                 </BarChart>
-//               </ResponsiveContainer>
-//             </div>
-
-//             <div className="mt-4 grid grid-cols-3 gap-3">
-//               <div className="bg-gray-50 rounded-lg p-3 text-center">
-//                 <div className="text-xs text-gray-500">Avg order value</div>
-//                 <div className="text-lg font-semibold">{totalOrders ? formatCurrency(Math.round(totalEarnings / totalOrders)) : '-'} </div>
-//               </div>
-//               <div className="bg-gray-50 rounded-lg p-3 text-center">
-//                 <div className="text-xs text-gray-500">Conversion</div>
-//                 <div className="text-lg font-semibold">{totalOrders ? `${Math.min(100, Math.round((totalOrders / Math.max(1, totalCustomers)) * 100))}%` : '-'}</div>
-//               </div>
-//               <div className="bg-gray-50 rounded-lg p-3 text-center">
-//                 <div className="text-xs text-gray-500">Return rate</div>
-//                 <div className="text-lg font-semibold">—</div>
-//               </div>
-//             </div>
-//           </div>
-
-//           {/* Right side: status pie + top items */}
-//           <div className="bg-white rounded-2xl p-5 shadow-sm border border-gray-50 flex flex-col">
-//             <div className="flex items-center justify-between">
-//               <h3 className="text-lg font-semibold text-gray-800">Order status</h3>
-//               <div className="text-sm text-gray-500">Snapshot</div>
-//             </div>
-
-//             <div className="mt-4 grid grid-cols-1 gap-4">
-//               <div className="h-48">
-//                 <ResponsiveContainer width="100%" height="100%">
-//                   <PieChart>
-//                     <Pie data={statusPieData} dataKey="value" nameKey="name" cx="50%" cy="50%" outerRadius={70} innerRadius={30} paddingAngle={2}>
-//                       {statusPieData.map((entry, idx) => (
-//                         <Cell key={idx} fill={COLORS[idx % COLORS.length]} />
-//                       ))}
-//                     </Pie>
-//                     <Legend verticalAlign="bottom" height={36} />
-//                   </PieChart>
-//                 </ResponsiveContainer>
-//               </div>
-
-//               <div>
-//                 <div className="flex items-center justify-between mb-2">
-//                   <div className="text-sm text-gray-500">Top ordered items</div>
-//                   <div className="text-xs text-gray-400">Last 30 days</div>
-//                 </div>
-
-//                 <div className="space-y-2 max-h-52 overflow-auto">
-//                   {filteredTopItems.length ? (
-//                     filteredTopItems.map((it, i) => (
-//                       <div key={it.itemName + i} className="flex items-center justify-between gap-3 p-2 rounded-md hover:bg-gray-50">
-//                         <div className="flex-1">
-//                           <div className="font-medium text-gray-800">{it.itemName}</div>
-//                           <div className="text-xs text-gray-400">Orders: {it.orders}</div>
-//                         </div>
-//                         <div className="w-20 text-right font-semibold text-orange-600">{it.orders}</div>
-//                       </div>
-//                     ))
-//                   ) : (
-//                     <div className="text-sm text-gray-400">No top items found</div>
-//                   )}
-//                 </div>
-
-//                 <div className="mt-3 flex gap-2">
-//                   <button onClick={exportTopItemsCSV} className="flex-1 px-3 py-2 rounded-lg bg-gradient-to-r from-orange-500 to-orange-400 text-white">Export CSV</button>
-//                   <button className="px-3 py-2 rounded-lg border border-gray-200">Details</button>
-//                 </div>
-//               </div>
-//             </div>
-//           </div>
-//         </div>
-
-//         {/* Footer small widgets */}
-//         <div className="grid grid-cols-1 md:grid-cols-3 gap-6">
-//           <div className="bg-white rounded-2xl p-5 shadow-sm border border-gray-50">
-//             <h4 className="text-sm font-medium text-gray-700">Kitchen load</h4>
-//             <div className="mt-3 space-y-2">
-//               <div className="w-full bg-gray-100 rounded-full h-3 overflow-hidden">
-//                 <div className="h-3 rounded-full bg-gradient-to-r from-orange-400 to-orange-500" style={{ width: `${Math.min(100, (preparingOrders * 8))}%` }}></div>
-//               </div>
-//               <div className="text-xs text-gray-400">Preparing orders: {preparingOrders}</div>
-//             </div>
-//           </div>
-
-//           <div className="bg-white rounded-2xl p-5 shadow-sm border border-gray-50">
-//             <h4 className="text-sm font-medium text-gray-700">Delivery / Takeaway</h4>
-//             <div className="mt-3 text-sm text-gray-500">Under progress / Delivery streams — monitor orders in transit</div>
-//             <div className="mt-4 flex gap-2">
-//               <button className="px-3 py-2 rounded-lg bg-white border border-gray-200">View map</button>
-//               <button className="px-3 py-2 rounded-lg bg-gradient-to-r from-orange-500 to-orange-400 text-white">Manage</button>
-//             </div>
-//           </div>
-
-//           <div className="bg-white rounded-2xl p-5 shadow-sm border border-gray-50">
-//             <h4 className="text-sm font-medium text-gray-700">Quick actions</h4>
-//             <div className="mt-3 grid grid-cols-3 gap-2">
-//               <button className="px-2 py-2 text-xs rounded-lg bg-white border border-gray-200">New order</button>
-//               <button className="px-2 py-2 text-xs rounded-lg bg-white border border-gray-200">Refund</button>
-//               <button className="px-2 py-2 text-xs rounded-lg bg-gradient-to-r from-orange-500 to-orange-400 text-white">Reports</button>
-//             </div>
-//           </div>
-//         </div>
-
-//       </main>
-//     </div>
-//   );
-// };
-
-// export default DashBoardPage;

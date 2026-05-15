@@ -9,8 +9,7 @@ const screenRouteMap = {
   ecommerce_user_v1:"home"
 };
  
-export default function LoginPage({ onLoginSuccess }) {
-  const { clientId } = useParams()
+export default function LoginPage({ onLoginSuccess ,clientId}) {
   const [form, setForm] = useState({ username: '', password: '' });
   const [error, setError] = useState('');
   const [loading, setLoading] = useState(false);
@@ -60,26 +59,19 @@ export default function LoginPage({ onLoginSuccess }) {
       const token = data.data.access_token;
       const screen_id = data.screen_id || 'default_user';
 
-      console.log('Login successful', { token, screen_id });
-
-      // Call the onLoginSuccess callback to update parent state
+      // ✅ Just call the callback — App.jsx will handle navigation
       if (onLoginSuccess) {
-        onLoginSuccess(token, screen_id,clientId);
-        setShowAnimation(true);
+        onLoginSuccess(token, screen_id, clientId);
       }
-      const route = screenRouteMap[screen_id] || "home";
 
-      setTimeout(() => {
-        navigate(`/${APP_ROOT}/${clientId}/${route}`, { replace: true });
-      }, 1000);
-      
+      setShowAnimation(true);
+
     } catch (err) {
-      console.error('Login failed:', err);
       setError(err.message || 'Login failed. Please try again.');
     } finally {
       setLoading(false);
     }
-  };
+};
 
   const handleKeyPress = (e) => {
     if (e.key === 'Enter' && form.username && form.password && !loading) {
@@ -682,12 +674,3 @@ export default function LoginPage({ onLoginSuccess }) {
     </div>
   );
 }
-
-
-
-
-// =========================================================   Working ========================================================== //
-// =========================================================   Working ========================================================== //
-// =========================================================   Working ========================================================== //
-// =========================================================   Working ========================================================== //
-// =========================================================   Working ========================================================== //
