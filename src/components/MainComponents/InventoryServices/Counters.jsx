@@ -26,10 +26,10 @@ export default function CounterManager({ clientId, token }) {
   // ================= Fetch Counter Tree =================
   const fetchCounters = async () => {
     try {
-      const res = await axios.get(`${BASE}/read_category`, {
+      const res = await axios.get(
+        `${API}/${clientId}/inventory/read_category?category_id=${counterCategory}`, {
         params: {
           client_id: clientId,
-          category_id: counterCategory,
         },
         headers,
       });
