@@ -3,6 +3,11 @@ from sqlalchemy.orm import declarative_base, relationship
 from datetime import datetime
 from zoneinfo import ZoneInfo
 from models.order_model import OrderItemModel, DineinOrderModel
+import os
+from dotenv import load_dotenv
+
+load_dotenv()
+TIMEZONE = os.getenv("TIMEZONE", "UTC")
 Base = declarative_base()
 
 
@@ -24,10 +29,10 @@ class DineinOrder(Base):
     total_price = Column(Float, nullable=True)
     created_by = Column(String, nullable=True)
     updated_by = Column(String, nullable=True)
-    created_at = Column( DateTime(timezone=True),default=lambda: datetime.now(ZoneInfo("Asia/Kolkata")))
+    created_at = Column( DateTime(timezone=True),default=lambda: datetime.now(ZoneInfo(TIMEZONE)))
     updated_at = Column(DateTime(timezone=True),
-                 default=lambda: datetime.now(ZoneInfo("Asia/Kolkata")),
-                 onupdate=lambda: datetime.now(ZoneInfo("Asia/Kolkata")))
+                 default=lambda: datetime.now(ZoneInfo(TIMEZONE)),
+                 onupdate=lambda: datetime.now(ZoneInfo(TIMEZONE)))
     status = Column(String, nullable=True)
     items = relationship("OrderItem", backref="order",
                          cascade="all, delete-orphan")

@@ -13,7 +13,7 @@ from utils.send_email_otp import otpEmailService, otp_store
 from utils.create_notification import get_template_body, render_template
 from entity.inventory_entity import CategoryEntity
 from entity.order_entity import DineinOrder
-import random
+import random , os
 from datetime import datetime, timedelta
 from zoneinfo import ZoneInfo
 from services.add_users import create_user_and_person, getting_screen_id, get_user_perms, has_user_permission
@@ -22,6 +22,9 @@ import uuid
 from sqlalchemy import func
 from models.client_model import AddressModel 
 from utils.services import add_master_value , get_master_values ,delete_master_value
+from dotenv import load_dotenv
+load_dotenv()
+TIMEZONE = os.getenv("TIMEZONE", "UTC") 
 router = APIRouter()
 # ================== ADD USER ==================
 @router.post("/add")
@@ -167,7 +170,7 @@ async def forgot_password(client_id: str, req_data: ResetpasswordRequest, db: Se
     if not req_data.otp and not req_data.new_password:
         otp = str(random.randint(100000, 999999))
         otp_store[userModel.id] = {
-            "otp": otp, "expires": datetime.now(ZoneInfo("Asia/Kolkata")) + timedelta(minutes=10)}
+            "otp": otp, "expires": datetime.now(ZoneInfo(TIMEZONE)) + timedelta(minutes=10)}
 
         metadata = {"username": userModel.username,
                     "clientId": client_id, "otp": otp}
@@ -187,7 +190,7 @@ async def forgot_password(client_id: str, req_data: ResetpasswordRequest, db: Se
             raise HTTPException(status_code=400, detail="OTP not requested")
         if otp_data["otp"] != req_data.otp:
             raise HTTPException(status_code=400, detail="Invalid OTP")
-        if datetime.now(ZoneInfo("Asia/Kolkata")) > otp_data["expires"]:
+        if datetime.now(ZoneInfo(TIMEZONE)) > otp_data["expires"]:
             raise HTTPException(status_code=400, detail="OTP expired")
         if req_data.new_password != req_data.confirm_password:
             raise HTTPException(
@@ -225,7 +228,7 @@ async def reset_password(client_id: str, req_data: ResetpasswordRequest, context
 
         otp = str(random.randint(100000, 999999))
         otp_store[userModel.id] = {
-            "otp": otp, "expires": datetime.utcnow() + timedelta(minutes=10)}
+            "otp": otp, "expires": datetime.now(ZoneInfo(TIMEZONE)) + timedelta(minutes=10)}
 
         metadata = {"username": userModel.username,
                     "clientId": client_id, "otp": otp}
@@ -243,7 +246,7 @@ async def reset_password(client_id: str, req_data: ResetpasswordRequest, context
             raise HTTPException(status_code=400, detail="OTP not requested")
         if otp_data["otp"] != req_data.otp:
             raise HTTPException(status_code=400, detail="Invalid OTP")
-        if datetime.utcnow() > otp_data["expires"]:
+        if datetime.now(ZoneInfo(TIMEZONE)) > otp_data["expires"]:
             raise HTTPException(status_code=400, detail="OTP expired")
 
     # Old password verification
@@ -425,7 +428,7 @@ async def delegate_access(
     client_model = Client.copyToModel(client)
 
     # 4️⃣ Create delegated token
-    expire = datetime.now(ZoneInfo("Asia/Kolkata")) + timedelta(minutes=1)
+    expire = datetime.now(ZoneInfo(TIMEZONE)) + timedelta(minutes=1)
     payload = {
         "sub": str(requester.id),
         "roles": admin.roles,

@@ -19,6 +19,10 @@ import hashlib
 from datetime import datetime
 from zoneinfo import ZoneInfo
 from sqlalchemy.orm.attributes import flag_modified
+from dotenv import load_dotenv
+
+load_dotenv()
+TIMEZONE = os.getenv("TIMEZONE", "UTC")
 router = APIRouter()
 
 # ------------------------------ billing documents ------------------------------
@@ -351,7 +355,7 @@ async def verify_payment(client_id: str,body: RazorpayVerifyRequest,context: Saa
                 "razorpay_order_id":   body.razorpay_order_id,
                 "razorpay_signature":  body.razorpay_signature,
                 "razorpay_status":     payment["status"],
-                "verified_at":         datetime.now(ZoneInfo("Asia/Kolkata")).isoformat(),
+                "verified_at":         datetime.now(ZoneInfo(TIMEZONE)).isoformat(),
             }
             matched = True
 
@@ -365,14 +369,14 @@ async def verify_payment(client_id: str,body: RazorpayVerifyRequest,context: Saa
             "razorpay_order_id":   body.razorpay_order_id,
             "razorpay_signature":  body.razorpay_signature,
             "razorpay_status":     payment["status"],
-            "verified_at":         datetime.now(ZoneInfo("Asia/Kolkata")).isoformat(),
+            "verified_at":         datetime.now(ZoneInfo(TIMEZONE)).isoformat(),
         })
 
     invoice.payment_method  = updated_methods
     flag_modified(invoice, "payment_method")
     invoice.payment_status  = "Paid"
     invoice.approval_status = "Approved"
-    invoice.updated_at      = datetime.now(ZoneInfo("Asia/Kolkata"))
+    invoice.updated_at      = datetime.now(ZoneInfo(TIMEZONE))
 
     if not invoice.customer_id:
         invoice.customer_id   = payment.get("contact", "")
