@@ -11,3 +11,4 @@ pytest
 httpx
 python-dotenv
 saas_common_lib_473815
+tzdata
