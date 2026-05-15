@@ -7,19 +7,23 @@ from models.response_model import ResponseModel
 from models.saas_context import SaasContext
 from utils.auth import verify_token
 from database.postgres import get_db
-from services.billing_service import (
+from ..services.billing_service import (
     create_document_service, read_documents_service, update_document_service, delete_document_service,
     create_items_service, read_items_service, update_items_service, delete_items_service, upsert_from_order_payload,
     generate_invoice, issue_invoice
 )
-from services.payment_routes import razorpay_client, RazorpayOrderRequest,RazorpayVerifyRequest
+from ..services.payment_routes import razorpay_client, RazorpayOrderRequest,RazorpayVerifyRequest
 import os
+from zoneinfo import ZoneInfo
 import hmac
 import hashlib
 from datetime import datetime
 from sqlalchemy.orm.attributes import flag_modified
 router = APIRouter()
-
+from dotenv import load_dotenv
+load_dotenv()
+TIMEZONE = os.getenv("TIMEZONE", "UTC")
+router = APIRouter()
 # ------------------------------ billing documents ------------------------------
 
 
@@ -350,7 +354,7 @@ async def verify_payment(client_id: str,body: RazorpayVerifyRequest,context: Saa
                 "razorpay_order_id":   body.razorpay_order_id,
                 "razorpay_signature":  body.razorpay_signature,
                 "razorpay_status":     payment["status"],
-                "verified_at":         datetime.utcnow().isoformat(),
+                "verified_at":         datetime.now(ZoneInfo(TIMEZONE)).isoformat(),
             }
             matched = True
 
@@ -364,14 +368,14 @@ async def verify_payment(client_id: str,body: RazorpayVerifyRequest,context: Saa
             "razorpay_order_id":   body.razorpay_order_id,
             "razorpay_signature":  body.razorpay_signature,
             "razorpay_status":     payment["status"],
-            "verified_at":         datetime.utcnow().isoformat(),
+            "verified_at":         datetime.now(ZoneInfo(TIMEZONE)).isoformat(),
         })
 
     invoice.payment_method  = updated_methods
     flag_modified(invoice, "payment_method")
     invoice.payment_status  = "Paid"
     invoice.approval_status = "Approved"
-    invoice.updated_at      = datetime.utcnow()
+    invoice.updated_at      = datetime.now(ZoneInfo(TIMEZONE))
 
     if not invoice.customer_id:
         invoice.customer_id   = payment.get("contact", "")
