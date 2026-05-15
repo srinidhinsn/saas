@@ -2785,12 +2785,54 @@ const TakeOrder = ({ clientId, token, onOrderUpdate, realm }) => {
       .map(id => menuItems.find(mi => Number(mi.id) === Number(id)))
       .filter(Boolean);
 
-    if (isCombo) {
-      // Show the combo detail modal — combo goes to KDS as a single item
-      setComboModalItem(item);
-      setComboModalComponents(linkedItems);
-      setComboModalOpen(true);
-    } else {
+      if (isCombo) {
+        // ✅ Add combo directly without modal
+        let batch = currentBatchTimestamp;
+        if (!batch) { batch = Date.now(); setCurrentBatchTimestamp(batch); }
+    
+        setCart(prev => {
+          const existingCombo = prev.find(
+            i => i.id === Number(item.id) &&
+                 i.is_new_item &&
+                 !i.saved_sub_order &&
+                 !i.is_addon &&
+                 (i.frontend_unique_key || '').startsWith('combo_')
+          );
+    
+          if (existingCombo) {
+            return prev.map(i => {
+              if (i.frontend_unique_key === existingCombo.frontend_unique_key) {
+                return { ...i, quantity: i.quantity + 1 };
+              }
+              if (i.parent_item_key === existingCombo.frontend_unique_key && i.is_addon) {
+                return { ...i, quantity: i.quantity + 1 };
+              }
+              return i;
+            });
+          }
+    
+          const comboParentEntry = buildCartItem(item, {
+            batch_timestamp: batch,
+            is_addon: false,
+            _item_type: 'combo',
+          });
+    
+          const childEntries = linkedItems.map(comp =>
+            buildCartItem(comp, {
+              batch_timestamp: batch,
+              parent_item_key: comboParentEntry.frontend_unique_key,
+              is_addon: true,
+              _item_type: 'cchild',
+            })
+          );
+    
+          return [...prev, comboParentEntry, ...childEntries];
+        });
+    
+        setHasNewItems(true);
+        if (!isMobile) setShowCart(true);
+    
+      } else {
       // Show addon picker
       if (linkedItems.length > 0) {
         setSelectedMainItem(item);
@@ -3112,7 +3154,7 @@ const buildOrderPayload = (items) =>
             client_id: clientId,
             name: tableObj.name || `Table ${tableId}`,
             table_type: String(tableObj.table_type || 'Regular'),
-            status: 'Vacant',
+            status: 'vacant',
             location_zone: tableObj.location_zone || 'Main',
           },
           { headers }

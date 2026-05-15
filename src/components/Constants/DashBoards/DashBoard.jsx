@@ -629,29 +629,48 @@ const DashBoardPage = () => {
         setTwoHrTakeawaySales(twoHrTakeaway);
 
         // ── Build chart groups ────────────────────────────────────────────
-        const groups = {};
-        filteredOrders.forEach(order => {
-          const d = new Date(order.created_at);
-          const key = timeFilter === "Daily"
-            ? `${d.getHours()}:00`
-            : d.toLocaleDateString("en-US", { month: "short", day: "numeric" });
-          if (!groups[key]) groups[key] = { date: key, sales: 0, count: 0, dinein: 0, takeaway: 0 };
-          groups[key].sales += parseFloat(order.total_price) || 0;
-          groups[key].count += 1;
-          if (isTakeaway(order)) groups[key].takeaway += 1;
-          else groups[key].dinein += 1;
-        });
 
-        const sorted = timeFilter === "Daily"
-          ? Object.values(groups).sort((a, b) => parseInt(a.date) - parseInt(b.date))
-          : Object.values(groups).sort((a, b) =>
-            new Date(`${a.date}, ${new Date().getFullYear()}`) -
-            new Date(`${b.date}, ${new Date().getFullYear()}`)
-          );
-        setChartData(sorted);
-        setSplitChartData(sorted);
-      } catch (e) {
-        console.error("Stats fetch failed:", e);
+      const groups = {};
+
+      filteredOrders.forEach(order => {
+
+      const d = new Date(order.created_at);
+
+      let key = "";
+      if (timeFilter === "Daily") {
+
+         const hh = String(d.getHours()).padStart(2, "0");
+         const mm = String(d.getMinutes()).padStart(2, "0");
+         key = `${hh}:${mm}`;
+        }
+      if (!groups[key]) {
+         groups[key] = {
+             date: key,
+             sales: 0,
+             count: 0,
+             dinein: 0,
+             takeaway: 0,
+             sortTime: d.getTime(),
+            };
+          }
+
+        groups[key].sales += parseFloat(order.total_price) || 0;
+        groups[key].count += 1;
+
+      if (isTakeaway(order)) {
+        groups[key].takeaway += 1;
+      } else {
+        groups[key].dinein += 1;
+      }
+    });
+
+// proper sorting
+    const sorted = Object.values(groups).sort(
+      (a, b) => a.sortTime - b.sortTime);
+
+    setChartData(sorted);
+    setSplitChartData(sorted);
+  } catch (e) {console.error("Stats fetch failed:", e);
       }
     };
     run();
