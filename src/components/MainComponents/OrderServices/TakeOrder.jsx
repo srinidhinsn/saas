@@ -3154,7 +3154,7 @@ const buildOrderPayload = (items) =>
             client_id: clientId,
             name: tableObj.name || `Table ${tableId}`,
             table_type: String(tableObj.table_type || 'Regular'),
-            status: 'Vacant',
+            status: 'vacant',
             location_zone: tableObj.location_zone || 'Main',
           },
           { headers }
