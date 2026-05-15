@@ -48,17 +48,33 @@ const ORDER_FILTER_OPTIONS = [
 ];
 
 
+// ─── IST timestamp parser ──────────────────────────────────────────────────────
+// Server stores timestamps as IST wall-clock time without a timezone marker
+// (e.g. "2025-01-15 14:30:00"). Appending 'Z' would parse them as UTC, making
+// every order appear 5h30m ahead of actual time. We subtract the IST offset
+// (UTC+5:30) to recover the correct epoch milliseconds.
+
+const IST_OFFSET_MS = 5.5 * 60 * 60 * 1000;
+
+const parseISTTimestamp = (createdAt) => {
+  if (!createdAt) return 0;
+  const raw = typeof createdAt === 'string'
+    ? createdAt.replace(' ', 'T').split('.')[0]
+    : String(createdAt);
+  // If the string already carries timezone info, parse as-is
+  const hasZone = raw.endsWith('Z') || /[+-]\d{2}:\d{2}$/.test(raw);
+  return hasZone
+    ? new Date(raw).getTime()
+    : new Date(raw + 'Z').getTime() - IST_OFFSET_MS;
+};
+
+
 // ─── Elapsed time helper ───────────────────────────────────────────────────────
 
 const calculateElapsedTime = (createdAt) => {
   if (!createdAt) return null;
 
-  const utcString =
-    typeof createdAt === 'string'
-      ? createdAt.replace(' ', 'T').split('.')[0] + 'Z'
-      : createdAt;
-
-  const diffMs = Date.now() - new Date(utcString).getTime();
+  const diffMs = Date.now() - parseISTTimestamp(createdAt);
   if (diffMs < 0) return '0m';
 
   const totalSeconds = Math.floor(diffMs / 1000);
@@ -92,11 +108,7 @@ const isCancelledStatus = (status) => {
 // ─── Derive card-level status from its items ───────────────────────────────────
 const minutesElapsed = (createdAt) => {
   if (!createdAt) return 0;
-  const utcString =
-    typeof createdAt === 'string'
-      ? createdAt.replace(' ', 'T').split('.')[0] + 'Z'
-      : createdAt;
-  return Math.floor((Date.now() - new Date(utcString).getTime()) / 60000);
+  return Math.floor((Date.now() - parseISTTimestamp(createdAt)) / 60000);
 };
 
 // ─── Helper: is this order item a combo? ──────────────────────────────────────
@@ -223,7 +235,7 @@ const AggregatePanel = ({ cards, tablesMap, onClose }) => {
 
   entries.forEach(([, data]) => {
     data.orders.sort(
-      (a, b) => new Date(a.createdAt || 0) - new Date(b.createdAt || 0)
+      (a, b) => parseISTTimestamp(a.createdAt || 0) - parseISTTimestamp(b.createdAt || 0)
     );
   });
 
@@ -698,7 +710,7 @@ const KitchenDisplay = () => {
     // One card per sub-order: sort strictly by created_at ascending
     return subOrders
       .slice()
-      .sort((a, b) => new Date(a.created_at || 0) - new Date(b.created_at || 0))
+      .sort((a, b) => parseISTTimestamp(a.created_at || 0) - parseISTTimestamp(b.created_at || 0))
       .map((subOrder) => ({
         card_id: subOrder.id,
         sub_order_id: subOrder.id,
@@ -745,10 +757,7 @@ const KitchenDisplay = () => {
         if (mergedOrder.status === 'draft') return;
         const createdAt = mergedOrder.created_at;
         if (createdAt) {
-          const utc = typeof createdAt === 'string'
-            ? createdAt.replace(' ', 'T').split('.')[0] + 'Z'
-            : createdAt;
-          const orderDate = new Date(utc).toLocaleDateString(KDS_CONFIG.DATE_FORMAT);
+          const orderDate = new Date(parseISTTimestamp(createdAt)).toLocaleDateString(KDS_CONFIG.DATE_FORMAT);
           if (orderDate !== today) return;
         }
 
@@ -766,7 +775,7 @@ const KitchenDisplay = () => {
       });
 
       // Sort all cards by created_at ascending so newest orders appear last
-      allCards.sort((a, b) => new Date(a.created_at || 0) - new Date(b.created_at || 0));
+      allCards.sort((a, b) => parseISTTimestamp(a.created_at || 0) - parseISTTimestamp(b.created_at || 0));
 
       // Stabilise item order using a ref so positions survive refresh + navigation.
       // On first sight of a card, record item ids in server-arrival order.
