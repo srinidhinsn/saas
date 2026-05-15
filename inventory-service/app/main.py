@@ -19,8 +19,7 @@ ALLOWED_ORIGINS = [origin.strip() for origin in origins.split(",") if origin]
 
 logging.config.dictConfig(LOGGING_CONFIG)
 logger = logging.getLogger(__name__)
-app.include_router(routes.router, prefix="/saas/{client_id}/inventory")
-app.include_router(routes.router, prefix="/saas/{client_id}/menu")
+
 app.add_middleware(
     CORSMiddleware,
     allow_origins=ALLOWED_ORIGINS,
@@ -28,7 +27,8 @@ app.add_middleware(
     allow_methods=["*"],
     allow_headers=["*"]
 )
-
+app.include_router(routes.router, prefix="/saas/{client_id}/inventory")
+app.include_router(routes.router, prefix="/saas/{client_id}/menu")
 
 @app.get('/')
 def root():

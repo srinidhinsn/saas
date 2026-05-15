@@ -305,25 +305,32 @@ ALTER TABLE public.dinein_order ALTER COLUMN id ADD GENERATED ALWAYS AS IDENTITY
 -- Name: document; Type: TABLE; Schema: public; Owner: postgres
 --
 
-CREATE TABLE public.document (
-    id text NOT NULL,
-    client_id text NOT NULL,
-    category_id text NOT NULL,
-    name text,
-    description text,
-    is_protected boolean,
-    realm text,
-    url text,
-    path text,
-    is_active boolean,
-    created_by text,
-    last_read_by text,
-    created_date_time timestamp without time zone DEFAULT CURRENT_TIMESTAMP,
-    last_read_date_time timestamp without time zone DEFAULT CURRENT_TIMESTAMP
+CREATE TABLE documents (
+ id UUID  DEFAULT gen_random_uuid(),
+    client_id TEXT,
+    category_id TEXT,
+    name TEXT,
+    description TEXT,
+    realm TEXT,
+    filetype TEXT,
+    extension TEXT,
+    size_kb TEXT,
+    is_protected BOOLEAN,
+    is_active BOOLEAN,
+    uuid_name TEXT,
+    path TEXT,
+    storage_type TEXT,
+    checksum_md5 TEXT,
+    created_by TEXT,
+    last_read_by TEXT,
+    created_date_time TIMESTAMP DEFAULT now(),
+    last_read_date_time TIMESTAMP DEFAULT now(),
+    deleted BOOLEAN,
+    deleted_at TIMESTAMP
 );
 
 
-ALTER TABLE public.document OWNER TO postgres;
+ALTER TABLE public.documents OWNER TO postgres;
 
 --
 -- TOC entry 225 (class 1259 OID 21143)
@@ -712,8 +719,8 @@ ALTER TABLE ONLY public.inventory_transactions ALTER COLUMN id SET DEFAULT nextv
 --
 
 INSERT INTO public.category (id, client_id, name, description, sub_categories, slug, created_by, updated_by, created_at, updated_at) VALUES ('realm', 'saas', 'Realm', 'Realm of overall application framework', '{restaurant}', '_Realm', NULL, NULL, '2025-09-19 02:27:03.632856', '2025-09-19 02:27:03.632856');
-INSERT INTO public.category (id, client_id, name, description, sub_categories, slug, created_by, updated_by, created_at, updated_at) VALUES ('restaurant', 'saas', 'Restaurant', 'Restaurant realm in saas application', '{dinein,order,menu,inventory,users,tables,invoice,menu,document,order_item,order_items,kds}', '_Realm_Restaurant', NULL, NULL, '2025-09-19 02:27:03.632856', '2025-09-19 02:27:03.632856');
-INSERT INTO public.category (id, client_id, name, description, sub_categories, slug, created_by, updated_by, created_at, updated_at) VALUES ('dinein', 'saas', 'Dinein', 'All access to dine in module', '{create,create-sub-order,update,order,table,delete,kds/orders}', '_Realm_Restaurant_Dinein', NULL, NULL, '2025-09-19 02:27:03.632856', '2025-09-19 02:27:03.632856');
+INSERT INTO public.category (id, client_id, name, description, sub_categories, slug, created_by, updated_by, created_at, updated_at) VALUES ('restaurant', 'saas', 'Restaurant', 'Restaurant realm in saas application', '{dinein,order,menu,inventory,users,tables,invoice,menu,document,documents,order_item,order_items,kds}', '_Realm_Restaurant', NULL, NULL, '2025-09-19 02:27:03.632856', '2025-09-19 02:27:03.632856');
+INSERT INTO public.category (id, client_id, name, description, sub_categories, slug, created_by, updated_by, created_at, updated_at) VALUES ('dinein', 'saas', 'Dinein', 'All access to dine in module', '{create,create-sub-order,update,order,table,delete,kds/orders,cancel}', '_Realm_Restaurant_Dinein', NULL, NULL, '2025-09-19 02:27:03.632856', '2025-09-19 02:27:03.632856');
 INSERT INTO public.category (id, client_id, name, description, sub_categories, slug, created_by, updated_by, created_at, updated_at) VALUES ('order_items', 'saas', 'Order Items', 'All access to order items module', '{update}', '_Realm_Restaurant_Order Items', NULL, NULL, '2025-09-19 02:27:03.632856', '2025-09-19 02:27:03.632856');
 INSERT INTO public.category (id, client_id, name, description, sub_categories, slug, created_by, updated_by, created_at, updated_at) VALUES ('order', 'saas', 'Order', 'All access to order module', '{update}', '_Realm_Restaurant_Order', NULL, NULL, '2025-09-19 02:27:03.632856', '2025-09-19 02:27:03.632856');
 INSERT INTO public.category (id, client_id, name, description, sub_categories, slug, created_by, updated_by, created_at, updated_at) VALUES ('order_item', 'saas', 'Order item', 'Single order item accessibility', '{update,delete}', '_Realm_Restaurant_Order item', NULL, NULL, '2025-09-19 02:27:03.632856', '2025-09-19 02:27:03.632856');
@@ -723,17 +730,19 @@ INSERT INTO public.category (id, client_id, name, description, sub_categories, s
 INSERT INTO public.category (id, client_id, name, description, sub_categories, slug, created_by, updated_by, created_at, updated_at) VALUES ('users', 'saas', 'Users', 'User management accesses', '{register,login,add,reset-password,users,roles,roles/config,permissions,permissions/catelog,screens,screens/configure,persons,person-details,realm,realms,delete,delegate-access,client,clients,address}', '_Realm_Restaurant_Users', NULL, NULL, '2025-09-19 02:27:03.632856', '2025-09-19 02:27:03.632856');
 INSERT INTO public.category (id, client_id, name, description, sub_categories, slug, created_by, updated_by, created_at, updated_at) VALUES ('invoice', 'saas', 'Billing', 'Billing generation and update service accessibility', '{create,update,read,delete,read_document,update_document,delete_document,create_document,from-order-service,generate,issue,razorpay,verify}', '_Realm_Restaurant_Billing', NULL, NULL, '2025-09-19 02:27:03.632856', '2025-09-19 02:27:03.632856');
 INSERT INTO public.category (id, client_id, name, description, sub_categories, slug, created_by, updated_by, created_at, updated_at) VALUES ('document', 'saas', 'Document', 'Document storage', '{read,upload,replace,download}', '_Realm_Restaurant_Document', NULL, NULL, '2025-09-19 02:27:03.632856', '2025-09-19 02:27:03.632856');
+INSERT INTO public.category (id, client_id, name, description, sub_categories, slug, created_by, updated_by, created_at, updated_at) VALUES ('documents', 'saas', 'Documents', 'Document storage', '{read,upload,replace,download}', '_Realm_Restaurant_Document', NULL, NULL, '2025-09-19 02:27:03.632856', '2025-09-19 02:27:03.632856');
 INSERT INTO public.category (id, client_id, name, description, sub_categories, slug, created_by, updated_by, created_at, updated_at) VALUES ('kds', 'saas', 'KDS', 'Kitchen Display', '{read,update,delete}', '_Realm_Restaurant_KDS', NULL, NULL, '2025-09-19 02:27:03.632856', '2025-09-19 02:27:03.632856');
-INSERT INTO public.category (id, client_id, name, description, sub_categories, slug, created_by, updated_by, created_at, updated_at) VALUES ('dietery_01', 'easyfood', 'Veg', 'Veg only', NULL, '_Dietery_Veg_Non_AC', '1000', '1000', '2025-09-25 01:36:00.080849', '2025-09-25 01:36:00.080849');
-INSERT INTO public.category (id, client_id, name, description, sub_categories, slug, created_by, updated_by, created_at, updated_at) VALUES ('dietery_02', 'easyfood', 'Non-Veg', 'Non veg', NULL, '_Dietery_Non-Veg_Non_AC', '1000', '1000', '2025-09-25 01:36:00.080849', '2025-09-25 01:36:00.080849');
-INSERT INTO public.category (id, client_id, name, description, sub_categories, slug, created_by, updated_by, created_at, updated_at) VALUES ('dietery_03', 'easyfood', 'Vegan', 'Jain food', NULL, '_Dietery_Vegan_Non_AC', '1000', '1000', '2025-09-25 01:36:00.080849', '2025-09-25 01:36:00.080849');
-INSERT INTO public.category (id, client_id, name, description, sub_categories, slug, created_by, updated_by, created_at, updated_at) VALUES ('addons', 'easyfood', 'Add-ons', 'Add ons', NULL, '_Dietery_Add-ons_Non_AC', '1000', '1000', '2025-09-25 01:36:00.080849', '2025-09-25 01:36:00.080849');
-INSERT INTO public.category (id, client_id, name, description, sub_categories, slug, created_by, updated_by, created_at, updated_at) VALUES ('dietery_04', 'easyfood', 'Eggeterian', 'Egg food', NULL, '_Dietery_Eggeterian_Non_AC', '1000', '1000', '2025-09-25 01:36:00.080849', '2025-09-25 01:36:00.080849');
+INSERT INTO public.category (id, client_id, name, description, sub_categories, slug, created_by, updated_by, created_at, updated_at) VALUES ('dietery_01', 'easyfood', 'Veg', 'Veg only', NULL, '_Dietery_Veg', '1000', '1000', '2025-09-25 01:36:00.080849', '2025-09-25 01:36:00.080849');
+INSERT INTO public.category (id, client_id, name, description, sub_categories, slug, created_by, updated_by, created_at, updated_at) VALUES ('dietery_02', 'easyfood', 'Non-Veg', 'Non veg', NULL, '_Dietery_Non-Veg', '1000', '1000', '2025-09-25 01:36:00.080849', '2025-09-25 01:36:00.080849');
+INSERT INTO public.category (id, client_id, name, description, sub_categories, slug, created_by, updated_by, created_at, updated_at) VALUES ('dietery_03', 'easyfood', 'Vegan', 'Jain food', NULL, '_Dietery_Vegan', '1000', '1000', '2025-09-25 01:36:00.080849', '2025-09-25 01:36:00.080849');
+INSERT INTO public.category (id, client_id, name, description, sub_categories, slug, created_by, updated_by, created_at, updated_at) VALUES ('addons', 'easyfood', 'Add-ons', 'Add ons', NULL, '_Dietery_Add-ons', '1000', '1000', '2025-09-25 01:36:00.080849', '2025-09-25 01:36:00.080849');
+INSERT INTO public.category (id, client_id, name, description, sub_categories, slug, created_by, updated_by, created_at, updated_at) VALUES ('combos', 'easyfood', 'Combos', 'Combos', NULL, '_Dietery_Combos', '1000', '1000', '2025-09-25 01:36:00.080849', '2025-09-25 01:36:00.080849');
+INSERT INTO public.category (id, client_id, name, description, sub_categories, slug, created_by, updated_by, created_at, updated_at) VALUES ('dietery_04', 'easyfood', 'Eggeterian', 'Egg food', NULL, '_Dietery_Eggeterian', '1000', '1000', '2025-09-25 01:36:00.080849', '2025-09-25 01:36:00.080849');
 INSERT INTO public.category (id, client_id, name, description, sub_categories, slug, created_by, updated_by, created_at, updated_at) VALUES ('roles', 'easyfood', 'Roles', 'Roles definition', '{admin,waiter,receptionist}', '_Roles', '1000', '1000', '2025-08-19 12:47:01.377214', '2025-08-19 12:47:01.377214');
 INSERT INTO public.category (id, client_id, name, description, sub_categories, slug, created_by, updated_by, created_at, updated_at) VALUES ('admin', 'easyfood', 'Admin', 'admin', NULL, '_Roles_Admin', '1000', '1000', '2025-08-19 12:47:01.377214', '2025-08-19 12:47:01.377214');
 INSERT INTO public.category (id, client_id, name, description, sub_categories, slug, created_by, updated_by, created_at, updated_at) VALUES ('waiter', 'easyfood', 'Waiter', 'admin', NULL, '_Roles_Waiter', '1000', '1000', '2025-08-19 12:47:01.377214', '2025-08-19 12:47:01.377214');
 INSERT INTO public.category (id, client_id, name, description, sub_categories, slug, created_by, updated_by, created_at, updated_at) VALUES ('receptionist', 'easyfood', 'Receptionist', 'admin', NULL, '_Roles_Receptionist', '1000', '1000', '2025-08-19 12:47:01.377214', '2025-08-19 12:47:01.377214');
-INSERT INTO public.category (id, client_id, name, description, sub_categories, slug, created_by, updated_by, created_at, updated_at) VALUES ('status', 'easyfood', 'Status', 'Status Selection', '{Vacant,Occupied,Reserved}', '_Status', '1000', '1000', '2025-08-19 12:47:01.377214', '2025-08-19 12:47:01.377214');
+INSERT INTO public.category (id, client_id, name, description, sub_categories, slug, created_by, updated_by, created_at, updated_at) VALUES ('status', 'easyfood', 'Status', 'Status Selection', '{vacant,occupied,reserved}', '_Status', '1000', '1000', '2025-08-19 12:47:01.377214', '2025-08-19 12:47:01.377214');
 INSERT INTO public.category (id, client_id, name, description, sub_categories, slug, created_by, updated_by, created_at, updated_at) VALUES ('inventory', 'easyfood', 'Inventory', 'Inventory items', '{menu,ration_inventory}', '_Inventory', '1000', '1000', '2025-08-19 12:47:01.377214', '2025-08-19 12:47:01.377214');
 INSERT INTO public.category (id, client_id, name, description, sub_categories, slug, created_by, updated_by, created_at, updated_at) VALUES ('menu', 'easyfood', 'Menu', 'menu items', NULL, '_Inventory_Menu', '1000', '1000', '2025-08-19 12:47:01.377214', '2025-08-19 12:47:01.377214');
 INSERT INTO public.category (id, client_id, name, description, sub_categories, slug, created_by, updated_by, created_at, updated_at) VALUES ('ration_inventory', 'easyfood', 'Ration/Stock', 'stock items', NULL, '_Inventory_Ration/stock', '1000', '1000', '2025-08-19 12:47:01.377214', '2025-08-19 12:47:01.377214');
@@ -749,7 +758,7 @@ INSERT INTO public.category (id, client_id, name, description, sub_categories, s
 INSERT INTO public.category (id, client_id, name, description, sub_categories, slug, created_by, updated_by, created_at, updated_at) VALUES ('roof top', 'easyfood', 'Roof top', 'roof top', NULL, '_roof top_', NULL, NULL, '2026-04-22 15:53:41.247779', '2026-04-22 15:53:41.247779');
 INSERT INTO public.category (id, client_id, name, description, sub_categories, slug, created_by, updated_by, created_at, updated_at) VALUES ('section', 'easyfood', 'Section', 'Section Selection', '{AC,Non-AC,general}', '_Section', '1000', '1000', '2025-08-19 12:47:01.377214', '2026-04-22 15:53:47.927039');
 INSERT INTO public.category (id, client_id, name, description, sub_categories, slug, created_by, updated_by, created_at, updated_at) VALUES ('general', 'easyfood', 'General', 'general', NULL, '_general_', NULL, NULL, '2026-04-22 15:53:47.927039', '2026-04-22 15:53:47.927039');
-INSERT INTO public.category (id, client_id, name, description, sub_categories, slug, created_by, updated_by, created_at, updated_at) VALUES ('dietery', 'easyfood', 'Dietery', 'Dietry type', '{dietery_01,dietery_02,dietery_03,addons,dietery_04,biriyani_all_categories}', '_Dietery', '1000', '1000', '2025-09-25 01:36:00.080849', '2026-04-22 15:54:35.44673');
+INSERT INTO public.category (id, client_id, name, description, sub_categories, slug, created_by, updated_by, created_at, updated_at) VALUES ('dietery', 'easyfood', 'Dietery', 'Dietry type', '{dietery_01,dietery_02,dietery_03,addons,combos,dietery_04,biriyani_all_categories}', '_Dietery', '1000', '1000', '2025-09-25 01:36:00.080849', '2026-04-22 15:54:35.44673');
 INSERT INTO public.category (id, client_id, name, description, sub_categories, slug, created_by, updated_by, created_at, updated_at) VALUES ('biriyani_all_categories', 'easyfood', 'Biriyani', '', '{veg_biriyani_biriyani,non_veg_biriyani_biriyani}', '_All_Categories_Biriyani', '461e8cc6-a897-59b3-9f0e-1f2e19cd179c', '461e8cc6-a897-59b3-9f0e-1f2e19cd179c', '2026-04-22 15:54:35.330874', '2026-04-22 15:58:23.350569');
 INSERT INTO public.category (id, client_id, name, description, sub_categories, slug, created_by, updated_by, created_at, updated_at) VALUES ('available_timings', 'easyfood', 'Availability Time', 'Food Availability Timings', '{evening(15:30-17:30)}', '_AvailabilityTime', '1000', '1000', '2026-04-22 15:25:53.184091', '2026-04-22 15:57:26.284375');
 INSERT INTO public.category (id, client_id, name, description, sub_categories, slug, created_by, updated_by, created_at, updated_at) VALUES ('evening(15:30-17:30)', 'easyfood', 'Evening(15:30-17:30)', 'evening(15:30-17:30)', NULL, '_evening(15:30-17:30)_', NULL, NULL, '2026-04-22 15:57:26.284375', '2026-04-22 15:57:26.284375');
@@ -850,7 +859,7 @@ INSERT INTO public.page_definition (id, client_id, module, role, screen_id, load
 INSERT INTO public.page_definition (id, client_id, module, role, screen_id, load_type, operations) OVERRIDING SYSTEM VALUE VALUES (1003, 'easyfood', 'order', 'Admin', 'default_order', 'include', '{ALL}');
 INSERT INTO public.page_definition (id, client_id, module, role, screen_id, load_type, operations) OVERRIDING SYSTEM VALUE VALUES (1005, 'easyfood', 'tables', 'Admin', 'default_tables', 'include', '{ALL}');
 INSERT INTO public.page_definition (id, client_id, module, role, screen_id, load_type, operations) OVERRIDING SYSTEM VALUE VALUES (1002, 'easyfood', 'inventory', 'Admin', 'default_inventory', 'include', '{ALL}');
-INSERT INTO public.page_definition (id, client_id, module, role, screen_id, load_type, operations) OVERRIDING SYSTEM VALUE VALUES (1004, 'easyfood', 'users', 'Admin', 'default_user', 'exclude', '{test}');
+INSERT INTO public.page_definition (id, client_id, module, role, screen_id, load_type, operations) OVERRIDING SYSTEM VALUE VALUES (1004, 'easyfood', 'users', 'Admin', 'default_user', 'include', '{ALL}');
 INSERT INTO public.page_definition (id, client_id, module, role, screen_id, load_type, operations) OVERRIDING SYSTEM VALUE VALUES (1006, 'easyfood', 'invoice', 'Admin', 'default_invoice', 'include', '{ALL}');
 INSERT INTO public.page_definition (id, client_id, module, role, screen_id, load_type, operations) OVERRIDING SYSTEM VALUE VALUES (1007, 'easyfood', 'menu', 'Admin', 'default_menu', 'include', '{ALL}');
 INSERT INTO public.page_definition (id, client_id, module, role, screen_id, load_type, operations) OVERRIDING SYSTEM VALUE VALUES (1008, 'easyfood', 'document', 'Admin', 'default_document', 'include', '{ALL}');
@@ -1042,7 +1051,7 @@ ALTER TABLE ONLY public.dinein_order
 -- Name: document document_pk; Type: CONSTRAINT; Schema: public; Owner: postgres
 --
 
-ALTER TABLE ONLY public.document
+ALTER TABLE ONLY public.documents
     ADD CONSTRAINT document_pk PRIMARY KEY (id, client_id, category_id);
 
 
@@ -1161,6 +1170,10 @@ ALTER TABLE ONLY public.tables
 
 ALTER TABLE ONLY public."user"
     ADD CONSTRAINT user_client_fk FOREIGN KEY (client_id) REFERENCES public.client(id) ON DELETE CASCADE;
+
+
+ALTER TABLE inventory
+ADD CONSTRAINT inventory_pk PRIMARY KEY (id, inventory_id, client_id, category_id, zone_config_id);
 
 
 -- Completed on 2026-04-23 12:45:14

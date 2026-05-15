@@ -21,6 +21,7 @@ class TxPayload(BaseModel):
     movement_type:  Optional[str]     = None
     reference_type: Optional[str]     = None
 
+
 UNIT_TO_BASE = {
     "g": 1,
     "kg": 1000,
@@ -33,11 +34,40 @@ WEIGHT_UNITS = {"g", "kg"}
 VOLUME_UNITS = {"ml", "litre"}
 COUNT_UNITS = {"pcs"}
 
+
+# ─────────────────────────────────────────────────────────────────────────────
+# Remark helpers — single source of truth for all remark strings
+# ─────────────────────────────────────────────────────────────────────────────
+
+def build_remark(tag: str, order_id: int, item_name: str, qty, reason: str) -> str:
+    """Canonical remark format: [TAG] Order #N | item xQty | reason"""
+    return f"[{tag}] Order #{order_id} | {item_name} x{qty} | {reason}"
+
+
+def resolve_reason(
+    reason: Optional[str],
+    tx_type: Optional[TransactionTypeEnum],
+) -> str:
+    """
+    Return the human-readable reason string.
+    Falls back to a sensible default based on tx_type when reason is absent.
+    """
+    if reason:
+        return reason
+    if tx_type == TransactionTypeEnum.wastage:
+        return "Wastage — served item removed"
+    if tx_type == TransactionTypeEnum.item_cancelled:
+        return "Item cancelled before serving"
+    if tx_type == TransactionTypeEnum.order_cancelled:
+        return "Full order cancelled"
+    return "No reason provided"
+
+
+# ─────────────────────────────────────────────────────────────────────────────
+# Existing helpers (unchanged)
+# ─────────────────────────────────────────────────────────────────────────────
+
 def _compute_current_stock(db: Session, client_id: str, stock_item_id: int) -> Decimal:
-    """
-    Sum all transactions for a stock item to get the live stock level.
-    IN transactions add, OUT transactions subtract.
-    """
     rows = (
         db.query(InventoryTransactionEntity)
         .filter(
@@ -54,7 +84,6 @@ def _compute_current_stock(db: Session, client_id: str, stock_item_id: int) -> D
         else:
             total -= qty
     return total
- 
 
 def _convert(recipe_qty: float, recipe_unit: str, stock_unit: str) -> float:
     ru, su = recipe_unit.strip(), stock_unit.strip()
@@ -132,7 +161,7 @@ def create_transaction(
     else:
         if tx_type_str in ["WASTAGE"]:
          if before <= 0:
-           movement = "NONE"
+           movement = "out"
            after = before
          else:
            movement = "OUT"
@@ -151,7 +180,7 @@ def create_transaction(
 
         elif tx_type_str in ["ORDER_DEDUCTION", "STOCK_OUT", "CANCELLATION"]:
             if before <= 0:
-             movement = "NONE"
+             movement = "OUT"
              after = before
             else:
              movement = "OUT"
@@ -167,8 +196,8 @@ def create_transaction(
     # =========================================================
     tx = InventoryTransactionEntity(
         transaction_id=str(uuid.uuid4()),
-        client_id=client_id,
 
+        client_id=client_id,
         stock_item_id=item.id,
         inventory_id=item.inventory_id,
         name=item.name,
@@ -219,11 +248,7 @@ def record_partial_transaction(
     if not menu_item:
         return
 
-    base_remarks = (
-        f"{reason or transaction_type.value} | "
-        f"{item.item_name} x{remove_qty} (partial) | "
-        f"[key={item.frontend_unique_key}]"
-    )
+    effective_reason = resolve_reason(reason, transaction_type)
 
     stock_unit = (menu_item.unit or "").strip()
     serving_qty = float(menu_item.serving_quantity or 0)
@@ -234,25 +259,21 @@ def record_partial_transaction(
         create_transaction(db=db, client_id=client_id,
     payload=TxPayload(item_id=menu_item.id, tx_type=TransactionTypeEnum.item_cancelled,
         ref_id=order_id, qty=remove_qty,
-        remarks=f"[ITEM_CANCELLED_PARTIAL] Order #{order_id} — {base_remarks}"))
+        remarks=build_remark(TransactionTypeEnum.item_cancelled.value, order_id, item.item_name, remove_qty, effective_reason),
+            ),
+        )
 
     # 🔹 WASTAGE
     elif transaction_type == TransactionTypeEnum.wastage:
 
-        # 🔸 Menu item reversal (serving based)
-        if serving_qty > 0 and serving_unit and stock_unit:
-            try:
-                converted = _convert(serving_qty, serving_unit, stock_unit)
-                reversal_qty = round(converted * remove_qty, 6)
+        # 🔸 Always record wastage transaction
+        create_transaction(db=db, client_id=client_id,
+            payload=TxPayload(item_id=menu_item.id, tx_type=TransactionTypeEnum.wastage,
+                ref_id=order_id, qty=remove_qty,
+                remarks=build_remark(TransactionTypeEnum.wastage.value, order_id, item.item_name, remove_qty, effective_reason),
+            ),
+        )
 
-                create_transaction(db=db, client_id=client_id,
-    payload=TxPayload(item_id=menu_item.id, tx_type=TransactionTypeEnum.wastage,
-        ref_id=order_id, qty=reversal_qty,
-        remarks=f"[WASTAGE_PARTIAL] Order #{order_id} — {base_remarks}"))
-            except ValueError:
-                pass
-
-        # 🔸 Ingredient reversal
         for ingredient in menu_item.recipe or []:
             stock_item_id_raw = ingredient.get("stock_item_id")
             recipe_qty = float(ingredient.get("quantity_required") or 0)
@@ -270,14 +291,15 @@ def record_partial_transaction(
                 continue
 
             ing_stock_unit = (stock_item.unit or "").strip()
-
             try:
                 reversal = _convert(recipe_qty, recipe_unit, ing_stock_unit) * remove_qty
                 reversal_qty = round(reversal, 6)
 
                 create_transaction(db=db, client_id=client_id,
-    payload=TxPayload(item_id=stock_item.id, tx_type=TransactionTypeEnum.wastage,
+                    payload=TxPayload(item_id=stock_item.id, tx_type=TransactionTypeEnum.wastage,
         ref_id=order_id, qty=reversal_qty,
-        remarks=f"[INGREDIENT_REVERSAL_PARTIAL] Order #{order_id} — {base_remarks}"))
+        remarks=build_remark(TransactionTypeEnum.wastage.value, order_id, item.item_name, remove_qty, effective_reason),
+                    ),
+                )
             except ValueError:
                 continue

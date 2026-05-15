@@ -1,4 +1,5 @@
 from datetime import datetime, timedelta
+from zoneinfo import ZoneInfo
 from jose import JWTError, jwt
 from passlib.context import CryptContext
 from fastapi import Depends, HTTPException, Request
@@ -9,7 +10,10 @@ from entity.user_entity import PageDefinition
 from entity.inventory_entity import CategoryEntity
 from database.postgres import get_db
 from sqlalchemy.orm import Session
-
+import os
+from dotenv import load_dotenv
+load_dotenv()
+TIMEZONE = os.getenv("TIMEZONE", "UTC")
 SECRET_KEY = "nsn"
 ALGORITHM = "HS256"
 ACCESS_TOKEN_EXPIRE_MINUTES = 30
@@ -25,7 +29,7 @@ def verify_password(plain_password, hashed_password):
 
 def create_access_token(data: dict):
     to_encode = data.copy()
-    expire = datetime.utcnow() + timedelta(minutes=ACCESS_TOKEN_EXPIRE_MINUTES)
+    expire = datetime.now(ZoneInfo(TIMEZONE)) + timedelta(minutes=ACCESS_TOKEN_EXPIRE_MINUTES)
     to_encode.update({"exp": expire})
     return jwt.encode(to_encode, SECRET_KEY, algorithm=ALGORITHM)
 

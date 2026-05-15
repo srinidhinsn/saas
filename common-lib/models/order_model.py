@@ -20,6 +20,10 @@ class TransactionTypeEnum(str, Enum):
     item_cancelled = "ITEM_CANCELLED"
     wastage = "WASTAGE"
     order_cancelled = "ORDER_CANCELLED"
+    combo_child_wastage = "COMBO_CHILD_WASTAGE"
+    combo_child_cancelled = "COMBO_CHILD_CANCELLED"
+    recipe_cancel = "RECIPE_CANCEL"
+    ingredient_reversal = "INGREDIENT_REVERSAL"
 
 
 class MovementTypeEnum(str, Enum):
@@ -40,7 +44,6 @@ class OrderItemModel(BaseModel):
     line_total: Optional[float] = None
     status: Optional[OrderStatusEnum] = None
     frontend_unique_key: Optional[str] = None
-    parent_item_key: Optional[str] = None
 
     class Config:
         orm_mode = True
