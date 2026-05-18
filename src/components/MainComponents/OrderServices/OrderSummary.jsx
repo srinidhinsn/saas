@@ -1331,10 +1331,10 @@ const OrderSummaryVisible = ({ clientId, token }) => {
             {/* Order mode — singular selection */}
             <div className="grid grid-cols-2 sm:flex sm:flex-wrap gap-2 sm:gap-4 w-full xl:w-auto">
               {[
-                { value: 'all', label: 'All', icon: <Filter size={18} /> },
-                { value: 'dinein', label: 'Dine In', icon: <Users size={18} /> },
-                { value: 'takeaway', label: 'Takeaway', icon: <Package size={18} /> },
-                { value: 'delivery', label: 'Delivery', icon: <Truck size={18} /> },
+                { value: 'all', label: 'All', icon: <Filter size={20} /> },
+                { value: 'dinein', label: 'Dine In', icon: <Users size={20} /> },
+                { value: 'takeaway', label: 'Takeaway', icon: <Package size={20} /> },
+                { value: 'delivery', label: 'Delivery', icon: <Truck size={20} /> },
               ].map(({ value, label, icon }) => (
                 <button
                   key={value}
