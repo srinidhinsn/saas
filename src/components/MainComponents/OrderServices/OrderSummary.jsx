@@ -275,7 +275,7 @@ const LineItemsModal = ({
 // OrderItemsViewModal — read-only view of all items for an order
 // ─────────────────────────────────────────────────────────────────────────────
 
-const OrderItemsViewModal = ({ isOpen, onClose, order, inventoryMap, onRequestDeleteItem, getOrderTotal }) => {
+const OrderItemsViewModal = ({ isOpen, onClose, order, inventoryMap, onRequestDeleteItem,getOrderTotal }) => {
   if (!isOpen || !order) return null;
 
   const getItemStatusStyle = (status) => {
@@ -355,7 +355,7 @@ const OrderItemsViewModal = ({ isOpen, onClose, order, inventoryMap, onRequestDe
               </tr>
             </thead>
             <tbody className="divide-y divide-border-default">
-              {order.items.map((item, idx) => {
+             {order.items.map((item, idx) => {
                 const unitPrice =
                   item.unit_price ??
                   item.price ??
@@ -492,9 +492,9 @@ const OrderSummaryVisible = ({ clientId, token }) => {
   const [lineItemsDetails, setLineItemsDetails] = useState([]);
   const [pendingOrderId, setPendingOrderId] = useState(null);
 
-  // ─────────────────────────────────────────────────────────────────────────
-  // localStorage helpers (preserved exactly from original)
-  // ─────────────────────────────────────────────────────────────────────────
+ // ─────────────────────────────────────────────────────────────────────────
+ // localStorage helpers (preserved exactly from original)
+ // ─────────────────────────────────────────────────────────────────────────
 
   const generateSlug = name => name.toLowerCase().replace(/[\s]+/g, '-');
 
@@ -1054,7 +1054,7 @@ const OrderSummaryVisible = ({ clientId, token }) => {
         handleRequestDeleteItem(item, orderId);
         return;
       }
-      const updatedItems = o.items.map(item => { const itemKey = item.id || item.frontend_unique_key; if (itemKey === itemIdentifier) return { ...item, quantity: newQty }; return item; });
+      const updatedItems = o.items.map(item => { const itemKey = item.id || item.frontend_unique_key; if (itemKey === itemIdentifier) return { ...item,quantity: newQty }; return item; });
       const newTotal = updatedItems.reduce((s, it) => s + ((inventoryMap[it.item_id]?.unit_price || it.unit_price || it.price || 0) * (it.quantity || 1)), 0);
       return { ...o, items: updatedItems, total_price: newTotal };
     }));
@@ -1381,7 +1381,7 @@ const OrderSummaryVisible = ({ clientId, token }) => {
                 className="w-full sm:w-auto px-3 py-2 rounded-lg bg-bg-primary border border-border-default text-text-primary text-sm"
               />
 
-              <div className="text-lg font-bold text-text-primary whitespace-nowrap xl:ml-auto">
+              <div className="text-sm font-semibold text-text-secondary whitespace-nowrap xl:ml-auto">
                 {filteredOrders.length} order{filteredOrders.length !== 1 ? 's' : ''}
               </div>
 
@@ -1397,55 +1397,56 @@ const OrderSummaryVisible = ({ clientId, token }) => {
           <div className="rounded-xl overflow-hidden border border-border-default shadow-card bg-bg-primary">
             <div className="w-full overflow-x-auto">
               <table className="min-w-[1100px] w-full">
-                <thead className="bg-bg-tertiary border-b border-border-default">
-                  <tr>
-                    {['Order #', 'Table / Customer', 'Mode', 'Items', 'Total Price', 'Status', 'Actions'].map(h => (
-                      <th key={h} className="px-4 sm:px-6 py-4 text-left text-xs font-bold text-text-primary uppercase tracking-wider whitespace-nowrap">{h}</th>
-                    ))}
-                  </tr>
-                </thead>
-                <tbody className="divide-y divide-border-default">
-                  {filteredOrders.map((order, rowIdx) => {
-                    const status = order.status?.toLowerCase();
-                    const orderTotal = getOrderTotal(order);
-                    return (
-                      <tr key={order.id} className={`hover:bg-bg-tertiary transition-colors ${rowIdx % 2 === 0 ? 'bg-bg-primary' : 'bg-bg-tertiary'}`}>
-                        <td className="px-4 sm:px-6 py-4 whitespace-nowrap">
-                          <div className="flex items-center gap-1.5">
-                            <span className="font-bold text-action-primary">#{order.id}</span>
-                            {order.has_new_items && <span className="text-[9px] font-bold text-text-white bg-action-primary px-1.5 py-0.5 rounded-full uppercase">New</span>}
-                          </div>
-                        </td>
-                        <td className="px-4 sm:px-6 py-4 whitespace-nowrap">{order._fixedOrderMode === 'takeaway' ? order.customer_name || 'Takeaway' : tablesMap[order.table_id] || order.table || String(order.table_id)}</td>
-                        <td className="px-4 sm:px-6 py-4 whitespace-nowrap">
-                          <span className="inline-flex items-center gap-1 px-2.5 py-1 rounded-full text-xs font-semibold bg-bg-tertiary text-text-secondary border border-border-default whitespace-nowrap">{getOrderModeIcon(order._fixedOrderMode)}{getOrderModeLabel(order._fixedOrderMode)}</span>
-                        </td>
-                        <td className="px-4 sm:px-6 py-4 whitespace-nowrap">{order.items.length}</td>
-                        <td className="px-4 sm:px-6 py-4 whitespace-nowrap">₹{orderTotal.toFixed(2)}</td>
-                        <td className="px-4 sm:px-6 py-4 whitespace-nowrap"><StatusBadge status={order.status} /></td>
-                        <td className="px-4 sm:px-6 py-4 whitespace-nowrap">
-                          <div className="flex items-center justify-center gap-2 flex-nowrap">
-                            <button
-                              onClick={() => { setViewOrder({ ...order, _tableName: tablesMap[order.table_id] || order.table || String(order.table_id) }); setShowViewModal(true); }}
-                              className="p-1.5 rounded-lg bg-action-primary/10 text-action-primary hover:bg-action-primary hover:text-text-white transition-colors shrink-0" title="View items"
-                            ><Eye size={15} /></button>
-                            {status === 'ready' && (
-                              <button onClick={() => handleStatusChange(order.id, 'served')} className="px-2.5 py-1 rounded-lg bg-action-success text-text-white text-xs font-semibold hover:opacity-90 transition-colors whitespace-nowrap shrink-0">Mark As Served</button>
-                            )}
-                            {status === 'served' && (
-                              <button onClick={() => handleGenerateBill(order)} className="px-2.5 py-1 rounded-lg bg-green-700 text-text-white text-xs font-semibold hover:bg-green-800 transition-colors whitespace-nowrap shrink-0">Generate Bill</button>
-                            )}
-                            <button
-                              onClick={() => setCancelOrderModal({ isOpen: true, orderId: order.id })}
-                              className="p-1.5 rounded-lg bg-action-danger/10 text-action-danger hover:bg-action-danger hover:text-text-white transition-colors shrink-0" title="Cancel order"
-                            ><Trash2 size={15} /></button>
-                          </div>
-                        </td>
-                      </tr>
-                    );
-                  })}
-                </tbody>
-              </table>
+              <thead className="bg-bg-tertiary border-b border-border-default">
+                <tr>
+                  {['Order #', 'Table / Customer', 'Mode', 'Items', 'Total Price', 'Status', 'Actions'].map(h => (
+                    <th key={h} className="px-6 py-4 text-left text-xs font-bold text-text-primary uppercase tracking-wider">{h}</th>
+                  ))}
+                </tr>
+              </thead>
+              <tbody className="divide-y divide-border-default">
+                {filteredOrders.map((order, rowIdx) => {
+                  const status = order.status?.toLowerCase();
+                  const orderTotal = getOrderTotal(order);
+                  return (
+                    <tr key={order.id} className={`hover:bg-bg-tertiary transition-colors ${rowIdx % 2 === 0 ? 'bg-bg-primary' : 'bg-bg-tertiary'}`}>
+                      <td className="px-6 py-4 whitespace-nowrap">
+                        <div className="flex items-center gap-1.5">
+                          <span className="font-bold text-action-primary">#{order.id}</span>
+                          {order.has_new_items && <span className="text-[9px] font-bold text-text-white bg-action-primary px-1.5 py-0.5 rounded-full uppercase">New</span>}
+                        </div>
+                      </td>
+                      <td className="px-6 py-4 whitespace-nowrap">{order._fixedOrderMode === 'takeaway' ? order.customer_name || 'Takeaway' : tablesMap[order.table_id] || order.table || String(order.table_id)}</td>
+                      <td className="px-6 py-4 whitespace-nowrap">
+                        <span className="inline-flex items-center gap-1 px-2.5 py-1 rounded-full text-xs font-semibold bg-bg-tertiary text-text-secondary border border-border-default">{getOrderModeIcon(order._fixedOrderMode)}{getOrderModeLabel(order._fixedOrderMode)}</span>
+                      </td>
+                      <td className="px-6 py-4 whitespace-nowrap">{order.items.length}</td>
+                      <td className="px-6 py-4 whitespace-nowrap">₹{orderTotal.toFixed(2)}</td>
+                      <td className="px-6 py-4 whitespace-nowrap"><StatusBadge status={order.status} /></td>
+                      <td className="px-6 py-4 whitespace-nowrap">
+                        <div className="flex items-center justify-center gap-4 flex-wrap">
+                          <button
+                            onClick={() => { setViewOrder({ ...order, _tableName: tablesMap[order.table_id] || order.table || String(order.table_id) }); setShowViewModal(true); }}
+                            className="p-1.5 rounded-lg bg-action-primary/10 text-action-primary hover:bg-action-primary hover:text-text-white transition-colors" title="View items"
+                          ><Eye size={15} /></button>
+                          {status === 'ready' && (
+                            <button onClick={() => handleStatusChange(order.id, 'served')} className="px-2.5 py-1 rounded-lg bg-action-success text-text-white text-xs font-semibold hover:opacity-90 transition-colors whitespace-nowrap">Mark As Served</button>
+                          )}
+                          {status === 'served' && (
+                            <button onClick={() => handleGenerateBill(order)} className="px-2.5 py-1 rounded-lg bg-green-700 text-text-white text-xs font-semibold hover:bg-green-800 transition-colors whitespace-nowrap">Generate Bill</button>
+                          )}
+                          {/* REQ: trash now opens CancelOrderConfirmModal */}
+                          <button
+                            onClick={() => setCancelOrderModal({ isOpen: true, orderId: order.id })}
+                            className="p-1.5 rounded-lg bg-action-danger/10 text-action-danger hover:bg-action-danger hover:text-text-white transition-colors" title="Cancel order"
+                          ><Trash2 size={15} /></button>
+                        </div>
+                      </td>
+                    </tr>
+                  );
+                })}
+              </tbody>
+            </table>
             </div>
           </div>
         )}
@@ -1574,8 +1575,8 @@ const OrderSummaryVisible = ({ clientId, token }) => {
         .custom-scrollbar::-webkit-scrollbar-thumb { background: var(--color-border-default); border-radius: 10px; }
         .custom-scrollbar::-webkit-scrollbar-thumb:hover { background: var(--color-action-primary); }
       `}</style>
-    </div>
-  );
+      </div>
+      );
 };
 
-export default OrderSummaryVisible;
+      export default OrderSummaryVisible;
