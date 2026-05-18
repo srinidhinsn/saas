@@ -10,6 +10,7 @@ import Headers_V1 from './components/V1_Components/Headers/Headers_V1';
 import Super_Admin_Header from './components/Super_Admin/Headers/Super_Admin_Header';
 import { setupAuthInterceptor } from './components/utils/authInterceptor';
 import Header_Super_User from './components/Super_User/Header/Header_Super_User';
+import { jwtDecode } from "jwt-decode";
 
 // ─── Screen → Route mapping (keep in sync with Login.jsx) ───────────────────
 const screenRouteMap = {
@@ -96,13 +97,30 @@ const FallbackPreserveClient = () => {
 const App = () => {
   const [authState, setAuthState] = useState(() => {
    const token= localStorage.getItem('access_token');
+   let validToken = null;
+
+if (token) {
+  try {
+    const decoded = jwtDecode(token);
+
+    if (decoded.exp * 1000 > Date.now()) {
+      validToken = token;
+    } else {
+      localStorage.removeItem("access_token");
+      localStorage.removeItem("screen_id");
+    }
+  } catch (e) {
+    localStorage.removeItem("access_token");
+    localStorage.removeItem("screen_id");
+  }
+}
    const screenId= localStorage.getItem('screen_id');
    const clientId= localStorage.getItem('client_id');
     return {
-      token,
+      token: validToken,
       screenId,
       clientId,
-      isAuthenticated: !!token,
+      isAuthenticated: !!validToken,
     };
   });
 
