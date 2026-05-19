@@ -2920,9 +2920,12 @@ const buildOrderPayload = (items) =>
       if (activeOrderId && activeDineinOrderId) {
         const newOnly = cart.filter(i => i.is_new_item && !i.saved_sub_order);
         if (newOnly.length > 0) {
+          const subTotal = newOnly
+            .filter(i => !i.is_addon)
+            .reduce((s, i) => s + (i.unit_price || 0) * i.quantity, 0);
           const r = await axios.post(
             `${import.meta.env.VITE_API_ORDER_SERVICE_URL}/${clientId}/dinein/create-sub-order`,
-            { items: buildOrderPayload(newOnly) },
+            { items: buildOrderPayload(newOnly), price: subTotal, total_price: subTotal },
             { headers, params: { client_id: clientId, parent_dinein_order_id: activeDineinOrderId } }
           );
           placedOrderId = activeOrderId;
