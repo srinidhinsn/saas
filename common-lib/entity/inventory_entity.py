@@ -57,7 +57,7 @@ class CategoryEntity(Base):
     __tablename__ = "category"
 
     id = Column(Text, primary_key=True)
-    client_id = Column(Text, nullable=False)
+    client_id = Column(Text, primary_key=True)
     name = Column(Text, nullable=True)
     description = Column(Text, nullable=True)
     sub_categories = Column(ARRAY(Text), nullable=True)
