@@ -2915,9 +2915,12 @@ const buildOrderPayload = (items) =>
       if (activeOrderId && activeDineinOrderId) {
         const newOnly = cart.filter(i => i.is_new_item && !i.saved_sub_order);
         if (newOnly.length > 0) {
+          const subTotal = newOnly
+            .filter(i => !i.is_addon)
+            .reduce((s, i) => s + (i.unit_price || 0) * i.quantity, 0);
           const r = await axios.post(
             `${import.meta.env.VITE_API_ORDER_SERVICE_URL}/${clientId}/dinein/create-sub-order`,
-            { items: buildOrderPayload(newOnly) },
+            { items: buildOrderPayload(newOnly), price: subTotal, total_price: subTotal },
             { headers, params: { client_id: clientId, parent_dinein_order_id: activeDineinOrderId } }
           );
           placedOrderId = activeOrderId;
@@ -3344,7 +3347,7 @@ const buildOrderPayload = (items) =>
   // ─────────────────────────────────────────────────────────────────────────
 
   return (
-    <div className="bg-bg-primary p-0 h-[calc(100vh-4rem)] overflow-x-hidden overflow-y-auto">
+    <div className="bg-bg-primary p-0 h-[calc(100vh-4rem)] overflow-y-auto">
 
       {/* ══════════════ FLOOR VIEW ══════════════ */}
       {currentView === 'floor' && (
@@ -3370,11 +3373,11 @@ const buildOrderPayload = (items) =>
 
       {/* ══════════════ ORDER VIEW ══════════════ */}
       {currentView === 'order' && (
-        <div className="mx-auto px-2 py-2">
-          <div className="grid lg:grid-cols-4 gap-1">
+        <div className="w-full max-w-screen-2xl mx-auto px-2 sm:px-3 md:px-4 lg:px-5 py-2 overflow-x-hidden">
+          <div className="grid grid-cols-1 xl:grid-cols-4 gap-2 w-full min-w-0">
 
             {/* ── Category sidebar ── */}
-            <div className="w-full lg:col-span-1">
+            <div className="xl:col-span-1 min-w-0 w-full overflow-hidden">
               <div className="lg:h-[calc(98dvh-4rem)] lg:overflow-y-auto pr-1">
                 <CategoryTree
                   categories={sidebarCategories}
@@ -3382,7 +3385,6 @@ const buildOrderPayload = (items) =>
                   onSelectCategory={setSelectedCategoryId}
                   defaultOpenAll
                   zoneConfigId={zoneConfigId}
-                  dietaryOptions={dietaryOptions}
                   dietaryColorMap={dietaryColorMap}
                   selectedDietary={selectedDietary}
                   onSelectDietary={setSelectedDietary}
@@ -3391,15 +3393,14 @@ const buildOrderPayload = (items) =>
             </div>
 
             {/* ── Menu panel + Cart panel ── */}
-            <div className="lg:col-span-3 flex gap-2">
+            <div className="xl:col-span-3 w-full min-w-0 flex flex-col xl:flex-row overflow-hidden gap-2">
 
               {/* Menu panel */}
-              <div className="transition-all duration-300 border-default border-border-default p-2 rounded-lg flex-1 overflow-y-auto h-[calc(98dvh-4rem)] lg:h-auto lg:max-h-[calc(98dvh-4rem)]">
+              <div className="transition-all duration-300 border-default border-border-default p-2 sm:p-3 rounded-lg flex-1 w-full min-w-0 overflow-x-hidden overflow-y-auto h-[calc(100dvh-10rem)] xl:h-[calc(98dvh-4rem)]">
 
                 {/* Top controls */}
                 <div className="space-y-2 mb-2">
-                  {/* Back button + Dietary pills + Search */}
-                  <div className="flex items-center gap-2 flex-wrap">
+                  <div className="flex flex-wrap sm:flex-nowrap items-center gap-2 w-full min-w-0">
                     <button
                       onClick={handleBackToTables}
                       className="p-2 rounded-lg bg-bg-tertiary border border-border-default hover:bg-bg-secondary flex-shrink-0"
@@ -3408,7 +3409,7 @@ const buildOrderPayload = (items) =>
                     </button>
 
                     {/* Dietary type pills */}
-                    <div className="flex gap-1.5 overflow-x-auto scrollbar-hide flex-1">
+                    <div className="flex gap-1.5 overflow-x-auto scrollbar-hide flex-1 min-w-0 whitespace-nowrap py-1">
                       <button
                         onClick={() => setSelectedDietary(null)}
                         className={`px-3 py-1.5 rounded-full text-xs font-semibold whitespace-nowrap flex-shrink-0 transition-all border
@@ -3437,17 +3438,13 @@ const buildOrderPayload = (items) =>
                               <span className={`w-2 h-2 rounded-full flex-shrink-0 ${dietaryColorMap[key]}`} />
                             )}
                             {type}
-                            {/* <span className={`text-[10px] px-1.5 py-0.5 rounded-full font-bold
-              ${selectedDietary === key ? 'bg-white/20' : 'bg-bg-primary'}`}>
-                                {count}
-                              </span> */}
                           </button>
                         );
                       })}
                     </div>
 
                     {/* Search */}
-                    <div className="relative w-52 flex-shrink-0">
+                    <div className="relative w-full sm:w-64 md:w-72 lg:w-80 xl:w-72 flex-shrink-0">
                       <Search size={16} className="absolute left-3 top-1/2 -translate-y-1/2 text-text-secondary" />
                       <input
                         ref={searchInputRef}
@@ -3461,7 +3458,7 @@ const buildOrderPayload = (items) =>
                 </div>
 
                 {/* Item grid */}
-                <div className={`grid gap-2 grid-cols-2 md:grid-cols-4 ${showCart ? 'lg:grid-cols-3' : 'lg:grid-cols-4'}`}>
+                <div className={`grid gap-2 grid-cols-2 sm:grid-cols-2 md:grid-cols-2 lg:grid-cols-3 2xl:grid-cols-4 ${showCart ? 'xl:grid-cols-3' : 'xl:grid-cols-4'} w-full min-w-0`}>
                   {filteredItems.map(item => {
                     const dp = item.discount && Number(item.discount) > 0
                       ? Number(item.discount).toFixed(0) : null;
@@ -3472,7 +3469,7 @@ const buildOrderPayload = (items) =>
                       <div
                         key={`${item.id}_${item.zone_config_id ?? 0}`}
                         onClick={() => handleItemClick(item)}
-                        className="flex gap-2 items-center bg-bg-primary border-default border-border-default rounded-xl p-1 shadow-sm hover:shadow-md transition cursor-pointer"
+                        className="flex gap-2 items-center bg-bg-primary border-default border-border-default rounded-xl p-2 min-w-0 w-full overflow-hidden shadow-sm hover:shadow-md transition cursor-pointer"
                       >
                         <div className={`w-[4px] self-stretch rounded-l-xl flex-shrink-0 ${dietaryColor}`} />
                         <div className="w-14 h-16 rounded-lg overflow-hidden shrink-0 bg-gray-100">
@@ -3531,225 +3528,390 @@ const buildOrderPayload = (items) =>
                 </div>
               </div>
 
-              {/* ── Cart panel (desktop only) ── */}
-              {!isMobile && (
-                <div
-                  className={`transition-all duration-300 ease-in-out
-                    ${showCart ? 'w-[22rem] opacity-100 z-30' : 'w-0 opacity-0 pointer-events-none'}`}
-                >
-                  <div className="border border-gray-300 rounded-xl bg-white shadow-xl lg:h-[calc(98dvh-4rem)] flex flex-col">
-                    <div className="flex flex-col h-full p-4">
+              {/* ── Cart panel (desktop only, slide in) ── */}
+              <div
+                className={`hidden lg:block transition-all duration-300 ease-in-out
+                  ${showCart ? 'w-[22rem] opacity-100' : 'w-0 opacity-0 pointer-events-none'}`}
+              >
+                <div className="border border-gray-300 rounded-xl bg-white shadow-xl lg:h-[calc(98dvh-4rem)] flex flex-col">
+                  <div className="flex flex-col h-full p-4">
 
-                      {/* Cart header */}
-                      <div className="pb-3 border-b space-y-2">
-                        <h2 className="text-lg font-semibold text-gray-800">Your Order</h2>
+                    {/* Cart header */}
+                    <div className="pb-3 border-b space-y-2">
+                      <h2 className="text-lg font-semibold text-gray-800">Your Order</h2>
 
-                        <div className="flex items-center justify-between text-sm bg-gray-50 px-3 py-2 rounded-lg">
-                          <div className="flex items-center gap-2">
-                            {orderMode === 'dinein' && selectedTable && (
-                              <span className="font-semibold text-lg text-gray-700">
-                                {tables.find(t => t.id.toString() === selectedTable)?.table_number}
-                              </span>
-                            )}
-
-                            {orderMode === 'takeaway' && (
-                              <select
-                                value={selectedTable}
-                                onChange={(e) => {
-                                  setSelectedTable(e.target.value);
-                                  setTakeawayTableId(e.target.value);
-                                }}
-                                className="border-none outline-none rounded px-2 py-1 text-sm bg-white"
-                              >
-                                <option value="">Select Table</option>
-                                {takeawayTables.map(t => (
-                                  <option key={t.id} value={t.id}>
-                                    {t.table_number}
-                                  </option>
-                                ))}
-                              </select>
-                            )}
-                            {activeOrderId && (
-                              <button
-                                onClick={() => setShowTransferModal(true)}
-                                className="text-sm text-red-600 hover:underline"
-                              >
-                                Transfer
-                              </button>
-                            )}
-                            {activeDineinOrderId && (
-                              <span className="text-xs text-gray-500 font-mono">
-                                #{activeDineinOrderId}
-                              </span>
-                            )}
-                          </div>
-                          <span className="text-base font-bold text-red-600">₹{getTotalPrice()}</span>
-                        </div>
-
-                        {/* Draft saved indicator */}
-                        {draftSavedAt && (
-                          <div className="flex items-center gap-1.5 text-xs text-green-700 bg-green-50 px-2 py-1 rounded-lg">
-                            <Save size={11} />
-                            <span>
-                              Draft saved ·{' '}
-                              {new Date(draftSavedAt).toLocaleTimeString([], {
-                                hour: '2-digit',
-                                minute: '2-digit',
-                              })}
+                      <div className="flex items-center justify-between text-sm bg-gray-50 px-3 py-2 rounded-lg">
+                        <div className="flex items-center gap-2">
+                          {orderMode === 'dinein' && selectedTable && (
+                            <span className="font-semibold text-lg text-gray-700">
+                              {tables.find(t => t.id.toString() === selectedTable)?.table_number}
                             </span>
-                          </div>
-                        )}
+                          )}
+
+                          {orderMode === 'takeaway' && (
+                            <select
+                              value={selectedTable}
+                              onChange={(e) => {
+                                setSelectedTable(e.target.value);
+                                setTakeawayTableId(e.target.value);
+                              }}
+                              className="border-none outline-none rounded px-2 py-1 text-sm bg-white"
+                            >
+                              <option value="">Select Table</option>
+                              {takeawayTables.map(t => (
+                                <option key={t.id} value={t.id}>
+                                  {t.table_number}
+                                </option>
+                              ))}
+                            </select>
+                          )}
+                          {activeOrderId && (
+                            <button
+                              onClick={() => setShowTransferModal(true)}
+                              className="text-sm text-red-600 hover:underline"
+                            >
+                              Transfer
+                            </button>
+                          )}
+                          {activeDineinOrderId && (
+                            <span className="text-xs text-gray-500 font-mono">
+                              #{activeDineinOrderId}
+                            </span>
+                          )}
+                        </div>
+                        <span className="text-base font-bold text-red-600">₹{getTotalPrice()}</span>
                       </div>
 
-                      {/* Dine-in / Takeaway toggle */}
-                      <div className="mt-3">
-                        <div className="flex bg-gray-100 rounded-lg p-1">
-                          <button
-                            onClick={() => {
-                              setOrderMode('dinein');
-                              if (dineinTableId) setSelectedTable(dineinTableId);
-                            }}
-                            className={`flex-1 py-2 rounded-md text-sm font-medium flex items-center justify-center gap-2
-                              ${orderMode === 'dinein'
-                                ? 'bg-action-primary text-white shadow-sm'
-                                : 'text-gray-600 hover:text-gray-800'}`}
-                          >
-                            <Users size={16} /> Dine In
-                          </button>
-                          <button
-                            onClick={() => {
-                              setOrderMode('takeaway');
-                              setSelectedTable(takeawayTableId?.toString());
-                            }}
-                            className={`flex-1 py-2 rounded-md text-sm font-medium flex items-center justify-center gap-2
-                              ${orderMode === 'takeaway'
-                                ? 'bg-action-primary text-white shadow-sm'
-                                : 'text-gray-600 hover:text-gray-800'}`}
-                          >
-                            <Package size={16} /> Takeaway
-                          </button>
+                      {draftSavedAt && (
+                        <div className="flex items-center gap-1.5 text-xs text-green-700 bg-green-50 px-2 py-1 rounded-lg">
+                          <Save size={11} />
+                          <span>
+                            Draft saved ·{' '}
+                            {new Date(draftSavedAt).toLocaleTimeString([], {
+                              hour: '2-digit',
+                              minute: '2-digit',
+                            })}
+                          </span>
                         </div>
-                      </div>
-
-                      {/* Cart body */}
-                      {cart.length === 0 ? (
-                        <div className="flex-1 flex items-center justify-center text-sm text-gray-400">
-                          No items added
-                        </div>
-                      ) : (
-                        <>
-                          <div className="flex-1 overflow-y-auto mt-4 space-y-2">
-
-                            {/* Old (previously placed) items */}
-                            {getGroupedCartItems(oldItems).map((group, idx) => (
-                              <OldItemRow
-                                key={`old-${idx}`}
-                                group={group}
-                                clientId={clientId}
-                                token={token}
-                                activeDineinOrderId={activeDineinOrderId}
-                                onRequestDelete={handleOldItemRequestDelete}
-                              />
-                            ))}
-
-                            {/* Divider between old and new */}
-                            {activeOrderId && oldItems.length > 0 && newItems.length > 0 && (
-                              <div className="flex items-center gap-2 my-2">
-                                <div className="flex-1 h-px bg-gradient-to-r from-transparent via-orange-400 to-transparent" />
-                                <span className="text-xs font-semibold text-orange-600 px-2">NEW ITEMS</span>
-                                <div className="flex-1 h-px bg-gradient-to-r from-orange-400 via-transparent to-transparent" />
-                              </div>
-                            )}
-
-                            {/* New items (editable), grouped by batch */}
-                            {batchTimestamps.map((ts, bi) => (
-                              <React.Fragment key={ts}>
-                                {bi > 0 && (
-                                  <div className="flex items-center gap-2 my-2">
-                                    <div className="flex-1 h-px bg-gradient-to-r from-transparent via-orange-400 to-transparent" />
-                                    <span className="text-xs font-semibold text-orange-600 px-2">
-                                      NEW ITEMS
-                                    </span>
-                                    <div className="flex-1 h-px bg-gradient-to-r from-orange-400 via-transparent to-transparent" />
-                                  </div>
-                                )}
-                                {getGroupedCartItems(groupedNewItems[ts]).map((group, idx) => (
-                                  <NewItemRow
-                                    key={`new-${ts}-${idx}`}
-                                    group={group}
-                                    clientId={clientId}
-                                    token={token}
-                                    onUpdateQuantity={updateQuantity}
-                                    onRemove={removeFromCart}
-                                  />
-                                ))}
-                              </React.Fragment>
-                            ))}
-                          </div>
-
-                          {/* ── Action buttons ── */}
-                          <div className="grid grid-cols-2 gap-2 mt-3">
-
-                            {/* Place Order */}
-                            <button
-                              onClick={handlePlaceOrder}
-                              disabled={!canPlaceOrder || isPlacingOrder}
-                              className={`py-2 rounded-lg text-sm font-semibold
-                                ${canPlaceOrder && !isPlacingOrder
-                                  ? 'bg-action-primary text-white hover:bg-action-danger'
-                                  : 'bg-gray-300 cursor-not-allowed'}`}
-                            >
-                              {isPlacingOrder ? 'Placing...' : 'Place Order'}
-                            </button>
-
-                            {/* Bill */}
-                            <button
-                              onClick={handleBillFromCart}
-                              className="py-2 rounded-lg text-sm font-semibold bg-green-600 text-white hover:bg-green-700 flex items-center justify-center gap-1"
-                            >
-                              <FileText size={16} /> Bill
-                            </button>
-
-                            {/* Save Draft */}
-                            <button
-                              onClick={handleSaveDraft}
-                              disabled={cart.length === 0}
-                              title="Save draft — items will be here even after a page refresh"
-                              className={`py-2 border rounded-lg text-sm flex items-center justify-center gap-1 font-semibold transition-colors
-                                ${cart.length > 0
-                                  ? 'bg-yellow-50 border-yellow-400 text-yellow-700 hover:bg-yellow-100'
-                                  : 'opacity-40 cursor-not-allowed text-gray-400 border-gray-200'}`}
-                            >
-                              <Save size={15} /> Save
-                            </button>
-
-                            {/* Clear */}
-                            <button
-                              onClick={handleClearCart}
-                              className="py-2 border rounded-lg text-sm hover:bg-gray-100"
-                            >
-                              Clear
-                            </button>
-                          </div>
-                        </>
                       )}
                     </div>
+
+                    {/* Dine-in / Takeaway toggle */}
+                    <div className="mt-3">
+                      <div className="flex bg-gray-100 rounded-lg p-1">
+                        <button
+                          onClick={() => {
+                            setOrderMode('dinein');
+                            if (dineinTableId) setSelectedTable(dineinTableId);
+                          }}
+                          className={`flex-1 py-2 rounded-md text-sm font-medium flex items-center justify-center gap-2
+                            ${orderMode === 'dinein'
+                              ? 'bg-action-primary text-white shadow-sm'
+                              : 'text-gray-600 hover:text-gray-800'}`}
+                        >
+                          <Users size={16} /> Dine In
+                        </button>
+                        <button
+                          onClick={() => {
+                            setOrderMode('takeaway');
+                            setSelectedTable(takeawayTableId?.toString());
+                          }}
+                          className={`flex-1 py-2 rounded-md text-sm font-medium flex items-center justify-center gap-2
+                            ${orderMode === 'takeaway'
+                              ? 'bg-action-primary text-white shadow-sm'
+                              : 'text-gray-600 hover:text-gray-800'}`}
+                        >
+                          <Package size={16} /> Takeaway
+                        </button>
+                      </div>
+                    </div>
+
+                    {/* Cart body */}
+                    {cart.length === 0 ? (
+                      <div className="flex-1 flex items-center justify-center text-sm text-gray-400">
+                        No items added
+                      </div>
+                    ) : (
+                      <>
+                        <div className="flex-1 overflow-y-auto mt-4 space-y-2">
+                          {getGroupedCartItems(oldItems).map((group, idx) => (
+                            <OldItemRow
+                              key={`old-${idx}`}
+                              group={group}
+                              clientId={clientId}
+                              token={token}
+                              activeDineinOrderId={activeDineinOrderId}
+                              onRequestDelete={handleOldItemRequestDelete}
+                            />
+                          ))}
+
+                          {activeOrderId && oldItems.length > 0 && newItems.length > 0 && (
+                            <div className="flex items-center gap-2 my-2">
+                              <div className="flex-1 h-px bg-gradient-to-r from-transparent via-orange-400 to-transparent" />
+                              <span className="text-xs font-semibold text-orange-600 px-2">NEW ITEMS</span>
+                              <div className="flex-1 h-px bg-gradient-to-r from-orange-400 via-transparent to-transparent" />
+                            </div>
+                          )}
+
+                          {batchTimestamps.map((ts, bi) => (
+                            <React.Fragment key={ts}>
+                              {bi > 0 && (
+                                <div className="flex items-center gap-2 my-2">
+                                  <div className="flex-1 h-px bg-gradient-to-r from-transparent via-orange-400 to-transparent" />
+                                  <span className="text-xs font-semibold text-orange-600 px-2">
+                                    NEW ITEMS
+                                  </span>
+                                  <div className="flex-1 h-px bg-gradient-to-r from-orange-400 via-transparent to-transparent" />
+                                </div>
+                              )}
+                              {getGroupedCartItems(groupedNewItems[ts]).map((group, idx) => (
+                                <NewItemRow
+                                  key={`new-${ts}-${idx}`}
+                                  group={group}
+                                  clientId={clientId}
+                                  token={token}
+                                  onUpdateQuantity={updateQuantity}
+                                  onRemove={removeFromCart}
+                                />
+                              ))}
+                            </React.Fragment>
+                          ))}
+                        </div>
+
+                        <div className="grid grid-cols-2 gap-2 mt-3">
+                          <button
+                            onClick={handlePlaceOrder}
+                            disabled={!canPlaceOrder || isPlacingOrder}
+                            className={`py-2 rounded-lg text-sm font-semibold
+                              ${canPlaceOrder && !isPlacingOrder
+                                ? 'bg-action-primary text-white hover:bg-action-danger'
+                                : 'bg-gray-300 cursor-not-allowed'}`}
+                          >
+                            {isPlacingOrder ? 'Placing...' : 'Place Order'}
+                          </button>
+
+                          <button
+                            onClick={handleBillFromCart}
+                            className="py-2 rounded-lg text-sm font-semibold bg-green-600 text-white hover:bg-green-700 flex items-center justify-center gap-1"
+                          >
+                            <FileText size={16} /> Bill
+                          </button>
+
+                          <button
+                            onClick={handleSaveDraft}
+                            disabled={cart.length === 0}
+                            title="Save draft — items will be here even after a page refresh"
+                            className={`py-2 border rounded-lg text-sm flex items-center justify-center gap-1 font-semibold transition-colors
+                              ${cart.length > 0
+                                ? 'bg-yellow-50 border-yellow-400 text-yellow-700 hover:bg-yellow-100'
+                                : 'opacity-40 cursor-not-allowed text-gray-400 border-gray-200'}`}
+                          >
+                            <Save size={15} /> Save
+                          </button>
+
+                          <button
+                            onClick={handleClearCart}
+                            className="py-2 border rounded-lg text-sm hover:bg-gray-100"
+                          >
+                            Clear
+                          </button>
+                        </div>
+                      </>
+                    )}
                   </div>
                 </div>
-              )}
+              </div>
             </div>
           </div>
         </div>
       )}
 
       {/* ── Floating cart button (mobile) ── */}
-      {currentView === 'order' && cart.length > 0 && !showCart && (
+      {currentView === 'order' && cart.length > 0 && (
         <button
           onClick={() => setShowCart(true)}
-          className="fixed bottom-6 right-6 bg-action-primary text-white p-4 rounded-full shadow-lg z-40"
+          className="fixed bottom-6 right-6 bg-action-primary text-white p-4 rounded-full shadow-lg z-40 lg:hidden flex items-center gap-2"
         >
           <ShoppingCart size={24} />
+          <span className="text-sm font-bold">{cart.length}</span>
         </button>
+      )}
+
+      {/* ── Mobile cart bottom sheet ── */}
+      {currentView === 'order' && showCart && (
+        <div className="fixed inset-0 z-50 lg:hidden">
+          <div
+            className="absolute inset-0 bg-black/50"
+            onClick={() => setShowCart(false)}
+          />
+          <div className="absolute bottom-0 left-0 right-0 bg-white rounded-t-2xl shadow-2xl flex flex-col max-h-[90dvh]">
+            {/* Sheet handle + close */}
+            <div className="flex items-center justify-between px-4 pt-4 pb-2 border-b flex-shrink-0">
+              <h2 className="text-lg font-semibold text-gray-800">Your Order</h2>
+              <button
+                onClick={() => setShowCart(false)}
+                className="p-1 rounded-lg hover:bg-gray-100 text-gray-500"
+              >
+                ✕
+              </button>
+            </div>
+
+            <div className="flex flex-col flex-1 overflow-hidden p-4">
+              {/* Table info + total */}
+              <div className="flex items-center justify-between text-sm bg-gray-50 px-3 py-2 rounded-lg mb-3">
+                <div className="flex items-center gap-2">
+                  {orderMode === 'dinein' && selectedTable && (
+                    <span className="font-semibold text-lg text-gray-700">
+                      {tables.find(t => t.id.toString() === selectedTable)?.table_number}
+                    </span>
+                  )}
+                  {orderMode === 'takeaway' && (
+                    <select
+                      value={selectedTable}
+                      onChange={(e) => {
+                        setSelectedTable(e.target.value);
+                        setTakeawayTableId(e.target.value);
+                      }}
+                      className="border-none outline-none rounded px-2 py-1 text-sm bg-white"
+                    >
+                      <option value="">Select Table</option>
+                      {takeawayTables.map(t => (
+                        <option key={t.id} value={t.id}>
+                          {t.table_number}
+                        </option>
+                      ))}
+                    </select>
+                  )}
+                  {activeOrderId && (
+                    <button
+                      onClick={() => setShowTransferModal(true)}
+                      className="text-sm text-red-600 hover:underline"
+                    >
+                      Transfer
+                    </button>
+                  )}
+                  {activeDineinOrderId && (
+                    <span className="text-xs text-gray-500 font-mono">
+                      #{activeDineinOrderId}
+                    </span>
+                  )}
+                </div>
+                <span className="text-base font-bold text-red-600">₹{getTotalPrice()}</span>
+              </div>
+
+              {draftSavedAt && (
+                <div className="flex items-center gap-1.5 text-xs text-green-700 bg-green-50 px-2 py-1 rounded-lg mb-3">
+                  <Save size={11} />
+                  <span>
+                    Draft saved ·{' '}
+                    {new Date(draftSavedAt).toLocaleTimeString([], { hour: '2-digit', minute: '2-digit' })}
+                  </span>
+                </div>
+              )}
+
+              {/* Dine-in / Takeaway toggle */}
+              <div className="flex bg-gray-100 rounded-lg p-1 mb-3 flex-shrink-0">
+                <button
+                  onClick={() => { setOrderMode('dinein'); if (dineinTableId) setSelectedTable(dineinTableId); }}
+                  className={`flex-1 py-2 rounded-md text-sm font-medium flex items-center justify-center gap-2
+                    ${orderMode === 'dinein' ? 'bg-action-primary text-white shadow-sm' : 'text-gray-600'}`}
+                >
+                  <Users size={16} /> Dine In
+                </button>
+                <button
+                  onClick={() => { setOrderMode('takeaway'); setSelectedTable(takeawayTableId?.toString()); }}
+                  className={`flex-1 py-2 rounded-md text-sm font-medium flex items-center justify-center gap-2
+                    ${orderMode === 'takeaway' ? 'bg-action-primary text-white shadow-sm' : 'text-gray-600'}`}
+                >
+                  <Package size={16} /> Takeaway
+                </button>
+              </div>
+
+              {/* Scrollable cart items */}
+              <div className="flex-1 overflow-y-auto space-y-2">
+                {getGroupedCartItems(oldItems).map((group, idx) => (
+                  <OldItemRow
+                    key={`old-${idx}`}
+                    group={group}
+                    clientId={clientId}
+                    token={token}
+                    activeDineinOrderId={activeDineinOrderId}
+                    onRequestDelete={handleOldItemRequestDelete}
+                  />
+                ))}
+
+                {activeOrderId && oldItems.length > 0 && newItems.length > 0 && (
+                  <div className="flex items-center gap-2 my-2">
+                    <div className="flex-1 h-px bg-gradient-to-r from-transparent via-orange-400 to-transparent" />
+                    <span className="text-xs font-semibold text-orange-600 px-2">NEW ITEMS</span>
+                    <div className="flex-1 h-px bg-gradient-to-r from-orange-400 via-transparent to-transparent" />
+                  </div>
+                )}
+
+                {batchTimestamps.map((ts, bi) => (
+                  <React.Fragment key={ts}>
+                    {bi > 0 && (
+                      <div className="flex items-center gap-2 my-2">
+                        <div className="flex-1 h-px bg-gradient-to-r from-transparent via-orange-400 to-transparent" />
+                        <span className="text-xs font-semibold text-orange-600 px-2">NEW ITEMS</span>
+                        <div className="flex-1 h-px bg-gradient-to-r from-orange-400 via-transparent to-transparent" />
+                      </div>
+                    )}
+                    {getGroupedCartItems(groupedNewItems[ts]).map((group, idx) => (
+                      <NewItemRow
+                        key={`new-${ts}-${idx}`}
+                        group={group}
+                        clientId={clientId}
+                        token={token}
+                        onUpdateQuantity={updateQuantity}
+                        onRemove={removeFromCart}
+                      />
+                    ))}
+                  </React.Fragment>
+                ))}
+              </div>
+
+              {/* Action buttons */}
+              <div className="grid grid-cols-2 gap-2 mt-3 flex-shrink-0">
+                <button
+                  onClick={handlePlaceOrder}
+                  disabled={!canPlaceOrder || isPlacingOrder}
+                  className={`py-2 rounded-lg text-sm font-semibold
+                    ${canPlaceOrder && !isPlacingOrder
+                      ? 'bg-action-primary text-white hover:bg-action-danger'
+                      : 'bg-gray-300 cursor-not-allowed'}`}
+                >
+                  {isPlacingOrder ? 'Placing...' : 'Place Order'}
+                </button>
+
+                <button
+                  onClick={handleBillFromCart}
+                  className="py-2 rounded-lg text-sm font-semibold bg-green-600 text-white hover:bg-green-700 flex items-center justify-center gap-1"
+                >
+                  <FileText size={16} /> Bill
+                </button>
+
+                <button
+                  onClick={handleSaveDraft}
+                  disabled={cart.length === 0}
+                  className={`py-2 border rounded-lg text-sm flex items-center justify-center gap-1 font-semibold transition-colors
+                    ${cart.length > 0
+                      ? 'bg-yellow-50 border-yellow-400 text-yellow-700 hover:bg-yellow-100'
+                      : 'opacity-40 cursor-not-allowed text-gray-400 border-gray-200'}`}
+                >
+                  <Save size={15} /> Save
+                </button>
+
+                <button
+                  onClick={handleClearCart}
+                  className="py-2 border rounded-lg text-sm hover:bg-gray-100"
+                >
+                  Clear
+                </button>
+              </div>
+            </div>
+          </div>
+        </div>
       )}
 
       {/* ── Clear confirm dialog ── */}
@@ -3807,7 +3969,6 @@ const buildOrderPayload = (items) =>
   if (!batch) { batch = Date.now(); setCurrentBatchTimestamp(batch); }
 
   setCart(prev => {
-    // Check if this combo already exists in the new (unsaved) cart
     const existingCombo = prev.find(
       i => i.id === Number(comboModalItem.id) &&
            i.is_new_item &&
@@ -3817,12 +3978,10 @@ const buildOrderPayload = (items) =>
     );
 
     if (existingCombo) {
-      // Increment combo parent quantity
       const updated = prev.map(i => {
         if (i.frontend_unique_key === existingCombo.frontend_unique_key) {
           return { ...i, quantity: i.quantity + 1 };
         }
-        // Increment each child that belongs to this combo parent
         if (
           i.parent_item_key === existingCombo.frontend_unique_key &&
           i.is_addon
@@ -3834,7 +3993,6 @@ const buildOrderPayload = (items) =>
       return updated;
     }
 
-    // First time adding this combo — create parent + children
     const comboParentEntry = buildCartItem(comboModalItem, {
       batch_timestamp: batch,
       is_addon: false,
