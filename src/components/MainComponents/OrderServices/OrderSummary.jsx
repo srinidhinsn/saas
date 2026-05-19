@@ -1322,14 +1322,14 @@ const OrderSummaryVisible = ({ clientId, token }) => {
   // ─────────────────────────────────────────────────────────────────────────
 
   return (
-    <div className="min-h-screen bg-bg-primary">
-      <div className="mx-auto px-4 py-3">
-        <div className="bg-action-primary rounded-2xl shadow-xl px-6 py-5 mb-6">
+    <div className="min-h-screen bg-bg-primary overflow-x-hidden">
+      <div className="mx-auto px-2 sm:px-4 py-3">
+        <div className="bg-action-primary rounded-2xl shadow-xl px-3 sm:px-6 py-5 mb-6 overflow-hidden">
           {/* ── Filter bar ── */}
-          <div className="flex flex-wrap gap-8 items-center rounded-xl p-3">
+          <div className="flex flex-col xl:flex-row gap-4 xl:gap-8 xl:items-center rounded-xl p-2 sm:p-3">
 
             {/* Order mode — singular selection */}
-            <div className="flex gap-4">
+            <div className="grid grid-cols-2 sm:flex sm:flex-wrap gap-2 sm:gap-4 w-full xl:w-auto">
               {[
                 { value: 'all', label: 'All', icon: <Filter size={20} /> },
                 { value: 'dinein', label: 'Dine In', icon: <Users size={20} /> },
@@ -1339,7 +1339,7 @@ const OrderSummaryVisible = ({ clientId, token }) => {
                 <button
                   key={value}
                   onClick={() => setSelectedOrderMode(value)}
-                  className={`flex items-center gap-1.5 px-3 py-1.5 rounded-lg font-bold text-lg transition-all
+                  className={`flex items-center justify-center gap-1.5 px-3 py-2 rounded-lg font-bold text-sm sm:text-base transition-all whitespace-nowrap
                   ${selectedOrderMode === value
                       ? 'bg-action-primary text-text-white shadow-sm'
                       : 'bg-bg-primary text-text-secondary hover:text-text-primary border border-border-default'}`}
@@ -1350,37 +1350,41 @@ const OrderSummaryVisible = ({ clientId, token }) => {
               ))}
             </div>
 
-            <div className="w-px h-6 bg-border-default mx-1 hidden sm:block" />
+            <div className="hidden xl:block w-px h-6 bg-border-default mx-1" />
 
-            {/* Status filter */}
-            <div className="relative">
-              <Filter
-                className="absolute left-3 top-1/2 -translate-y-1/2 text-text-secondary"
-                size={15}
+            <div className="flex flex-col sm:flex-row gap-3 sm:items-center w-full xl:w-auto">
+
+              {/* Status filter */}
+              <div className="relative w-full sm:w-auto">
+                <Filter
+                  className="absolute left-3 top-1/2 -translate-y-1/2 text-text-secondary"
+                  size={15}
+                />
+                <select
+                  value={filterMode}
+                  onChange={e => setFilterMode(Number(e.target.value))}
+                  className="w-full sm:w-auto pl-9 pr-4 py-2 rounded-lg bg-bg-primary border border-border-default text-text-primary text-sm"
+                >
+                  <option value={0}>All Status</option>
+                  <option value={2}>Pending</option>
+                  <option value={3}>Preparing</option>
+                  <option value={4}>Ready</option>
+                  <option value={5}>Served</option>
+                </select>
+              </div>
+
+              {/* Date */}
+              <input
+                type="date"
+                value={selectedDate}
+                onChange={e => setSelectedDate(e.target.value)}
+                className="w-full sm:w-auto px-3 py-2 rounded-lg bg-bg-primary border border-border-default text-text-primary text-sm"
               />
-              <select
-                value={filterMode}
-                onChange={e => setFilterMode(Number(e.target.value))}
-                className="pl-9 pr-4 py-1.5 rounded-lg bg-bg-primary border border-border-default text-text-primary text-sm"
-              >
-                <option value={0}>All Status</option>
-                <option value={2}>Pending</option>
-                <option value={3}>Preparing</option>
-                <option value={4}>Ready</option>
-                <option value={5}>Served</option>
-              </select>
-            </div>
 
-            {/* Date */}
-            <input
-              type="date"
-              value={selectedDate}
-              onChange={e => setSelectedDate(e.target.value)}
-              className="px-3 py-1.5 rounded-lg bg-bg-primary border border-border-default text-text-primary text-sm"
-            />
+              <div className="text-sm font-semibold text-text-secondary whitespace-nowrap xl:ml-auto">
+                {filteredOrders.length} order{filteredOrders.length !== 1 ? 's' : ''}
+              </div>
 
-            <div className="ml-auto text-sm font-semibold text-text-secondary">
-              {filteredOrders.length} order{filteredOrders.length !== 1 ? 's' : ''}
             </div>
           </div>
         </div>
@@ -1391,7 +1395,8 @@ const OrderSummaryVisible = ({ clientId, token }) => {
           <div className="rounded-xl p-16 text-center bg-bg-primary border border-border-default shadow-card"><ShoppingBag size={40} className="mx-auto mb-3 text-text-secondary opacity-40" /><p className="text-text-secondary text-base font-medium">No orders found</p></div>
         ) : (
           <div className="rounded-xl overflow-hidden border border-border-default shadow-card bg-bg-primary">
-            <table className="w-full">
+            <div className="w-full overflow-x-auto">
+              <table className="min-w-[1100px] w-full">
               <thead className="bg-bg-tertiary border-b border-border-default">
                 <tr>
                   {['Order #', 'Table / Customer', 'Mode', 'Items', 'Total Price', 'Status', 'Actions'].map(h => (
@@ -1442,6 +1447,7 @@ const OrderSummaryVisible = ({ clientId, token }) => {
                 })}
               </tbody>
             </table>
+            </div>
           </div>
         )}
       </div>
