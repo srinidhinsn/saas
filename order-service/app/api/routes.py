@@ -101,7 +101,7 @@ def create_sub_order(
         dinein_order_id=sub_dinein_order_id,
         table_id=root_order.table_id,
         status=OrderStatusEnum.pending,
-        price=root_order.price, gst=0, cst=0, total_price=root_order.total_price,
+        price=order.price, gst=0, cst=0, total_price=order.total_price,
         created_by=order.created_by, invoice_id=None, invoice_status=None,
     )
     db.add(db_sub_order)
@@ -532,7 +532,7 @@ def delete_order_items( client_id: str, order_item_id: Optional[str] = Query(Non
 
                 elif tx_type == TransactionTypeEnum.wastage:
                     tag = TransactionTypeEnum.combo_child_wastage if is_combo_child else TransactionTypeEnum.wastage
-                    serving_qty  = float(inv_item.serving_quantity)
+                    serving_qty  = float(inv_item.serving_quantity or 0)
                     serving_unit = (inv_item.serving_unit or "").strip()
                     stock_unit   = (inv_item.unit or "").strip()
 
