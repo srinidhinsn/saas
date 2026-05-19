@@ -938,7 +938,7 @@ const OldItemRow = ({ group, clientId, token, activeDineinOrderId, onRequestDele
           <div className="min-w-0 flex-1">
             <h4 className="text-sm font-semibold truncate text-gray-800">{main.name}</h4>
             <p className="text-xs font-bold text-action-primary">
-            ₹{(main.unit_price * (1 - (Number(main.discount) || 0) / 100)).toFixed(2)}
+              ₹{(main.unit_price * (1 - (Number(main.discount) || 0) / 100)).toFixed(2)}
             </p>
             <div className="flex items-center gap-1.5 mt-1 flex-wrap">
               {main.batch_label && main.batch_label !== activeDineinOrderId && (
@@ -970,7 +970,7 @@ const OldItemRow = ({ group, clientId, token, activeDineinOrderId, onRequestDele
           <span className="text-xs text-blue-600">↳</span>
           <span className="text-sm text-gray-700 truncate flex-1">{addon.name}</span>
           <span className="text-xs font-semibold text-blue-600">
-          ₹{(addon.unit_price * (1 - (Number(addon.discount) || 0) / 100)).toFixed(2)}
+            ₹{(addon.unit_price * (1 - (Number(addon.discount) || 0) / 100)).toFixed(2)}
           </span>
           <span className="text-xs text-gray-500 w-6 text-center">×{addon.quantity}</span>
         </div>
@@ -1004,7 +1004,7 @@ const NewItemRow = ({ group, clientId, token, onUpdateQuantity, onRemove }) => {
           <div className="min-w-0 flex-1">
             <h4 className="text-sm font-semibold truncate text-gray-800">{main.name}</h4>
             <p className="text-xs font-bold text-action-primary">
-            ₹{(main.unit_price * (1 - (Number(main.discount) || 0) / 100)).toFixed(2)}
+              ₹{(main.unit_price * (1 - (Number(main.discount) || 0) / 100)).toFixed(2)}
             </p>
           </div>
         </div>
@@ -1041,7 +1041,7 @@ const NewItemRow = ({ group, clientId, token, onUpdateQuantity, onRemove }) => {
           <span className="text-xs text-orange-600">↳</span>
           <span className="text-sm text-gray-700 truncate flex-1">{addon.name}</span>
           <span className="text-xs font-semibold text-orange-600">
-          ₹{(addon.unit_price * (1 - (Number(addon.discount) || 0) / 100)).toFixed(2)}
+            ₹{(addon.unit_price * (1 - (Number(addon.discount) || 0) / 100)).toFixed(2)}
           </span>
           <span className="text-xs text-gray-500 w-6 text-center">×{addon.quantity}</span>
         </div>
@@ -1661,17 +1661,17 @@ const TakeOrder = ({ clientId, token, onOrderUpdate, realm }) => {
   const deduplicateOrderItems = (items) => {
     const uniqueKeyToItemMap = new Map();
     const result = [];
-  
+
     items.forEach(item => {
       // Prefer frontend_unique_key, then DB id, then warn and include as-is
       const fkey = item.frontend_unique_key || (item.id ? String(item.id) : null);
-  
+
       if (!fkey) {
         console.warn(`Item ${item.item_id} has no unique key or DB id — included without dedup`);
         result.push({ ...item });
         return;
       }
-  
+
       if (uniqueKeyToItemMap.has(fkey)) {
         // Same logical item appearing in multiple sub-orders — accumulate quantity
         uniqueKeyToItemMap.get(fkey).quantity += (item.quantity ?? 0);
@@ -1681,7 +1681,7 @@ const TakeOrder = ({ clientId, token, onOrderUpdate, realm }) => {
         result.push(copy);
       }
     });
-  
+
     return result;
   };
   const handleSaveDraft = useCallback(async () => {
@@ -2478,34 +2478,34 @@ const TakeOrder = ({ clientId, token, onOrderUpdate, realm }) => {
       .reduce((t, i) => t + (i.unit_price || 0) * i.quantity, 0)
       .toFixed(2);
 
-      const buildCartItem = (item, extra = {}) => {
-        const ts = Date.now() + Math.random();
-        const { _item_type, ...cleanExtra } = extra;
+  const buildCartItem = (item, extra = {}) => {
+    const ts = Date.now() + Math.random();
+    const { _item_type, ...cleanExtra } = extra;
 
-        const typePrefix = _item_type || 'main';
-        const parentKey = cleanExtra.parent_item_key || '';
-        const key = parentKey
-          ? `${typePrefix}_${parentKey}_${item.id}_${ts}`
-          : `${typePrefix}_${item.id}_${ts}`;
-      
-        return {
-          id: Number(item.id),
-          name: item.name,
-          image_id: item.image_id,
-          unit_price: (item.unit_price || 0) * (1 - (Number(item.discount) || 0) / 100),
-          slug: item.slug,
-          category: item.category_name,
-          category_id: item.category_id || null,
-          quantity: 1,
-          note: '',
-          frontend_unique_key: key,
-          is_new_item: true,
-          saved_sub_order: false,
-          is_addon: false,
-          parent_item_key: null,
-          ...cleanExtra,
-        };
-      };
+    const typePrefix = _item_type || 'main';
+    const parentKey = cleanExtra.parent_item_key || '';
+    const key = parentKey
+      ? `${typePrefix}_${parentKey}_${item.id}_${ts}`
+      : `${typePrefix}_${item.id}_${ts}`;
+
+    return {
+      id: Number(item.id),
+      name: item.name,
+      image_id: item.image_id,
+      unit_price: (item.unit_price || 0) * (1 - (Number(item.discount) || 0) / 100),
+      slug: item.slug,
+      category: item.category_name,
+      category_id: item.category_id || null,
+      quantity: 1,
+      note: '',
+      frontend_unique_key: key,
+      is_new_item: true,
+      saved_sub_order: false,
+      is_addon: false,
+      parent_item_key: null,
+      ...cleanExtra,
+    };
+  };
 
   const addToCart = (item, parentItemKey = null) => {
     // Count how many of this item are already in the new (unsaved) cart
@@ -2818,7 +2818,7 @@ const TakeOrder = ({ clientId, token, onOrderUpdate, realm }) => {
         const addonEntry = buildCartItem(addon, {
           batch_timestamp: batch,
           parent_item_key: mainKey,
-          is_addon: true, _item_type: 'addon', 
+          is_addon: true, _item_type: 'addon',
         });
         setCart(prev => [...prev, addonEntry]);
       });
@@ -2858,19 +2858,19 @@ const TakeOrder = ({ clientId, token, onOrderUpdate, realm }) => {
     const itemsToPrintKOT = newItems.length > 0 ? [...newItems] : [...cart];
 
     // For the order API we only send parent (non-addon) items
-const buildOrderPayload = (items) =>
-  items
-    .filter(i => !(i.frontend_unique_key || '').startsWith('cchild_'))
-    .map(i => ({
-      item_id: i.id,
-      item_name: i.name,
-      quantity: i.quantity,
-      unit_price: i.unit_price,
-      line_total: i.unit_price * i.quantity,
-      status: 'pending',
-      slug: i.slug || '',
-      frontend_unique_key: i.frontend_unique_key,
-    }));
+    const buildOrderPayload = (items) =>
+      items
+        .filter(i => !(i.frontend_unique_key || '').startsWith('cchild_'))
+        .map(i => ({
+          item_id: i.id,
+          item_name: i.name,
+          quantity: i.quantity,
+          unit_price: i.unit_price,
+          line_total: i.unit_price * i.quantity,
+          status: 'pending',
+          slug: i.slug || '',
+          frontend_unique_key: i.frontend_unique_key,
+        }));
     try {
       const headers = { Authorization: `Bearer ${token}` };
       let placedOrderId = null;
@@ -3176,7 +3176,7 @@ const buildOrderPayload = (items) =>
       );
       const order = (r.data?.data || []).find(o => o.id === orderId);
       if (!order) { toast.error('Order not found'); return; }
-  
+
       const enriched = (order.items || []).map(item => {
         const inv = inventoryMap[item.item_id] || {};
         return {
@@ -3185,9 +3185,9 @@ const buildOrderPayload = (items) =>
           name: item.item_name ?? inv.name ?? 'Unnamed Item',
         };
       });
-  
+
       const deduplicatedItems = deduplicateOrderItems(enriched);
-  
+
       const billingDoc = await fetchBillingDocumentForOrder(orderId);
       setInvoiceOrderData({
         ...order,
@@ -3215,7 +3215,7 @@ const buildOrderPayload = (items) =>
       );
       const order = (r.data?.data || []).find(o => o.id === activeOrderId);
       if (!order) { toast.error('Order not found'); return; }
-  
+
       const enriched = (order.items || []).map(item => {
         const inv = inventoryMap[item.item_id] || {};
         return {
@@ -3224,9 +3224,9 @@ const buildOrderPayload = (items) =>
           name: item.item_name ?? inv.name ?? 'Unnamed',
         };
       });
-  
+
       const deduplicatedItems = deduplicateOrderItems(enriched);
-  
+
       const billingDoc = await fetchBillingDocumentForOrder(activeOrderId);
       setInvoiceOrderData({
         ...order,
@@ -3307,7 +3307,7 @@ const buildOrderPayload = (items) =>
   // ─────────────────────────────────────────────────────────────────────────
 
   return (
-    <div className="bg-bg-primary p-0 h-[calc(100vh-4rem)] overflow-x-hidden overflow-y-auto">
+    <div className="bg-bg-primary p-0 h-[calc(100vh-4rem)] overflow-y-auto">
 
       {/* ══════════════ FLOOR VIEW ══════════════ */}
       {currentView === 'floor' && (
@@ -3333,7 +3333,7 @@ const buildOrderPayload = (items) =>
 
       {/* ══════════════ ORDER VIEW ══════════════ */}
       {currentView === 'order' && (
-        <div className="mx-auto px-2 py-2">
+        <div className="mx-auto px-2 py-2 overflow-hidden">
           <div className="grid lg:grid-cols-4 gap-1">
 
             {/* ── Category sidebar ── */}
@@ -3438,7 +3438,7 @@ const buildOrderPayload = (items) =>
                         className="flex gap-2 items-center bg-bg-primary border-default border-border-default rounded-xl p-1 shadow-sm hover:shadow-md transition cursor-pointer"
                       >
                         <div className={`w-[4px] self-stretch rounded-l-xl flex-shrink-0 ${dietaryColor}`} />
-                        <div className="w-14 h-16 rounded-lg overflow-hidden shrink-0 bg-gray-100">
+                        <div className="w-12 h-12 sm:w-14 sm:h-16 rounded-md sm:rounded-lg overflow-hidden shrink-0 bg-gray-100">
                           <ImagePreview
                             clientId={clientId}
                             imageId={item.image_id}
@@ -3451,37 +3451,44 @@ const buildOrderPayload = (items) =>
                           />
                         </div>
                         <div className="flex-1 min-w-0">
-                          <h3 className="text-sm font-semibold text-text-primary line-clamp-2">
+                          <h3 className="text-xs sm:text-sm font-semibold text-text-primary line-clamp-2 leading-tight">
                             {item.name}
                           </h3>
-                          <div className="flex items-center gap-2 mt-1">
+
+                          <div className="flex items-center gap-1 sm:gap-2 mt-1 flex-wrap">
                             {dp ? (
                               <>
-                                <span className="text-sm font-bold text-action-primary">
+                                <span className="text-xs sm:text-sm font-bold text-action-primary">
                                   ₹{(item.unit_price * (1 - Number(item.discount) / 100)).toFixed(0)}
                                 </span>
-                                <span className="text-xs line-through text-text-secondary">
+
+                                <span className="text-[10px] sm:text-xs line-through text-text-secondary">
                                   ₹{item.unit_price}
                                 </span>
-                                <span className="text-xs text-action-danger font-semibold">{dp}% OFF</span>
+
+                                <span className="text-[9px] sm:text-xs text-action-danger font-semibold">
+                                  {dp}% OFF
+                                </span>
                               </>
                             ) : (
-                              <span className="text-sm font-bold text-action-primary">
+                              <span className="text-xs sm:text-sm font-bold text-action-primary">
                                 ₹{item.unit_price}
                               </span>
                             )}
                           </div>
+
                           {item.availability != null && (
-                            <p className={`text-[10px] font-semibold mt-0.5
-    ${Number(item.availability) <= 5
+                            <p className={`text-[9px] sm:text-[10px] font-semibold mt-0.5
+${Number(item.availability) <= 5
                                 ? 'text-red-500'
                                 : 'text-text-secondary'}`}>
                               Qty: {Number(item.availability)}
                             </p>
                           )}
+
                           {ac > 0 && (
-                            <span className={`text-xs px-2 py-0.5 rounded-full font-semibold
-                              ${isComboCategoryId(item.category_id)
+                            <span className={`inline-block text-[9px] sm:text-xs px-1.5 sm:px-2 py-0.5 rounded-full font-semibold mt-1 max-w-full truncate
+      ${isComboCategoryId(item.category_id)
                                 ? 'bg-violet-100 text-violet-700'
                                 : 'bg-blue-100 text-blue-700'}`}>
                               {isComboCategoryId(item.category_id) ? `${ac} items` : `+${ac} addon${ac > 1 ? 's' : ''}`}
@@ -3495,211 +3502,209 @@ const buildOrderPayload = (items) =>
               </div>
 
               {/* ── Cart panel (desktop only) ── */}
-              {!isMobile && (
-                <div
-                  className={`transition-all duration-300 ease-in-out
+              <div
+                className={`transition-all duration-300 ease-in-out
                     ${showCart ? 'w-[22rem] opacity-100 z-30' : 'w-0 opacity-0 pointer-events-none'}`}
-                >
-                  <div className="border border-gray-300 rounded-xl bg-white shadow-xl lg:h-[calc(98dvh-4rem)] flex flex-col">
-                    <div className="flex flex-col h-full p-4">
+              >
+                <div className="border border-gray-300 rounded-xl bg-white shadow-xl lg:h-[calc(98dvh-4rem)] flex flex-col">
+                  <div className="flex flex-col h-full p-4">
 
-                      {/* Cart header */}
-                      <div className="pb-3 border-b space-y-2">
-                        <h2 className="text-lg font-semibold text-gray-800">Your Order</h2>
+                    {/* Cart header */}
+                    <div className="pb-3 border-b space-y-2">
+                      <h2 className="text-lg font-semibold text-gray-800">Your Order</h2>
 
-                        <div className="flex items-center justify-between text-sm bg-gray-50 px-3 py-2 rounded-lg">
-                          <div className="flex items-center gap-2">
-                            {orderMode === 'dinein' && selectedTable && (
-                              <span className="font-semibold text-lg text-gray-700">
-                                {tables.find(t => t.id.toString() === selectedTable)?.table_number}
-                              </span>
-                            )}
-
-                            {orderMode === 'takeaway' && (
-                              <select
-                                value={selectedTable}
-                                onChange={(e) => {
-                                  setSelectedTable(e.target.value);
-                                  setTakeawayTableId(e.target.value);
-                                }}
-                                className="border-none outline-none rounded px-2 py-1 text-sm bg-white"
-                              >
-                                <option value="">Select Table</option>
-                                {takeawayTables.map(t => (
-                                  <option key={t.id} value={t.id}>
-                                    {t.table_number}
-                                  </option>
-                                ))}
-                              </select>
-                            )}
-                            {activeOrderId && (
-                              <button
-                                onClick={() => setShowTransferModal(true)}
-                                className="text-sm text-red-600 hover:underline"
-                              >
-                                Transfer
-                              </button>
-                            )}
-                            {activeDineinOrderId && (
-                              <span className="text-xs text-gray-500 font-mono">
-                                #{activeDineinOrderId}
-                              </span>
-                            )}
-                          </div>
-                          <span className="text-base font-bold text-red-600">₹{getTotalPrice()}</span>
-                        </div>
-
-                        {/* Draft saved indicator */}
-                        {draftSavedAt && (
-                          <div className="flex items-center gap-1.5 text-xs text-green-700 bg-green-50 px-2 py-1 rounded-lg">
-                            <Save size={11} />
-                            <span>
-                              Draft saved ·{' '}
-                              {new Date(draftSavedAt).toLocaleTimeString([], {
-                                hour: '2-digit',
-                                minute: '2-digit',
-                              })}
+                      <div className="flex items-center justify-between text-sm bg-gray-50 px-3 py-2 rounded-lg">
+                        <div className="flex items-center gap-2">
+                          {orderMode === 'dinein' && selectedTable && (
+                            <span className="font-semibold text-lg text-gray-700">
+                              {tables.find(t => t.id.toString() === selectedTable)?.table_number}
                             </span>
-                          </div>
-                        )}
+                          )}
+
+                          {orderMode === 'takeaway' && (
+                            <select
+                              value={selectedTable}
+                              onChange={(e) => {
+                                setSelectedTable(e.target.value);
+                                setTakeawayTableId(e.target.value);
+                              }}
+                              className="border-none outline-none rounded px-2 py-1 text-sm bg-white"
+                            >
+                              <option value="">Select Table</option>
+                              {takeawayTables.map(t => (
+                                <option key={t.id} value={t.id}>
+                                  {t.table_number}
+                                </option>
+                              ))}
+                            </select>
+                          )}
+                          {activeOrderId && (
+                            <button
+                              onClick={() => setShowTransferModal(true)}
+                              className="text-sm text-red-600 hover:underline"
+                            >
+                              Transfer
+                            </button>
+                          )}
+                          {activeDineinOrderId && (
+                            <span className="text-xs text-gray-500 font-mono">
+                              #{activeDineinOrderId}
+                            </span>
+                          )}
+                        </div>
+                        <span className="text-base font-bold text-red-600">₹{getTotalPrice()}</span>
                       </div>
 
-                      {/* Dine-in / Takeaway toggle */}
-                      <div className="mt-3">
-                        <div className="flex bg-gray-100 rounded-lg p-1">
-                          <button
-                            onClick={() => {
-                              setOrderMode('dinein');
-                              if (dineinTableId) setSelectedTable(dineinTableId);
-                            }}
-                            className={`flex-1 py-2 rounded-md text-sm font-medium flex items-center justify-center gap-2
-                              ${orderMode === 'dinein'
-                                ? 'bg-action-primary text-white shadow-sm'
-                                : 'text-gray-600 hover:text-gray-800'}`}
-                          >
-                            <Users size={16} /> Dine In
-                          </button>
-                          <button
-                            onClick={() => {
-                              setOrderMode('takeaway');
-                              setSelectedTable(takeawayTableId?.toString());
-                            }}
-                            className={`flex-1 py-2 rounded-md text-sm font-medium flex items-center justify-center gap-2
-                              ${orderMode === 'takeaway'
-                                ? 'bg-action-primary text-white shadow-sm'
-                                : 'text-gray-600 hover:text-gray-800'}`}
-                          >
-                            <Package size={16} /> Takeaway
-                          </button>
+                      {/* Draft saved indicator */}
+                      {draftSavedAt && (
+                        <div className="flex items-center gap-1.5 text-xs text-green-700 bg-green-50 px-2 py-1 rounded-lg">
+                          <Save size={11} />
+                          <span>
+                            Draft saved ·{' '}
+                            {new Date(draftSavedAt).toLocaleTimeString([], {
+                              hour: '2-digit',
+                              minute: '2-digit',
+                            })}
+                          </span>
                         </div>
-                      </div>
-
-                      {/* Cart body */}
-                      {cart.length === 0 ? (
-                        <div className="flex-1 flex items-center justify-center text-sm text-gray-400">
-                          No items added
-                        </div>
-                      ) : (
-                        <>
-                          <div className="flex-1 overflow-y-auto mt-4 space-y-2">
-
-                            {/* Old (previously placed) items */}
-                            {getGroupedCartItems(oldItems).map((group, idx) => (
-                              <OldItemRow
-                                key={`old-${idx}`}
-                                group={group}
-                                clientId={clientId}
-                                token={token}
-                                activeDineinOrderId={activeDineinOrderId}
-                                onRequestDelete={handleOldItemRequestDelete}
-                              />
-                            ))}
-
-                            {/* Divider between old and new */}
-                            {activeOrderId && oldItems.length > 0 && newItems.length > 0 && (
-                              <div className="flex items-center gap-2 my-2">
-                                <div className="flex-1 h-px bg-gradient-to-r from-transparent via-orange-400 to-transparent" />
-                                <span className="text-xs font-semibold text-orange-600 px-2">NEW ITEMS</span>
-                                <div className="flex-1 h-px bg-gradient-to-r from-orange-400 via-transparent to-transparent" />
-                              </div>
-                            )}
-
-                            {/* New items (editable), grouped by batch */}
-                            {batchTimestamps.map((ts, bi) => (
-                              <React.Fragment key={ts}>
-                                {bi > 0 && (
-                                  <div className="flex items-center gap-2 my-2">
-                                    <div className="flex-1 h-px bg-gradient-to-r from-transparent via-orange-400 to-transparent" />
-                                    <span className="text-xs font-semibold text-orange-600 px-2">
-                                      NEW ITEMS
-                                    </span>
-                                    <div className="flex-1 h-px bg-gradient-to-r from-orange-400 via-transparent to-transparent" />
-                                  </div>
-                                )}
-                                {getGroupedCartItems(groupedNewItems[ts]).map((group, idx) => (
-                                  <NewItemRow
-                                    key={`new-${ts}-${idx}`}
-                                    group={group}
-                                    clientId={clientId}
-                                    token={token}
-                                    onUpdateQuantity={updateQuantity}
-                                    onRemove={removeFromCart}
-                                  />
-                                ))}
-                              </React.Fragment>
-                            ))}
-                          </div>
-
-                          {/* ── Action buttons ── */}
-                          <div className="grid grid-cols-2 gap-2 mt-3">
-
-                            {/* Place Order */}
-                            <button
-                              onClick={handlePlaceOrder}
-                              disabled={!canPlaceOrder || isPlacingOrder}
-                              className={`py-2 rounded-lg text-sm font-semibold
-                                ${canPlaceOrder && !isPlacingOrder
-                                  ? 'bg-action-primary text-white hover:bg-action-danger'
-                                  : 'bg-gray-300 cursor-not-allowed'}`}
-                            >
-                              {isPlacingOrder ? 'Placing...' : 'Place Order'}
-                            </button>
-
-                            {/* Bill */}
-                            <button
-                              onClick={handleBillFromCart}
-                              className="py-2 rounded-lg text-sm font-semibold bg-green-600 text-white hover:bg-green-700 flex items-center justify-center gap-1"
-                            >
-                              <FileText size={16} /> Bill
-                            </button>
-
-                            {/* Save Draft */}
-                            <button
-                              onClick={handleSaveDraft}
-                              disabled={cart.length === 0}
-                              title="Save draft — items will be here even after a page refresh"
-                              className={`py-2 border rounded-lg text-sm flex items-center justify-center gap-1 font-semibold transition-colors
-                                ${cart.length > 0
-                                  ? 'bg-yellow-50 border-yellow-400 text-yellow-700 hover:bg-yellow-100'
-                                  : 'opacity-40 cursor-not-allowed text-gray-400 border-gray-200'}`}
-                            >
-                              <Save size={15} /> Save
-                            </button>
-
-                            {/* Clear */}
-                            <button
-                              onClick={handleClearCart}
-                              className="py-2 border rounded-lg text-sm hover:bg-gray-100"
-                            >
-                              Clear
-                            </button>
-                          </div>
-                        </>
                       )}
                     </div>
+
+                    {/* Dine-in / Takeaway toggle */}
+                    <div className="mt-3">
+                      <div className="flex bg-gray-100 rounded-lg p-1">
+                        <button
+                          onClick={() => {
+                            setOrderMode('dinein');
+                            if (dineinTableId) setSelectedTable(dineinTableId);
+                          }}
+                          className={`flex-1 py-2 rounded-md text-sm font-medium flex items-center justify-center gap-2
+                              ${orderMode === 'dinein'
+                              ? 'bg-action-primary text-white shadow-sm'
+                              : 'text-gray-600 hover:text-gray-800'}`}
+                        >
+                          <Users size={16} /> Dine In
+                        </button>
+                        <button
+                          onClick={() => {
+                            setOrderMode('takeaway');
+                            setSelectedTable(takeawayTableId?.toString());
+                          }}
+                          className={`flex-1 py-2 rounded-md text-sm font-medium flex items-center justify-center gap-2
+                              ${orderMode === 'takeaway'
+                              ? 'bg-action-primary text-white shadow-sm'
+                              : 'text-gray-600 hover:text-gray-800'}`}
+                        >
+                          <Package size={16} /> Takeaway
+                        </button>
+                      </div>
+                    </div>
+
+                    {/* Cart body */}
+                    {cart.length === 0 ? (
+                      <div className="flex-1 flex items-center justify-center text-sm text-gray-400">
+                        No items added
+                      </div>
+                    ) : (
+                      <>
+                        <div className="flex-1 overflow-y-auto mt-4 space-y-2">
+
+                          {/* Old (previously placed) items */}
+                          {getGroupedCartItems(oldItems).map((group, idx) => (
+                            <OldItemRow
+                              key={`old-${idx}`}
+                              group={group}
+                              clientId={clientId}
+                              token={token}
+                              activeDineinOrderId={activeDineinOrderId}
+                              onRequestDelete={handleOldItemRequestDelete}
+                            />
+                          ))}
+
+                          {/* Divider between old and new */}
+                          {activeOrderId && oldItems.length > 0 && newItems.length > 0 && (
+                            <div className="flex items-center gap-2 my-2">
+                              <div className="flex-1 h-px bg-gradient-to-r from-transparent via-orange-400 to-transparent" />
+                              <span className="text-xs font-semibold text-orange-600 px-2">NEW ITEMS</span>
+                              <div className="flex-1 h-px bg-gradient-to-r from-orange-400 via-transparent to-transparent" />
+                            </div>
+                          )}
+
+                          {/* New items (editable), grouped by batch */}
+                          {batchTimestamps.map((ts, bi) => (
+                            <React.Fragment key={ts}>
+                              {bi > 0 && (
+                                <div className="flex items-center gap-2 my-2">
+                                  <div className="flex-1 h-px bg-gradient-to-r from-transparent via-orange-400 to-transparent" />
+                                  <span className="text-xs font-semibold text-orange-600 px-2">
+                                    NEW ITEMS
+                                  </span>
+                                  <div className="flex-1 h-px bg-gradient-to-r from-orange-400 via-transparent to-transparent" />
+                                </div>
+                              )}
+                              {getGroupedCartItems(groupedNewItems[ts]).map((group, idx) => (
+                                <NewItemRow
+                                  key={`new-${ts}-${idx}`}
+                                  group={group}
+                                  clientId={clientId}
+                                  token={token}
+                                  onUpdateQuantity={updateQuantity}
+                                  onRemove={removeFromCart}
+                                />
+                              ))}
+                            </React.Fragment>
+                          ))}
+                        </div>
+
+                        {/* ── Action buttons ── */}
+                        <div className="grid grid-cols-2 gap-2 mt-3">
+
+                          {/* Place Order */}
+                          <button
+                            onClick={handlePlaceOrder}
+                            disabled={!canPlaceOrder || isPlacingOrder}
+                            className={`py-2 rounded-lg text-sm font-semibold
+                                ${canPlaceOrder && !isPlacingOrder
+                                ? 'bg-action-primary text-white hover:bg-action-danger'
+                                : 'bg-gray-300 cursor-not-allowed'}`}
+                          >
+                            {isPlacingOrder ? 'Placing...' : 'Place Order'}
+                          </button>
+
+                          {/* Bill */}
+                          <button
+                            onClick={handleBillFromCart}
+                            className="py-2 rounded-lg text-sm font-semibold bg-green-600 text-white hover:bg-green-700 flex items-center justify-center gap-1"
+                          >
+                            <FileText size={16} /> Bill
+                          </button>
+
+                          {/* Save Draft */}
+                          <button
+                            onClick={handleSaveDraft}
+                            disabled={cart.length === 0}
+                            title="Save draft — items will be here even after a page refresh"
+                            className={`py-2 border rounded-lg text-sm flex items-center justify-center gap-1 font-semibold transition-colors
+                                ${cart.length > 0
+                                ? 'bg-yellow-50 border-yellow-400 text-yellow-700 hover:bg-yellow-100'
+                                : 'opacity-40 cursor-not-allowed text-gray-400 border-gray-200'}`}
+                          >
+                            <Save size={15} /> Save
+                          </button>
+
+                          {/* Clear */}
+                          <button
+                            onClick={handleClearCart}
+                            className="py-2 border rounded-lg text-sm hover:bg-gray-100"
+                          >
+                            Clear
+                          </button>
+                        </div>
+                      </>
+                    )}
                   </div>
                 </div>
-              )}
+              </div>
             </div>
           </div>
         </div>
@@ -3764,61 +3769,61 @@ const buildOrderPayload = (items) =>
         }}
         comboItem={comboModalItem}
         comboComponents={comboModalComponents}
-  onAddCombo={() => {
-  if (!comboModalItem) return;
-  let batch = currentBatchTimestamp;
-  if (!batch) { batch = Date.now(); setCurrentBatchTimestamp(batch); }
+        onAddCombo={() => {
+          if (!comboModalItem) return;
+          let batch = currentBatchTimestamp;
+          if (!batch) { batch = Date.now(); setCurrentBatchTimestamp(batch); }
 
-  setCart(prev => {
-    // Check if this combo already exists in the new (unsaved) cart
-    const existingCombo = prev.find(
-      i => i.id === Number(comboModalItem.id) &&
-           i.is_new_item &&
-           !i.saved_sub_order &&
-           !i.is_addon &&
-           (i.frontend_unique_key || '').startsWith('combo_')
-    );
+          setCart(prev => {
+            // Check if this combo already exists in the new (unsaved) cart
+            const existingCombo = prev.find(
+              i => i.id === Number(comboModalItem.id) &&
+                i.is_new_item &&
+                !i.saved_sub_order &&
+                !i.is_addon &&
+                (i.frontend_unique_key || '').startsWith('combo_')
+            );
 
-    if (existingCombo) {
-      // Increment combo parent quantity
-      const updated = prev.map(i => {
-        if (i.frontend_unique_key === existingCombo.frontend_unique_key) {
-          return { ...i, quantity: i.quantity + 1 };
-        }
-        // Increment each child that belongs to this combo parent
-        if (
-          i.parent_item_key === existingCombo.frontend_unique_key &&
-          i.is_addon
-        ) {
-          return { ...i, quantity: i.quantity + 1 };
-        }
-        return i;
-      });
-      return updated;
-    }
+            if (existingCombo) {
+              // Increment combo parent quantity
+              const updated = prev.map(i => {
+                if (i.frontend_unique_key === existingCombo.frontend_unique_key) {
+                  return { ...i, quantity: i.quantity + 1 };
+                }
+                // Increment each child that belongs to this combo parent
+                if (
+                  i.parent_item_key === existingCombo.frontend_unique_key &&
+                  i.is_addon
+                ) {
+                  return { ...i, quantity: i.quantity + 1 };
+                }
+                return i;
+              });
+              return updated;
+            }
 
-    // First time adding this combo — create parent + children
-    const comboParentEntry = buildCartItem(comboModalItem, {
-      batch_timestamp: batch,
-      is_addon: false,
-      _item_type: 'combo',
-    });
+            // First time adding this combo — create parent + children
+            const comboParentEntry = buildCartItem(comboModalItem, {
+              batch_timestamp: batch,
+              is_addon: false,
+              _item_type: 'combo',
+            });
 
-    const childEntries = comboModalComponents.map(comp =>
-      buildCartItem(comp, {
-        batch_timestamp: batch,
-        parent_item_key: comboParentEntry.frontend_unique_key,
-        is_addon: true,
-        _item_type: 'cchild',
-      })
-    );
+            const childEntries = comboModalComponents.map(comp =>
+              buildCartItem(comp, {
+                batch_timestamp: batch,
+                parent_item_key: comboParentEntry.frontend_unique_key,
+                is_addon: true,
+                _item_type: 'cchild',
+              })
+            );
 
-    return [...prev, comboParentEntry, ...childEntries];
-  });
+            return [...prev, comboParentEntry, ...childEntries];
+          });
 
-  setHasNewItems(true);
-  if (!isMobile) setShowCart(true);
-}}
+          setHasNewItems(true);
+          if (!isMobile) setShowCart(true);
+        }}
       />
 
       <CancelOrderConfirmModal
