@@ -2469,12 +2469,7 @@ const TakeOrder = ({ clientId, token, onOrderUpdate, realm }) => {
 
   const getTotalPrice = () =>
     cart
-      .filter(i => {
-        if (!i.parent_item_key) return true; // parent item — always include
-        // child item — only include if its parent is NOT a combo
-        const parent = cart.find(p => p.frontend_unique_key === i.parent_item_key);
-        return !isComboCategoryId(parent?.category_id);
-      })
+      .filter(i => !(i.frontend_unique_key || '').startsWith('cchild_'))
       .reduce((t, i) => t + (i.unit_price || 0) * i.quantity, 0)
       .toFixed(2);
 
@@ -2933,8 +2928,8 @@ const buildOrderPayload = (items) =>
         }
       } else {
         const existingDraft = await readDraft(selectedTable, clientId, token);
-        const parentItemsOnly = cart.filter(i => !i.is_addon);
-        const total = parentItemsOnly.reduce((s, i) => s + (i.unit_price || 0) * i.quantity, 0);
+        const total = cart.filter(i => !(i.frontend_unique_key || '').startsWith('cchild_'))
+                          .reduce((s, i) => s + (i.unit_price || 0) * i.quantity, 0);
         const itemsPayload = buildOrderPayload(cart);
 
         if (existingDraft) {
@@ -2996,8 +2991,8 @@ const buildOrderPayload = (items) =>
       // Clean up on success
       if (placedOrderId && (customerDetails.customer_id || customerDetails.contact_phone)) {
         const tableObj = tables.find(t => t.id.toString() === selectedTable);
-        const parentItemsOnly = cart.filter(i => !i.is_addon);
-        const orderSubtotal = parentItemsOnly.reduce((s, i) => s + (i.unit_price || 0) * i.quantity, 0);
+        const orderSubtotal = cart.filter(i => !(i.frontend_unique_key || '').startsWith('cchild_'))
+                                  .reduce((s, i) => s + (i.unit_price || 0) * i.quantity, 0);
         await upsertBillingDocumentForCustomer({
           clientId,
           token,
