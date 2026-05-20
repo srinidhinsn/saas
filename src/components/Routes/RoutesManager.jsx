@@ -59,7 +59,7 @@ const RoutesManager = () => {
 
       // Fetch all screens for this role
       axios
-        .get(`${import.meta.env.VITE_API_USER_SERVICE_URL}/${clientId}/users/screens?client_id=${clientId}&role=${userRole}`, {
+        .get(`${import.meta.env.VITE_API_USER_SERVICE_URL}/${paramClientId}/users/screens?client_id=${paramClientId}&role=${userRole}`, {
           headers: { Authorization: `Bearer ${t}` },
         })
         .then((res) => {
