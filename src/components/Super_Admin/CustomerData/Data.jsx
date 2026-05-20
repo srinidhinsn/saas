@@ -11,6 +11,8 @@ const Data = ({ clientId, token }) => {
     const [realms, setRealms] = useState([]);
     const [selectedRealm, setSelectedRealm] = useState("");
     const { switchTenant } = useTenant();
+    const [toastMsg, setToastMsg] = useState("");
+    const [activeClient, setActiveClient] = useState(null);
     useEffect(() => {
         if (!selectedRealm) return;
         const fetchClientsAndUsers = async () => {
@@ -79,27 +81,39 @@ const Data = ({ clientId, token }) => {
         setExpanded((prev) => ({ ...prev, [id]: !prev[id] }));
     };
 
-    const switchTenantHandler = async (selectedClientId) => {
-        try {
-            const res = await axios.post(
-                `${import.meta.env.VITE_API_USER_SERVICE_URL}/${clientId}/users/switch-tenant`,
-                { target_client_id: selectedClientId },
-                { headers: { Authorization: `Bearer ${token}` } }
-            );
-    
-            const newToken = res.data.data.access_token;  // matches your ResponseModel shape
-    
-            localStorage.setItem("token", newToken);
-            localStorage.setItem("client_id", selectedClientId);
-    
-            window.location.href = `/saas/${selectedClientId}/home`;
-    
-        } catch (err) {
-            console.error("Tenant switch failed", err);
-        }
+    const switchTenantHandler = (selectedClientId, clientName) => {
+        localStorage.setItem("selected_client_id", selectedClientId);
+        window.dispatchEvent(new Event("storage"));
+        setActiveClient(clientName || selectedClientId);
+        setToastMsg(`Now you are in ${clientName || selectedClientId}`);
+        setTimeout(() => setToastMsg(""), 3000);
     };
     return (
         <div className="p-4 md:p-8 min-h-screen bg-bg-primary">
+                    {/* Toast */}
+        {toastMsg && (
+            <div className="fixed top-6 right-6 z-50 bg-green-600 text-white px-6 py-3 
+                            rounded-xl shadow-lg text-sm font-semibold animate-fade-in">
+                Now you are in <strong>{activeClient}</strong>
+            </div>
+        )}
+
+        {/* Active client banner */}
+        {activeClient && (
+            <div className="mb-6 flex items-center justify-between px-4 py-3 
+                            bg-yellow-50 border border-yellow-300 rounded-xl text-sm text-yellow-800">
+                <span>🏢 Operating as: <strong>{activeClient}</strong></span>
+                <button
+                    onClick={() => {
+                        localStorage.removeItem("selected_client_id");
+                        setActiveClient(null);
+                    }}
+                    className="text-xs text-yellow-600 hover:underline"
+                >
+                    Back to default
+                </button>
+            </div>
+        )}
             <h1 className="text-2xl md:text-3xl font-bold mb-8 text-action-primary">
                 Customer Tenants
             </h1>
@@ -152,11 +166,11 @@ const Data = ({ clientId, token }) => {
                             <button
                                 onClick={(e) => {
                                     e.stopPropagation();
-                                    switchTenantHandler(client.id);
+                                    switchTenantHandler(client.id, client.name);
                                 }}
                                 className="w-full py-2 rounded-lg bg-green-600 text-white font-semibold hover:bg-green-700 transition"
                             >
-                               Get in
+                                Get in
                             </button>
                         </div>
                         <div

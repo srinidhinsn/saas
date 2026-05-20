@@ -26,13 +26,23 @@ import KitchenDisplay_Super_User from '../Super_User/Order_Place/KitchenDisplay'
 import TableManagement_sub from '../MainComponents/TableServices/TableManagement_sub';
 
 const RoutesManager = () => {
-  const { clientId } = useParams();
+  const { clientId: paramClientId } = useParams();
+  const [clientId, setClientId] = useState(localStorage.getItem("selected_client_id") || paramClientId);  
   const [token, setToken] = useState(getValidToken());
   const [role, setRole] = useState(null);
   const [realm, setRealm] = useState();
   const [screenIds, setScreenIds] = useState([]);
   const [userId, setUserId] = useState();
+  
+  useEffect(() => {
+    const handleStorageChange = () => {
+      const selected = localStorage.getItem("selected_client_id");
+      setClientId(selected || paramClientId);
+    };
 
+    window.addEventListener("storage", handleStorageChange);
+    return () => window.removeEventListener("storage", handleStorageChange);
+  }, [paramClientId]);
   useEffect(() => {
     const t = localStorage.getItem("access_token");
 
@@ -122,7 +132,7 @@ const RoutesManager = () => {
       />
       <Route
         path="customer-data"
-        element={<Data clientId={clientId} token={token} realm={realm} screenIds={screenIds} />}
+        element={<Data clientId={paramClientId} token={token} realm={realm} screenIds={screenIds} />}
       />
 
       <Route path="role-config" element={
