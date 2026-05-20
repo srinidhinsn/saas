@@ -118,7 +118,7 @@ const UserManagement = ({ token, clientId, screenIds = [] }) => {
   const [activeView, setActiveView] = useState('list');
   const [selectedUser, setSelectedUser] = useState(null);
   const loginClientId = useMemo(() => getLoginClientId(token), [token]);
-  const isSuperAdmin = loginClientId === "superadmin";
+  const isSuperAdmin = screenIds?.includes("super_admin_v1");
   return (
     <div className="min-h-screen bg-bg-primary">
       {/* Content */}
@@ -460,7 +460,7 @@ const UsersList = ({ onAddNew, clientId, token, onEdit,isSuperAdminScreen}) => {
                 Delete
               </button>
 
-              {isSuperAdminScreen && (
+              {isSuperAdminScreen && (     
                 <button
                   onClick={navigator}
                   className="flex items-center justify-center gap-2
