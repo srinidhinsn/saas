@@ -716,3 +716,24 @@ def delete_role(client_id: str, category_id: str, value: str,context: SaasContex
     data = delete_master_value(db, client_id, category_id, value)
 
     return ResponseModel(screen_id=context.screen_id,status="success",message="Role deleted",data=data)
+
+@router.post("/switch-tenant")
+async def switch_tenant(client_id: str,payload: dict,context: SaasContext = Depends(verify_token),db: Session = Depends(get_db)):
+    target_client_id = payload.get("target_client_id")
+    if not target_client_id:
+        raise HTTPException(status_code=400, detail="target_client_id is required")
+
+    target_client = db.query(Client).filter(Client.id == target_client_id).first()
+    if not target_client:
+        raise HTTPException(status_code=404, detail="Target client not found")
+
+    target_client_model = Client.copyToModel(target_client)
+    new_token = create_access_token({
+        "user_id": str(context.user_id),
+        "roles": context.roles,
+        "client_id": target_client_id,      
+        "grants": context.grants,
+        "realm": target_client_model.realm  
+    })
+
+    return ResponseModel(screen_id=context.screen_id,data={"access_token": new_token, "token_type": "bearer"})
