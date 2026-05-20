@@ -79,11 +79,24 @@ const Data = ({ clientId, token }) => {
         setExpanded((prev) => ({ ...prev, [id]: !prev[id] }));
     };
 
-    const switchTenantHandler = (selectedClientId) => {
-        localStorage.setItem("client_id", selectedClientId);
+    const switchTenantHandler = async (selectedClientId) => {
+        try {
+            const res = await axios.post(
+                `${import.meta.env.VITE_API_USER_SERVICE_URL}/${clientId}/users/switch-tenant`,
+                { target_client_id: selectedClientId },
+                { headers: { Authorization: `Bearer ${token}` } }
+            );
     
-        // VERY IMPORTANT LINE
-        window.location.href = `/saas/${selectedClientId}/home`;
+            const newToken = res.data.data.access_token;  // matches your ResponseModel shape
+    
+            localStorage.setItem("token", newToken);
+            localStorage.setItem("client_id", selectedClientId);
+    
+            window.location.href = `/saas/${selectedClientId}/home`;
+    
+        } catch (err) {
+            console.error("Tenant switch failed", err);
+        }
     };
     return (
         <div className="p-4 md:p-8 min-h-screen bg-bg-primary">
