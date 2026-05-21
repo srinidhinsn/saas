@@ -749,7 +749,7 @@ export default function StockRecipeManager({ clientId: propClientId, token: prop
 
   return (
     <div className="min-h-screen bg-gray-50/50 py-6 px-4 sm:px-6 lg:px-8">
-      <div className="max-w-8xl mx-auto">
+      <div className="max-w-8xl mx-auto w-full">
         <div className="flex flex-col sm:flex-row sm:items-center sm:justify-between gap-4 mb-8">
           <div className="flex gap-3">
             <p className="text-3xl font-bold xl mt-2 text-base text-gray-600">
@@ -805,7 +805,7 @@ export default function StockRecipeManager({ clientId: propClientId, token: prop
         )}
 
         <div className="grid lg:grid-cols-12 gap-6">
-          <main className="lg:col-span-9 space-y-6">
+          <main className="lg:col-span-9 space-y-6 min-w-0">
             {/* Dynamic Inventory Category Tabs */}
             {inventoryCategories.some(cat => cat.id === activeTab) && activeTab !== "menu" && (
               <InventoryCategoryTab
@@ -852,7 +852,7 @@ export default function StockRecipeManager({ clientId: propClientId, token: prop
             )}
           </main>
 
-          <aside className="lg:col-span-3 space-y-6">
+          <aside className="lg:col-span-3 space-y-6 min-w-0">
             {inventoryCategories.some(cat => cat.id === activeTab) && (
               <div className="bg-bg-primary rounded-xl border border-gray-100 shadow p-6">
                 <h3 className="text-lg font-semibold text-gray-800 mb-4">Filters</h3>
@@ -1022,7 +1022,7 @@ function InventoryCategoryTab({
   if (!category) return null;
 
   return (
-    <div className="bg-bg-primary rounded-xl shadow border border-gray-100 overflow-hidden">
+    <div className="bg-bg-primary rounded-xl shadow border border-gray-100">
       <div className="bg-action-primary p-6 border-b border-gray-100 flex items-center justify-between">
         <div className="flex-1">
           <h2 className="text-2xl font-bold text-white">{category.name}</h2>
@@ -1047,8 +1047,8 @@ function InventoryCategoryTab({
         </button>
       </div>
 
-      <div className="overflow-auto max-h-[600px]">
-        <table className="min-w-full divide-y divide-gray-200">
+      <div className="overflow-x-auto rounded-lg border-default border-border-default max-h-[600px] overflow-y-auto">
+        <table className="w-full min-w-[700px]">
           <thead className="bg-gray-50 sticky top-0">
             <tr>
               <th className="px-6 py-4 text-left text-sm font-semibold text-gray-600 uppercase tracking-wider">Item</th>
@@ -1170,8 +1170,8 @@ function RecipeTab({
 
       {selectedMenuId ? (
         <>
-          <div className="overflow-x-auto mb-6">
-            <table className="min-w-full divide-y divide-gray-200">
+          <div className="overflow-x-auto rounded-lg border-default border-border-default mb-6">
+            <table className="w-full min-w-[500px] divide-y divide-gray-200">
               <thead className="bg-gray-50">
                 <tr>
                   <th className="px-6 py-3 text-left text-xs font-medium text-gray-500 uppercase tracking-wider">Ingredient</th>
@@ -1329,7 +1329,7 @@ function MenuAvailabilityTab({ menuItems, loading, onUpdateAvailability, allCate
   };
 
   return (
-    <div className="bg-bg-primary rounded-xl shadow border border-gray-100 overflow-hidden">
+    <div className="bg-bg-primary rounded-xl shadow border border-gray-100">
       <div className="bg-action-primary p-5 border-b border-gray-100">
         <h2 className="text-lg font-semibold text-text-white">Menu Availability</h2>
         <p className="text-sm text-text-white mt-1">Manage availability and units for menu items</p>
@@ -1340,8 +1340,8 @@ function MenuAvailabilityTab({ menuItems, loading, onUpdateAvailability, allCate
       ) : menuItems.length === 0 ? (
         <div className="px-6 py-12 text-center text-gray-500">No menu items found</div>
       ) : (
-        <div className="overflow-x-auto">
-          <table className="min-w-full divide-y divide-gray-200">
+        <div className="overflow-x-auto rounded-lg border-default border-border-default">
+          <table className="w-full min-w-[700px] divide-y divide-gray-200">
             <thead className="bg-gray-50">
               <tr>
                 <th className="px-6 py-3 text-left text-xs font-medium text-gray-500 uppercase tracking-wider">

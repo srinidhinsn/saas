@@ -749,8 +749,11 @@ const TableManagement = ({ clientId, token, screenIds, userId, realm}) => {
                         const groupedBySection = filteredTables.reduce((acc, table) => {
                             const config = configs.find(c => Number(c.id) === Number(table?.config_id));
                             const sectionKey = config?.section?.toUpperCase() || table.section?.toUpperCase() || "Unassigned";
-                            if (!acc[sectionKey]) acc[sectionKey] = [];
-                            acc[sectionKey].push(table);
+                            const zoneKey = config?.zone?.toUpperCase() || table.location_zone?.toUpperCase() || "Unassigned";
+                        
+                            if (!acc[sectionKey]) acc[sectionKey] = {};
+                            if (!acc[sectionKey][zoneKey]) acc[sectionKey][zoneKey] = [];
+                            acc[sectionKey][zoneKey].push(table);
                             return acc;
                         }, {});
 
@@ -768,76 +771,91 @@ const TableManagement = ({ clientId, token, screenIds, userId, realm}) => {
                             );
                         }
 
-                        return sectionEntries.map(([sectionName, sectionTables]) => (
-                            <div key={sectionName} className="mb-6">
+                        return sectionEntries.map(([sectionName, zoneGroups]) => (
+                            <div key={sectionName} className="mb-8">
                                 {/* Section Header */}
                                 <div className="flex items-center gap-3 mb-3">
                                     <h2 className="text-base font-bold text-text-primary uppercase tracking-wide">
                                         {sectionName}
                                     </h2>
                                     <span className="text-xs font-semibold px-2 py-0.5 rounded-full bg-action-primary/10 text-action-primary border border-action-primary/20">
-                                        {sectionTables.length} table{sectionTables.length !== 1 ? 's' : ''}
+                                        {Object.values(zoneGroups).flat().length} table{Object.values(zoneGroups).flat().length !== 1 ? 's' : ''}
                                     </span>
                                 </div>
-
-                                {/* Tables in this section */}
-                                <div className="grid grid-cols-2 sm:grid-cols-4 lg:grid-cols-6 xl:grid-cols-6 2xl:grid-cols-8 gap-2 sm:gap-3">
-                                    {sectionTables.map(table => {
-                                        const config = configs.find(c => Number(c.id) === Number(table?.config_id));
-                                        return (
-                                            <div
-                                                key={table.id}
-                                                className={`border-2 rounded-lg overflow-hidden shadow-sm hover:shadow-md transition
-                ${table.status === "vacant" ? "border-border-default" :
-                                                        table.status === "Occupied" ? "border-red-400" :
-                                                            "border-blue-400"}`}
-                                            >
-                                                {/* HEADER */}
-                                                <div className="flex justify-between items-center px-3 py-2 text-sm font-bold bg-action-primary text-white">
-                                                    <span>{table.name}</span>
-                                                    <span className="capitalize font-semibold text-xs">{table.status}</span>
-                                                </div>
-
-                                                {/* BODY */}
-                                                <div className="px-3 py-3 text-sm text-text-primary flex justify-between">
-                                                    <div>
-                                                        <div className="text-xs text-text-secondary mt-1">
-                                                            <div className="font-medium">{config?.zone?.toUpperCase() || "-"}</div>
-                                                            Seats: <span className="font-bold">{table.table_type}</span>
+                        
+                                {/* Zone Groups inside Section */}
+                                {Object.entries(zoneGroups).map(([zoneName, zoneTables]) => (
+                                    <div key={zoneName} className="mb-5 pl-3 border-l-2 border-action-primary/20">
+                                        {/* Zone Header */}
+                                        <div className="flex items-center gap-2 mb-2">
+                                            <h3 className="text-sm font-semibold text-text-secondary uppercase tracking-wide">
+                                                {zoneName}
+                                            </h3>
+                                            <span className="text-xs px-2 py-0.5 rounded-full bg-gray-100 text-gray-500 border border-gray-200">
+                                                {zoneTables.length} table{zoneTables.length !== 1 ? 's' : ''}
+                                            </span>
+                                        </div>
+                        
+                                        {/* Tables Grid */}
+                                        <div className="grid grid-cols-2 sm:grid-cols-4 lg:grid-cols-6 xl:grid-cols-6 2xl:grid-cols-8 gap-2 sm:gap-3">
+                                            {zoneTables.map(table => {
+                                                const config = configs.find(c => Number(c.id) === Number(table?.config_id));
+                                                return (
+                                                    <div
+                                                        key={table.id}
+                                                        className={`border-2 rounded-lg overflow-hidden shadow-sm hover:shadow-md transition
+                                                            ${table.status === "vacant" ? "border-border-default" :
+                                                                table.status === "Occupied" ? "border-red-400" :
+                                                                    "border-blue-400"}`}
+                                                    >
+                                                        {/* HEADER */}
+                                                        <div className="flex justify-between items-center px-3 py-2 text-sm font-bold bg-action-primary text-white">
+                                                            <span>{table.name}</span>
+                                                            <span className="capitalize font-semibold text-xs">{table.status}</span>
+                                                        </div>
+                        
+                                                        {/* BODY */}
+                                                        <div className="px-3 py-3 text-sm text-text-primary flex justify-between">
+                                                            <div>
+                                                                <div className="text-xs text-text-secondary mt-1">
+                                                                    <div className="font-medium">{config?.zone?.toUpperCase() || "-"}</div>
+                                                                    Seats: <span className="font-bold">{table.table_type}</span>
+                                                                </div>
+                                                            </div>
+                                                            <span className="text-[10px] font-semibold">
+                                                                {config?.section?.toUpperCase() || "-"}
+                                                            </span>
+                                                        </div>
+                        
+                                                        {/* FOOTER */}
+                                                        <div className="grid grid-cols-2 border-t text-xs font-semibold">
+                                                            <button
+                                                                onClick={() => {
+                                                                    const copy = structuredClone(table);
+                                                                    editRef.current = copy;
+                                                                    setEditTable(copy);
+                                                                    setEditRowId(copy.id);
+                                                                }}
+                                                                className="py-2 hover:bg-bg-tertiary transition"
+                                                            >
+                                                                EDIT
+                                                            </button>
+                                                            <button
+                                                                onClick={() => {
+                                                                    setDeleteTableId(table.id);
+                                                                    setShowConfirmDelete(true);
+                                                                }}
+                                                                className="py-2 text-action-danger hover:bg-red-50 transition border-l"
+                                                            >
+                                                                DELETE
+                                                            </button>
                                                         </div>
                                                     </div>
-                                                    <span className="text-[10px] font-semibold">
-                                                        {config?.section?.toUpperCase() || "-"}
-                                                    </span>
-                                                </div>
-
-                                                {/* FOOTER */}
-                                                <div className="grid grid-cols-2 border-t text-xs font-semibold">
-                                                    <button
-                                                        onClick={() => {
-                                                            const copy = structuredClone(table);
-                                                            editRef.current = copy;
-                                                            setEditTable(copy);
-                                                            setEditRowId(copy.id);
-                                                        }}
-                                                        className="py-2 hover:bg-bg-tertiary transition"
-                                                    >
-                                                        EDIT
-                                                    </button>
-                                                    <button
-                                                        onClick={() => {
-                                                            setDeleteTableId(table.id);
-                                                            setShowConfirmDelete(true);
-                                                        }}
-                                                        className="py-2 text-action-danger hover:bg-red-50 transition border-l"
-                                                    >
-                                                        DELETE
-                                                    </button>
-                                                </div>
-                                            </div>
-                                        );
-                                    })}
-                                </div>
+                                                );
+                                            })}
+                                        </div>
+                                    </div>
+                                ))}
                             </div>
                         ));
                     })()}
