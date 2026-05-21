@@ -37,6 +37,7 @@ def create_access_token(data: dict):
 
 def verify_token(req: Request = None, token: str = Depends(oauth2_scheme), db: Session = Depends(get_db)):
     try:
+        print ("token - ", token)
         payload = jwt.decode(token, SECRET_KEY, algorithms=[ALGORITHM])
         print ("Payload - ", payload)
 
@@ -84,7 +85,7 @@ def verify_token(req: Request = None, token: str = Depends(oauth2_scheme), db: S
                         page_definitions = get_page_definition(roles, url_module, client_id, db)
                         pageDefinitionModels = PageDefinition.copyToModels(page_definitions)
                         screenId = get_screen_id(pageDefinitionModels, url_operation)
-                        print("screen_id - ", screenId)
+                        print ("screen_id - ", screenId)
 
                         if (screenId == "accessRestricted"):
                             raise HTTPException(status_code=403, detail="Restricted Access. Please contact administrator.")
