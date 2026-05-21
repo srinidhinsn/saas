@@ -1,4 +1,5 @@
 from datetime import datetime, timedelta
+from zoneinfo import ZoneInfo
 from jose import JWTError, jwt
 from passlib.context import CryptContext
 from fastapi import Depends, HTTPException, Request
@@ -11,7 +12,6 @@ from database.postgres import get_db
 from sqlalchemy.orm import Session
 import os
 from dotenv import load_dotenv
-from zoneinfo import ZoneInfo
 load_dotenv()
 TIMEZONE = os.getenv("TIMEZONE", "UTC")
 SECRET_KEY = "nsn"
