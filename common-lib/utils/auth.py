@@ -55,6 +55,7 @@ def verify_token(req: Request = None, token: str = Depends(oauth2_scheme), db: S
         default_realm = "realm"
         default_client_id = "saas"
         default_admin = "super_admin"
+        super_user = "super_user"
         records = db.query(CategoryEntity).filter(CategoryEntity.client_id == default_client_id).order_by(CategoryEntity.slug).all()
         models = CategoryEntity.copyToModels(records)
         lookup = {cat.id: cat for cat in models}
@@ -62,6 +63,8 @@ def verify_token(req: Request = None, token: str = Depends(oauth2_scheme), db: S
 
         if default_category:
             if realm == default_admin:
+                if default_admin not in grants:
+                    raise HTTPException(status_code=403, detail="Restricted Grant. Super admin grant required.")
                 page_definitions = get_page_definition(roles, url_module, client_id, db)
                 pageDefinitionModels = PageDefinition.copyToModels(page_definitions)
                 screenId = get_screen_id(pageDefinitionModels, url_operation)
@@ -71,34 +74,37 @@ def verify_token(req: Request = None, token: str = Depends(oauth2_scheme), db: S
                                       str(payload.get("user_id")), roles, grants, screenId)
                 saasContext.set(context)
                 return context
-
-            if grants.index(realm) < 0:
+            if realm == super_user:
+                if super_user not in grants:
+                    raise HTTPException(status_code=403, detail="Restricted Grant. Super user grant required.")
+                page_definitions = get_page_definition(roles, url_module, client_id, db)
+                pageDefinitionModels = PageDefinition.copyToModels(page_definitions)
+                screenId = get_screen_id(pageDefinitionModels, url_operation)
+                if screenId == "accessRestricted":
+                    raise HTTPException(status_code=403, detail="Restricted Access.")
+                context = SaasContext(url_client_id, url_module, url_operation,str(payload.get("user_id")), roles, grants, screenId)
+                saasContext.set(context)
+                return context
+            
+            if realm not in grants:
                 raise HTTPException(status_code=403, detail="Restricted Grant. Please contact administrator.")
-
-            if default_category.sub_categories.index(realm) >= 0:
-                realm_category = lookup.get(realm)
-                print("realm_category - ", realm_category)
-                if realm_category.sub_categories.index(url_module) >= 0 :
-                    access_category = lookup.get(url_module)
-                    print("access_category - ", access_category)
-                    if access_category.sub_categories.index(url_operation) >= 0 :
-                        page_definitions = get_page_definition(roles, url_module, client_id, db)
-                        pageDefinitionModels = PageDefinition.copyToModels(page_definitions)
-                        screenId = get_screen_id(pageDefinitionModels, url_operation)
-                        print ("screen_id - ", screenId)
-
-                        if (screenId == "accessRestricted"):
-                            raise HTTPException(status_code=403, detail="Restricted Access. Please contact administrator.")
-
-                        context = SaasContext(url_client_id, url_module, url_operation, str(payload.get("user_id")), roles, grants, screenId)
-                        saasContext.set(context)
-                    if context is None:
-                        raise HTTPException(status_code=403, detail="Restricted Access. Please contact administrator.")
-                    return context
-                else :
-                    raise HTTPException(status_code=403, detail="Restricted Access. Please contact administrator.")
-            else :
+            if realm not in default_category.sub_categories:
                 raise HTTPException(status_code=403, detail="Restricted Grants. Please contact administrator.")
+            realm_category = lookup.get(realm)
+            if not realm_category or url_module not in realm_category.sub_categories:
+                raise HTTPException(status_code=403, detail="Restricted Access. Please contact administrator.")
+            access_category = lookup.get(url_module)
+            if not access_category or url_operation not in access_category.sub_categories:
+                raise HTTPException(status_code=403, detail="Restricted Access. Please contact administrator.")
+            page_definitions = get_page_definition(roles, url_module, client_id, db)
+            pageDefinitionModels = PageDefinition.copyToModels(page_definitions)
+            screenId = get_screen_id(pageDefinitionModels, url_operation)
+            if screenId == "accessRestricted":
+                raise HTTPException(status_code=403, detail="Restricted Access. Please contact administrator.")
+            context = SaasContext(url_client_id, url_module, url_operation,str(payload.get("user_id")), roles, grants, screenId)
+            saasContext.set(context)
+            return context
+        
     except jwt.ExpiredSignatureError:
         raise HTTPException(status_code=401, detail="Token expired")
     except JWTError as e:
