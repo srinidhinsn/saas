@@ -576,10 +576,7 @@ const KitchenCard = ({
 
 // ─── Main KitchenDisplay component ────────────────────────────────────────────
 
-const KitchenDisplay = () => {
-  const { clientId } = useParams();
-  const token = localStorage.getItem('access_token');
-
+const KitchenDisplay = ({clientId , token}) => {
   const [cards, setCards] = useState([]);
   const [tablesMap, setTablesMap] = useState({});
   const [menuItemsMap, setMenuItemsMap] = useState({});
