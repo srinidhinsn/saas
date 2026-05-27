@@ -18,6 +18,7 @@ from utils.transaction import record_partial_transaction, create_transaction , T
 from models.saas_context import SaasContext
 from typing import Optional
 from entity.inventory_entity import InventoryEntity, CategoryEntity
+from entity.client_entity import Address
 from models.inventory_model import InventoryTransaction
 from services.order_service import (
     _root_dinein_id,
@@ -35,7 +36,15 @@ router = APIRouter()
 
 @router.post("/dinein/create", response_model=ResponseModel[DineinOrderModel])
 def create_order(client_id: str, order: DineinOrderModel, context: SaasContext = Depends(verify_token), db: Session = Depends(get_db)):
-    db_order = Db_Order_Entity(
+    formatted_address = None
+    if order.delivery_address:
+        selected_address = db.query(Address).filter(
+        Address.id == int(order.delivery_address)
+    ).first()
+        if selected_address:
+            formatted_address = f"""{selected_address.name} , {selected_address.address_line1} , {selected_address.address_line2}
+                                    {selected_address.city} , {selected_address.state} , {selected_address.country} - {selected_address.pincode}"""
+    db_order = Db_Order_Entity( customer_id=order.customer_id,delivery_address=formatted_address,
         client_id=client_id, table_id=order.table_id, status=order.status,
         price=order.price, gst=order.gst, cst=order.cst, discount=order.discount,
         invoice_status=order.invoice_status, total_price=order.total_price,
