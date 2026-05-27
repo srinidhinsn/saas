@@ -30,16 +30,16 @@ export default function BillingPage({ clientId, token }) {
           axios.get(`${import.meta.env.VITE_API_ORDER_SERVICE_URL}/${clientId}/dinein/table`, { headers: { Authorization: `Bearer ${token}` } }),
           axios.get(`${import.meta.env.VITE_API_TABLE_SERVICE_URL}/${clientId}/tables/read`, { headers: { Authorization: `Bearer ${token}` } }),
           axios.get(`${import.meta.env.VITE_API_INVENTORY_SERVICE_URL}/${clientId}/inventory/read`, { headers: { Authorization: `Bearer ${token}` } }),
-          axios.get(`${import.meta.env.VITE_API_BILLING_SERVICE_URL}/${clientId}/invoice/read_document`, { headers: { Authorization: `Bearer ${token}` } }),
+          axios.get(`${import.meta.env.VITE_API_BILLING_SERVICE_URL}/${clientId}/billing-docs/read`, { headers: { Authorization: `Bearer ${token}` } }),
         ]);
-
+        
         const allOrders = ordersRes.data?.data || [];
         setOrders(allOrders);
-
+        
         const tMap = {};
         (tablesRes.data?.data || []).forEach((t) => (tMap[t.id] = t));
         setTablesMap(tMap);
-
+        
         const iMap = {};
         (invRes.data?.data || []).forEach((i) => (iMap[i.id] = i));
         setInventoryMap(iMap);
@@ -99,7 +99,7 @@ export default function BillingPage({ clientId, token }) {
 
   const handleSelectOrder = async (order) => {
     if (!order) return;
-
+  
 
     const enrichedItems = (order.items || []).map((item) => {
       const inv = inventoryMap[item.item_id] || {};
@@ -110,24 +110,24 @@ export default function BillingPage({ clientId, token }) {
         name: item.item_name ?? inv.name ?? "Unnamed Item",
       };
     });
-
+  
     // Deduplicate by frontend_unique_key — same item across sub-orders should appear once
     // For items without a fkey, fall back to a composite key
-    const uniqueKeyToItemMap = new Map();
+    const uniqueKeyToItemMap  = new Map();
     const deduplicatedItems = [];
-
+  
     enrichedItems.forEach(item => {
       const fkey = item.frontend_unique_key || `${item.item_id}_${item.unit_price}_${item.sub_order_id ?? ''}`;
-      if (uniqueKeyToItemMap.has(fkey)) {
+      if (uniqueKeyToItemMap .has(fkey)) {
         // Accumulate quantity for duplicate entries
         uniqueKeyToItemMap.get(fkey).quantity += (item.quantity ?? 0);
       } else {
         const copy = { ...item };
-        uniqueKeyToItemMap.set(fkey, copy);
+        uniqueKeyToItemMap .set(fkey, copy);
         deduplicatedItems.push(copy);
       }
     });
-
+  
     const updatedOrder = {
       ...order,
       items: deduplicatedItems,
@@ -139,7 +139,7 @@ export default function BillingPage({ clientId, token }) {
   // Auto-open invoice when orderId is in URL params
   useEffect(() => {
     const orderIdFromUrl = searchParams.get('orderId');
-
+    
     if (orderIdFromUrl && orders.length > 0 && !selectedOrder && !loading) {
       const matchingOrder = orders.find(order => order.id.toString() === orderIdFromUrl.toString());
       if (matchingOrder) {
@@ -150,9 +150,10 @@ export default function BillingPage({ clientId, token }) {
     }
   }, [orders, selectedOrder, loading, searchParams]);
 
-  // AFTER
   const handleInvoiceSave = async (draftId) => {
+    // Optionally refresh orders or perform other actions after save
     console.log('Invoice saved with ID:', draftId);
+
     try {
       const res = await axios.get(
         `${import.meta.env.VITE_API_BILLING_SERVICE_URL}/${clientId}/read_document`,
@@ -243,8 +244,8 @@ export default function BillingPage({ clientId, token }) {
                     const orderTotal = Number(order.total_price ?? 0);
 
                     return (
-                      <tr
-                        key={order.id}
+                      <tr 
+                        key={order.id} 
                         className="hover:bg-bg-tertiary transition-colors"
                       >
                         <td className="px-6 py-4 whitespace-nowrap">
