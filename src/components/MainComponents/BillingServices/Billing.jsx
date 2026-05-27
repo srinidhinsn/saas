@@ -13,6 +13,7 @@ export default function BillingPage({ clientId, token }) {
   const [filteredOrders, setFilteredOrders] = useState([]);
   const [tablesMap, setTablesMap] = useState({});
   const [inventoryMap, setInventoryMap] = useState({});
+  const [billingDocMap, setBillingDocMap] = useState({});
   const [selectedOrder, setSelectedOrder] = useState(null);
   const [loading, setLoading] = useState(true);
   const [invoiceModalOpen, setInvoiceModalOpen] = useState(false);
@@ -25,22 +26,29 @@ export default function BillingPage({ clientId, token }) {
     async function fetchAll() {
       try {
         setLoading(true);
-        const [ordersRes, tablesRes, invRes] = await Promise.all([
+        const [ordersRes, tablesRes, invRes, billingRes] = await Promise.all([
           axios.get(`${import.meta.env.VITE_API_ORDER_SERVICE_URL}/${clientId}/dinein/table`, { headers: { Authorization: `Bearer ${token}` } }),
           axios.get(`${import.meta.env.VITE_API_TABLE_SERVICE_URL}/${clientId}/tables/read`, { headers: { Authorization: `Bearer ${token}` } }),
           axios.get(`${import.meta.env.VITE_API_INVENTORY_SERVICE_URL}/${clientId}/inventory/read`, { headers: { Authorization: `Bearer ${token}` } }),
+          axios.get(`${import.meta.env.VITE_API_BILLING_SERVICE_URL}/${clientId}/invoice/read_document`, { headers: { Authorization: `Bearer ${token}` } }),
         ]);
-        
+
         const allOrders = ordersRes.data?.data || [];
         setOrders(allOrders);
-        
+
         const tMap = {};
         (tablesRes.data?.data || []).forEach((t) => (tMap[t.id] = t));
         setTablesMap(tMap);
-        
+
         const iMap = {};
         (invRes.data?.data || []).forEach((i) => (iMap[i.id] = i));
         setInventoryMap(iMap);
+
+        const bMap = {};
+        (billingRes.data?.data || []).forEach((doc) => {
+          if (doc.order_id != null) bMap[doc.order_id.toString()] = doc;
+        });
+        setBillingDocMap(bMap);
       } catch (e) {
         toast.error("Error loading data");
       } finally {
@@ -91,7 +99,7 @@ export default function BillingPage({ clientId, token }) {
 
   const handleSelectOrder = async (order) => {
     if (!order) return;
-  
+
 
     const enrichedItems = (order.items || []).map((item) => {
       const inv = inventoryMap[item.item_id] || {};
@@ -102,24 +110,24 @@ export default function BillingPage({ clientId, token }) {
         name: item.item_name ?? inv.name ?? "Unnamed Item",
       };
     });
-  
+
     // Deduplicate by frontend_unique_key — same item across sub-orders should appear once
     // For items without a fkey, fall back to a composite key
-    const uniqueKeyToItemMap  = new Map();
+    const uniqueKeyToItemMap = new Map();
     const deduplicatedItems = [];
-  
+
     enrichedItems.forEach(item => {
       const fkey = item.frontend_unique_key || `${item.item_id}_${item.unit_price}_${item.sub_order_id ?? ''}`;
-      if (uniqueKeyToItemMap .has(fkey)) {
+      if (uniqueKeyToItemMap.has(fkey)) {
         // Accumulate quantity for duplicate entries
         uniqueKeyToItemMap.get(fkey).quantity += (item.quantity ?? 0);
       } else {
         const copy = { ...item };
-        uniqueKeyToItemMap .set(fkey, copy);
+        uniqueKeyToItemMap.set(fkey, copy);
         deduplicatedItems.push(copy);
       }
     });
-  
+
     const updatedOrder = {
       ...order,
       items: deduplicatedItems,
@@ -131,7 +139,7 @@ export default function BillingPage({ clientId, token }) {
   // Auto-open invoice when orderId is in URL params
   useEffect(() => {
     const orderIdFromUrl = searchParams.get('orderId');
-    
+
     if (orderIdFromUrl && orders.length > 0 && !selectedOrder && !loading) {
       const matchingOrder = orders.find(order => order.id.toString() === orderIdFromUrl.toString());
       if (matchingOrder) {
@@ -142,9 +150,22 @@ export default function BillingPage({ clientId, token }) {
     }
   }, [orders, selectedOrder, loading, searchParams]);
 
+  // AFTER
   const handleInvoiceSave = async (draftId) => {
-    // Optionally refresh orders or perform other actions after save
     console.log('Invoice saved with ID:', draftId);
+    try {
+      const res = await axios.get(
+        `${import.meta.env.VITE_API_BILLING_SERVICE_URL}/${clientId}/read_document`,
+        { headers: { Authorization: `Bearer ${token}` } }
+      );
+      const bMap = {};
+      (res.data?.data || []).forEach((doc) => {
+        if (doc.order_id != null) bMap[doc.order_id.toString()] = doc;
+      });
+      setBillingDocMap(bMap);
+    } catch (e) {
+      toast.error("Failed to refresh billing data");
+    }
   };
 
   return (
@@ -211,6 +232,8 @@ export default function BillingPage({ clientId, token }) {
                     <th className="px-6 py-4 text-left text-xs font-bold text-text-primary uppercase tracking-wider">Table</th>
                     <th className="px-6 py-4 text-left text-xs font-bold text-text-primary uppercase tracking-wider">Items</th>
                     <th className="px-6 py-4 text-left text-xs font-bold text-text-primary uppercase tracking-wider">Total</th>
+                    <th className="px-6 py-4 text-left text-xs font-bold text-text-primary uppercase tracking-wider">Total Amount</th>
+                    <th className="px-6 py-4 text-left text-xs font-bold text-text-primary uppercase tracking-wider">Payment Status</th>
                     <th className="px-6 py-4 text-center text-xs font-bold text-text-primary uppercase tracking-wider">Action</th>
                   </tr>
                 </thead>
@@ -220,8 +243,8 @@ export default function BillingPage({ clientId, token }) {
                     const orderTotal = Number(order.total_price ?? 0);
 
                     return (
-                      <tr 
-                        key={order.id} 
+                      <tr
+                        key={order.id}
                         className="hover:bg-bg-tertiary transition-colors"
                       >
                         <td className="px-6 py-4 whitespace-nowrap">
@@ -237,6 +260,37 @@ export default function BillingPage({ clientId, token }) {
                         <td className="px-6 py-4 whitespace-nowrap">
                           <div className="text-sm font-bold text-action-primary">₹{orderTotal.toFixed(2)}</div>
                         </td>
+                        {(() => {
+                          const billingDoc = billingDocMap[order.id.toString()];
+                          return (
+                            <>
+                              {/* Total Amount */}
+                              <td className="px-6 py-4 whitespace-nowrap">
+                                <div className="text-sm font-bold text-action-primary">
+                                  {billingDoc ? `₹${Number(billingDoc.total_amount).toFixed(2)}` : "—"}
+                                </div>
+                              </td>
+
+                              {/* Payment Status */}
+                              <td className="px-6 py-4 whitespace-nowrap">
+                                {billingDoc ? (
+                                  <span className={`inline-flex px-2.5 py-1 rounded-full text-xs font-semibold ${billingDoc.payment_status === "paid"
+                                      ? "bg-green-100 text-green-700"
+                                      : billingDoc.status === "partial"
+                                        ? "bg-yellow-100 text-yellow-700"
+                                        : "bg-red-100 text-red-700"
+                                    }`}>
+                                    {billingDoc.payment_status?.toUpperCase() ?? "UNKNOWN"}
+                                  </span>
+                                ) : (
+                                  <span className="inline-flex px-2.5 py-1 rounded-full text-xs font-semibold bg-gray-100 text-gray-500">
+                                    NOT BILLED
+                                  </span>
+                                )}
+                              </td>
+                            </>
+                          );
+                        })()}
                         <td className="px-6 py-4 whitespace-nowrap text-center">
                           <button
                             onClick={() => handleSelectOrder(order)}

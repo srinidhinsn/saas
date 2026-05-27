@@ -585,9 +585,9 @@ export default function InvoiceModal({
         if (updated) {
           setSelectedOrder(prev => ({
             ...prev,
-            customer_id: updatedDraft.customer_id || prev.customer_id,
-            contact_email: updatedDraft.contact_email || prev.contact_email,
-            contact_phone: updatedDraft.contact_phone || prev.contact_phone
+            customer_id: updated.customer_id || prev.customer_id,
+            contact_email: updated.contact_email || prev.contact_email,
+            contact_phone: updated.contact_phone || prev.contact_phone
           }));
         }
       } catch {
