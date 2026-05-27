@@ -30,7 +30,7 @@ export default function BillingPage({ clientId, token }) {
           axios.get(`${import.meta.env.VITE_API_ORDER_SERVICE_URL}/${clientId}/dinein/table`, { headers: { Authorization: `Bearer ${token}` } }),
           axios.get(`${import.meta.env.VITE_API_TABLE_SERVICE_URL}/${clientId}/tables/read`, { headers: { Authorization: `Bearer ${token}` } }),
           axios.get(`${import.meta.env.VITE_API_INVENTORY_SERVICE_URL}/${clientId}/inventory/read`, { headers: { Authorization: `Bearer ${token}` } }),
-          axios.get(`${import.meta.env.VITE_API_BILLING_SERVICE_URL}/${clientId}/billing-docs/read`, { headers: { Authorization: `Bearer ${token}` } }),
+          axios.get(`${import.meta.env.VITE_API_BILLING_SERVICE_URL}/${clientId}/invoice/read_document`, { headers: { Authorization: `Bearer ${token}` } }),
         ]);
         
         const allOrders = ordersRes.data?.data || [];
@@ -156,7 +156,7 @@ export default function BillingPage({ clientId, token }) {
 
     try {
       const res = await axios.get(
-        `${import.meta.env.VITE_API_BILLING_SERVICE_URL}/${clientId}/read_document`,
+        `${import.meta.env.VITE_API_BILLING_SERVICE_URL}/${clientId}/invoice/read_document`,
         { headers: { Authorization: `Bearer ${token}` } }
       );
       const bMap = {};
