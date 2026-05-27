@@ -5,13 +5,13 @@ import { useNavigate, useParams, useLocation } from 'react-router-dom';
 
 export const navMap = {
   data: (clientId) => `/${APP_ROOT}/${clientId}/customer-data`,
-  table: (clientId) => `/${APP_ROOT}/${clientId}/sub-tables`,
+  home: (clientId) => `/${APP_ROOT}/${clientId}/home`,
   menu: (clientId) => `/${APP_ROOT}/${clientId}/menu`,
   billing: (clientId) => `/${APP_ROOT}/${clientId}/billing`,
   users: (clientId) => `/${APP_ROOT}/${clientId}/users`,
   inventory: (clientId) => `/${APP_ROOT}/${clientId}/inventory`,
   role: (clientId) => `/${APP_ROOT}/${clientId}/role`,
-  order: (clientId) => `/${APP_ROOT}/${clientId}/order`,
+  order: (clientId) => `/${APP_ROOT}/${clientId}/order-place`,
   summary: (clientId) => `/${APP_ROOT}/${clientId}/summary`,
   kds: (clientId) => `/${APP_ROOT}/${clientId}/kds`,
   details: (clientId) => `/${APP_ROOT}/${clientId}/details`,
@@ -105,7 +105,7 @@ const Header_Super_User = ({ onLogout }) => {
           <NavLink id="inventory">Inventory</NavLink>
 
         </div> */}
-
+  
         {/* ClientId with Theme Toggle - Click to change theme */}
         <button
           onClick={toggleTheme}
@@ -121,6 +121,7 @@ const Header_Super_User = ({ onLogout }) => {
         </button>
 
         <div className="hidden lg:flex items-center space-x-8 text-text-primary">
+        <NavLink id="home">Dashboard</NavLink>
           <NavLink id="data">Clients</NavLink>
           <NavLink id="order">Order</NavLink>
           <NavLink id="summary">Summary</NavLink>
