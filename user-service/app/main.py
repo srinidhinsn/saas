@@ -1,5 +1,5 @@
 import config.settings
-from fastapi import FastAPI, Depends, Request, Header, HTTPException
+from fastapi import FastAPI, Depends, Request, Header, HTTPException, WebSocket
 from sqlalchemy.orm import Session
 from api import routes
 import logging
@@ -9,7 +9,7 @@ import time
 from config.settings import LOGGING_CONFIG
 from fastapi.middleware.cors import CORSMiddleware
 from dotenv import load_dotenv
-
+from services.chat_service import chat_service
 load_dotenv()
 
 app = FastAPI()
@@ -20,7 +20,6 @@ origins = os.getenv("ALLOWED_ORIGINS", "")
 ALLOWED_ORIGINS = [origin.strip() for origin in origins.split(",") if origin]
 
 
-app.include_router(routes.router, prefix="/saas/{client_id}/users")
 app.add_middleware(
     CORSMiddleware,
     allow_origins=ALLOWED_ORIGINS,
@@ -28,6 +27,7 @@ app.add_middleware(
     allow_methods=["*"],
     allow_headers=["*"],
 )
+app.include_router(routes.router, prefix="/saas/{client_id}/users")
 
 
 @app.get('/')
@@ -54,3 +54,9 @@ async def read_root():
 if __name__ == "__main__":
     import uvicorn
     uvicorn.run(app, host="0.0.0.0", port=8000)
+
+
+@app.websocket("/chat")
+async def chat(websocket: WebSocket):
+    await chat_service.chat(websocket)
+    
