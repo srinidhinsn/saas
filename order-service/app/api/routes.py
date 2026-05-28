@@ -1008,3 +1008,27 @@ def get_kds_orders(client_id: str, context: SaasContext = Depends(verify_token),
 
     result = [_order_row_to_flat(order) for order in orders]
     return ResponseModel(screen_id=context.screen_id, data=result)
+
+@router.get("/dinein/customer-orders")
+def get_customer_orders(
+    customer_id: str,
+    context: SaasContext = Depends(verify_token),
+    db: Session = Depends(get_db),
+):
+    orders = db.query(Db_Order_Entity).filter(
+        Db_Order_Entity.customer_id == customer_id,
+        Db_Order_Entity.status != OrderStatusEnum.cancelled,
+    ).all()
+
+    groups = {}
+
+    for order in orders:
+        root = _root_dinein_id(order.dinein_order_id or str(order.id))
+        groups.setdefault(root, []).append(order)
+
+    result = [_merge_group(group) for group in groups.values()]
+
+    return ResponseModel(
+        screen_id=context.screen_id,
+        data=result,
+    )
