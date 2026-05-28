@@ -1,7 +1,13 @@
 from sqlalchemy import Column, Integer, String, Float, DateTime, ForeignKey, ARRAY,BigInteger
 from sqlalchemy.orm import declarative_base, relationship
-import datetime
+from datetime import datetime
 from models.order_model import OrderItemModel, DineinOrderModel
+from zoneinfo import ZoneInfo
+import os
+from dotenv import load_dotenv
+
+load_dotenv()
+TIMEZONE = os.getenv("TIMEZONE", "UTC")
 Base = declarative_base()
 
 
@@ -23,9 +29,10 @@ class DineinOrder(Base):
     total_price = Column(Float, nullable=True)
     created_by = Column(String, nullable=True)
     updated_by = Column(String, nullable=True)
-    created_at = Column(DateTime, default=datetime.datetime.utcnow)
-    updated_at = Column(DateTime, default=datetime.datetime.utcnow,
-                        onupdate=datetime.datetime.utcnow)
+    created_at = Column(DateTime(timezone=True),default=lambda: datetime.now(ZoneInfo(TIMEZONE)))
+    updated_at = Column(DateTime(timezone=True),
+                 default=lambda: datetime.now(ZoneInfo(TIMEZONE)),
+                 onupdate=lambda: datetime.now(ZoneInfo(TIMEZONE)))
     status = Column(String, nullable=True)
     items = relationship("OrderItem", backref="order",
                          cascade="all, delete-orphan")

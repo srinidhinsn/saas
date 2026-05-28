@@ -180,7 +180,7 @@ def create_transaction(
 
         elif tx_type_str in ["ORDER_DEDUCTION", "STOCK_OUT", "CANCELLATION"]:
             if before <= 0:
-             movement = "NONE"
+             movement = "OUT"
              after = before
             else:
              movement = "OUT"
@@ -259,27 +259,20 @@ def record_partial_transaction(
         create_transaction(db=db, client_id=client_id,
     payload=TxPayload(item_id=menu_item.id, tx_type=TransactionTypeEnum.item_cancelled,
         ref_id=order_id, qty=remove_qty,
-        remarks=build_remark(TransactionTypeEnum.item_cancelled, order_id, item.item_name, remove_qty, effective_reason),
+        remarks=build_remark(TransactionTypeEnum.item_cancelled.value, order_id, item.item_name, remove_qty, effective_reason),
             ),
         )
 
     # 🔹 WASTAGE
     elif transaction_type == TransactionTypeEnum.wastage:
 
-        # 🔸 Menu item reversal (serving based)
-        if serving_qty > 0 and serving_unit and stock_unit:
-            try:
-                converted = _convert(serving_qty, serving_unit, stock_unit)
-                reversal_qty = round(converted * remove_qty, 6)
-
-                create_transaction(db=db, client_id=client_id,
-    payload=TxPayload(item_id=menu_item.id, tx_type=TransactionTypeEnum.wastage,
-        ref_id=order_id, qty=reversal_qty,
-            remarks=build_remark(TransactionTypeEnum.wastage, order_id, item.item_name, remove_qty, effective_reason),
-                    ),
-                )
-            except ValueError:
-                pass
+        # 🔸 Always record wastage transaction
+        create_transaction(db=db, client_id=client_id,
+            payload=TxPayload(item_id=menu_item.id, tx_type=TransactionTypeEnum.wastage,
+                ref_id=order_id, qty=remove_qty,
+                remarks=build_remark(TransactionTypeEnum.wastage.value, order_id, item.item_name, remove_qty, effective_reason),
+            ),
+        )
 
         for ingredient in menu_item.recipe or []:
             stock_item_id_raw = ingredient.get("stock_item_id")
@@ -303,9 +296,9 @@ def record_partial_transaction(
                 reversal_qty = round(reversal, 6)
 
                 create_transaction(db=db, client_id=client_id,
-    payload=TxPayload(item_id=stock_item.id, tx_type=TransactionTypeEnum.wastage,
+                    payload=TxPayload(item_id=stock_item.id, tx_type=TransactionTypeEnum.wastage,
         ref_id=order_id, qty=reversal_qty,
-        remarks=build_remark(TransactionTypeEnum.wastage, order_id, item.item_name, remove_qty, effective_reason),
+        remarks=build_remark(TransactionTypeEnum.wastage.value, order_id, item.item_name, remove_qty, effective_reason),
                     ),
                 )
             except ValueError:

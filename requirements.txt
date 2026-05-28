@@ -11,3 +11,4 @@ pytest
 httpx
 cloud-sql-python-connector[pg8000]
 saas_common_lib_473815
+tzdata

@@ -203,14 +203,14 @@ def _deduct_stock_for_order(db: Session, client_id: str, order_id: int) -> None:
                     menu_item.id,
                     TransactionTypeEnum.order_deduction,
                     ordered_qty,
-                    f"[{label}_FALLBACK] Order #{order_id} | {menu_item.name} x{ordered_qty}",
+                    f"[{TransactionTypeEnum.order_deduction.value}] Order #{order_id} | {menu_item.name} x{ordered_qty}",
                 )
         else:
             _tx(
                 menu_item.id,
                 TransactionTypeEnum.order_deduction,
                 ordered_qty,
-                f"[{label}_NO_SERVING] Order #{order_id} | {menu_item.name} x{ordered_qty}",
+                f"[{TransactionTypeEnum.order_deduction.value}] Order #{order_id} | {menu_item.name} x{ordered_qty}",
             )
 
         # Recipe ingredients
