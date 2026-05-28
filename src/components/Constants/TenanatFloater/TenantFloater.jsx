@@ -149,6 +149,7 @@ const TenantSwitcher = ({ clientId, token }) => {
     localStorage.setItem("selected_client_name",  c.name);
     localStorage.setItem("selected_client_realm", c.realm || "");
     window.dispatchEvent(new Event("storage"));
+    window.dispatchEvent(new CustomEvent("tenant-switched", { detail: { clientId: c.id } }));
     setActive({ id: c.id, name: c.name, realm: c.realm });
     switchTenant?.(c.id);
     setToast(`Switched to ${c.name}`);
@@ -508,6 +509,7 @@ const TenantSwitcher = ({ clientId, token }) => {
                   localStorage.removeItem("selected_client_name");
                   localStorage.removeItem("selected_client_realm");
                   window.dispatchEvent(new Event("storage"));
+                  window.dispatchEvent(new CustomEvent("tenant-switched", { detail: { clientId: null } }));
                   setActive(null);
                   switchTenant?.(null);
                   setOpen(false);
