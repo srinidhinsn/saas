@@ -498,7 +498,6 @@ const OrderSummaryVisible = ({ clientId, token }) => {
   const getUserIdFromToken = (token) => {
     try {
       const payload = JSON.parse(atob(token.split(".")[1]));
-      console.log("JWT PAYLOAD", payload);
       return (
         payload.user_id ||
         payload.id ||
