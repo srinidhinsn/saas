@@ -17,7 +17,7 @@ const screenRouteMap = {
   super_admin_v1: 'customer-data',
   default_user: 'home',
   ecommerce_user_v1: 'home',
-  super_user_v1: 'home',
+  super_user_v1: 'customer-data',
 };
 
 // ─── Login wrapper ────────────────────────────────────────────────────────────
