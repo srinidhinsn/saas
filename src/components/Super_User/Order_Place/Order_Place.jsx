@@ -3020,10 +3020,6 @@ ${selectedAddress.country || ""}
 
   const handlePlaceOrder = async () => {
     if (isPlacingRef.current || !canPlaceOrder) return;
-    if (!selectedAddressId) {
-      toast.error("Please select address");
-      return;
-    }
     isPlacingRef.current = true;
     setIsPlacingOrder(true);
 
