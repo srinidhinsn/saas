@@ -54,7 +54,7 @@ async def login_user(client_id: str, userReq: LoginRequest, db: Session = Depend
     user = db.query(User).filter(
         and_(User.username == userReq.username, User.client_id == client_id)
     ).first()
-
+    print(db ,"is my credentials")
     if not user or not verify_password(userReq.password, user.hashed_password):
         raise HTTPException(status_code=400, detail="Invalid credentials")
 
@@ -641,28 +641,6 @@ async def save_address(client_id: str,add: AddressModel,context: SaasContext = D
     person = db.query(Person).filter(Person.id == user_uuid).first()
     if not person:
         raise HTTPException(status_code=404, detail="Person not found")
-    # If user already has address → UPDATE
-    if person.saved_address_ids and len(person.saved_address_ids) > 0:
-        address = db.query(Address).filter(
-            Address.id == person.saved_address_ids[0]
-        ).first()
-        
-        if address:
-            address.address_line1 = add.address_line1
-            address.address_line2 = add.address_line2
-            address.name = add.name
-            address.city = add.city
-            address.state = add.state
-            address.country = add.country
-            address.pincode = add.pincode
-            address.contact_name = add.contact_name
-            address.contact_number = add.contact_number
-
-            db.commit()
-
-            return ResponseModel(screen_id=context.screen_id,
-                data={"message": "Address updated successfully","address_id": address.id})
-
     # Otherwise CREATE
     new_address = Address(
         address_line1=add.address_line1,
@@ -679,9 +657,10 @@ async def save_address(client_id: str,add: AddressModel,context: SaasContext = D
     db.add(new_address)
     db.flush()
 
-    if not person.saved_address_ids:
-        person.saved_address_ids = []
-    person.saved_address_ids.append(new_address.id)
+    existing_ids = person.saved_address_ids or []
+    existing_ids = list(existing_ids)
+    existing_ids.append(new_address.id)
+    person.saved_address_ids = existing_ids
     db.commit()
     return ResponseModel(screen_id=context.screen_id,
     data={"message": "Address added successfully","address_id": new_address.id}
@@ -716,3 +695,42 @@ def delete_role(client_id: str, category_id: str, value: str,context: SaasContex
     data = delete_master_value(db, client_id, category_id, value)
 
     return ResponseModel(screen_id=context.screen_id,status="success",message="Role deleted",data=data)
+
+@router.get("/customer/{customer_id}/addresses")
+async def get_customer_addresses(client_id: str,customer_id: str,context: SaasContext = Depends(verify_token),db: Session = Depends(get_db)):
+    try:
+        customer_uuid = uuid.UUID(str(customer_id))
+    except ValueError:
+        raise HTTPException(status_code=400, detail="Invalid customer_id")
+
+    person = db.query(Person).filter(Person.id == customer_uuid).first()
+
+    if not person or not person.saved_address_ids:
+        return ResponseModel(screen_id=context.screen_id,data=[])
+
+    addresses = (db.query(Address).filter(Address.id.in_(person.saved_address_ids)).all())
+    return ResponseModel(screen_id=context.screen_id,data=[Address.copyToModel(a).dict() for a in addresses])
+
+@router.put("/address/{address_id}")
+async def update_address(address_id: int,add: AddressModel,client_id: str,context: SaasContext = Depends(verify_token),db: Session = Depends(get_db)):
+    address = db.query(Address).filter(
+        Address.id == address_id
+    ).first()
+
+    if not address:
+        raise HTTPException(status_code=404,detail="Address not found")
+
+    address.address_line1 = add.address_line1
+    address.address_line2 = add.address_line2
+    address.name = add.name
+    address.city = add.city
+    address.state = add.state
+    address.country = add.country
+    address.pincode = add.pincode
+    address.contact_name = add.contact_name
+    address.contact_number = add.contact_number
+
+    db.commit()
+    db.refresh(address)
+
+    return ResponseModel(screen_id=context.screen_id,data={"message": "Address updated successfully"})
