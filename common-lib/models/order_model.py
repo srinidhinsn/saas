@@ -68,6 +68,8 @@ class DineinOrderModel(BaseModel):
     updated_at: Optional[datetime.datetime] = None
     status: Optional[OrderStatusEnum] = None
     items: Optional[List[OrderItemModel]] = []
+    customer_id: Optional[str] = None
+    delivery_address: Optional[str] = None
 
     class Config:
         orm_mode = True
