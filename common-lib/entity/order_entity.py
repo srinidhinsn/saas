@@ -27,6 +27,8 @@ class DineinOrder(Base):
     gst = Column(Float, nullable=True)
     discount = Column(Float, nullable=True)
     total_price = Column(Float, nullable=True)
+    customer_id = Column(String, nullable=True)
+    delivery_address = Column(String, nullable=True)
     created_by = Column(String, nullable=True)
     updated_by = Column(String, nullable=True)
     created_at = Column(DateTime(timezone=True),default=lambda: datetime.now(ZoneInfo(TIMEZONE)))

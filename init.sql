@@ -901,3 +901,6 @@ SET sub_categories = array_cat(sub_categories, ARRAY['item-types'])
 WHERE id = 'inventory' AND client_id = 'saas';
 
 ALTER TABLE inventory ALTER COLUMN id DROP DEFAULT;   -- stopping the sequence of inventory table's id
+
+ALTER TABLE dinein_order ADD COLUMN customer_id text;
+ALTER TABLE dinein_order ADD COLUMN delivery_address text;
