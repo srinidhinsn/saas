@@ -422,9 +422,16 @@ export default function InvoiceModal({
         payment_method: paymentMethodArray,
         single_payment_amount: splitPaymentEnabled ? null : Number(paymentSplits[0]?.amount ?? total),  // ✅ also fixed here
         status: status,
-        customer_id: selectedOrder.customer_id || "",
+        customer_id:
+        selectedOrder.customer_id ??
+        initialOrder.customer_id ??
+        undefined,
         contact_email: selectedOrder.contact_email || "",
         contact_phone: selectedOrder.contact_phone || "",
+        shipping_address:
+  selectedOrder.shipping_address ??
+  initialOrder.shipping_address ??
+  undefined,
       };
 
       let draftId = invoiceDraftId;
@@ -585,9 +592,9 @@ export default function InvoiceModal({
         if (updated) {
           setSelectedOrder(prev => ({
             ...prev,
-            customer_id: updatedDraft.customer_id || prev.customer_id,
-            contact_email: updatedDraft.contact_email || prev.contact_email,
-            contact_phone: updatedDraft.contact_phone || prev.contact_phone
+            customer_id: updated.customer_id || prev.customer_id,
+            contact_email: updated.contact_email || prev.contact_email,
+            contact_phone: updated.contact_phone || prev.contact_phone
           }));
         }
       } catch {

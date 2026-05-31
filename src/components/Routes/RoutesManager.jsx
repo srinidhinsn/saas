@@ -24,6 +24,7 @@ import Summary_Super_User from '../Super_User/Order_Place/Summary_Super_User';
 import BillingPage_Super_User from '../Super_User/Billing/Billing_Super_User';
 import KitchenDisplay_Super_User from '../Super_User/Order_Place/KitchenDisplay';
 import TableManagement_sub from '../MainComponents/TableServices/TableManagement_sub';
+import TenantSwitcher from '../Constants/TenanatFloater/TenantFloater';
 
 const RoutesManager = () => {
   const { clientId: paramClientId } = useParams();
@@ -81,6 +82,9 @@ const RoutesManager = () => {
   if (!token) return <Navigate to="/" replace />;
 
   return (
+    <>
+    {(realm ==='super_user' && <TenantSwitcher clientId={paramClientId} token={token} />)}
+        
     <Routes>
       <Route
         path="/"
@@ -157,10 +161,15 @@ const RoutesManager = () => {
         path="sub-tables"
         element={<TableManagement_sub clientId={clientId} token={token} userId={userId} realm={realm} screenIds={screenIds} />}
       />
+         <Route
+        path="tenant-switcher"
+        element={<TenantSwitcher clientId={clientId} token={token} userId={userId} realm={realm} screenIds={screenIds} />}
+      />
       <Route path="*" element={<Navigate to="home" replace />} />
-      <Route path='user-profile' element={<UserProfile token={token} clientId={clientId} />} />
+      <Route path='user-profile' element={<UserProfile token={token} clientId={clientId} realm={realm} screenIds={screenIds}/>} />
       <Route path='counter' element={<Counters token={token} clientId={clientId} />} />
     </Routes>
+    </>
   );
 };
 
