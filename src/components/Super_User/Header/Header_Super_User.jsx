@@ -1,13 +1,13 @@
 import { APP_ROOT } from '../../config/pathConfig';
 import React, { useEffect, useState } from 'react';
 import { useNavigate, useParams, useLocation } from 'react-router-dom';
-
-
+import { getValidToken } from '../../utils/Interceptors/Api';
+import axios from 'axios';
 export const navMap = {
-  data: (clientId) => `/${APP_ROOT}/${clientId}/customer-data`,
+  data: (clientId) => `/${APP_ROOT}/${clientId}/super-user-data`,
   home: (clientId) => `/${APP_ROOT}/${clientId}/home`,
   menu: (clientId) => `/${APP_ROOT}/${clientId}/menu`,
-  billing: (clientId) => `/${APP_ROOT}/${clientId}/billing`,
+  billing: (clientId) => `/${APP_ROOT}/${clientId}/billing-super-user`,
   users: (clientId) => `/${APP_ROOT}/${clientId}/users`,
   inventory: (clientId) => `/${APP_ROOT}/${clientId}/inventory`,
   role: (clientId) => `/${APP_ROOT}/${clientId}/role`,
@@ -26,35 +26,7 @@ const Header_Super_User = ({ onLogout }) => {
   const [mobileOpen, setMobileOpen] = useState(false);
   const [darkMode, setDarkMode] = useState(false);
   const [profileOpen, setProfileOpen] = useState(false);
-
-  // Initialize theme on mount
-  useEffect(() => {
-    const savedTheme = localStorage.getItem('theme');
-    const systemPrefersDark = window.matchMedia('(prefers-color-scheme: dark)').matches;
-    const isDark = savedTheme === 'dark' || (!savedTheme && systemPrefersDark);
-
-    setDarkMode(isDark);
-
-    if (isDark) {
-      document.documentElement.classList.add('dark');
-    } else {
-      document.documentElement.classList.remove('dark');
-    }
-  }, []);
-
-  // Toggle theme when clicking clientId
-  const toggleTheme = () => {
-    const newDarkMode = !darkMode;
-    setDarkMode(newDarkMode);
-
-    if (newDarkMode) {
-      document.documentElement.classList.add('dark');
-      localStorage.setItem('theme', 'dark');
-    } else {
-      document.documentElement.classList.remove('dark');
-      localStorage.setItem('theme', 'light');
-    }
-  };
+  const [clientName, setClientName] = useState('');
 
   useEffect(() => {
     if (mobileOpen) document.body.style.overflow = 'hidden';
@@ -93,40 +65,38 @@ const Header_Super_User = ({ onLogout }) => {
       </button>
     );
   };
+  useEffect(() => {
+    if (!clientId) return;
+    const token = getValidToken();
+    if (!token) return;
 
+    axios
+      .get(
+        `${import.meta.env.VITE_API_USER_SERVICE_URL}/${clientId}/users/realm`,
+        { headers: { Authorization: `Bearer ${token}` } }
+      )
+      .then((res) => {
+        const clients = res.data?.data?.clients || [];
+        const match = clients.find((c) => c.id === clientId);
+        if (match?.name) setClientName(match.name);
+      })
+      .catch(() => {
+      });
+  }, [clientId]);
+  const displayLabel = clientName || (clientId || 'APP').toUpperCase();
   return (
     <header className="shadow-md sticky top-0 z-50 bg-bg-primary dark:bg-bg-primary-dark border-b border-border-default dark:border-border-default-dark transition-colors duration-300">
       <div className="mx-auto px-4 md:px-2 py-3 lg:py-4 flex items-center justify-between">
-        {/* <div className="hidden lg:flex items-center space-x-8 md:space-x-2 text-text-primary">
-          <NavLink id="data">Clients</NavLink>
-          <NavLink id="table">Table</NavLink>
-          <NavLink id="menu">Menu</NavLink>
-          <NavLink id="billing">Billing</NavLink>
-          <NavLink id="inventory">Inventory</NavLink>
-
-        </div> */}
-  
-        {/* ClientId with Theme Toggle - Click to change theme */}
-        <button
-          onClick={toggleTheme}
-          className="flex items-center gap-2 text-2xl lg:text-3xl font-serif italic text-action-primary hover:text-action-primary-hover transition-colors duration-300 group"
-          title={darkMode ? 'Switch to light mode' : 'Switch to dark mode'}
-        >
-          <span>{(clientId || 'APP').toUpperCase()}</span>
-          {/* {darkMode ? (
-            <Sun size={24} className="text-yellow-400 group-hover:rotate-180 transition-transform duration-500" />
-          ) : (
-            <Moon size={24} className="text-action-primary group-hover:-rotate-12 transition-transform duration-300" />
-          )} */}
-        </button>
+        <span className="text-lg font-bold text-action-primary  tracking-tight  transition-colors">
+          {displayLabel}
+        </span>
 
         <div className="hidden lg:flex items-center space-x-8 text-text-primary">
-        {/* <NavLink id="home">Dashboard</NavLink> */}
+          {/* <NavLink id="home">Dashboard</NavLink> */}
           <NavLink id="data">Clients</NavLink>
-          <NavLink id="order">Order</NavLink>
+          {/* <NavLink id="order">Order</NavLink> */}
           <NavLink id="summary">Summary</NavLink>
           <NavLink id="kds">KDS</NavLink>
-          <NavLink id="billing">Billing</NavLink>
           {/* <NavLink id="details">Details</NavLink>
           <NavLink id="documents">Documents</NavLink> */}
 
@@ -168,13 +138,6 @@ const Header_Super_User = ({ onLogout }) => {
               </ul>
             </div>
           </div>
-          {/* <button
-            onClick={() => onLogout?.()}
-            className="px-2 py-1 rounded text-text-primary dark:text-text-secondary-dark hover:text-action-primary transition-colors"
-            aria-label="Logout"
-          >
-            Logout
-          </button> */}
         </div>
 
         {/* Mobile hamburger */}

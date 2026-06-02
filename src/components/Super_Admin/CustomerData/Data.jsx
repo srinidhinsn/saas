@@ -1,8 +1,9 @@
 import React, { useEffect, useState, useCallback } from "react";
 import axios from "axios";
 import { useTenant } from "../../../context/TenantContext";
+import * as XLSX from "xlsx";
 
-/* ─── icons ────────────────────────────────────────────── */
+/* ─── Icons ────────────────────────────────────────────── */
 const Icon = ({ d, size = 16, className = "" }) => (
   <svg xmlns="http://www.w3.org/2000/svg" width={size} height={size}
     viewBox="0 0 24 24" fill="none" stroke="currentColor"
@@ -13,29 +14,111 @@ const Icon = ({ d, size = 16, className = "" }) => (
 );
 
 const IC = {
-  search      : "M21 21l-4.35-4.35M17 11A6 6 0 1 1 5 11a6 6 0 0 1 12 0z",
-  chevronDown : "M6 9l6 6 6-6",
-  chevronUp   : "M18 15l-6-6-6 6",
-  enter       : "M13 3h7v7M10 14L20 4M10 5H4a1 1 0 0 0-1 1v13a1 1 0 0 0 1 1h13a1 1 0 0 0 1-1v-6",
-  users       : "M17 21v-2a4 4 0 0 0-4-4H5a4 4 0 0 0-4 4v2M23 21v-2a4 4 0 0 0-3-3.87M16 3.13a4 4 0 0 1 0 7.75",
-  building    : "M3 9l9-7 9 7v11a2 2 0 0 1-2 2H5a2 2 0 0 1-2-2zM9 22V12h6v10",
-  menu        : "M3 12h18M3 6h18M3 18h18",
-  portal      : "M9 3H5a2 2 0 0 0-2 2v4m6-6h10a2 2 0 0 1 2 2v4M9 3v18m0 0h10a2 2 0 0 0 2-2V9M9 21H5a2 2 0 0 1-2-2V9m0 0h18",
+  search: "M21 21l-4.35-4.35M17 11A6 6 0 1 1 5 11a6 6 0 0 1 12 0z",
+  calendar: "M3 9l0 12a2 2 0 0 0 2 2h14a2 2 0 0 0 2 -2l0 -12a2 2 0 0 0 -2 -2h-14a2 2 0 0 0 -2 2m9 -5l0 4m-5 -4v4",
+  filters: "M4 6h16M4 12h16M4 18h16",
+  chevronRight: "M9 6l6 6-6 6",
+  chevronLeft: "M15 18l-6-6 6-6",
+  menu: "M4 6h16M4 12h16M4 18h16",
+  users: "M17 21v-2a4 4 0 0 0-4-4H5a4 4 0 0 0-4 4v2M23 21v-2a4 4 0 0 0-3-3.87M16 3.13a4 4 0 0 1 0 7.75",
+  export: "M4 17v2a2 2 0 0 0 2 2h12a2 2 0 0 0 2-2v-2M7 11l5 5m0 0l5-5m-5 5V3",
+  plus: "M12 5v14M5 12h14",
+  arrowRight: "M5 12h14M12 5l7 7-7 7",
+  x: "M18 6L6 18M6 6l12 12",
+};
+
+/* ─── Export Function ────────────────────────────────────── */
+const exportToExcel = (clients, realm, activeClientId) => {
+  try {
+    const mainSheetData = [
+      ["Realm", realm],
+      ["Total Tenants", clients.length],
+      ["Total Users", clients.reduce((sum, c) => sum + c.users.length, 0)],
+      ["Export Date", new Date().toLocaleDateString()],
+      [],
+      ["Tenant Name", "Realm", "User Count", "Status", "Users"]
+    ];
+
+    clients.forEach((client, idx) => {
+      const status = activeClientId === client.id ? "Active" : "Inactive";
+      const userNames = client.users.map(u => u.username).join(", ") || "—";
+      mainSheetData.push([
+        client.name,
+        client.realm,
+        client.users.length,
+        status,
+        userNames
+      ]);
+    });
+
+    const ws = XLSX.utils.aoa_to_sheet(mainSheetData);
+    ws["!cols"] = [
+      { wch: 25 },
+      { wch: 15 },
+      { wch: 12 },
+      { wch: 12 },
+      { wch: 40 }
+    ];
+
+    const usersSheetData = [
+      ["USERS DETAILED REPORT"],
+      ["Realm", realm],
+      ["Report Date", new Date().toLocaleDateString()],
+      [],
+      ["Tenant", "Username", "Email", "Role", "Status"]
+    ];
+
+    clients.forEach(client => {
+      if (client.users.length > 0) {
+        client.users.forEach(user => {
+          usersSheetData.push([
+            client.name,
+            user.username,
+            user.email || "—",
+            user.roles?.[0] || "user",
+            activeClientId === client.id ? "Tenant Active" : "Inactive"
+          ]);
+        });
+      }
+    });
+
+    const usersWs = XLSX.utils.aoa_to_sheet(usersSheetData);
+    usersWs["!cols"] = [
+      { wch: 25 },
+      { wch: 20 },
+      { wch: 25 },
+      { wch: 15 },
+      { wch: 15 }
+    ];
+
+    const wb = XLSX.utils.book_new();
+    XLSX.utils.book_append_sheet(wb, ws, "Tenants Summary");
+    XLSX.utils.book_append_sheet(wb, usersWs, "Users Details");
+
+    const fileName = `Tenants_${realm}_${new Date().toISOString().split('T')[0]}.xlsx`;
+    XLSX.writeFile(wb, fileName);
+
+    return true;
+  } catch (error) {
+    console.error("Export failed:", error);
+    return false;
+  }
 };
 
 /* ─── Avatar ────────────────────────────────────────────── */
-const Avatar = ({ name, size = "md", color = "blue" }) => {
+const Avatar = ({ name }) => {
   const initials = (name || "?").split(" ").map(w => w[0]).join("").slice(0, 2).toUpperCase();
-  const colors = {
-    blue  : "bg-blue-100   text-blue-700   dark:bg-blue-900/40   dark:text-blue-300",
-    green : "bg-emerald-100 text-emerald-700 dark:bg-emerald-900/40 dark:text-emerald-300",
-    purple: "bg-violet-100 text-violet-700 dark:bg-violet-900/40 dark:text-violet-300",
-    amber : "bg-amber-100  text-amber-700  dark:bg-amber-900/40  dark:text-amber-300",
-    rose  : "bg-rose-100   text-rose-700   dark:bg-rose-900/40   dark:text-rose-300",
-  };
-  const sizes = { sm: "w-8 h-8 text-xs", md: "w-10 h-10 text-sm" };
+  const colors = [
+    "bg-gradient-to-br from-orange-400 to-red-500",
+    "bg-gradient-to-br from-blue-400 to-indigo-600",
+    "bg-gradient-to-br from-emerald-400 to-teal-600",
+    "bg-gradient-to-br from-purple-400 to-fuchsia-600",
+    "bg-gradient-to-br from-pink-400 to-rose-600",
+  ];
+  const colorClass = colors[name.charCodeAt(0) % colors.length];
+
   return (
-    <div className={`flex items-center justify-center rounded-xl font-bold flex-shrink-0 ${sizes[size]} ${colors[color]}`}>
+    <div className={`w-10 h-10 rounded-full flex items-center justify-center text-white text-xs font-bold flex-shrink-0 ${colorClass} shadow-sm`}>
       {initials}
     </div>
   );
@@ -45,180 +128,115 @@ const Avatar = ({ name, size = "md", color = "blue" }) => {
 const Toast = ({ message, onDone }) => {
   useEffect(() => {
     if (!message) return;
-    const t = setTimeout(onDone, 2800);
+    const t = setTimeout(onDone, 3000);
     return () => clearTimeout(t);
   }, [message, onDone]);
   if (!message) return null;
   return (
-    <div className="fixed top-5 right-5 z-50 flex items-center gap-2 px-4 py-3 rounded-2xl
-                    bg-emerald-600 text-white text-sm font-semibold shadow-xl
-                    animate-in slide-in-from-top-2 duration-200">
-      <div className="w-2 h-2 rounded-full bg-emerald-300 animate-pulse" />
+    <div className="fixed top-6 right-6 z-50 animate-in slide-in-from-top-4 duration-300
+                    px-6 py-4 rounded-lg
+                    bg-gradient-to-r from-emerald-50 to-teal-50
+                    border border-emerald-200 shadow-lg
+                    text-emerald-900 text-sm font-semibold
+                    flex items-center gap-3">
+      <div className="w-2 h-2 rounded-full bg-emerald-500 animate-pulse" />
       {message}
     </div>
   );
 };
 
-/* ─── Skeleton ───────────────────────────────────────────── */
-const Skeleton = () => (
-  <div className="rounded-2xl border border-border-default dark:border-border-default-dark bg-bg-primary overflow-hidden">
-    <div className="p-4 flex items-center gap-3">
-      <div className="w-10 h-10 rounded-xl bg-bg-tertiary dark:bg-bg-tertiary-dark animate-pulse" />
-      <div className="flex-1 space-y-2">
-        <div className="h-3.5 w-3/5 rounded bg-bg-tertiary dark:bg-bg-tertiary-dark animate-pulse" />
-        <div className="h-3 w-2/5 rounded bg-bg-tertiary dark:bg-bg-tertiary-dark animate-pulse" />
-      </div>
-    </div>
-    <div className="px-4 pb-4 space-y-2">
-      <div className="h-9 rounded-xl bg-bg-tertiary dark:bg-bg-tertiary-dark animate-pulse" />
-    </div>
-  </div>
+/* ─── Loading Skeleton ──────────────────────────────────── */
+const SkeletonRow = () => (
+  <tr className="border-b border-gray-100 hover:bg-gray-50">
+    <td className="px-6 py-4"><div className="w-5 h-5 bg-gray-200 rounded animate-pulse" /></td>
+    <td className="px-6 py-4"><div className="flex items-center gap-3"><div className="w-10 h-10 bg-gray-200 rounded-full animate-pulse" /><div className="space-y-2"><div className="w-24 h-4 bg-gray-200 rounded animate-pulse" /><div className="w-20 h-3 bg-gray-100 rounded animate-pulse" /></div></div></td>
+    <td className="px-6 py-4"><div className="w-20 h-4 bg-gray-200 rounded animate-pulse" /></td>
+    <td className="px-6 py-4"><div className="w-24 h-4 bg-gray-200 rounded animate-pulse" /></td>
+    <td className="px-6 py-4"><div className="w-20 h-4 bg-gray-200 rounded animate-pulse" /></td>
+    <td className="px-6 py-4"><div className="w-16 h-6 bg-blue-200 rounded animate-pulse" /></td>
+  </tr>
 );
 
-/* ─── Stat card ──────────────────────────────────────────── */
-const StatCard = ({ label, value, icon }) => (
-  <div className="bg-bg-primary dark:bg-bg-primary-dark rounded-2xl px-4 py-3.5
-                  border border-border-default dark:border-border-default-dark flex items-center gap-3">
-    <div className="w-9 h-9 rounded-xl bg-action-primary/10 flex items-center justify-center text-action-primary flex-shrink-0">
-      <Icon d={icon} size={16} />
-    </div>
-    <div>
-      <p className="text-xs text-text-secondary dark:text-text-secondary-dark">{label}</p>
-      <p className="text-xl font-bold text-text-primary dark:text-text-primary-dark leading-tight">{value}</p>
-    </div>
-  </div>
-);
-
-/* ─── User row ───────────────────────────────────────────── */
-const UserRow = ({ user }) => {
-  const initial = (user.first_name || user.username || "?")[0].toUpperCase();
+/* ═══════════════════════════════════════════════════════════
+   Sidebar Navigation Component
+═══════════════════════════════════════════════════════════ */
+const Sidebar = ({ realms, selectedRealm, onSelectRealm, isOpen, onClose }) => {
   return (
-    <div className="flex items-center gap-3 px-3 py-2.5 rounded-xl
-                    hover:bg-bg-secondary dark:hover:bg-bg-secondary-dark transition-colors">
-      <div className="w-8 h-8 rounded-full flex items-center justify-center flex-shrink-0
-                      bg-bg-tertiary dark:bg-bg-tertiary-dark border border-border-default
-                      dark:border-border-default-dark text-xs font-bold
-                      text-text-secondary dark:text-text-secondary-dark">
-        {initial}
-      </div>
-      <div className="flex-1 min-w-0">
-        <p className="text-sm font-medium text-text-primary dark:text-text-primary-dark truncate leading-tight">
-          {user.username}
-        </p>
-        <p className="text-xs text-text-secondary dark:text-text-secondary-dark truncate">
-          {user.email || "No email"}
-        </p>
-      </div>
-      <span className="px-2.5 py-0.5 rounded-full text-xs font-semibold flex-shrink-0
-                       bg-emerald-100 text-emerald-700 dark:bg-emerald-900/30 dark:text-emerald-300">
-        {user.roles?.[0] || "user"}
-      </span>
-    </div>
-  );
-};
-
-/* ─── Client card ────────────────────────────────────────── */
-const PALETTE = ["blue", "purple", "green", "amber", "rose"];
-
-const ClientCard = ({ client, isActive, onEnter, onToggle, expanded }) => {
-  const avatarColor = PALETTE[client.name.charCodeAt(0) % PALETTE.length];
-
-  return (
-    <div className={`rounded-2xl border bg-bg-primary dark:bg-bg-primary-dark
-                    overflow-hidden transition-all duration-200 group
-                    ${isActive
-                      ? "border-2 border-action-primary shadow-lg shadow-action-primary/10"
-                      : "border-border-default dark:border-border-default-dark hover:border-border-medium dark:hover:border-border-medium-dark hover:shadow-md"
-                    }`}>
-
-      {/* Header — click to expand */}
-      <div className="flex items-center gap-3 p-4 cursor-pointer select-none"
-        onClick={onToggle} role="button" aria-expanded={expanded}>
-        <Avatar name={client.name} size="md" color={avatarColor} />
-        <div className="flex-1 min-w-0">
-          <p className="text-sm font-bold text-text-primary dark:text-text-primary-dark truncate leading-snug">
-            {client.name || "Unnamed Tenant"}
-          </p>
-          <p className="text-xs text-text-secondary dark:text-text-secondary-dark mt-0.5">
-            <span className="font-mono text-action-primary">{client.realm}</span>
-          </p>
-        </div>
-        <div className="flex items-center gap-1.5 px-2.5 py-1 rounded-full
-                        bg-bg-tertiary dark:bg-bg-tertiary-dark
-                        border border-border-default dark:border-border-default-dark
-                        text-xs text-text-secondary dark:text-text-secondary-dark flex-shrink-0">
-          <Icon d={IC.users} size={11} />
-          <span className="font-semibold">{client.users.length}</span>
-        </div>
-      </div>
-
-      {/* Active badge */}
-      {isActive && (
-        <div className="mx-4 mb-3 flex items-center gap-2 px-3 py-1.5 rounded-lg
-                        bg-action-primary/10 border border-action-primary/20 text-action-primary text-xs font-semibold">
-          <div className="w-1.5 h-1.5 rounded-full bg-action-primary animate-pulse" />
-          Currently active workspace
-        </div>
+    <>
+      {/* Overlay for mobile */}
+      {isOpen && (
+        <div 
+          className="fixed inset-0 bg-black/30 z-30 lg:hidden"
+          onClick={onClose}
+        />
       )}
 
-      {/* Actions */}
-      <div className="flex gap-2 px-4 pb-4">
-        {/* Enter button — arrow-into-box icon */}
-        <button
-          onClick={(e) => { e.stopPropagation(); onEnter(); }}
-          title="Switch to this tenant"
-          className={`flex-1 flex items-center justify-center gap-2 py-2.5 rounded-xl
-                      text-sm font-semibold transition-all duration-150 active:scale-[0.98]
-                      ${isActive
-                        ? "bg-action-primary/10 text-action-primary border border-action-primary/30"
-                        : "bg-bg-secondary dark:bg-bg-secondary-dark text-text-primary dark:text-text-primary-dark border border-border-default dark:border-border-default-dark hover:bg-action-primary hover:text-white hover:border-action-primary"
-                      }`}
-        >
-          <Icon d={IC.enter} size={15} />
-          {isActive ? "Active" : "Switch here"}
-        </button>
+      {/* Sidebar */}
+      <div className={`
+        fixed lg:relative
+        top-0 left-0 bottom-0
+        w-64 bg-white border-r border-gray-200
+        overflow-y-auto z-40 lg:z-0
+        transition-transform duration-300 ease-out
+        ${isOpen ? 'translate-x-0' : '-translate-x-full lg:translate-x-0'}
+      `}>
+        {/* Header */}
+        <div className="sticky top-0 bg-white border-b border-gray-200 px-6 py-6 flex items-center justify-between">
+          <h2 className="text-lg font-bold text-gray-900">Realms</h2>
+          <button
+            onClick={onClose}
+            className="lg:hidden p-1 hover:bg-gray-100 rounded-lg transition-colors"
+          >
+            <Icon d={IC.x} size={20} className="text-gray-600" />
+          </button>
+        </div>
 
-        {/* Expand / collapse */}
-        <button
-          onClick={(e) => { e.stopPropagation(); onToggle(); }}
-          aria-label={expanded ? "Collapse" : "Show users"}
-          className="w-10 h-10 flex items-center justify-center rounded-xl flex-shrink-0
-                     border border-border-default dark:border-border-default-dark
-                     bg-bg-secondary dark:bg-bg-secondary-dark
-                     text-text-secondary dark:text-text-secondary-dark
-                     hover:bg-bg-tertiary dark:hover:bg-bg-tertiary-dark transition-colors"
-        >
-          <Icon d={expanded ? IC.chevronUp : IC.chevronDown} size={16} />
-        </button>
-      </div>
-
-      {/* Users panel */}
-      <div className={`transition-all duration-300 overflow-hidden ${expanded ? "max-h-[480px]" : "max-h-0"}`}>
-        <div className="px-3 pb-3">
-          <div className="h-px bg-border-default dark:bg-border-default-dark mb-2" />
-          {client.users.length === 0
-            ? <p className="text-xs text-text-tertiary dark:text-text-tertiary-dark px-3 py-2">No users registered</p>
-            : <div className="space-y-0.5">{client.users.map(u => <UserRow key={u.id} user={u} />)}</div>
-          }
+        {/* Realms List */}
+        <div className="px-3 py-4 space-y-2">
+          {realms.map((realm) => (
+            <button
+              key={realm}
+              onClick={() => {
+                onSelectRealm(realm);
+                onClose();
+              }}
+              className={`
+                w-full text-left px-4 py-3 rounded-lg font-medium text-sm
+                transition-all duration-200 capitalize
+                flex items-center justify-between
+                ${selectedRealm === realm
+                  ? "bg-gradient-to-r from-blue-500 to-indigo-600 text-white shadow-lg"
+                  : "text-gray-700 hover:bg-gray-100"
+                }
+              `}
+            >
+              <span>{realm}</span>
+              {selectedRealm === realm && (
+                <Icon d={IC.chevronRight} size={18} />
+              )}
+            </button>
+          ))}
         </div>
       </div>
-    </div>
+    </>
   );
 };
 
 /* ═══════════════════════════════════════════════════════════
-   Main Data component
+   Main Dashboard Component
 ═══════════════════════════════════════════════════════════ */
 const Data = ({ clientId, token }) => {
-  const [clients, setClients]             = useState([]);
-  const [loading, setLoading]             = useState(false);
-  const [expanded, setExpanded]           = useState({});
-  const [realms, setRealms]               = useState([]);
+  const [clients, setClients] = useState([]);
+  const [loading, setLoading] = useState(false);
+  const [exporting, setExporting] = useState(false);
+  const [realms, setRealms] = useState([]);
   const [selectedRealm, setSelectedRealm] = useState("");
-  const [activeClient, setActiveClient]   = useState(null); // { id, name }
-  const [toastMsg, setToastMsg]           = useState("");
-  const [searchQuery, setSearchQuery]     = useState("");
-  const [sidebarOpen, setSidebarOpen]     = useState(false);
+  const [activeClient, setActiveClient] = useState(null);
+  const [toastMsg, setToastMsg] = useState("");
+  const [searchQuery, setSearchQuery] = useState("");
+  const [currentPage, setCurrentPage] = useState(1);
+  const [sidebarOpen, setSidebarOpen] = useState(false);
+  const itemsPerPage = 10;
 
   const { switchTenant } = useTenant();
 
@@ -243,7 +261,10 @@ const Data = ({ clientId, token }) => {
     if (!selectedRealm) return;
     const fetch = async () => {
       try {
-        setLoading(true); setClients([]);
+        setLoading(true); 
+        setClients([]);
+        setCurrentPage(1);
+        
         const res = await axios.get(
           `${import.meta.env.VITE_API_USER_SERVICE_URL}/${clientId}/users/realm?realm=${selectedRealm}`,
           { headers: { Authorization: `Bearer ${token}` } }
@@ -265,10 +286,10 @@ const Data = ({ clientId, token }) => {
     fetch();
   }, [selectedRealm, clientId, token]);
 
-  /* ── sync active client from localStorage (floater writes here) ── */
+  /* ── sync active client ── */
   useEffect(() => {
     const sync = () => {
-      const id   = localStorage.getItem("selected_client_id");
+      const id = localStorage.getItem("selected_client_id");
       const name = localStorage.getItem("selected_client_name");
       setActiveClient(id ? { id, name } : null);
     };
@@ -277,139 +298,258 @@ const Data = ({ clientId, token }) => {
     return () => window.removeEventListener("storage", sync);
   }, []);
 
-  const handleSelectRealm = (realm) => {
-    setSelectedRealm(realm);
-    setSearchQuery(""); setExpanded({});
-    setSidebarOpen(false);
-  };
-
   const handleEnter = useCallback((id, name) => {
-    localStorage.setItem("selected_client_id",   id);
+    localStorage.setItem("selected_client_id", id);
     localStorage.setItem("selected_client_name", name);
     window.dispatchEvent(new Event("storage"));
     setActiveClient({ id, name });
-    setToastMsg(`Switched to ${name}`);
+    setToastMsg(`✨ Switched to ${name}`);
   }, []);
 
-  const handleReset = () => {
-    localStorage.removeItem("selected_client_id");
-    localStorage.removeItem("selected_client_name");
-    window.dispatchEvent(new Event("storage"));
-    setActiveClient(null);
+  const handleExport = async () => {
+    setExporting(true);
+    try {
+      setTimeout(() => {
+        const success = exportToExcel(filtered, selectedRealm, activeClient?.id);
+        if (success) {
+          setToastMsg(`📊 Excel file downloaded successfully!`);
+        } else {
+          setToastMsg(`❌ Export failed. Please try again.`);
+        }
+        setExporting(false);
+      }, 300);
+    } catch (error) {
+      console.error(error);
+      setToastMsg(`❌ Export error: ${error.message}`);
+      setExporting(false);
+    }
   };
 
-  const toggleExpand = (id) => setExpanded(p => ({ ...p, [id]: !p[id] }));
-
+  /* ── Filtering & Pagination ── */
   const filtered = clients.filter(c => {
     const q = searchQuery.toLowerCase();
     return c.name.toLowerCase().includes(q)
-      || c.users.some(u => u.username.toLowerCase().includes(q) || (u.email||"").toLowerCase().includes(q));
+      || c.users.some(u => u.username.toLowerCase().includes(q) || (u.email || "").toLowerCase().includes(q));
   });
+
+  const totalPages = Math.ceil(filtered.length / itemsPerPage);
+  const paginatedClients = filtered.slice(
+    (currentPage - 1) * itemsPerPage,
+    currentPage * itemsPerPage
+  );
 
   const totalUsers = filtered.reduce((a, c) => a + c.users.length, 0);
 
   /* ── render ── */
   return (
-    <div className="flex min-h-screen bg-bg-tertiary dark:bg-bg-tertiary-dark">
+    <div className="min-h-screen bg-gray-50 flex">
       <Toast message={toastMsg} onDone={() => setToastMsg("")} />
 
-      {/* ── Sidebar ── */}
-      <aside className={`
-        fixed inset-y-0 left-0 z-40 w-60
-        bg-bg-primary dark:bg-bg-primary-dark
-        border-r border-border-default dark:border-border-default-dark
-        flex flex-col py-6 transition-transform duration-200
-        md:static md:translate-x-0 md:min-h-screen md:flex-shrink-0
-        ${sidebarOpen ? "translate-x-0" : "-translate-x-full"}
-      `}>
-        {/* Logo area */}
-        <div className="px-5 mb-6 flex items-center gap-2.5">
-          <div className="w-8 h-8 rounded-lg bg-action-primary/10 flex items-center justify-center">
-            <Icon d={IC.portal} size={16} className="text-action-primary" />
+      {/* Sidebar */}
+      <Sidebar 
+        realms={realms}
+        selectedRealm={selectedRealm}
+        onSelectRealm={setSelectedRealm}
+        isOpen={sidebarOpen}
+        onClose={() => setSidebarOpen(false)}
+      />
+
+      {/* Main Content */}
+      <div className="flex-1 flex flex-col">
+        {/* Top Header */}
+        <div className="sticky top-0 z-20 bg-white border-b border-gray-200 shadow-sm">
+          <div className="px-6 py-4 flex items-center justify-between gap-4">
+            <div className="flex items-center gap-4">
+              <button
+                onClick={() => setSidebarOpen(!sidebarOpen)}
+                className="lg:hidden p-2 hover:bg-gray-100 rounded-lg transition-colors"
+              >
+                <Icon d={IC.menu} size={20} className="text-gray-700" />
+              </button>
+              <div>
+                <h1 className="text-xl font-bold text-gray-900 capitalize">{selectedRealm}</h1>
+                <p className="text-xs text-gray-500">
+                  {filtered.length} tenant{filtered.length !== 1 ? 's' : ''} • {totalUsers} user{totalUsers !== 1 ? 's' : ''}
+                </p>
+              </div>
+            </div>
+
+            {/* Search & Export Bar */}
+            <div className="flex items-center gap-3 flex-1 max-w-md ml-auto">
+              <div className="flex-1 relative">
+                <Icon d={IC.search} size={18} className="absolute left-3 top-1/2 -translate-y-1/2 text-gray-400" />
+                <input
+                  type="text"
+                  placeholder="Search..."
+                  value={searchQuery}
+                  onChange={(e) => {
+                    setSearchQuery(e.target.value);
+                    setCurrentPage(1);
+                  }}
+                  className="w-full pl-10 pr-4 py-2 rounded-lg border border-gray-300 text-sm
+                             focus:outline-none focus:ring-2 focus:ring-blue-500 focus:border-transparent
+                             placeholder-gray-500"
+                />
+              </div>
+
+              <button 
+                onClick={handleExport}
+                disabled={exporting || filtered.length === 0}
+                className="flex items-center gap-2 px-4 py-2 rounded-lg border border-gray-300 text-gray-700 font-semibold hover:bg-gray-50 transition-all duration-200 disabled:opacity-50 disabled:cursor-not-allowed whitespace-nowrap"
+              >
+                <Icon d={IC.export} size={18} />
+                {exporting ? "..." : "Export"}
+              </button>
+            </div>
           </div>
-          <span className="text-sm font-bold text-text-primary dark:text-text-primary-dark tracking-tight">
-            Super Admin
-          </span>
         </div>
 
-        <p className="text-[10px] font-bold tracking-widest uppercase
-                      text-text-tertiary dark:text-text-tertiary-dark px-5 mb-3">
-          Realms
-        </p>
+        {/* Main Table Area */}
+        <div className="flex-1 overflow-auto p-6">
+          <div className="bg-white rounded-xl border border-gray-200 shadow-sm overflow-hidden">
+            {loading ? (
+              <table className="w-full">
+                <thead className="bg-gray-50 border-b border-gray-200">
+                  <tr>
+                    <th className="px-6 py-4 text-left"><input type="checkbox" className="rounded" /></th>
+                    <th className="px-6 py-4 text-left text-sm font-semibold text-gray-700">Tenant Info</th>
+                    <th className="px-6 py-4 text-left text-sm font-semibold text-gray-700">Realm</th>
+                    <th className="px-6 py-4 text-left text-sm font-semibold text-gray-700">Users</th>
+                    <th className="px-6 py-4 text-left text-sm font-semibold text-gray-700">Status</th>
+                    <th className="px-6 py-4 text-right text-sm font-semibold text-gray-700">Action</th>
+                  </tr>
+                </thead>
+                <tbody>
+                  {Array(8).fill(0).map((_, i) => <SkeletonRow key={i} />)}
+                </tbody>
+              </table>
+            ) : filtered.length === 0 ? (
+              <div className="flex flex-col items-center justify-center py-20">
+                <div className="w-16 h-16 rounded-full bg-gray-100 flex items-center justify-center mb-4">
+                  <Icon d={IC.users} size={32} className="text-gray-400" />
+                </div>
+                <p className="text-lg font-semibold text-gray-900">No tenants found</p>
+                <p className="text-sm text-gray-600">Try adjusting your search filters</p>
+              </div>
+            ) : (
+              <>
+                <table className="w-full">
+                  <thead className="bg-gray-50 border-b border-gray-200 sticky top-0">
+                    <tr>
+                      <th className="px-6 py-4 text-left"><input type="checkbox" className="rounded" /></th>
+                      <th className="px-6 py-4 text-left text-sm font-semibold text-gray-700">Tenant Info</th>
+                      <th className="px-6 py-4 text-left text-sm font-semibold text-gray-700">Realm</th>
+                      <th className="px-6 py-4 text-left text-sm font-semibold text-gray-700">Users</th>
+                      <th className="px-6 py-4 text-left text-sm font-semibold text-gray-700">Status</th>
+                      <th className="px-6 py-4 text-right text-sm font-semibold text-gray-700">Action</th>
+                    </tr>
+                  </thead>
+                  <tbody className="divide-y divide-gray-100">
+                    {paginatedClients.map((client, idx) => (
+                      <tr key={client.id} className="hover:bg-gray-50 transition-colors animate-in fade-in duration-300" style={{ animationDelay: `${idx * 50}ms` }}>
+                        <td className="px-6 py-4">
+                          <input type="checkbox" className="rounded" />
+                        </td>
+                        <td className="px-6 py-4">
+                          <div className="flex items-center gap-3">
+                            <Avatar name={client.name} />
+                            <div>
+                              <p className="font-semibold text-gray-900">{client.name}</p>
+                              <p className="text-xs text-gray-500">{client.id}</p>
+                            </div>
+                          </div>
+                        </td>
+                        <td className="px-6 py-4">
+                          <span className="font-mono text-sm text-gray-700 font-bold">{client.realm}</span>
+                        </td>
+                        <td className="px-6 py-4">
+                          <span className="inline-flex items-center gap-1.5 px-3 py-1.5 rounded-full text-xs font-semibold bg-gray-700 text-white">
+                            <Icon d={IC.users} size={14} />
+                            {client.users.length}
+                          </span>
+                        </td>
+                        <td className="px-6 py-4">
+                          {activeClient?.id === client.id ? (
+                            <span className="inline-flex items-center gap-1.5 px-3 py-1.5 rounded-full text-xs font-bold bg-emerald-100 text-emerald-700">
+                              <span className="w-1.5 h-1.5 rounded-full bg-emerald-600" />
+                              Active
+                            </span>
+                          ) : (
+                            <span className="inline-flex items-center gap-1.5 px-3 py-1.5 rounded-full text-xs font-bold bg-gray-100 text-gray-700">
+                              <span className="w-1.5 h-1.5 rounded-full bg-gray-400" />
+                              Inactive
+                            </span>
+                          )}
+                        </td>
+                        <td className="px-6 py-4 text-right">
+                          <button
+                            onClick={() => handleEnter(client.id, client.name)}
+                            className="inline-flex items-center gap-2 px-4 py-2 rounded-lg
+                                     bg-gradient-to-r from-blue-600 to-indigo-600 text-white
+                                     font-semibold text-sm hover:shadow-lg
+                                     transition-all duration-200 active:scale-95"
+                          >
+                            Visit
+                            <Icon d={IC.arrowRight} size={16} />
+                          </button>
+                        </td>
+                      </tr>
+                    ))}
+                  </tbody>
+                </table>
 
-        <nav className="flex-1 overflow-y-auto px-3 space-y-0.5">
-          {realms.map(realm => (
-            <button key={realm} onClick={() => handleSelectRealm(realm)}
-              className={`w-full flex items-center gap-3 px-3 py-2.5 rounded-xl text-sm
-                          text-left transition-all duration-150 font-medium
-                          ${selectedRealm === realm
-                            ? "bg-action-primary text-white shadow-sm shadow-action-primary/30"
-                            : "text-text-secondary dark:text-text-secondary-dark hover:bg-bg-secondary dark:hover:bg-bg-secondary-dark"
-                          }`}>
-              <span className={`w-2 h-2 rounded-full flex-shrink-0
-                               ${selectedRealm === realm ? "bg-white" : "bg-current opacity-30"}`} />
-              {realm.charAt(0).toUpperCase() + realm.slice(1)}
-              {selectedRealm === realm && (
-                <span className="ml-auto text-xs bg-white/20 px-1.5 py-0.5 rounded-md">
-                  {clients.length}
-                </span>
-              )}
-            </button>
-          ))}
-        </nav>
-      </aside>
-
-      {/* Overlay */}
-      {sidebarOpen && (
-        <div className="fixed inset-0 z-30 bg-black/40 md:hidden backdrop-blur-sm"
-          onClick={() => setSidebarOpen(false)} />
-      )}
-
-      {/* ── Main ── */}
-      <div className="flex-1 min-w-0 p-5 md:p-8 space-y-6">
-
-        {/* Header */}
-        <div className="flex items-center gap-3">
-          <button
-            className="md:hidden w-9 h-9 flex items-center justify-center rounded-xl
-                       border border-border-default dark:border-border-default-dark
-                       bg-bg-primary dark:bg-bg-primary-dark
-                       text-text-secondary dark:text-text-secondary-dark"
-            onClick={() => setSidebarOpen(true)} aria-label="Open sidebar">
-            <Icon d={IC.menu} size={18} />
-          </button>
-          <div>
-            <h1 className="text-2xl font-bold text-text-primary dark:text-text-primary-dark">
-              Customer Tenants
-            </h1>
-            {selectedRealm && (
-              <p className="text-sm text-text-secondary dark:text-text-secondary-dark mt-0.5">
-                Viewing <span className="font-mono font-semibold text-action-primary">{selectedRealm}</span> realm
-              </p>
+                {/* Pagination */}
+                {totalPages > 1 && (
+                  <div className="flex items-center justify-between px-6 py-4 border-t border-gray-200 bg-gray-50">
+                    <button 
+                      onClick={() => setCurrentPage(p => Math.max(1, p - 1))}
+                      disabled={currentPage === 1}
+                      className="flex items-center gap-2 px-4 py-2 rounded-lg border border-gray-300 text-gray-700 font-semibold hover:bg-white disabled:opacity-50 disabled:cursor-not-allowed transition-all duration-200"
+                    >
+                      ← Previous
+                    </button>
+                    <div className="flex items-center gap-1">
+                      {Array.from({ length: Math.min(5, totalPages) }).map((_, i) => {
+                        const pageNum = i + 1;
+                        return (
+                          <button
+                            key={pageNum}
+                            onClick={() => setCurrentPage(pageNum)}
+                            className={`w-8 h-8 rounded-lg font-semibold text-sm transition-all duration-200 ${
+                              currentPage === pageNum
+                                ? "bg-blue-600 text-white"
+                                : "border border-gray-300 text-gray-700 hover:bg-gray-100"
+                            }`}
+                          >
+                            {pageNum}
+                          </button>
+                        );
+                      })}
+                      {totalPages > 5 && (
+                        <>
+                          <span className="text-gray-500">...</span>
+                          <button
+                            onClick={() => setCurrentPage(totalPages)}
+                            className="w-8 h-8 rounded-lg border border-gray-300 text-gray-700 font-semibold text-sm hover:bg-gray-100 transition-all duration-200"
+                          >
+                            {totalPages}
+                          </button>
+                        </>
+                      )}
+                    </div>
+                    <button 
+                      onClick={() => setCurrentPage(p => Math.min(totalPages, p + 1))}
+                      disabled={currentPage === totalPages}
+                      className="flex items-center gap-2 px-4 py-2 rounded-lg border border-gray-300 text-gray-700 font-semibold hover:bg-white disabled:opacity-50 disabled:cursor-not-allowed transition-all duration-200"
+                    >
+                      Next →
+                    </button>
+                  </div>
+                )}
+              </>
             )}
           </div>
         </div>
-
-        {/* Grid */}
-        {loading
-          ? <div className="grid gap-4 sm:grid-cols-2 xl:grid-cols-3">
-              {Array(6).fill(0).map((_, i) => <Skeleton key={i} />)}
-            </div>
-          : filtered.length === 0
-          ? <div className="flex flex-col items-center justify-center py-24 gap-3 text-text-tertiary dark:text-text-tertiary-dark">
-              <Icon d={IC.building} size={44} />
-              <p className="text-sm">{searchQuery ? "No clients match your search" : "No clients in this realm"}</p>
-            </div>
-          : <div className="grid gap-4 sm:grid-cols-2 xl:grid-cols-3">
-              {filtered.map(c => (
-                <ClientCard key={c.id} client={c}
-                  isActive={activeClient?.id === c.id}
-                  expanded={!!expanded[c.id]}
-                  onEnter={() => handleEnter(c.id, c.name)}
-                  onToggle={() => toggleExpand(c.id)} />
-              ))}
-            </div>
-        }
       </div>
     </div>
   );
