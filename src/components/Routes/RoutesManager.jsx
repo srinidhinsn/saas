@@ -25,6 +25,9 @@ import BillingPage_Super_User from '../Super_User/Billing/Billing_Super_User';
 import KitchenDisplay_Super_User from '../Super_User/Order_Place/KitchenDisplay';
 import TableManagement_sub from '../MainComponents/TableServices/TableManagement_sub';
 import TenantSwitcher from '../Constants/TenanatFloater/TenantFloater';
+import CustomerChat from '../Constants/Chatbots/CustomerChat';
+import Super_User_Data from '../Super_User/Header/Super_User_Data';
+import Super_User_Tenant from '../Super_User/Header/Super_User_tenat';
 
 const RoutesManager = () => {
   const { clientId: paramClientId } = useParams();
@@ -83,8 +86,8 @@ const RoutesManager = () => {
 
   return (
     <>
-    {(realm ==='super_user' && <TenantSwitcher clientId={paramClientId} token={token} />)}
-        
+    {(realm ==='super_user' && <Super_User_Tenant clientId={paramClientId} token={token} />)}
+    {(realm ==='super_admin' && <TenantSwitcher clientId={paramClientId} token={token} />)}
     <Routes>
       <Route
         path="/"
@@ -134,6 +137,10 @@ const RoutesManager = () => {
         path="summary-manage"
         element={<Summary_V1 clientId={clientId} token={token} realm={realm} screenIds={screenIds} />}
       />
+       <Route
+        path="chatbot"
+        element={<CustomerChat clientId={clientId} token={token} realm={realm} screenIds={screenIds} />}
+      />
       <Route
         path="customer-data"
         element={<Data clientId={paramClientId} token={token} realm={realm} screenIds={screenIds} />}
@@ -164,6 +171,14 @@ const RoutesManager = () => {
          <Route
         path="tenant-switcher"
         element={<TenantSwitcher clientId={clientId} token={token} userId={userId} realm={realm} screenIds={screenIds} />}
+      />
+      <Route
+        path="super-user-data"
+        element={<Super_User_Data clientId={clientId} token={token} userId={userId} realm={realm} screenIds={screenIds} />}
+      />
+      <Route
+        path="super-user-tenant"
+        element={<Super_User_Tenant clientId={clientId} token={token} userId={userId} realm={realm} screenIds={screenIds} />}
       />
       <Route path="*" element={<Navigate to="home" replace />} />
       <Route path='user-profile' element={<UserProfile token={token} clientId={clientId} realm={realm} screenIds={screenIds}/>} />

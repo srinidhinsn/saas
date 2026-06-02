@@ -11,6 +11,7 @@ import CategoryTree from '../../MainComponents/InventoryServices/CategoryTree';
 import ImagePreview from '../../utils/ImagePreview';
 import InvoiceModal from '../../MainComponents/BillingServices/InvoiceModal';
 import { getMenuConfig } from '../../utils/menuConfigResolver';
+import CustomerChat from '../../Constants/Chatbots/CustomerChat';
 
 // ─────────────────────────────────────────────────────────────────────────────
 // Constants
@@ -1506,7 +1507,7 @@ const TakeawayOrdersModal = ({ isOpen, onClose, clientId, token, takeawayTableId
 // TakeOrder — main component
 // ─────────────────────────────────────────────────────────────────────────────
 
-const TakeOrder = ({ clientId, token, onOrderUpdate, realm, screenIds }) => {
+const Order_Place = ({ clientId, token, onOrderUpdate, realm, screenIds }) => {
 
   // ── View ──────────────────────────────────────────────────────────────────
   const [currentView, setCurrentView] = useState(
@@ -3020,6 +3021,10 @@ ${selectedAddress.country || ""}
 
   const handlePlaceOrder = async () => {
     if (isPlacingRef.current || !canPlaceOrder) return;
+    if (!selectedAddressId) {
+      toast.error("Please select address");
+      return;
+    }
     isPlacingRef.current = true;
     setIsPlacingOrder(true);
 
@@ -4245,6 +4250,7 @@ ${selectedAddress.country || ""}
           }}
         />
       )}
+      <CustomerChat clientId={clientId} token={token}/>
       {stockWarning && (
         <div className="fixed inset-0 z-50 flex items-center justify-center bg-black/40">
           <div className="bg-white rounded-xl p-6 w-80 shadow-xl">
@@ -4269,6 +4275,6 @@ ${selectedAddress.country || ""}
   );
 };
 
-export default TakeOrder;
+export default Order_Place;
 
 // =================================================================================        =========================   //

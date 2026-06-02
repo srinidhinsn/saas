@@ -1015,7 +1015,7 @@ const OrderSummaryVisible = ({ clientId, token }) => {
   };
 
   const handleRequestDeleteItem = (item, orderId) => {
-    setItemDeleteModal({ isOpen: true, item, orderId });
+    setItemDeleteModal({ isOpen: true, item, orderId });  
   };
 
   // ── Status change (unchanged) ──────────────────────────────────────────────
