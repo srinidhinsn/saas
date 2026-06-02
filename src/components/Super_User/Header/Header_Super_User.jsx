@@ -87,16 +87,16 @@ const Header_Super_User = ({ onLogout }) => {
   return (
     <header className="shadow-md sticky top-0 z-50 bg-bg-primary dark:bg-bg-primary-dark border-b border-border-default dark:border-border-default-dark transition-colors duration-300">
       <div className="mx-auto px-4 md:px-2 py-3 lg:py-4 flex items-center justify-between">
-        <span className="text-lg font-bold text-action-primary  tracking-tight  transition-colors">
-          {displayLabel}
+        <span  className="text-lg font-bold text-action-primary  tracking-tight  transition-colors">
+        <NavLink id="data"> <span className='text-action-primary'>{displayLabel}</span></NavLink>   
         </span>
 
         <div className="hidden lg:flex items-center space-x-8 text-text-primary">
           {/* <NavLink id="home">Dashboard</NavLink> */}
-          <NavLink id="data">Clients</NavLink>
+          {/* <NavLink id="data">Clients</NavLink> */}
           {/* <NavLink id="order">Order</NavLink> */}
           <NavLink id="summary">Summary</NavLink>
-          <NavLink id="kds">KDS</NavLink>
+          {/* <NavLink id="kds">KDS</NavLink> */}
           {/* <NavLink id="details">Details</NavLink>
           <NavLink id="documents">Documents</NavLink> */}
 
