@@ -34,14 +34,13 @@ const RoutesManager = () => {
   const [userId, setUserId] = useState();
 
   useEffect(() => {
-    const t = localStorage.getItem("access_token");
 
-    if (!t) return;
-    setToken(t);
+    if (!token) return;
+    setToken(token);
 
     // Decode token
     try {
-      const decoded = jwtDecode(t);
+      const decoded = jwtDecode(token);
       const userRole = decoded.roles && decoded.roles[0]; // pick first role
       setRole(userRole);
       setRealm(decoded.realm)
@@ -50,7 +49,7 @@ const RoutesManager = () => {
       // Fetch all screens for this role
       axios
         .get(`${import.meta.env.VITE_API_USER_SERVICE_URL}/${clientId}/users/screens?client_id=${clientId}&role=${userRole}`, {
-          headers: { Authorization: `Bearer ${t}` },
+          headers: { Authorization: `Bearer ${token}` },
         })
         .then((res) => {
           if (res.data && res.data.data && res.data.data.screens) {

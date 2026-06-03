@@ -169,7 +169,6 @@ const TableManagement = ({ clientId, token, screenIds, userId, realm}) => {
             setConfigs(freshConfigs);
             setRequiredScreenId(result.screen_id);
 
-            if (result.screen_id === "default_tables") {
                 const tableList = Array.isArray(result?.data) ? result.data : [];
                 const enrichedTables = tableList.map(t => {
                     const matchedConfig = freshConfigs.find(
@@ -186,8 +185,6 @@ const TableManagement = ({ clientId, token, screenIds, userId, realm}) => {
 
                 setTables(enrichedTables);
                 setOriginalTables(structuredClone(enrichedTables));
-
-            }
         } catch (error) {
             console.error("Error fetching tables:", error);
         } finally {
@@ -657,7 +654,6 @@ const TableManagement = ({ clientId, token, screenIds, userId, realm}) => {
     }
 
     return (
-        <AccessGuard screenIds={screenIds} requiredScreenId={requiredScreenId} clientId={clientId} requesterId={userId}>
             <div className="min-h-screen bg-bg-primary">
                 <style>
                     {`
@@ -1046,7 +1042,6 @@ const TableManagement = ({ clientId, token, screenIds, userId, realm}) => {
                     )}
                 </main>
             </div>
-        </AccessGuard>
     );
 };
 

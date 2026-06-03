@@ -10,6 +10,8 @@ import Headers_V1 from './components/V1_Components/Headers/Headers_V1';
 import Super_Admin_Header from './components/Super_Admin/Headers/Super_Admin_Header';
 import { setupAuthInterceptor } from './components/utils/authInterceptor';
 import Header_Super_User from './components/Super_User/Header/Header_Super_User';
+import { OperationGuardProvider } from './components/utils/Interceptors/OperationGaurdProvider';
+import { jwtDecode } from 'jwt-decode';
 
 // ─── Screen → Route mapping (keep in sync with Login.jsx) ───────────────────
 const screenRouteMap = {
@@ -51,11 +53,12 @@ const HeaderSwitcher = ({ clientId, onLogout }) => {
 
 // ─── Authenticated app shell ──────────────────────────────────────────────────
 const InnerAuthenticatedApp = ({ token, onLogout }) => {
+  const decoded=jwtDecode(token);
   const { clientId } = useParams();
   const finalClientId = clientId || 'easyfood';
 
   return (
-    <>
+    <OperationGuardProvider clientId={finalClientId} requesterId={decoded.user_id}>
       <HeaderSwitcher
         clientId={finalClientId}
         onLogout={onLogout}
@@ -67,7 +70,7 @@ const InnerAuthenticatedApp = ({ token, onLogout }) => {
           clientId={finalClientId}
         />
       </main>
-    </>
+    </OperationGuardProvider>
   );
 };
 
