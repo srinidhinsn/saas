@@ -62,7 +62,7 @@ const MenuTreeNode = ({
           )}
 
           <span className={`text-sm font-medium truncate ${isSelected ? "text-white" : "text-text-primary"}`}>
-            {category.name}
+          {category.displayName || category.name}
           </span>
         </div>
 
