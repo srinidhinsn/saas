@@ -2333,9 +2333,22 @@ const TakeOrder = ({ clientId, token, onOrderUpdate, realm }) => {
     setShowCart(true);
 
     // Set takeaway zone_config_id so correct prices are fetched
-    const takeawayZoneConfigId = takeawaySections.length > 0
-      ? takeawaySections[0].id
-      : null;
+    const takeawayTable = tables.find(
+      t => String(t.id) === String(tableIdStr)
+    );
+    
+    const matchedSection = takeawaySections.find(
+      s =>
+        s.zone === takeawayTable?.location_zone &&
+        s.section === takeawayTable?.section
+    );
+    
+    const takeawayZoneConfigId = matchedSection?.id || null;
+    
+    console.log("TAKEAWAY TABLE:", takeawayTable);
+    console.log("MATCHED TAKEAWAY SECTION:", matchedSection);
+    console.log("ZONE CONFIG:", takeawayZoneConfigId);
+    
     setZoneConfigId(takeawayZoneConfigId);
 
     goToOrderView();
@@ -2346,9 +2359,22 @@ const TakeOrder = ({ clientId, token, onOrderUpdate, realm }) => {
     setSelectedTable(tableIdStr);
 
     // Set takeaway zone_config_id so correct prices are fetched
-    const takeawayZoneConfigId = takeawaySections.length > 0
-      ? takeawaySections[0].id
-      : null;
+    const takeawayTable = tables.find(
+      t => String(t.id) === String(tableIdStr)
+    );
+    
+    const matchedSection = takeawaySections.find(
+      s =>
+        s.zone === takeawayTable?.location_zone &&
+        s.section === takeawayTable?.section
+    );
+    
+    const takeawayZoneConfigId = matchedSection?.id || null;
+    
+    console.log("TAKEAWAY TABLE:", takeawayTable);
+    console.log("MATCHED TAKEAWAY SECTION:", matchedSection);
+    console.log("ZONE CONFIG:", takeawayZoneConfigId);
+    
     setZoneConfigId(takeawayZoneConfigId);
 
     if (!existingOrder) {
