@@ -531,7 +531,7 @@ const KitchenCard = ({
               </div>
 
               {/* Combo components list — unchanged */}
-              {combo && <ComboComponentsList menuRecord={menuRecord} menuItemsMap={menuItemsMap} parentQuantity={item.quantity ?? 1} />}
+              {combo && <ComboComponentsList menuRecord={menuRecord} menuItemsMap={menuItemsMap} parentQuantity={item.quantity ?? 1}  />}
 
               {/* Addon rows — identified by "addon_" prefix on frontend_unique_key */}
               {/* Addon rows */}
@@ -593,7 +593,7 @@ const KitchenCard = ({
 
 // ─── Main KitchenDisplay component ────────────────────────────────────────────
 
-const KitchenDisplay = ({ clientId, token }) => {
+const KitchenDisplay = ({clientId, token}) => {
   const [cards, setCards] = useState([]);
   const [tablesMap, setTablesMap] = useState({});
   const [menuItemsMap, setMenuItemsMap] = useState({});
@@ -919,7 +919,7 @@ const KitchenDisplay = ({ clientId, token }) => {
       setCards((prev) =>
         prev.map((c) => {
           if (c.card_id !== cardId) return c;
-          const rolledBackItems = c.items.map((i) =>
+          const rolledBackItems  = c.items.map((i) =>
             String(i.id) === String(itemId) ? { ...i, status: previousStatus } : i
           );
           return { ...c, items: rolledBackItems, status: deriveStatus(rolledBackItems) };
@@ -958,8 +958,8 @@ const KitchenDisplay = ({ clientId, token }) => {
                   key={key}
                   onClick={() => setOrderFilter(key)}
                   className={`flex items-center gap-2 px-4 py-2 rounded-lg font-medium text-sm transition-all ${orderFilter === key
-                    ? 'bg-action-primary text-text-white shadow-sm'
-                    : 'bg-bg-tertiary text-text-secondary hover:text-text-primary border border-border-default'
+                     ? 'bg-action-primary text-text-white shadow-sm'
+                     : 'bg-bg-tertiary text-text-secondary hover:text-text-primary border border-border-default'
                     }`}
                 >
                   <Icon size={16} />
