@@ -124,7 +124,7 @@ const generateCategoryId = (name, parentName, existingCategories = []) => {
       .toString()
       .padStart(2, "0");
 
-    return `dietary_${nextNumber}`;
+    return `menu_${nextNumber}`;
   }
 
   // ─── Default logic ───────────────────────────
