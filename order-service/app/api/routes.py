@@ -278,7 +278,7 @@ def update_order_status(
                     Db_OrderItem_Entity.client_id == client_id,
                 )
                 .all()
-        )
+            )
 
         for item in order_items:
             if item.status != OrderStatusEnum.cancelled:
