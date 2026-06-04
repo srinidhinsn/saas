@@ -105,34 +105,30 @@ const normalizeIdPart = (value) => {
     .replace(/^_|_$/g, "");
 };
 
-const generateCategoryId = (name, parentName, existingCategories = []) => {
-  const normalizedParentName = normalizeIdPart(parentName);
+const generateCategoryId = (name, parentName, existingCategories = [], parentId = null) => {
+  const parentNorm = normalizeIdPart(parentName);
 
-  // ─── Dietary special handling ─────────────────
-  if (normalizedParentName === "dietery") {
+  // If parent is root → prefix is "menu"
+  // If parent is anything else → prefix is parent's normalized name
+  const isDirectUnderRoot = parentId
+    ? String(parentId).toLowerCase() === String(menuConfig?.root).toLowerCase()
+    : false;
 
-    const dietaryIds = existingCategories
-      .map(c => c.id)
-      .filter(id => /^dietary_\d+$/i.test(id));
+  const prefix = isDirectUnderRoot ? "menu" : parentNorm;
 
-    const numbers = dietaryIds.map(id => {
+  const existingNumbers = existingCategories
+    .map(c => c.id)
+    .filter(id => new RegExp(`^${prefix}_\\d+$`, 'i').test(id))
+    .map(id => {
       const match = id.match(/(\d+)$/);
       return match ? Number(match[1]) : 0;
     });
 
-    const nextNumber = (Math.max(0, ...numbers) + 1)
-      .toString()
-      .padStart(2, "0");
+  const nextNumber = (Math.max(0, ...existingNumbers) + 1)
+    .toString()
+    .padStart(2, "0");
 
-    return `menu_${nextNumber}`;
-  }
-
-  // ─── Default logic ───────────────────────────
-  const normalizedName = normalizeIdPart(name);
-
-  if (!normalizedParentName) return normalizedName;
-
-  return `${normalizedName}_${normalizedParentName}`;
+  return `${prefix}_${nextNumber}`;
 };
 
   const getCategoriesAtLevel = (nodes, targetLevel, level = 1) => {
@@ -660,7 +656,7 @@ const generateCategoryId = (name, parentName, existingCategories = []) => {
     const parentName = rootNode?.name || menuConfig.root;
 
     // Generate ID using root's name as parent
-    const newId = generateCategoryId(newCategoryName, parentName,flattenAllCategories(categories));
+    const newId = generateCategoryId(newCategoryName, parentName,flattenAllCategories(categories),parentId);
 
     try {
       // 1️⃣ Create the new category
@@ -736,7 +732,7 @@ const generateCategoryId = (name, parentName, existingCategories = []) => {
         const newSubId = generateCategoryId(
           editNewSubcategoryName,
           editingCategory.name,
-          flattenAllCategories(categories)
+          flattenAllCategories(categories), editingCategory.id
         );
         await axios.post(
           `${import.meta.env.VITE_API_INVENTORY_SERVICE_URL}/${clientId}/menu/create_category`,
