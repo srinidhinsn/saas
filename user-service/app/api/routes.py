@@ -422,14 +422,14 @@ async def delegate_access(
 
     # 3️⃣ Combine original grants with delegated page
     original_grants = requester.grants or []
-    delegated_grants = list(set(original_grants + [req.page]))
+    delegated_grants = list(set(original_grants))
     print("the deegated grants", delegated_grants)
 
     client = db.query(Client).filter(Client.id == client_id).first()
     client_model = Client.copyToModel(client)
 
     # 4️⃣ Create delegated token
-    expire = datetime.now(ZoneInfo(TIMEZONE)) + timedelta(minutes=1)
+    expire = datetime.utcnow() + timedelta(minutes=1)
     payload = {
         "sub": str(requester.id),
         "roles": admin.roles,
