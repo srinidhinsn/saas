@@ -3,7 +3,7 @@ import axios from 'axios';
 import { useParams } from 'react-router-dom';
 import { toast } from 'react-toastify';
 import 'react-toastify/dist/ReactToastify.css';
-import { FaCheckCircle, FaClock, FaHourglassHalf } from 'react-icons/fa';
+import { FaCheckCircle, FaClock, FaHourglassHalf, FaConciergeBell } from 'react-icons/fa';
 import { Filter, Clock, Users, Package, Truck, Trash2, BarChart2, X, ChevronRight } from 'lucide-react';
 
 // ─── Constants ─────────────────────────────────────────────────────────────────
@@ -26,8 +26,6 @@ const KDS_CONFIG = {
     READY: 'ready',
     CANCELLED: 'cancelled',
   },
-
-  TAKEAWAY_TABLE_IDS: [500], // can support multiple IDs
 
   POLL_INTERVAL_MS: 10000,
 
@@ -81,7 +79,7 @@ const calculateElapsedTime = (createdAt) => {
 };
 
 const deriveStatus = (items) => {
-  const { PENDING, PREPARING, READY } = KDS_CONFIG.STATUS;
+  const { PENDING, PREPARING, READY, SERVED } = KDS_CONFIG.STATUS;
   const activeItems = (items || []).filter((item) => {
     const status = String(item?.status || '').toLowerCase();
     return status !== KDS_CONFIG.STATUS.CANCELLED;
@@ -89,7 +87,8 @@ const deriveStatus = (items) => {
   if (!activeItems.length) return PENDING;
   if (activeItems.some((i) => i.status === PENDING)) return PENDING;
   if (activeItems.some((i) => i.status === PREPARING)) return PREPARING;
-  if (activeItems.every((i) => i.status === READY || i.status === KDS_CONFIG.STATUS.SERVED)) return READY;
+  if (activeItems.every((i) => i.status === READY)) return READY;
+  if (activeItems.every((i) => i.status === SERVED)) return SERVED;
   return PENDING;
 };
 
@@ -516,6 +515,18 @@ const KitchenCard = ({
                       className={item.status === 'ready' ? 'text-green-500' : 'text-gray-400'}
                     />
                   </button>
+                  <button
+                    type="button"
+                    disabled={isPending || isCancelled}
+                    onClick={() => handleStatusClick(card.card_id, item.id, KDS_CONFIG.STATUS.SERVED)}
+                    title="Mark as Served"
+                    className={`p-2 rounded-md hover:bg-gray-100 transition-colors ${isPending || isCancelled ? 'opacity-40 cursor-not-allowed' : ''}`}
+                  >
+                    <FaConciergeBell
+                      size={20}
+                      className={item.status === 'served' ? 'text-purple-500' : 'text-gray-400'}
+                    />
+                  </button>
                 </div>
               </div>
 
@@ -552,6 +563,12 @@ const KitchenCard = ({
                             className={`p-1 rounded hover:bg-gray-100 ${isAddonPending || isAddonCancelled ? 'opacity-40 cursor-not-allowed' : ''}`}>
                             <FaCheckCircle size={14} className={addon.status === 'ready' ? 'text-green-500' : 'text-gray-400'} />
                           </button>
+                          <button type="button" disabled={isAddonPending || isAddonCancelled}
+                            onClick={() => handleStatusClick(card.card_id, addon.id, KDS_CONFIG.STATUS.SERVED)}
+                            title="Mark as Served"
+                            className={`p-1 rounded hover:bg-gray-100 ${isAddonPending || isAddonCancelled ? 'opacity-40 cursor-not-allowed' : ''}`}>
+                            <FaConciergeBell size={14} className={addon.status === 'served' ? 'text-purple-500' : 'text-gray-400'} />
+                          </button>
                         </div>
                       </div>
                     );
@@ -576,7 +593,7 @@ const KitchenCard = ({
 
 // ─── Main KitchenDisplay component ────────────────────────────────────────────
 
-const KitchenDisplay = ({clientId , token}) => {
+const KitchenDisplay = ({clientId, token}) => {
   const [cards, setCards] = useState([]);
   const [tablesMap, setTablesMap] = useState({});
   const [menuItemsMap, setMenuItemsMap] = useState({});
@@ -918,7 +935,8 @@ const KitchenDisplay = ({clientId , token}) => {
   const filteredCards = cards
     .filter((card) => {
       if (orderFilter === KDS_CONFIG.FILTERS.ALL) return true;
-      const isTakeaway = KDS_CONFIG.TAKEAWAY_TABLE_IDS.includes(Number(card.table_id));
+      const tableName = tablesMap[card.table_id] || '';
+      const isTakeaway = tableName.toLowerCase().includes('takeaway');
       if (orderFilter === KDS_CONFIG.FILTERS.TAKEAWAY) return isTakeaway;
       if (orderFilter === KDS_CONFIG.FILTERS.DINEIN) return !isTakeaway;
       return true;
