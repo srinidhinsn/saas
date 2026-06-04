@@ -11,7 +11,7 @@ import { jwtDecode } from "jwt-decode";
 import { getMenuConfig } from '../../utils/menuConfigResolver';
 import MenuConfigModal from '../../utils/Modals/MenuConfigModal';
 
-const MenuManagement = ({ clientId, token, realm }) => {
+const MenuManagement = ({ clientId, token,screenIds, userId, realm }) => {
   const [searchOpen, setSearchOpen] = useState(false);
   const [searchQuery, setSearchQuery] = useState('');
   const searchInputRef = useRef(null);
@@ -31,7 +31,7 @@ const MenuManagement = ({ clientId, token, realm }) => {
   const [selectedCategoryId, setSelectedCategoryId] = useState(null);
   const [dieterySubCategories, setDieterySubCategories] = useState([]);
   const [sidebarCategories, setSidebarCategories] = useState([]);
-
+  const [requiredScreenId, setRequiredScreenId] = useState(null);
   const savedCategoryRef = useRef(localStorage.getItem("menu_selected_category"));
   const [dietaryColorMap, setDietaryColorMap] = useState({});
   const [dietaryOptions, setDietaryOptions] = useState([]);
@@ -849,6 +849,8 @@ const MenuManagement = ({ clientId, token, realm }) => {
           }
         )
       ]);
+
+      setRequiredScreenId(catRes.data.screen_id);
 
       const fullTree = (catRes.data.data || []).filter(c => c.name?.toLowerCase() !== "all");
       const subcategoryIds = new Set();

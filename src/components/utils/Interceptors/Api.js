@@ -1,14 +1,13 @@
-// axiosInterceptor.js
 import axios from "axios";
 import {jwtDecode} from "jwt-decode";
 
-/* -----------------------------------------------------
-   1️⃣ Function to get the valid token (delegate > access)
-------------------------------------------------------*/
 export const getValidToken = () => {
   const delegateToken = localStorage.getItem("delegate_token");
   const accessToken = localStorage.getItem("access_token");
-
+  
+  /* -----------------------------------------------------
+   1️⃣ Function to get the valid token (delegate > access)
+  ------------------------------------------------------*/
   const isTokenValid = (token) => {
     if (!token) return false;
     try {
@@ -33,7 +32,7 @@ export const getValidToken = () => {
   } else if (accessToken) {
     localStorage.removeItem("access_token");
   }
-
+  
   // 3️⃣ no valid token left
   return null;
 };
@@ -62,18 +61,38 @@ axios.interceptors.response.use(
   (error) => {
     if (!error.response) return Promise.reject(error);
 
-    const status = error.response.status;
+    const { status, data } = error.response;
 
-    // 401 → invalid/expired token → logout
+    if (status === 403) {
+      console.log("403 response:", JSON.stringify(data));  // ← add here
+    }
     if (status === 401) {
       localStorage.removeItem("delegate_token");
       localStorage.removeItem("access_token");
       window.location.href = "/";
+      return Promise.reject(error);
     }
 
-    // 403 → RBAC violation → trigger access denied
-   
+    if (
+      status === 403 &&
+      data?.detail?.type === "operation_forbidden"  // ← structured = operation level
+    ) {
+      window.dispatchEvent(
+        new CustomEvent("operation:forbidden", {
+          detail: {
+            module: data.detail.module,
+            operation: data.detail.operation,
+          },
+        })
+      );
 
+      // Suspend the original promise until modal resolves
+      return new Promise((resolve, reject) => {
+        window.__pendingRetry = { resolve, reject, config: error.config };
+      });
+    }
+
+    // Plain string 403 (realm/grant issues) → just reject normally
     return Promise.reject(error);
   }
 );
