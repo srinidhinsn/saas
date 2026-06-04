@@ -69,7 +69,7 @@ def verify_token(req: Request = None, token: str = Depends(oauth2_scheme), db: S
                 pageDefinitionModels = PageDefinition.copyToModels(page_definitions)
                 screenId = get_screen_id(pageDefinitionModels, url_operation)
                 if screenId == "accessRestricted":
-                    raise HTTPException(status_code=403, detail="Restricted Access.")
+                    raise HTTPException(status_code=403, detail={"type": "operation_forbidden", "module": url_module, "operation": url_operation, "message": "Restricted Access. Please contact administrator."})
                 context = SaasContext(url_client_id, url_module, url_operation,
                                       str(payload.get("user_id")), roles, grants, screenId)
                 saasContext.set(context)
@@ -81,7 +81,7 @@ def verify_token(req: Request = None, token: str = Depends(oauth2_scheme), db: S
                 pageDefinitionModels = PageDefinition.copyToModels(page_definitions)
                 screenId = get_screen_id(pageDefinitionModels, url_operation)
                 if screenId == "accessRestricted":
-                    raise HTTPException(status_code=403, detail="Restricted Access.")
+                    raise HTTPException(status_code=403, detail={"type": "operation_forbidden", "module": url_module, "operation": url_operation, "message": "Restricted Access. Please contact administrator."})
                 context = SaasContext(url_client_id, url_module, url_operation,str(payload.get("user_id")), roles, grants, screenId)
                 saasContext.set(context)
                 return context
@@ -100,7 +100,7 @@ def verify_token(req: Request = None, token: str = Depends(oauth2_scheme), db: S
             pageDefinitionModels = PageDefinition.copyToModels(page_definitions)
             screenId = get_screen_id(pageDefinitionModels, url_operation)
             if screenId == "accessRestricted":
-                raise HTTPException(status_code=403, detail="Restricted Access. Please contact administrator.")
+                raise HTTPException(status_code=403, detail={"type": "operation_forbidden", "module": url_module, "operation": url_operation, "message": "Restricted Access. Please contact administrator."})
             context = SaasContext(url_client_id, url_module, url_operation,str(payload.get("user_id")), roles, grants, screenId)
             saasContext.set(context)
             return context
