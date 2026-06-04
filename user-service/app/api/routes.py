@@ -429,7 +429,7 @@ async def delegate_access(
     client_model = Client.copyToModel(client)
 
     # 4️⃣ Create delegated token
-    expire = datetime.utcnow() + timedelta(minutes=1)
+    expire = datetime.now(ZoneInfo(TIMEZONE)) + timedelta(minutes=1)
     payload = {
         "sub": str(requester.id),
         "roles": admin.roles,
