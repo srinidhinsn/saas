@@ -232,10 +232,8 @@ def update_order_status(
         )
 
         for o in related_orders:
-            # update main order
             o.status = OrderStatusEnum.cancelled
 
-            # update all items
             order_items = (
                 db.query(Db_OrderItem_Entity)
                 .filter(
@@ -264,62 +262,41 @@ def update_order_status(
             },
         )
 
-    # ── Served / completed entire group ────────────────────────────────────
+    # ── Served / completed — only the single order passed in ───────────────
     if body.status in [OrderStatusEnum.served, OrderStatusEnum.completed]:
-        root_id = _root_dinein_id(order.dinein_order_id)
+        should_deduct = order.status not in [
+            OrderStatusEnum.served,
+            OrderStatusEnum.completed
+        ]
 
-        related_orders = db.query(Db_Order_Entity).filter(
-            Db_Order_Entity.client_id == client_id,
-            Db_Order_Entity.dinein_order_id.like(f"{root_id}%")
-        ).all()
+        order.status = body.status
 
-        orders_to_deduct = []
-
-        for o in related_orders:
-            # Deduct only if not already served/completed
-            should_deduct = o.status not in [
-                OrderStatusEnum.served,
-                OrderStatusEnum.completed
-            ]
-
-            # Update main order status
-            o.status = body.status
-
-            # Update all items in this order
-            order_items = (
-                db.query(Db_OrderItem_Entity)
-                .filter(
-                    Db_OrderItem_Entity.order_id == o.id,
-                    Db_OrderItem_Entity.client_id == client_id,
-                )
-                .all()
+        order_items = (
+            db.query(Db_OrderItem_Entity)
+            .filter(
+                Db_OrderItem_Entity.order_id == order.id,
+                Db_OrderItem_Entity.client_id == client_id,
             )
+            .all()
+        )
 
-            for item in order_items:
-             if item.status != OrderStatusEnum.cancelled:
-               item.status = body.status
-
-            if should_deduct:
-                orders_to_deduct.append(o.id)
+        for item in order_items:
+            if item.status != OrderStatusEnum.cancelled:
+                item.status = body.status
 
         db.flush()
 
-        # Deduct stock only once
-        for order_id in orders_to_deduct:
-            _deduct_stock_for_order(
-                db=db,
-                client_id=client_id,
-                order_id=order_id
-            )
+        if should_deduct:
+            _deduct_stock_for_order(db=db, client_id=client_id, order_id=order.id)
 
         db.commit()
 
         return ResponseModel(
             screen_id=context.screen_id,
             data={
-                "message": "All related orders marked as served",
-                "updated_count": len(related_orders),
-                "deducted_count": len(orders_to_deduct),
+                "message": "Order marked as served",
+                "updated_count": 1,
+                "deducted_count": 1 if should_deduct else 0,
             },
         )
 
