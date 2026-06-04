@@ -262,22 +262,22 @@ def update_order_status(
             },
         )
 
-    # ── Served / completed — only the single order passed in ───────────────
+    # ── Served / completed entire group ────────────────────────────────────
     if body.status in [OrderStatusEnum.served, OrderStatusEnum.completed]:
         should_deduct = order.status not in [
             OrderStatusEnum.served,
             OrderStatusEnum.completed
         ]
-
+        # Update main order status
         order.status = body.status
 
         order_items = (
-            db.query(Db_OrderItem_Entity)
-            .filter(
-                Db_OrderItem_Entity.order_id == order.id,
-                Db_OrderItem_Entity.client_id == client_id,
-            )
-            .all()
+                db.query(Db_OrderItem_Entity)
+                .filter(
+                    Db_OrderItem_Entity.order_id == order.id,
+                    Db_OrderItem_Entity.client_id == client_id,
+                )
+                .all()
         )
 
         for item in order_items:
@@ -285,17 +285,19 @@ def update_order_status(
                 item.status = body.status
 
         db.flush()
-
+        
+        deducted_count = 0
         if should_deduct:
             _deduct_stock_for_order(db=db, client_id=client_id, order_id=order.id)
+            deducted_count += 1
 
         db.commit()
 
         return ResponseModel(
             screen_id=context.screen_id,
             data={
-                "message": "Order marked as served",
-                "updated_count": 1,
+                "message": "All related orders marked as served",
+                "updated_count": len(order_items),
                 "deducted_count": 1 if should_deduct else 0,
             },
         )
