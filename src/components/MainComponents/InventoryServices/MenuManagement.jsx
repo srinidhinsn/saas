@@ -480,7 +480,7 @@ const MenuManagement = ({ clientId, token, realm }) => {
     let flatList = [];
     tree.forEach(category => {
       flatList.push({
-        id: category.id, name: category.name, level,
+        id: category.id, name: category.name, level, description: category.description || "",
         parentId, hasChildren: !!(category.subCategories?.length),
       });
       if (category.subCategories?.length) {
