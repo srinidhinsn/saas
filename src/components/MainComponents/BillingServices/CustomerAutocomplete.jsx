@@ -23,8 +23,11 @@ export default function CustomerAutocomplete({
 
   useEffect(() => {
     if (value && value.length > 0) {
+      const q = value.toLowerCase();
       const filtered = customers.filter((customer) =>
-        customer.customer_id?.toLowerCase().includes(value.toLowerCase())
+        customer.customer_id?.toLowerCase().includes(q) ||
+        customer.contact_phone?.toLowerCase().includes(q) ||
+        customer.contact_email?.toLowerCase().includes(q)
       );
       setFilteredCustomers(filtered);
     } else {
