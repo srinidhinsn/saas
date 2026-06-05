@@ -97,6 +97,7 @@ const FallbackPreserveClient = () => {
 
 // ─── Root App ─────────────────────────────────────────────────────────────────
 const App = () => {
+  const [checkingAuth, setCheckingAuth] = useState(true);
   const [authState, setAuthState] = useState(() => {
    const token= localStorage.getItem('access_token');
    let validToken = null;
@@ -109,11 +110,11 @@ if (token) {
       validToken = token;
     } else {
       localStorage.removeItem("access_token");
-      localStorage.removeItem("screen_id");
+      validToken = null;
     }
   } catch (e) {
     localStorage.removeItem("access_token");
-    localStorage.removeItem("screen_id");
+    validToken = null;
   }
 }
    const screenId= localStorage.getItem('screen_id');
@@ -138,9 +139,69 @@ if (token) {
     const match = window.location.pathname.match(/^\/saas\/([^/]+)/);
     if (match?.[1]) localStorage.setItem('client_id', match[1]);
   }, []);
+  useEffect(() => {
+    const refreshAccessToken = async () => {
+      const refreshToken = localStorage.getItem("refresh_token");
+  
+      if (!refreshToken) {
+        setCheckingAuth(false);
+        return;
+      }
+      const clientId = localStorage.getItem("client_id") || "easyfood";
 
-  const handleLoginSuccess = (accessToken, screenId, clientId) => {
+      try {
+        const response = await fetch(
+          `${import.meta.env.VITE_API_USER_SERVICE_URL}/${clientId}/users/refresh`,
+          {
+            method: "POST",
+            headers: {
+              "Content-Type": "application/json",
+            },
+            body: JSON.stringify({
+              refresh_token: refreshToken,
+            }),
+          }
+        );
+  
+        if (!response.ok) {
+          handleLogout();
+          setCheckingAuth(false);
+          return;
+        }
+  
+        const data = await response.json();
+  
+        const newAccessToken = data.data.access_token;
+  
+        localStorage.setItem(
+          "access_token",
+          newAccessToken
+        );
+  
+        setAuthState({
+          token: newAccessToken,
+          screenId: localStorage.getItem("screen_id"),
+          clientId: localStorage.getItem("client_id"),
+          isAuthenticated: true,
+        });
+      } catch (err) {
+        handleLogout();
+      } finally {
+        setCheckingAuth(false);
+      }
+    };
+    if (
+      !authState.token &&
+      localStorage.getItem("refresh_token")
+    ) {
+      refreshAccessToken();
+    } else {
+      setCheckingAuth(false);
+    }
+  }, []);
+  const handleLoginSuccess = (accessToken, refreshToken,screenId, clientId) => {
     localStorage.setItem('access_token', accessToken);
+    localStorage.setItem("refresh_token", refreshToken);
     localStorage.setItem('screen_id', screenId || '');
     localStorage.setItem('client_id', clientId);
 
@@ -155,7 +216,8 @@ if (token) {
   const handleLogout = () => {
     localStorage.removeItem('access_token');
     localStorage.removeItem('screen_id');
-
+    localStorage.removeItem("refresh_token");
+    localStorage.removeItem("selected_client_id");
     setAuthState(prev => ({
       token: null,
       screenId: null,
@@ -163,7 +225,13 @@ if (token) {
       isAuthenticated: false,
     }));
   };
-
+  if (checkingAuth) {
+    return (
+      <div className="min-h-screen flex items-center justify-center">
+        Loading...
+      </div>
+    );
+  }
   return (
     <BrowserRouter>
       <div className="min-h-screen" style={{ backgroundColor: 'var(--color-bg-secondary)' }}>
