@@ -13,6 +13,7 @@ export default function BillingPage({ clientId, token }) {
   const [filteredOrders, setFilteredOrders] = useState([]);
   const [tablesMap, setTablesMap] = useState({});
   const [inventoryMap, setInventoryMap] = useState({});
+  const [billingDocMap, setBillingDocMap] = useState({});
   const [selectedOrder, setSelectedOrder] = useState(null);
   const [loading, setLoading] = useState(true);
   const [invoiceModalOpen, setInvoiceModalOpen] = useState(false);
@@ -25,10 +26,11 @@ export default function BillingPage({ clientId, token }) {
     async function fetchAll() {
       try {
         setLoading(true);
-        const [ordersRes, tablesRes, invRes] = await Promise.all([
+        const [ordersRes, tablesRes, invRes, billingRes] = await Promise.all([
           axios.get(`${import.meta.env.VITE_API_ORDER_SERVICE_URL}/${clientId}/dinein/table`, { headers: { Authorization: `Bearer ${token}` } }),
           axios.get(`${import.meta.env.VITE_API_TABLE_SERVICE_URL}/${clientId}/tables/read`, { headers: { Authorization: `Bearer ${token}` } }),
           axios.get(`${import.meta.env.VITE_API_INVENTORY_SERVICE_URL}/${clientId}/inventory/read`, { headers: { Authorization: `Bearer ${token}` } }),
+          axios.get(`${import.meta.env.VITE_API_BILLING_SERVICE_URL}/${clientId}/invoice/read_document`, { headers: { Authorization: `Bearer ${token}` } }),
         ]);
         
         const allOrders = ordersRes.data?.data || [];
@@ -41,6 +43,12 @@ export default function BillingPage({ clientId, token }) {
         const iMap = {};
         (invRes.data?.data || []).forEach((i) => (iMap[i.id] = i));
         setInventoryMap(iMap);
+
+        const bMap = {};
+        (billingRes.data?.data || []).forEach((doc) => {
+          if (doc.order_id != null) bMap[doc.order_id.toString()] = doc;
+        });
+        setBillingDocMap(bMap);
       } catch (e) {
         toast.error("Error loading data");
       } finally {
@@ -145,6 +153,20 @@ export default function BillingPage({ clientId, token }) {
   const handleInvoiceSave = async (draftId) => {
     // Optionally refresh orders or perform other actions after save
     console.log('Invoice saved with ID:', draftId);
+
+    try {
+      const res = await axios.get(
+        `${import.meta.env.VITE_API_BILLING_SERVICE_URL}/${clientId}/invoice/read_document`,
+        { headers: { Authorization: `Bearer ${token}` } }
+      );
+      const bMap = {};
+      (res.data?.data || []).forEach((doc) => {
+        if (doc.order_id != null) bMap[doc.order_id.toString()] = doc;
+      });
+      setBillingDocMap(bMap);
+    } catch (e) {
+      toast.error("Failed to refresh billing data");
+    }
   };
 
   return (
@@ -211,6 +233,8 @@ export default function BillingPage({ clientId, token }) {
                     <th className="px-6 py-4 text-left text-xs font-bold text-text-primary uppercase tracking-wider">Table</th>
                     <th className="px-6 py-4 text-left text-xs font-bold text-text-primary uppercase tracking-wider">Items</th>
                     <th className="px-6 py-4 text-left text-xs font-bold text-text-primary uppercase tracking-wider">Total</th>
+                    <th className="px-6 py-4 text-left text-xs font-bold text-text-primary uppercase tracking-wider">Total Amount</th>
+                    <th className="px-6 py-4 text-left text-xs font-bold text-text-primary uppercase tracking-wider">Payment Status</th>
                     <th className="px-6 py-4 text-center text-xs font-bold text-text-primary uppercase tracking-wider">Action</th>
                   </tr>
                 </thead>
@@ -237,6 +261,37 @@ export default function BillingPage({ clientId, token }) {
                         <td className="px-6 py-4 whitespace-nowrap">
                           <div className="text-sm font-bold text-action-primary">₹{orderTotal.toFixed(2)}</div>
                         </td>
+                        {(() => {
+                          const billingDoc = billingDocMap[order.id.toString()];
+                          return (
+                            <>
+                              {/* Total Amount */}
+                              <td className="px-6 py-4 whitespace-nowrap">
+                                <div className="text-sm font-bold text-action-primary">
+                                  {billingDoc ? `₹${Number(billingDoc.total_amount).toFixed(2)}` : "—"}
+                                </div>
+                              </td>
+
+                              {/* Payment Status */}
+                              <td className="px-6 py-4 whitespace-nowrap">
+                                {billingDoc ? (
+                                  <span className={`inline-flex px-2.5 py-1 rounded-full text-xs font-semibold ${billingDoc.payment_status === "paid"
+                                      ? "bg-green-100 text-green-700"
+                                      : billingDoc.status === "partial"
+                                        ? "bg-yellow-100 text-yellow-700"
+                                        : "bg-red-100 text-red-700"
+                                    }`}>
+                                    {billingDoc.payment_status?.toUpperCase() ?? "UNKNOWN"}
+                                  </span>
+                                ) : (
+                                  <span className="inline-flex px-2.5 py-1 rounded-full text-xs font-semibold bg-gray-100 text-gray-500">
+                                    NOT BILLED
+                                  </span>
+                                )}
+                              </td>
+                            </>
+                          );
+                        })()}
                         <td className="px-6 py-4 whitespace-nowrap text-center">
                           <button
                             onClick={() => handleSelectOrder(order)}

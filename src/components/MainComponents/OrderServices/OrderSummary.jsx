@@ -434,8 +434,9 @@ const StatusBadge = ({ status }) => {
 // Helper
 // ─────────────────────────────────────────────────────────────────────────────
 
-const getInitialOrderMode = (order) => {
-  if (Number(order.table_id) === 500) return 'takeaway';
+const getInitialOrderMode = (order, tablesMap = {}) => {
+  const tableName = tablesMap[order.table_id] || tablesMap[String(order.table_id)] || '';
+  if (tableName.toLowerCase().includes('takeaway')) return 'takeaway';
   return 'dinein';
 };
 const normaliseItem = (item) => {
@@ -698,7 +699,7 @@ const OrderSummaryVisible = ({ clientId, token }) => {
       clearNewItemsStorage(order.id);
       return {
         ...order,
-        _fixedOrderMode: order._fixedOrderMode ?? getInitialOrderMode(order),
+        _fixedOrderMode: order._fixedOrderMode ?? getInitialOrderMode(order, tablesMap),
       };
     }
 
@@ -841,7 +842,7 @@ const OrderSummaryVisible = ({ clientId, token }) => {
 
     return {
       ...order,
-      _fixedOrderMode: order._fixedOrderMode ?? getInitialOrderMode(order),
+      _fixedOrderMode: order._fixedOrderMode ?? getInitialOrderMode(order, tablesMap),
       items: deduped.map(normaliseItem),
       has_new_items: batchItemsMap.size > 0,
     };
