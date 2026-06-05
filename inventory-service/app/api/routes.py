@@ -91,11 +91,10 @@ def update_inventory(
 
     payload["zone_config_id"] = zone_id
 
-    # ✅ Image-only path: ONLY when image_id is real AND unit_price is truly absent
-    # unit_price=0 is a valid price — must NOT trigger image-only path
+    # ✅ Image-only path
     image_id_val = payload.get("image_id")
     has_real_image = image_id_val and str(image_id_val).strip() not in ("", "null", "None")
-    has_unit_price = "unit_price" in payload  # key present = price update intended
+    has_unit_price = "unit_price" in payload
 
     if has_real_image and not has_unit_price:
         records = db.query(InventoryEntity).filter(
@@ -125,6 +124,9 @@ def update_inventory(
         InventoryEntity.client_id == client_id
     ).first()
 
+    # ✅ Pop availability BEFORE setattr so create_transaction reads old value from DB
+    new_availability = payload.pop("availability", None)
+
     if record:
         for key, value in payload.items():
             setattr(record, key, value)
@@ -132,68 +134,37 @@ def update_inventory(
         record = InventoryEntity(**payload)
         db.add(record)
 
+    # ✅ If availability is being updated, record transaction then apply to all zones
+    if new_availability is not None:
+        new_qty = Decimal(str(new_availability))
+        before_stock = Decimal(str(record.availability or 0))
+
+        if new_qty != before_stock:
+            create_transaction(db=db, client_id=client_id, payload=TxPayload(
+                item_id=record.id,
+                tx_type="MENU_AVAILABILITY_ADJUSTMENT",
+                ref_id=record.id,
+                qty=abs(new_qty - before_stock),
+                after_stock=new_qty,
+                remarks=f"Manual availability update for '{record.name}'",
+            ))
+
+        # Apply to ALL zones
+        db.query(InventoryEntity).filter(
+            InventoryEntity.id == updates.id,
+            InventoryEntity.client_id == client_id
+        ).update({"availability": new_qty}, synchronize_session="fetch")
+
     db.commit()
     db.refresh(record)
 
     return ResponseModel(
-    screen_id=context.screen_id,
-    status="success",
-    message="Inventory updated successfully",
-    data=InventoryEntity.copyToModel(record)
-    )
-
-@router.post("/update/avail", response_model=ResponseModel[Inventory])
-def update_inventory_availability(
-    client_id: str,
-    updates: Inventory,
-    context: SaasContext = Depends(verify_token),
-    db: Session = Depends(get_db),
-):
-    if not updates.id:
-        raise HTTPException(status_code=400, detail="Missing item ID")
-
-    records = db.query(InventoryEntity).filter(
-        InventoryEntity.id == updates.id,
-        InventoryEntity.client_id == client_id,
-    ).all()
-
-    if not records:
-        raise HTTPException(status_code=404, detail="Inventory item not found")
-
-    update_data = updates.dict(exclude_unset=True)
-    new_availability = update_data.pop("availability", None)
-
-    # ✅ Update metadata for ALL zones
-    for record in records:
-        for key, value in update_data.items():
-            if key != "client_id":
-                setattr(record, key, value)
-
-    # ✅ SINGLE transaction logic (use first record as reference)
-    if new_availability is not None:
-        new_qty = Decimal(str(new_availability))
-        before_stock = Decimal(str(records[0].availability or 0))  # take any one
-
-        if new_qty != before_stock:
-            create_transaction(db=db, client_id=client_id, payload=TxPayload(item_id=record.id,
-                                tx_type="MENU_AVAILABILITY_ADJUSTMENT",ref_id=record.id,qty=abs(new_qty - before_stock),
-                                after_stock=new_qty,remarks=f"Manual availability update for '{record.name}'",))
-
-        # ✅ Apply same availability to ALL zones
-        for record in records:
-            record.availability = new_qty
-
-    db.commit()
-
-    # refresh first record just for response
-    db.refresh(records[0])
-
-    return ResponseModel[Inventory](
         screen_id=context.screen_id,
         status="success",
-        message="Inventory updated",
-        data=InventoryEntity.copyToModel(records[0])
+        message="Inventory updated successfully",
+        data=InventoryEntity.copyToModel(record)
     )
+
 
 @router.post("/delete", response_model=ResponseModel[Inventory])
 def delete_inventory(
