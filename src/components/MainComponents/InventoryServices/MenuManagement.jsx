@@ -11,7 +11,7 @@ import { jwtDecode } from "jwt-decode";
 import { getMenuConfig } from '../../utils/menuConfigResolver';
 import MenuConfigModal from '../../utils/Modals/MenuConfigModal';
 
-const MenuManagement = ({ clientId, token, realm }) => {
+const MenuManagement = ({ clientId, token,screenIds, userId, realm }) => {
   const [searchOpen, setSearchOpen] = useState(false);
   const [searchQuery, setSearchQuery] = useState('');
   const searchInputRef = useRef(null);
@@ -31,7 +31,7 @@ const MenuManagement = ({ clientId, token, realm }) => {
   const [selectedCategoryId, setSelectedCategoryId] = useState(null);
   const [dieterySubCategories, setDieterySubCategories] = useState([]);
   const [sidebarCategories, setSidebarCategories] = useState([]);
-
+  const [requiredScreenId, setRequiredScreenId] = useState(null);
   const savedCategoryRef = useRef(localStorage.getItem("menu_selected_category"));
   const [dietaryColorMap, setDietaryColorMap] = useState({});
   const [dietaryOptions, setDietaryOptions] = useState([]);
@@ -480,7 +480,7 @@ const MenuManagement = ({ clientId, token, realm }) => {
     let flatList = [];
     tree.forEach(category => {
       flatList.push({
-        id: category.id, name: category.name, level,
+        id: category.id, name: category.name, level, description: category.description || "",
         parentId, hasChildren: !!(category.subCategories?.length),
       });
       if (category.subCategories?.length) {
@@ -697,32 +697,27 @@ const MenuManagement = ({ clientId, token, realm }) => {
           parts.unshift(toSlugSegment(cat.name));
           currentId = cat.parentId ?? cat.parent_id ?? null;
         }
-
+      
         const itemPart = toSlugSegment(editingItem.name);
-        // Check if category path already contains a dietary segment
-        const categoryPathStr = parts.join('_').toLowerCase().replace(/[-_\s]/g, '');
-        const dietaryAlreadyInPath = dietaryOptions.some(
-          d => categoryPathStr.includes(d.toLowerCase().replace(/[-_\s]/g, ''))
-        );
-
+      
         const normalizedDietary = (dietary_type || '').toLowerCase().replace(/[-_\s]/g, '');
-
-        // Only inject dietary segment if it's NOT already in the category path
-        const nameParts = (normalizedDietary && !dietaryAlreadyInPath)
-          ? [...parts, normalizedDietary, itemPart]
-          : [...parts, itemPart];
-
+      
+        const base = [...parts, itemPart].filter(Boolean).join('_');
+      
         const timingArr = Array.isArray(editingItem.availability_time)
           ? editingItem.availability_time.filter(Boolean)
           : (editingItem.availability_time ? [editingItem.availability_time] : []);
-        const timingPart = timingArr.length > 0 ? timingArr.join('+') : null;
-
-        const base = nameParts.filter(Boolean).join('_');
-
+      
         if ((editingItem.slug || '').endsWith('__unavailable') && timingArr.length === 0) {
           return `${base}__unavailable`;
         }
-        return timingPart ? `${base}__${timingPart}` : base;
+      
+        const suffixParts = [
+          ...(normalizedDietary ? [normalizedDietary] : []),
+          ...timingArr,
+        ].filter(Boolean);
+      
+        return suffixParts.length > 0 ? `${base}__${suffixParts.join('+')}` : base;
       })();
 
       // console.log(`[Edit] slug="${slug}" dietary="${dietary_type}" timing="${editingItem.availability_time}"`);
@@ -850,6 +845,8 @@ const MenuManagement = ({ clientId, token, realm }) => {
         )
       ]);
 
+      setRequiredScreenId(catRes.data.screen_id);
+
       const fullTree = (catRes.data.data || []).filter(c => c.name?.toLowerCase() !== "all");
       const subcategoryIds = new Set();
       fullTree.forEach(cat => { cat.subCategories?.forEach(sub => subcategoryIds.add(sub.id)); });
@@ -923,7 +920,7 @@ const MenuManagement = ({ clientId, token, realm }) => {
 
       const categoryTree = buildCategoryTree(flatCategories).map(cat => {
         if (cat.id === menuConfig.root || cat.name.toLowerCase() === menuConfig.root.toLowerCase()) {
-          return { ...cat, name: 'All Categories', count: cat.children.length };
+          return { ...cat, displayName: 'All Categories', count: cat.children.length };
         }
         return cat;
       });
@@ -1060,31 +1057,44 @@ const MenuManagement = ({ clientId, token, realm }) => {
       return currentMinutes >= (sh * 60 + sm) && currentMinutes <= (eh * 60 + em);
     });
   };
-  const getDietaryFromSlug = (item) => {
-    if (!item || !dietaryOptions.length) return null;
+  // MenuManagement.jsx — plain function (not useCallback)
+const getDietaryFromSlug = (item) => {
+  if (!item || !dietaryOptions.length) return null;
+  const normalize = (str) => (str || '').toLowerCase().replace(/[-_\s]/g, '');
+  const slug = item.slug || '';
+  const doubleUnderIdx = slug.lastIndexOf('__');
 
-    const normalize = (str) => (str || '').toLowerCase().replace(/[-_\s]/g, '');
-
-    const [mainPart = ''] = (item.slug || '').split('__');
-    const slugSegments = mainPart.split('_').filter(Boolean);
-
-    // Try matching by joining consecutive segments (to catch "Non_Veg" → "nonveg")
-    // Sort dietary options longest-first so "nonveg" is tried before "veg"
-    const sortedOptions = [...dietaryOptions].sort(
-      (a, b) => normalize(b).length - normalize(a).length
-    );
-
-    for (let i = 0; i < slugSegments.length; i++) {
-      // Try joining 1, 2, 3 consecutive segments from position i
-      for (let j = 1; j <= 3; j++) {
-        const joined = normalize(slugSegments.slice(i, i + j).join(''));
-        const match = sortedOptions.find(d => normalize(d) === joined);
+  // ── NEW FORMAT: dietary is in the __ suffix ──
+  if (doubleUnderIdx !== -1) {
+    const suffix = slug.slice(doubleUnderIdx + 2).toLowerCase();
+    if (suffix && suffix !== 'unavailable' && suffix !== 'allday') {
+      const suffixParts = suffix.split('+').filter(Boolean);
+      const sortedOptions = [...dietaryOptions].sort(
+        (a, b) => normalize(b).length - normalize(a).length
+      );
+      for (const part of suffixParts) {
+        const match = sortedOptions.find(d => normalize(d) === normalize(part));
         if (match) return normalize(match);
       }
     }
+  }
 
-    return null;
-  };
+  // ── OLD FORMAT FALLBACK: dietary was injected into the main slug path ──
+  const mainPart = doubleUnderIdx !== -1 ? slug.slice(0, doubleUnderIdx) : slug;
+  const slugSegments = mainPart.toLowerCase().split('_').filter(Boolean);
+  const sortedOptions = [...dietaryOptions].sort(
+    (a, b) => normalize(b).length - normalize(a).length
+  );
+  for (let i = 0; i < slugSegments.length; i++) {
+    for (let j = 1; j <= 3; j++) {
+      const joined = normalize(slugSegments.slice(i, i + j).join(''));
+      const match = sortedOptions.find(d => normalize(d) === joined);
+      if (match) return normalize(match);
+    }
+  }
+
+  return null;
+};
   const handleEditImageFile = (file) => {
     if (file?.type.startsWith('image/')) { setEditItemImage(file); setEditItemImageUrl(URL.createObjectURL(file)); }
     else { alert('Please upload a valid image file'); }
@@ -1326,8 +1336,12 @@ const handleBulkUpdate = async () => {
         .filter(({ baseItem }) => baseItem !== null) // skip orphaned zone records
         .map(({ baseItem: item, zonePrices }) => {
           const dietary = getDietaryFromSlug(item);
-          const slugTimingPart = item.slug?.includes('__') ? item.slug.split('__')[1] : '';
-          const availabilityTiming = (!slugTimingPart || slugTimingPart === 'allday') ? "" : slugTimingPart;
+const slugTimingPart = item.slug?.includes('__') ? item.slug.split('__')[1] : '';
+const suffixPartsForExport = (slugTimingPart || '').split('+').filter(
+  p => p && p !== 'unavailable' && p !== 'allday' &&
+  !dietaryOptions.some(d => d.toLowerCase().replace(/[-_\s]/g, '') === p.toLowerCase().replace(/[-_\s]/g, ''))
+);
+const availabilityTiming = suffixPartsForExport.join('+') || '';
 
           const row = {
             Name: item.name ?? "",
@@ -1421,12 +1435,12 @@ const handleBulkUpdate = async () => {
         const dietaryAlreadyInPath = dietaryOptions.some(
           d => categoryPathStr.includes(d.toLowerCase().replace(/[-_\s]/g, ''))
         );
-        const nameParts =
-          importedDietary && !dietaryAlreadyInPath
-            ? [...parts, importedDietary, itemPart]
-            : [...parts, itemPart];
-        const base = nameParts.filter(Boolean).join('_');
-        return timingPart ? `${base}__${timingPart}` : base;
+        const base = [...parts, itemPart].filter(Boolean).join('_');
+const suffixParts = [
+  ...(importedDietary ? [importedDietary] : []),
+  ...(timingPart ? [timingPart] : []),
+].filter(Boolean);
+return suffixParts.length > 0 ? `${base}__${suffixParts.join('+')}` : base;
       })();
 
       const basePayload = {

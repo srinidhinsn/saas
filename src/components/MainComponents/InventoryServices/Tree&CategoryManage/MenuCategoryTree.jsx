@@ -105,13 +105,30 @@ const normalizeIdPart = (value) => {
     .replace(/^_|_$/g, "");
 };
 
-const generateCategoryId = (name, parentName) => {
-  const normalizedName = normalizeIdPart(name);
-  const normalizedParentName = normalizeIdPart(parentName);
+const generateCategoryId = (name, parentName, existingCategories = [], parentId = null) => {
+  const parentNorm = normalizeIdPart(parentName);
 
-  if (!normalizedParentName) return normalizedName;
+  // If parent is root → prefix is "menu"
+  // If parent is anything else → prefix is parent's normalized name
+  const isDirectUnderRoot = parentId
+    ? String(parentId).toLowerCase() === String(menuConfig?.root).toLowerCase()
+    : false;
 
-  return `${normalizedName}_${normalizedParentName}`;
+  const prefix = isDirectUnderRoot ? "menu" : parentNorm;
+
+  const existingNumbers = existingCategories
+    .map(c => c.id)
+    .filter(id => new RegExp(`^${prefix}_\\d+$`, 'i').test(id))
+    .map(id => {
+      const match = id.match(/(\d+)$/);
+      return match ? Number(match[1]) : 0;
+    });
+
+  const nextNumber = (Math.max(0, ...existingNumbers) + 1)
+    .toString()
+    .padStart(2, "0");
+
+  return `${prefix}_${nextNumber}`;
 };
 
   const getCategoriesAtLevel = (nodes, targetLevel, level = 1) => {
@@ -639,7 +656,7 @@ const generateCategoryId = (name, parentName) => {
     const parentName = rootNode?.name || menuConfig.root;
 
     // Generate ID using root's name as parent
-    const newId = generateCategoryId(newCategoryName, parentName);
+    const newId = generateCategoryId(newCategoryName, parentName,flattenAllCategories(categories),parentId);
 
     try {
       // 1️⃣ Create the new category
@@ -714,7 +731,8 @@ const generateCategoryId = (name, parentName) => {
       if (editNewSubcategoryName.trim()) {
         const newSubId = generateCategoryId(
           editNewSubcategoryName,
-          editingCategory.name
+          editingCategory.name,
+          flattenAllCategories(categories), editingCategory.id
         );
         await axios.post(
           `${import.meta.env.VITE_API_INVENTORY_SERVICE_URL}/${clientId}/menu/create_category`,
@@ -776,8 +794,86 @@ const generateCategoryId = (name, parentName) => {
 
   const handleDeleteCategory = async () => {
     if (!deleteTarget) return;
-
+  
     try {
+      // 1. Find parent category id
+      const parentId = findParentIdFromTree(categories, deleteTarget.id);
+  
+      if (!parentId) {
+        alert("Cannot delete root category");
+        return;
+      }
+  
+      // 2. Fetch all menu items
+      const menuRes = await axios.get(
+        `${import.meta.env.VITE_API_INVENTORY_SERVICE_URL}/${clientId}/menu/read`,
+        {
+          headers: {
+            Authorization: `Bearer ${token}`,
+          },
+        }
+      );
+  
+      const allItems = menuRes.data?.data || [];
+  
+      // 3. Find items inside deleting category
+      const itemsToMove = allItems.filter(
+        item => item.category_id === deleteTarget.id
+      );
+  
+      // 4. Move items to parent category
+      await Promise.all(
+        itemsToMove.map(item =>
+          axios.post(
+            `${import.meta.env.VITE_API_INVENTORY_SERVICE_URL}/${clientId}/menu/update`,
+            {
+              ...item,
+              category_id: parentId,
+              client_id: clientId,
+            },
+            {
+              headers: {
+                Authorization: `Bearer ${token}`,
+                "Content-Type": "application/json",
+              },
+            }
+          )
+        )
+      );
+  
+      // 5. Move child categories also to parent
+      const parentCategory = await fetchCategoryById(parentId);
+  
+      const existingSubs =
+        parentCategory?.subCategories?.map(c => c.id) || [];
+  
+      const childIds =
+        deleteTarget.children?.map(c => c.id) || [];
+  
+      await axios.post(
+        `${import.meta.env.VITE_API_INVENTORY_SERVICE_URL}/${clientId}/menu/update_category`,
+        {
+          id: parentId,
+          client_id: clientId,
+          name: parentCategory.name,
+          description: parentCategory.description || "",
+          sub_categories: [
+            ...new Set([
+              ...existingSubs.filter(id => id !== deleteTarget.id),
+              ...childIds,
+            ]),
+          ],
+          overwrite_subcategories: true,
+        },
+        {
+          headers: {
+            Authorization: `Bearer ${token}`,
+            "Content-Type": "application/json",
+          },
+        }
+      );
+  
+      // 6. Delete category
       await axios.post(
         `${import.meta.env.VITE_API_INVENTORY_SERVICE_URL}/${clientId}/menu/delete_category`,
         { id: deleteTarget.id },
@@ -788,10 +884,13 @@ const generateCategoryId = (name, parentName) => {
           },
         }
       );
-
+  
       closeDeleteModal();
-
-      if (onCategoriesUpdate) onCategoriesUpdate();
+  
+      if (onCategoriesUpdate) {
+        onCategoriesUpdate();
+      }
+  
     } catch (err) {
       console.error("Delete error:", err.response?.data || err);
     }
