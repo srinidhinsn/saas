@@ -422,7 +422,7 @@ async def delegate_access(
 
     # 3️⃣ Combine original grants with delegated page
     original_grants = requester.grants or []
-    delegated_grants = list(set(original_grants + [req.page]))
+    delegated_grants = list(set(original_grants))
     print("the deegated grants", delegated_grants)
 
     client = db.query(Client).filter(Client.id == client_id).first()
