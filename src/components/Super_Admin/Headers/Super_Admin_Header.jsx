@@ -1,7 +1,8 @@
 import { APP_ROOT } from '../../config/pathConfig';
 import React, { useEffect, useState } from 'react';
 import { useNavigate, useParams, useLocation } from 'react-router-dom';
-
+import {getValidToken} from '../../utils/Interceptors/Api'
+import axios from 'axios'
 
 export const navMap = {
   data: (clientId) => `/${APP_ROOT}/${clientId}/customer-data`,
