@@ -91,10 +91,11 @@ def update_inventory(
 
     payload["zone_config_id"] = zone_id
 
-    # ✅ Image-only path
+    # ✅ Image-only path: ONLY when image_id is real AND unit_price is truly absent
+    # unit_price=0 is a valid price — must NOT trigger image-only path
     image_id_val = payload.get("image_id")
     has_real_image = image_id_val and str(image_id_val).strip() not in ("", "null", "None")
-    has_unit_price = "unit_price" in payload
+    has_unit_price = "unit_price" in payload  # key present = price update intended
 
     if has_real_image and not has_unit_price:
         records = db.query(InventoryEntity).filter(
@@ -140,14 +141,9 @@ def update_inventory(
         before_stock = Decimal(str(record.availability or 0))
 
         if new_qty != before_stock:
-            create_transaction(db=db, client_id=client_id, payload=TxPayload(
-                item_id=record.id,
-                tx_type="MENU_AVAILABILITY_ADJUSTMENT",
-                ref_id=record.id,
-                qty=abs(new_qty - before_stock),
-                after_stock=new_qty,
-                remarks=f"Manual availability update for '{record.name}'",
-            ))
+            create_transaction(db=db, client_id=client_id, payload=TxPayload(item_id=record.id,
+                                tx_type="MENU_AVAILABILITY_ADJUSTMENT",ref_id=record.id,qty=abs(new_qty - before_stock),
+                                after_stock=new_qty,remarks=f"Manual availability update for '{record.name}'",))
 
         # Apply to ALL zones
         db.query(InventoryEntity).filter(
