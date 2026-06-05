@@ -7,6 +7,9 @@ from models.order_model import TransactionTypeEnum, MovementTypeEnum, OrderStatu
 from models.inventory_model import InventoryTransaction
 from utils.transaction import create_transaction , TxPayload
 from decimal import Decimal
+from models.response_model import ResponseModel
+from fastapi import HTTPException
+from models.order_model import DineinOrderModel 
 
 
 def build_billing_payload_from_order(order: DBOrder, items: List[DBOrderItem]) -> Dict[str, Any]:
@@ -298,3 +301,133 @@ def _deduct_stock_for_order(db: Session, client_id: str, order_id: int) -> None:
         else:
             # Regular item or addon — deduct directly
             _deduct_single_item(menu_item, ordered_qty, "ITEM")
+            
+
+def update_order_status_service(client_id: str, body: DineinOrderModel, context, db: Session):
+    returnResponseModel = None
+
+    order = (
+        db.query(Db_Order_Entity)
+        .filter(
+            Db_Order_Entity.id == body.id,
+            Db_Order_Entity.client_id == client_id
+        )
+        .first()
+    )
+
+    if not order:
+        raise HTTPException(
+            status_code=404,
+            detail=f"Order {body.id} not found"
+        )
+
+    # ── Cancel entire order group ───────────────────────────────────────────
+    if body.status == OrderStatusEnum.cancelled:
+        root_id = _root_dinein_id(order.dinein_order_id)
+
+        related_orders = (
+            db.query(Db_Order_Entity)
+            .filter(
+                Db_Order_Entity.client_id == client_id,
+                Db_Order_Entity.dinein_order_id.like(f"{root_id}%"),
+            )
+            .all()
+        )
+
+        for o in related_orders:
+            o.status = OrderStatusEnum.cancelled
+
+            order_items = (
+                db.query(Db_OrderItem_Entity)
+                .filter(
+                    Db_OrderItem_Entity.order_id == o.id,
+                    Db_OrderItem_Entity.client_id == client_id,
+                )
+                .all()
+            )
+
+            for item in order_items:
+                item.status = OrderStatusEnum.cancelled
+
+        cancellation_reason = getattr(body, "cancellation_reason", None)
+        if cancellation_reason:
+            for o in related_orders:
+                if hasattr(o, "cancellation_reason"):
+                    o.cancellation_reason = cancellation_reason
+
+        db.commit()
+
+        returnResponseModel = ResponseModel(
+            screen_id=context.screen_id,
+            data={
+                "message": "Order and all sub-orders cancelled",
+                "cancelled_count": len(related_orders),
+            },
+        )
+
+    # ── Served / completed — only the single order passed in ───────────────
+    if body.status in [OrderStatusEnum.served, OrderStatusEnum.completed]:
+        should_deduct = order.status not in [
+            OrderStatusEnum.served,
+            OrderStatusEnum.completed
+        ]
+
+        order.status = body.status
+
+        order_items = (
+            db.query(Db_OrderItem_Entity)
+            .filter(
+                Db_OrderItem_Entity.order_id == order.id,
+                Db_OrderItem_Entity.client_id == client_id,
+            )
+            .all()
+        )
+
+        for item in order_items:
+            if item.status != OrderStatusEnum.cancelled:
+                item.status = body.status
+
+        db.flush()
+
+        deducted_count = 0
+        if should_deduct:
+            _deduct_stock_for_order(db=db, client_id=client_id, order_id=order.id)
+            deducted_count += 1
+
+        db.commit()
+
+        returnResponseModel = ResponseModel(
+            screen_id=context.screen_id,
+            data={
+                "message": "All related orders marked as served",
+                "updated_count": len(order_items),
+                "deducted_count": deducted_count,
+            },
+        )
+
+    # ── Normal single order update (for other statuses) ────────────────────
+    if body.status not in [OrderStatusEnum.cancelled, OrderStatusEnum.served, OrderStatusEnum.completed]:
+        if body.status is not None:
+            order.status = body.status
+
+        if body.total_price is not None:
+            order.total_price = body.total_price
+
+        if body.table_id is not None:
+            order.table_id = body.table_id
+
+        if body.dinein_order_id is not None:
+            order.dinein_order_id = body.dinein_order_id
+
+        db.commit()
+        db.refresh(order)
+
+        returnResponseModel = ResponseModel(
+            screen_id=context.screen_id,
+            data={
+                "message": "Status updated",
+                "new_status": order.status,
+            },
+        )
+
+    return returnResponseModel
