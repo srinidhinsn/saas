@@ -29,17 +29,15 @@ import CustomerChat from '../Constants/Chatbots/CustomerChat';
 import Super_User_Data from '../Super_User/Header/Super_User_Data';
 import Super_User_Tenant from '../Super_User/Header/Super_User_tenat';
 
-const RoutesManager = ({ token: appToken }) => {
+const RoutesManager = () => {
   const { clientId: paramClientId } = useParams();
   const [clientId, setClientId] = useState(localStorage.getItem("selected_client_id") || paramClientId);  
-  const [token, setToken] = useState(appToken);
+  const [token, setToken] = useState(getValidToken());
   const [role, setRole] = useState(null);
   const [realm, setRealm] = useState();
   const [screenIds, setScreenIds] = useState([]);
   const [userId, setUserId] = useState();
-  useEffect(() => {
-    setToken(appToken);
-  }, [appToken]);
+  
   useEffect(() => {
     const handleStorageChange = () => {
       const selected = localStorage.getItem("selected_client_id");

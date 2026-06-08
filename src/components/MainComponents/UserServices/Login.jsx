@@ -56,18 +56,12 @@ export default function LoginPage({ onLoginSuccess ,clientId}) {
       }
 
       const data = await response.json();
+      const token = data.data.access_token;
+      const screen_id = data.screen_id || 'default_user';
 
-      const accessToken = data.data.access_token;
-      const refreshToken = data.data.refresh_token;
-      const screen_id = data.screen_id || "default_user";
-      
+      // ✅ Just call the callback — App.jsx will handle navigation
       if (onLoginSuccess) {
-        onLoginSuccess(
-          accessToken,
-          refreshToken,
-          screen_id,
-          clientId
-        );
+        onLoginSuccess(token, screen_id, clientId);
       }
 
       setShowAnimation(true);
