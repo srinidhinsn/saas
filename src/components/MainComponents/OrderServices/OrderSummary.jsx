@@ -275,7 +275,7 @@ const LineItemsModal = ({
 // OrderItemsViewModal — read-only view of all items for an order
 // ─────────────────────────────────────────────────────────────────────────────
 
-const OrderItemsViewModal = ({ isOpen, onClose, order, inventoryMap, onRequestDeleteItem, getOrderTotal }) => {
+const OrderItemsViewModal = ({ isOpen, onClose, order, inventoryMap, onRequestDeleteItem,getOrderTotal }) => {
   if (!isOpen || !order) return null;
 
   const getItemStatusStyle = (status) => {
@@ -332,65 +332,56 @@ const OrderItemsViewModal = ({ isOpen, onClose, order, inventoryMap, onRequestDe
         {/* Items table */}
         <div className="flex-1 overflow-y-auto">
           <table className="w-full text-sm">
-            <thead className="sticky top-0 bg-bg-tertiary border-b border-border-default z-10">
-              <tr>
-                <th className="text-left px-5 py-3 text-text-secondary font-semibold text-xs uppercase tracking-wider">
-                  #
-                </th>
-                <th className="text-left px-4 py-3 text-text-secondary font-semibold text-xs uppercase tracking-wider">
-                  Item
-                </th>
-                <th className="text-center px-4 py-3 text-text-secondary font-semibold text-xs uppercase tracking-wider">
-                  Qty
-                </th>
-                <th className="text-right px-4 py-3 text-text-secondary font-semibold text-xs uppercase tracking-wider">
-                  Unit Price
-                </th>
-                <th className="text-right px-4 py-3 text-text-secondary font-semibold text-xs uppercase tracking-wider">
-                  Total
-                </th>
-                <th className="text-center px-4 py-3 text-text-secondary font-semibold text-xs uppercase tracking-wider">
-                  Status
-                </th>
-              </tr>
-            </thead>
-            <tbody className="divide-y divide-border-default">
-              {order.items.map((item, idx) => {
-                const unitPrice =
-                  item.unit_price ??
-                  item.price ??
-                  inventoryMap[item.item_id]?.unit_price ??
-                  0;
-                const lineTotal = unitPrice * (item.quantity || 1);
-
-                const isServedItem = item.status?.toLowerCase() === 'served';
-                return (
-                  <tr key={item.id || idx} className="hover:bg-bg-tertiary/50 transition-colors">
-                    <td className="px-5 py-3 text-text-secondary text-xs">{idx + 1}</td>
-                    <td className="px-4 py-3 font-medium text-text-primary">{item.item_name || 'Unnamed Item'}</td>
-                    <td className="px-4 py-3 text-center font-semibold text-text-primary">{item.quantity || 1}</td>
-                    <td className="px-4 py-3 text-right text-text-secondary">₹{unitPrice.toFixed(2)}</td>
-                    <td className="px-4 py-3 text-right font-bold text-text-primary">₹{lineTotal.toFixed(2)}</td>
-                    <td className="px-4 py-3 text-center">
-                      <span className={`text-xs font-semibold px-2.5 py-1 rounded-full ${getItemStatusStyle(item.status)}`}>{item.status || 'pending'}</span>
-                    </td>
-                    <td className="px-4 py-3 text-center">
-                      <button
-                        onClick={() => onRequestDeleteItem(item)}
-                        className={`p-1.5 rounded-lg transition-colors
-                          ${isServedItem
-                            ? 'bg-orange-100 text-orange-600 hover:bg-orange-500 hover:text-white'
-                            : 'bg-action-danger/10 text-action-danger hover:bg-action-danger hover:text-text-white'}`}
-                        title={isServedItem ? 'Delete served item (records wastage)' : 'Delete item'}
-                      >
-                        <Trash2 size={14} />
-                      </button>
-                    </td>
-                  </tr>
-                );
-              })}
-            </tbody>
-          </table>
+            <thead className="bg-bg-tertiary border-b border-border-default">
+                <tr>
+                  {['Order #', 'Table / Customer', 'Mode', 'Items', 'Total Price', 'Status', 'Actions'].map(h => (
+                    <th key={h} className="px-6 py-4 text-left text-xs font-bold text-text-primary uppercase tracking-wider">{h}</th>
+                  ))}
+                </tr>
+              </thead>
+              <tbody className="divide-y divide-border-default">
+                {filteredOrders.map((order, rowIdx) => {
+                  const status = order.status?.toLowerCase();
+                  const orderTotal = getOrderTotal(order);
+                  return (
+                    <tr key={order.id} className={`hover:bg-bg-tertiary transition-colors ${rowIdx % 2 === 0 ? 'bg-bg-primary' : 'bg-bg-tertiary'}`}>
+                      <td className="px-6 py-4 whitespace-nowrap">
+                        <div className="flex items-center gap-1.5">
+                          <span className="font-bold text-action-primary">#{order.id}</span>
+                          {order.has_new_items && <span className="text-[9px] font-bold text-text-white bg-action-primary px-1.5 py-0.5 rounded-full uppercase">New</span>}
+                        </div>
+                      </td>
+                      <td className="px-6 py-4 whitespace-nowrap">{order._fixedOrderMode === 'takeaway' ? order.customer_name || 'Takeaway' : tablesMap[order.table_id] || order.table || String(order.table_id)}</td>
+                      <td className="px-6 py-4 whitespace-nowrap">
+                        <span className="inline-flex items-center gap-1 px-2.5 py-1 rounded-full text-xs font-semibold bg-bg-tertiary text-text-secondary border border-border-default">{getOrderModeIcon(order._fixedOrderMode)}{getOrderModeLabel(order._fixedOrderMode)}</span>
+                      </td>
+                      <td className="px-6 py-4 whitespace-nowrap">{order.items.length}</td>
+                      <td className="px-6 py-4 whitespace-nowrap">₹{orderTotal.toFixed(2)}</td>
+                      <td className="px-6 py-4 whitespace-nowrap"><StatusBadge status={order.status} /></td>
+                      <td className="px-6 py-4 whitespace-nowrap">
+                        <div className="flex items-center justify-center gap-4 flex-wrap">
+                          <button
+                            onClick={() => { setViewOrder({ ...order, _tableName: tablesMap[order.table_id] || order.table || String(order.table_id) }); setShowViewModal(true); }}
+                            className="p-1.5 rounded-lg bg-action-primary/10 text-action-primary hover:bg-action-primary hover:text-text-white transition-colors" title="View items"
+                          ><Eye size={15} /></button>
+                          {status === 'ready' && (
+                            <button onClick={() => handleStatusChange(order.id, 'served')} className="px-2.5 py-1 rounded-lg bg-action-success text-text-white text-xs font-semibold hover:opacity-90 transition-colors whitespace-nowrap">Mark As Served</button>
+                          )}
+                          {status === 'served' && (
+                            <button onClick={() => handleGenerateBill(order)} className="px-2.5 py-1 rounded-lg bg-green-700 text-text-white text-xs font-semibold hover:bg-green-800 transition-colors whitespace-nowrap">Generate Bill</button>
+                          )}
+                          {/* REQ: trash now opens CancelOrderConfirmModal */}
+                          <button
+                            onClick={() => setCancelOrderModal({ isOpen: true, orderId: order.id })}
+                            className="p-1.5 rounded-lg bg-action-danger/10 text-action-danger hover:bg-action-danger hover:text-text-white transition-colors" title="Cancel order"
+                          ><Trash2 size={15} /></button>
+                        </div>
+                      </td>
+                    </tr>
+                  );
+                })}
+              </tbody>
+            </table>
         </div>
 
         {/* Footer */}
@@ -496,9 +487,9 @@ const OrderSummaryVisible = ({ clientId, token }) => {
   const [lineItemsDetails, setLineItemsDetails] = useState([]);
   const [pendingOrderId, setPendingOrderId] = useState(null);
 
-  // ─────────────────────────────────────────────────────────────────────────
-  // localStorage helpers (preserved exactly from original)
-  // ─────────────────────────────────────────────────────────────────────────
+// ─────────────────────────────────────────────────────────────────────────
+// localStorage helpers (preserved exactly from original)
+// ─────────────────────────────────────────────────────────────────────────
 
   const generateSlug = name => name.toLowerCase().replace(/[\s]+/g, '-');
 
@@ -1640,8 +1631,8 @@ const OrderSummaryVisible = ({ clientId, token }) => {
         .custom-scrollbar::-webkit-scrollbar-thumb { background: var(--color-border-default); border-radius: 10px; }
         .custom-scrollbar::-webkit-scrollbar-thumb:hover { background: var(--color-action-primary); }
       `}</style>
-    </div>
-  );
+      </div>
+      );
 };
 
-export default OrderSummaryVisible;
+      export default OrderSummaryVisible;
