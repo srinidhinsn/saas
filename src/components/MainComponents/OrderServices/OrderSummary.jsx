@@ -1,4 +1,4 @@
-import React, { useEffect, useState } from "react";
+import React, { useEffect, useState, useRef} from "react";
 import axios from 'axios';
 import { toast } from "react-toastify";
 import Modal from "react-modal";
@@ -275,7 +275,7 @@ const LineItemsModal = ({
 // OrderItemsViewModal — read-only view of all items for an order
 // ─────────────────────────────────────────────────────────────────────────────
 
-const OrderItemsViewModal = ({ isOpen, onClose, order, inventoryMap, onRequestDeleteItem,getOrderTotal }) => {
+const OrderItemsViewModal = ({ isOpen, onClose, order, inventoryMap, onRequestDeleteItem, getOrderTotal }) => {
   if (!isOpen || !order) return null;
 
   const getItemStatusStyle = (status) => {
@@ -355,7 +355,7 @@ const OrderItemsViewModal = ({ isOpen, onClose, order, inventoryMap, onRequestDe
               </tr>
             </thead>
             <tbody className="divide-y divide-border-default">
-             {order.items.map((item, idx) => {
+              {order.items.map((item, idx) => {
                 const unitPrice =
                   item.unit_price ??
                   item.price ??
@@ -434,9 +434,8 @@ const StatusBadge = ({ status }) => {
 // Helper
 // ─────────────────────────────────────────────────────────────────────────────
 
-const getInitialOrderMode = (order, tablesMap = {}) => {
-  const tableName = tablesMap[order.table_id] || tablesMap[String(order.table_id)] || '';
-  if (tableName.toLowerCase().includes('takeaway')) return 'takeaway';
+const getInitialOrderMode = (order) => {
+  if (Number(order.table_id) === 500) return 'takeaway';
   return 'dinein';
 };
 const normaliseItem = (item) => {
@@ -466,7 +465,11 @@ const OrderSummaryVisible = ({ clientId, token }) => {
 
   // ── Singular filter state ─────────────────────────────────────────────────
   const todayDate = new Date().toISOString().split('T')[0];
-  const [selectedDate, setSelectedDate] = useState(todayDate);
+  const [datePreset, setDatePreset] = useState('today');
+  const [customFrom, setCustomFrom] = useState(todayDate);
+  const [customTo, setCustomTo] = useState(todayDate);
+  const customFromRef = useRef(null);
+  const customToRef = useRef(null);
   const [filterMode, setFilterMode] = useState(0);
   // Single order-mode selection — NOT multi-select
   const [selectedOrderMode, setSelectedOrderMode] = useState('all');
@@ -493,9 +496,9 @@ const OrderSummaryVisible = ({ clientId, token }) => {
   const [lineItemsDetails, setLineItemsDetails] = useState([]);
   const [pendingOrderId, setPendingOrderId] = useState(null);
 
- // ─────────────────────────────────────────────────────────────────────────
- // localStorage helpers (preserved exactly from original)
- // ─────────────────────────────────────────────────────────────────────────
+  // ─────────────────────────────────────────────────────────────────────────
+  // localStorage helpers (preserved exactly from original)
+  // ─────────────────────────────────────────────────────────────────────────
 
   const generateSlug = name => name.toLowerCase().replace(/[\s]+/g, '-');
 
@@ -699,7 +702,7 @@ const OrderSummaryVisible = ({ clientId, token }) => {
       clearNewItemsStorage(order.id);
       return {
         ...order,
-        _fixedOrderMode: order._fixedOrderMode ?? getInitialOrderMode(order, tablesMap),
+        _fixedOrderMode: order._fixedOrderMode ?? getInitialOrderMode(order),
       };
     }
 
@@ -842,7 +845,7 @@ const OrderSummaryVisible = ({ clientId, token }) => {
 
     return {
       ...order,
-      _fixedOrderMode: order._fixedOrderMode ?? getInitialOrderMode(order, tablesMap),
+      _fixedOrderMode: order._fixedOrderMode ?? getInitialOrderMode(order),
       items: deduped.map(normaliseItem),
       has_new_items: batchItemsMap.size > 0,
     };
@@ -1055,7 +1058,7 @@ const OrderSummaryVisible = ({ clientId, token }) => {
         handleRequestDeleteItem(item, orderId);
         return;
       }
-      const updatedItems = o.items.map(item => { const itemKey = item.id || item.frontend_unique_key; if (itemKey === itemIdentifier) return { ...item,quantity: newQty }; return item; });
+      const updatedItems = o.items.map(item => { const itemKey = item.id || item.frontend_unique_key; if (itemKey === itemIdentifier) return { ...item, quantity: newQty }; return item; });
       const newTotal = updatedItems.reduce((s, it) => s + ((inventoryMap[it.item_id]?.unit_price || it.unit_price || it.price || 0) * (it.quantity || 1)), 0);
       return { ...o, items: updatedItems, total_price: newTotal };
     }));
@@ -1267,12 +1270,29 @@ const OrderSummaryVisible = ({ clientId, token }) => {
   // Singular filtering
   // ─────────────────────────────────────────────────────────────────────────
 
-  let filteredOrders = selectedDate
-    ? orders.filter(order => {
-      const orderDate = new Date(order.created_at).toLocaleDateString('en-CA');
-      return orderDate === selectedDate;
-    })
-    : orders;
+  const getDateRange = () => {
+    const now = new Date();
+    const toStr = (d) => d.toISOString().split('T')[0];
+    const today = toStr(now);
+    const subtractDays = (n) => { const d = new Date(now); d.setDate(d.getDate() - n); return toStr(d); };
+    const subtractMonths = (n) => { const d = new Date(now); d.setMonth(d.getMonth() - n); return toStr(d); };
+    switch (datePreset) {
+      case 'today': return { from: today, to: today };
+      case '1w': return { from: subtractDays(7), to: today };
+      case '15d': return { from: subtractDays(15), to: today };
+      case '1m': return { from: subtractMonths(1), to: today };
+      case '3m': return { from: subtractMonths(3), to: today };
+      case '6m': return { from: subtractMonths(6), to: today };
+      case 'custom': return { from: customFrom, to: customTo };
+      default: return { from: today, to: today };
+    }
+  };
+
+  const { from, to } = getDateRange();
+  let filteredOrders = orders.filter(order => {
+    const orderDate = new Date(order.created_at).toLocaleDateString('en-CA');
+    return orderDate >= from && orderDate <= to;
+  });
 
   // Single mode selection (not multi)
   if (selectedOrderMode !== 'all') {
@@ -1374,13 +1394,57 @@ const OrderSummaryVisible = ({ clientId, token }) => {
                 </select>
               </div>
 
-              {/* Date */}
-              <input
-                type="date"
-                value={selectedDate}
-                onChange={e => setSelectedDate(e.target.value)}
-                className="w-full sm:w-auto px-3 py-2 rounded-lg bg-bg-primary border border-border-default text-text-primary text-sm"
-              />
+              {/* Single dropdown — "Custom" triggers hidden date inputs */}
+              <div className="relative flex items-center gap-2">
+                <select
+                  value={datePreset}
+                  onChange={e => {
+                    const val = e.target.value;
+                    setDatePreset(val);
+                    if (val === 'custom') {
+                      // open the from-date picker immediately
+                      setTimeout(() => customFromRef.current?.showPicker?.(), 50);
+                    }
+                  }}
+                  className="pl-3 pr-8 py-2 rounded-lg bg-bg-primary border border-border-default text-text-primary text-sm appearance-none cursor-pointer"
+                >
+                  <option value="today">Today</option>
+                  <option value="1w">Last 1 Week</option>
+                  <option value="15d">Last 15 Days</option>
+                  <option value="1m">Last 1 Month</option>
+                  <option value="3m">Last 3 Months</option>
+                  <option value="6m">Last 6 Months</option>
+                  <option value="custom">Custom Range</option>
+                </select>
+
+                {/* Hidden date pickers — only mount when custom is selected */}
+                {datePreset === 'custom' && (
+                  <>
+                    <input
+                      ref={customFromRef}
+                      type="date"
+                      value={customFrom}
+                      max={customTo}
+                      onChange={e => {
+                        setCustomFrom(e.target.value);
+                        // after picking from-date, auto-open the to-date picker
+                        setTimeout(() => customToRef.current?.showPicker?.(), 50);
+                      }}
+                      className="px-3 py-2 rounded-lg bg-bg-primary border border-border-default text-text-primary text-sm"
+                    />
+                    <span className="text-text-secondary text-xs font-medium">→</span>
+                    <input
+                      ref={customToRef}
+                      type="date"
+                      value={customTo}
+                      min={customFrom}
+                      max={todayDate}
+                      onChange={e => setCustomTo(e.target.value)}
+                      className="px-3 py-2 rounded-lg bg-bg-primary border border-border-default text-text-primary text-sm"
+                    />
+                  </>
+                )}
+              </div>
 
               <div className="text-sm font-semibold text-text-secondary whitespace-nowrap xl:ml-auto">
                 {filteredOrders.length} order{filteredOrders.length !== 1 ? 's' : ''}
@@ -1398,56 +1462,56 @@ const OrderSummaryVisible = ({ clientId, token }) => {
           <div className="rounded-xl overflow-hidden border border-border-default shadow-card bg-bg-primary">
             <div className="w-full overflow-x-auto">
               <table className="min-w-[1100px] w-full">
-              <thead className="bg-bg-tertiary border-b border-border-default">
-                <tr>
-                  {['Order #', 'Table / Customer', 'Mode', 'Items', 'Total Price', 'Status', 'Actions'].map(h => (
-                    <th key={h} className="px-6 py-4 text-left text-xs font-bold text-text-primary uppercase tracking-wider">{h}</th>
-                  ))}
-                </tr>
-              </thead>
-              <tbody className="divide-y divide-border-default">
-                {filteredOrders.map((order, rowIdx) => {
-                  const status = order.status?.toLowerCase();
-                  const orderTotal = getOrderTotal(order);
-                  return (
-                    <tr key={order.id} className={`hover:bg-bg-tertiary transition-colors ${rowIdx % 2 === 0 ? 'bg-bg-primary' : 'bg-bg-tertiary'}`}>
-                      <td className="px-6 py-4 whitespace-nowrap">
-                        <div className="flex items-center gap-1.5">
-                          <span className="font-bold text-action-primary">#{order.id}</span>
-                          {order.has_new_items && <span className="text-[9px] font-bold text-text-white bg-action-primary px-1.5 py-0.5 rounded-full uppercase">New</span>}
-                        </div>
-                      </td>
-                      <td className="px-6 py-4 whitespace-nowrap">{order._fixedOrderMode === 'takeaway' ? order.customer_name || 'Takeaway' : tablesMap[order.table_id] || order.table || String(order.table_id)}</td>
-                      <td className="px-6 py-4 whitespace-nowrap">
-                        <span className="inline-flex items-center gap-1 px-2.5 py-1 rounded-full text-xs font-semibold bg-bg-tertiary text-text-secondary border border-border-default">{getOrderModeIcon(order._fixedOrderMode)}{getOrderModeLabel(order._fixedOrderMode)}</span>
-                      </td>
-                      <td className="px-6 py-4 whitespace-nowrap">{order.items.length}</td>
-                      <td className="px-6 py-4 whitespace-nowrap">₹{orderTotal.toFixed(2)}</td>
-                      <td className="px-6 py-4 whitespace-nowrap"><StatusBadge status={order.status} /></td>
-                      <td className="px-6 py-4 whitespace-nowrap">
-                        <div className="flex items-center justify-center gap-4 flex-wrap">
-                          <button
-                            onClick={() => { setViewOrder({ ...order, _tableName: tablesMap[order.table_id] || order.table || String(order.table_id) }); setShowViewModal(true); }}
-                            className="p-1.5 rounded-lg bg-action-primary/10 text-action-primary hover:bg-action-primary hover:text-text-white transition-colors" title="View items"
-                          ><Eye size={15} /></button>
-                          {status === 'ready' && (
-                            <button onClick={() => handleStatusChange(order.id, 'served')} className="px-2.5 py-1 rounded-lg bg-action-success text-text-white text-xs font-semibold hover:opacity-90 transition-colors whitespace-nowrap">Mark As Served</button>
-                          )}
-                          {status === 'served' && (
-                            <button onClick={() => handleGenerateBill(order)} className="px-2.5 py-1 rounded-lg bg-green-700 text-text-white text-xs font-semibold hover:bg-green-800 transition-colors whitespace-nowrap">Generate Bill</button>
-                          )}
-                          {/* REQ: trash now opens CancelOrderConfirmModal */}
-                          <button
-                            onClick={() => setCancelOrderModal({ isOpen: true, orderId: order.id })}
-                            className="p-1.5 rounded-lg bg-action-danger/10 text-action-danger hover:bg-action-danger hover:text-text-white transition-colors" title="Cancel order"
-                          ><Trash2 size={15} /></button>
-                        </div>
-                      </td>
-                    </tr>
-                  );
-                })}
-              </tbody>
-            </table>
+                <thead className="bg-bg-tertiary border-b border-border-default">
+                  <tr>
+                    {['Order #', 'Table / Customer', 'Mode', 'Items', 'Total Price', 'Status', 'Actions'].map(h => (
+                      <th key={h} className="px-6 py-4 text-left text-xs font-bold text-text-primary uppercase tracking-wider">{h}</th>
+                    ))}
+                  </tr>
+                </thead>
+                <tbody className="divide-y divide-border-default">
+                  {filteredOrders.map((order, rowIdx) => {
+                    const status = order.status?.toLowerCase();
+                    const orderTotal = getOrderTotal(order);
+                    return (
+                      <tr key={order.id} className={`hover:bg-bg-tertiary transition-colors ${rowIdx % 2 === 0 ? 'bg-bg-primary' : 'bg-bg-tertiary'}`}>
+                        <td className="px-6 py-4 whitespace-nowrap">
+                          <div className="flex items-center gap-1.5">
+                            <span className="font-bold text-action-primary">#{order.id}</span>
+                            {order.has_new_items && <span className="text-[9px] font-bold text-text-white bg-action-primary px-1.5 py-0.5 rounded-full uppercase">New</span>}
+                          </div>
+                        </td>
+                        <td className="px-6 py-4 whitespace-nowrap">{order._fixedOrderMode === 'takeaway' ? order.customer_name || 'Takeaway' : tablesMap[order.table_id] || order.table || String(order.table_id)}</td>
+                        <td className="px-6 py-4 whitespace-nowrap">
+                          <span className="inline-flex items-center gap-1 px-2.5 py-1 rounded-full text-xs font-semibold bg-bg-tertiary text-text-secondary border border-border-default">{getOrderModeIcon(order._fixedOrderMode)}{getOrderModeLabel(order._fixedOrderMode)}</span>
+                        </td>
+                        <td className="px-6 py-4 whitespace-nowrap">{order.items.length}</td>
+                        <td className="px-6 py-4 whitespace-nowrap">₹{orderTotal.toFixed(2)}</td>
+                        <td className="px-6 py-4 whitespace-nowrap"><StatusBadge status={order.status} /></td>
+                        <td className="px-6 py-4 whitespace-nowrap">
+                          <div className="flex items-center justify-center gap-4 flex-wrap">
+                            <button
+                              onClick={() => { setViewOrder({ ...order, _tableName: tablesMap[order.table_id] || order.table || String(order.table_id) }); setShowViewModal(true); }}
+                              className="p-1.5 rounded-lg bg-action-primary/10 text-action-primary hover:bg-action-primary hover:text-text-white transition-colors" title="View items"
+                            ><Eye size={15} /></button>
+                            {status === 'ready' && (
+                              <button onClick={() => handleStatusChange(order.id, 'served')} className="px-2.5 py-1 rounded-lg bg-action-success text-text-white text-xs font-semibold hover:opacity-90 transition-colors whitespace-nowrap">Mark As Served</button>
+                            )}
+                            {status === 'served' && (
+                              <button onClick={() => handleGenerateBill(order)} className="px-2.5 py-1 rounded-lg bg-green-700 text-text-white text-xs font-semibold hover:bg-green-800 transition-colors whitespace-nowrap">Generate Bill</button>
+                            )}
+                            {/* REQ: trash now opens CancelOrderConfirmModal */}
+                            <button
+                              onClick={() => setCancelOrderModal({ isOpen: true, orderId: order.id })}
+                              className="p-1.5 rounded-lg bg-action-danger/10 text-action-danger hover:bg-action-danger hover:text-text-white transition-colors" title="Cancel order"
+                            ><Trash2 size={15} /></button>
+                          </div>
+                        </td>
+                      </tr>
+                    );
+                  })}
+                </tbody>
+              </table>
             </div>
           </div>
         )}
@@ -1576,8 +1640,8 @@ const OrderSummaryVisible = ({ clientId, token }) => {
         .custom-scrollbar::-webkit-scrollbar-thumb { background: var(--color-border-default); border-radius: 10px; }
         .custom-scrollbar::-webkit-scrollbar-thumb:hover { background: var(--color-action-primary); }
       `}</style>
-      </div>
-      );
+    </div>
+  );
 };
 
-      export default OrderSummaryVisible;
+export default OrderSummaryVisible;
