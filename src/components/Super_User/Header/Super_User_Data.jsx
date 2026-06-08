@@ -260,14 +260,14 @@ const Super_User_Data = ({ clientId, token, screenIds }) => {
                 {filtered.length} tenant{filtered.length !== 1 ? "s" : ""} · {totalUsers} user{totalUsers !== 1 ? "s" : ""}
               </p>
             </div>
-            <button
+            {/* <button
               onClick={handleExport}
               disabled={exporting || filtered.length === 0}
               title="Export to Excel"
               className="p-1.5 rounded-lg border border-gray-200 text-gray-500 hover:bg-gray-50 hover:text-gray-700 disabled:opacity-40 disabled:cursor-not-allowed transition-all"
             >
               <Icon d={IC.export} size={13} />
-            </button>
+            </button> */}
           </div>
 
           {/* Search */}
