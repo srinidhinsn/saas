@@ -3,7 +3,7 @@ import axios from "axios";
 import { useNavigate, useSearchParams } from "react-router-dom";
 import { toast } from "react-toastify";
 import InvoiceModal from './InvoiceModal';
-import { Search, Eye } from 'lucide-react';
+import { Search, Calendar, Eye } from 'lucide-react';
 
 export default function BillingPage({ clientId, token }) {
   const navigate = useNavigate();
@@ -18,6 +18,7 @@ export default function BillingPage({ clientId, token }) {
   const [loading, setLoading] = useState(true);
   const [invoiceModalOpen, setInvoiceModalOpen] = useState(false);
 
+  // New state for filters
   const [searchQuery, setSearchQuery] = useState("");
   const todayDate = new Date().toISOString().split('T')[0];
   const [datePreset, setDatePreset] = useState('today');
@@ -62,6 +63,7 @@ export default function BillingPage({ clientId, token }) {
     fetchAll();
   }, [clientId, token]);
 
+  // Filter orders based on search and date
   const getDateRange = () => {
     const now = new Date();
     const toStr = (d) => d.toISOString().split('T')[0];
@@ -83,12 +85,14 @@ export default function BillingPage({ clientId, token }) {
   useEffect(() => {
     let filtered = [...orders];
 
+    // Date filter
     const { from, to } = getDateRange();
     filtered = filtered.filter(order => {
       const orderDate = new Date(order.created_at).toLocaleDateString('en-CA');
       return orderDate >= from && orderDate <= to;
     });
 
+    // Search filter
     if (searchQuery.trim()) {
       const query = searchQuery.toLowerCase();
       filtered = filtered.filter(order => {
@@ -117,6 +121,7 @@ export default function BillingPage({ clientId, token }) {
 
   const handleSelectOrder = async (order) => {
     if (!order) return;
+  
 
     const enrichedItems = (order.items || []).map((item) => {
       const inv = inventoryMap[item.item_id] || {};
@@ -128,16 +133,19 @@ export default function BillingPage({ clientId, token }) {
       };
     });
   
-    const uniqueKeyToItemMap = new Map();
+    // Deduplicate by frontend_unique_key — same item across sub-orders should appear once
+    // For items without a fkey, fall back to a composite key
+    const uniqueKeyToItemMap  = new Map();
     const deduplicatedItems = [];
   
     enrichedItems.forEach(item => {
       const fkey = item.frontend_unique_key || `${item.item_id}_${item.unit_price}_${item.sub_order_id ?? ''}`;
-      if (uniqueKeyToItemMap.has(fkey)) {
+      if (uniqueKeyToItemMap .has(fkey)) {
+        // Accumulate quantity for duplicate entries
         uniqueKeyToItemMap.get(fkey).quantity += (item.quantity ?? 0);
       } else {
         const copy = { ...item };
-        uniqueKeyToItemMap.set(fkey, copy);
+        uniqueKeyToItemMap .set(fkey, copy);
         deduplicatedItems.push(copy);
       }
     });
@@ -150,7 +158,7 @@ export default function BillingPage({ clientId, token }) {
     setSelectedOrder(updatedOrder);
     setInvoiceModalOpen(true);
   };
-
+  // Auto-open invoice when orderId is in URL params
   useEffect(() => {
     const orderIdFromUrl = searchParams.get('orderId');
     
@@ -165,6 +173,7 @@ export default function BillingPage({ clientId, token }) {
   }, [orders, selectedOrder, loading, searchParams]);
 
   const handleInvoiceSave = async (draftId) => {
+    // Optionally refresh orders or perform other actions after save
     console.log('Invoice saved with ID:', draftId);
 
     try {
@@ -293,7 +302,10 @@ export default function BillingPage({ clientId, token }) {
                     const orderTotal = Number(order.total_price ?? 0);
 
                     return (
-                      <tr key={order.id} className="hover:bg-bg-tertiary transition-colors">
+                      <tr 
+                        key={order.id} 
+                        className="hover:bg-bg-tertiary transition-colors"
+                      >
                         <td className="px-6 py-4 whitespace-nowrap">
                           <div className="text-sm font-semibold text-text-primary">#{order.id}</div>
                         </td>
@@ -311,12 +323,14 @@ export default function BillingPage({ clientId, token }) {
                           const billingDoc = billingDocMap[order.id.toString()];
                           return (
                             <>
+                              {/* Total Amount */}
                               <td className="px-6 py-4 whitespace-nowrap">
                                 <div className="text-sm font-bold text-action-primary">
                                   {billingDoc ? `₹${Number(billingDoc.total_amount).toFixed(2)}` : "—"}
                                 </div>
                               </td>
 
+                              {/* Payment Status */}
                               <td className="px-6 py-4 whitespace-nowrap">
                                 {billingDoc ? (
                                   <span className={`inline-flex px-2.5 py-1 rounded-full text-xs font-semibold ${billingDoc.payment_status === "paid"
