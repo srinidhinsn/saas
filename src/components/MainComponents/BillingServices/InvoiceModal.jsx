@@ -988,6 +988,7 @@ export default function InvoiceModal({
                       }}
                       customers={customersList}
                       placeholder="📞 Phone"
+                      valueField="contact_phone"
                     />
                     <CustomerAutocomplete
                       value={selectedOrder.contact_email || ""}
@@ -1003,6 +1004,23 @@ export default function InvoiceModal({
                       }}
                       customers={customersList}
                       placeholder="📧 Email"
+                      valueField="contact_email"
+                    />
+                    <CustomerAutocomplete
+                      value={selectedOrder.shipping_address || ""}
+                      onChange={(val) => setSelectedOrder((p) => ({ ...p, shipping_address: val }))}
+                      onSelectCustomer={(c) => {
+                        setSelectedOrder((p) => ({
+                          ...p,
+                          customer_id: c.customer_id || p.customer_id,
+                          contact_phone: c.contact_phone || p.contact_phone,
+                          contact_email: c.contact_email || p.contact_email,
+                          shipping_address: c.shipping_address || "",
+                        }));
+                      }}
+                      customers={customersList}
+                      placeholder="🏠 Shipping Address"
+                      valueField="shipping_address"
                     />
                   </div>
                 </div>
