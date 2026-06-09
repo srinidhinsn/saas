@@ -1105,7 +1105,7 @@ const getDietaryFromSlug = (item) => {
     const aActive = isItemActive(a.slug, timingOptions);
     const bActive = isItemActive(b.slug, timingOptions);
     if (bActive !== aActive) return bActive - aActive; // active first
-    return Number(a.id) - Number(b.id);               // same order within each group
+   return (a.name || '').localeCompare(b.name || '');              // same order within each group
   });
   const uploadImageToDocumentService = async (imageFile) => {
     const formData = new FormData();
