@@ -7,7 +7,7 @@ import os
 load_dotenv(dotenv_path="/app/.env")
 DATABASE_URL = os.getenv("DATABASE_URL")
 
-engine = create_engine(DATABASE_URL)
+engine = create_engine(DATABASE_URL,pool_size=30, max_overflow=60,pool_pre_ping=True, pool_recycle=1800, pool_timeout=30)
 
 SessionLocal = sessionmaker(autocommit=False, autoflush=False, bind=engine)
 
@@ -18,6 +18,9 @@ def get_db():
     db = SessionLocal()
     try:
         yield db
+    except Exception:
+        db.rollback()
+        raise    
     finally:
         db.close()
 
