@@ -1868,7 +1868,7 @@ return suffixParts.length > 0 ? `${base}__${suffixParts.join('+')}` : base;
                       </div>
 
                       <div className="flex-1 min-w-0 cursor-pointer" onClick={() => handleItemClick(item)}>
-                        <h3 className="text-[10px] md:text-[16px] font-semibold text-text-primary">{item.name}</h3>
+                        <h3 className="text-[10px] md:text-[16px] font-semibold text-text-primary truncate"title={item.name}>{item.name}</h3>
                         {/* {!active && (
                           <p className="text-[10px] text-red-500">
                             Not available now
