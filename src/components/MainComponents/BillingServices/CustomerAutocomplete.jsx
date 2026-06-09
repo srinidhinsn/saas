@@ -83,6 +83,9 @@ export default function CustomerAutocomplete({
                     📱 {customer.contact_phone}
                   </span>
                 )}
+                {customer.shipping_address && (
+                   <span>🏠 {customer.shipping_address}</span>
+                )}
               </div>
             </div>
           ))}
