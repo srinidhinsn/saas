@@ -6,6 +6,7 @@ export default function CustomerAutocomplete({
   onSelectCustomer,
   customers,
   placeholder = "Enter customer ID",
+  valueField = "customer_id",
 }) {
   const [showSuggestions, setShowSuggestions] = useState(false);
   const [filteredCustomers, setFilteredCustomers] = useState([]);
@@ -23,8 +24,12 @@ export default function CustomerAutocomplete({
 
   useEffect(() => {
     if (value && value.length > 0) {
+      const q = value.toLowerCase();
       const filtered = customers.filter((customer) =>
-        customer.customer_id?.toLowerCase().includes(value.toLowerCase())
+        customer.customer_id?.toLowerCase().includes(q) ||
+        customer.contact_phone?.toLowerCase().includes(q) ||
+        customer.contact_email?.toLowerCase().includes(q) ||
+        customer.shipping_address?.toLowerCase().includes(q)
       );
       setFilteredCustomers(filtered);
     } else {
@@ -39,7 +44,7 @@ export default function CustomerAutocomplete({
   };
 
   const handleSelectSuggestion = (customer) => {
-    onChange(customer.customer_id);
+    onChange(customer[valueField] ?? customer.customer_id ?? "");
     onSelectCustomer(customer);
     setShowSuggestions(false);
   };
