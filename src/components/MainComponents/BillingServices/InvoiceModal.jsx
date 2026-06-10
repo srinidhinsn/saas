@@ -97,12 +97,7 @@ export default function InvoiceModal({
   onSave
 }) {
   const [selectedOrder, setSelectedOrder] = useState(initialOrder);
-  useEffect(() => {
-    console.log('ORDER ITEMS:', (selectedOrder?.items || []).map(i => ({
-      name: i.name || i.item_name,
-      fkey: i.frontend_unique_key,
-    })));
-  }, [selectedOrder]);
+
   const [invoiceDraftId, setInvoiceDraftId] = useState(null);
   const [taxPercent, setTaxPercent] = useState(18);
   const [discount, setDiscount] = useState(0);
@@ -215,7 +210,15 @@ export default function InvoiceModal({
   };
 
   // ─── Fetch customers & invoice draft ──────────────────────────────────────
-
+  const searchCustomersLocally = (q) => {
+    if (!q || q.trim().length === 0) return customersList;
+    const lower = q.toLowerCase();
+    return customersList.filter(c =>
+      c.customer_id?.toLowerCase().includes(lower) ||
+      c.contact_phone?.toLowerCase().includes(lower) ||
+      c.contact_email?.toLowerCase().includes(lower)
+    );
+  };
   const fetchUniqueCustomers = async () => {
     try {
       const res = await axios.get(
@@ -227,7 +230,6 @@ export default function InvoiceModal({
       );
       const invoices = res.data?.data || [];
       const customersMap = new Map();
-
       invoices.forEach(inv => {
         if (inv.customer_id) {
           if (!customersMap.has(inv.customer_id) ||
@@ -235,12 +237,15 @@ export default function InvoiceModal({
             customersMap.set(inv.customer_id, {
               customer_id: inv.customer_id,
               contact_email: inv.contact_email || "",
-              contact_phone: inv.contact_phone || "",
+              contact_phone: inv.contact_phone || "", shipping_address: inv.shipping_address || "",
               created_at: inv.created_at
             });
           }
         }
       });
+      console.log("raw invoices:", invoices.length, "customers built:", customersMap.size);
+      console.log("customersList sample:", Array.from(customersMap.values()).slice(0, 3));
+
       const uniqueCustomers = Array.from(customersMap.values())
         .sort((a, b) => a.customer_id.localeCompare(b.customer_id));
       setCustomersList(uniqueCustomers);
@@ -289,7 +294,13 @@ export default function InvoiceModal({
       setStatus(invoiceDraft?.status ?? "Draft");
       setDocumentNumber(invoiceDraft?.document_number ?? "");
       setPaymentStatus(invoiceDraft?.payment_status ?? "Pending");
-
+      setSelectedOrder(prev => ({
+        ...prev,
+        customer_id: invoiceDraft?.customer_id || prev.customer_id || "",
+        contact_email: invoiceDraft?.contact_email || prev.contact_email || "",
+        contact_phone: invoiceDraft?.contact_phone || prev.contact_phone || "",
+        shipping_address: invoiceDraft?.shipping_address || prev.shipping_address || "",
+      }));
       const totalVal = Number(initialOrder.total_price ?? 0);
 
       if (Array.isArray(invoiceDraft?.payment_method) && invoiceDraft.payment_method.length > 0) {
@@ -423,15 +434,15 @@ export default function InvoiceModal({
         single_payment_amount: splitPaymentEnabled ? null : Number(paymentSplits[0]?.amount ?? total),  // ✅ also fixed here
         status: status,
         customer_id:
-        selectedOrder.customer_id ??
-        initialOrder.customer_id ??
-        undefined,
+          selectedOrder.customer_id ??
+          initialOrder.customer_id ??
+          undefined,
         contact_email: selectedOrder.contact_email || "",
         contact_phone: selectedOrder.contact_phone || "",
         shipping_address:
-  selectedOrder.shipping_address ??
-  initialOrder.shipping_address ??
-  undefined,
+          selectedOrder.shipping_address ??
+          initialOrder.shipping_address ??
+          undefined,
       };
 
       let draftId = invoiceDraftId;
@@ -871,10 +882,10 @@ export default function InvoiceModal({
                       const items = selectedOrder.items || [];
                       const parents = items.filter(i => !_isChildItem(i.frontend_unique_key));
                       return parents.map((item, idx) => {
-       
-const addons = items.filter(i =>
-  (i.frontend_unique_key || '').startsWith(`addon_${item.frontend_unique_key}_`)
-);  console.log('parent fkey:', item.frontend_unique_key, '| addons:', addons.map(a => a.frontend_unique_key));
+
+                        const addons = items.filter(i =>
+                          (i.frontend_unique_key || '').startsWith(`addon_${item.frontend_unique_key}_`)
+                        );
 
                         return (
                           <div key={idx}>
@@ -957,23 +968,59 @@ const addons = items.filter(i =>
                           ...p,
                           customer_id: c.customer_id,
                           contact_email: c.contact_email || "",
-                          contact_phone: c.contact_phone || "",
+                          contact_phone: c.contact_phone || "", shipping_address: c.shipping_address || "",
                         }));
                       }}
                       customers={customersList}
                       placeholder="Walk-in / Customer ID"
                     />
-                    <input
-                      className="w-full border border-border-default rounded-lg px-3 py-2 text-sm bg-bg-primary text-text-primary focus:ring-2 focus:ring-action-primary focus:border-action-primary transition-all"
-                      placeholder="📞 Phone"
+                    <CustomerAutocomplete
                       value={selectedOrder.contact_phone || ""}
-                      onChange={(e) => setSelectedOrder((p) => ({ ...p, contact_phone: e.target.value }))}
+                      onChange={(val) => setSelectedOrder((p) => ({ ...p, contact_phone: val }))}
+                      onSelectCustomer={(c) => {
+                        setSelectedOrder((p) => ({
+                          ...p,
+                          customer_id: c.customer_id || p.customer_id,
+                          contact_phone: c.contact_phone || "",
+                          contact_email: c.contact_email || "",
+                          shipping_address: c.shipping_address || "",
+                        }));
+                      }}
+                      customers={customersList}
+                      placeholder="📞 Phone"
+                      valueField="contact_phone"
                     />
-                    <input
-                      className="w-full border border-border-default rounded-lg px-3 py-2 text-sm bg-bg-primary text-text-primary focus:ring-2 focus:ring-action-primary focus:border-action-primary transition-all"
-                      placeholder="📧 Email"
+                    <CustomerAutocomplete
                       value={selectedOrder.contact_email || ""}
-                      onChange={(e) => setSelectedOrder((p) => ({ ...p, contact_email: e.target.value }))}
+                      onChange={(val) => setSelectedOrder((p) => ({ ...p, contact_email: val }))}
+                      onSelectCustomer={(c) => {
+                        setSelectedOrder((p) => ({
+                          ...p,
+                          customer_id: c.customer_id || p.customer_id,
+                          contact_phone: c.contact_phone || "",
+                          contact_email: c.contact_email || "",
+                          shipping_address: c.shipping_address || "",
+                        }));
+                      }}
+                      customers={customersList}
+                      placeholder="📧 Email"
+                      valueField="contact_email"
+                    />
+                    <CustomerAutocomplete
+                      value={selectedOrder.shipping_address || ""}
+                      onChange={(val) => setSelectedOrder((p) => ({ ...p, shipping_address: val }))}
+                      onSelectCustomer={(c) => {
+                        setSelectedOrder((p) => ({
+                          ...p,
+                          customer_id: c.customer_id || p.customer_id,
+                          contact_phone: c.contact_phone || p.contact_phone,
+                          contact_email: c.contact_email || p.contact_email,
+                          shipping_address: c.shipping_address || "",
+                        }));
+                      }}
+                      customers={customersList}
+                      placeholder="🏠 Shipping Address"
+                      valueField="shipping_address"
                     />
                   </div>
                 </div>
@@ -1215,16 +1262,16 @@ const addons = items.filter(i =>
                 toast.error("Invoice ID missing — save before paying");
                 return;
               }
-      
+
               const isSplit = response?.is_split_payment;
               const paymentsToVerify = isSplit
                 ? response.completed_razorpay_payments   // array of { razorpay_payment_id, order_id, signature }
                 : [{
-                    razorpay_payment_id: response.razorpay_payment_id,
-                    razorpay_order_id:   response.razorpay_order_id,
-                    razorpay_signature:  response.razorpay_signature,
-                  }];
-          
+                  razorpay_payment_id: response.razorpay_payment_id,
+                  razorpay_order_id: response.razorpay_order_id,
+                  razorpay_signature: response.razorpay_signature,
+                }];
+
               // ✅ Verify each Razorpay payment sequentially
               for (const p of paymentsToVerify) {
                 if (!p.razorpay_payment_id || !p.razorpay_order_id || !p.razorpay_signature) {
@@ -1234,10 +1281,10 @@ const addons = items.filter(i =>
                 await axios.post(
                   `${import.meta.env.VITE_API_BILLING_SERVICE_URL}/${clientId}/invoice/verify?client_id=${clientId}`,
                   {
-                    document_id:         Number(docId),
+                    document_id: Number(docId),
                     razorpay_payment_id: String(p.razorpay_payment_id),
-                    razorpay_order_id:   String(p.razorpay_order_id),
-                    razorpay_signature:  String(p.razorpay_signature),
+                    razorpay_order_id: String(p.razorpay_order_id),
+                    razorpay_signature: String(p.razorpay_signature),
                   },
                   {
                     headers: {
@@ -1247,7 +1294,7 @@ const addons = items.filter(i =>
                   }
                 );
               }
-          
+
               // Update order status
               await axios.post(
                 `${import.meta.env.VITE_API_ORDER_SERVICE_URL}/${clientId}/dinein/update`,

@@ -86,7 +86,6 @@ const RoutesManager = () => {
   return (
     <>
     {(realm ==='super_user' && <Super_User_Tenant clientId={paramClientId} token={token} />)}
-    {(realm ==='super_admin' && <TenantSwitcher clientId={paramClientId} token={token} />)}
     <Routes>
       <Route
         path="/"
@@ -188,6 +187,3 @@ const RoutesManager = () => {
 };
 
 export default RoutesManager;
-
-
-// =========================================================   Working ========================================================== //
