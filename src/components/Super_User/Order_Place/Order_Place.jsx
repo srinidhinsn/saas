@@ -2188,8 +2188,27 @@ ${selectedAddress.country || ""}
   const getDietaryFromSlug = useCallback((item) => {
     if (!item || !dietaryOptions.length) return null;
     const normalize = (str) => (str || '').toLowerCase().replace(/[-_\s]/g, '');
-    const [mainPart = ''] = (item.slug || '').split('__');
-    const slugSegments = mainPart.split('_').filter(Boolean);
+    const slug = item.slug || '';
+    const doubleUnderIdx = slug.lastIndexOf('__');
+  
+    // ── NEW FORMAT: dietary is in the __ suffix ──
+    if (doubleUnderIdx !== -1) {
+      const suffix = slug.slice(doubleUnderIdx + 2).toLowerCase();
+      if (suffix && suffix !== 'unavailable' && suffix !== 'allday') {
+        const suffixParts = suffix.split('+').filter(Boolean);
+        const sortedOptions = [...dietaryOptions].sort(
+          (a, b) => normalize(b).length - normalize(a).length
+        );
+        for (const part of suffixParts) {
+          const match = sortedOptions.find(d => normalize(d) === normalize(part));
+          if (match) return normalize(match);
+        }
+      }
+    }
+  
+    // ── OLD FORMAT FALLBACK: dietary was injected into the main slug path ──
+    const mainPart = doubleUnderIdx !== -1 ? slug.slice(0, doubleUnderIdx) : slug;
+    const slugSegments = mainPart.toLowerCase().split('_').filter(Boolean);
     const sortedOptions = [...dietaryOptions].sort(
       (a, b) => normalize(b).length - normalize(a).length
     );
@@ -2200,6 +2219,7 @@ ${selectedAddress.country || ""}
         if (match) return normalize(match);
       }
     }
+  
     return null;
   }, [dietaryOptions]);
   // ─────────────────────────────────────────────────────────────────────────
@@ -2224,7 +2244,12 @@ ${selectedAddress.country || ""}
     }
 
     const tableIdStr = takeawayTables[0].id.toString();
-    const takeawayZoneConfigId = takeawaySections.length > 0 ? takeawaySections[0].id : null;
+    const takeawayTable = takeawayTables[0];
+const matchedSection = takeawaySections.find(
+  s => s.zone === takeawayTable?.location_zone &&
+       s.section === takeawayTable?.section
+);
+const takeawayZoneConfigId = matchedSection?.id || null;
 
     setOrderMode('takeaway');
     setSelectedTable(tableIdStr);
@@ -2442,9 +2467,12 @@ ${selectedAddress.country || ""}
     setShowCart(true);
 
     // Set takeaway zone_config_id so correct prices are fetched
-    const takeawayZoneConfigId = takeawaySections.length > 0
-      ? takeawaySections[0].id
-      : null;
+    const takeawayTable = tables.find(t => String(t.id) === tableIdStr);
+  const matchedSection = takeawaySections.find(
+    s => s.zone === takeawayTable?.location_zone &&
+         s.section === takeawayTable?.section
+  );
+  const takeawayZoneConfigId = matchedSection?.id || null;
     setZoneConfigId(takeawayZoneConfigId);
 
     goToOrderView();
@@ -2454,10 +2482,12 @@ ${selectedAddress.country || ""}
     setOrderMode('takeaway');
     setSelectedTable(tableIdStr);
 
-    // Set takeaway zone_config_id so correct prices are fetched
-    const takeawayZoneConfigId = takeawaySections.length > 0
-      ? takeawaySections[0].id
-      : null;
+    const takeawayTable = tables.find(t => String(t.id) === tableIdStr);
+  const matchedSection = takeawaySections.find(
+    s => s.zone === takeawayTable?.location_zone &&
+         s.section === takeawayTable?.section
+  );
+  const takeawayZoneConfigId = matchedSection?.id || null;
     setZoneConfigId(takeawayZoneConfigId);
 
     if (!existingOrder) {
@@ -3456,15 +3486,12 @@ ${selectedAddress.country || ""}
     }
 
     // ── 2. Dietary filter ──
-    if (selectedDietary) {
-      items = items.filter(item => {
-        const [mainPart = ''] = (item.slug || '').split('__');
-        const segments = mainPart.split('_').filter(Boolean);
-        return segments.some(seg =>
-          seg.toLowerCase().replace(/[-_\s]/g, '') === selectedDietary
-        );
-      });
-    }
+if (selectedDietary) {
+  items = items.filter(item => {
+    const dietary = getDietaryFromSlug(item);
+    return dietary !== null && dietary === selectedDietary;
+  });
+}
 
     // ── 3. Category filter — uses flat list for reliable traversal ──
     if (selectedCategoryId) {
@@ -3579,10 +3606,7 @@ ${selectedAddress.country || ""}
                       </button>
                       {dietaryOptions.map(type => {
                         const key = type.toLowerCase().replace(/[-_\s]/g, '');
-                        const count = menuItems.filter(item => {
-                          const [mainPart = ''] = (item.slug || '').split('__');
-                          return mainPart.split('_').some(seg => seg.toLowerCase().replace(/[-_\s]/g, '') === key);
-                        }).length;
+                        const count = menuItems.filter(item => getDietaryFromSlug(item) === key).length;
                         return (
                           <button
                             key={key}
