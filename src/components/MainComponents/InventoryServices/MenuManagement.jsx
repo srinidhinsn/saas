@@ -10,6 +10,7 @@ import UniversalBulkUpdateModal from '../../utils/Modals/UniversalBulkUpdateModa
 import { jwtDecode } from "jwt-decode";
 import { getMenuConfig } from '../../utils/menuConfigResolver';
 import MenuConfigModal from '../../utils/Modals/MenuConfigModal';
+import { menuCache } from '../../utils/Menu-utils/menuCache';
 
 const MenuManagement = ({ clientId, token,screenIds, userId, realm }) => {
   const [searchOpen, setSearchOpen] = useState(false);
@@ -121,6 +122,8 @@ const MenuManagement = ({ clientId, token,screenIds, userId, realm }) => {
   }, [token]);
 
   const fetchTimings = async () => {
+    const cached = menuCache.get('timings', clientId);
+  if (cached) { setTimingOptions(cached); return; }
     try {
       const res = await axios.get(
         `${import.meta.env.VITE_API_INVENTORY_SERVICE_URL}/${clientId}/inventory/item-types`,
@@ -143,6 +146,7 @@ const MenuManagement = ({ clientId, token,screenIds, userId, realm }) => {
       });
 
       setTimingOptions(parsed);
+      menuCache.set('timings', clientId, parsed);
     } catch (err) {
       console.error("Timing fetch error:", err);
       setTimingOptions([]);
@@ -173,6 +177,12 @@ const MenuManagement = ({ clientId, token,screenIds, userId, realm }) => {
     return pathNames; // nearest-first: [leafName, parentName, grandparentName, ...]
   }, []);
   const fetchZoneConfig = useCallback(async () => {
+    const cachedZone = menuCache.get('zoneConfig', clientId);
+if (cachedZone) {
+  setSections(cachedZone.sections);
+  setZones(cachedZone.zones);
+  return;
+}
     try {
       const res = await axios.get(
         `${import.meta.env.VITE_API_TABLE_SERVICE_URL}/${clientId}/tables/config`,
@@ -185,6 +195,7 @@ const MenuManagement = ({ clientId, token,screenIds, userId, realm }) => {
 
       const uniqueZones = [...new Set(data.map(d => d.zone))];
       setZones(uniqueZones);
+      menuCache.set('zoneConfig', clientId, { sections: data, zones: uniqueZones });
 
     } catch (err) {
       console.error("Zone config fetch failed", err);
@@ -251,6 +262,8 @@ const MenuManagement = ({ clientId, token,screenIds, userId, realm }) => {
   }, [getTopLevelSection]);
 
   const fetchDietaryTypes = useCallback(async () => {
+    const cached = menuCache.get('dietaryTypes', clientId);
+    if (cached) { setDietaryOptions(cached); return; }
     try {
       const res = await axios.get(
         `${import.meta.env.VITE_API_INVENTORY_SERVICE_URL}/${clientId}/inventory/item-types`,
@@ -260,7 +273,9 @@ const MenuManagement = ({ clientId, token,screenIds, userId, realm }) => {
         }
       );
 
-      setDietaryOptions(res.data?.data || []);
+      const data = res.data?.data || [];
+    setDietaryOptions(data);
+    menuCache.set('dietaryTypes', clientId, data);
     } catch (err) {
       console.error("Dietary fetch error:", err);
       setDietaryOptions([]);
@@ -272,6 +287,8 @@ const MenuManagement = ({ clientId, token,screenIds, userId, realm }) => {
 
   const fetchAddonData = useCallback(async (zoneConfigIdParam = zoneConfigId) => {
     if (!menuConfig) return { subcategories: [], items: [] };
+    const cachedAddon = menuCache.get('addonData', clientId);
+if (cachedAddon) return cachedAddon;
     try {
       const [catRes, itemRes] = await Promise.all([
         axios.get(
@@ -340,7 +357,7 @@ const MenuManagement = ({ clientId, token,screenIds, userId, realm }) => {
           seen.set(key, { ...item, zone_config_id: itemZid });
         }
       });
-
+      menuCache.set('addonData', clientId, { subcategories: subcats, items: Array.from(seen.values()) });
       return { subcategories: subcats, items: Array.from(seen.values()) };
     } catch (error) {
       console.warn('Addon fetch failed:', error);
@@ -510,6 +527,9 @@ const MenuManagement = ({ clientId, token,screenIds, userId, realm }) => {
 
   // ✅ FIXED — uses the same axios pattern as the rest of MenuManagement
   const fetchUnits = useCallback(async () => {
+    const cached = menuCache.get('units', clientId);
+  if (cached) { setUnits(cached); return; }
+
     try {
       const res = await axios.get(
         `${import.meta.env.VITE_API_INVENTORY_SERVICE_URL}/${clientId}/menu/read_category?category_id=units`,
@@ -520,6 +540,7 @@ const MenuManagement = ({ clientId, token,screenIds, userId, realm }) => {
       const subCats = unitsNode?.subCategories || [];
       const unitList = subCats.map((u) => (typeof u === "string" ? u : u.id));
       setUnits(unitList.length > 0 ? unitList : ["g", "kg", "ml", "litre", "pcs"]);
+      menuCache.set('units', clientId, unitList.length > 0 ? unitList : ["g", "kg", "ml", "litre", "pcs"]);
     } catch (err) {
       console.error("fetchUnits failed:", err);
       setUnits();
@@ -539,12 +560,16 @@ const MenuManagement = ({ clientId, token,screenIds, userId, realm }) => {
 
   const fetchInventoryIds = useCallback(async () => {
     if (!menuConfig) return;
+    const cached = menuCache.get('inventoryIds', clientId);
+    if (cached) { setInventoryIds(cached); return; }
     try {
       const res = await axios.get(
         `${import.meta.env.VITE_API_INVENTORY_SERVICE_URL}/${clientId}/menu/read_category?category_id=${menuConfig.inventoryCategoryRoot}`,
         { headers: { Authorization: `Bearer ${token}` } }
       );
-      setInventoryIds(res.data.data[0]?.subCategories ?? []);
+      const result = res.data.data[0]?.subCategories ?? [];
+    setInventoryIds(result);
+    menuCache.set('inventoryIds', clientId, result);
     } catch (error) {
       console.error("Error fetching inventory IDs:", error);
     }
@@ -555,6 +580,7 @@ const MenuManagement = ({ clientId, token,screenIds, userId, realm }) => {
   }, [fetchInventoryIds]);
 
   const handleAddItem = async () => {
+    menuCache.invalidate(clientId);
     try {
       let imageId = null;
 
@@ -671,6 +697,7 @@ const MenuManagement = ({ clientId, token,screenIds, userId, realm }) => {
   };
 
   const handleEditItem = async () => {
+    menuCache.invalidate(clientId);
     try {
       let imageId = editingItem.image_id;
       if (editItemImage) imageId = await uploadImageToDocumentService(editItemImage);
@@ -817,7 +844,21 @@ const MenuManagement = ({ clientId, token,screenIds, userId, realm }) => {
       if (!silent) setLoading(false);
       return;
     }
-
+    const cacheSlice = `menuData_zone_${zoneConfigId ?? 'all'}`;
+    if (!silent) {
+      
+const cached = menuCache.get(cacheSlice, clientId);
+      if (cached) {  console.log('Menu Loaded from cache', cached);
+        setCategoriesFlat(cached.categoriesFlat);
+        setMenuItems(cached.menuItems);
+        setAllMenuItemsRaw(cached.allMenuItemsRaw);
+        setCategories(cached.categoryTree);
+        setDedupedMenuItems(cached.dedupedMenuItems);
+        setRequiredScreenId(cached.screen_id);
+        setLoading(false);
+        return; // skip network
+      } console.log('menuCache MISS — fetching from network'); 
+    }
     try {
       if (!silent) setLoading(true);
 
@@ -925,7 +966,18 @@ const MenuManagement = ({ clientId, token,screenIds, userId, realm }) => {
         return cat;
       });
       setCategories(categoryTree);
-
+      menuCache.set(cacheSlice, clientId, {
+        categoriesFlat: normalizedFlat,
+        menuItems: enrichedItems,
+        allMenuItemsRaw: allRawItems.map(item => ({
+          ...item,
+          zone_config_id: item.zone_config_id === null || item.zone_config_id === undefined
+            ? 0 : Number(item.zone_config_id)
+        })),
+        categoryTree,
+        dedupedMenuItems: Array.from(dedupMap.values()),
+        screen_id: catRes.data.screen_id,
+      });console.log('Menu Items SAVED — menuData written to localStorage'); 
       const rootNode = findCategoryNode(categoryTree, menuConfig.root);
       let quickCategories = [];
       if (rootNode) {
@@ -945,7 +997,7 @@ const MenuManagement = ({ clientId, token,screenIds, userId, realm }) => {
       if (!silent) setLoading(false);
     }
   }, [clientId, token, realm, menuConfig, zoneConfigId]);
-
+  useEffect(() => { if (zoneConfigId) fetchData(); }, [zoneConfigId]);
   useEffect(() => { fetchData(); }, [fetchData]);
 
   const getAllDescendantCategoryIds = (categoryId, categoryTree) => {
@@ -1127,6 +1179,7 @@ const getDietaryFromSlug = (item) => {
   };
 
   const handleDeleteItem = async () => {
+    menuCache.invalidate(clientId);
     try {
       const deletedItemId = deleteTarget.id;
 
@@ -1162,6 +1215,7 @@ const getDietaryFromSlug = (item) => {
   };
 
   const handleBulkDelete = async () => {
+    menuCache.invalidate(clientId);
     if (selectedRows.length === 0) { alert('No items selected'); return; }
     if (!window.confirm(`Delete ${selectedRows.length} selected items?`)) return;
 
@@ -1195,6 +1249,7 @@ const getDietaryFromSlug = (item) => {
 
 // Find and replace the entire handleBulkUpdate function:
 const handleBulkUpdate = async () => {
+  menuCache.invalidate(clientId);
   if (selectedRows.length === 0) return;
   try {
     for (const id of selectedRows) {
@@ -1392,6 +1447,7 @@ const availabilityTiming = suffixPartsForExport.join('+') || '';
     created_by, updated_by,
     currentCategoriesFlat, currentSelectedCategoryId, currentSections,
   }) => {
+    menuCache.invalidate(clientId); 
     for (const row of parsedData) {
       if (!row.Name?.trim()) continue;  
       const existingRecords = allMenuItems.filter(
