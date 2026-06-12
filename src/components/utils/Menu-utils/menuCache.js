@@ -51,7 +51,7 @@ export const menuCache = {
   invalidate(clientId) {
     if (!clientId) return;
 
-    ['addonData', 'zoneConfig', 'units', 'inventoryIds', 'dietaryTypes', 'timings']
+    ['addonData', 'zoneConfig', 'units', 'inventoryIds', 'dietaryTypes', 'timings', 'counterTree', 'kds_menuMap', 'summary_menuMap']
       .forEach(slice => this.remove(slice, clientId));
 
     const prefix = `mc_v${CACHE_VERSION}_${clientId}_menuData`;

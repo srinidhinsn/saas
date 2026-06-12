@@ -1,4 +1,4 @@
-import React, { useEffect, useState, useRef} from "react";
+import React, { useEffect, useState, useRef } from "react";
 import axios from 'axios';
 import { toast } from "react-toastify";
 import Modal from "react-modal";
@@ -7,7 +7,7 @@ import {
   Users, Package, Truck, Eye, AlertTriangle,
 } from 'lucide-react';
 import { useNavigate } from "react-router-dom";
-
+import { menuCache } from '../../utils/Menu-utils/menuCache';
 Modal.setAppElement("#root");
 
 // ─────────────────────────────────────────────────────────────────────────────
@@ -275,7 +275,7 @@ const LineItemsModal = ({
 // OrderItemsViewModal — read-only view of all items for an order
 // ─────────────────────────────────────────────────────────────────────────────
 
-const OrderItemsViewModal = ({ isOpen, onClose, order, inventoryMap, onRequestDeleteItem,getOrderTotal }) => {
+const OrderItemsViewModal = ({ isOpen, onClose, order, inventoryMap, onRequestDeleteItem, getOrderTotal }) => {
   if (!isOpen || !order) return null;
 
   const getItemStatusStyle = (status) => {
@@ -355,7 +355,7 @@ const OrderItemsViewModal = ({ isOpen, onClose, order, inventoryMap, onRequestDe
               </tr>
             </thead>
             <tbody className="divide-y divide-border-default">
-             {order.items.map((item, idx) => {
+              {order.items.map((item, idx) => {
                 const unitPrice =
                   item.unit_price ??
                   item.price ??
@@ -455,6 +455,9 @@ const normaliseItem = (item) => {
 
 const OrderSummaryVisible = ({ clientId, token }) => {
   const navigate = useNavigate();
+  const hasFetchedStaticRef = useRef(false);
+  const hasFetchedOrdersRef = useRef(false);
+  const inventoryMapRef = useRef({});
 
   // ── Data ──────────────────────────────────────────────────────────────────
   const [orders, setOrders] = useState([]);
@@ -497,9 +500,9 @@ const OrderSummaryVisible = ({ clientId, token }) => {
   const [lineItemsDetails, setLineItemsDetails] = useState([]);
   const [pendingOrderId, setPendingOrderId] = useState(null);
 
- // ─────────────────────────────────────────────────────────────────────────
- // localStorage helpers (preserved exactly from original)
- // ─────────────────────────────────────────────────────────────────────────
+  // ─────────────────────────────────────────────────────────────────────────
+  // localStorage helpers (preserved exactly from original)
+  // ─────────────────────────────────────────────────────────────────────────
 
   const generateSlug = name => name.toLowerCase().replace(/[\s]+/g, '-');
 
@@ -626,38 +629,59 @@ const OrderSummaryVisible = ({ clientId, token }) => {
   // Fetch helpers
   // ─────────────────────────────────────────────────────────────────────────
 
-  const fetchTables = async () => {
-    try {
-      const res = await axios.get(
-        `${import.meta.env.VITE_API_TABLE_SERVICE_URL}/${clientId}/tables/read`,
-        { headers: { Authorization: `Bearer ${token}` } }
-      );
-      setTables(res.data?.data || []);
-      const map = {};
-      (res.data?.data || []).forEach(t => (map[t.id] = t.name));
-      setTablesMap(map);
-    } catch (e) {
-      console.error('fetchTables', e);
-    }
-  };
-
   useEffect(() => {
-    if (clientId) fetchTables();
-  }, [clientId]);
+    if (!clientId || !token) return;
+    if (hasFetchedStaticRef.current) return;
+    hasFetchedStaticRef.current = true;
 
-  useEffect(() => {
-    axios
-      .get(
-        `${import.meta.env.VITE_API_INVENTORY_SERVICE_URL}/${clientId}/menu/read`,
-        { headers: { Authorization: `Bearer ${token}` } }
-      )
-      .then(res => {
-        setAllInventoryItems(res.data.data || []);
-        const map = {};
-        (res.data.data || []).forEach(i => (map[i.id] = i));
-        setInventoryMap(map);
-      })
-      .catch(() => { });
+    const fetchStaticData = async () => {
+      // ── Tables ──
+      const cachedTables = menuCache.get('summary_tablesMap', clientId);
+      if (cachedTables) {
+        setTablesMap(cachedTables.map);
+        setTables(cachedTables.list);
+      } else {
+        try {
+          const res = await axios.get(
+            `${import.meta.env.VITE_API_TABLE_SERVICE_URL}/${clientId}/tables/read`,
+            { headers: { Authorization: `Bearer ${token}` } }
+          );
+          const list = res.data?.data || [];
+          const map = {};
+          list.forEach(t => (map[t.id] = t.name));
+          setTables(list);
+          setTablesMap(map);
+          menuCache.set('summary_tablesMap', clientId, { list, map });
+        } catch (e) {
+          console.error('fetchTables', e);
+        }
+      }
+
+      // ── Menu items ──
+      const cachedMenu = menuCache.get('summary_menuMap', clientId);
+      if (cachedMenu) {
+        setAllInventoryItems(cachedMenu.list);
+        setInventoryMap(cachedMenu.map);
+      } else {
+        try {
+          const res = await axios.get(
+            `${import.meta.env.VITE_API_INVENTORY_SERVICE_URL}/${clientId}/menu/read`,
+            { headers: { Authorization: `Bearer ${token}` } }
+          );
+          const list = res.data?.data || [];
+          const map = {};
+          list.forEach(i => (map[i.id] = i));
+          setAllInventoryItems(list);
+          setInventoryMap(map);
+          inventoryMapRef.current = map;
+          menuCache.set('summary_menuMap', clientId, { list, map });
+        } catch (e) {
+          console.error('fetchMenu', e);
+        }
+      }
+    };
+
+    fetchStaticData();
   }, [clientId, token]);
 
   // ─────────────────────────────────────────────────────────────────────────
@@ -792,7 +816,7 @@ const OrderSummaryVisible = ({ clientId, token }) => {
       if (!si || !si.unique_key) return;
       if (backendUniqueKeys.has(String(si.unique_key))) return;
       if (!si.batch_timestamp || !si.item_id) return;
-      const itemInfo = inventoryMap[si.item_id];
+      const itemInfo = inventoryMapRef.current[si.item_id];
       if (!itemInfo) return;
       pushToBatch(si.batch_timestamp, {
         item_id: si.item_id,
@@ -857,6 +881,10 @@ const OrderSummaryVisible = ({ clientId, token }) => {
   // ─────────────────────────────────────────────────────────────────────────
 
   useEffect(() => {
+    if (!token || !clientId) return;
+    if (hasFetchedOrdersRef.current) return;
+    hasFetchedOrdersRef.current = true;
+
     const fetchOrders = async () => {
       if (!token || !clientId) { setLoading(false); return; }
       try {
@@ -876,8 +904,10 @@ const OrderSummaryVisible = ({ clientId, token }) => {
 
     fetchOrders();
     const interval = setInterval(fetchOrders, 10000);
-    return () => clearInterval(interval);
-  }, [clientId, token, inventoryMap]);
+    return () => {
+      clearInterval(interval);
+    };
+  }, [clientId, token]);
 
   // ─────────────────────────────────────────────────────────────────────────
   // Actions (preserved from original)
@@ -1059,7 +1089,7 @@ const OrderSummaryVisible = ({ clientId, token }) => {
         handleRequestDeleteItem(item, orderId);
         return;
       }
-      const updatedItems = o.items.map(item => { const itemKey = item.id || item.frontend_unique_key; if (itemKey === itemIdentifier) return { ...item,quantity: newQty }; return item; });
+      const updatedItems = o.items.map(item => { const itemKey = item.id || item.frontend_unique_key; if (itemKey === itemIdentifier) return { ...item, quantity: newQty }; return item; });
       const newTotal = updatedItems.reduce((s, it) => s + ((inventoryMap[it.item_id]?.unit_price || it.unit_price || it.price || 0) * (it.quantity || 1)), 0);
       return { ...o, items: updatedItems, total_price: newTotal };
     }));
@@ -1463,56 +1493,56 @@ const OrderSummaryVisible = ({ clientId, token }) => {
           <div className="rounded-xl overflow-hidden border border-border-default shadow-card bg-bg-primary">
             <div className="w-full overflow-x-auto">
               <table className="min-w-[1100px] w-full">
-              <thead className="bg-bg-tertiary border-b border-border-default">
-                <tr>
-                  {['Order #', 'Table / Customer', 'Mode', 'Items', 'Total Price', 'Status', 'Actions'].map(h => (
-                    <th key={h} className="px-6 py-4 text-left text-xs font-bold text-text-primary uppercase tracking-wider">{h}</th>
-                  ))}
-                </tr>
-              </thead>
-              <tbody className="divide-y divide-border-default">
-                {filteredOrders.map((order, rowIdx) => {
-                  const status = order.status?.toLowerCase();
-                  const orderTotal = getOrderTotal(order);
-                  return (
-                    <tr key={order.id} className={`hover:bg-bg-tertiary transition-colors ${rowIdx % 2 === 0 ? 'bg-bg-primary' : 'bg-bg-tertiary'}`}>
-                      <td className="px-6 py-4 whitespace-nowrap">
-                        <div className="flex items-center gap-1.5">
-                          <span className="font-bold text-action-primary">#{order.id}</span>
-                          {order.has_new_items && <span className="text-[9px] font-bold text-text-white bg-action-primary px-1.5 py-0.5 rounded-full uppercase">New</span>}
-                        </div>
-                      </td>
-                      <td className="px-6 py-4 whitespace-nowrap">{order._fixedOrderMode === 'takeaway' ? order.customer_name || 'Takeaway' : tablesMap[order.table_id] || order.table || String(order.table_id)}</td>
-                      <td className="px-6 py-4 whitespace-nowrap">
-                        <span className="inline-flex items-center gap-1 px-2.5 py-1 rounded-full text-xs font-semibold bg-bg-tertiary text-text-secondary border border-border-default">{getOrderModeIcon(order._fixedOrderMode)}{getOrderModeLabel(order._fixedOrderMode)}</span>
-                      </td>
-                      <td className="px-6 py-4 whitespace-nowrap">{order.items.length}</td>
-                      <td className="px-6 py-4 whitespace-nowrap">₹{orderTotal.toFixed(2)}</td>
-                      <td className="px-6 py-4 whitespace-nowrap"><StatusBadge status={order.status} /></td>
-                      <td className="px-6 py-4 whitespace-nowrap">
-                        <div className="flex items-center justify-center gap-4 flex-wrap">
-                          <button
-                            onClick={() => { setViewOrder({ ...order, _tableName: tablesMap[order.table_id] || order.table || String(order.table_id) }); setShowViewModal(true); }}
-                            className="p-1.5 rounded-lg bg-action-primary/10 text-action-primary hover:bg-action-primary hover:text-text-white transition-colors" title="View items"
-                          ><Eye size={15} /></button>
-                          {status === 'ready' && (
-                            <button onClick={() => handleStatusChange(order.id, 'served')} className="px-2.5 py-1 rounded-lg bg-action-success text-text-white text-xs font-semibold hover:opacity-90 transition-colors whitespace-nowrap">Mark As Served</button>
-                          )}
-                          {status === 'served' && (
-                            <button onClick={() => handleGenerateBill(order)} className="px-2.5 py-1 rounded-lg bg-green-700 text-text-white text-xs font-semibold hover:bg-green-800 transition-colors whitespace-nowrap">Generate Bill</button>
-                          )}
-                          {/* REQ: trash now opens CancelOrderConfirmModal */}
-                          <button
-                            onClick={() => setCancelOrderModal({ isOpen: true, orderId: order.id })}
-                            className="p-1.5 rounded-lg bg-action-danger/10 text-action-danger hover:bg-action-danger hover:text-text-white transition-colors" title="Cancel order"
-                          ><Trash2 size={15} /></button>
-                        </div>
-                      </td>
-                    </tr>
-                  );
-                })}
-              </tbody>
-            </table>
+                <thead className="bg-bg-tertiary border-b border-border-default">
+                  <tr>
+                    {['Order #', 'Table / Customer', 'Mode', 'Items', 'Total Price', 'Status', 'Actions'].map(h => (
+                      <th key={h} className="px-6 py-4 text-left text-xs font-bold text-text-primary uppercase tracking-wider">{h}</th>
+                    ))}
+                  </tr>
+                </thead>
+                <tbody className="divide-y divide-border-default">
+                  {filteredOrders.map((order, rowIdx) => {
+                    const status = order.status?.toLowerCase();
+                    const orderTotal = getOrderTotal(order);
+                    return (
+                      <tr key={order.id} className={`hover:bg-bg-tertiary transition-colors ${rowIdx % 2 === 0 ? 'bg-bg-primary' : 'bg-bg-tertiary'}`}>
+                        <td className="px-6 py-4 whitespace-nowrap">
+                          <div className="flex items-center gap-1.5">
+                            <span className="font-bold text-action-primary">#{order.id}</span>
+                            {order.has_new_items && <span className="text-[9px] font-bold text-text-white bg-action-primary px-1.5 py-0.5 rounded-full uppercase">New</span>}
+                          </div>
+                        </td>
+                        <td className="px-6 py-4 whitespace-nowrap">{order._fixedOrderMode === 'takeaway' ? order.customer_name || 'Takeaway' : tablesMap[order.table_id] || order.table || String(order.table_id)}</td>
+                        <td className="px-6 py-4 whitespace-nowrap">
+                          <span className="inline-flex items-center gap-1 px-2.5 py-1 rounded-full text-xs font-semibold bg-bg-tertiary text-text-secondary border border-border-default">{getOrderModeIcon(order._fixedOrderMode)}{getOrderModeLabel(order._fixedOrderMode)}</span>
+                        </td>
+                        <td className="px-6 py-4 whitespace-nowrap">{order.items.length}</td>
+                        <td className="px-6 py-4 whitespace-nowrap">₹{orderTotal.toFixed(2)}</td>
+                        <td className="px-6 py-4 whitespace-nowrap"><StatusBadge status={order.status} /></td>
+                        <td className="px-6 py-4 whitespace-nowrap">
+                          <div className="flex items-center justify-center gap-4 flex-wrap">
+                            <button
+                              onClick={() => { setViewOrder({ ...order, _tableName: tablesMap[order.table_id] || order.table || String(order.table_id) }); setShowViewModal(true); }}
+                              className="p-1.5 rounded-lg bg-action-primary/10 text-action-primary hover:bg-action-primary hover:text-text-white transition-colors" title="View items"
+                            ><Eye size={15} /></button>
+                            {status === 'ready' && (
+                              <button onClick={() => handleStatusChange(order.id, 'served')} className="px-2.5 py-1 rounded-lg bg-action-success text-text-white text-xs font-semibold hover:opacity-90 transition-colors whitespace-nowrap">Mark As Served</button>
+                            )}
+                            {status === 'served' && (
+                              <button onClick={() => handleGenerateBill(order)} className="px-2.5 py-1 rounded-lg bg-green-700 text-text-white text-xs font-semibold hover:bg-green-800 transition-colors whitespace-nowrap">Generate Bill</button>
+                            )}
+                            {/* REQ: trash now opens CancelOrderConfirmModal */}
+                            <button
+                              onClick={() => setCancelOrderModal({ isOpen: true, orderId: order.id })}
+                              className="p-1.5 rounded-lg bg-action-danger/10 text-action-danger hover:bg-action-danger hover:text-text-white transition-colors" title="Cancel order"
+                            ><Trash2 size={15} /></button>
+                          </div>
+                        </td>
+                      </tr>
+                    );
+                  })}
+                </tbody>
+              </table>
             </div>
           </div>
         )}
@@ -1641,8 +1671,8 @@ const OrderSummaryVisible = ({ clientId, token }) => {
         .custom-scrollbar::-webkit-scrollbar-thumb { background: var(--color-border-default); border-radius: 10px; }
         .custom-scrollbar::-webkit-scrollbar-thumb:hover { background: var(--color-action-primary); }
       `}</style>
-      </div>
-      );
+    </div>
+  );
 };
 
-      export default OrderSummaryVisible;
+export default OrderSummaryVisible;
