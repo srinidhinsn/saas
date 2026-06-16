@@ -1688,6 +1688,9 @@ ${selectedAddress.country || ""}
             );
             const addresses = addrRes.data?.data?.addresses || [];
             setCustomerAddresses(addresses);
+            if (addresses.length > 0) {
+              setSelectedAddressId(String(addresses[0].id));  
+            }
           } catch {
             setCustomerAddresses([]);
           }
@@ -2009,37 +2012,31 @@ ${selectedAddress.country || ""}
 
   // REMOVE the old fetchTables and REPLACE WITH:
   const fetchTables = async () => {
-    const takeawayRoots =
-      (import.meta.env.VITE_EASYFOOD_TAKEAWAY_TABLE_DEFAULT_ROOT || '')
-        .split(',')
-        .map(v => v.trim().toLowerCase());
-
-    const res = await axios.get(
-      `${import.meta.env.VITE_API_TABLE_SERVICE_URL}/${clientId}/tables/read`,
-      { headers: { Authorization: `Bearer ${token}` } }
-    );
-
-    const list = Array.isArray(res.data?.data)
-      ? res.data.data.map(t => ({
-        ...t,
-        table_number: t.name || t.table_number || '-',
-      }))
+    const takeawayRoots = (import.meta.env.VITE_EASYFOOD_TAKEAWAY_TABLE_DEFAULT_ROOT || '')
+      .split(',').map(v => v.trim().toLowerCase());
+  
+    const [tableRes, configRes] = await Promise.all([
+      axios.get(`${import.meta.env.VITE_API_TABLE_SERVICE_URL}/${clientId}/tables/read`, { headers: { Authorization: `Bearer ${token}` } }),
+      axios.get(`${import.meta.env.VITE_API_TABLE_SERVICE_URL}/${clientId}/tables/config`, { headers: { Authorization: `Bearer ${token}` } }),
+    ]);
+  
+    const freshConfigs = configRes.data || [];
+  
+    const list = Array.isArray(tableRes.data?.data)
+      ? tableRes.data.data.map(t => {
+          const matchedConfig = freshConfigs.find(
+            c => c.section?.trim().toLowerCase() === t.section?.trim().toLowerCase()
+              && c.zone?.trim().toLowerCase() === t.location_zone?.trim().toLowerCase()
+          );
+          return { ...t, table_number: t.name || t.table_number || '-', config_id: matchedConfig?.id || null };
+        })
       : [];
-
-    const takeaway = list.filter(t =>
-      takeawayRoots.some(root =>
-        (t.name || '').toLowerCase().startsWith(root)
-      )
-    );
-
+  
+    const takeaway = list.filter(t => takeawayRoots.some(root => (t.name || '').toLowerCase().startsWith(root)));
     setTakeawayTables(takeaway);
-    if (takeaway.length > 0) {
-      setTakeawayTableId(takeaway[0].id);
-    }
-
-    list.sort((a, b) =>
-      a.table_number.localeCompare(b.table_number, undefined, { numeric: true })
-    );
+    if (takeaway.length > 0) setTakeawayTableId(takeaway[0].id);
+  
+    list.sort((a, b) => a.table_number.localeCompare(b.table_number, undefined, { numeric: true }));
     setTables(list);
     await fetchTableOrders(list);
   };
@@ -2245,11 +2242,7 @@ ${selectedAddress.country || ""}
 
     const tableIdStr = takeawayTables[0].id.toString();
     const takeawayTable = takeawayTables[0];
-const matchedSection = takeawaySections.find(
-  s => s.zone === takeawayTable?.location_zone &&
-       s.section === takeawayTable?.section
-);
-const takeawayZoneConfigId = matchedSection?.id || null;
+    const takeawayZoneConfigId = takeawayTable?.config_id || null;
 
     setOrderMode('takeaway');
     setSelectedTable(tableIdStr);
@@ -2368,11 +2361,8 @@ const takeawayZoneConfigId = matchedSection?.id || null;
     setOrderMode('dinein');
     setSelectedTable(tableIdStr);
     setDineinTableId(tableIdStr);
-    const matchedSection = sections.find(
-      s => s.zone === table.location_zone && s.section === table.section
-    );
-    const resolvedZoneConfigId = matchedSection ? matchedSection.id : null;
-    setZoneConfigId(resolvedZoneConfigId);
+    const resolvedZoneConfigId = table.config_id || null;
+setZoneConfigId(resolvedZoneConfigId);
     const draft = await readDraft(tableIdStr, clientId, token);
 
     if (draft) {
@@ -2466,13 +2456,8 @@ const takeawayZoneConfigId = matchedSection?.id || null;
     setCustomerDetails(prev => ({ ...prev, customer_id: '', contact_phone: '' }));
     setShowCart(true);
 
-    // Set takeaway zone_config_id so correct prices are fetched
     const takeawayTable = tables.find(t => String(t.id) === tableIdStr);
-  const matchedSection = takeawaySections.find(
-    s => s.zone === takeawayTable?.location_zone &&
-         s.section === takeawayTable?.section
-  );
-  const takeawayZoneConfigId = matchedSection?.id || null;
+    const takeawayZoneConfigId = takeawayTable?.config_id || null;
     setZoneConfigId(takeawayZoneConfigId);
 
     goToOrderView();
@@ -2483,11 +2468,7 @@ const takeawayZoneConfigId = matchedSection?.id || null;
     setSelectedTable(tableIdStr);
 
     const takeawayTable = tables.find(t => String(t.id) === tableIdStr);
-  const matchedSection = takeawaySections.find(
-    s => s.zone === takeawayTable?.location_zone &&
-         s.section === takeawayTable?.section
-  );
-  const takeawayZoneConfigId = matchedSection?.id || null;
+    const takeawayZoneConfigId = takeawayTable?.config_id || null;
     setZoneConfigId(takeawayZoneConfigId);
 
     if (!existingOrder) {
