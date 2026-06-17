@@ -51,6 +51,5 @@ class PageDefinitionModel(BaseModel):
 
 class DelegatedAccessRequest(BaseModel):
     requester_id: str   # waiter user_id
-    page: str           # e.g., "orders"
     admin_username: str
     admin_password: str

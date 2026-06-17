@@ -18,6 +18,7 @@ from utils.transaction import record_partial_transaction, create_transaction , T
 from models.saas_context import SaasContext
 from typing import Optional
 from entity.inventory_entity import InventoryEntity, CategoryEntity
+from entity.client_entity import Address
 from models.inventory_model import InventoryTransaction
 from services.order_service import (
     _root_dinein_id,
@@ -26,6 +27,7 @@ from services.order_service import (
     _merge_group,
     _deduct_stock_for_order,
     _convert,
+    update_order_status_service,
 )
 from decimal import Decimal
 
@@ -35,7 +37,15 @@ router = APIRouter()
 
 @router.post("/dinein/create", response_model=ResponseModel[DineinOrderModel])
 def create_order(client_id: str, order: DineinOrderModel, context: SaasContext = Depends(verify_token), db: Session = Depends(get_db)):
-    db_order = Db_Order_Entity(
+    formatted_address = None
+    if order.delivery_address:
+        selected_address = db.query(Address).filter(
+        Address.id == int(order.delivery_address)
+    ).first()
+        if selected_address:
+            formatted_address = f"""{selected_address.name} , {selected_address.address_line1} , {selected_address.address_line2}
+                                    {selected_address.city} , {selected_address.state} , {selected_address.country} - {selected_address.pincode}"""
+    db_order = Db_Order_Entity( customer_id=order.customer_id,delivery_address=formatted_address,
         client_id=client_id, table_id=order.table_id, status=order.status,
         price=order.price, gst=order.gst, cst=order.cst, discount=order.discount,
         invoice_status=order.invoice_status, total_price=order.total_price,
@@ -194,150 +204,8 @@ def update_order_status(
     context: SaasContext = Depends(verify_token),
     db: Session = Depends(get_db),
 ):
-    order = (
-        db.query(Db_Order_Entity)
-        .filter(
-            Db_Order_Entity.id == body.id,
-            Db_Order_Entity.client_id == client_id
-        )
-        .first()
-    )
-
-    if not order:
-        raise HTTPException(
-            status_code=404,
-            detail=f"Order {body.id} not found"
-        )
-
-    # ── Cancel entire order group ───────────────────────────────────────────
-    if body.status == OrderStatusEnum.cancelled:
-        root_id = _root_dinein_id(order.dinein_order_id)
-
-        related_orders = (
-            db.query(Db_Order_Entity)
-            .filter(
-                Db_Order_Entity.client_id == client_id,
-                Db_Order_Entity.dinein_order_id.like(f"{root_id}%"),
-            )
-            .all()
-        )
-
-        for o in related_orders:
-            # update main order
-            o.status = OrderStatusEnum.cancelled
-
-            # update all items
-            order_items = (
-                db.query(Db_OrderItem_Entity)
-                .filter(
-                    Db_OrderItem_Entity.order_id == o.id,
-                    Db_OrderItem_Entity.client_id == client_id,
-                )
-                .all()
-            )
-
-            for item in order_items:
-                item.status = OrderStatusEnum.cancelled
-
-        cancellation_reason = getattr(body, "cancellation_reason", None)
-        if cancellation_reason:
-            for o in related_orders:
-                if hasattr(o, "cancellation_reason"):
-                    o.cancellation_reason = cancellation_reason
-
-        db.commit()
-
-        return ResponseModel(
-            screen_id=context.screen_id,
-            data={
-                "message": "Order and all sub-orders cancelled",
-                "cancelled_count": len(related_orders),
-            },
-        )
-
-    # ── Served / completed entire group ────────────────────────────────────
-    if body.status in [OrderStatusEnum.served, OrderStatusEnum.completed]:
-        root_id = _root_dinein_id(order.dinein_order_id)
-
-        related_orders = db.query(Db_Order_Entity).filter(
-            Db_Order_Entity.client_id == client_id,
-            Db_Order_Entity.dinein_order_id.like(f"{root_id}%")
-        ).all()
-
-        orders_to_deduct = []
-
-        for o in related_orders:
-            # Deduct only if not already served/completed
-            should_deduct = o.status not in [
-                OrderStatusEnum.served,
-                OrderStatusEnum.completed
-            ]
-
-            # Update main order status
-            o.status = body.status
-
-            # Update all items in this order
-            order_items = (
-                db.query(Db_OrderItem_Entity)
-                .filter(
-                    Db_OrderItem_Entity.order_id == o.id,
-                    Db_OrderItem_Entity.client_id == client_id,
-                )
-                .all()
-            )
-
-            for item in order_items:
-             if item.status != OrderStatusEnum.cancelled:
-               item.status = body.status
-
-            if should_deduct:
-                orders_to_deduct.append(o.id)
-
-        db.flush()
-
-        # Deduct stock only once
-        for order_id in orders_to_deduct:
-            _deduct_stock_for_order(
-                db=db,
-                client_id=client_id,
-                order_id=order_id
-            )
-
-        db.commit()
-
-        return ResponseModel(
-            screen_id=context.screen_id,
-            data={
-                "message": "All related orders marked as served",
-                "updated_count": len(related_orders),
-                "deducted_count": len(orders_to_deduct),
-            },
-        )
-
-    # ✅ Normal single order update (for other statuses)
-    if body.status is not None:
-        order.status = body.status
-
-    if body.total_price is not None:
-        order.total_price = body.total_price
-
-    if body.table_id is not None:
-        order.table_id = body.table_id
-
-    if body.dinein_order_id is not None:
-        order.dinein_order_id = body.dinein_order_id
-
-    db.commit()
-    db.refresh(order)
-
-    return ResponseModel(
-        screen_id=context.screen_id,
-        data={
-            "message": "Status updated",
-            "new_status": order.status,
-        },
-    )
-
+    returnResponseModel = update_order_status_service(client_id=client_id, body=body, context=context, db=db)
+    return returnResponseModel
 
 @router.post("/order_items/update")
 def update_order_items(
@@ -999,3 +867,27 @@ def get_kds_orders(client_id: str, context: SaasContext = Depends(verify_token),
 
     result = [_order_row_to_flat(order) for order in orders]
     return ResponseModel(screen_id=context.screen_id, data=result)
+
+@router.get("/dinein/customer-orders")
+def get_customer_orders(
+    customer_id: str,
+    context: SaasContext = Depends(verify_token),
+    db: Session = Depends(get_db),
+):
+    orders = db.query(Db_Order_Entity).filter(
+        Db_Order_Entity.customer_id == customer_id,
+        Db_Order_Entity.status != OrderStatusEnum.cancelled,
+    ).all()
+
+    groups = {}
+
+    for order in orders:
+        root = _root_dinein_id(order.dinein_order_id or str(order.id))
+        groups.setdefault(root, []).append(order)
+
+    result = [_merge_group(group) for group in groups.values()]
+
+    return ResponseModel(
+        screen_id=context.screen_id,
+        data=result,
+    )

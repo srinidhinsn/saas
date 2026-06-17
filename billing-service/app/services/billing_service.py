@@ -313,6 +313,8 @@ def upsert_from_order_payload(db: Session, payload: Dict[str, Any]) -> Dict[str,
             document_type="Invoice",
             status="Draft",
             order_id=order_id,
+            customer_id=payload.get("customer_id"),
+            shipping_address=payload.get("delivery_address"),
             currency="INR",
             notes="Synced from order-service",
         )
@@ -323,6 +325,8 @@ def upsert_from_order_payload(db: Session, payload: Dict[str, Any]) -> Dict[str,
     table_id = payload.get("table_id")
     if table_id is not None:
         doc.reference_number = f"Table-{table_id}"
+    doc.customer_id = payload.get("customer_id")
+    doc.shipping_address = payload.get("delivery_address")
 
     # -------- Replace lines --------
     db.query(BillingDocumentItemEntity).filter(
