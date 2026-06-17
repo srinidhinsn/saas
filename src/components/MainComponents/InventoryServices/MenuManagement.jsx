@@ -838,14 +838,14 @@ if (cachedAddon) return cachedAddon;
   }, []);
 
   // Uses menuInventoryId and root from config — not hardcoded
-  const fetchData = useCallback(async (options = { silent: false }) => {
-    const { silent = false } = options;
+  const fetchData = useCallback(async (options = { silent: false , force: false}) => {
+    const { silent = false , force = false} = options;
     if (!clientId || !token || !menuConfig) {
       if (!silent) setLoading(false);
       return;
     }
     const cacheSlice = `menuData_zone_${zoneConfigId ?? 'all'}`;
-    if (!silent) {
+    if (!silent && !force) {
       
 const cached = menuCache.get(cacheSlice, clientId);
       if (cached) {  console.log('Menu Loaded from cache', cached);
@@ -1447,7 +1447,6 @@ const availabilityTiming = suffixPartsForExport.join('+') || '';
     created_by, updated_by,
     currentCategoriesFlat, currentSelectedCategoryId, currentSections,
   }) => {
-    menuCache.invalidate(clientId); 
     for (const row of parsedData) {
       if (!row.Name?.trim()) continue;  
       const existingRecords = allMenuItems.filter(
@@ -1573,8 +1572,8 @@ return suffixParts.length > 0 ? `${base}__${suffixParts.join('+')}` : base;
         );
       }
     }
-  
-    await fetchData({ silent: false });
+    menuCache.invalidate(clientId);
+    await fetchData({ silent: false, force: true });
     setImportSuccess(true);
     setTimeout(() => setImportSuccess(false), 3000);
   };
