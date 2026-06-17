@@ -1,4 +1,4 @@
-import React, { useEffect, useState } from "react";
+import React, { useEffect, useState, useRef } from "react";
 import axios from "axios";
 import { useNavigate, useSearchParams } from "react-router-dom";
 import { toast } from "react-toastify";
@@ -13,22 +13,29 @@ export default function BillingPage({ clientId, token }) {
   const [filteredOrders, setFilteredOrders] = useState([]);
   const [tablesMap, setTablesMap] = useState({});
   const [inventoryMap, setInventoryMap] = useState({});
+  const [billingDocMap, setBillingDocMap] = useState({});
   const [selectedOrder, setSelectedOrder] = useState(null);
   const [loading, setLoading] = useState(true);
   const [invoiceModalOpen, setInvoiceModalOpen] = useState(false);
 
   // New state for filters
   const [searchQuery, setSearchQuery] = useState("");
-  const [dateFilter, setDateFilter] = useState(new Date().toISOString().split('T')[0]);
+  const todayDate = new Date().toISOString().split('T')[0];
+  const [datePreset, setDatePreset] = useState('today');
+  const [customFrom, setCustomFrom] = useState(todayDate);
+  const [customTo, setCustomTo] = useState(todayDate);
+  const customFromRef = useRef(null);
+  const customToRef = useRef(null);
 
   useEffect(() => {
     async function fetchAll() {
       try {
         setLoading(true);
-        const [ordersRes, tablesRes, invRes] = await Promise.all([
+        const [ordersRes, tablesRes, invRes, billingRes] = await Promise.all([
           axios.get(`${import.meta.env.VITE_API_ORDER_SERVICE_URL}/${clientId}/dinein/table`, { headers: { Authorization: `Bearer ${token}` } }),
           axios.get(`${import.meta.env.VITE_API_TABLE_SERVICE_URL}/${clientId}/tables/read`, { headers: { Authorization: `Bearer ${token}` } }),
           axios.get(`${import.meta.env.VITE_API_INVENTORY_SERVICE_URL}/${clientId}/inventory/read`, { headers: { Authorization: `Bearer ${token}` } }),
+          axios.get(`${import.meta.env.VITE_API_BILLING_SERVICE_URL}/${clientId}/invoice/read_document`, { headers: { Authorization: `Bearer ${token}` } }),
         ]);
         
         const allOrders = ordersRes.data?.data || [];
@@ -41,6 +48,12 @@ export default function BillingPage({ clientId, token }) {
         const iMap = {};
         (invRes.data?.data || []).forEach((i) => (iMap[i.id] = i));
         setInventoryMap(iMap);
+
+        const bMap = {};
+        (billingRes.data?.data || []).forEach((doc) => {
+          if (doc.order_id != null) bMap[doc.order_id.toString()] = doc;
+        });
+        setBillingDocMap(bMap);
       } catch (e) {
         toast.error("Error loading data");
       } finally {
@@ -51,16 +64,33 @@ export default function BillingPage({ clientId, token }) {
   }, [clientId, token]);
 
   // Filter orders based on search and date
+  const getDateRange = () => {
+    const now = new Date();
+    const toStr = (d) => d.toISOString().split('T')[0];
+    const today = toStr(now);
+    const subtractDays = (n) => { const d = new Date(now); d.setDate(d.getDate() - n); return toStr(d); };
+    const subtractMonths = (n) => { const d = new Date(now); d.setMonth(d.getMonth() - n); return toStr(d); };
+    switch (datePreset) {
+      case 'today': return { from: today, to: today };
+      case '1w': return { from: subtractDays(7), to: today };
+      case '15d': return { from: subtractDays(15), to: today };
+      case '1m': return { from: subtractMonths(1), to: today };
+      case '3m': return { from: subtractMonths(3), to: today };
+      case '6m': return { from: subtractMonths(6), to: today };
+      case 'custom': return { from: customFrom, to: customTo };
+      default: return { from: today, to: today };
+    }
+  };
+
   useEffect(() => {
     let filtered = [...orders];
 
     // Date filter
-    if (dateFilter) {
-      filtered = filtered.filter(order => {
-        const orderDate = new Date(order.created_at).toISOString().split('T')[0];
-        return orderDate === dateFilter;
-      });
-    }
+    const { from, to } = getDateRange();
+    filtered = filtered.filter(order => {
+      const orderDate = new Date(order.created_at).toLocaleDateString('en-CA');
+      return orderDate >= from && orderDate <= to;
+    });
 
     // Search filter
     if (searchQuery.trim()) {
@@ -73,7 +103,7 @@ export default function BillingPage({ clientId, token }) {
     }
 
     setFilteredOrders(filtered);
-  }, [searchQuery, dateFilter, orders, tablesMap]);
+  }, [searchQuery, datePreset, customFrom, customTo, orders, tablesMap]);
 
   const combineDuplicateItems = (items) => {
     const itemsMap = new Map();
@@ -145,6 +175,20 @@ export default function BillingPage({ clientId, token }) {
   const handleInvoiceSave = async (draftId) => {
     // Optionally refresh orders or perform other actions after save
     console.log('Invoice saved with ID:', draftId);
+
+    try {
+      const res = await axios.get(
+        `${import.meta.env.VITE_API_BILLING_SERVICE_URL}/${clientId}/invoice/read_document`,
+        { headers: { Authorization: `Bearer ${token}` } }
+      );
+      const bMap = {};
+      (res.data?.data || []).forEach((doc) => {
+        if (doc.order_id != null) bMap[doc.order_id.toString()] = doc;
+      });
+      setBillingDocMap(bMap);
+    } catch (e) {
+      toast.error("Failed to refresh billing data");
+    }
   };
 
   return (
@@ -175,16 +219,52 @@ export default function BillingPage({ clientId, token }) {
                 />
               </div>
             </div>
-            <div className="md:w-64">
-              <div className="relative">
-                <Calendar className="absolute left-3 top-1/2 -translate-y-1/2 text-text-secondary" size={20} />
-                <input
-                  type="date"
-                  value={dateFilter}
-                  onChange={(e) => setDateFilter(e.target.value)}
-                  className="w-full pl-10 pr-4 py-2.5 border border-border-default rounded-lg bg-bg-primary text-text-primary focus:ring-2 focus:ring-action-primary focus:border-action-primary transition-all"
-                />
-              </div>
+            <div className="flex items-center gap-2">
+              <select
+                value={datePreset}
+                onChange={e => {
+                  const val = e.target.value;
+                  setDatePreset(val);
+                  if (val === 'custom') {
+                    setTimeout(() => customFromRef.current?.showPicker?.(), 50);
+                  }
+                }}
+                className="pl-3 pr-8 py-2.5 rounded-lg bg-bg-primary border border-border-default text-text-primary text-sm appearance-none cursor-pointer"
+              >
+                <option value="today">Today</option>
+                <option value="1w">Last 1 Week</option>
+                <option value="15d">Last 15 Days</option>
+                <option value="1m">Last 1 Month</option>
+                <option value="3m">Last 3 Months</option>
+                <option value="6m">Last 6 Months</option>
+                <option value="custom">Custom Range</option>
+              </select>
+
+              {datePreset === 'custom' && (
+                <>
+                  <input
+                    ref={customFromRef}
+                    type="date"
+                    value={customFrom}
+                    max={customTo}
+                    onChange={e => {
+                      setCustomFrom(e.target.value);
+                      setTimeout(() => customToRef.current?.showPicker?.(), 50);
+                    }}
+                    className="px-3 py-2.5 rounded-lg bg-bg-primary border border-border-default text-text-primary text-sm"
+                  />
+                  <span className="text-text-secondary text-xs font-medium">→</span>
+                  <input
+                    ref={customToRef}
+                    type="date"
+                    value={customTo}
+                    min={customFrom}
+                    max={todayDate}
+                    onChange={e => setCustomTo(e.target.value)}
+                    className="px-3 py-2.5 rounded-lg bg-bg-primary border border-border-default text-text-primary text-sm"
+                  />
+                </>
+              )}
             </div>
           </div>
         </div>
@@ -211,6 +291,8 @@ export default function BillingPage({ clientId, token }) {
                     <th className="px-6 py-4 text-left text-xs font-bold text-text-primary uppercase tracking-wider">Table</th>
                     <th className="px-6 py-4 text-left text-xs font-bold text-text-primary uppercase tracking-wider">Items</th>
                     <th className="px-6 py-4 text-left text-xs font-bold text-text-primary uppercase tracking-wider">Total</th>
+                    <th className="px-6 py-4 text-left text-xs font-bold text-text-primary uppercase tracking-wider">Total Amount</th>
+                    <th className="px-6 py-4 text-left text-xs font-bold text-text-primary uppercase tracking-wider">Payment Status</th>
                     <th className="px-6 py-4 text-center text-xs font-bold text-text-primary uppercase tracking-wider">Action</th>
                   </tr>
                 </thead>
@@ -237,6 +319,37 @@ export default function BillingPage({ clientId, token }) {
                         <td className="px-6 py-4 whitespace-nowrap">
                           <div className="text-sm font-bold text-action-primary">₹{orderTotal.toFixed(2)}</div>
                         </td>
+                        {(() => {
+                          const billingDoc = billingDocMap[order.id.toString()];
+                          return (
+                            <>
+                              {/* Total Amount */}
+                              <td className="px-6 py-4 whitespace-nowrap">
+                                <div className="text-sm font-bold text-action-primary">
+                                  {billingDoc ? `₹${Number(billingDoc.total_amount).toFixed(2)}` : "—"}
+                                </div>
+                              </td>
+
+                              {/* Payment Status */}
+                              <td className="px-6 py-4 whitespace-nowrap">
+                                {billingDoc ? (
+                                  <span className={`inline-flex px-2.5 py-1 rounded-full text-xs font-semibold ${billingDoc.payment_status === "paid"
+                                      ? "bg-green-100 text-green-700"
+                                      : billingDoc.status === "partial"
+                                        ? "bg-yellow-100 text-yellow-700"
+                                        : "bg-red-100 text-red-700"
+                                    }`}>
+                                    {billingDoc.payment_status?.toUpperCase() ?? "UNKNOWN"}
+                                  </span>
+                                ) : (
+                                  <span className="inline-flex px-2.5 py-1 rounded-full text-xs font-semibold bg-gray-100 text-gray-500">
+                                    NOT BILLED
+                                  </span>
+                                )}
+                              </td>
+                            </>
+                          );
+                        })()}
                         <td className="px-6 py-4 whitespace-nowrap text-center">
                           <button
                             onClick={() => handleSelectOrder(order)}

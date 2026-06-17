@@ -668,7 +668,7 @@ export default function StockRecipeManager({ clientId: propClientId, token: prop
   const updateMenuAvailability = async (menuId, newAvailability, newUnit) => {
     try {
       await axios.post(
-        `${API_CONFIG.baseMenu(clientId)}/update/avail`,
+        `${API_CONFIG.baseMenu(clientId)}/update`,
         {
           id: menuId,
           availability: newAvailability,

@@ -175,7 +175,8 @@
 import { APP_ROOT } from '../../config/pathConfig';
 import React, { useEffect, useState } from 'react';
 import { useNavigate, useParams, useLocation } from 'react-router-dom';
-import { Sun, Moon } from 'lucide-react';
+import { getValidToken } from '../../utils/Interceptors/Api';
+import axios from 'axios';
 
 export const navMap = {
   home: (clientId) => `/${APP_ROOT}/${clientId}/home`,
@@ -201,6 +202,7 @@ const HeaderShared = ({ onLogout }) => {
   const [mobileOpen, setMobileOpen] = useState(false);
   const [darkMode, setDarkMode] = useState(false);
   const [profileOpen, setProfileOpen] = useState(false);
+  const [clientName, setClientName] = useState('');
 
   // Initialize theme on mount
   useEffect(() => {
@@ -268,7 +270,25 @@ const HeaderShared = ({ onLogout }) => {
       </button>
     );
   };
+  useEffect(() => {
+    if (!clientId) return;
+    const token = getValidToken();
+    if (!token) return;
 
+    axios
+      .get(
+        `${import.meta.env.VITE_API_USER_SERVICE_URL}/${clientId}/users/realm`,
+        { headers: { Authorization: `Bearer ${token}` } }
+      )
+      .then((res) => {
+        const clients = res.data?.data?.clients || [];
+        const match = clients.find((c) => c.id === clientId);
+        if (match?.name) setClientName(match.name);
+      })
+      .catch(() => {
+      });
+  }, [clientId]);
+  const displayLabel = clientName || (clientId || 'APP').toUpperCase();
   return (
     <header className="shadow-md sticky top-0 z-50 bg-bg-primary dark:bg-bg-primary-dark border-b border-border-default dark:border-border-default-dark transition-colors duration-300">
       <div className="mx-auto px-4 md:px-2 py-3 lg:py-4 flex items-center justify-between">
@@ -281,19 +301,14 @@ const HeaderShared = ({ onLogout }) => {
 
         </div>
 
-        {/* ClientId with Theme Toggle - Click to change theme */}
         <button
-          onClick={toggleTheme}
-          className="flex items-center gap-2 text-2xl lg:text-3xl font-serif italic text-action-primary hover:text-action-primary-hover transition-colors duration-300 group"
-          title={darkMode ? 'Switch to light mode' : 'Switch to dark mode'}
-        >
-          <span>{(clientId || 'APP').toUpperCase()}</span>
-          {/* {darkMode ? (
-            <Sun size={24} className="text-yellow-400 group-hover:rotate-180 transition-transform duration-500" />
-          ) : (
-            <Moon size={24} className="text-action-primary group-hover:-rotate-12 transition-transform duration-300" />
-          )} */}
-        </button>
+    onClick={() => handleNavigate('home')}
+    className="text-2xl lg:text-3xl font-serif italic text-action-primary hover:text-action-primary-hover transition-colors duration-300"
+  >
+    <span className="text-action-primary">
+      {displayLabel}
+    </span>
+  </button>
 
         <div className="hidden lg:flex items-center space-x-8 text-text-primary">
           <NavLink id="users">Users</NavLink>
