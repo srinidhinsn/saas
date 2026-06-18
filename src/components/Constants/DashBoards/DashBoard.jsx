@@ -16,6 +16,7 @@ import axios from 'axios';
 import resolveConfig from "tailwindcss/resolveConfig";
 import tailwindConfig from "../../../../tailwind.config";
 import { menuCache } from '../../utils/Menu-utils/menuCache';
+import { getMenuConfig } from '../../utils/menuConfigResolver';
 
 const fullConfig = resolveConfig(tailwindConfig);
 const ACTION_PRIMARY = fullConfig.theme.colors.action?.primary || "#f97316";
@@ -464,6 +465,7 @@ const DashBoardPage = () => {
 
   // Takeaway table IDs (loaded once)
   const [takeawayTableIds, setTakeawayTableIds] = useState(new Set());
+  const { takeawayTableRoot } = getMenuConfig(clientId);
 
   const getStartDate = (filter) => {
     const now = new Date();
@@ -486,7 +488,7 @@ const DashBoardPage = () => {
 
     menuCache.fetchTables(clientId, token).then(data => {
       setTablesData(data);
-      const takeawayRoots = (import.meta.env.VITE_EASYFOOD_TAKEAWAY_TABLE_DEFAULT_ROOT || 'takeaway')
+      const takeawayRoots = String(takeawayTableRoot || 'takeaway')
         .split(',').map(v => v.trim().toLowerCase()).filter(Boolean);
       const ids = new Set(
         data.list
