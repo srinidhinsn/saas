@@ -1573,26 +1573,31 @@ const TakeOrder = ({ clientId, token, onOrderUpdate, realm }) => {
   const fetchZoneConfig = async () => {
   const { sections: allSections } = await menuCache.fetchTablesConfig(clientId, token);
 
-  const takeawayRoots = (import.meta.env.VITE_EASYFOOD_TAKEAWAY_TABLE_DEFAULT_ROOT || '')
-    .split(',').map(v => v.trim().toLowerCase()).filter(Boolean);
+  const takeawayRoots =
+        (import.meta.env.VITE_EASYFOOD_TAKEAWAY_TABLE_DEFAULT_ROOT || '')
+          .split(',')
+          .map(v => v.trim().toLowerCase())
+          .filter(Boolean);
 
-  const dineInSections = takeawayRoots.length > 0
-    ? allSections.filter(s =>
-        !takeawayRoots.some(root =>
-          (s.zone || '').toLowerCase().startsWith(root) ||
-          (s.section || '').toLowerCase().startsWith(root)
-        )
+  // Dine-in sections — exclude anything that matches takeaway roots
+      const dineInSections = takeawayRoots.length > 0
+        ? allSections.filter(s =>
+          !takeawayRoots.some(root =>
+            (s.zone || '').toLowerCase().startsWith(root) ||
+            (s.section || '').toLowerCase().startsWith(root)
+          )
       )
     : allSections;
 
-  const takeawaySectionsFiltered = takeawayRoots.length > 0
-    ? allSections.filter(s =>
-        takeawayRoots.some(root =>
-          (s.zone || '').toLowerCase().startsWith(root) ||
-          (s.section || '').toLowerCase().startsWith(root)
-        )
+  // Takeaway sections — only those matching takeaway roots
+      const takeawaySectionsFiltered = takeawayRoots.length > 0
+        ? allSections.filter(s =>
+          takeawayRoots.some(root =>
+            (s.zone || '').toLowerCase().startsWith(root) ||
+            (s.section || '').toLowerCase().startsWith(root)
+          )
       )
-    : [];
+      : [];
 
   setSections(dineInSections);
   setTakeawaySections(takeawaySectionsFiltered);

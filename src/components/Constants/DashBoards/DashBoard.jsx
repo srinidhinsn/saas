@@ -526,16 +526,18 @@ const DashBoardPage = () => {
           const isTakeaway = takeawayTableIds.has(String(order.table_id));
           const counts = isTakeaway ? takeawayCounts : dineinCounts;
           (order.items || []).forEach(item => {
-            const name = item.item_name || item.name || 'Unknown';
+            const name = item.item_name || item.name || "Unknown";
             const qty = parseInt(item.quantity, 10) || 1;
             counts[name] = (counts[name] || 0) + qty;
           });
         });
+
         const sortTop5 = (counts) =>
           Object.entries(counts)
             .map(([itemName, orders]) => ({ itemName, orders }))
             .sort((a, b) => b.orders - a.orders)
             .slice(0, 5);
+
         setTopDineinItems(sortTop5(dineinCounts));
         setTopTakeawayItems(sortTop5(takeawayCounts));
         const combined = {};
@@ -564,7 +566,8 @@ const DashBoardPage = () => {
           o.status?.toLowerCase() === 'cancelled' && new Date(o.created_at) >= startDate
         );
         setCancelledOrders(cancelledFiltered.sort((a, b) => new Date(b.created_at) - new Date(a.created_at)));
-
+        
+        // Ops stats split
         setDineinPending(dineinFiltered.filter(o => o.status === 'pending').length);
         setDineinPreparing(dineinFiltered.filter(o => o.status === 'preparing').length);
         setDineinServed(dineinFiltered.filter(o => o.status === 'served').length);
@@ -573,7 +576,10 @@ const DashBoardPage = () => {
         setTakeawayServed(takeawayFiltered.filter(o => o.status === 'served').length);
 
         const earnings = filteredInvoices
-          .filter(inv => inv.payment_status?.toLowerCase() === 'paid' || inv.status?.toLowerCase() === 'issued')
+          .filter(inv =>
+            inv.payment_status?.toLowerCase() === "paid" ||
+            inv.status?.toLowerCase() === "issued"
+          )
           .reduce((sum, inv) => sum + (parseFloat(inv.total_amount) || 0), 0);
 
         const dSales = dineinFiltered.reduce((s, o) => s + (parseFloat(o.total_price) || 0), 0);
@@ -583,11 +589,13 @@ const DashBoardPage = () => {
         setTakeawaySales(earnings * (1 - splitRatio));
 
         setTotalOrders(filteredOrders.length);
-        setPendingOrders(filteredOrders.filter(o => o.status === 'pending').length);
+        setPendingOrders(filteredOrders.filter(o => o.status === "pending").length);
         setTotalEarnings(Math.round(earnings));
-        setPreparingOrders(filteredOrders.filter(o => o.status === 'preparing').length);
-        setServedOrders(filteredOrders.filter(o => o.status === 'served').length);
-
+        setPreparingOrders(filteredOrders.filter(o => o.status === "preparing").length);
+        setServedOrders(filteredOrders.filter(o => o.status === "served").length);
+        
+        // ── 2-hour sales ──────────────────────────────────────────────────
+        // ── Timed sales ──────────────────────────────────────────────────
         const selectedTimeAgo = new Date(Date.now() - salesDuration * 60 * 60 * 1000);
         setTwoHrDineinSales(
           dineinFiltered.filter(o => new Date(o.created_at) >= selectedTimeAgo)
@@ -622,33 +630,42 @@ const DashBoardPage = () => {
         orders.forEach(order => {
           if (String(order.status || '').toLowerCase() === 'cancelled') {
             insights.push({
-              transaction_type: 'ORDER_CANCELLED',
-              movement_type: 'OUT',
+              transaction_type: "ORDER_CANCELLED",
+              movement_type: "OUT",
               quantity: order.total_price || 0,
-              unit: '₹',
+              unit: "₹",
               name: `Order #${order.dinein_order_id || order.id}`,
-              remarks: 'Customer cancelled order',
+              remarks: "Customer cancelled order",
               created_at: order.created_at,
             });
           }
           (order.items || []).forEach(item => {
-            if (String(item.status || '').toLowerCase() === 'cancelled') {
+            
+            if (
+              String(item.status || "").toLowerCase() === "cancelled"
+            ) {
               insights.push({
-                transaction_type: 'ITEM_CANCELLED',
-                movement_type: 'OUT',
+                transaction_type: "ITEM_CANCELLED",
+                movement_type: "OUT",
                 quantity: item.quantity || 0,
-                unit: 'qty',
+                unit: "qty",
                 name: item.item_name,
-                remarks: 'Item removed from order',
+                remarks: "Item removed from order",
                 created_at: order.created_at,
               });
             }
           });
         });
-        setInventoryInsights(insights.sort((a, b) => new Date(b.created_at) - new Date(a.created_at)));
+        
+        setInventoryInsights(
+          insights.sort(
+            (a, b) =>
+              new Date(b.created_at) - new Date(a.created_at)
+          )
+        );
 
       } catch (e) {
-        console.error('Dashboard fetch failed:', e);
+        console.error("Insights fetch failed:", e);
       } finally {
         setLoading(false);
       }
@@ -742,21 +759,21 @@ const DashBoardPage = () => {
     Daily: "today", Weekly: "this week", Monthly: "this month",
     Quarterly: "this quarter", "Half Yearly": "last 6 months", Yearly: "this year",
   }[timeFilter] || "";
-  // ── Cancellation insights ─────────────────────────────
-  const cancellationCount = cancelledOrders.length;
+// ── Cancellation insights ─────────────────────────────
+const cancellationCount = cancelledOrders.length;
 
-  const cancellationRate = totalOrders
-    ? ((cancellationCount / totalOrders) * 100).toFixed(1)
-    : 0;
+const cancellationRate = totalOrders
+  ? ((cancellationCount / totalOrders) * 100).toFixed(1)
+  : 0;
 
-  const cancellationLoss = cancelledOrders.reduce(
-    (sum, o) => sum + (parseFloat(o.total_price) || 0),
-    0
-  );
+const cancellationLoss = cancelledOrders.reduce(
+  (sum, o) => sum + (parseFloat(o.total_price) || 0),
+  0
+);
 
-  const latestCancellation =
-    cancelledOrders[0]?.dinein_order_id ||
-    cancelledOrders[0]?.id;
+const latestCancellation =
+  cancelledOrders[0]?.dinein_order_id ||
+  cancelledOrders[0]?.id;
   return (
     <>
       <style>{`
@@ -1180,7 +1197,7 @@ const DashBoardPage = () => {
               {/* 2-hour sales snapshot */}
               <TwoHrSalesCard dineinSales={twoHrDineinSales} takeawaySales={twoHrTakeawaySales} salesDuration={salesDuration}
                 setSalesDuration={setSalesDuration} />
-
+                
             </div>
           </section>
 
