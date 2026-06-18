@@ -813,8 +813,7 @@ const KitchenDisplay = ({clientId, token}) => {
     fetchOrders();
     const interval = setInterval(fetchOrders, KDS_CONFIG.POLL_INTERVAL_MS);
     return () => clearInterval(interval);
-  }, [fetchOrders]); // fetchOrders is now stable so this effect fires exactly once
-
+  }, [fetchOrders]);
 
   // ─── Item status change ───────────────────────────────────────────────────────
 

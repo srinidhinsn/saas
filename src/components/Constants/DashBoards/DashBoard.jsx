@@ -597,38 +597,67 @@ const DashBoardPage = () => {
         // ── 2-hour sales ──────────────────────────────────────────────────
         // ── Timed sales ──────────────────────────────────────────────────
         const selectedTimeAgo = new Date(Date.now() - salesDuration * 60 * 60 * 1000);
-        setTwoHrDineinSales(
-          dineinFiltered.filter(o => new Date(o.created_at) >= selectedTimeAgo)
-            .reduce((s, o) => s + (parseFloat(o.total_price) || 0), 0)
-        );
-        setTwoHrTakeawaySales(
-          takeawayFiltered.filter(o => new Date(o.created_at) >= selectedTimeAgo)
-            .reduce((s, o) => s + (parseFloat(o.total_price) || 0), 0)
-        );
+        const twoHrDinein = dineinFiltered
+          .filter(o => new Date(o.created_at) >= selectedTimeAgo)
+          .reduce((s, o) => s + (parseFloat(o.total_price) || 0), 0);
 
-        const groups = {};
-        filteredOrders.forEach(order => {
-          const d = new Date(order.created_at);
-          let key = '';
-          if (timeFilter === 'Daily') {
-            const hh = String(d.getHours()).padStart(2, '0');
-            const mm = String(d.getMinutes()).padStart(2, '0');
-            key = `${hh}:${mm}`;
+        const twoHrTakeaway = takeawayFiltered
+          .filter(o => new Date(o.created_at) >= selectedTimeAgo)
+          .reduce((s, o) => s + (parseFloat(o.total_price) || 0), 0);
+
+        setTwoHrDineinSales(twoHrDinein);
+        setTwoHrTakeawaySales(twoHrTakeaway);
+
+        // ── Build chart groups ────────────────────────────────────────────
+
+      const groups = {};
+
+      filteredOrders.forEach(order => {
+
+      const d = new Date(order.created_at);
+
+      let key = "";
+      if (timeFilter === "Daily") {
+
+         const hh = String(d.getHours()).padStart(2, "0");
+         const mm = String(d.getMinutes()).padStart(2, "0");
+         key = `${hh}:${mm}`;
+        }
+      if (!groups[key]) {
+         groups[key] = {
+             date: key,
+             sales: 0,
+             count: 0,
+             dinein: 0,
+             takeaway: 0,
+             sortTime: d.getTime(),
+            };
           }
-          if (!groups[key]) groups[key] = { date: key, sales: 0, count: 0, dinein: 0, takeaway: 0, sortTime: d.getTime() };
           groups[key].sales += parseFloat(order.total_price) || 0;
-          groups[key].count += 1;
-          if (isTakeaway(order)) groups[key].takeaway += 1;
-          else groups[key].dinein += 1;
-        });
-        const sorted = Object.values(groups).sort((a, b) => a.sortTime - b.sortTime);
-        setChartData(sorted);
-        setSplitChartData(sorted);
+        groups[key].count += 1;
+
+      if (isTakeaway(order)) {
+        groups[key].takeaway += 1;
+      } else {
+        groups[key].dinein += 1;
+      }
+    });
+
+// proper sorting
+    const sorted = Object.values(groups).sort(
+      (a, b) => a.sortTime - b.sortTime);
+
+    setChartData(sorted);
+    setSplitChartData(sorted);
 
         // ── Transactions/insights (was useEffect 4) ──
         const insights = [];
         orders.forEach(order => {
-          if (String(order.status || '').toLowerCase() === 'cancelled') {
+          
+          // cancelled orders
+          if (
+            String(order.status || "").toLowerCase() === "cancelled"
+          ) {
             insights.push({
               transaction_type: "ORDER_CANCELLED",
               movement_type: "OUT",
@@ -640,7 +669,7 @@ const DashBoardPage = () => {
             });
           }
           (order.items || []).forEach(item => {
-            
+
             if (
               String(item.status || "").toLowerCase() === "cancelled"
             ) {
@@ -654,23 +683,25 @@ const DashBoardPage = () => {
                 created_at: order.created_at,
               });
             }
+
           });
+
         });
-        
+
         setInventoryInsights(
           insights.sort(
             (a, b) =>
               new Date(b.created_at) - new Date(a.created_at)
           )
         );
-
+ 
       } catch (e) {
         console.error("Insights fetch failed:", e);
       } finally {
         setLoading(false);
       }
     };
-
+ 
     run();
   }, [clientId, token, takeawayTableIds]);
 
