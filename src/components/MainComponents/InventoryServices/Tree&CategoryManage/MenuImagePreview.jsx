@@ -1,6 +1,29 @@
 import { useEffect,useRef,useState } from "react";
 import axios from "axios";
 
+const IMAGE_CACHE_VERSION = 1;
+const IMAGE_TTL_MS = 30 * 60 * 1000;
+
+const imageCache = {
+  key: (clientId, imageId) => `img_v${IMAGE_CACHE_VERSION}_${clientId}_${imageId}`,
+  get(clientId, imageId) {
+    try {
+      const raw = localStorage.getItem(this.key(clientId, imageId));
+      if (!raw) return null;
+      const entry = JSON.parse(raw);
+      if (Date.now() - entry.ts > IMAGE_TTL_MS) { this.remove(clientId, imageId); return null; }
+      return entry.data;
+    } catch { return null; }
+  },
+  set(clientId, imageId, base64) {
+    try {
+      localStorage.setItem(this.key(clientId, imageId), JSON.stringify({ ts: Date.now(), data: base64 }));
+    } catch (e) { console.warn('[imageCache] write failed:', e?.name); }
+  },
+  remove(clientId, imageId) {
+    try { localStorage.removeItem(this.key(clientId, imageId)); } catch { }
+  },
+};
 const MenuImagePreview = ({ clientId, imageId, token, alt = "Item image", baseUrl, urlBuilder, className = "" }) => {
   const [imageSrc, setImageSrc] = useState(null);
   const [loading, setLoading] = useState(true);
@@ -16,7 +39,12 @@ const MenuImagePreview = ({ clientId, imageId, token, alt = "Item image", baseUr
       setError(true);
       return;
     }
-
+    const cached = imageCache.get(clientId, imageId);
+    if (cached) {
+      setImageSrc(cached);
+      setLoading(false);
+      return;
+    }
     const fetchImage = async () => {
       try {
         setLoading(true);
@@ -29,9 +57,14 @@ const MenuImagePreview = ({ clientId, imageId, token, alt = "Item image", baseUr
           responseType: 'blob'
         });
 
-        const imageObjectUrl = URL.createObjectURL(response.data);
-        setImageSrc(imageObjectUrl);
-        setLoading(false);
+        const reader = new FileReader();
+reader.onloadend = () => {
+  const base64 = reader.result;
+  imageCache.set(clientId, imageId, base64);
+  setImageSrc(base64);
+  setLoading(false);
+};
+reader.readAsDataURL(response.data);
       } catch (err) {
         console.error('Error loading image:', err);
         setError(true);
@@ -41,11 +74,11 @@ const MenuImagePreview = ({ clientId, imageId, token, alt = "Item image", baseUr
 
     fetchImage();
 
-    return () => {
-      if (imageSrc) {
-        URL.revokeObjectURL(imageSrc);
-      }
-    };
+    // return () => {
+    //   if (imageSrc) {
+    //     URL.revokeObjectURL(imageSrc);
+    //   }
+    // };
   }, [imageId, clientId, token]);
 
   if (loading) {
