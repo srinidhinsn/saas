@@ -1,4 +1,4 @@
-import React, { useEffect, useState, useMemo } from 'react';
+import React, { useEffect, useState, useMemo, useRef } from 'react';
 import { RiMoneyRupeeCircleLine } from "react-icons/ri";
 import { FaHamburger } from "react-icons/fa";
 import { PiHamburgerThin } from "react-icons/pi";
@@ -15,6 +15,7 @@ import { useParams } from 'react-router-dom';
 import axios from 'axios';
 import resolveConfig from "tailwindcss/resolveConfig";
 import tailwindConfig from "../../../../tailwind.config";
+import { menuCache } from '../../utils/Menu-utils/menuCache';
 
 const fullConfig = resolveConfig(tailwindConfig);
 const ACTION_PRIMARY = fullConfig.theme.colors.action?.primary || "#f97316";
@@ -442,6 +443,11 @@ const DashBoardPage = () => {
   const [topDineinItems, setTopDineinItems] = useState([]);
   const [topTakeawayItems, setTopTakeawayItems] = useState([]);
 
+  const hasFetchedTablesRef = useRef(false);
+  const hasFetchedOrdersRef = useRef(false);
+  const [allOrders, setAllOrders] = useState([]);
+  const [tablesData, setTablesData] = useState({ list: [], map: {} });
+
   // Timed sales
   const [salesDuration, setSalesDuration] = useState(2);
 
@@ -453,8 +459,8 @@ const DashBoardPage = () => {
 
   // Cancellations & transactions
   const [cancelledOrders, setCancelledOrders] = useState([]);
-  const [inventoryInsights, setInventoryInsights] = useState([]); const [loadingTx, setLoadingTx] = useState(false);
-  const [txTab, setTxTab] = useState("cancellations"); // "cancellations" | "transactions"
+  const [inventoryInsights, setInventoryInsights] = useState([]); 
+  const [loading, setLoading] = useState(true);
 
   // Takeaway table IDs (loaded once)
   const [takeawayTableIds, setTakeawayTableIds] = useState(new Set());
@@ -475,76 +481,27 @@ const DashBoardPage = () => {
   // ── Fetch takeaway table IDs ──────────────────────────────────────────────
   useEffect(() => {
     if (!clientId || !token) return;
-    const run = async () => {
-      try {
-        const res = await axios.get(
-          `${import.meta.env.VITE_API_TABLE_SERVICE_URL}/${clientId}/tables/read`,
-          { headers: { Authorization: `Bearer ${token}` } }
-        );
-        const takeawayRoots = (import.meta.env.VITE_EASYFOOD_TAKEAWAY_TABLE_DEFAULT_ROOT || "takeaway")
-          .split(",").map(v => v.trim().toLowerCase()).filter(Boolean);
-        const ids = new Set(
-          (res.data?.data || [])
-            .filter(t => takeawayRoots.some(r => (t.name || "").toLowerCase().startsWith(r)))
-            .map(t => String(t.id))
-        );
-        setTakeawayTableIds(ids);
-      } catch (e) {
-        console.error("Table fetch failed:", e);
-      }
-    };
-    run();
+    if (hasFetchedTablesRef.current) return;
+    hasFetchedTablesRef.current = true;
+
+    menuCache.fetchTables(clientId, token).then(data => {
+      setTablesData(data);
+      const takeawayRoots = (import.meta.env.VITE_EASYFOOD_TAKEAWAY_TABLE_DEFAULT_ROOT || 'takeaway')
+        .split(',').map(v => v.trim().toLowerCase()).filter(Boolean);
+      const ids = new Set(
+        data.list
+          .filter(t => takeawayRoots.some(r => (t.name || '').toLowerCase().startsWith(r)))
+          .map(t => String(t.id))
+      );
+      setTakeawayTableIds(ids);
+    });
   }, [clientId, token]);
 
-  // ── Fetch top ordered items (split dine-in / takeaway) ───────────────────
   useEffect(() => {
-    if (!clientId) return;
-    const run = async () => {
-      try {
-        const res = await axios.get(
-          `${import.meta.env.VITE_API_ORDER_SERVICE_URL}/${clientId}/dinein/table`,
-          { headers: { Authorization: `Bearer ${token}` } }
-        );
-        const allOrders = res.data?.data || [];
-        const dineinCounts = {};
-        const takeawayCounts = {};
+    if (!clientId || !token || takeawayTableIds.size === 0) return;
+    if (hasFetchedOrdersRef.current) return;
+    hasFetchedOrdersRef.current = true;
 
-        allOrders.forEach(order => {
-          const isTakeaway = takeawayTableIds.has(String(order.table_id));
-          const counts = isTakeaway ? takeawayCounts : dineinCounts;
-          (order.items || []).forEach(item => {
-            const name = item.item_name || item.name || item.itemName || "Unknown";
-            const qty = parseInt(item.quantity, 10) || 1;
-            counts[name] = (counts[name] || 0) + qty;
-          });
-        });
-
-        const sortTop5 = (counts) =>
-          Object.entries(counts)
-            .map(([itemName, orders]) => ({ itemName, orders }))
-            .sort((a, b) => b.orders - a.orders)
-            .slice(0, 5);
-
-        setTopDineinItems(sortTop5(dineinCounts));
-        setTopTakeawayItems(sortTop5(takeawayCounts));
-
-        // combined for existing topItemsData
-        const combined = {};
-        [...Object.entries(dineinCounts), ...Object.entries(takeawayCounts)].forEach(([k, v]) => {
-          combined[k] = (combined[k] || 0) + v;
-        });
-        setTopItemsData(sortTop5(combined));
-      } catch (e) {
-        console.error("Top items fetch failed:", e);
-      }
-    };
-    run();
-    // eslint-disable-next-line react-hooks/exhaustive-deps
-  }, [clientId, takeawayTableIds]);
-
-  // ── Fetch stats + chart data ──────────────────────────────────────────────
-  useEffect(() => {
-    if (!token || !clientId) return;
     const run = async () => {
       try {
         const [ordersRes, billingRes] = await Promise.all([
@@ -554,20 +511,46 @@ const DashBoardPage = () => {
           ),
           axios.get(
             `${import.meta.env.VITE_API_BILLING_SERVICE_URL}/${clientId}/invoice/read_document`,
-            { headers: { Authorization: `Bearer ${token}` }, params: { client_id: clientId } }
+            { headers: { Authorization: `Bearer ${token}`, params: { client_id: clientId } } }
           ),
         ]);
 
-        const allOrders = ordersRes.data?.data || [];
+        const orders = ordersRes.data?.data || [];
         const allInvoices = billingRes.data?.data || [];
-        const startDate = getStartDate(timeFilter);
+        setAllOrders(orders);
 
-        const filteredOrders = allOrders.filter(o => new Date(o.created_at) >= startDate);
+        // ── Top items (was useEffect 2) ──
+        const dineinCounts = {};
+        const takeawayCounts = {};
+        orders.forEach(order => {
+          const isTakeaway = takeawayTableIds.has(String(order.table_id));
+          const counts = isTakeaway ? takeawayCounts : dineinCounts;
+          (order.items || []).forEach(item => {
+            const name = item.item_name || item.name || 'Unknown';
+            const qty = parseInt(item.quantity, 10) || 1;
+            counts[name] = (counts[name] || 0) + qty;
+          });
+        });
+        const sortTop5 = (counts) =>
+          Object.entries(counts)
+            .map(([itemName, orders]) => ({ itemName, orders }))
+            .sort((a, b) => b.orders - a.orders)
+            .slice(0, 5);
+        setTopDineinItems(sortTop5(dineinCounts));
+        setTopTakeawayItems(sortTop5(takeawayCounts));
+        const combined = {};
+        [...Object.entries(dineinCounts), ...Object.entries(takeawayCounts)].forEach(([k, v]) => {
+          combined[k] = (combined[k] || 0) + v;
+        });
+        setTopItemsData(sortTop5(combined));
+
+        // ── Stats + chart (was useEffect 3) ──
+        const startDate = getStartDate(timeFilter);
+        const filteredOrders = orders.filter(o => new Date(o.created_at) >= startDate);
         const filteredInvoices = allInvoices.filter(inv =>
           new Date(inv.document_date || inv.created_at) >= startDate
         );
 
-        // ── Split dine-in vs takeaway ──────────────────────────────────────
         const isDinein = (o) => !takeawayTableIds.has(String(o.table_id));
         const isTakeaway = (o) => takeawayTableIds.has(String(o.table_id));
 
@@ -577,30 +560,22 @@ const DashBoardPage = () => {
         setDineinOrders(dineinFiltered.length);
         setTakeawayOrders(takeawayFiltered.length);
 
-        // Cancelled orders for records section
-        const cancelledFiltered = allOrders.filter(o =>
-          o.status?.toLowerCase() === "cancelled" &&
-          new Date(o.created_at) >= startDate
+        const cancelledFiltered = orders.filter(o =>
+          o.status?.toLowerCase() === 'cancelled' && new Date(o.created_at) >= startDate
         );
         setCancelledOrders(cancelledFiltered.sort((a, b) => new Date(b.created_at) - new Date(a.created_at)));
 
-        // Ops stats split
-        setDineinPending(dineinFiltered.filter(o => o.status === "pending").length);
-        setDineinPreparing(dineinFiltered.filter(o => o.status === "preparing").length);
-        setDineinServed(dineinFiltered.filter(o => o.status === "served").length);
-        setTakeawayPending(takeawayFiltered.filter(o => o.status === "pending").length);
-        setTakeawayPreparing(takeawayFiltered.filter(o => o.status === "preparing").length);
-        setTakeawayServed(takeawayFiltered.filter(o => o.status === "served").length);
+        setDineinPending(dineinFiltered.filter(o => o.status === 'pending').length);
+        setDineinPreparing(dineinFiltered.filter(o => o.status === 'preparing').length);
+        setDineinServed(dineinFiltered.filter(o => o.status === 'served').length);
+        setTakeawayPending(takeawayFiltered.filter(o => o.status === 'pending').length);
+        setTakeawayPreparing(takeawayFiltered.filter(o => o.status === 'preparing').length);
+        setTakeawayServed(takeawayFiltered.filter(o => o.status === 'served').length);
 
-        // Sales from invoices
         const earnings = filteredInvoices
-          .filter(inv =>
-            inv.payment_status?.toLowerCase() === "paid" ||
-            inv.status?.toLowerCase() === "issued"
-          )
+          .filter(inv => inv.payment_status?.toLowerCase() === 'paid' || inv.status?.toLowerCase() === 'issued')
           .reduce((sum, inv) => sum + (parseFloat(inv.total_amount) || 0), 0);
 
-        // Approximate split by summing order total_price
         const dSales = dineinFiltered.reduce((s, o) => s + (parseFloat(o.total_price) || 0), 0);
         const tSales = takeawayFiltered.reduce((s, o) => s + (parseFloat(o.total_price) || 0), 0);
         const splitRatio = (dSales + tSales) > 0 ? dSales / (dSales + tSales) : 0.5;
@@ -608,151 +583,140 @@ const DashBoardPage = () => {
         setTakeawaySales(earnings * (1 - splitRatio));
 
         setTotalOrders(filteredOrders.length);
-        setPendingOrders(filteredOrders.filter(o => o.status === "pending").length);
+        setPendingOrders(filteredOrders.filter(o => o.status === 'pending').length);
         setTotalEarnings(Math.round(earnings));
-        setPreparingOrders(filteredOrders.filter(o => o.status === "preparing").length);
-        setServedOrders(filteredOrders.filter(o => o.status === "served").length);
+        setPreparingOrders(filteredOrders.filter(o => o.status === 'preparing').length);
+        setServedOrders(filteredOrders.filter(o => o.status === 'served').length);
 
-        // ── 2-hour sales ──────────────────────────────────────────────────
-        // ── Timed sales ──────────────────────────────────────────────────
         const selectedTimeAgo = new Date(Date.now() - salesDuration * 60 * 60 * 1000);
-
-        const twoHrDinein = dineinFiltered
-          .filter(o => new Date(o.created_at) >= selectedTimeAgo)
-          .reduce((s, o) => s + (parseFloat(o.total_price) || 0), 0);
-
-        const twoHrTakeaway = takeawayFiltered
-          .filter(o => new Date(o.created_at) >= selectedTimeAgo)
-          .reduce((s, o) => s + (parseFloat(o.total_price) || 0), 0);
-
-        setTwoHrDineinSales(twoHrDinein);
-        setTwoHrTakeawaySales(twoHrTakeaway);
-
-        // ── Build chart groups ────────────────────────────────────────────
-
-      const groups = {};
-
-      filteredOrders.forEach(order => {
-
-      const d = new Date(order.created_at);
-
-      let key = "";
-      if (timeFilter === "Daily") {
-
-         const hh = String(d.getHours()).padStart(2, "0");
-         const mm = String(d.getMinutes()).padStart(2, "0");
-         key = `${hh}:${mm}`;
-        }
-      if (!groups[key]) {
-         groups[key] = {
-             date: key,
-             sales: 0,
-             count: 0,
-             dinein: 0,
-             takeaway: 0,
-             sortTime: d.getTime(),
-            };
-          }
-
-        groups[key].sales += parseFloat(order.total_price) || 0;
-        groups[key].count += 1;
-
-      if (isTakeaway(order)) {
-        groups[key].takeaway += 1;
-      } else {
-        groups[key].dinein += 1;
-      }
-    });
-
-// proper sorting
-    const sorted = Object.values(groups).sort(
-      (a, b) => a.sortTime - b.sortTime);
-
-    setChartData(sorted);
-    setSplitChartData(sorted);
-  } catch (e) {console.error("Stats fetch failed:", e);
-      }
-    };
-    run();
-  }, [clientId, timeFilter, token, takeawayTableIds, salesDuration]);
-
-  // ── Fetch transactions ────────────────────────────────────────────────────
-  useEffect(() => {
-    if (!clientId || !token) return;
-  
-    const run = async () => {
-      setLoadingTx(true);
-  
-      try {
-  
-        const res = await axios.get(
-          `${import.meta.env.VITE_API_ORDER_SERVICE_URL}/${clientId}/dinein/table`,
-          {
-            headers: {
-              Authorization: `Bearer ${token}`
-            }
-          }
+        setTwoHrDineinSales(
+          dineinFiltered.filter(o => new Date(o.created_at) >= selectedTimeAgo)
+            .reduce((s, o) => s + (parseFloat(o.total_price) || 0), 0)
         );
-  
-        const orders = res.data?.data || [];
-  
+        setTwoHrTakeawaySales(
+          takeawayFiltered.filter(o => new Date(o.created_at) >= selectedTimeAgo)
+            .reduce((s, o) => s + (parseFloat(o.total_price) || 0), 0)
+        );
+
+        const groups = {};
+        filteredOrders.forEach(order => {
+          const d = new Date(order.created_at);
+          let key = '';
+          if (timeFilter === 'Daily') {
+            const hh = String(d.getHours()).padStart(2, '0');
+            const mm = String(d.getMinutes()).padStart(2, '0');
+            key = `${hh}:${mm}`;
+          }
+          if (!groups[key]) groups[key] = { date: key, sales: 0, count: 0, dinein: 0, takeaway: 0, sortTime: d.getTime() };
+          groups[key].sales += parseFloat(order.total_price) || 0;
+          groups[key].count += 1;
+          if (isTakeaway(order)) groups[key].takeaway += 1;
+          else groups[key].dinein += 1;
+        });
+        const sorted = Object.values(groups).sort((a, b) => a.sortTime - b.sortTime);
+        setChartData(sorted);
+        setSplitChartData(sorted);
+
+        // ── Transactions/insights (was useEffect 4) ──
         const insights = [];
-  
         orders.forEach(order => {
-  
-          // cancelled orders
-          if (
-            String(order.status || "").toLowerCase() === "cancelled"
-          ) {
+          if (String(order.status || '').toLowerCase() === 'cancelled') {
             insights.push({
-              transaction_type: "ORDER_CANCELLED",
-              movement_type: "OUT",
+              transaction_type: 'ORDER_CANCELLED',
+              movement_type: 'OUT',
               quantity: order.total_price || 0,
-              unit: "₹",
+              unit: '₹',
               name: `Order #${order.dinein_order_id || order.id}`,
-              remarks: "Customer cancelled order",
+              remarks: 'Customer cancelled order',
               created_at: order.created_at,
             });
           }
-  
-          // cancelled items
           (order.items || []).forEach(item => {
-  
-            if (
-              String(item.status || "").toLowerCase() === "cancelled"
-            ) {
+            if (String(item.status || '').toLowerCase() === 'cancelled') {
               insights.push({
-                transaction_type: "ITEM_CANCELLED",
-                movement_type: "OUT",
+                transaction_type: 'ITEM_CANCELLED',
+                movement_type: 'OUT',
                 quantity: item.quantity || 0,
-                unit: "qty",
+                unit: 'qty',
                 name: item.item_name,
-                remarks: "Item removed from order",
+                remarks: 'Item removed from order',
                 created_at: order.created_at,
               });
             }
-  
           });
-  
         });
-  
-        setInventoryInsights(
-          insights.sort(
-            (a, b) =>
-              new Date(b.created_at) - new Date(a.created_at)
-          )
-        );
-  
+        setInventoryInsights(insights.sort((a, b) => new Date(b.created_at) - new Date(a.created_at)));
+
       } catch (e) {
-        console.error("Insights fetch failed:", e);
+        console.error('Dashboard fetch failed:', e);
       } finally {
-        setLoadingTx(false);
+        setLoading(false);
       }
     };
-  
+
     run();
-  
-  }, [clientId, token]);
+  }, [clientId, token, takeawayTableIds]);
+
+  useEffect(() => {
+    if (!allOrders.length || !takeawayTableIds) return;
+
+    const startDate = getStartDate(timeFilter);
+    const filteredOrders = allOrders.filter(o => new Date(o.created_at) >= startDate);
+
+    const isDinein = (o) => !takeawayTableIds.has(String(o.table_id));
+    const isTakeaway = (o) => takeawayTableIds.has(String(o.table_id));
+
+    const dineinFiltered = filteredOrders.filter(isDinein);
+    const takeawayFiltered = filteredOrders.filter(isTakeaway);
+
+    setDineinOrders(dineinFiltered.length);
+    setTakeawayOrders(takeawayFiltered.length);
+    setTotalOrders(filteredOrders.length);
+    setPendingOrders(filteredOrders.filter(o => o.status === 'pending').length);
+    setPreparingOrders(filteredOrders.filter(o => o.status === 'preparing').length);
+    setServedOrders(filteredOrders.filter(o => o.status === 'served').length);
+    setDineinPending(dineinFiltered.filter(o => o.status === 'pending').length);
+    setDineinPreparing(dineinFiltered.filter(o => o.status === 'preparing').length);
+    setDineinServed(dineinFiltered.filter(o => o.status === 'served').length);
+    setTakeawayPending(takeawayFiltered.filter(o => o.status === 'pending').length);
+    setTakeawayPreparing(takeawayFiltered.filter(o => o.status === 'preparing').length);
+    setTakeawayServed(takeawayFiltered.filter(o => o.status === 'served').length);
+
+    const selectedTimeAgo = new Date(Date.now() - salesDuration * 60 * 60 * 1000);
+    setTwoHrDineinSales(
+      dineinFiltered.filter(o => new Date(o.created_at) >= selectedTimeAgo)
+        .reduce((s, o) => s + (parseFloat(o.total_price) || 0), 0)
+    );
+    setTwoHrTakeawaySales(
+      takeawayFiltered.filter(o => new Date(o.created_at) >= selectedTimeAgo)
+        .reduce((s, o) => s + (parseFloat(o.total_price) || 0), 0)
+    );
+
+    const cancelledFiltered = allOrders.filter(o =>
+      o.status?.toLowerCase() === 'cancelled' && new Date(o.created_at) >= startDate
+    );
+    setCancelledOrders(cancelledFiltered.sort((a, b) => new Date(b.created_at) - new Date(a.created_at)));
+
+    const groups = {};
+    filteredOrders.forEach(order => {
+      const d = new Date(order.created_at);
+      let key = '';
+      if (timeFilter === 'Daily') {
+        const hh = String(d.getHours()).padStart(2, '0');
+        const mm = String(d.getMinutes()).padStart(2, '0');
+        key = `${hh}:${mm}`;
+      }
+      if (!groups[key]) groups[key] = { date: key, sales: 0, count: 0, dinein: 0, takeaway: 0, sortTime: d.getTime() };
+      groups[key].sales += parseFloat(order.total_price) || 0;
+      groups[key].count += 1;
+      if (isTakeaway(order)) groups[key].takeaway += 1;
+      else groups[key].dinein += 1;
+    });
+    const sorted = Object.values(groups).sort((a, b) => a.sortTime - b.sortTime);
+    setChartData(sorted);
+    setSplitChartData(sorted);
+
+  }, [allOrders, timeFilter, salesDuration, takeawayTableIds]);
 
   // ── Derived ──────────────────────────────────────────────────────────────
   const totalActive = preparingOrders + pendingOrders + servedOrders || 1;
@@ -778,21 +742,21 @@ const DashBoardPage = () => {
     Daily: "today", Weekly: "this week", Monthly: "this month",
     Quarterly: "this quarter", "Half Yearly": "last 6 months", Yearly: "this year",
   }[timeFilter] || "";
-// ── Cancellation insights ─────────────────────────────
-const cancellationCount = cancelledOrders.length;
+  // ── Cancellation insights ─────────────────────────────
+  const cancellationCount = cancelledOrders.length;
 
-const cancellationRate = totalOrders
-  ? ((cancellationCount / totalOrders) * 100).toFixed(1)
-  : 0;
+  const cancellationRate = totalOrders
+    ? ((cancellationCount / totalOrders) * 100).toFixed(1)
+    : 0;
 
-const cancellationLoss = cancelledOrders.reduce(
-  (sum, o) => sum + (parseFloat(o.total_price) || 0),
-  0
-);
+  const cancellationLoss = cancelledOrders.reduce(
+    (sum, o) => sum + (parseFloat(o.total_price) || 0),
+    0
+  );
 
-const latestCancellation =
-  cancelledOrders[0]?.dinein_order_id ||
-  cancelledOrders[0]?.id;
+  const latestCancellation =
+    cancelledOrders[0]?.dinein_order_id ||
+    cancelledOrders[0]?.id;
   return (
     <>
       <style>{`
@@ -1216,7 +1180,7 @@ const latestCancellation =
               {/* 2-hour sales snapshot */}
               <TwoHrSalesCard dineinSales={twoHrDineinSales} takeawaySales={twoHrTakeawaySales} salesDuration={salesDuration}
                 setSalesDuration={setSalesDuration} />
-                
+
             </div>
           </section>
 

@@ -531,7 +531,7 @@ const KitchenCard = ({
               </div>
 
               {/* Combo components list — unchanged */}
-              {combo && <ComboComponentsList menuRecord={menuRecord} menuItemsMap={menuItemsMap} parentQuantity={item.quantity ?? 1} />}
+              {combo && <ComboComponentsList menuRecord={menuRecord} menuItemsMap={menuItemsMap} parentQuantity={item.quantity ?? 1}  />}
 
               {/* Addon rows — identified by "addon_" prefix on frontend_unique_key */}
               {/* Addon rows */}
@@ -593,7 +593,7 @@ const KitchenCard = ({
 
 // ─── Main KitchenDisplay component ────────────────────────────────────────────
 
-const KitchenDisplay = ({ clientId, token }) => {
+const KitchenDisplay = ({clientId, token}) => {
   const [cards, setCards] = useState([]);
   const [tablesMap, setTablesMap] = useState({});
   const [menuItemsMap, setMenuItemsMap] = useState({});
@@ -632,49 +632,11 @@ const KitchenDisplay = ({ clientId, token }) => {
     hasFetchedStaticRef.current = true;
 
     const fetchStaticData = async () => {
-      // ── Tables ──
-      const cachedTables = menuCache.get('kds_tablesMap', clientId);
-      if (cachedTables) {
-        setTablesMap(cachedTables);
-      } else {
-        try {
-          const res = await axios.get(
-            `${import.meta.env.VITE_API_TABLE_SERVICE_URL}/${clientId}/tables/read`,
-            { headers: { Authorization: `Bearer ${token}` } }
-          );
-          const map = {};
-          (res.data?.data || []).forEach((t) => (map[t.id] = t.name));
-          setTablesMap(map);
-          menuCache.set('kds_tablesMap', clientId, map);
-        } catch {
-          toast.error('Failed to fetch tables');
-        }
-      }
+      const { map: tablesMap } = await menuCache.fetchTables(clientId, token);
+      setTablesMap(tablesMap);
 
-      // ── Menu items ──
-      const cachedMenu = menuCache.get('kds_menuMap', clientId);
-      if (cachedMenu) {
-        setMenuItemsMap(cachedMenu);
-      } else {
-        try {
-          const res = await axios.get(
-            `${import.meta.env.VITE_API_INVENTORY_SERVICE_URL}/${clientId}/menu/read`,
-            {
-              headers: { Authorization: `Bearer ${token}` },
-              params: { inventory_id: 'menu' },
-            }
-          );
-          const map = {};
-          (res.data?.data || []).forEach((item) => {
-            map[Number(item.id)] = item;
-            map[String(item.id)] = item;
-          });
-          setMenuItemsMap(map);
-          menuCache.set('kds_menuMap', clientId, map);
-        } catch {
-          toast.error('Failed to fetch menu items');
-        }
-      }
+      const { map: menuMap } = await menuCache.fetchMenuItems(clientId, token);
+      setMenuItemsMap(menuMap);
     };
 
     fetchStaticData();
@@ -850,12 +812,7 @@ const KitchenDisplay = ({ clientId, token }) => {
 
     fetchOrders();
     const interval = setInterval(fetchOrders, KDS_CONFIG.POLL_INTERVAL_MS);
-    return () => {
-      clearInterval(interval);
-      // ── FIX 2: do NOT reset hasFetchedOrdersRef here.
-      //    Resetting it caused Strict Mode's unmount+remount to trigger a second
-      //    fetch. The ref stays true for the lifetime of the component.
-    };
+    return () => clearInterval(interval);
   }, [fetchOrders]); // fetchOrders is now stable so this effect fires exactly once
 
 
@@ -933,7 +890,7 @@ const KitchenDisplay = ({ clientId, token }) => {
       setCards((prev) =>
         prev.map((c) => {
           if (c.card_id !== cardId) return c;
-          const rolledBackItems = c.items.map((i) =>
+          const rolledBackItems  = c.items.map((i) =>
             String(i.id) === String(itemId) ? { ...i, status: previousStatus } : i
           );
           return { ...c, items: rolledBackItems, status: deriveStatus(rolledBackItems) };
@@ -972,8 +929,8 @@ const KitchenDisplay = ({ clientId, token }) => {
                   key={key}
                   onClick={() => setOrderFilter(key)}
                   className={`flex items-center gap-2 px-4 py-2 rounded-lg font-medium text-sm transition-all ${orderFilter === key
-                    ? 'bg-action-primary text-text-white shadow-sm'
-                    : 'bg-bg-tertiary text-text-secondary hover:text-text-primary border border-border-default'
+                     ? 'bg-action-primary text-text-white shadow-sm'
+                     : 'bg-bg-tertiary text-text-secondary hover:text-text-primary border border-border-default'
                     }`}
                 >
                   <Icon size={16} />
