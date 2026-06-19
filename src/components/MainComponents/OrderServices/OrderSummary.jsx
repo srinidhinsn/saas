@@ -458,6 +458,7 @@ const OrderSummaryVisible = ({ clientId, token }) => {
   const hasFetchedStaticRef = useRef(false);
   const hasFetchedOrdersRef = useRef(false);
   const inventoryMapRef = useRef({});
+  const tablesMapRef = useRef({});
 
   // ── Data ──────────────────────────────────────────────────────────────────
   const [orders, setOrders] = useState([]);
@@ -503,6 +504,10 @@ const OrderSummaryVisible = ({ clientId, token }) => {
  // ─────────────────────────────────────────────────────────────────────────
  // localStorage helpers (preserved exactly from original)
  // ─────────────────────────────────────────────────────────────────────────
+
+ useEffect(() => {
+  tablesMapRef.current = tablesMap;
+}, [tablesMap]);
 
   const generateSlug = name => name.toLowerCase().replace(/[\s]+/g, '-');
 
@@ -691,7 +696,7 @@ const OrderSummaryVisible = ({ clientId, token }) => {
       clearNewItemsStorage(order.id);
       return {
         ...order,
-        _fixedOrderMode: order._fixedOrderMode ?? getInitialOrderMode(order, tablesMap),
+        _fixedOrderMode: order._fixedOrderMode ?? getInitialOrderMode(order, tablesMapRef.current),
       };
     }
 
@@ -834,7 +839,7 @@ const OrderSummaryVisible = ({ clientId, token }) => {
 
     return {
       ...order,
-      _fixedOrderMode: order._fixedOrderMode ?? getInitialOrderMode(order, tablesMap),
+      _fixedOrderMode: order._fixedOrderMode ?? getInitialOrderMode(order, tablesMapRef.current),
       items: deduped.map(normaliseItem),
       has_new_items: batchItemsMap.size > 0,
     };
