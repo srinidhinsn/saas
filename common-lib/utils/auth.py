@@ -16,7 +16,7 @@ load_dotenv()
 TIMEZONE = os.getenv("TIMEZONE", "UTC")
 SECRET_KEY = "nsn"
 ALGORITHM = "HS256"
-ACCESS_TOKEN_EXPIRE_MINUTES = 3
+ACCESS_TOKEN_EXPIRE_MINUTES = 30
 REFRESH_TOKEN_EXPIRE_DAYS = 7
 pwd_context = CryptContext(schemes=["bcrypt"], deprecated="auto")
 
