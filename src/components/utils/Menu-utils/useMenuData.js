@@ -1,14 +1,7 @@
 import { useState, useEffect, useCallback } from 'react';
 import axios from 'axios';
 import { menuCache } from './menuCache';        
-import {
-  flattenCategoryTree,
-  normalizeFlatCategories,
-  buildCategoryTree,
-  findCategoryNode,
-  getCategoriesAtLevel,
-  parseTimingString,
-} from './menuUtils';
+import {flattenCategoryTree,normalizeFlatCategories,buildCategoryTree,findCategoryNode,getCategoriesAtLevel,parseTimingString,} from './menuUtils';
 
 // ─────────────────────────────────────────────────────────────────────────────
 // useDietaryTypes
