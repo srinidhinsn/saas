@@ -70,6 +70,15 @@ export default function UserProfile({ clientId, token,realm , screenIds }) {
   const [showOld, setShowOld] = useState(false);
   const [savedSections, setSavedSections] = useState({ personal: false, address: false, security: false });
   const [savedAddresses, setSavedAddresses] = useState([]);
+  function getRoleFromToken(token) {
+    try {
+      const payload = JSON.parse(atob(token.split(".")[1]));
+      return payload.roles || payload.role || "";
+    } catch {
+      return "";
+    }
+  }
+  const [userRole, setUserRole] = useState(() => getRoleFromToken(token));
   useEffect(() => {
     const fetchProfile = async () => {
       if (!clientId || !token) { setFetchingProfile(false); return; }
@@ -183,7 +192,25 @@ export default function UserProfile({ clientId, token,realm , screenIds }) {
     } catch (e) { toast.error(e?.response?.data?.detail || "Failed to reset"); }
     finally { setPasswordLoading(false); }
   };
-
+  const handleSetPrimary = async (addressId) => {
+    try {
+      await axios.post(
+        `${import.meta.env.VITE_API_USER_SERVICE_URL}/${clientId}/users/address/${addressId}/set-primary`,
+        {},
+        { headers: { Authorization: `Bearer ${token}` } }
+      );
+      setSavedAddresses(prev => {
+        const reordered = [...prev];
+        const idx = reordered.findIndex(a => a.id === addressId);
+        const [selected] = reordered.splice(idx, 1);
+        reordered.unshift(selected);
+        return reordered;
+      });
+      toast.success("Primary address updated!");
+    } catch (e) {
+      toast.error("Failed to set primary address");
+    }
+  };
   const initials = `${profileForm.first_name?.charAt(0) || ""}${profileForm.last_name?.charAt(0) || ""}`.toUpperCase();
   const fullName = `${profileForm.first_name} ${profileForm.last_name}`.trim();
   const pwMatch = passwordForm.new_password && passwordForm.confirm_password && passwordForm.new_password === passwordForm.confirm_password;
@@ -252,9 +279,12 @@ export default function UserProfile({ clientId, token,realm , screenIds }) {
                 </div>
                 <p className="text-[15px] font-bold text-zinc-800 leading-tight">{fullName || "Your Name"}</p>
                 <p className="text-[11px] text-zinc-400 mt-0.5 break-all leading-relaxed">{profileForm.email || "your@email.com"}</p>
-                <span className="inline-flex items-center gap-1.5 mt-2.5 text-[10px] font-bold uppercase tracking-wider bg-emerald-50 text-emerald-600 border border-emerald-100 rounded-full px-2.5 py-0.5">
-                  <span className="w-1.5 h-1.5 rounded-full bg-emerald-500 inline-block animate-pulse" />Admin
-                </span>
+          {userRole && (
+             <span className="inline-flex items-center gap-1.5 mt-2.5 text-[10px] font-bold uppercase tracking-wider bg-emerald-50 text-emerald-600 border border-emerald-100 rounded-full px-2.5 py-0.5">
+                    <span className="w-1.5 h-1.5 rounded-full bg-emerald-500 inline-block animate-pulse" />
+                  {userRole}
+             </span>
+          )}
               </div>
             </div>
 
@@ -354,8 +384,8 @@ export default function UserProfile({ clientId, token,realm , screenIds }) {
                   <div className="sm:col-span-2">
                   <div className="flex flex-wrap gap-2 mb-5">
 
-{savedAddresses.map((addr) => (
-
+{savedAddresses.map((addr,index) => (
+       <div key={addr.id} className="flex items-center gap-1">
   <button
     key={addr.id}
     type="button"
@@ -366,10 +396,20 @@ export default function UserProfile({ clientId, token,realm , screenIds }) {
         : "bg-white border-zinc-200 hover:border-orange-300"
       }`}
   >
-    {addr.name}
+      {index === 0 && (
+        <span className={`text-[10px] font-bold px-1.5 py-0.5 rounded-full
+          ${addressForm.id === addr.id? "bg-white/20 text-white border border-white/30": "bg-orange-50 text-orange-400 border border-orange-200"}`}>
+          ★ Primary
+        </span>)}
+      {addr.name}
   </button>
 
-))}
+  {addressForm.id === addr.id && index !== 0 && (
+      <button type="button" onClick={() => handleSetPrimary(addr.id)}
+        className="px-3 py-2 rounded-xl text-xs border border-dashed border-orange-300 text-orange-500 hover:bg-orange-50 transition-all">
+  ↑ Set as Primary
+      </button>)}
+  </div>))}
 
 <button
   type="button"

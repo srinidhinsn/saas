@@ -1586,6 +1586,46 @@ const TakeOrder = ({ clientId, token, onOrderUpdate, realm }) => {
     zoneConfigId,
     includeAllRaw: true,
   });
+  // const fetchZoneConfig = async () => {
+  //   try {
+  //     const res = await axios.get(
+  //       `${import.meta.env.VITE_API_TABLE_SERVICE_URL}/${clientId}/tables/config`,
+  //       { headers: { Authorization: `Bearer ${token}` } }
+  //     );
+
+  //     const takeawayRoots =
+  //       (import.meta.env.VITE_EASYFOOD_TAKEAWAY_TABLE_DEFAULT_ROOT || '')
+  //         .split(',')
+  //         .map(v => v.trim().toLowerCase())
+  //         .filter(Boolean);
+
+  //     const allSections = res.data || [];
+
+  //     // Dine-in sections — exclude anything that matches takeaway roots
+  //     const dineInSections = takeawayRoots.length > 0
+  //       ? allSections.filter(s =>
+  //         !takeawayRoots.some(root =>
+  //           (s.zone || '').toLowerCase().startsWith(root) ||
+  //           (s.section || '').toLowerCase().startsWith(root)
+  //         )
+  //       )
+  //       : allSections;
+
+  //     // Takeaway sections — only those matching takeaway roots
+  //     const takeawaySectionsFiltered = takeawayRoots.length > 0
+  //       ? allSections.filter(s =>
+  //         takeawayRoots.some(root =>
+  //           (s.zone || '').toLowerCase().startsWith(root) ||
+  //           (s.section || '').toLowerCase().startsWith(root)
+  //         )
+  //       )
+  //       : [];
+
+  //     setTakeawaySections(takeawaySectionsFiltered);
+  //   } catch (err) {
+  //     console.error('Zone config fetch failed', err);
+  //   }
+  // };
 
   // ─────────────────────────────────────────────────────────────────────────
   // Draft helpers
@@ -1595,10 +1635,31 @@ const TakeOrder = ({ clientId, token, onOrderUpdate, realm }) => {
     token,
   });
   
-  const {sections,takeawaySections,zones,} = useZoneConfig({clientId,token,takeawayRootEnv:import.meta.env.VITE_TAKEAWAY_TABLE_DEFAULT_ROOT,});
+  const {
+    sections,
+    takeawaySections,
+    zones,
+  } = useZoneConfig({
+    clientId,
+    token,
+    takeawayRootEnv:
+      import.meta.env.VITE_TAKEAWAY_TABLE_DEFAULT_ROOT,
+  });
   
-  const {dietaryOptions,dietaryColorMap,} = useDietaryTypes({clientId,token,});
-  const {timingOptions,} = useTimings({clientId,token,});
+  const {
+    dietaryOptions,
+    dietaryColorMap,
+  } = useDietaryTypes({
+    clientId,
+    token,
+  });
+  
+  const {
+    timingOptions,
+  } = useTimings({
+    clientId,
+    token,
+  });
   const handleSaveDraft = useCallback(async () => {
     if (!selectedTable || cart.length === 0) {
       toast.warn('Nothing to save — cart is empty.');
@@ -1788,7 +1849,7 @@ const TakeOrder = ({ clientId, token, onOrderUpdate, realm }) => {
   // REMOVE the old fetchTables and REPLACE WITH:
   const fetchTables = async () => {
     const takeawayRoots =
-      (import.meta.env.VITE_EASYFOOD_TAKEAWAY_TABLE_DEFAULT_ROOT || '')
+      (import.meta.env.VITE_TAKEAWAY_TABLE_DEFAULT_ROOT || '')
         .split(',')
         .map(v => v.trim().toLowerCase());
   
