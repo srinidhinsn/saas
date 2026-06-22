@@ -5,7 +5,7 @@ import { toast } from 'react-toastify';
 import 'react-toastify/dist/ReactToastify.css';
 import { FaCheckCircle, FaClock, FaHourglassHalf, FaConciergeBell } from 'react-icons/fa';
 import { Filter, Clock, Users, Package, Truck, Trash2, BarChart2, X, ChevronRight } from 'lucide-react';
-
+import { menuCache } from '../../utils/Menu-utils/menuCache';
 // ─── Constants ─────────────────────────────────────────────────────────────────
 
 
@@ -609,6 +609,13 @@ const KitchenDisplay = ({clientId, token}) => {
   //    overwrites an optimistic update that hasn't reached the backend yet.
   const inflightUpdatesRef = useRef(0);
 
+  // ── FIX 2: stable refs for clientId and token so fetchOrders never needs
+  //    them in its useCallback dep array, preventing interval resets on re-render.
+  const clientIdRef = useRef(clientId);
+  const tokenRef = useRef(token);
+  useEffect(() => { clientIdRef.current = clientId; }, [clientId]);
+  useEffect(() => { tokenRef.current = token; }, [token]);
+
   const [showDeleteOrderModal, setShowDeleteOrderModal] = useState(false);
   const [cardToDelete, setCardToDelete] = useState(null);
 
@@ -617,69 +624,22 @@ const KitchenDisplay = ({clientId, token}) => {
   const [itemToDelete, setItemToDelete] = useState(null);  // { cardId, item }
 
 
-  // ─── Fetch tables ────────────────────────────────────────────────────────────
+  const hasFetchedStaticRef = useRef(false);
 
   useEffect(() => {
     if (!token || !clientId) return;
-    axios
-      .get(`${import.meta.env.VITE_API_TABLE_SERVICE_URL}/${clientId}/tables/read`, {
-        headers: { Authorization: `Bearer ${token}` },
-      })
-      .then((res) => {
-        const map = {};
-        (res.data?.data || []).forEach((t) => (map[t.id] = t.name));
-        setTablesMap(map);
-      })
-      .catch(() => toast.error('Failed to fetch tables'));
-  }, [clientId, token]);
+    if (hasFetchedStaticRef.current) return;
+    hasFetchedStaticRef.current = true;
 
+    const fetchStaticData = async () => {
+      const { map: tablesMap } = await menuCache.fetchTables(clientId, token);
+      setTablesMap(tablesMap);
 
-  // ─── Fetch inventory ─────────────────────────────────────────────────────────
+      const { map: menuMap } = await menuCache.fetchMenuItems(clientId, token);
+      setMenuItemsMap(menuMap);
+    };
 
-  useEffect(() => {
-    if (!token || !clientId) return;
-    axios
-      .get(`${import.meta.env.VITE_API_INVENTORY_SERVICE_URL}/${clientId}/inventory/read`, {
-        headers: { Authorization: `Bearer ${token}` },
-      })
-      .then((res) => {
-        const map = {};
-        (res.data?.data || []).forEach((item) => {
-          map[Number(item.id)] = item;
-          map[String(item.id)] = item;
-        });
-        setMenuItemsMap(map);
-      })
-      .catch(() => toast.error('Failed to fetch inventory'));
-  }, [clientId, token]);
-
-
-  // ─── Parse /dinein/table merged response into per-sub-order cards ─────────────
-  //
-  // Backend _merge_group() returns one merged entry per table group with:
-  //   item.batch_label  = the sub-order's dinein_order_id ("1001" or "1001-2")
-  //   item.sub_order_id = the DB pk of that sub-order row
-  //   sub_orders[]      = [{id, dinein_order_id, created_at, status, total_price}, ...]
-  //
-  // We split merged items back into individual per-sub-order cards for the KDS.
-  useEffect(() => {
-    if (!token || !clientId) return;
-    axios
-      .get(`${import.meta.env.VITE_API_INVENTORY_SERVICE_URL}/${clientId}/menu/read`, {
-        headers: { Authorization: `Bearer ${token}` },
-        params: { inventory_id: 'menu' },
-      })
-      .then((res) => {
-        const map = {};
-        (res.data?.data || []).forEach((item) => {
-          map[Number(item.id)] = item;
-          map[String(item.id)] = item;
-        });
-        setMenuItemsMap((prev) => ({ ...prev, ...map }));
-      })
-      .catch(() => {
-        // Silent — inventory/read fallback is sufficient
-      });
+    fetchStaticData();
   }, [clientId, token]);
 
   // ─── Parse merged orders into per-sub-order cards ─────────────────────────
@@ -733,8 +693,13 @@ const KitchenDisplay = ({clientId, token}) => {
 
 
   // ─── Fetch & poll orders ──────────────────────────────────────────────────────
+  // ── FIX 2: empty dep array — fetchOrders is stable forever.
+  //    clientId and token are read from refs so they're always current.
 
   const fetchOrders = useCallback(async () => {
+    const clientId = clientIdRef.current;
+    const token = tokenRef.current;
+
     if (!token || !clientId) {
       setLoading(false);
       return;
@@ -836,14 +801,19 @@ const KitchenDisplay = ({clientId, token}) => {
     } finally {
       setLoading(false);
     }
-  }, [clientId, token]);
+  }, []); // ── FIX 2: empty deps — stable forever, reads clientId/token from refs
+
+  const hasFetchedOrdersRef = useRef(false);
 
   useEffect(() => {
+    if (!clientId || !token) return;
+    if (hasFetchedOrdersRef.current) return;
+    hasFetchedOrdersRef.current = true;
+
     fetchOrders();
     const interval = setInterval(fetchOrders, KDS_CONFIG.POLL_INTERVAL_MS);
     return () => clearInterval(interval);
   }, [fetchOrders]);
-
 
   // ─── Item status change ───────────────────────────────────────────────────────
 
@@ -884,7 +854,7 @@ const KitchenDisplay = ({clientId, token}) => {
         slug: targetItem.slug || '',
         unit_price: targetItem.unit_price || 0,
         line_total: (targetItem.unit_price || 0) * (targetItem.quantity || 1),
-        client_id: clientId,
+        client_id: clientIdRef.current,
         order_id: card.sub_order_id,
         frontend_unique_key: targetItem.frontend_unique_key || null,
         is_addon: false,
@@ -892,15 +862,15 @@ const KitchenDisplay = ({clientId, token}) => {
       }];
 
       await axios.post(
-        `${import.meta.env.VITE_API_ORDER_SERVICE_URL}/${clientId}/order_items/update?order_id=${card.sub_order_id}`,
+        `${import.meta.env.VITE_API_ORDER_SERVICE_URL}/${clientIdRef.current}/order_items/update?order_id=${card.sub_order_id}`,
         singleItemPayload,
-        { headers: { Authorization: `Bearer ${token}` } }
+        { headers: { Authorization: `Bearer ${tokenRef.current}` } }
       );
 
       await axios.post(
-        `${import.meta.env.VITE_API_ORDER_SERVICE_URL}/${clientId}/dinein/update`,
+        `${import.meta.env.VITE_API_ORDER_SERVICE_URL}/${clientIdRef.current}/dinein/update`,
         { id: card.sub_order_id, status: derivedStatus },
-        { headers: { Authorization: `Bearer ${token}` } }
+        { headers: { Authorization: `Bearer ${tokenRef.current}` } }
       );
 
       if (derivedStatus === KDS_CONFIG.STATUS.READY && card.status !== KDS_CONFIG.STATUS.READY) {

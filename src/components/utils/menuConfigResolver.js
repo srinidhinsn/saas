@@ -44,6 +44,11 @@ export function getMenuConfig(clientId) {
     import.meta.env.VITE_INVENTORY_CATEGORY_ROOT ??
     "inventory";
 
+  const takeawayTableRoot =
+    import.meta.env[`VITE_${prefix}_TAKEAWAY_TABLE_DEFAULT_ROOT`] ??
+    import.meta.env.VITE_TAKEAWAY_TABLE_DEFAULT_ROOT ??
+    "takeaway";
+
 
   return {
     root,
@@ -51,6 +56,7 @@ export function getMenuConfig(clientId) {
     menuInventoryId,
     inventoryCategoryRoot,
     addons,
+    takeawayTableRoot,
   };
 }
 
