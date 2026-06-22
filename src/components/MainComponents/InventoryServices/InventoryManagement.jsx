@@ -76,6 +76,7 @@ export default function StockRecipeManager({ clientId: propClientId, token: prop
   const [searchQuery, setSearchQuery] = useState("");
   const [categoryFilter, setCategoryFilter] = useState("All");
   const [lowStockOnly, setLowStockOnly] = useState(false);
+  const [stockSortBy, setStockSortBy] = useState("name_asc");
 
   // Recipe
   const [menuItems, setMenuItems] = useState([]);
@@ -814,6 +815,8 @@ export default function StockRecipeManager({ clientId: propClientId, token: prop
                 loading={loading}
                 searchQuery={searchQuery}
                 onSearchChange={setSearchQuery}
+                sortBy={stockSortBy}
+                onSortChange={setStockSortBy}
                 onAddNew={() => openStockModal(null, activeTab)}
                 onEdit={openStockModal}
                 onDelete={deleteStock}
@@ -832,6 +835,8 @@ export default function StockRecipeManager({ clientId: propClientId, token: prop
                 onUpdateAvailability={updateMenuAvailability}
                 allCategories={allCategories}
                 units={units}
+                searchQuery={menuSearchQuery}
+                onSearchChange={setMenuSearchQuery}
               />
             )}
 
@@ -1005,6 +1010,8 @@ function InventoryCategoryTab({
   loading,
   searchQuery,
   onSearchChange,
+  sortBy,
+  onSortChange,
   onAddNew,
   onEdit,
   onDelete,
@@ -1018,6 +1025,33 @@ function InventoryCategoryTab({
     const category = allCategories.find(cat => cat.id === categoryId);
     return category?.name || categoryId;
   };
+
+  const sortedStocks = useMemo(() => {
+  const sorted = [...stocks];
+  switch (sortBy) {
+    case "name_asc":
+      sorted.sort((a, b) => (a.name || "").localeCompare(b.name || ""));
+      break;
+    case "name_desc":
+      sorted.sort((a, b) => (b.name || "").localeCompare(a.name || ""));
+      break;
+    case "availability_asc":
+      sorted.sort((a, b) => Number(a.effectiveAvailability || 0) - Number(b.effectiveAvailability || 0));
+      break;
+    case "availability_desc":
+      sorted.sort((a, b) => Number(b.effectiveAvailability || 0) - Number(a.effectiveAvailability || 0));
+      break;
+    case "price_asc":
+      sorted.sort((a, b) => Number(a.unit_price || 0) - Number(b.unit_price || 0));
+      break;
+    case "price_desc":
+      sorted.sort((a, b) => Number(b.unit_price || 0) - Number(a.unit_price || 0));
+      break;
+    default:
+      break;
+  }
+  return sorted;
+}, [stocks, sortBy]);
 
   if (!category) return null;
 
@@ -1039,6 +1073,18 @@ function InventoryCategoryTab({
             onChange={(e) => onSearchChange(e.target.value)}
           />
         </div>
+        <select
+          value={sortBy}
+          onChange={(e) => onSortChange(e.target.value)}
+          className="ml-4 px-4 py-3 text-base border border-purple-300 rounded-lg focus:ring-2 focus:ring-white focus:border-white bg-white"
+        >
+          <option value="name_asc">Name (A–Z)</option>
+          <option value="name_desc">Name (Z–A)</option>
+          <option value="availability_asc">Availability (Low–High)</option>
+          <option value="availability_desc">Availability (High–Low)</option>
+          <option value="price_asc">Price (Low–High)</option>
+          <option value="price_desc">Price (High–Low)</option>
+        </select>
         <button
           onClick={onAddNew}
           className="ml-4 px-6 py-3 bg-action-primary border border-black-600 hover:bg-action-primary  text-text-white rounded-lg text-base font-semibold transition-colors"
@@ -1064,14 +1110,14 @@ function InventoryCategoryTab({
               <tr>
                 <td colSpan={6} className="px-6 py-12 text-center text-gray-500 text-base">Loading...</td>
               </tr>
-            ) : stocks.length === 0 ? (
+            ) : sortedStocks.length === 0 ? (
               <tr>
                 <td colSpan={6} className="px-6 py-12 text-center text-gray-500 text-base">
                   No stock items found. Click "Add Stock" to create one.
                 </td>
               </tr>
             ) : (
-              stocks.map((item) => (
+              sortedStocks.map((item) => (
                 <tr key={item.id} className="hover:bg-gray-50 transition-colors">
                   <td className="px-6 py-4 whitespace-nowrap">
                     <div className="font-semibold text-gray-900 text-base">{item.name}</div>
@@ -1298,7 +1344,7 @@ function RecipeTab({
   );
 }
 
-function MenuAvailabilityTab({ menuItems, loading, onUpdateAvailability, allCategories, units }) {
+function MenuAvailabilityTab({ menuItems, loading, onUpdateAvailability, allCategories, units, searchQuery, onSearchChange }) {
   const [editingItem, setEditingItem] = useState(null);
   const [editForm, setEditForm] = useState({ availability: "", unit: "" });
 
@@ -1328,17 +1374,81 @@ function MenuAvailabilityTab({ menuItems, loading, onUpdateAvailability, allCate
     return category?.name || categoryId;
   };
 
+  const [sortBy, setSortBy] = useState("name_asc");
+
+  const filteredItems = useMemo(() => {
+    let result = menuItems;
+
+    if (searchQuery) {
+      const q = searchQuery.toLowerCase();
+      result = result.filter((item) =>
+        `${item.name} ${item.description || ""} ${getCategoryName(item.category_id)}`
+          .toLowerCase()
+          .includes(q)
+      );
+    }
+
+    const sorted = [...result];
+    switch (sortBy) {
+      case "name_asc":
+        sorted.sort((a, b) => (a.name || "").localeCompare(b.name || ""));
+        break;
+      case "name_desc":
+        sorted.sort((a, b) => (b.name || "").localeCompare(a.name || ""));
+        break;
+      case "availability_asc":
+        sorted.sort((a, b) => Number(a.availability || 0) - Number(b.availability || 0));
+        break;
+      case "availability_desc":
+        sorted.sort((a, b) => Number(b.availability || 0) - Number(a.availability || 0));
+        break;
+      case "category_asc":
+        sorted.sort((a, b) => getCategoryName(a.category_id).localeCompare(getCategoryName(b.category_id)));
+        break;
+      default:
+        break;
+    }
+
+    return sorted;
+  }, [menuItems, searchQuery, sortBy, allCategories]);
+
   return (
     <div className="bg-bg-primary rounded-xl shadow border border-gray-100">
-      <div className="bg-action-primary p-5 border-b border-gray-100">
-        <h2 className="text-lg font-semibold text-text-white">Menu Availability</h2>
-        <p className="text-sm text-text-white mt-1">Manage availability and units for menu items</p>
+      <div className="bg-action-primary p-5 border-b border-gray-100 flex items-center justify-between gap-4 flex-wrap">
+        <div className="flex-1 min-w-[200px]">
+          <h2 className="text-lg font-semibold text-text-white">Menu Availability</h2>
+          <p className="text-sm text-text-white mt-1">Manage availability and units for menu items</p>
+        </div>
+
+        <div className="flex-1 max-w-md">
+          <input
+            type="text"
+            placeholder="Search menu items..."
+            className="w-full px-4 py-3 text-base border border-purple-300 rounded-lg focus:ring-2 focus:ring-white focus:border-white"
+            value={searchQuery}
+            onChange={(e) => onSearchChange(e.target.value)}
+          />
+        </div>
+
+        <select
+          value={sortBy}
+          onChange={(e) => setSortBy(e.target.value)}
+          className="px-4 py-3 text-base border border-purple-300 rounded-lg focus:ring-2 focus:ring-white focus:border-white bg-white"
+        >
+          <option value="name_asc">Name (A–Z)</option>
+          <option value="name_desc">Name (Z–A)</option>
+          <option value="availability_asc">Availability (Low–High)</option>
+          <option value="availability_desc">Availability (High–Low)</option>
+          <option value="category_asc">Category (A–Z)</option>
+        </select>
       </div>
 
       {loading ? (
         <div className="px-6 py-12 text-center text-gray-500">Loading menu items...</div>
-      ) : menuItems.length === 0 ? (
-        <div className="px-6 py-12 text-center text-gray-500">No menu items found</div>
+      ) : filteredItems.length === 0 ? (
+        <div className="px-6 py-12 text-center text-gray-500">
+          {searchQuery ? "No menu items match your search" : "No menu items found"}
+        </div>
       ) : (
         <div className="overflow-x-auto rounded-lg border-default border-border-default">
           <table className="w-full min-w-[700px] divide-y divide-gray-200">
@@ -1362,7 +1472,7 @@ function MenuAvailabilityTab({ menuItems, loading, onUpdateAvailability, allCate
               </tr>
             </thead>
             <tbody className="bg-bg-primary divide-y divide-gray-200">
-              {menuItems.map((item) => (
+              {filteredItems.map((item) => (
                 <tr key={item.id} className="hover:bg-gray-50 transition-colors">
                   <td className="px-6 py-4 whitespace-nowrap">
                     <div className="font-medium text-gray-900">{item.name}</div>

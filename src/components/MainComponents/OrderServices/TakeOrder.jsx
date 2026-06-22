@@ -11,7 +11,7 @@ import CategoryTree from '../InventoryServices/CategoryTree';
 import ImagePreview from '../../utils/ImagePreview';
 import InvoiceModal from '../BillingServices/InvoiceModal';
 import { getMenuConfig } from '../../utils/menuConfigResolver';
-
+import { menuCache } from '../../utils/Menu-utils/menuCache'; 
 // ─────────────────────────────────────────────────────────────────────────────
 // Constants
 // ─────────────────────────────────────────────────────────────────────────────
@@ -1564,25 +1564,20 @@ const TakeOrder = ({ clientId, token, onOrderUpdate, realm }) => {
   const [stockWarning, setStockWarning] = useState(null);
   const [timingOptions, setTimingOptions] = useState([]);
   const [showTakeawayOrdersModal, setShowTakeawayOrdersModal] = useState(false);
+  const hasFetchedRef = useRef(false);
   const menuConfig = useMemo(
     () => (clientId ? getMenuConfig(clientId) : null),
     [clientId]
   );
 
   const fetchZoneConfig = async () => {
-    try {
-      const res = await axios.get(
-        `${import.meta.env.VITE_API_TABLE_SERVICE_URL}/${clientId}/tables/config`,
-        { headers: { Authorization: `Bearer ${token}` } }
-      );
+  const { sections: allSections } = await menuCache.fetchTablesConfig(clientId, token);
 
       const takeawayRoots =
         (import.meta.env.VITE_EASYFOOD_TAKEAWAY_TABLE_DEFAULT_ROOT || '')
           .split(',')
           .map(v => v.trim().toLowerCase())
           .filter(Boolean);
-
-      const allSections = res.data || [];
 
       // Dine-in sections — exclude anything that matches takeaway roots
       const dineInSections = takeawayRoots.length > 0
@@ -1604,15 +1599,25 @@ const TakeOrder = ({ clientId, token, onOrderUpdate, realm }) => {
         )
         : [];
 
-      setSections(dineInSections);
-      setTakeawaySections(takeawaySectionsFiltered);
-    } catch (err) {
-      console.error('Zone config fetch failed', err);
-    }
-  };
+  setSections(dineInSections);
+  setTakeawaySections(takeawaySectionsFiltered);
+};
+
   const DIETARY_COLORS = ['bg-green-500', 'bg-red-500', 'bg-yellow-400', 'bg-orange-500', 'bg-purple-500', 'bg-blue-500'];
 
   const fetchDietaryTypes = async () => {
+    const cached = menuCache.get('dietaryTypes', clientId);
+    if (cached) {
+      // MenuManagement saves as a plain array — handle that
+      const opts = Array.isArray(cached) ? cached : cached.opts || [];
+      setDietaryOptions(opts);
+      const map = {};
+      opts.forEach((opt, idx) => {
+        map[opt.toLowerCase().replace(/[-_\s]/g, '')] = DIETARY_COLORS[idx % DIETARY_COLORS.length];
+      });
+      setDietaryColorMap(map);
+      return;
+    }
     try {
       const res = await axios.get(
         `${import.meta.env.VITE_API_INVENTORY_SERVICE_URL}/${clientId}/inventory/item-types`,
@@ -1625,11 +1630,15 @@ const TakeOrder = ({ clientId, token, onOrderUpdate, realm }) => {
         map[opt.toLowerCase().replace(/[-_\s]/g, '')] = DIETARY_COLORS[idx % DIETARY_COLORS.length];
       });
       setDietaryColorMap(map);
+      // Save as plain array to match MenuManagement's format
+      menuCache.set('dietaryTypes', clientId, opts);
     } catch (err) {
       console.error('Dietary fetch failed:', err);
     }
   };
   const fetchTimings = async () => {
+    const cached = menuCache.get('timings', clientId);
+    if (cached) { setTimingOptions(cached); return; }
     try {
       const res = await axios.get(
         `${import.meta.env.VITE_API_INVENTORY_SERVICE_URL}/${clientId}/inventory/item-types`,
@@ -1649,6 +1658,7 @@ const TakeOrder = ({ clientId, token, onOrderUpdate, realm }) => {
         };
       });
       setTimingOptions(parsed);
+      menuCache.set('timings', clientId, parsed);
     } catch (err) {
       console.error('Timing fetch failed:', err);
       setTimingOptions([]);
@@ -1856,6 +1866,8 @@ const TakeOrder = ({ clientId, token, onOrderUpdate, realm }) => {
   // ─────────────────────────────────────────────────────────────────────────
 
   const fetchCounterTree = async () => {
+    const cached = menuCache.get('counterTree', clientId);
+    if (cached) { setCounterTree(cached); return; }
     try {
       const res = await axios.get(
         `${import.meta.env.VITE_API_INVENTORY_SERVICE_URL}/${clientId}/menu/read_category`,
@@ -1864,7 +1876,9 @@ const TakeOrder = ({ clientId, token, onOrderUpdate, realm }) => {
           headers: { Authorization: `Bearer ${token}` },
         }
       );
-      setCounterTree(res.data.data?.[0]?.subCategories || []);
+      const tree = res.data.data?.[0]?.subCategories || [];
+      setCounterTree(tree);
+      menuCache.set('counterTree', clientId, tree);
     } catch (err) {
       console.error('Failed to fetch counter tree:', err);
     }
@@ -1955,11 +1969,26 @@ const TakeOrder = ({ clientId, token, onOrderUpdate, realm }) => {
   // ─────────────────────────────────────────────────────────────────────────
 
   useEffect(() => {
+    if (hasFetchedRef.current) return;
+    hasFetchedRef.current = true;
     const fetchData = async () => {
       if (!clientId || !token || !menuConfig) return;
       try {
         setLoading(true);
         await Promise.all([fetchTables(), fetchCounterTree(), fetchZoneConfig(), fetchDietaryTypes(), fetchTimings()]);
+        // ── Check cache for menu + categories ──────────────────────────
+        const menuCacheSlice = `menuData_zone_all`;
+        const cachedMenu = menuCache.get(menuCacheSlice, clientId);
+        if (cachedMenu) {
+          setCategoriesFlat(cachedMenu.categoriesFlat);
+          setMenuItems(cachedMenu.menuItems);
+          setCategories(cachedMenu.categoryTree);
+          setSidebarCategories(cachedMenu.categoryTree);
+          setDieterySubCategories(cachedMenu.dieterySubCategories);
+          setInventoryMap(cachedMenu.inventoryMap);
+          setLoading(false);
+          return;
+        }
 
         const [catRes, itemRes, invRes] = await Promise.all([
           axios.get(
@@ -1991,15 +2020,27 @@ const TakeOrder = ({ clientId, token, onOrderUpdate, realm }) => {
         fullTree.forEach(c => c.subCategories?.forEach(s => subIds.add(s.id)));
         const topLevel = fullTree.filter(c => !subIds.has(c.id));
         const flatCats = flattenCategoryTree(topLevel);
-        setCategoriesFlat(
-          flatCats.map(c => ({
-            id: c.id,
-            name: (c.name || '').trim(),
-            parentId: c.parentId ?? c.parent_id ?? null,
-          }))
-        );
+        const normalizedFlat = flatCats.map(c => ({
+          id: c.id,
+          name: (c.name || '').trim(),
+          parentId: c.parentId ?? c.parent_id ?? null,
+        }));
+        setCategoriesFlat(normalizedFlat);
 
-        const enrichedItems = itemRes.data.data.map(item => {
+        const seenInit = new Map();
+itemRes.data.data.forEach(item => {
+  const zid = item.zone_config_id === null || item.zone_config_id === undefined
+    ? 0
+    : Number(item.zone_config_id);
+
+  if (!seenInit.has(item.id)) {
+    seenInit.set(item.id, { ...item, zone_config_id: zid });
+  } else if (zid === 0) {
+    seenInit.set(item.id, { ...item, zone_config_id: 0 });
+  }
+});
+
+        const enrichedItems = Array.from(seenInit.values()).map(item => {
           const cat = flatCats.find(c => c.id === item.category_id);
           return { ...item, category_name: cat?.name || 'Uncategorized' };
         });
@@ -2042,6 +2083,14 @@ const TakeOrder = ({ clientId, token, onOrderUpdate, realm }) => {
           }
         }
         setDieterySubCategories(qc);
+        // ── Save to cache ───────────────────────────────────────────────
+        menuCache.set(menuCacheSlice, clientId, {
+          categoriesFlat: normalizedFlat,
+          menuItems: enrichedItems,
+          categoryTree,
+          dieterySubCategories: qc,
+          inventoryMap: iMap,
+        });
       } catch (err) {
         console.error('Fetch error:', err);
       } finally {
@@ -2056,6 +2105,13 @@ const TakeOrder = ({ clientId, token, onOrderUpdate, realm }) => {
     if (!zoneConfigId || !clientId || !token || !menuConfig) return;
 
     const refetchMenu = async () => {
+      // Check zone-specific cache first
+      const zoneSlice = `menuData_zone_${zoneConfigId}`;
+      const cached = menuCache.get(zoneSlice, clientId);
+      if (cached) {
+        setMenuItems(cached.menuItems);
+        return;
+      }
       try {
         const itemRes = await axios.get(
           `${import.meta.env.VITE_API_INVENTORY_SERVICE_URL}/${clientId}/menu/read`,
@@ -2084,6 +2140,8 @@ const TakeOrder = ({ clientId, token, onOrderUpdate, realm }) => {
         });
         enriched.sort((a, b) => (a.name || '').localeCompare(b.name || ''));
         setMenuItems(enriched);
+        // Save zone-specific cache
+        menuCache.set(zoneSlice, clientId, { menuItems: enriched });
       } catch (err) {
         console.error('Zone menu refetch failed:', err);
       }

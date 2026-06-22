@@ -4,9 +4,11 @@ import { useNavigate, useSearchParams } from "react-router-dom";
 import { toast } from "react-toastify";
 import InvoiceModal from './InvoiceModal';
 import { Search, Calendar, Eye } from 'lucide-react';
+import { menuCache } from '../../utils/Menu-utils/menuCache';
 
 export default function BillingPage({ clientId, token }) {
   const navigate = useNavigate();
+  const hasFetchedRef = useRef(false);
   const [searchParams] = useSearchParams();
 
   const [orders, setOrders] = useState([]);
@@ -28,26 +30,41 @@ export default function BillingPage({ clientId, token }) {
   const customToRef = useRef(null);
 
   useEffect(() => {
+    if (hasFetchedRef.current) return;
+    hasFetchedRef.current = true;
     async function fetchAll() {
       try {
         setLoading(true);
-        const [ordersRes, tablesRes, invRes, billingRes] = await Promise.all([
+
+        const cachedTables = menuCache.get('billing_tablesMap', clientId);
+        const cachedMenu = menuCache.get('billing_menuMap', clientId);
+
+        const [ordersRes, billingRes, tablesRes, invRes] = await Promise.all([
           axios.get(`${import.meta.env.VITE_API_ORDER_SERVICE_URL}/${clientId}/dinein/table`, { headers: { Authorization: `Bearer ${token}` } }),
-          axios.get(`${import.meta.env.VITE_API_TABLE_SERVICE_URL}/${clientId}/tables/read`, { headers: { Authorization: `Bearer ${token}` } }),
-          axios.get(`${import.meta.env.VITE_API_INVENTORY_SERVICE_URL}/${clientId}/inventory/read`, { headers: { Authorization: `Bearer ${token}` } }),
           axios.get(`${import.meta.env.VITE_API_BILLING_SERVICE_URL}/${clientId}/invoice/read_document`, { headers: { Authorization: `Bearer ${token}` } }),
+          cachedTables ? Promise.resolve(null) : axios.get(`${import.meta.env.VITE_API_TABLE_SERVICE_URL}/${clientId}/tables/read`, { headers: { Authorization: `Bearer ${token}` } }),
+          cachedMenu ? Promise.resolve(null) : axios.get(`${import.meta.env.VITE_API_INVENTORY_SERVICE_URL}/${clientId}/inventory/read`, { headers: { Authorization: `Bearer ${token}` } }),
         ]);
-        
-        const allOrders = ordersRes.data?.data || [];
-        setOrders(allOrders);
-        
-        const tMap = {};
-        (tablesRes.data?.data || []).forEach((t) => (tMap[t.id] = t));
-        setTablesMap(tMap);
-        
-        const iMap = {};
-        (invRes.data?.data || []).forEach((i) => (iMap[i.id] = i));
-        setInventoryMap(iMap);
+
+        setOrders(ordersRes.data?.data || []);
+
+        if (cachedTables) {
+          setTablesMap(cachedTables);
+        } else {
+          const tMap = {};
+          (tablesRes.data?.data || []).forEach((t) => (tMap[t.id] = t));
+          setTablesMap(tMap);
+          menuCache.set('billing_tablesMap', clientId, tMap);
+        }
+
+        if (cachedMenu) {
+          setInventoryMap(cachedMenu);
+        } else {
+          const iMap = {};
+          (invRes.data?.data || []).forEach((i) => (iMap[i.id] = i));
+          setInventoryMap(iMap);
+          menuCache.set('billing_menuMap', clientId, iMap);
+        }
 
         const bMap = {};
         (billingRes.data?.data || []).forEach((doc) => {
