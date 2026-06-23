@@ -8,7 +8,7 @@ import {
 import { toast } from "react-toastify";
 import "react-toastify/dist/ReactToastify.css";
 import axios from "axios";
-
+import { jwtDecode } from "jwt-decode";
 const inp =
   "w-full px-3.5 py-2.5 rounded-lg text-sm border border-zinc-200 bg-zinc-50 text-zinc-800 outline-none transition-all duration-150 focus:border-orange-400 focus:bg-white focus:ring-2 focus:ring-orange-400/10 placeholder:text-zinc-300 font-[inherit]";
 
@@ -70,15 +70,16 @@ export default function UserProfile({ clientId, token,realm , screenIds }) {
   const [showOld, setShowOld] = useState(false);
   const [savedSections, setSavedSections] = useState({ personal: false, address: false, security: false });
   const [savedAddresses, setSavedAddresses] = useState([]);
-  function getRoleFromToken(token) {
+  const [userRole, setUserRole] = useState("");
+
+  useEffect(() => {
     try {
-      const payload = JSON.parse(atob(token.split(".")[1]));
-      return payload.roles || payload.role || "";
+      const decoded = jwtDecode(token);
+      setUserRole(decoded?.roles || decoded?.role || "");
     } catch {
-      return "";
+      console.warn("JWT decode failed");
     }
-  }
-  const [userRole, setUserRole] = useState(() => getRoleFromToken(token));
+  }, [token]);
   useEffect(() => {
     const fetchProfile = async () => {
       if (!clientId || !token) { setFetchingProfile(false); return; }
