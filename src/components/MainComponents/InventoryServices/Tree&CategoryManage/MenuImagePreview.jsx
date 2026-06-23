@@ -1,11 +1,19 @@
 import { useEffect,useRef,useState } from "react";
 import axios from "axios";
 
-const IMAGE_CACHE_VERSION = 1;
 const IMAGE_TTL_MS = 30 * 60 * 1000;
-
+(function purgeOldVersionedKeys() {
+  try {
+    const toRemove = [];
+    for (let i = 0; i < localStorage.length; i++) {
+      const key = localStorage.key(i);
+      if (key?.startsWith('img_v')) toRemove.push(key);
+    }
+    toRemove.forEach(k => localStorage.removeItem(k));
+  } catch { }
+})();
 const imageCache = {
-  key: (clientId, imageId) => `img_v${IMAGE_CACHE_VERSION}_${clientId}_${imageId}`,
+  key: (clientId, imageId) => `img_${clientId}_${imageId}`,
   get(clientId, imageId) {
     try {
       const raw = localStorage.getItem(this.key(clientId, imageId));
@@ -96,5 +104,5 @@ reader.readAsDataURL(response.data);
   return <img src={imageSrc} alt={alt} className={className} />;
 };
 
-
+export { imageCache };
 export default MenuImagePreview
