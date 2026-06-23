@@ -1848,11 +1848,19 @@ const TakeOrder = ({ clientId, token, onOrderUpdate, realm }) => {
   };
 
   // REMOVE the old fetchTables and REPLACE WITH:
-  const fetchTables = async () => {
-    const takeawayRoots =
-      (import.meta.env.VITE_TAKEAWAY_TABLE_DEFAULT_ROOT || '')
-        .split(',')
-        .map(v => v.trim().toLowerCase());
+  const fetchTables = useCallback(async () => {
+    const prefix = String(clientId)
+    .trim().toLowerCase().split('/').pop()
+    .replace(/[^a-z0-9]/g, '_').toUpperCase();
+
+  const takeawayRoots = (
+    import.meta.env[`VITE_${prefix}_TAKEAWAY_TABLE_DEFAULT_ROOT`] ||
+    import.meta.env.VITE_TAKEAWAY_TABLE_DEFAULT_ROOT ||
+    ''
+  )
+    .split(',')
+    .map(v => v.trim().toLowerCase())
+    .filter(Boolean);
   
     const [tableRes, configRes] = await Promise.all([
       axios.get(
@@ -1898,7 +1906,7 @@ const TakeOrder = ({ clientId, token, onOrderUpdate, realm }) => {
     );
     setTables(list);
     await fetchTableOrders(list);
-  };
+  },[clientId,token])
 
   // ─────────────────────────────────────────────────────────────────────────
   // Initial data load
