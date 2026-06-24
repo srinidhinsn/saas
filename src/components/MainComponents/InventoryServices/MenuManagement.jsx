@@ -3,7 +3,7 @@ import { Plus, Search, Edit, Trash2, Upload, Download, CloudUpload } from 'lucid
 import axios from 'axios';
 import * as XLSX from 'xlsx';
 import MenuCategoryTree from './Tree&CategoryManage/MenuCategoryTree';
-import MenuImagePreview from './Tree&CategoryManage/MenuImagePreview';
+import MenuImagePreview, { imageCache } from './Tree&CategoryManage/MenuImagePreview';
 import UniversalAddModal from '../../utils/Modals/UniversalAddModal';
 import UniversalEditModal from '../../utils/Modals/UniversalEditModal';
 import UniversalBulkUpdateModal from '../../utils/Modals/UniversalBulkUpdateModal';
@@ -800,7 +800,9 @@ if (cachedAddon) return cachedAddon;
                 }
               }
       }
-
+   if (editingItem?.image_id) {
+        imageCache.remove(clientId, editingItem.image_id);
+      }
       await fetchData({ silent: true });
       setShowEditModal(false);
       setEditingItem(null);
@@ -1202,7 +1204,10 @@ const getDietaryFromSlug = (item) => {
     if (!window.confirm(`Delete ${selectedRows.length} selected items?`)) return;
 
     try {
-      // ✅ Backend now deletes all zone variants — just send id + zone_config_id: 0
+      selectedRows.forEach(id => {
+        const item = menuItems.find(i => i.id === id);
+        if (item?.image_id) imageCache.remove(clientId, item.image_id);
+      });
       await Promise.all(selectedRows.map(id => axios.post(
         `${import.meta.env.VITE_API_INVENTORY_SERVICE_URL}/${clientId}/menu/delete`,
         { id, zone_config_id: 0 },
