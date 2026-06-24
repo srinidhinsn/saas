@@ -178,12 +178,10 @@ def get_orders_for_table(client_id: str, table_id: Optional[str] = None, context
         orders = db.query(Db_Order_Entity).filter(
             Db_Order_Entity.client_id == client_id,
             Db_Order_Entity.table_id == table_id,
-            Db_Order_Entity.status != OrderStatusEnum.cancelled,
         ).all()
     else:
         orders = db.query(Db_Order_Entity).filter(
             Db_Order_Entity.client_id == client_id,
-            Db_Order_Entity.status != OrderStatusEnum.cancelled,
         ).all()
 
     # Group root + sub-orders, return one merged entry per table group
