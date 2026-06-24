@@ -84,12 +84,13 @@ const deriveStatus = (items) => {
     const status = String(item?.status || '').toLowerCase();
     return status !== KDS_CONFIG.STATUS.CANCELLED;
   });
+
   if (!activeItems.length) return PENDING;
+  if (activeItems.every((i) => i.status === SERVED)) return SERVED;
   if (activeItems.some((i) => i.status === PENDING)) return PENDING;
   if (activeItems.some((i) => i.status === PREPARING)) return PREPARING;
   if (activeItems.every((i) => i.status === READY)) return READY;
-  if (activeItems.every((i) => i.status === SERVED)) return SERVED;
-  return PENDING;
+  return READY;
 };
 
 const isCancelledStatus = (status) => {
@@ -404,11 +405,14 @@ const KitchenCard = ({
   const elapsedTime = card.created_at ? calculateElapsedTime(card.created_at) : null;
 
   const allReady =
-    card.items?.length > 0 &&
-    card.items.every((i) => i.status === KDS_CONFIG.STATUS.READY);
+  card.items?.length > 0 &&
+  card.items.every((i) => i.status === KDS_CONFIG.STATUS.READY || i.status === KDS_CONFIG.STATUS.SERVED) &&
+  !card.items.every((i) => i.status === KDS_CONFIG.STATUS.SERVED);
 
   const statusColorClass =
-    allReady
+  allReady
+    ? 'text-yellow-500'
+    : card.status === KDS_CONFIG.STATUS.SERVED
       ? 'text-green-600'
       : card.status === KDS_CONFIG.STATUS.PENDING
         ? 'text-blue-600'
@@ -677,6 +681,7 @@ const KitchenDisplay = ({clientId, token}) => {
     // One card per sub-order: sort strictly by created_at ascending
     return subOrders
       .slice()
+      .filter((subOrder) => !isCancelledStatus(subOrder.status)) 
       .sort((a, b) => parseISTTimestamp(a.created_at || 0) - parseISTTimestamp(b.created_at || 0))
       .map((subOrder) => ({
         card_id: subOrder.id,
@@ -727,6 +732,7 @@ const KitchenDisplay = ({clientId, token}) => {
       (res.data?.data || []).forEach((mergedOrder) => {
         // Date filter using root created_at
         if (mergedOrder.status === 'draft') return;
+        if (isCancelledStatus(mergedOrder.status)) return;
         const createdAt = mergedOrder.created_at;
         if (createdAt) {
           const orderDate = new Date(parseISTTimestamp(createdAt)).toLocaleDateString(KDS_CONFIG.DATE_FORMAT);
@@ -738,6 +744,7 @@ const KitchenDisplay = ({clientId, token}) => {
 
         parseIntoCards(mergedOrder).forEach((card) => {
           if (!card.items || card.items.length === 0) return;
+          if (isCancelledStatus(card.status)) return;
           if (
             card.items.length > 0 &&
             card.items.every((i) => i.status === KDS_CONFIG.STATUS.SERVED)
