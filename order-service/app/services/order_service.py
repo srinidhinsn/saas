@@ -87,9 +87,10 @@ def _merge_group(orders: list) -> dict:
     orders = sorted(orders, key=lambda o: o.created_at or 0)
     root = orders[0]
     merged_items = []
+    all_cancelled = all((o.status or "").lower() == OrderStatusEnum.cancelled.value for o in orders)
     for order in orders:
         for item in order.items:
-            if (item.status or "").lower() == OrderStatusEnum.cancelled.value:
+            if not all_cancelled and (item.status or "").lower() == OrderStatusEnum.cancelled.value:
                 continue
             m = Db_OrderItem_Entity.copyToModel(item).dict()
             m["batch_label"] = order.dinein_order_id

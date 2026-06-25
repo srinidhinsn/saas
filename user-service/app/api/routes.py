@@ -16,6 +16,7 @@ from entity.order_entity import DineinOrder
 import random
 from datetime import datetime, timedelta
 from services.add_users import create_user_and_person, getting_screen_id, get_user_perms, has_user_permission
+from services.person_service import set_primary_address_service
 from jose import jwt
 import uuid , os
 from sqlalchemy import func
@@ -734,3 +735,8 @@ async def update_address(address_id: int,add: AddressModel,client_id: str,contex
     db.refresh(address)
 
     return ResponseModel(screen_id=context.screen_id,data={"message": "Address updated successfully"})
+
+@router.post("/address/{address_id}/set-primary")
+async def set_primary(address_id: int, client_id: str, context: SaasContext = Depends(verify_token), db: Session = Depends(get_db)):
+    result = await set_primary_address_service(address_id, context, db)
+    return ResponseModel(screen_id=context.screen_id, data=result)
