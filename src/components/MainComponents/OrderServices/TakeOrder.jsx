@@ -1921,13 +1921,6 @@ const TakeOrder = ({ clientId, token, onOrderUpdate, realm }) => {
     if ( !clientId || !token || !menuConfig) return;
 
     const refetchMenu = async () => {
-      // Check zone-specific cache first
-      const zoneSlice = `menuData_zone_${zoneConfigId}`;
-      const cached = menuCache.get(zoneSlice, clientId);
-      if (cached) {
-        setMenuItems(cached.menuItems);
-        return;
-      }
       try {
         const itemRes = await axios.get(
           `${import.meta.env.VITE_API_INVENTORY_SERVICE_URL}/${clientId}/menu/read`,
