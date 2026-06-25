@@ -3,7 +3,7 @@ import { Plus, Search, Edit, Trash2, Upload, Download, CloudUpload } from 'lucid
 import axios from 'axios';
 import * as XLSX from 'xlsx';
 import MenuCategoryTree from './Tree&CategoryManage/MenuCategoryTree';
-import MenuImagePreview from './Tree&CategoryManage/MenuImagePreview';
+import MenuImagePreview, { imageCache } from './Tree&CategoryManage/MenuImagePreview';
 import UniversalAddModal from '../../utils/Modals/UniversalAddModal';
 import UniversalEditModal from '../../utils/Modals/UniversalEditModal';
 import UniversalBulkUpdateModal from '../../utils/Modals/UniversalBulkUpdateModal';
@@ -176,31 +176,13 @@ const MenuManagement = ({ clientId, token,screenIds, userId, realm }) => {
     }
     return pathNames; // nearest-first: [leafName, parentName, grandparentName, ...]
   }, []);
+
+  
   const fetchZoneConfig = useCallback(async () => {
-    const cachedZone = menuCache.get('zoneConfig', clientId);
-if (cachedZone) {
-  setSections(cachedZone.sections);
-  setZones(cachedZone.zones);
-  return;
-}
-    try {
-      const res = await axios.get(
-        `${import.meta.env.VITE_API_TABLE_SERVICE_URL}/${clientId}/tables/config`,
-        { headers: { Authorization: `Bearer ${token}` } }
-      );
-
-      const data = res.data || [];
-
-      setSections(data);
-
-      const uniqueZones = [...new Set(data.map(d => d.zone))];
-      setZones(uniqueZones);
-      menuCache.set('zoneConfig', clientId, { sections: data, zones: uniqueZones });
-
-    } catch (err) {
-      console.error("Zone config fetch failed", err);
-    }
-  }, [clientId, token]);
+  const { sections, zones } = await menuCache.fetchTablesConfig(clientId, token);
+  setSections(sections);
+  setZones(zones);
+}, [clientId, token]);
 
   useEffect(() => {
     fetchZoneConfig();
@@ -818,7 +800,9 @@ if (cachedAddon) return cachedAddon;
                 }
               }
       }
-
+   if (editingItem?.image_id) {
+        imageCache.remove(clientId, editingItem.image_id);
+      }
       await fetchData({ silent: true });
       setShowEditModal(false);
       setEditingItem(null);
@@ -1220,7 +1204,10 @@ const getDietaryFromSlug = (item) => {
     if (!window.confirm(`Delete ${selectedRows.length} selected items?`)) return;
 
     try {
-      // ✅ Backend now deletes all zone variants — just send id + zone_config_id: 0
+      selectedRows.forEach(id => {
+        const item = menuItems.find(i => i.id === id);
+        if (item?.image_id) imageCache.remove(clientId, item.image_id);
+      });
       await Promise.all(selectedRows.map(id => axios.post(
         `${import.meta.env.VITE_API_INVENTORY_SERVICE_URL}/${clientId}/menu/delete`,
         { id, zone_config_id: 0 },
