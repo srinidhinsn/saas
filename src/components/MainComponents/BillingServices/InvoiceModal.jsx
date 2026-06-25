@@ -431,8 +431,8 @@ export default function InvoiceModal({
         total_amount: calculatedTotal,
         payment_status: paymentStatus,
         payment_method: paymentMethodArray,
-        single_payment_amount: splitPaymentEnabled ? null : Number(paymentSplits[0]?.amount ?? total),  // ✅ also fixed here
-        status: status,
+        single_payment_amount: splitPaymentEnabled ? null : Number(paymentSplits[0]?.amount ?? total),
+        status: "Draft",
         customer_id:
           selectedOrder.customer_id ??
           initialOrder.customer_id ??
@@ -481,13 +481,11 @@ export default function InvoiceModal({
         `${import.meta.env.VITE_API_ORDER_SERVICE_URL}/${clientId}/dinein/update`,
         {
           id: selectedOrder.id,
-          // REQ 2: Only update invoice_status; do not change order status to served yet.
           invoice_status: paymentStatus.toLowerCase(),
         },
         { headers: { Authorization: `Bearer ${token}` } }
       );
 
-      // REQ 2: Table is NOT freed here. It is freed only after payment confirmation.
       toast.success("Invoice saved successfully!");
       if (onSave) onSave(draftId);
       return draftId;
@@ -509,21 +507,39 @@ export default function InvoiceModal({
     setShowPayConfirm(false);
     setSaving(true);
     try {
-      // 1. Update the billing document payment_status to Paid
-      if (invoiceDraftId) {
-        await axios.post(
-          `${import.meta.env.VITE_API_BILLING_SERVICE_URL}/${clientId}/invoice/update_document`,
-          {
-            id: invoiceDraftId,
-            client_id: clientId,
-            payment_status: "Paid",
-            status: "Issued",
-          },
-          { headers: { Authorization: `Bearer ${token}` } }
-        );
+      const invoiceDraft = await fetchInvoiceDraft(selectedOrder.id);
+      const correctInvoiceDraftId = invoiceDraft?.id || invoiceDraftId;
+      
+      if (!correctInvoiceDraftId) {
+        throw new Error("No invoice draft found");
       }
 
-      // 2. Mark dine-in order as served and invoice_status as paid
+      if (!documentNumber || documentNumber.toLowerCase() === "draft") {
+        try {
+          const res = await axios.post(
+            `${import.meta.env.VITE_API_BILLING_SERVICE_URL}/${clientId}/invoice/issue?invoice_id=${correctInvoiceDraftId}`,
+            null,
+            { headers: { Authorization: `Bearer ${token}` } }
+          );
+          
+          const newDocumentNumber = res?.data?.data?.document_number || res?.data?.document_number;
+          if (newDocumentNumber) {
+            setDocumentNumber(newDocumentNumber);
+          }
+        } catch (err) {
+          throw new Error("Failed to generate invoice number: " + (err.response?.data?.detail || err.message));
+        }
+      }
+      await axios.post(
+        `${import.meta.env.VITE_API_BILLING_SERVICE_URL}/${clientId}/invoice/update_document`,
+        {
+          id: correctInvoiceDraftId,
+          client_id: clientId,
+          payment_status: "Paid",
+          status: "Issued",
+        },
+        { headers: { Authorization: `Bearer ${token}` } }
+      );
       await axios.post(
         `${import.meta.env.VITE_API_ORDER_SERVICE_URL}/${clientId}/dinein/update`,
         {
@@ -534,7 +550,6 @@ export default function InvoiceModal({
         { headers: { Authorization: `Bearer ${token}` } }
       );
 
-      // 3. Free the table (REQ 2: only HERE, not on save)
       await freeTable({
         clientId,
         token,
@@ -543,11 +558,9 @@ export default function InvoiceModal({
       });
 
       setPaymentStatus("Paid");
-      toast.success("Payment confirmed! Table is now free.");
       onClose();
     } catch (err) {
-      console.error("[handleConfirmPayment]", err);
-      toast.error("Failed to confirm payment");
+      console.error("Payment Confirmation Failed:", err.message);
     } finally {
       setSaving(false);
     }
@@ -598,7 +611,7 @@ export default function InvoiceModal({
         const updated = await fetchInvoiceDraft(selectedOrder.id);
         if (updated?.id) {
           setInvoiceDraftId(updated.id);
-          setPaymentStatus(updated.payment_status || "Paid");
+          setPaymentStatus(updated.payment_status || "Pending");
         }
         if (updated) {
           setSelectedOrder(prev => ({
@@ -615,21 +628,8 @@ export default function InvoiceModal({
     }
 
     if (!currentInvoiceNumber || currentInvoiceNumber.toLowerCase() === "draft") {
-      try {
-        const res = await axios.post(
-          `${import.meta.env.VITE_API_BILLING_SERVICE_URL}/${clientId}/invoice/issue?invoice_id=${currentInvoiceDraftId}`,
-          null,
-          { headers: { Authorization: `Bearer ${token}` } }
-        );
-        currentInvoiceNumber = res?.data?.data?.document_number;
-        if (!currentInvoiceNumber) throw new Error("Invoice number generation failed");
-        setDocumentNumber(currentInvoiceNumber);
-        setStatus("Issued");
-      } catch (err) {
-        console.error("Invoice issue error: ", err);
-        toast.error("Failed to generate invoice number");
-        return;
-      }
+      toast.error("Invoice number will be generated after payment confirmation. Please confirm payment first.");
+      return;
     }
 
     try {
