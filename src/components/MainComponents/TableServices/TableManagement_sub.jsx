@@ -7,6 +7,7 @@ import UniversalBulkUpdateModal from "../../utils/Modals/UniversalBulkUpdateModa
 import UniversalBulkDeleteModal from "../../utils/Modals/UniversalBulkDeleteModal";
 import AccessGuard from "../../utils/Interceptors/ProtectedRoute";
 import TableConfigModal from "../../utils/Modals/TableConfigModal";
+import { menuCache } from '../../utils/Menu-utils/menuCache'; 
 
 const TableManagement = ({ clientId, token, screenIds, userId, realm}) => {
 
