@@ -122,21 +122,10 @@ def get_notifications(client_id: str,context: SaasContext = Depends(verify_token
 
 
 @router.get("/persons")
-async def get_all_persons(
-    client_id: str,
-    context: SaasContext = Depends(verify_token),
-    db: Session = Depends(get_db)
-):
-
-    result = await get_all_persons_service(
-        client_id,
-        db
-    )
-
-    return ResponseModel(
-        screen_id=context.screen_id,
-        data=result
-    )
+async def get_all_persons(client_id: str,context: SaasContext = Depends(verify_token),db: Session = Depends(get_db)):
+    result = await get_all_persons_service(client_id,db)
+    return ResponseModel(screen_id=context.screen_id,data=result)
+  
 @router.post("/delegate-access")
 async def delegate_access(
     client_id: str,
@@ -404,34 +393,16 @@ async def refresh_token(req: Request, db: Session = Depends(get_db)):
     return ResponseModel(data=result)
 
 @router.post("/chat")
-async def chat(
-    client_id: str,
-    req: ChatRequest,
-    db: Session = Depends(get_db)
-):
+async def chat(client_id: str,req: ChatRequest,db: Session = Depends(get_db)):
+    inventory_items = db.query(InventoryEntity).filter(InventoryEntity.client_id == client_id).all()
+    categories = db.query(CategoryEntity).filter(CategoryEntity.client_id == client_id).all()
 
-    # ================= FETCH REALTIME DATA =================
-
-    inventory_items = db.query(InventoryEntity).filter(
-        InventoryEntity.client_id == client_id
-    ).all()
-
-    categories = db.query(CategoryEntity).filter(
-        CategoryEntity.client_id == client_id
-    ).all()
-
-    orders = db.query(DineinOrder).filter(
-        DineinOrder.client_id == client_id
-    ).all()
-
-    # ================= BUILD MENU CONTEXT =================
+    orders = db.query(DineinOrder).filter(DineinOrder.client_id == client_id).all()
 
     menu_context = []
-
     menu_unique_items = set()
 
     for category in categories:
-
         category_items = [
             item for item in inventory_items
             if item.category_id == category.id
@@ -440,8 +411,6 @@ async def chat(
         item_lines = []
 
         for item in category_items:
-
-            # Skip empty names
             if not item.name:
                 continue
 
@@ -452,38 +421,27 @@ async def chat(
                 continue
 
             menu_unique_items.add(clean_name.lower())
-
-            item_lines.append(
-                f"{clean_name} - ₹{item.price}"
-            )
+            item_lines.append(f"{clean_name} - ₹{item.price}")
 
         # Add category only if items exist
         if item_lines:
-            menu_context.append(
-                f"{category.name}: {', '.join(item_lines)}"
-            )
-
+            menu_context.append(f"{category.name}: {', '.join(item_lines)}")
+          
     # ================= BUILD ORDER ITEMS CONTEXT =================
-
     ordered_items_context = []
 
     total_orders = len(orders)
 
     for order in orders:
-
         order_items = []
-
         for item in order.items:
 
             if not item.item_name:
                 continue
 
-            order_items.append(
-                f"{item.item_name} x {item.quantity}"
-            )
+            order_items.append(f"{item.item_name} x {item.quantity}")
 
         if order_items:
-
             ordered_items_context.append(
                 f"Order #{order.id}: {', '.join(order_items)}"
             )
@@ -505,14 +463,7 @@ async def chat(
 
     {'\n'.join(ordered_items_context)}
     """
-
     # ================= ASK AI =================
+    reply = await ask_restaurant_ai(req.message,realtime_context)
 
-    reply = await ask_restaurant_ai(
-        req.message,
-        realtime_context
-    )
-
-    return {
-        "reply": reply
-    }
+    return {"reply": reply}
