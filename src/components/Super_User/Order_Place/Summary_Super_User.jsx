@@ -491,7 +491,7 @@ const OrderSummaryVisible = ({ clientId, token }) => {
   const [selectedMainItem, setSelectedMainItem] = useState(null);
   const [lineItemsDetails, setLineItemsDetails] = useState([]);
   const [pendingOrderId, setPendingOrderId] = useState(null);
-
+  const [datePreset, setDatePreset] = useState('today');
   // ─────────────────────────────────────────────────────────────────────────
   // localStorage helpers (preserved exactly from original)
   // ─────────────────────────────────────────────────────────────────────────
@@ -1319,12 +1319,29 @@ const OrderSummaryVisible = ({ clientId, token }) => {
   // Singular filtering
   // ─────────────────────────────────────────────────────────────────────────
 
-  let filteredOrders = selectedDate
-    ? orders.filter(order => {
-      const orderDate = new Date(order.created_at).toLocaleDateString('en-CA');
-      return orderDate === selectedDate;
-    })
-    : orders;
+  const getDateRange = () => {
+    const now = new Date();
+    const toStr = (d) => d.toISOString().split('T')[0];
+    const today = toStr(now);
+    const subtractDays = (n) => { const d = new Date(now); d.setDate(d.getDate() - n); return toStr(d); };
+    const subtractMonths = (n) => { const d = new Date(now); d.setMonth(d.getMonth() - n); return toStr(d); };
+    switch (datePreset) {
+      case 'today': return { from: today, to: today };
+      case '1w': return { from: subtractDays(7), to: today };
+      case '15d': return { from: subtractDays(15), to: today };
+      case '1m': return { from: subtractMonths(1), to: today };
+      case '3m': return { from: subtractMonths(3), to: today };
+      case '6m': return { from: subtractMonths(6), to: today };
+      case 'custom': return { from: customFrom, to: customTo };
+      default: return { from: today, to: today };
+    }
+  };
+
+  const { from, to } = getDateRange();
+  let filteredOrders = orders.filter(order => {
+    const orderDate = new Date(order.created_at).toLocaleDateString('en-CA');
+    return orderDate >= from && orderDate <= to;
+  });
 
   // Single mode selection (not multi)
   if (selectedOrderMode !== 'all') {
@@ -1426,13 +1443,56 @@ const OrderSummaryVisible = ({ clientId, token }) => {
                 </select>
               </div>
 
-              {/* Date */}
-              <input
-                type="date"
-                value={selectedDate}
-                onChange={e => setSelectedDate(e.target.value)}
-                className="w-full sm:w-auto px-3 py-2 rounded-lg bg-bg-primary border border-border-default text-text-primary text-sm"
-              />
+              <div className="relative flex items-center gap-2">
+                <select
+                  value={datePreset}
+                  onChange={e => {
+                    const val = e.target.value;
+                    setDatePreset(val);
+                    if (val === 'custom') {
+                      // open the from-date picker immediately
+                      setTimeout(() => customFromRef.current?.showPicker?.(), 50);
+                    }
+                  }}
+                  className="pl-3 pr-8 py-2 rounded-lg bg-bg-primary border border-border-default text-text-primary text-sm appearance-none cursor-pointer"
+                >
+                  <option value="today">Today</option>
+                  <option value="1w">Last 1 Week</option>
+                  <option value="15d">Last 15 Days</option>
+                  <option value="1m">Last 1 Month</option>
+                  <option value="3m">Last 3 Months</option>
+                  <option value="6m">Last 6 Months</option>
+                  <option value="custom">Custom Range</option>
+                </select>
+
+                {/* Hidden date pickers — only mount when custom is selected */}
+                {datePreset === 'custom' && (
+                  <>
+                    <input
+                      ref={customFromRef}
+                      type="date"
+                      value={customFrom}
+                      max={customTo}
+                      onChange={e => {
+                        setCustomFrom(e.target.value);
+                        // after picking from-date, auto-open the to-date picker
+                        setTimeout(() => customToRef.current?.showPicker?.(), 50);
+                      }}
+                      className="px-3 py-2 rounded-lg bg-bg-primary border border-border-default text-text-primary text-sm"
+                    />
+                    <span className="text-text-secondary text-xs font-medium">→</span>
+                    <input
+                      ref={customToRef}
+                      type="date"
+                      value={customTo}
+                      min={customFrom}
+                      max={todayDate}
+                      onChange={e => setCustomTo(e.target.value)}
+                      className="px-3 py-2 rounded-lg bg-bg-primary border border-border-default text-text-primary text-sm"
+                    />
+                  </>
+                )}
+              </div>
 
               <div className="text-sm font-semibold text-text-secondary whitespace-nowrap xl:ml-auto">
                 {filteredOrders.length} order{filteredOrders.length !== 1 ? 's' : ''}
