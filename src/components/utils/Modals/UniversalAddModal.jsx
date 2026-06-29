@@ -35,7 +35,7 @@ const UniversalAddModal = ({
   fieldErrors,
   setFieldErrors,
   isGenerating,
-  generateTables,
+  generateTables,setAddonSubcategories,setAllAddonItems,
   units
 }) => {
   const [dragActive, setDragActive] = useState(false);

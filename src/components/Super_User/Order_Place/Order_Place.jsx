@@ -12,7 +12,10 @@ import ImagePreview from '../../utils/ImagePreview';
 import InvoiceModal from '../../MainComponents/BillingServices/InvoiceModal';
 import { getMenuConfig } from '../../utils/menuConfigResolver';
 import CustomerChat from '../../Constants/Chatbots/CustomerChat';
-
+import { getDietaryFromSlug, isItemActive,
+  buildCartItem, getGroupedCartItems, deduplicateOrderItems,getCategoryAndChildrenIds
+} from '../../utils/Menu-utils/menuUtils';
+import {useDietaryTypes, useTimings, useZoneConfig, useMenuData} from '../../utils/Menu-utils/useMenuData';
 // ─────────────────────────────────────────────────────────────────────────────
 // Constants
 // ─────────────────────────────────────────────────────────────────────────────
@@ -1550,7 +1553,9 @@ const Order_Place = ({ clientId, token, onOrderUpdate, realm, screenIds }) => {
   const [customerDetails, setCustomerDetails] = useState({ customer_id: '', contact_phone: '', customer_name: '' });
   const [customerAddresses, setCustomerAddresses] = useState([]);
   const [selectedAddressId, setSelectedAddressId] = useState("");
-
+const { dietaryOptions, dietaryColorMap } = useDietaryTypes({ clientId, token });
+const { timingOptions }                   = useTimings({ clientId, token });
+const { sections, zones }                 = useZoneConfig({ clientId, token });
   // ── UI state ──────────────────────────────────────────────────────────────
   const [selectedCategoryId, setSelectedCategoryId] = useState(null);
   const [searchQuery, setSearchQuery] = useState('');
@@ -1575,14 +1580,10 @@ const Order_Place = ({ clientId, token, onOrderUpdate, realm, screenIds }) => {
   const searchInputRef = useRef(null);
   const isMobile = window.matchMedia('(max-width: 1024px)').matches;
 
-  const [sections, setSections] = useState([]);
   const [takeawaySections, setTakeawaySections] = useState([]);
   const [zoneConfigId, setZoneConfigId] = useState(null);
-  const [dietaryOptions, setDietaryOptions] = useState([]);
-  const [dietaryColorMap, setDietaryColorMap] = useState({});
   const [selectedDietary, setSelectedDietary] = useState(null);
   const [stockWarning, setStockWarning] = useState(null);
-  const [timingOptions, setTimingOptions] = useState([]);
   const [showTakeawayOrdersModal, setShowTakeawayOrdersModal] = useState(false);
   const menuConfig = useMemo(
     () => (clientId ? getMenuConfig(clientId) : null),
@@ -1637,7 +1638,6 @@ ${selectedAddress.country || ""}
         )
         : [];
 
-      setSections(dineInSections);
       setTakeawaySections(takeawaySectionsFiltered);
     } catch (err) {
       console.error('Zone config fetch failed', err);
@@ -1713,12 +1713,10 @@ ${selectedAddress.country || ""}
         { params: { category_id: 'dietary_type' }, headers: { Authorization: `Bearer ${token}` } }
       );
       const opts = res.data?.data || [];
-      setDietaryOptions(opts);
       const map = {};
       opts.forEach((opt, idx) => {
         map[opt.toLowerCase().replace(/[-_\s]/g, '')] = DIETARY_COLORS[idx % DIETARY_COLORS.length];
       });
-      setDietaryColorMap(map);
     } catch (err) {
       console.error('Dietary fetch failed:', err);
     }
@@ -1742,42 +1740,14 @@ ${selectedAddress.country || ""}
           raw: v
         };
       });
-      setTimingOptions(parsed);
     } catch (err) {
       console.error('Timing fetch failed:', err);
-      setTimingOptions([]);
     }
   };
   // ─────────────────────────────────────────────────────────────────────────
   // Draft helpers
   // ─────────────────────────────────────────────────────────────────────────
 
-  const deduplicateOrderItems = (items) => {
-    const uniqueKeyToItemMap = new Map();
-    const result = [];
-
-    items.forEach(item => {
-      // Prefer frontend_unique_key, then DB id, then warn and include as-is
-      const fkey = item.frontend_unique_key || (item.id ? String(item.id) : null);
-
-      if (!fkey) {
-        console.warn(`Item ${item.item_id} has no unique key or DB id — included without dedup`);
-        result.push({ ...item });
-        return;
-      }
-
-      if (uniqueKeyToItemMap.has(fkey)) {
-        // Same logical item appearing in multiple sub-orders — accumulate quantity
-        uniqueKeyToItemMap.get(fkey).quantity += (item.quantity ?? 0);
-      } else {
-        const copy = { ...item };
-        uniqueKeyToItemMap.set(fkey, copy);
-        result.push(copy);
-      }
-    });
-
-    return result;
-  };
   const handleSaveDraft = useCallback(async () => {
     if (!selectedTable || cart.length === 0) {
       toast.warn('Nothing to save — cart is empty.');
@@ -1849,19 +1819,6 @@ ${selectedAddress.country || ""}
     return null;
   }, [categoriesFlat]);
 
-  const getCategoryAndChildrenIds = useCallback((targetId) => {
-    if (!targetId || !categoriesFlat.length) return [];
-    const result = new Set();
-    const addWithChildren = (id) => {
-      result.add(id);
-      categoriesFlat
-        .filter(c => c.parentId === id)
-        .forEach(c => addWithChildren(c.id));
-    };
-    addWithChildren(targetId);
-    return Array.from(result);
-  }, [categoriesFlat]);
-
   const findCategoryNode = (tree, matcher) => {
     for (const c of tree) {
       if (
@@ -1896,40 +1853,6 @@ ${selectedAddress.country || ""}
     }
     return null;
   };
-  const isItemActive = useCallback((slug) => {
-    if (!slug) return true;
-
-    const doubleUnderIdx = slug.lastIndexOf('__');
-    const timingSegment = doubleUnderIdx !== -1
-      ? slug.slice(doubleUnderIdx + 2).toLowerCase()
-      : null;
-
-    // ✅ Explicit unavailable flag
-    if (timingSegment === 'unavailable') return false;
-
-    if (!timingOptions || timingOptions.length === 0) return true;
-    if (!timingSegment || timingSegment === 'allday') return true;
-
-    const timingKeys = timingSegment.split('+').filter(Boolean);
-    if (timingKeys.length === 0) return true;
-
-    const recognizedKeys = timingKeys.filter(key => {
-      const t = timingOptions.find(o => o.name?.toLowerCase() === key);
-      return t && t.start && t.end;
-    });
-
-    if (recognizedKeys.length === 0) return true;
-
-    const now = new Date();
-    const currentMinutes = now.getHours() * 60 + now.getMinutes();
-
-    return recognizedKeys.some(key => {
-      const t = timingOptions.find(o => o.name?.toLowerCase() === key);
-      const [sh, sm] = t.start.split(':').map(Number);
-      const [eh, em] = t.end.split(':').map(Number);
-      return currentMinutes >= (sh * 60 + sm) && currentMinutes <= (eh * 60 + em);
-    });
-  }, [timingOptions]);
   // ─────────────────────────────────────────────────────────────────────────
   // Determine if a category is a combo category (walks ancestors)
   // ─────────────────────────────────────────────────────────────────────────
@@ -2063,7 +1986,7 @@ ${selectedAddress.country || ""}
               headers: { Authorization: `Bearer ${token}` },
               params: {
                 inventory_id: menuConfig.menuInventoryId,
-                ...(zoneConfigId && { zone_config_id: zoneConfigId }),
+                ...(zoneConfigId !== null && zoneConfigId !== undefined ? { zone_config_id: zoneConfigId } : {}),
               }
             }
           ),
@@ -2144,8 +2067,8 @@ ${selectedAddress.country || ""}
   }, [clientId, token, realm, menuConfig]);
 
   useEffect(() => {
-    if (!zoneConfigId || !clientId || !token || !menuConfig) return;
-
+    if (!clientId || !token || !menuConfig) return;
+  
     const refetchMenu = async () => {
       try {
         const itemRes = await axios.get(
@@ -2154,12 +2077,14 @@ ${selectedAddress.country || ""}
             headers: { Authorization: `Bearer ${token}` },
             params: {
               inventory_id: menuConfig.menuInventoryId,
-              zone_config_id: zoneConfigId,
+              // ✅ Always include zoneConfigId (even if null/undefined)
+              ...(zoneConfigId !== null && zoneConfigId !== undefined 
+                ? { zone_config_id: zoneConfigId } 
+                : {}),
             }
           }
         );
-
-        // Deduplicate: prefer base record (zone_config_id === 0) when no zone match
+  
         const allItems = itemRes.data.data || [];
         const uniqueKeyToItemMap = new Map();
         allItems.forEach(item => {
@@ -2168,7 +2093,7 @@ ${selectedAddress.country || ""}
             uniqueKeyToItemMap.set(item.id, item);
           }
         });
-
+  
         const enriched = Array.from(uniqueKeyToItemMap.values()).map(item => {
           const cat = categoriesFlat.find(c => c.id === item.category_id);
           return { ...item, category_name: cat?.name || 'Uncategorized' };
@@ -2179,46 +2104,9 @@ ${selectedAddress.country || ""}
         console.error('Zone menu refetch failed:', err);
       }
     };
-
+  
     refetchMenu();
-  }, [zoneConfigId, clientId, token, menuConfig]);
-  const getDietaryFromSlug = useCallback((item) => {
-    if (!item || !dietaryOptions.length) return null;
-    const normalize = (str) => (str || '').toLowerCase().replace(/[-_\s]/g, '');
-    const slug = item.slug || '';
-    const doubleUnderIdx = slug.lastIndexOf('__');
-  
-    // ── NEW FORMAT: dietary is in the __ suffix ──
-    if (doubleUnderIdx !== -1) {
-      const suffix = slug.slice(doubleUnderIdx + 2).toLowerCase();
-      if (suffix && suffix !== 'unavailable' && suffix !== 'allday') {
-        const suffixParts = suffix.split('+').filter(Boolean);
-        const sortedOptions = [...dietaryOptions].sort(
-          (a, b) => normalize(b).length - normalize(a).length
-        );
-        for (const part of suffixParts) {
-          const match = sortedOptions.find(d => normalize(d) === normalize(part));
-          if (match) return normalize(match);
-        }
-      }
-    }
-  
-    // ── OLD FORMAT FALLBACK: dietary was injected into the main slug path ──
-    const mainPart = doubleUnderIdx !== -1 ? slug.slice(0, doubleUnderIdx) : slug;
-    const slugSegments = mainPart.toLowerCase().split('_').filter(Boolean);
-    const sortedOptions = [...dietaryOptions].sort(
-      (a, b) => normalize(b).length - normalize(a).length
-    );
-    for (let i = 0; i < slugSegments.length; i++) {
-      for (let j = 1; j <= 3; j++) {
-        const joined = normalize(slugSegments.slice(i, i + j).join(''));
-        const match = sortedOptions.find(d => normalize(d) === joined);
-        if (match) return normalize(match);
-      }
-    }
-  
-    return null;
-  }, [dietaryOptions]);
+  }, [zoneConfigId, clientId, token, menuConfig, categoriesFlat]);  // ✅ Added categoriesFlat dependency
   // ─────────────────────────────────────────────────────────────────────────
   // Browser history (back button) — push initial floor state once
   // ─────────────────────────────────────────────────────────────────────────
@@ -2351,117 +2239,159 @@ ${selectedAddress.country || ""}
     }
   };
 
-  const handleTableSelect = async (table) => {
-    const tableIdStr = table.id.toString();
-
-    setActiveOrderId(null);
-    setActiveDineinOrderId(null);
-    setHasNewItems(false);
-    setCurrentBatchTimestamp(null);
-    setOrderMode('dinein');
-    setSelectedTable(tableIdStr);
-    setDineinTableId(tableIdStr);
-    const resolvedZoneConfigId = table.config_id || null;
-setZoneConfigId(resolvedZoneConfigId);
-    const draft = await readDraft(tableIdStr, clientId, token);
-
-    if (draft) {
-      // Reconstruct cart from draft order items
-      const restoredCart = (draft.items || []).flatMap(item => {
-        const menuItem = menuItems.find(mi => Number(mi.id) === Number(item.item_id));
-        const mainKey = item.frontend_unique_key || `${item.item_id}_restored_${Date.now()}`;
-        const mainEntry = {
-          id: Number(item.item_id),
-          name: item.item_name || menuItem?.name || 'Item',
-          unit_price: item.unit_price ?? menuItem?.unit_price ?? 0,
-          discount: menuItem?.discount || 0,
-          image_id: menuItem?.image_id,
-          slug: item.slug || menuItem?.slug,
-          category: menuItem?.category_name,
-          category_id: menuItem?.category_id || null,
-          quantity: item.quantity || 1,
-          note: '',
-          frontend_unique_key: mainKey,
-          batch_timestamp: null,
-          is_new_item: true,
-          saved_sub_order: false,
-          status: 'draft',
-          is_addon: false,
-          parent_item_key: null,
-        };
-
-        // Restore linked addons that were saved as line_item_id on the draft item
-        const addonEntries = (item.line_item_id || []).map((addonId, idx) => {
-          const addonMenuItem = menuItems.find(mi => Number(mi.id) === Number(addonId));
-          if (!addonMenuItem) return null;
-          return {
-            id: Number(addonId),
-            name: addonMenuItem.name || 'Addon',
-            unit_price: addonMenuItem.unit_price ?? 0,
-            discount: addonMenuItem.discount || 0,
-            image_id: addonMenuItem.image_id,
-            slug: addonMenuItem.slug,
-            category: addonMenuItem.category_name,
-            category_id: addonMenuItem.category_id || null,
-            quantity: 1,
-            note: '',
-            frontend_unique_key: `${addonId}_addon_${mainKey}_${idx}`,
-            batch_timestamp: null,
-            is_new_item: true,
-            saved_sub_order: false,
-            status: 'draft',
-            is_addon: true,
-            parent_item_key: mainKey,
-          };
-        }).filter(Boolean);
-
-        return [mainEntry, ...addonEntries];
-      });
-
-      setCart(restoredCart);
-      setHasNewItems(true);
-      setDraftSavedAt(Date.now());
-      setShowCart(true);
-      if (draft.customer_id || draft.contact_phone) {
-        setCustomerDetails({
-          customer_id: draft.customer_id || '',
-          contact_phone: draft.contact_phone || '',
-        });
-      } else {
-        setCustomerDetails(prev => ({ ...prev, customer_id: '', contact_phone: '' }));
-      }
-      toast.info('Draft restored for this table.', { autoClose: 2000 });
-    } else {
-      setCart([]);
-      setDraftSavedAt(null);
-      setCustomerDetails(prev => ({ ...prev, customer_id: '', contact_phone: '' }));
-      setShowCart(true);
-    }
-
-    goToOrderView();
-  };
-
-  const handleTakeawaySelect = () => {
-    if (!takeawayTables.length) {
-      toast.error('No takeaway table configured');
-      return;
-    }
-    setShowTakeawayOrdersModal(true);
-    const tableIdStr = (takeawayTableId || takeawayTables[0].id).toString();
-    setOrderMode('takeaway');
-    setSelectedTable(tableIdStr);
-    setActiveOrderId(null);
-    setActiveDineinOrderId(null);
-    setCart([]);
-    setCustomerDetails(prev => ({ ...prev, customer_id: '', contact_phone: '' }));
-    setShowCart(true);
-
-    const takeawayTable = tables.find(t => String(t.id) === tableIdStr);
-    const takeawayZoneConfigId = takeawayTable?.config_id || null;
-    setZoneConfigId(takeawayZoneConfigId);
-
-    goToOrderView();
-  };
+   const selectOrderTable = async ({
+     table,
+     mode = "dinein",
+     restoreDraft = false,
+     openTakeawayModal = false,
+   }) => {
+     const tableIdStr = table.id.toString();
+     const resolvedZoneConfigId = table.config_id || null;
+   
+     setActiveOrderId(null);
+     setActiveDineinOrderId(null);
+     setHasNewItems(false);
+     setCurrentBatchTimestamp(null);
+   
+     setOrderMode(mode);
+     setSelectedTable(tableIdStr);
+     setZoneConfigId(resolvedZoneConfigId);
+   
+     if (mode === "dinein") {
+       setDineinTableId(tableIdStr);
+     }
+   
+     if (restoreDraft) {
+       const draft = await readDraft(tableIdStr, clientId, token);
+   
+       if (draft) {
+         const restoredCart = (draft.items || []).flatMap(item => {
+           const menuItem = menuItems.find(
+             mi => Number(mi.id) === Number(item.item_id)
+           );
+   
+           const mainKey =
+             item.frontend_unique_key ||
+             `${item.item_id}_restored_${Date.now()}`;
+   
+           const mainEntry = {
+             id: Number(item.item_id),
+             name: item.item_name || menuItem?.name || "Item",
+             unit_price: item.unit_price ?? menuItem?.unit_price ?? 0,
+             discount: menuItem?.discount || 0,
+             image_id: menuItem?.image_id,
+             slug: item.slug || menuItem?.slug,
+             category: menuItem?.category_name,
+             category_id: menuItem?.category_id || null,
+             quantity: item.quantity || 1,
+             note: "",
+             frontend_unique_key: mainKey,
+             batch_timestamp: null,
+             is_new_item: true,
+             saved_sub_order: false,
+             status: "draft",
+             is_addon: false,
+             parent_item_key: null,
+           };
+   
+           const addonEntries = (item.line_item_id || [])
+             .map((addonId, idx) => {
+               const addonMenuItem = menuItems.find(
+                 mi => Number(mi.id) === Number(addonId)
+               );
+   
+               if (!addonMenuItem) return null;
+   
+               return {
+                 id: Number(addonId),
+                 name: addonMenuItem.name,
+                 unit_price: addonMenuItem.unit_price ?? 0,
+                 discount: addonMenuItem.discount || 0,
+                 image_id: addonMenuItem.image_id,
+                 slug: addonMenuItem.slug,
+                 category: addonMenuItem.category_name,
+                 category_id: addonMenuItem.category_id || null,
+                 quantity: 1,
+                 note: "",
+                 frontend_unique_key: `${addonId}_addon_${mainKey}_${idx}`,
+                 batch_timestamp: null,
+                 is_new_item: true,
+                 saved_sub_order: false,
+                 status: "draft",
+                 is_addon: true,
+                 parent_item_key: mainKey,
+               };
+             })
+             .filter(Boolean);
+   
+           return [mainEntry, ...addonEntries];
+         });
+   
+         setCart(restoredCart);
+         setHasNewItems(true);
+         setDraftSavedAt(Date.now());
+   
+         setCustomerDetails({
+           customer_id: draft.customer_id || "",
+           contact_phone: draft.contact_phone || "",
+         });
+   
+         toast.info("Draft restored for this table.", {
+           autoClose: 2000,
+         });
+       } else {
+         setCart([]);
+         setDraftSavedAt(null);
+         setCustomerDetails({
+           customer_id: "",
+           contact_phone: "",
+         });
+       }
+     } else {
+       setCart([]);
+       setCustomerDetails({
+         customer_id: "",
+         contact_phone: "",
+       });
+     }
+   
+     setShowCart(true);
+   
+     if (openTakeawayModal) {
+       setShowTakeawayOrdersModal(true);
+     }
+   
+     goToOrderView();
+   };
+   const handleTableSelect = async (table) => {
+     await selectOrderTable({
+       table,
+       mode: "dinein",
+       restoreDraft: true,
+     });
+   };
+ 
+   const handleTakeawaySelect = async () => {
+     if (!takeawayTables.length) {
+       toast.error("No takeaway table configured");
+       return;
+     }
+   
+     const tableIdStr = (
+       takeawayTableId || takeawayTables[0].id
+     ).toString();
+   
+     const takeawayTable = tables.find(
+       t => String(t.id) === tableIdStr
+     );
+   
+     await selectOrderTable({
+       table: takeawayTable,
+       mode: "takeaway",
+       restoreDraft: false,
+       openTakeawayModal: true,
+     });
+   };
   const handleTakeawayOrderSelected = async (existingOrder) => {
     const tableIdStr = (takeawayTableId || takeawayTables[0].id).toString();
     setOrderMode('takeaway');
@@ -2596,56 +2526,11 @@ setZoneConfigId(resolvedZoneConfigId);
   // Cart operations
   // ─────────────────────────────────────────────────────────────────────────
 
-  const getGroupedCartItems = (items) => {
-    const grouped = [];
-    const processed = new Set();
-    items.forEach(item => {
-      const key = item.frontend_unique_key || item.id;
-      if (processed.has(key)) return;
-      if (!item.parent_item_key) {  // ← parent items have no parent_item_key
-        const children = items.filter(i => i.parent_item_key === item.frontend_unique_key);
-        grouped.push({ main: { ...item }, addons: children });
-        processed.add(key);
-        children.forEach(c => processed.add(c.frontend_unique_key || c.id));
-      }
-    });
-    return grouped;
-  };
-
   const getTotalPrice = () =>
     cart
       .filter(i => !(i.frontend_unique_key || '').startsWith('cchild_'))
       .reduce((t, i) => t + (i.unit_price || 0) * i.quantity, 0)
       .toFixed(2);
-
-  const buildCartItem = (item, extra = {}) => {
-    const ts = Date.now() + Math.random();
-    const { _item_type, ...cleanExtra } = extra;
-
-    const typePrefix = _item_type || 'main';
-    const parentKey = cleanExtra.parent_item_key || '';
-    const key = parentKey
-      ? `${typePrefix}_${parentKey}_${item.id}_${ts}`
-      : `${typePrefix}_${item.id}_${ts}`;
-
-    return {
-      id: Number(item.id),
-      name: item.name,
-      image_id: item.image_id,
-      unit_price: (item.unit_price || 0) * (1 - (Number(item.discount) || 0) / 100),
-      slug: item.slug,
-      category: item.category_name,
-      category_id: item.category_id || null,
-      quantity: 1,
-      note: '',
-      frontend_unique_key: key,
-      is_new_item: true,
-      saved_sub_order: false,
-      is_addon: false,
-      parent_item_key: null,
-      ...cleanExtra,
-    };
-  };
 
   const addToCart = (item, parentItemKey = null) => {
     // Count how many of this item are already in the new (unsaved) cart
@@ -3469,14 +3354,14 @@ setZoneConfigId(resolvedZoneConfigId);
     // ── 2. Dietary filter ──
 if (selectedDietary) {
   items = items.filter(item => {
-    const dietary = getDietaryFromSlug(item);
+    const dietary = getDietaryFromSlug(item,dietaryOptions);
     return dietary !== null && dietary === selectedDietary;
   });
 }
 
     // ── 3. Category filter — uses flat list for reliable traversal ──
     if (selectedCategoryId) {
-      const ids = getCategoryAndChildrenIds(selectedCategoryId); // ← no categories arg needed now
+      const ids = getCategoryAndChildrenIds(selectedCategoryId,categoriesFlat); // ← no categories arg needed now
       items = items.filter(i => ids.includes(i.category_id));
     }
 
@@ -3587,7 +3472,7 @@ if (selectedDietary) {
                       </button>
                       {dietaryOptions.map(type => {
                         const key = type.toLowerCase().replace(/[-_\s]/g, '');
-                        const count = menuItems.filter(item => getDietaryFromSlug(item) === key).length;
+                        const count = menuItems.filter(item => getDietaryFromSlug(item,dietaryOptions) === key).length;
                         return (
                           <button
                             key={key}
@@ -3626,7 +3511,7 @@ if (selectedDietary) {
                     const dp = item.discount && Number(item.discount) > 0
                       ? Number(item.discount).toFixed(0) : null;
                     const ac = item.line_item_id?.length || 0;
-                    const dietary = getDietaryFromSlug(item);
+                    const dietary = getDietaryFromSlug(item,dietaryOptions);
                     const dietaryColor = dietary ? (dietaryColorMap[dietary] || '') : '';
                     return (
                       <div

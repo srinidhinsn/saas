@@ -11,7 +11,10 @@ import CategoryTree from '../InventoryServices/CategoryTree';
 import ImagePreview from '../../utils/ImagePreview';
 import InvoiceModal from '../BillingServices/InvoiceModal';
 import { getMenuConfig } from '../../utils/menuConfigResolver';
-import { menuCache } from '../../utils/Menu-utils/menuCache'; 
+import { menuCache } from '../../utils/Menu-utils/menuCache';
+import { getDietaryFromSlug, isItemActive,buildCartItem, getGroupedCartItems, deduplicateOrderItems,getCategoryAndChildrenIds}
+         from '../../utils/Menu-utils/menuUtils';
+import {useDietaryTypes, useTimings, useZoneConfig, useMenuData,useCounterTree} from '../../utils/Menu-utils/useMenuData';
 // ─────────────────────────────────────────────────────────────────────────────
 // Constants
 // ─────────────────────────────────────────────────────────────────────────────
@@ -1500,15 +1503,17 @@ const TakeOrder = ({ clientId, token, onOrderUpdate, realm }) => {
   // ── Remote data ───────────────────────────────────────────────────────────
   const [tables, setTables] = useState([]);
   const [tableOrders, setTableOrders] = useState({});
-  const [menuItems, setMenuItems] = useState([]);
-  const [categories, setCategories] = useState([]);
-  const [categoriesFlat, setCategoriesFlat] = useState([]);
-  const [dieterySubCategories, setDieterySubCategories] = useState([]);
+  // const [menuItems, setMenuItems] = useState([]);
+  // const [categories, setCategories] = useState([]);
+  // const [categoriesFlat, setCategoriesFlat] = useState([]);
+  // const [dieterySubCategories, setDieterySubCategories] = useState([]);
   const [sidebarCategories, setSidebarCategories] = useState([]);
-  const [counterTree, setCounterTree] = useState([]);
+  // const [counterTree, setCounterTree] = useState([]);
   const [inventoryMap, setInventoryMap] = useState({});
-  const [loading, setLoading] = useState(true);
-
+  // const [loading, setLoading] = useState(true);
+//   const { dietaryOptions, dietaryColorMap } = useDietaryTypes({ clientId, token });
+// const { timingOptions }                   = useTimings({ clientId, token });
+// const { sections, zones }                 = useZoneConfig({ clientId, token });
   // ── Order context ─────────────────────────────────────────────────────────
   const [selectedTable, setSelectedTable] = useState('');
   const [takeawayTables, setTakeawayTables] = useState([]);
@@ -1555,145 +1560,107 @@ const TakeOrder = ({ clientId, token, onOrderUpdate, realm }) => {
   const searchInputRef = useRef(null);
   const isMobile = window.matchMedia('(max-width: 1024px)').matches;
 
-  const [sections, setSections] = useState([]);
-  const [takeawaySections, setTakeawaySections] = useState([]);
+  // const [takeawaySections, setTakeawaySections] = useState([]);
   const [zoneConfigId, setZoneConfigId] = useState(null);
-  const [dietaryOptions, setDietaryOptions] = useState([]);
-  const [dietaryColorMap, setDietaryColorMap] = useState({});
   const [selectedDietary, setSelectedDietary] = useState(null);
   const [stockWarning, setStockWarning] = useState(null);
-  const [timingOptions, setTimingOptions] = useState([]);
   const [showTakeawayOrdersModal, setShowTakeawayOrdersModal] = useState(false);
   const hasFetchedRef = useRef(false);
   const menuConfig = useMemo(
     () => (clientId ? getMenuConfig(clientId) : null),
     [clientId]
   );
+  const {
+    menuItems,
+    allMenuItemsRaw,
+    categories,
+    categoriesFlat,
+    dieterySubCategories,
+    dedupedMenuItems,
+    requiredScreenId,
+    loading,
+    refetch: fetchData,
+  } = useMenuData({
+    clientId,
+    token,
+    menuConfig,
+    zoneConfigId,
+    includeAllRaw: true,
+  });
+  // const fetchZoneConfig = async () => {
+  //   try {
+  //     const res = await axios.get(
+  //       `${import.meta.env.VITE_API_TABLE_SERVICE_URL}/${clientId}/tables/config`,
+  //       { headers: { Authorization: `Bearer ${token}` } }
+  //     );
 
-  const fetchZoneConfig = async () => {
-  const { sections: allSections } = await menuCache.fetchTablesConfig(clientId, token);
+  //     const takeawayRoots =
+  //       (import.meta.env.VITE_EASYFOOD_TAKEAWAY_TABLE_DEFAULT_ROOT || '')
+  //         .split(',')
+  //         .map(v => v.trim().toLowerCase())
+  //         .filter(Boolean);
 
-      const takeawayRoots =
-        (import.meta.env.VITE_EASYFOOD_TAKEAWAY_TABLE_DEFAULT_ROOT || '')
-          .split(',')
-          .map(v => v.trim().toLowerCase())
-          .filter(Boolean);
+  //     const allSections = res.data || [];
 
-      // Dine-in sections — exclude anything that matches takeaway roots
-      const dineInSections = takeawayRoots.length > 0
-        ? allSections.filter(s =>
-          !takeawayRoots.some(root =>
-            (s.zone || '').toLowerCase().startsWith(root) ||
-            (s.section || '').toLowerCase().startsWith(root)
-          )
-        )
-        : allSections;
+  //     // Dine-in sections — exclude anything that matches takeaway roots
+  //     const dineInSections = takeawayRoots.length > 0
+  //       ? allSections.filter(s =>
+  //         !takeawayRoots.some(root =>
+  //           (s.zone || '').toLowerCase().startsWith(root) ||
+  //           (s.section || '').toLowerCase().startsWith(root)
+  //         )
+  //       )
+  //       : allSections;
 
-      // Takeaway sections — only those matching takeaway roots
-      const takeawaySectionsFiltered = takeawayRoots.length > 0
-        ? allSections.filter(s =>
-          takeawayRoots.some(root =>
-            (s.zone || '').toLowerCase().startsWith(root) ||
-            (s.section || '').toLowerCase().startsWith(root)
-          )
-        )
-        : [];
+  //     // Takeaway sections — only those matching takeaway roots
+  //     const takeawaySectionsFiltered = takeawayRoots.length > 0
+  //       ? allSections.filter(s =>
+  //         takeawayRoots.some(root =>
+  //           (s.zone || '').toLowerCase().startsWith(root) ||
+  //           (s.section || '').toLowerCase().startsWith(root)
+  //         )
+  //       )
+  //       : [];
 
-  setSections(dineInSections);
-  setTakeawaySections(takeawaySectionsFiltered);
-};
+  //     setTakeawaySections(takeawaySectionsFiltered);
+  //   } catch (err) {
+  //     console.error('Zone config fetch failed', err);
+  //   }
+  // };
 
-  const DIETARY_COLORS = ['bg-green-500', 'bg-red-500', 'bg-yellow-400', 'bg-orange-500', 'bg-purple-500', 'bg-blue-500'];
-
-  const fetchDietaryTypes = async () => {
-    const cached = menuCache.get('dietaryTypes', clientId);
-    if (cached) {
-      // MenuManagement saves as a plain array — handle that
-      const opts = Array.isArray(cached) ? cached : cached.opts || [];
-      setDietaryOptions(opts);
-      const map = {};
-      opts.forEach((opt, idx) => {
-        map[opt.toLowerCase().replace(/[-_\s]/g, '')] = DIETARY_COLORS[idx % DIETARY_COLORS.length];
-      });
-      setDietaryColorMap(map);
-      return;
-    }
-    try {
-      const res = await axios.get(
-        `${import.meta.env.VITE_API_INVENTORY_SERVICE_URL}/${clientId}/inventory/item-types`,
-        { params: { category_id: 'dietary_type' }, headers: { Authorization: `Bearer ${token}` } }
-      );
-      const opts = res.data?.data || [];
-      setDietaryOptions(opts);
-      const map = {};
-      opts.forEach((opt, idx) => {
-        map[opt.toLowerCase().replace(/[-_\s]/g, '')] = DIETARY_COLORS[idx % DIETARY_COLORS.length];
-      });
-      setDietaryColorMap(map);
-      // Save as plain array to match MenuManagement's format
-      menuCache.set('dietaryTypes', clientId, opts);
-    } catch (err) {
-      console.error('Dietary fetch failed:', err);
-    }
-  };
-  const fetchTimings = async () => {
-    const cached = menuCache.get('timings', clientId);
-    if (cached) { setTimingOptions(cached); return; }
-    try {
-      const res = await axios.get(
-        `${import.meta.env.VITE_API_INVENTORY_SERVICE_URL}/${clientId}/inventory/item-types`,
-        {
-          params: { category_id: 'available_timings' },
-          headers: { Authorization: `Bearer ${token}` },
-        }
-      );
-      const raw = res.data?.data || [];
-      const parsed = raw.map(v => {
-        const match = v.match(/^(.+)\((.+)-(.+)\)$/);
-        return {
-          name: (match?.[1] ?? v).trim().toLowerCase(),
-          start: match?.[2] ?? null,
-          end: match?.[3] ?? null,
-          raw: v
-        };
-      });
-      setTimingOptions(parsed);
-      menuCache.set('timings', clientId, parsed);
-    } catch (err) {
-      console.error('Timing fetch failed:', err);
-      setTimingOptions([]);
-    }
-  };
   // ─────────────────────────────────────────────────────────────────────────
   // Draft helpers
   // ─────────────────────────────────────────────────────────────────────────
-
-  const deduplicateOrderItems = (items) => {
-    const uniqueKeyToItemMap = new Map();
-    const result = [];
+  const { counterTree } = useCounterTree({
+    clientId,
+    token,
+  });
   
-    items.forEach(item => {
-      // Prefer frontend_unique_key, then DB id, then warn and include as-is
-      const fkey = item.frontend_unique_key || (item.id ? String(item.id) : null);
+  const {
+    sections,
+    takeawaySections,
+    zones,
+  } = useZoneConfig({
+    clientId,
+    token,
+    takeawayRootEnv:
+      import.meta.env.VITE_TAKEAWAY_TABLE_DEFAULT_ROOT,
+  });
   
-      if (!fkey) {
-        console.warn(`Item ${item.item_id} has no unique key or DB id — included without dedup`);
-        result.push({ ...item });
-        return;
-      }
+  const {
+    dietaryOptions,
+    dietaryColorMap,
+  } = useDietaryTypes({
+    clientId,
+    token,
+  });
   
-      if (uniqueKeyToItemMap.has(fkey)) {
-        // Same logical item appearing in multiple sub-orders — accumulate quantity
-        uniqueKeyToItemMap.get(fkey).quantity += (item.quantity ?? 0);
-      } else {
-        const copy = { ...item };
-        uniqueKeyToItemMap.set(fkey, copy);
-        result.push(copy);
-      }
-    });
-  
-    return result;
-  };
+  const {
+    timingOptions,
+  } = useTimings({
+    clientId,
+    token,
+  });
   const handleSaveDraft = useCallback(async () => {
     if (!selectedTable || cart.length === 0) {
       toast.warn('Nothing to save — cart is empty.');
@@ -1762,19 +1729,6 @@ const TakeOrder = ({ clientId, token, onOrderUpdate, realm }) => {
     return null;
   }, [categoriesFlat]);
 
-  const getCategoryAndChildrenIds = useCallback((targetId) => {
-    if (!targetId || !categoriesFlat.length) return [];
-    const result = new Set();
-    const addWithChildren = (id) => {
-      result.add(id);
-      categoriesFlat
-        .filter(c => c.parentId === id)
-        .forEach(c => addWithChildren(c.id));
-    };
-    addWithChildren(targetId);
-    return Array.from(result);
-  }, [categoriesFlat]);
-
   const findCategoryNode = (tree, matcher) => {
     for (const c of tree) {
       if (
@@ -1809,40 +1763,6 @@ const TakeOrder = ({ clientId, token, onOrderUpdate, realm }) => {
     }
     return null;
   };
-  const isItemActive = useCallback((slug) => {
-    if (!slug) return true;
-
-    const doubleUnderIdx = slug.lastIndexOf('__');
-    const timingSegment = doubleUnderIdx !== -1
-      ? slug.slice(doubleUnderIdx + 2).toLowerCase()
-      : null;
-
-    // ✅ Explicit unavailable flag
-    if (timingSegment === 'unavailable') return false;
-
-    if (!timingOptions || timingOptions.length === 0) return true;
-    if (!timingSegment || timingSegment === 'allday') return true;
-
-    const timingKeys = timingSegment.split('+').filter(Boolean);
-    if (timingKeys.length === 0) return true;
-
-    const recognizedKeys = timingKeys.filter(key => {
-      const t = timingOptions.find(o => o.name?.toLowerCase() === key);
-      return t && t.start && t.end;
-    });
-
-    if (recognizedKeys.length === 0) return true;
-
-    const now = new Date();
-    const currentMinutes = now.getHours() * 60 + now.getMinutes();
-
-    return recognizedKeys.some(key => {
-      const t = timingOptions.find(o => o.name?.toLowerCase() === key);
-      const [sh, sm] = t.start.split(':').map(Number);
-      const [eh, em] = t.end.split(':').map(Number);
-      return currentMinutes >= (sh * 60 + sm) && currentMinutes <= (eh * 60 + em);
-    });
-  }, [timingOptions]);
   // ─────────────────────────────────────────────────────────────────────────
   // Determine if a category is a combo category (walks ancestors)
   // ─────────────────────────────────────────────────────────────────────────
@@ -1865,27 +1785,27 @@ const TakeOrder = ({ clientId, token, onOrderUpdate, realm }) => {
   // Data fetching
   // ─────────────────────────────────────────────────────────────────────────
 
-  const fetchCounterTree = async () => {
-    const cached = menuCache.get('counterTree', clientId);
-    if (cached) { setCounterTree(cached); return; }
-    try {
-      const res = await axios.get(
-        `${import.meta.env.VITE_API_INVENTORY_SERVICE_URL}/${clientId}/menu/read_category`,
-        {
-          params: { client_id: clientId, category_id: 'counter' },
-          headers: { Authorization: `Bearer ${token}` },
-        }
-      );
-      const tree = res.data.data?.[0]?.subCategories || [];
-      setCounterTree(tree);
-      menuCache.set('counterTree', clientId, tree);
-    } catch (err) {
-      console.error('Failed to fetch counter tree:', err);
-    }
-  };
+  // const fetchCounterTree = async () => {
+  //   const cached = menuCache.get('counterTree', clientId);
+  //   if (cached) { setCounterTree(cached); return; }
+  //   try {
+  //     const res = await axios.get(
+  //       `${import.meta.env.VITE_API_INVENTORY_SERVICE_URL}/${clientId}/menu/read_category`,
+  //       {
+  //         params: { client_id: clientId, category_id: 'counter' },
+  //         headers: { Authorization: `Bearer ${token}` },
+  //       }
+  //     );
+  //     const data = res.data.data?.[0]?.subCategories || [];
+  //     setCounterTree(data);
+  //     menuCache.set('counterTree', clientId, data);
+  //   } catch (err) {
+  //     console.error('Failed to fetch counter tree:', err);
+  //   }
+  // };
 
 
-  const fetchTableOrders = async (tableList) => {
+  const fetchTableOrders = async (tableList = []) => {
     try {
       const r = await axios.get(
         `${import.meta.env.VITE_API_ORDER_SERVICE_URL}/${clientId}/dinein/table`,
@@ -1928,22 +1848,46 @@ const TakeOrder = ({ clientId, token, onOrderUpdate, realm }) => {
   };
 
   // REMOVE the old fetchTables and REPLACE WITH:
-  const fetchTables = async () => {
-    const takeawayRoots =
-      (import.meta.env.VITE_EASYFOOD_TAKEAWAY_TABLE_DEFAULT_ROOT || '')
-        .split(',')
-        .map(v => v.trim().toLowerCase());
+  const fetchTables = useCallback(async () => {
+    const prefix = String(clientId)
+    .trim().toLowerCase().split('/').pop()
+    .replace(/[^a-z0-9]/g, '_').toUpperCase();
 
-    const res = await axios.get(
-      `${import.meta.env.VITE_API_TABLE_SERVICE_URL}/${clientId}/tables/read`,
-      { headers: { Authorization: `Bearer ${token}` } }
-    );
-
-    const list = Array.isArray(res.data?.data)
-      ? res.data.data.map(t => ({
-        ...t,
-        table_number: t.name || t.table_number || '-',
-      }))
+  const takeawayRoots = (
+    import.meta.env[`VITE_${prefix}_TAKEAWAY_TABLE_DEFAULT_ROOT`] ||
+    import.meta.env.VITE_TAKEAWAY_TABLE_DEFAULT_ROOT ||
+    ''
+  )
+    .split(',')
+    .map(v => v.trim().toLowerCase())
+    .filter(Boolean);
+  
+    const [tableRes, configRes] = await Promise.all([
+      axios.get(
+        `${import.meta.env.VITE_API_TABLE_SERVICE_URL}/${clientId}/tables/read`,
+        { headers: { Authorization: `Bearer ${token}` } }
+      ),
+      axios.get(
+        `${import.meta.env.VITE_API_TABLE_SERVICE_URL}/${clientId}/tables/config`,
+        { headers: { Authorization: `Bearer ${token}` } }
+      ),
+    ]);
+  
+    const freshConfigs = configRes.data || [];
+  
+    const list = Array.isArray(tableRes.data?.data)
+      ? tableRes.data.data.map(t => {
+          const matchedConfig = freshConfigs.find(
+            c =>
+              c.section?.trim().toLowerCase() === t.section?.trim().toLowerCase() &&
+              c.zone?.trim().toLowerCase() === t.location_zone?.trim().toLowerCase()
+          );
+          return {
+            ...t,
+            table_number: t.name || t.table_number || '-',
+            config_id: matchedConfig?.id || null,
+          };
+        })
       : [];
 
     const takeaway = list.filter(t =>
@@ -1962,147 +1906,19 @@ const TakeOrder = ({ clientId, token, onOrderUpdate, realm }) => {
     );
     setTables(list);
     await fetchTableOrders(list);
-  };
+  },[clientId,token])
 
   // ─────────────────────────────────────────────────────────────────────────
   // Initial data load
   // ─────────────────────────────────────────────────────────────────────────
 
   useEffect(() => {
-    if (hasFetchedRef.current) return;
-    hasFetchedRef.current = true;
-    const fetchData = async () => {
-      if (!clientId || !token || !menuConfig) return;
-      try {
-        setLoading(true);
-        await Promise.all([fetchTables(), fetchCounterTree(), fetchZoneConfig(), fetchDietaryTypes(), fetchTimings()]);
-        // ── Check cache for menu + categories ──────────────────────────
-        const menuCacheSlice = `menuData_zone_all`;
-        const cachedMenu = menuCache.get(menuCacheSlice, clientId);
-        if (cachedMenu) {
-          setCategoriesFlat(cachedMenu.categoriesFlat);
-          setMenuItems(cachedMenu.menuItems);
-          setCategories(cachedMenu.categoryTree);
-          setSidebarCategories(cachedMenu.categoryTree);
-          setDieterySubCategories(cachedMenu.dieterySubCategories);
-          setInventoryMap(cachedMenu.inventoryMap);
-          setLoading(false);
-          return;
-        }
-
-        const [catRes, itemRes, invRes] = await Promise.all([
-          axios.get(
-            `${import.meta.env.VITE_API_INVENTORY_SERVICE_URL}/${clientId}/menu/read_category?category_id=${menuConfig.root}`,
-            { headers: { Authorization: `Bearer ${token}` } }
-          ),
-          axios.get(
-            `${import.meta.env.VITE_API_INVENTORY_SERVICE_URL}/${clientId}/menu/read`,
-            {
-              headers: { Authorization: `Bearer ${token}` },
-              params: {
-                inventory_id: menuConfig.menuInventoryId,
-                ...(zoneConfigId && { zone_config_id: zoneConfigId }),
-              }
-            }
-          ),
-          axios.get(
-            `${import.meta.env.VITE_API_INVENTORY_SERVICE_URL}/${clientId}/inventory/read`,
-            { headers: { Authorization: `Bearer ${token}` } }
-          ),
-        ]);
-
-        const iMap = {};
-        (invRes.data?.data || []).forEach(i => (iMap[i.id] = i));
-        setInventoryMap(iMap);
-
-        const fullTree = catRes.data.data.filter(c => c.name?.toLowerCase() !== 'all');
-        const subIds = new Set();
-        fullTree.forEach(c => c.subCategories?.forEach(s => subIds.add(s.id)));
-        const topLevel = fullTree.filter(c => !subIds.has(c.id));
-        const flatCats = flattenCategoryTree(topLevel);
-        const normalizedFlat = flatCats.map(c => ({
-          id: c.id,
-          name: (c.name || '').trim(),
-          parentId: c.parentId ?? c.parent_id ?? null,
-        }));
-        setCategoriesFlat(normalizedFlat);
-
-        const seenInit = new Map();
-itemRes.data.data.forEach(item => {
-  const zid = item.zone_config_id === null || item.zone_config_id === undefined
-    ? 0
-    : Number(item.zone_config_id);
-
-  if (!seenInit.has(item.id)) {
-    seenInit.set(item.id, { ...item, zone_config_id: zid });
-  } else if (zid === 0) {
-    seenInit.set(item.id, { ...item, zone_config_id: 0 });
-  }
-});
-
-        const enrichedItems = Array.from(seenInit.values()).map(item => {
-          const cat = flatCats.find(c => c.id === item.category_id);
-          return { ...item, category_name: cat?.name || 'Uncategorized' };
-        });
-        enrichedItems.sort((a, b) => (a.name || '').localeCompare(b.name || ''));
-        setMenuItems(enrichedItems);
-
-        const buildTree = () => {
-          const map = new Map();
-          flatCats.forEach(c =>
-            map.set(c.id, {
-              ...c,
-              count: enrichedItems.filter(i => i.category_id === c.id).length,
-              children: [],
-            })
-          );
-          const tree = [];
-          map.forEach(c => {
-            if (c.parentId && map.has(c.parentId)) map.get(c.parentId).children.push(c);
-            else tree.push(c);
-          });
-          return tree;
-        };
-
-        const categoryTree = buildTree().map(c =>
-          c.id === menuConfig.root || c.name?.toLowerCase() === menuConfig.root.toLowerCase()
-            ? { ...c, name: 'All Categories', count: c.children.length }
-            : c
-        );
-        setCategories(categoryTree);
-        setSidebarCategories(categoryTree);
-
-        const rootNode = findCategoryNode(categoryTree, menuConfig.root);
-        let qc = [];
-        if (rootNode) {
-          let l = menuConfig.level;
-          while (l >= 0) {
-            qc = getCategoriesAtLevel(rootNode, l);
-            if (qc.length > 0) break;
-            l--;
-          }
-        }
-        setDieterySubCategories(qc);
-        // ── Save to cache ───────────────────────────────────────────────
-        menuCache.set(menuCacheSlice, clientId, {
-          categoriesFlat: normalizedFlat,
-          menuItems: enrichedItems,
-          categoryTree,
-          dieterySubCategories: qc,
-          inventoryMap: iMap,
-        });
-      } catch (err) {
-        console.error('Fetch error:', err);
-      } finally {
-        setLoading(false);
-      }
-    };
     fetchData();
     // eslint-disable-next-line react-hooks/exhaustive-deps
   }, [clientId, token, realm, menuConfig]);
 
   useEffect(() => {
-    if (!zoneConfigId || !clientId || !token || !menuConfig) return;
+    if ( !clientId || !token || !menuConfig) return;
 
     const refetchMenu = async () => {
       // Check zone-specific cache first
@@ -2139,9 +1955,7 @@ itemRes.data.data.forEach(item => {
           return { ...item, category_name: cat?.name || 'Uncategorized' };
         });
         enriched.sort((a, b) => (a.name || '').localeCompare(b.name || ''));
-        setMenuItems(enriched);
-        // Save zone-specific cache
-        menuCache.set(zoneSlice, clientId, { menuItems: enriched });
+        // setMenuItems(enriched);
       } catch (err) {
         console.error('Zone menu refetch failed:', err);
       }
@@ -2149,43 +1963,6 @@ itemRes.data.data.forEach(item => {
 
     refetchMenu();
   }, [zoneConfigId, clientId, token, menuConfig]);
-  const getDietaryFromSlug = useCallback((item) => {
-    if (!item || !dietaryOptions.length) return null;
-    const normalize = (str) => (str || '').toLowerCase().replace(/[-_\s]/g, '');
-    const slug = item.slug || '';
-    const doubleUnderIdx = slug.lastIndexOf('__');
-  
-    // ── NEW FORMAT: dietary is in the __ suffix ──
-    if (doubleUnderIdx !== -1) {
-      const suffix = slug.slice(doubleUnderIdx + 2).toLowerCase();
-      if (suffix && suffix !== 'unavailable' && suffix !== 'allday') {
-        const suffixParts = suffix.split('+').filter(Boolean);
-        const sortedOptions = [...dietaryOptions].sort(
-          (a, b) => normalize(b).length - normalize(a).length
-        );
-        for (const part of suffixParts) {
-          const match = sortedOptions.find(d => normalize(d) === normalize(part));
-          if (match) return normalize(match);
-        }
-      }
-    }
-  
-    // ── OLD FORMAT FALLBACK: dietary was injected into the main slug path ──
-    const mainPart = doubleUnderIdx !== -1 ? slug.slice(0, doubleUnderIdx) : slug;
-    const slugSegments = mainPart.toLowerCase().split('_').filter(Boolean);
-    const sortedOptions = [...dietaryOptions].sort(
-      (a, b) => normalize(b).length - normalize(a).length
-    );
-    for (let i = 0; i < slugSegments.length; i++) {
-      for (let j = 1; j <= 3; j++) {
-        const joined = normalize(slugSegments.slice(i, i + j).join(''));
-        const match = sortedOptions.find(d => normalize(d) === joined);
-        if (match) return normalize(match);
-      }
-    }
-  
-    return null;
-  }, [dietaryOptions]);
   // ─────────────────────────────────────────────────────────────────────────
   // Browser history (back button) — push initial floor state once
   // ─────────────────────────────────────────────────────────────────────────
@@ -2244,7 +2021,7 @@ itemRes.data.data.forEach(item => {
       return;
     }
     try {
-      setLoading(true);
+      // setLoading(true);
       const headers = { Authorization: `Bearer ${token}` };
       const oldTableId = Number(selectedTable);
       const newTableId = newTable.id;
@@ -2277,166 +2054,175 @@ itemRes.data.data.forEach(item => {
     } catch (err) {
       console.error('[Transfer] Failed:', err);
       toast.error('Transfer failed');
-    } finally {
-      setLoading(false);
+    } finally { 
+      console.log("error");
+      
+      // setLoading(false);
     }
   };
-
-  const handleTableSelect = async (table) => {
+  
+  const selectOrderTable = async ({
+    table,
+    mode = "dinein",
+    restoreDraft = false,
+    openTakeawayModal = false,
+  }) => {
     const tableIdStr = table.id.toString();
-
+    const resolvedZoneConfigId = table.config_id || null;
+  
     setActiveOrderId(null);
     setActiveDineinOrderId(null);
     setHasNewItems(false);
     setCurrentBatchTimestamp(null);
-    setOrderMode('dinein');
+  
+    setOrderMode(mode);
     setSelectedTable(tableIdStr);
-    setDineinTableId(tableIdStr);
-    const matchedSection = sections.find(
-      s => s.zone === table.location_zone && s.section === table.section
-    );
-    const resolvedZoneConfigId = matchedSection ? matchedSection.id : null;
     setZoneConfigId(resolvedZoneConfigId);
-    const draft = await readDraft(tableIdStr, clientId, token);
-
-    if (draft) {
-      // Reconstruct cart from draft order items
-      const restoredCart = (draft.items || []).flatMap(item => {
-        const menuItem = menuItems.find(mi => Number(mi.id) === Number(item.item_id));
-        const mainKey = item.frontend_unique_key || `${item.item_id}_restored_${Date.now()}`;
-        const mainEntry = {
-          id: Number(item.item_id),
-          name: item.item_name || menuItem?.name || 'Item',
-          unit_price: item.unit_price ?? menuItem?.unit_price ?? 0,
-          discount: menuItem?.discount || 0,
-          image_id: menuItem?.image_id,
-          slug: item.slug || menuItem?.slug,
-          category: menuItem?.category_name,
-          category_id: menuItem?.category_id || null,
-          quantity: item.quantity || 1,
-          note: '',
-          frontend_unique_key: mainKey,
-          batch_timestamp: null,
-          is_new_item: true,
-          saved_sub_order: false,
-          status: 'draft',
-          is_addon: false,
-          parent_item_key: null,
-        };
-
-        // Restore linked addons that were saved as line_item_id on the draft item
-        const addonEntries = (item.line_item_id || []).map((addonId, idx) => {
-          const addonMenuItem = menuItems.find(mi => Number(mi.id) === Number(addonId));
-          if (!addonMenuItem) return null;
-          return {
-            id: Number(addonId),
-            name: addonMenuItem.name || 'Addon',
-            unit_price: addonMenuItem.unit_price ?? 0,
-            discount: addonMenuItem.discount || 0,
-            image_id: addonMenuItem.image_id,
-            slug: addonMenuItem.slug,
-            category: addonMenuItem.category_name,
-            category_id: addonMenuItem.category_id || null,
-            quantity: 1,
-            note: '',
-            frontend_unique_key: `${addonId}_addon_${mainKey}_${idx}`,
+  
+    if (mode === "dinein") {
+      setDineinTableId(tableIdStr);
+    }
+  
+    if (restoreDraft) {
+      const draft = await readDraft(tableIdStr, clientId, token);
+  
+      if (draft) {
+        const restoredCart = (draft.items || []).flatMap(item => {
+          const menuItem = menuItems.find(
+            mi => Number(mi.id) === Number(item.item_id)
+          );
+  
+          const mainKey =
+            item.frontend_unique_key ||
+            `${item.item_id}_restored_${Date.now()}`;
+  
+          const mainEntry = {
+            id: Number(item.item_id),
+            name: item.item_name || menuItem?.name || "Item",
+            unit_price: item.unit_price ?? menuItem?.unit_price ?? 0,
+            discount: menuItem?.discount || 0,
+            image_id: menuItem?.image_id,
+            slug: item.slug || menuItem?.slug,
+            category: menuItem?.category_name,
+            category_id: menuItem?.category_id || null,
+            quantity: item.quantity || 1,
+            note: "",
+            frontend_unique_key: mainKey,
             batch_timestamp: null,
             is_new_item: true,
             saved_sub_order: false,
-            status: 'draft',
-            is_addon: true,
-            parent_item_key: mainKey,
+            status: "draft",
+            is_addon: false,
+            parent_item_key: null,
           };
-        }).filter(Boolean);
-
-        return [mainEntry, ...addonEntries];
-      });
-
-      setCart(restoredCart);
-      setHasNewItems(true);
-      setDraftSavedAt(Date.now());
-      setShowCart(true);
-      if (draft.customer_id || draft.contact_phone) {
+  
+          const addonEntries = (item.line_item_id || [])
+            .map((addonId, idx) => {
+              const addonMenuItem = menuItems.find(
+                mi => Number(mi.id) === Number(addonId)
+              );
+  
+              if (!addonMenuItem) return null;
+  
+              return {
+                id: Number(addonId),
+                name: addonMenuItem.name,
+                unit_price: addonMenuItem.unit_price ?? 0,
+                discount: addonMenuItem.discount || 0,
+                image_id: addonMenuItem.image_id,
+                slug: addonMenuItem.slug,
+                category: addonMenuItem.category_name,
+                category_id: addonMenuItem.category_id || null,
+                quantity: 1,
+                note: "",
+                frontend_unique_key: `${addonId}_addon_${mainKey}_${idx}`,
+                batch_timestamp: null,
+                is_new_item: true,
+                saved_sub_order: false,
+                status: "draft",
+                is_addon: true,
+                parent_item_key: mainKey,
+              };
+            })
+            .filter(Boolean);
+  
+          return [mainEntry, ...addonEntries];
+        });
+  
+        setCart(restoredCart);
+        setHasNewItems(true);
+        setDraftSavedAt(Date.now());
+  
         setCustomerDetails({
-          customer_id: draft.customer_id || '',
-          contact_phone: draft.contact_phone || '',
+          customer_id: draft.customer_id || "",
+          contact_phone: draft.contact_phone || "",
+        });
+  
+        toast.info("Draft restored for this table.", {
+          autoClose: 2000,
         });
       } else {
-        setCustomerDetails({ customer_id: '', contact_phone: '' });
+        setCart([]);
+        setDraftSavedAt(null);
+        setCustomerDetails({
+          customer_id: "",
+          contact_phone: "",
+        });
       }
-      toast.info('Draft restored for this table.', { autoClose: 2000 });
     } else {
       setCart([]);
-      setDraftSavedAt(null);
-      setCustomerDetails({ customer_id: '', contact_phone: '' });
-      setShowCart(true);
+      setCustomerDetails({
+        customer_id: "",
+        contact_phone: "",
+      });
     }
-
+  
+    setShowCart(true);
+  
+    if (openTakeawayModal) {
+      setShowTakeawayOrdersModal(true);
+    }
+  
     goToOrderView();
   };
+  const handleTableSelect = async (table) => {
+    await selectOrderTable({
+      table,
+      mode: "dinein",
+      restoreDraft: true,
+    });
+  };
 
-  const handleTakeawaySelect = () => {
+  const handleTakeawaySelect = async () => {
     if (!takeawayTables.length) {
-      toast.error('No takeaway table configured');
+      toast.error("No takeaway table configured");
       return;
     }
-    setShowTakeawayOrdersModal(true);
-    const tableIdStr = (takeawayTableId || takeawayTables[0].id).toString();
-    setOrderMode('takeaway');
-    setSelectedTable(tableIdStr);
-    setActiveOrderId(null);
-    setActiveDineinOrderId(null);
-    setCart([]);
-    setCustomerDetails({ customer_id: '', contact_phone: '' });
-    setShowCart(true);
-
-    // Set takeaway zone_config_id so correct prices are fetched
+  
+    const tableIdStr = (
+      takeawayTableId || takeawayTables[0].id
+    ).toString();
+  
     const takeawayTable = tables.find(
-      t => String(t.id) === String(tableIdStr)
+      t => String(t.id) === tableIdStr
     );
-    
-    const matchedSection = takeawaySections.find(
-      s =>
-        s.zone === takeawayTable?.location_zone &&
-        s.section === takeawayTable?.section
-    );
-    
-    const takeawayZoneConfigId = matchedSection?.id || null;
-    
-    console.log("TAKEAWAY TABLE:", takeawayTable);
-    console.log("MATCHED TAKEAWAY SECTION:", matchedSection);
-    console.log("ZONE CONFIG:", takeawayZoneConfigId);
-    
-    setZoneConfigId(takeawayZoneConfigId);
-
-    goToOrderView();
+  
+    await selectOrderTable({
+      table: takeawayTable,
+      mode: "takeaway",
+      restoreDraft: false,
+      openTakeawayModal: true,
+    });
   };
   const handleTakeawayOrderSelected = async (existingOrder) => {
     const tableIdStr = (takeawayTableId || takeawayTables[0].id).toString();
+    const takeawayTable = tables.find(t => String(t.id) === tableIdStr);
+    const takeawayZoneConfigId = takeawayTable?.config_id || null; 
     setOrderMode('takeaway');
     setSelectedTable(tableIdStr);
-
-    // Set takeaway zone_config_id so correct prices are fetched
-    const takeawayTable = tables.find(
-      t => String(t.id) === String(tableIdStr)
-    );
-    
-    const matchedSection = takeawaySections.find(
-      s =>
-        s.zone === takeawayTable?.location_zone &&
-        s.section === takeawayTable?.section
-    );
-    
-    const takeawayZoneConfigId = matchedSection?.id || null;
-    
-    console.log("TAKEAWAY TABLE:", takeawayTable);
-    console.log("MATCHED TAKEAWAY SECTION:", matchedSection);
-    console.log("ZONE CONFIG:", takeawayZoneConfigId);
-    
     setZoneConfigId(takeawayZoneConfigId);
-
+  
     if (!existingOrder) {
-      // New order
       setActiveOrderId(null);
       setActiveDineinOrderId(null);
       setCart([]);
@@ -2444,7 +2230,6 @@ itemRes.data.data.forEach(item => {
       setCurrentBatchTimestamp(null);
       setDraftSavedAt(null);
     } else {
-      // Resume existing order — reconstruct cart as old (read-only) items
       const reconstructedCart = (existingOrder.items || []).map(item => {
         const menuItem = menuItems.find(mi => Number(mi.id) === Number(item.item_id));
         return {
@@ -2484,7 +2269,7 @@ itemRes.data.data.forEach(item => {
       return;
     }
     try {
-      setLoading(true);
+      // setLoading(true);
       const r = await axios.get(
         `${import.meta.env.VITE_API_ORDER_SERVICE_URL}/${clientId}/dinein/table`,
         { headers: { Authorization: `Bearer ${token}` } }
@@ -2527,10 +2312,8 @@ itemRes.data.data.forEach(item => {
 
       setCart(reconstructedCart);
       setSelectedTable(table.id.toString());
-      const matchedSection = sections.find(
-        s => s.zone === table.location_zone && s.section === table.section
-      );
-      setZoneConfigId(matchedSection ? matchedSection.id : null);
+      const tableObj = tables.find(t => t.id === table.id);
+      setZoneConfigId(tableObj?.config_id || null);
       setOrderMode('dinein');
       setActiveOrderId(activeOrder.id);
       setActiveDineinOrderId(activeOrder.dinein_order_id);
@@ -2542,7 +2325,9 @@ itemRes.data.data.forEach(item => {
       console.error(err);
       alert('Failed to load order');
     } finally {
-      setLoading(false);
+      console.log("error");
+      
+      // setLoading(false);
     }
   };
 
@@ -2550,61 +2335,30 @@ itemRes.data.data.forEach(item => {
     // Leave cart & draft untouched — waiter can return to same table
     goToFloor();
   };
-
+  const initializeTakeOrder = useCallback(async () => {
+    if (!clientId || !token) return;
+  
+    try {
+      await Promise.all([
+        fetchTables(),
+        fetchTableOrders()
+      ]);
+    } catch (err) {
+      console.error("TakeOrder initialization failed:", err);
+    }
+  }, [clientId, token]);
+  useEffect(() => {
+    initializeTakeOrder();
+  }, [initializeTakeOrder]);
   // ─────────────────────────────────────────────────────────────────────────
   // Cart operations
   // ─────────────────────────────────────────────────────────────────────────
-
-  const getGroupedCartItems = (items) => {
-    const grouped = [];
-    const processed = new Set();
-    items.forEach(item => {
-      const key = item.frontend_unique_key || item.id;
-      if (processed.has(key)) return;
-      if (!item.parent_item_key) {  // ← parent items have no parent_item_key
-        const children = items.filter(i => i.parent_item_key === item.frontend_unique_key);
-        grouped.push({ main: { ...item }, addons: children });
-        processed.add(key);
-        children.forEach(c => processed.add(c.frontend_unique_key || c.id));
-      }
-    });
-    return grouped;
-  };
 
   const getTotalPrice = () =>
     cart
       .filter(i => !(i.frontend_unique_key || '').startsWith('cchild_'))
       .reduce((t, i) => t + (i.unit_price || 0) * i.quantity, 0)
       .toFixed(2);
-
-      const buildCartItem = (item, extra = {}) => {
-        const ts = Date.now() + Math.random();
-        const { _item_type, ...cleanExtra } = extra;
-
-        const typePrefix = _item_type || 'main';
-        const parentKey = cleanExtra.parent_item_key || '';
-        const key = parentKey
-          ? `${typePrefix}_${parentKey}_${item.id}_${ts}`
-          : `${typePrefix}_${item.id}_${ts}`;
-      
-        return {
-          id: Number(item.id),
-          name: item.name,
-          image_id: item.image_id,
-          unit_price: (item.unit_price || 0) * (1 - (Number(item.discount) || 0) / 100),
-          slug: item.slug,
-          category: item.category_name,
-          category_id: item.category_id || null,
-          quantity: 1,
-          note: '',
-          frontend_unique_key: key,
-          is_new_item: true,
-          saved_sub_order: false,
-          is_addon: false,
-          parent_item_key: null,
-          ...cleanExtra,
-        };
-      };
 
   const addToCart = (item, parentItemKey = null) => {
     // Count how many of this item are already in the new (unsaved) cart
@@ -2755,7 +2509,7 @@ itemRes.data.data.forEach(item => {
     }
 
     try {
-      setLoading(true);
+      // setLoading(true);
 
       await axios.delete(
         `${import.meta.env.VITE_API_ORDER_SERVICE_URL}/${clientId}/order_item/delete`,
@@ -2806,7 +2560,9 @@ itemRes.data.data.forEach(item => {
       console.error('[handleOldItemRemoveOne] failed:', err);
       toast.error('Failed to update item quantity.');
     } finally {
-      setLoading(false);
+      console.log("error");
+      
+      // setLoading(false);
     }
   };
 
@@ -2819,7 +2575,7 @@ itemRes.data.data.forEach(item => {
     }
 
     try {
-      setLoading(true);
+      // setLoading(true);
 
       // ✅ FIX: if this is a parent, find all saved children by parent_item_key
       const itemsToDelete = item.parent_item_key
@@ -2853,7 +2609,9 @@ itemRes.data.data.forEach(item => {
       console.error('[handleOldItemRemoveAll] failed:', err);
       toast.error('Failed to remove item.');
     } finally {
-      setLoading(false);
+      console.log("error");
+      
+      // setLoading(false);
     }
   };
   // ─────────────────────────────────────────────────────────────────────────
@@ -3028,7 +2786,7 @@ const buildOrderPayload = (items) =>
             { headers, params: { client_id: clientId, parent_dinein_order_id: activeDineinOrderId } }
           );
           placedOrderId = activeOrderId;
-          toast.success(`Sub-order ${r.data.data.dinein_order_id} created!`);
+          // toast.success(`Sub-order ${r.data.data.dinein_order_id} created!`);
         }
       } else {
         const existingDraft = await readDraft(selectedTable, clientId, token);
@@ -3137,7 +2895,7 @@ const buildOrderPayload = (items) =>
       setCurrentBatchTimestamp(null);
       setHasNewItems(false);
       setCustomerDetails({ customer_id: '', contact_phone: '' });
-      toast.success('Order placed!');
+      // toast.success('Order placed!');
     } catch (err) {
       console.error('ORDER ERROR:', err);
       toast.error('Order failed');
@@ -3217,7 +2975,7 @@ const buildOrderPayload = (items) =>
 
   const handleConfirmPaymentFromGrid = async (orderId, tableId) => {
     try {
-      setLoading(true);
+      // setLoading(true);
       const headers = { Authorization: `Bearer ${token}` };
 
       const docsRes = await axios.get(
@@ -3269,7 +3027,9 @@ const buildOrderPayload = (items) =>
       console.error('[handleConfirmPaymentFromGrid]', err);
       toast.error('Failed to confirm payment');
     } finally {
-      setLoading(false);
+      console.log("error");
+      
+      // setLoading(false);
     }
   };
 
@@ -3313,7 +3073,7 @@ const buildOrderPayload = (items) =>
 
   const handlePrintBill = async (orderId) => {
     try {
-      setLoading(true);
+      // setLoading(true);
       const r = await axios.get(
         `${import.meta.env.VITE_API_ORDER_SERVICE_URL}/${clientId}/dinein/table`,
         { headers: { Authorization: `Bearer ${token}` } }
@@ -3345,14 +3105,16 @@ const buildOrderPayload = (items) =>
       console.error(e);
       toast.error('Failed to load order');
     } finally {
-      setLoading(false);
+      console.log("error");
+      
+      // setLoading(false);
     }
   };
 
   const handleBillFromCart = async () => {
     if (!activeOrderId) { toast.error('No active order'); return; }
     try {
-      setLoading(true);
+      // setLoading(true);
       const r = await axios.get(
         `${import.meta.env.VITE_API_ORDER_SERVICE_URL}/${clientId}/dinein/table`,
         { headers: { Authorization: `Bearer ${token}` } }
@@ -3384,7 +3146,9 @@ const buildOrderPayload = (items) =>
       console.error(e);
       toast.error('Failed to load order');
     } finally {
-      setLoading(false);
+      console.log("error");
+      
+      // setLoading(false);
     }
   };
 
@@ -3404,14 +3168,14 @@ const buildOrderPayload = (items) =>
     // ── 2. Dietary filter ──
     if (selectedDietary) {
       items = items.filter(item => {
-        const dietary = getDietaryFromSlug(item);
+        const dietary = getDietaryFromSlug(item,dietaryOptions);
         return dietary !== null && dietary === selectedDietary;
       });
     }
 
     // ── 3. Category filter — uses flat list for reliable traversal ──
     if (selectedCategoryId) {
-      const ids = getCategoryAndChildrenIds(selectedCategoryId); // ← no categories arg needed now
+      const ids = getCategoryAndChildrenIds(selectedCategoryId,categoriesFlat); // ← no categories arg needed now
       items = items.filter(i => ids.includes(i.category_id));
     }
 
@@ -3481,7 +3245,7 @@ const buildOrderPayload = (items) =>
             <div className="xl:col-span-1 min-w-0 w-full overflow-hidden">
               <div className="lg:h-[calc(98dvh-4rem)] lg:overflow-y-auto pr-1">
                 <CategoryTree
-                  categories={sidebarCategories}
+                  categories={categories}
                   selectedCategoryId={selectedCategoryId}
                   onSelectCategory={setSelectedCategoryId}
                   defaultOpenAll
@@ -3522,7 +3286,7 @@ const buildOrderPayload = (items) =>
                       </button>
                       {dietaryOptions.map(type => {
                         const key = type.toLowerCase().replace(/[-_\s]/g, '');
-                        const count = menuItems.filter(item => getDietaryFromSlug(item) === key).length;
+                        const count = menuItems.filter(item => getDietaryFromSlug(item,dietaryOptions) === key).length;
                         return (
                           <button
                             key={key}
@@ -3561,7 +3325,7 @@ const buildOrderPayload = (items) =>
                     const dp = item.discount && Number(item.discount) > 0
                       ? Number(item.discount).toFixed(0) : null;
                     const ac = item.line_item_id?.length || 0;
-                    const dietary = getDietaryFromSlug(item);
+                    const dietary = getDietaryFromSlug(item,dietaryOptions);
                     const dietaryColor = dietary ? (dietaryColorMap[dietary] || '') : '';
                     return (
                       <div
