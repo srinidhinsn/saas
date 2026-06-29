@@ -4,7 +4,7 @@ import { useParams } from 'react-router-dom';
 import { toast } from 'react-toastify';
 import 'react-toastify/dist/ReactToastify.css';
 import { FaCheckCircle, FaClock, FaHourglassHalf, FaConciergeBell } from 'react-icons/fa';
-import { Filter, Clock, Users, Package, Truck, Trash2, BarChart2, X, ChevronRight } from 'lucide-react';
+import { Filter, Clock, Users, Package, Truck, Trash2, BarChart2, X, ChevronRight, Calendar, RotateCcw } from 'lucide-react';
 import { menuCache } from '../../utils/Menu-utils/menuCache';
 // ─── Constants ─────────────────────────────────────────────────────────────────
 
@@ -57,6 +57,13 @@ const parseISTTimestamp = (createdAt) => {
   return hasZone
     ? new Date(raw).getTime()
     : new Date(raw + 'Z').getTime() - IST_OFFSET_MS;
+};
+
+// Returns YYYY-MM-DD for "today" in IST, matching the en-CA formatted dates
+// produced elsewhere in this file so date-string comparisons stay consistent.
+const getTodayISTDateString = () => {
+  const nowIST = new Date(Date.now() + IST_OFFSET_MS);
+  return nowIST.toISOString().split('T')[0];
 };
 
 
@@ -605,6 +612,16 @@ const KitchenDisplay = ({clientId, token}) => {
   const [orderFilter, setOrderFilter] = useState('ALL');
   const [showAggregate, setShowAggregate] = useState(false);
 
+  // ── Date filter ──────────────────────────────────────────────────────────
+  // Defaults to today (live view). Selecting an earlier date switches the
+  // page into a "missed orders" lookup mode: same hide-served filtering,
+  // but no polling, since past orders don't change on their own.
+  const todayStr = getTodayISTDateString();
+  const [selectedDate, setSelectedDate] = useState(todayStr);
+  const isToday = selectedDate === todayStr;
+  const selectedDateRef = useRef(selectedDate);
+  useEffect(() => { selectedDateRef.current = selectedDate; }, [selectedDate]);
+
   // Stores the canonical item order (array of item ids) per card_id.
   // Persists across re-renders and poll ticks so item positions never shift.
   const itemOrderRef = useRef({});
@@ -700,10 +717,14 @@ const KitchenDisplay = ({clientId, token}) => {
   // ─── Fetch & poll orders ──────────────────────────────────────────────────────
   // ── FIX 2: empty dep array — fetchOrders is stable forever.
   //    clientId and token are read from refs so they're always current.
+  //    selectedDate is also read from a ref for the same reason — changing the
+  //    date shouldn't tear down/recreate the poll interval, it just changes
+  //    what the next fetch (and the manual refetch below) filters for.
 
   const fetchOrders = useCallback(async () => {
     const clientId = clientIdRef.current;
     const token = tokenRef.current;
+    const targetDateStr = selectedDateRef.current;
 
     if (!token || !clientId) {
       setLoading(false);
@@ -726,20 +747,24 @@ const KitchenDisplay = ({clientId, token}) => {
       // Check again after the await — a user may have clicked in the meantime
       if (inflightUpdatesRef.current > 0) return;
 
-      const today = new Date().toLocaleDateString(KDS_CONFIG.DATE_FORMAT);
       const allCards = [];
 
       (res.data?.data || []).forEach((mergedOrder) => {
-        // Date filter using root created_at
+        // Date filter using root created_at — matches whichever date is
+        // currently selected (defaults to today).
         if (mergedOrder.status === 'draft') return;
         if (isCancelledStatus(mergedOrder.status)) return;
         const createdAt = mergedOrder.created_at;
         if (createdAt) {
           const orderDate = new Date(parseISTTimestamp(createdAt)).toLocaleDateString(KDS_CONFIG.DATE_FORMAT);
-          if (orderDate !== today) return;
+          if (orderDate !== targetDateStr) return;
+        } else {
+          // No created_at at all — can't place it on the selected date, skip.
+          return;
         }
 
-        // Skip fully-served groups
+        // Skip fully-served groups (missed orders that were never served are
+        // exactly what we still want to surface, on any date)
         if (mergedOrder.status === KDS_CONFIG.STATUS.SERVED) return;
 
         parseIntoCards(mergedOrder).forEach((card) => {
@@ -808,7 +833,7 @@ const KitchenDisplay = ({clientId, token}) => {
     } finally {
       setLoading(false);
     }
-  }, []); // ── FIX 2: empty deps — stable forever, reads clientId/token from refs
+  }, []); // ── FIX 2: empty deps — stable forever, reads clientId/token/date from refs
 
   const hasFetchedOrdersRef = useRef(false);
 
@@ -818,9 +843,28 @@ const KitchenDisplay = ({clientId, token}) => {
     hasFetchedOrdersRef.current = true;
 
     fetchOrders();
-    const interval = setInterval(fetchOrders, KDS_CONFIG.POLL_INTERVAL_MS);
+    const interval = setInterval(() => {
+      // Only keep polling while looking at today — a past date is a static
+      // "what did we miss" lookup, no need to hit the API every 10s for it.
+      if (selectedDateRef.current === getTodayISTDateString()) {
+        fetchOrders();
+      }
+    }, KDS_CONFIG.POLL_INTERVAL_MS);
     return () => clearInterval(interval);
   }, [fetchOrders]);
+
+  // Whenever the user changes the date, do one immediate fetch for it
+  // (don't wait for the next poll tick). Skipped on the very first render
+  // since hasFetchedOrdersRef's effect above already covers that fetch.
+  const isFirstDateRenderRef = useRef(true);
+  useEffect(() => {
+    if (isFirstDateRenderRef.current) {
+      isFirstDateRenderRef.current = false;
+      return;
+    }
+    setLoading(true);
+    fetchOrders();
+  }, [selectedDate, fetchOrders]);
 
   // ─── Item status change ───────────────────────────────────────────────────────
 
@@ -919,6 +963,16 @@ const KitchenDisplay = ({clientId, token}) => {
       return true;
     });
 
+  const handleDateChange = (e) => {
+    const value = e.target.value; // 'YYYY-MM-DD'
+    if (!value) return;
+    setSelectedDate(value);
+  };
+
+  const handleResetToToday = () => {
+    setSelectedDate(getTodayISTDateString());
+  };
+
 
   // ─── Render ───────────────────────────────────────────────────────────────────
 
@@ -956,14 +1010,51 @@ const KitchenDisplay = ({clientId, token}) => {
                   </span>
                 )}
               </button>
+
+              {/* ── Date filter — defaults to today, lets staff look back for
+                   missed orders on a previous date. Future dates disabled. ── */}
+              <div className="flex items-center gap-2 ml-2 pl-2 border-l border-gray-300">
+                <div className="relative flex items-center">
+                  <Calendar size={16} className="absolute left-3 text-gray-400 pointer-events-none" />
+                  <input
+                    type="date"
+                    value={selectedDate}
+                    max={todayStr}
+                    onChange={handleDateChange}
+                    className="pl-9 pr-3 py-2 rounded-lg font-medium text-sm border border-border-default bg-bg-tertiary text-text-secondary hover:text-text-primary transition-all focus:outline-none focus:ring-2 focus:ring-action-primary"
+                  />
+                </div>
+                {!isToday && (
+                  <button
+                    onClick={handleResetToToday}
+                    title="Back to today"
+                    className="flex items-center gap-1.5 px-3 py-2 rounded-lg font-medium text-sm transition-all bg-amber-100 text-amber-700 hover:bg-amber-200"
+                  >
+                    <RotateCcw size={14} />
+                    Today
+                  </button>
+                )}
+              </div>
             </div>
           </div>
+
+          {!isToday && (
+            <div className="mb-3 px-4 py-2 rounded-lg bg-amber-50 border border-amber-200 text-amber-800 text-sm font-medium">
+              Viewing missed orders from {new Date(selectedDate + 'T00:00:00').toLocaleDateString('en-GB', { day: 'numeric', month: 'short', year: 'numeric' })}. Live updates are paused — switch back to "Today" to resume.
+            </div>
+          )}
 
           {/* ── Cards grid ── */}
           <div className="w-full">
             {loading ? (
               <div className="flex items-center justify-center py-12">
                 <div className="text-lg font-medium text-gray-500">Loading orders...</div>
+              </div>
+            ) : filteredCards.length === 0 ? (
+              <div className="flex items-center justify-center py-12">
+                <div className="text-lg font-medium text-gray-400">
+                  {isToday ? 'No active orders' : 'No missed orders found for this date'}
+                </div>
               </div>
             ) : (
               <div className="grid grid-cols-1 sm:grid-cols-2 lg:grid-cols-3 xl:grid-cols-4 gap-5">
