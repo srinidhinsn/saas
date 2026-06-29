@@ -717,9 +717,6 @@ const KitchenDisplay = ({clientId, token}) => {
   // ─── Fetch & poll orders ──────────────────────────────────────────────────────
   // ── FIX 2: empty dep array — fetchOrders is stable forever.
   //    clientId and token are read from refs so they're always current.
-  //    selectedDate is also read from a ref for the same reason — changing the
-  //    date shouldn't tear down/recreate the poll interval, it just changes
-  //    what the next fetch (and the manual refetch below) filters for.
 
   const fetchOrders = useCallback(async () => {
     const clientId = clientIdRef.current;
@@ -750,8 +747,7 @@ const KitchenDisplay = ({clientId, token}) => {
       const allCards = [];
 
       (res.data?.data || []).forEach((mergedOrder) => {
-        // Date filter using root created_at — matches whichever date is
-        // currently selected (defaults to today).
+        // Date filter using root created_at
         if (mergedOrder.status === 'draft') return;
         if (isCancelledStatus(mergedOrder.status)) return;
         const createdAt = mergedOrder.created_at;
@@ -763,8 +759,7 @@ const KitchenDisplay = ({clientId, token}) => {
           return;
         }
 
-        // Skip fully-served groups (missed orders that were never served are
-        // exactly what we still want to surface, on any date)
+        // Skip fully-served groups
         if (mergedOrder.status === KDS_CONFIG.STATUS.SERVED) return;
 
         parseIntoCards(mergedOrder).forEach((card) => {
@@ -833,7 +828,7 @@ const KitchenDisplay = ({clientId, token}) => {
     } finally {
       setLoading(false);
     }
-  }, []); // ── FIX 2: empty deps — stable forever, reads clientId/token/date from refs
+  }, []); // ── FIX 2: empty deps — stable forever, reads clientId/token from refs
 
   const hasFetchedOrdersRef = useRef(false);
 
@@ -844,8 +839,6 @@ const KitchenDisplay = ({clientId, token}) => {
 
     fetchOrders();
     const interval = setInterval(() => {
-      // Only keep polling while looking at today — a past date is a static
-      // "what did we miss" lookup, no need to hit the API every 10s for it.
       if (selectedDateRef.current === getTodayISTDateString()) {
         fetchOrders();
       }
@@ -853,9 +846,6 @@ const KitchenDisplay = ({clientId, token}) => {
     return () => clearInterval(interval);
   }, [fetchOrders]);
 
-  // Whenever the user changes the date, do one immediate fetch for it
-  // (don't wait for the next poll tick). Skipped on the very first render
-  // since hasFetchedOrdersRef's effect above already covers that fetch.
   const isFirstDateRenderRef = useRef(true);
   useEffect(() => {
     if (isFirstDateRenderRef.current) {
