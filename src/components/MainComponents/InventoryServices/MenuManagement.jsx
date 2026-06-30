@@ -11,31 +11,23 @@ import { jwtDecode } from "jwt-decode";
 import { getMenuConfig } from '../../utils/menuConfigResolver';
 import MenuConfigModal from '../../utils/Modals/MenuConfigModal';
 import { menuCache } from '../../utils/Menu-utils/menuCache';
+import { getDietaryFromSlug, isItemActive, generateSlug, toSlugSegment} from '../../utils/Menu-utils/menuUtils';
+import {useDietaryTypes, useTimings, useZoneConfig, useMenuData} from '../../utils/Menu-utils/useMenuData';
 
 const MenuManagement = ({ clientId, token,screenIds, userId, realm }) => {
   const [searchOpen, setSearchOpen] = useState(false);
   const [searchQuery, setSearchQuery] = useState('');
   const searchInputRef = useRef(null);
-  const [categories, setCategories] = useState([]);
-  const [menuItems, setMenuItems] = useState([]);
-  const [allMenuItemsRaw, setAllMenuItemsRaw] = useState([]);
-  const [loading, setLoading] = useState(true);
   const [inventoryIds, setInventoryIds] = useState([]);
 
   const [addonSubcategories, setAddonSubcategories] = useState([]);
   const [allAddonItems, setAllAddonItems] = useState([]);
-  const [categoriesFlat, setCategoriesFlat] = useState([]);
-
-  // Deduped menu items (one per name) — used by combo component picker
-  const [dedupedMenuItems, setDedupedMenuItems] = useState([]);
-
+  const { dietaryOptions, dietaryColorMap } = useDietaryTypes({ clientId, token });
+  const { timingOptions }                   = useTimings({ clientId, token });
+  const { sections, zones }                 = useZoneConfig({ clientId, token });
   const [selectedCategoryId, setSelectedCategoryId] = useState(null);
-  const [dieterySubCategories, setDieterySubCategories] = useState([]);
   const [sidebarCategories, setSidebarCategories] = useState([]);
-  const [requiredScreenId, setRequiredScreenId] = useState(null);
   const savedCategoryRef = useRef(localStorage.getItem("menu_selected_category"));
-  const [dietaryColorMap, setDietaryColorMap] = useState({});
-  const [dietaryOptions, setDietaryOptions] = useState([]);
   const [showMenuConfig, setShowMenuConfig] = useState(false);
   const [timeTick, setTimeTick] = useState(Date.now());
   // All IDs and keywords come from menuConfigResolver — nothing hardcoded here
@@ -45,21 +37,6 @@ const MenuManagement = ({ clientId, token,screenIds, userId, realm }) => {
   }, [clientId]);
 
   const { addons } = getMenuConfig(clientId);
-
-  // Detect combo category: any category whose name (or any ancestor) contains "combo"
-  const isComboCategory = React.useMemo(() => {
-    if (!selectedCategoryId || !categoriesFlat?.length) return false;
-    let currentId = selectedCategoryId;
-    const visited = new Set();
-    while (currentId && !visited.has(currentId)) {
-      visited.add(currentId);
-      const cat = categoriesFlat.find(c => c.id === currentId);
-      if (!cat) break;
-      if ((cat.name || '').toLowerCase().includes('combo')) return true;
-      currentId = cat.parentId ?? null;
-    }
-    return false;
-  }, [selectedCategoryId, categoriesFlat]);
 
   const normalizedRealm = (realm || '').toLowerCase();
   const [showAddModal, setShowAddModal] = useState(false);
@@ -86,75 +63,35 @@ const MenuManagement = ({ clientId, token,screenIds, userId, realm }) => {
   const [selectAllChecked, setSelectAllChecked] = useState(false);
   const [bulkEditData, setBulkEditData] = useState({});
   const quickCatRef = useRef(null);
-  const [zones, setZones] = useState([]);
-  const [sections, setSections] = useState([]);
   const [selectedZone, setSelectedZone] = useState("");
   const [selectedSection, setSelectedSection] = useState("");
   const [zoneConfigId, setZoneConfigId] = useState(null);
   const [currentUserId, setCurrentUserId] = useState(null);
-  const [selectedDietary, setSelectedDietary] = useState(null);
-  const [timingOptions, setTimingOptions] = useState([]);
+  const [selectedDietary, setSelectedDietary] = useState(null); 
+  const {menuItems,allMenuItemsRaw,categories,categoriesFlat,dieterySubCategories,dedupedMenuItems,requiredScreenId,loading,
+    refetch: fetchData} = useMenuData({clientId,token,menuConfig,zoneConfigId,includeAllRaw: true,});
 
-  const DIETARY_COLORS = [
-    'bg-green-500',
-    'bg-red-500',
-    'bg-yellow-400',
-    'bg-orange-500',
-    'bg-purple-500',
-    'bg-blue-500',
-  ];
-
-  useEffect(() => {
-    if (!dietaryOptions.length) return;
-    const map = {};
-    dietaryOptions.forEach((opt, idx) => {
-      // Key is normalized (no hyphens/spaces/underscores, lowercase)
-      const key = opt.toLowerCase().replace(/[-_\s]/g, '');
-      map[key] = DIETARY_COLORS[idx % DIETARY_COLORS.length];
-    });
-    setDietaryColorMap(map);
-  }, [dietaryOptions]);
   useEffect(() => {
     try {
       const decoded = jwtDecode(token);
       setCurrentUserId(decoded?.user_id || null);
     } catch { console.warn("JWT decode failed"); }
   }, [token]);
-
-  const fetchTimings = async () => {
-    const cached = menuCache.get('timings', clientId);
-  if (cached) { setTimingOptions(cached); return; }
-    try {
-      const res = await axios.get(
-        `${import.meta.env.VITE_API_INVENTORY_SERVICE_URL}/${clientId}/inventory/item-types`,
-        {
-          params: { category_id: "available_timings" },
-          headers: { Authorization: `Bearer ${token}` },
-        }
-      );
-
-      const raw = res.data?.data || [];
-
-      const parsed = raw.map(v => {
-        const match = v.match(/^(.+)\((.+)-(.+)\)$/);
-        return {
-          name: (match?.[1] ?? v).toLowerCase(),
-          start: match?.[2] ?? null,
-          end: match?.[3] ?? null,
-          raw: v
-        };
-      });
-
-      setTimingOptions(parsed);
-      menuCache.set('timings', clientId, parsed);
-    } catch (err) {
-      console.error("Timing fetch error:", err);
-      setTimingOptions([]);
+  // Detect combo category: any category whose name (or any ancestor) contains "combo"
+  const isComboCategory = React.useMemo(() => {
+    if (!selectedCategoryId || !categoriesFlat?.length) return false;
+    let currentId = selectedCategoryId;
+    const visited = new Set();
+    while (currentId && !visited.has(currentId)) {
+      visited.add(currentId);
+      const cat = categoriesFlat.find(c => c.id === currentId);
+      if (!cat) break;
+      if ((cat.name || '').toLowerCase().includes('combo')) return true;
+      currentId = cat.parentId ?? null;
     }
-  };
-  useEffect(() => {
-    if (normalizedRealm === 'restaurant') fetchTimings();
-  }, [clientId, normalizedRealm]);
+    return false;
+  }, [selectedCategoryId, categoriesFlat]);
+
   useEffect(() => {
     const interval = setInterval(() => {
       setTimeTick(Date.now()); // triggers re-render
@@ -162,31 +99,7 @@ const MenuManagement = ({ clientId, token,screenIds, userId, realm }) => {
 
     return () => clearInterval(interval);
   }, []);
-  // ─── Walk up the categoriesFlat tree and collect all ancestor name segments ─
-  const buildPathNames = useCallback((categoryId, flatList) => {
-    const pathNames = [];
-    let currentId = categoryId;
-    const visited = new Set();
-    while (currentId && !visited.has(currentId)) {
-      visited.add(currentId);
-      const cat = flatList.find(c => c.id === currentId);
-      if (!cat) break;
-      pathNames.push((cat.name || '').toLowerCase());
-      currentId = cat.parentId || cat.parent_id;
-    }
-    return pathNames; // nearest-first: [leafName, parentName, grandparentName, ...]
-  }, []);
 
-  
-  const fetchZoneConfig = useCallback(async () => {
-  const { sections, zones } = await menuCache.fetchTablesConfig(clientId, token);
-  setSections(sections);
-  setZones(zones);
-}, [clientId, token]);
-
-  useEffect(() => {
-    fetchZoneConfig();
-  }, [fetchZoneConfig]);
 
   useEffect(() => {
     if (!selectedZone || !selectedSection) return;
@@ -243,33 +156,11 @@ const MenuManagement = ({ clientId, token,screenIds, userId, realm }) => {
     return `addons_${slug}`;
   }, [getTopLevelSection]);
 
-  const fetchDietaryTypes = useCallback(async () => {
-    const cached = menuCache.get('dietaryTypes', clientId);
-    if (cached) { setDietaryOptions(cached); return; }
-    try {
-      const res = await axios.get(
-        `${import.meta.env.VITE_API_INVENTORY_SERVICE_URL}/${clientId}/inventory/item-types`,
-        {
-          params: { category_id: "dietary_type" },
-          headers: { Authorization: `Bearer ${token}` }
-        }
-      );
-
-      const data = res.data?.data || [];
-    setDietaryOptions(data);
-    menuCache.set('dietaryTypes', clientId, data);
-    } catch (err) {
-      console.error("Dietary fetch error:", err);
-      setDietaryOptions([]);
-    }
-  }, [clientId, token]);
-  useEffect(() => {
-    if (normalizedRealm === 'restaurant') fetchDietaryTypes();
-  }, [fetchDietaryTypes, normalizedRealm]);
 
   const fetchAddonData = useCallback(async (zoneConfigIdParam = zoneConfigId) => {
     if (!menuConfig) return { subcategories: [], items: [] };
-    const cachedAddon = menuCache.get('addonData', clientId);
+    const cacheKey = `addonData_${zoneConfigIdParam ?? "all"}`;
+const cachedAddon = menuCache.get(cacheKey, clientId);
 if (cachedAddon) return cachedAddon;
     try {
       const [catRes, itemRes] = await Promise.all([
@@ -339,7 +230,7 @@ if (cachedAddon) return cachedAddon;
           seen.set(key, { ...item, zone_config_id: itemZid });
         }
       });
-      menuCache.set('addonData', clientId, { subcategories: subcats, items: Array.from(seen.values()) });
+      menuCache.set(cacheKey,clientId,{ subcategories: subcats, items: Array.from(seen.values()) });
       return { subcategories: subcats, items: Array.from(seen.values()) };
     } catch (error) {
       console.warn('Addon fetch failed:', error);
@@ -362,53 +253,7 @@ if (cachedAddon) return cachedAddon;
       setAllAddonItems(items);
     });
     // eslint-disable-next-line react-hooks/exhaustive-deps
-  }, []);
-
-  useEffect(() => { if (zoneConfigId) fetchData(); }, [zoneConfigId]);
-
-  const buildCategoryPath = (categoryId) => {
-    if (!categoryId) return [];
-    const path = [];
-    let currentId = categoryId;
-    const visited = new Set();
-    while (currentId && !visited.has(currentId)) {
-      visited.add(currentId);
-      const current = categories.find(cat => cat && cat.id === currentId);
-      if (!current) break;
-      path.unshift((current.name || '').trim().replace(/\s+/g, '_'));
-      currentId = current.parent_id ?? current.parentId ?? null;
-    }
-    return path;
-  };
-  // ✅ Add this once near generateSlug
-  const toSlugSegment = (str) =>
-    (str || '')
-      .trim()
-      .replace(/[^a-zA-Z0-9]+/g, '_')  // replace ANY non-alphanumeric sequence with single _
-      .replace(/^_+|_+$/g, '');         // trim leading/trailing underscores
-  // CHANGED: accepts timings as string[] or string, joins with +
-  const generateSlug = (itemName, categoryId, timings, flatList = categoriesFlat) => {
-    const pathParts = [];
-    let currentId = categoryId;
-    const visited = new Set();
-    while (currentId && !visited.has(currentId)) {
-      visited.add(currentId);
-      const cat = flatList.find(c => c.id === currentId);
-      if (!cat) break;
-      pathParts.unshift(toSlugSegment(cat.name));
-      currentId = cat.parentId ?? cat.parent_id ?? null;
-    }
-
-    const itemPart = toSlugSegment(itemName);
-
-    const timingArr = Array.isArray(timings)
-      ? timings.filter(Boolean)
-      : (timings ? [timings] : []);
-    const timingPart = timingArr.length > 0 ? timingArr.join('+') : null;
-
-    const base = [...pathParts, itemPart].filter(Boolean).join('_');
-    return timingPart ? `${base}__${timingPart}` : base;
-  };
+  }, []);  
 
   const openAddModal = () => {
     setNewItem({
@@ -510,7 +355,7 @@ if (cachedAddon) return cachedAddon;
   // ✅ FIXED — uses the same axios pattern as the rest of MenuManagement
   const fetchUnits = useCallback(async () => {
     const cached = menuCache.get('units', clientId);
-  if (cached) { setUnits(cached); return; }
+  if (cached) {  setUnits(cached); return; }
 
     try {
       const res = await axios.get(
@@ -539,27 +384,6 @@ if (cachedAddon) return cachedAddon;
       c => c.name.trim().toLowerCase() === categoryName.trim().toLowerCase()
     )?.id || null;
   };
-
-  const fetchInventoryIds = useCallback(async () => {
-    if (!menuConfig) return;
-    const cached = menuCache.get('inventoryIds', clientId);
-    if (cached) { setInventoryIds(cached); return; }
-    try {
-      const res = await axios.get(
-        `${import.meta.env.VITE_API_INVENTORY_SERVICE_URL}/${clientId}/menu/read_category?category_id=${menuConfig.inventoryCategoryRoot}`,
-        { headers: { Authorization: `Bearer ${token}` } }
-      );
-      const result = res.data.data[0]?.subCategories ?? [];
-    setInventoryIds(result);
-    menuCache.set('inventoryIds', clientId, result);
-    } catch (error) {
-      console.error("Error fetching inventory IDs:", error);
-    }
-  }, [clientId, token, menuConfig]);
-
-  useEffect(() => {
-    fetchInventoryIds();
-  }, [fetchInventoryIds]);
 
   const handleAddItem = async () => {
     menuCache.invalidate(clientId);
@@ -800,7 +624,7 @@ if (cachedAddon) return cachedAddon;
                 }
               }
       }
-   if (editingItem?.image_id) {
+      if (editingItem?.image_id) {
         imageCache.remove(clientId, editingItem.image_id);
       }
       await fetchData({ silent: true });
@@ -822,167 +646,7 @@ if (cachedAddon) return cachedAddon;
   }, []);
 
   // Uses menuInventoryId and root from config — not hardcoded
-  const fetchData = useCallback(async (options = { silent: false , force: false}) => {
-    const { silent = false , force = false} = options;
-    if (!clientId || !token || !menuConfig) {
-      if (!silent) setLoading(false);
-      return;
-    }
-    const cacheSlice = `menuData_zone_${zoneConfigId ?? 'all'}`;
-    if (!silent && !force) {
-      
-const cached = menuCache.get(cacheSlice, clientId);
-      if (cached) {  console.log('Menu Loaded from cache', cached);
-        setCategoriesFlat(cached.categoriesFlat);
-        setMenuItems(cached.menuItems);
-        setAllMenuItemsRaw(cached.allMenuItemsRaw);
-        setCategories(cached.categoryTree);
-        setDedupedMenuItems(cached.dedupedMenuItems);
-        setRequiredScreenId(cached.screen_id);
-        setLoading(false);
-        return; // skip network
-      } console.log('menuCache MISS — fetching from network'); 
-    }
-    try {
-      if (!silent) setLoading(true);
 
-      const [catRes, itemRes, allItemsRes] = await Promise.all([
-        axios.get(
-          `${import.meta.env.VITE_API_INVENTORY_SERVICE_URL}/${clientId}/menu/read_category?category_id=${menuConfig.root}`,
-          { headers: { Authorization: `Bearer ${token}` } }
-        ),
-        axios.get(
-          `${import.meta.env.VITE_API_INVENTORY_SERVICE_URL}/${clientId}/menu/read`,
-          {
-            headers: { Authorization: `Bearer ${token}` },
-            params: {
-              inventory_id: menuConfig.menuInventoryId,
-              ...(zoneConfigId && { zone_config_id: zoneConfigId })
-            }
-          }
-        ),
-        axios.get(
-          `${import.meta.env.VITE_API_INVENTORY_SERVICE_URL}/${clientId}/menu/read`,
-          {
-            headers: { Authorization: `Bearer ${token}` },
-            params: { inventory_id: menuConfig.menuInventoryId }
-          }
-        )
-      ]);
-
-      setRequiredScreenId(catRes.data.screen_id);
-
-      const fullTree = (catRes.data.data || []).filter(c => c.name?.toLowerCase() !== "all");
-      const subcategoryIds = new Set();
-      fullTree.forEach(cat => { cat.subCategories?.forEach(sub => subcategoryIds.add(sub.id)); });
-
-      const topLevelCategories = fullTree.filter(cat => !subcategoryIds.has(cat.id));
-      const flatCategories = flattenCategoryTree(topLevelCategories);
-      const normalizedFlat = flatCategories.map(cat => ({
-        id: cat.id, name: (cat.name || '').trim(),
-        parentId: cat.parentId ?? cat.parent_id ?? null
-      }));
-      setCategoriesFlat(normalizedFlat);
-
-      const rawItems = itemRes.data.data;
-
-      const allRawItems = allItemsRes.data.data || [];
-      setAllMenuItemsRaw(allRawItems.map(item => ({
-        ...item,
-        zone_config_id: item.zone_config_id === null || item.zone_config_id === undefined
-          ? 0
-          : Number(item.zone_config_id)
-      })));
-
-      // ✅ FIXED — always prefer zone_config_id === 0 (base record)
-      const seenInit = new Map();
-      rawItems.forEach(item => {
-        const zid = item.zone_config_id === null || item.zone_config_id === undefined
-          ? 0
-          : Number(item.zone_config_id);
-
-        if (!seenInit.has(item.id)) {
-          seenInit.set(item.id, { ...item, zone_config_id: zid });
-        } else if (zid === 0) {
-          // Base record always wins — overwrite whatever zone record is there
-          seenInit.set(item.id, { ...item, zone_config_id: 0 });
-        }
-        // zone records (zid > 0) never overwrite an existing entry
-      });
-      const enrichedItems = Array.from(seenInit.values()).map(item => {
-        const cat = flatCategories.find(c => c.id === item.category_id);
-        return { ...item, category_name: cat?.name || 'Uncategorized' };
-      });
-      enrichedItems.sort((a, b) => (a.name || '').localeCompare(b.name || ''));
-      setMenuItems(enrichedItems);
-
-      // Build deduped list for combo component picker
-      const dedupMap = new Map();
-      enrichedItems.forEach(item => {
-        const key = (item.name || '').trim().toLowerCase();
-        if (!dedupMap.has(key)) {
-          dedupMap.set(key, item);
-        } else {
-          const existing = dedupMap.get(key);
-          const isBase = item.zone_config_id === 0 || item.zone_config_id === null;
-          const existingIsBase = existing.zone_config_id === 0 || existing.zone_config_id === null;
-          if (isBase && !existingIsBase) dedupMap.set(key, item);
-        }
-      });
-      setDedupedMenuItems(Array.from(dedupMap.values()));
-
-      const buildCategoryTree = (flatCats) => {
-        const categoryMap = new Map();
-        flatCats.forEach(cat => categoryMap.set(cat.id, { ...cat, children: [] }));
-        const tree = [];
-        categoryMap.forEach(cat => {
-          if (cat.parentId && categoryMap.has(cat.parentId)) { categoryMap.get(cat.parentId).children.push(cat); }
-          else { tree.push(cat); }
-        });
-        categoryMap.forEach(cat => { cat.count = cat.children.length; });
-        return tree;
-      };
-
-      const categoryTree = buildCategoryTree(flatCategories).map(cat => {
-        if (cat.id === menuConfig.root || cat.name.toLowerCase() === menuConfig.root.toLowerCase()) {
-          return { ...cat, displayName: 'All Categories', count: cat.children.length };
-        }
-        return cat;
-      });
-      setCategories(categoryTree);
-      menuCache.set(cacheSlice, clientId, {
-        categoriesFlat: normalizedFlat,
-        menuItems: enrichedItems,
-        allMenuItemsRaw: allRawItems.map(item => ({
-          ...item,
-          zone_config_id: item.zone_config_id === null || item.zone_config_id === undefined
-            ? 0 : Number(item.zone_config_id)
-        })),
-        categoryTree,
-        dedupedMenuItems: Array.from(dedupMap.values()),
-        screen_id: catRes.data.screen_id,
-      });console.log('Menu Items SAVED — menuData written to localStorage'); 
-      const rootNode = findCategoryNode(categoryTree, menuConfig.root);
-      let quickCategories = [];
-      if (rootNode) {
-        let level = menuConfig.level;
-        while (level >= 0) {
-          quickCategories = getCategoriesAtLevel(rootNode, level);
-          if (quickCategories.length > 0) break;
-          level--;
-        }
-      }
-      setDieterySubCategories(quickCategories);
-
-      if (!savedCategoryRef.current) setSidebarCategories(categoryTree);
-    } catch (error) {
-      console.error('Error fetching data:', error);
-    } finally {
-      if (!silent) setLoading(false);
-    }
-  }, [clientId, token, realm, menuConfig, zoneConfigId]);
-  useEffect(() => { if (zoneConfigId) fetchData(); }, [zoneConfigId]);
-  useEffect(() => { fetchData(); }, [fetchData]);
 
   const getAllDescendantCategoryIds = (categoryId, categoryTree) => {
     if (!categoryId) return [];
@@ -1013,7 +677,7 @@ const cached = menuCache.get(cacheSlice, clientId);
     // ── 1. Dietary filter — uses getDietaryFromSlug (slug-segment based) ──
     if (selectedDietary) {
       items = items.filter(item => {
-        const dietary = getDietaryFromSlug(item);
+        const dietary = getDietaryFromSlug(item,dietaryOptions);
         return dietary !== null && normalize(dietary) === normalize(selectedDietary);
       });
     }
@@ -1066,75 +730,6 @@ const cached = menuCache.get(cacheSlice, clientId);
     // Sort by id to guarantee same order across all zones
     return Array.from(seen.values()).sort((a, b) => Number(a.id) - Number(b.id));
   };
-  const isItemActive = (slug, timingOptions) => {
-    if (!slug) return true;
-
-    const doubleUnderIdx = slug.lastIndexOf('__');
-    const timingSegment = doubleUnderIdx !== -1
-      ? slug.slice(doubleUnderIdx + 2).toLowerCase()
-      : null;
-
-    if (timingSegment === 'unavailable') return false;
-
-    if (!timingOptions || timingOptions.length === 0) return true;
-    if (!timingSegment || timingSegment === 'allday') return true;
-
-    const timingKeys = timingSegment.split('+').filter(Boolean);
-    if (timingKeys.length === 0) return true;
-
-    const now = new Date();
-    const currentMinutes = now.getHours() * 60 + now.getMinutes();
-
-    return timingKeys.some(key => {
-      const t = timingOptions.find(o => o.name?.toLowerCase() === key);
-      if (!t || !t.start || !t.end) return true;
-      const [sh, sm] = t.start.split(':').map(Number);
-      const [eh, em] = t.end.split(':').map(Number);
-      return currentMinutes >= (sh * 60 + sm) && currentMinutes <= (eh * 60 + em);
-    });
-  };
-  // MenuManagement.jsx — plain function (not useCallback)
-const getDietaryFromSlug = (item) => {
-  if (!item || !dietaryOptions.length) return null;
-  const normalize = (str) => (str || '').toLowerCase().replace(/[-_\s]/g, '');
-  const slug = item.slug || '';
-  const doubleUnderIdx = slug.lastIndexOf('__');
-
-  // ── NEW FORMAT: dietary is in the __ suffix ──
-  if (doubleUnderIdx !== -1) {
-    const suffix = slug.slice(doubleUnderIdx + 2).toLowerCase();
-    if (suffix && suffix !== 'unavailable' && suffix !== 'allday') {
-      const suffixParts = suffix.split('+').filter(Boolean);
-      const sortedOptions = [...dietaryOptions].sort(
-        (a, b) => normalize(b).length - normalize(a).length
-      );
-      for (const part of suffixParts) {
-        const match = sortedOptions.find(d => normalize(d) === normalize(part));
-        if (match) return normalize(match);
-      }
-    }
-  }
-
-  // ── OLD FORMAT FALLBACK: dietary was injected into the main slug path ──
-  const mainPart = doubleUnderIdx !== -1 ? slug.slice(0, doubleUnderIdx) : slug;
-  const slugSegments = mainPart.toLowerCase().split('_').filter(Boolean);
-  const sortedOptions = [...dietaryOptions].sort(
-    (a, b) => normalize(b).length - normalize(a).length
-  );
-  for (let i = 0; i < slugSegments.length; i++) {
-    for (let j = 1; j <= 3; j++) {
-      const joined = normalize(slugSegments.slice(i, i + j).join(''));
-      const match = sortedOptions.find(d => normalize(d) === joined);
-      if (match) return normalize(match);
-    }
-  }
-
-  return null;
-};
-  const handleEditImageFile = (file) => {
-    if (file?.type.startsWith('image/')) { setEditItemImage(file); setEditItemImageUrl(URL.createObjectURL(file)); }
-    else { alert('Please upload a valid image file'); }
-  };
 
   const filteredItems = getFilteredItems();
   const sortedItems = [...filteredItems].sort((a, b) => {
@@ -1185,7 +780,9 @@ const getDietaryFromSlug = (item) => {
           { headers: { Authorization: `Bearer ${token}` } }
         )));
       }
-
+      if (deleteTarget?.image_id) {
+        imageCache.remove(clientId, deleteTarget.image_id);
+      }
       await fetchData({ silent: true });
       const { subcategories, items } = await fetchAddonData();
       setAddonSubcategories(subcategories);
@@ -1208,6 +805,7 @@ const getDietaryFromSlug = (item) => {
         const item = menuItems.find(i => i.id === id);
         if (item?.image_id) imageCache.remove(clientId, item.image_id);
       });
+      // ✅ Backend now deletes all zone variants — just send id + zone_config_id: 0
       await Promise.all(selectedRows.map(id => axios.post(
         `${import.meta.env.VITE_API_INVENTORY_SERVICE_URL}/${clientId}/menu/delete`,
         { id, zone_config_id: 0 },
@@ -1377,7 +975,7 @@ const handleBulkUpdate = async () => {
       const exportData = Object.values(grouped)
         .filter(({ baseItem }) => baseItem !== null) // skip orphaned zone records
         .map(({ baseItem: item, zonePrices }) => {
-          const dietary = getDietaryFromSlug(item);
+          const dietary = getDietaryFromSlug(item,dietaryOptions);
 const slugTimingPart = item.slug?.includes('__') ? item.slug.split('__')[1] : '';
 const suffixPartsForExport = (slugTimingPart || '').split('+').filter(
   p => p && p !== 'unavailable' && p !== 'allday' &&
@@ -1484,7 +1082,21 @@ const suffixParts = [
 ].filter(Boolean);
 return suffixParts.length > 0 ? `${base}__${suffixParts.join('+')}` : base;
       })();
-
+      const existingImageId = (() => {
+        const match = allMenuItems.find(
+          item =>
+            item.name?.trim().toLowerCase() === row.Name?.trim().toLowerCase() &&
+            (item.zone_config_id === 0 || item.zone_config_id === null)
+        );
+        return match?.image_id ?? null;
+      })();
+      
+      const importedImageId =
+        row.Image && String(row.Image).trim() !== ""
+          ? String(row.Image).trim()
+          : null;
+      
+      const resolvedImageId = importedImageId ?? existingImageId;
       const basePayload = {
         client_id: clientId,
         inventory_id: menuConfig.menuInventoryId,
@@ -1496,6 +1108,7 @@ return suffixParts.length > 0 ? `${base}__${suffixParts.join('+')}` : base;
         serving_quantity: row.Serving_Quantity || null,
         serving_unit: row.Serving_Unit || null,
         unit: row.Unit || null,
+        image_id: resolvedImageId,  
         ...(row.Image && String(row.Image).trim() !== "" && { image_id: String(row.Image).trim() }),
         discount: Number(row.Discount) || 0,
         availability: Number(row.Availability) || 0,
@@ -1676,10 +1289,6 @@ return suffixParts.length > 0 ? `${base}__${suffixParts.join('+')}` : base;
     reader.readAsBinaryString(file);
   };
 
-  const toggleSelectAll = () => {
-    if (!selectAllChecked) { setSelectedRows(filteredItems.map(item => item.id)); setSelectAllChecked(true); }
-    else { setSelectedRows([]); setSelectAllChecked(false); }
-  };
   const hasRestoredRef = useRef(false);
   useEffect(() => {
     if (hasRestoredRef.current) return; 
@@ -1807,32 +1416,6 @@ return suffixParts.length > 0 ? `${base}__${suffixParts.join('+')}` : base;
                   </span>
                 )}
               </div>
-              {/* {isRestaurant && (
-                <div className="flex gap-2 mb-3 flex-wrap">
-                  {dietaryOptions.map(type => {
-                    const key = type.toLowerCase().replace(/[-_\s]/g, '');
-                    return (
-                      <button
-                        key={key}
-                        onClick={() => setSelectedDietary(key)}
-                        className={`px-3 py-1 rounded-full text-sm flex items-center gap-1 ${selectedDietary === key ? "bg-black text-white" : "bg-gray-100"
-                          }`}
-                      >
-                        {dietaryColorMap[key] && (
-                          <span className={`inline-block w-2 h-2 rounded-full ${dietaryColorMap[key]}`} />
-                        )}
-                        {type}
-                      </button>
-                    );
-                  })}
-                  <button
-                    onClick={() => setSelectedDietary(null)}
-                    className="px-3 py-1 rounded-full text-sm bg-gray-200"
-                  >
-                    All
-                  </button>
-                </div>
-              )} */}
               <div className="flex flex-col gap-2 sm:flex-row sm:items-center sm:justify-end lg:flex-nowrap lg:gap-2">
                 <div className="relative w-full sm:w-56">
                   <Search size={16} className="absolute left-3 top-1/2 -translate-y-1/2 text-text-secondary" />
@@ -1848,13 +1431,13 @@ return suffixParts.length > 0 ? `${base}__${suffixParts.join('+')}` : base;
                 <div className="flex gap-2 flex-wrap justify-end">
 
                   {normalizedRealm === 'restaurant' &&
-                    <button onClick={() => setShowMenuConfig(true)} className="h-9 px-3 flex items-center gap-2 rounded-lg bg-action-success text-white text-sm font-semibold shadow-sm hover:opacity-90">
+                    <button onClick={() => setShowMenuConfig(true)} className="h-9 px-3 flex items-center gap-2 rounded-lg bg-action-success text-text-white text-sm font-semibold shadow-sm hover:opacity-90">
                       <span>Config</span>
                     </button>}
-                  <button onClick={openAddModal} className="h-9 px-3 flex items-center gap-2 rounded-lg bg-action-primary text-white text-sm font-semibold shadow-sm hover:opacity-90">
+                  <button onClick={openAddModal} className="h-9 px-3 flex items-center gap-2 rounded-lg bg-action-primary text-text-white text-sm font-semibold shadow-sm hover:opacity-90">
                     <Plus size={14} /><span>{isComboCategory ? 'Add Combo' : 'Add Item'}</span>
                   </button>
-                  <button onClick={() => setShowBulkModal(true)} className="h-9 px-3 flex items-center gap-2 rounded-lg bg-bg-tertiary border border-border-default text-sm font-semibold hover:border-action-primary hover:bg-bg-secondary">
+                  <button onClick={() => setShowBulkModal(true)} className="h-9 px-3 flex items-center gap-2 rounded-lg bg-action-danger text-text-white border border-border-default text-sm font-semibold hover:border-action-primary hover:bg-bg-secondary">
                     <Edit size={14} /><span className="hidden sm:inline">Bulk Update</span>
                   </button>
                   <div className="relative group">
@@ -1881,7 +1464,7 @@ return suffixParts.length > 0 ? `${base}__${suffixParts.join('+')}` : base;
                 {sortedItems.map((item) => {
                   const discountPercent = item.discount && Number(item.discount) > 0
                     ? Number(item.discount).toFixed(0) : null;
-                  const dietary = getDietaryFromSlug(item);
+                  const dietary = getDietaryFromSlug(item,dietaryOptions);
                   const dietaryColor = dietary ? (dietaryColorMap[dietary] || 'bg-transparent') : 'bg-transparent';
                   const active = isItemActive(item.slug, timingOptions);
                   return (
@@ -1900,7 +1483,7 @@ return suffixParts.length > 0 ? `${base}__${suffixParts.join('+')}` : base;
                       )}
                       <div className="relative w-10 h-12 md:h-16 md:w-14 rounded-lg overflow-hidden shrink-0 bg-gray-100">
                         {discountPercent && (
-                          <div className="absolute top-1 left-1 bg-action-danger text-white text-[7px] md:text-[10px] px-1 rounded z-10">
+                          <div className="absolute top-1 left-1 bg-action-danger text-text-white text-[7px] md:text-[10px] px-1 rounded z-10">
                             {discountPercent}% OFF
                           </div>
                         )}
@@ -1926,17 +1509,17 @@ return suffixParts.length > 0 ? `${base}__${suffixParts.join('+')}` : base;
                               <span className="text-xs line-through text-text-secondary">₹{item.unit_price}</span>
                             </>
                           ) : (
-                            <span className="text-sm font-bold text-action-primary">₹{item.unit_price}</span>
+                            <span className="text-sm font-bold text-text-primary">₹{item.unit_price}</span>
                           )}
                         </div>
                       </div>
 
                       <div className="absolute top-1 right-1 flex gap-1 opacity-0 group-hover:opacity-100 transition-opacity duration-200 z-20">
-                        <button className="bg-action-primary text-white p-1 rounded-full hover:scale-110"
+                        <button className="bg-action-primary text-text-white p-1 rounded-full hover:scale-110"
                           onClick={(e) => { e.stopPropagation(); handleItemClick(item); }}>
                           <Edit size={10} />
                         </button>
-                        <button className="bg-action-danger text-white p-1 rounded-full hover:scale-110"
+                        <button className="bg-action-danger text-text-white p-1 rounded-full hover:scale-110"
                           onClick={(e) => { e.stopPropagation(); setDeleteTarget(item); setShowDeleteModal(true); }}>
                           <Trash2 size={10} />
                         </button>
