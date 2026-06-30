@@ -15,21 +15,15 @@ async def get_person_details_service(context,db: Session):
 
     if not person:
         person = Person(id=user_uuid,email=None,phone=None,first_name=None,last_name=None,dob=None)
-
         db.add(person)
         db.commit()
         db.refresh(person)
 
     return {"person": PersonModel.from_orm(person)}
-    
+
 async def update_person_details_service(client_id: str,person_req,body: dict,context,db: Session):
-    target_user_id = (
-        body.get("user_id")
-        or context.user_id
-    )
-
+    target_user_id = (body.get("user_id") or context.user_id)
     roles = body.get("roles")
-
     try:
         user_uuid = uuid.UUID(str(target_user_id))
     except ValueError:
@@ -48,6 +42,7 @@ async def update_person_details_service(client_id: str,person_req,body: dict,con
         person_entity.dob = person_req.dob
         person_entity.email = person_req.email
         person_entity.phone = person_req.phone
+
         action = "updated"
 
     else:
@@ -75,23 +70,17 @@ async def update_person_details_service(client_id: str,person_req,body: dict,con
     return {"message": f"User details {action} successfully","user_id": str(user_entity.id)}
 
 async def get_all_persons_service(client_id: str,db: Session):
-    results = (
-        db.query(Person,User.username,User.roles).join(User,Person.id == User.id).filter(User.client_id == client_id).all())
+    results = (db.query(Person,User.username,User.roles).join(User,Person.id == User.id)
+                 .filter(User.client_id == client_id).all())
 
     persons = []
-
     for person, username, roles in results:
         if isinstance(roles, str):
             roles = [roles.strip("{}")]
         elif roles is None:
             roles = []
 
-        persons.append({
-            **Person.copyToModel(person).dict(),
-            "username": username,
-            "role": roles[0] if roles else ""
-        })
-
+        persons.append({**Person.copyToModel(person).dict(),"username": username,"role": roles[0] if roles else ""})
     return {"persons": persons}
 
 async def save_address_service(add,context,db: Session):
@@ -121,11 +110,8 @@ async def save_address_service(add,context,db: Session):
     db.flush()
 
     address_ids = list(person.saved_address_ids or [])
-
     address_ids.append(address.id)
-
     person.saved_address_ids = address_ids
-
     db.commit()
 
     return {"message": "Address added successfully","address_id": address.id}
@@ -137,7 +123,7 @@ async def get_addresses_service(context,db: Session):
         return {"addresses": []}
 
     addresses = (db.query(Address).filter(Address.id.in_(person.saved_address_ids)).all())
-   
+
     addr_map = {a.id: a for a in addresses}
     ordered = [
         Address.copyToModel(addr_map[aid])
@@ -166,8 +152,7 @@ async def update_address_service(address_id: int,add,db: Session):
     db.commit()
     db.refresh(address)
 
-    return {"message":"Address updated successfully"}
-
+    return {  "message":"Address updated successfully"}
 
 async def get_customer_addresses_service(customer_id: str,db: Session):
     try:
@@ -179,9 +164,7 @@ async def get_customer_addresses_service(customer_id: str,db: Session):
 
     if (not person or not person.saved_address_ids):
         return []
-
     addresses = (db.query(Address).filter(Address.id.in_(person.saved_address_ids)).all())
-
     return [
         Address.copyToModel(a).dict()
         for a in addresses
@@ -196,3 +179,82 @@ async def set_primary_address_service(address_id: int, context, db: Session):
         person.saved_address_ids = ids
         db.commit()
     return {"message": "Primary address set"}
+
+async def find_or_create_customer_service(email, phone, shipping_address, contact_name, db: Session):
+    person = None
+    if phone:
+        person = db.query(Person).filter(Person.phone == phone).first()
+    if not person and email:
+        person = db.query(Person).filter(Person.email == email).first()
+
+    if not person:
+        is_real_name = (
+            contact_name
+            and contact_name.strip()
+            and contact_name != phone
+            and contact_name != email
+        )
+
+        if is_real_name:
+            fallback_name = contact_name.strip()
+        else:
+            next_index = db.query(Person).count() + 1
+            fallback_name = f"customer_{next_index}"
+            while db.query(Person).filter(Person.first_name == fallback_name).first():
+                next_index += 1
+                fallback_name = f"customer_{next_index}"
+
+        person = Person(
+            id=uuid.uuid4(),
+            email=email or None,
+            phone=phone or None,
+            first_name=fallback_name,
+            last_name=None,
+            dob=None,
+            saved_address_ids=[],
+        )
+        db.add(person)
+        db.flush()
+    else:
+        if email and not person.email:
+            person.email = email
+        if phone and not person.phone:
+            person.phone = phone
+
+    if shipping_address:
+        existing_ids = list(person.saved_address_ids or [])
+        existing = db.query(Address).filter(Address.id.in_(existing_ids)).all() if existing_ids else []
+        match = next((a for a in existing if a.address_line1 == shipping_address), None)
+        if not match:
+            address = Address(address_line1=shipping_address, contact_name=person.first_name, contact_number=phone)
+            db.add(address)
+            db.flush()
+            person.saved_address_ids = existing_ids + [address.id]
+
+    db.commit()
+    db.refresh(person)
+
+    return {"person_id": str(person.id),"first_name": person.first_name,"email": person.email,
+        "phone": person.phone,"shipping_address": shipping_address or "",}
+
+async def search_customers_service(q: str, db: Session):
+    query = db.query(Person)
+    if q:
+        like = f"%{q}%"
+        query = query.filter((Person.phone.ilike(like)) | (Person.email.ilike(like)) | (Person.first_name.ilike(like)))
+    persons = query.limit(20).all()
+
+    results = []
+    for p in persons:
+        addr = ""
+        if p.saved_address_ids:
+            a = db.query(Address).filter(Address.id == p.saved_address_ids[0]).first()
+            if a:
+                addr = a.address_line1
+        results.append({
+            "customer_id": str(p.id),
+            "contact_email": p.email or "",
+            "contact_phone": p.phone or "",
+            "shipping_address": addr,
+        })
+    return results
