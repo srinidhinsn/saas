@@ -222,33 +222,10 @@ export default function InvoiceModal({
   const fetchUniqueCustomers = async () => {
     try {
       const res = await axios.get(
-        `${import.meta.env.VITE_API_BILLING_SERVICE_URL}/${clientId}/invoice/read_document`,
-        {
-          headers: { Authorization: `Bearer ${token}` },
-          params: { client_id: clientId }
-        }
+        `${import.meta.env.VITE_API_USER_SERVICE_URL}/${clientId}/users/customer/search`,
+        { headers: { Authorization: `Bearer ${token}` }, params: { client_id: clientId } }
       );
-      const invoices = res.data?.data || [];
-      const customersMap = new Map();
-      invoices.forEach(inv => {
-        if (inv.customer_id) {
-          if (!customersMap.has(inv.customer_id) ||
-            new Date(inv.created_at) > new Date(customersMap.get(inv.customer_id).created_at)) {
-            customersMap.set(inv.customer_id, {
-              customer_id: inv.customer_id,
-              contact_email: inv.contact_email || "",
-              contact_phone: inv.contact_phone || "", shipping_address: inv.shipping_address || "",
-              created_at: inv.created_at
-            });
-          }
-        }
-      });
-      console.log("raw invoices:", invoices.length, "customers built:", customersMap.size);
-      console.log("customersList sample:", Array.from(customersMap.values()).slice(0, 3));
-
-      const uniqueCustomers = Array.from(customersMap.values())
-        .sort((a, b) => a.customer_id.localeCompare(b.customer_id));
-      setCustomersList(uniqueCustomers);
+      setCustomersList(res.data?.data?.customers || []);
     } catch (err) {
       console.error("Failed to fetch customers:", err);
       setCustomersList([]);
@@ -416,6 +393,25 @@ export default function InvoiceModal({
     }
 
     setSaving(true);
+    let resolvedCustomerId = selectedOrder.customer_id;
+if (selectedOrder.contact_phone || selectedOrder.contact_email || selectedOrder.customer_id) {
+  try {
+    const custRes = await axios.post(
+      `${import.meta.env.VITE_API_USER_SERVICE_URL}/${clientId}/users/customer/find_or_create`,
+      {
+        contact_email: selectedOrder.contact_email,
+        contact_phone: selectedOrder.contact_phone,
+        shipping_address: selectedOrder.shipping_address,
+        customer_id: selectedOrder.customer_id,
+      },
+      { headers: { Authorization: `Bearer ${token}` } }
+    );
+    resolvedCustomerId = custRes.data?.data?.person_id || resolvedCustomerId;
+    console.log("find_or_create response:", custRes.data); // temporary debug
+  } catch (err) {
+    console.error("Failed to resolve/create customer:", err.response?.data || err.message);
+  }
+}
     try {
       const payload = {
         client_id: clientId,
@@ -433,10 +429,7 @@ export default function InvoiceModal({
         payment_method: paymentMethodArray,
         single_payment_amount: splitPaymentEnabled ? null : Number(paymentSplits[0]?.amount ?? total),
         status: "Draft",
-        customer_id:
-          selectedOrder.customer_id ??
-          initialOrder.customer_id ??
-          undefined,
+        customer_id: resolvedCustomerId ?? initialOrder.customer_id ?? undefined,
         contact_email: selectedOrder.contact_email || "",
         contact_phone: selectedOrder.contact_phone || "",
         shipping_address:
