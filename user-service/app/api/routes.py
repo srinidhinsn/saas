@@ -19,7 +19,8 @@ from datetime import datetime, timedelta, time
 from services.add_users import (create_user_and_person, login_user_service, get_user_perms, has_user_permission , delete_user_service , 
                                   forgot_password_service ,reset_password_service)
 from services.person_service import (update_person_details_service, get_person_details_service, get_all_persons_service, 
-                                       save_address_service, get_addresses_service, update_address_service, get_customer_addresses_service, set_primary_address_service)
+                                       save_address_service, get_addresses_service, update_address_service, get_customer_addresses_service, set_primary_address_service,
+find_or_create_customer,search_customers_service)
 from services.auth_service import refresh_access_token
 from jose import jwt
 import uuid , os
@@ -391,6 +392,21 @@ async def refresh_token(req: Request, db: Session = Depends(get_db)):
     body = await req.json()
     result = refresh_access_token(body.get("refresh_token"), db)
     return ResponseModel(data=result)
+@router.post("/customer/find_or_create")
+async def find_or_create_customer(client_id: str, payload: dict, context: SaasContext = Depends(verify_token), db: Session = Depends(get_db)):
+    result = await find_or_create_customer_service(
+        email=payload.get("contact_email"),
+        phone=payload.get("contact_phone"),
+        shipping_address=payload.get("shipping_address"),
+        contact_name=payload.get("customer_id"),
+        db=db,
+    )
+    return ResponseModel(screen_id=context.screen_id, data=result)
+
+@router.get("/customer/search")
+async def search_customers(client_id: str, q: str = "", context: SaasContext = Depends(verify_token), db: Session = Depends(get_db)):
+    result = await search_customers_service(q, db)
+    return ResponseModel(screen_id=context.screen_id, data={"customers": result})
 
 @router.post("/chat")
 async def chat(client_id: str,req: ChatRequest,db: Session = Depends(get_db)):
