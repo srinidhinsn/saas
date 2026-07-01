@@ -1,4 +1,4 @@
-import React, { useEffect, useState } from "react";
+import React, { useEffect, useState, useRef } from "react";
 import axios from 'axios';
 import { toast } from "react-toastify";
 import Modal from "react-modal";
@@ -7,7 +7,7 @@ import {
   Users, Package, Truck, Eye, AlertTriangle,
 } from 'lucide-react';
 import { useNavigate } from "react-router-dom";
-
+import { getDateRange } from "../../utils/Menu-utils/menuUtils";
 Modal.setAppElement("#root");
 
 // ─────────────────────────────────────────────────────────────────────────────
@@ -465,7 +465,6 @@ const OrderSummaryVisible = ({ clientId, token }) => {
 
   // ── Singular filter state ─────────────────────────────────────────────────
   const todayDate = new Date().toISOString().split('T')[0];
-  const [selectedDate, setSelectedDate] = useState(todayDate);
   const [filterMode, setFilterMode] = useState(0);
   // Single order-mode selection — NOT multi-select
   const [selectedOrderMode, setSelectedOrderMode] = useState('all');
@@ -491,7 +490,11 @@ const OrderSummaryVisible = ({ clientId, token }) => {
   const [selectedMainItem, setSelectedMainItem] = useState(null);
   const [lineItemsDetails, setLineItemsDetails] = useState([]);
   const [pendingOrderId, setPendingOrderId] = useState(null);
-  const [datePreset, setDatePreset] = useState('today');
+const [datePreset, setDatePreset] = useState('today');
+const [customFrom, setCustomFrom] = useState(todayDate);
+const [customTo, setCustomTo] = useState(todayDate);
+const customFromRef = useRef(null);
+const customToRef = useRef(null);
   // ─────────────────────────────────────────────────────────────────────────
   // localStorage helpers (preserved exactly from original)
   // ─────────────────────────────────────────────────────────────────────────
@@ -1319,25 +1322,8 @@ const OrderSummaryVisible = ({ clientId, token }) => {
   // Singular filtering
   // ─────────────────────────────────────────────────────────────────────────
 
-  const getDateRange = () => {
-    const now = new Date();
-    const toStr = (d) => d.toISOString().split('T')[0];
-    const today = toStr(now);
-    const subtractDays = (n) => { const d = new Date(now); d.setDate(d.getDate() - n); return toStr(d); };
-    const subtractMonths = (n) => { const d = new Date(now); d.setMonth(d.getMonth() - n); return toStr(d); };
-    switch (datePreset) {
-      case 'today': return { from: today, to: today };
-      case '1w': return { from: subtractDays(7), to: today };
-      case '15d': return { from: subtractDays(15), to: today };
-      case '1m': return { from: subtractMonths(1), to: today };
-      case '3m': return { from: subtractMonths(3), to: today };
-      case '6m': return { from: subtractMonths(6), to: today };
-      case 'custom': return { from: customFrom, to: customTo };
-      default: return { from: today, to: today };
-    }
-  };
 
-  const { from, to } = getDateRange();
+  const { from, to } = getDateRange(datePreset, customFrom, customTo);
   let filteredOrders = orders.filter(order => {
     const orderDate = new Date(order.created_at).toLocaleDateString('en-CA');
     return orderDate >= from && orderDate <= to;
