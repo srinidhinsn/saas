@@ -36,7 +36,7 @@ const NavigateAfterLogin = ({ authState }) => {
   return <Navigate to={`/saas/${finalClientId}/${route}`} replace />;
 };
 
-const HeaderSwitcher = ({ clientId, onLogout }) => {
+const HeaderSwitcher = ({ clientId, onLogout, subscription }) => {
   const screenId = localStorage.getItem('screen_id');
 
   if (screenId === 'ecommerce_user_v1') {
@@ -49,7 +49,7 @@ const HeaderSwitcher = ({ clientId, onLogout }) => {
     return <Header_Super_User clientId={clientId} onLogout={onLogout} />;
   }
   // default fallback
-  return <HeaderShared clientId={clientId} onLogout={onLogout} />;
+  return <HeaderShared clientId={clientId} onLogout={onLogout} subscription={subscription} />;  {/* ← NEW */}
 };
 
 // ─── Authenticated app shell ──────────────────────────────────────────────────
@@ -57,12 +57,14 @@ const InnerAuthenticatedApp = ({ token, onLogout }) => {
   const decoded=jwtDecode(token);
   const { clientId } = useParams();
   const finalClientId = clientId || 'easyfood';
+  const subscription = decoded.subscription || [];
 
   return (
     <OperationGuardProvider clientId={finalClientId} requesterId={decoded.user_id}>
       <HeaderSwitcher
         clientId={finalClientId}
         onLogout={onLogout}
+        subscription={subscription}
       />
 
       <main>

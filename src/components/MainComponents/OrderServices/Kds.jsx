@@ -6,6 +6,7 @@ import 'react-toastify/dist/ReactToastify.css';
 import { FaCheckCircle, FaClock, FaHourglassHalf, FaConciergeBell } from 'react-icons/fa';
 import { Filter, Clock, Users, Package, Truck, Trash2, BarChart2, X, ChevronRight, Calendar, RotateCcw } from 'lucide-react';
 import { menuCache } from '../../utils/Menu-utils/menuCache';
+import { parseISTTimestamp, getDateRangeFromPreset, DateRangeFilter } from '../../utils/dateRange';
 // ─── Constants ─────────────────────────────────────────────────────────────────
 
 
@@ -44,28 +45,6 @@ const ORDER_FILTER_OPTIONS = [
   { key: KDS_CONFIG.FILTERS.TAKEAWAY, label: 'Takeaway', Icon: Package },
   { key: KDS_CONFIG.FILTERS.DELIVERY, label: 'Delivery', Icon: Truck },
 ];
-
-const IST_OFFSET_MS = 5.5 * 60 * 60 * 1000;
-
-const parseISTTimestamp = (createdAt) => {
-  if (!createdAt) return 0;
-  const raw = typeof createdAt === 'string'
-    ? createdAt.replace(' ', 'T').split('.')[0]
-    : String(createdAt);
-  // If the string already carries timezone info, parse as-is
-  const hasZone = raw.endsWith('Z') || /[+-]\d{2}:\d{2}$/.test(raw);
-  return hasZone
-    ? new Date(raw).getTime()
-    : new Date(raw + 'Z').getTime() - IST_OFFSET_MS;
-};
-
-// Returns YYYY-MM-DD for "today" in IST, matching the en-CA formatted dates
-// produced elsewhere in this file so date-string comparisons stay consistent.
-const getTodayISTDateString = () => {
-  const nowIST = new Date(Date.now() + IST_OFFSET_MS);
-  return nowIST.toISOString().split('T')[0];
-};
-
 
 // ─── Elapsed time helper ───────────────────────────────────────────────────────
 
@@ -616,11 +595,16 @@ const KitchenDisplay = ({clientId, token}) => {
   // Defaults to today (live view). Selecting an earlier date switches the
   // page into a "missed orders" lookup mode: same hide-served filtering,
   // but no polling, since past orders don't change on their own.
-  const todayStr = getTodayISTDateString();
-  const [selectedDate, setSelectedDate] = useState(todayStr);
-  const isToday = selectedDate === todayStr;
-  const selectedDateRef = useRef(selectedDate);
-  useEffect(() => { selectedDateRef.current = selectedDate; }, [selectedDate]);
+const todayDate = new Date().toISOString().split('T')[0];
+const [datePreset, setDatePreset] = useState('today');
+const [customFrom, setCustomFrom] = useState(todayDate);
+const [customTo, setCustomTo] = useState(todayDate);
+const datePresetRef = useRef('today');
+const customFromValRef = useRef(todayDate);
+const customToValRef = useRef(todayDate);
+useEffect(() => { datePresetRef.current = datePreset; }, [datePreset]);
+useEffect(() => { customFromValRef.current = customFrom; }, [customFrom]);
+useEffect(() => { customToValRef.current = customTo; }, [customTo]);
 
   // Stores the canonical item order (array of item ids) per card_id.
   // Persists across re-renders and poll ticks so item positions never shift.
@@ -721,7 +705,7 @@ const KitchenDisplay = ({clientId, token}) => {
   const fetchOrders = useCallback(async () => {
     const clientId = clientIdRef.current;
     const token = tokenRef.current;
-    const targetDateStr = selectedDateRef.current;
+    const { from, to } = getDateRangeFromPreset(datePresetRef.current, customFromValRef.current, customToValRef.current);
 
     if (!token || !clientId) {
       setLoading(false);
@@ -753,7 +737,7 @@ const KitchenDisplay = ({clientId, token}) => {
         const createdAt = mergedOrder.created_at;
         if (createdAt) {
           const orderDate = new Date(parseISTTimestamp(createdAt)).toLocaleDateString(KDS_CONFIG.DATE_FORMAT);
-          if (orderDate !== targetDateStr) return;
+          if (orderDate < from || orderDate > to) return;
         } else {
           // No created_at at all — can't place it on the selected date, skip.
           return;
@@ -838,23 +822,15 @@ const KitchenDisplay = ({clientId, token}) => {
     hasFetchedOrdersRef.current = true;
 
     fetchOrders();
-    const interval = setInterval(() => {
-      if (selectedDateRef.current === getTodayISTDateString()) {
-        fetchOrders();
-      }
-    }, KDS_CONFIG.POLL_INTERVAL_MS);
+    const interval = setInterval(fetchOrders, KDS_CONFIG.POLL_INTERVAL_MS);
+
     return () => clearInterval(interval);
   }, [fetchOrders]);
 
-  const isFirstDateRenderRef = useRef(true);
   useEffect(() => {
-    if (isFirstDateRenderRef.current) {
-      isFirstDateRenderRef.current = false;
-      return;
-    }
-    setLoading(true);
-    fetchOrders();
-  }, [selectedDate, fetchOrders]);
+  setLoading(true);
+  fetchOrders();
+}, [datePreset, customFrom, customTo]);
 
   // ─── Item status change ───────────────────────────────────────────────────────
 
@@ -953,17 +929,6 @@ const KitchenDisplay = ({clientId, token}) => {
       return true;
     });
 
-  const handleDateChange = (e) => {
-    const value = e.target.value; // 'YYYY-MM-DD'
-    if (!value) return;
-    setSelectedDate(value);
-  };
-
-  const handleResetToToday = () => {
-    setSelectedDate(getTodayISTDateString());
-  };
-
-
   // ─── Render ───────────────────────────────────────────────────────────────────
 
   return (
@@ -1003,36 +968,16 @@ const KitchenDisplay = ({clientId, token}) => {
 
               {/* ── Date filter — defaults to today, lets staff look back for
                    missed orders on a previous date. Future dates disabled. ── */}
-              <div className="flex items-center gap-2 ml-2 pl-2 border-l border-gray-300">
-                <div className="relative flex items-center">
-                  <Calendar size={16} className="absolute left-3 text-gray-400 pointer-events-none" />
-                  <input
-                    type="date"
-                    value={selectedDate}
-                    max={todayStr}
-                    onChange={handleDateChange}
-                    className="pl-9 pr-3 py-2 rounded-lg font-medium text-sm border border-border-default bg-bg-tertiary text-text-secondary hover:text-text-primary transition-all focus:outline-none focus:ring-2 focus:ring-action-primary"
-                  />
-                </div>
-                {!isToday && (
-                  <button
-                    onClick={handleResetToToday}
-                    title="Back to today"
-                    className="flex items-center gap-1.5 px-3 py-2 rounded-lg font-medium text-sm transition-all bg-amber-100 text-amber-700 hover:bg-amber-200"
-                  >
-                    <RotateCcw size={14} />
-                    Today
-                  </button>
-                )}
-              </div>
+              <DateRangeFilter
+                datePreset={datePreset}
+                setDatePreset={setDatePreset}
+                customFrom={customFrom}
+                setCustomFrom={setCustomFrom}
+                customTo={customTo}
+                setCustomTo={setCustomTo}
+              />
             </div>
           </div>
-
-          {!isToday && (
-            <div className="mb-3 px-4 py-2 rounded-lg bg-amber-50 border border-amber-200 text-amber-800 text-sm font-medium">
-              Viewing missed orders from {new Date(selectedDate + 'T00:00:00').toLocaleDateString('en-GB', { day: 'numeric', month: 'short', year: 'numeric' })}. Live updates are paused — switch back to "Today" to resume.
-            </div>
-          )}
 
           {/* ── Cards grid ── */}
           <div className="w-full">
@@ -1043,7 +988,7 @@ const KitchenDisplay = ({clientId, token}) => {
             ) : filteredCards.length === 0 ? (
               <div className="flex items-center justify-center py-12">
                 <div className="text-lg font-medium text-gray-400">
-                  {isToday ? 'No active orders' : 'No missed orders found for this date'}
+                  { 'No active orders'}
                 </div>
               </div>
             ) : (
