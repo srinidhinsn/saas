@@ -1,4 +1,4 @@
-import React, { useEffect, useState, useRef } from "react";
+import React, { useEffect, useState } from "react";
 import axios from 'axios';
 import { toast } from "react-toastify";
 import Modal from "react-modal";
@@ -7,7 +7,7 @@ import {
   Users, Package, Truck, Eye, AlertTriangle,
 } from 'lucide-react';
 import { useNavigate } from "react-router-dom";
-import { getDateRange } from "../../utils/Menu-utils/menuUtils";
+
 Modal.setAppElement("#root");
 
 // ─────────────────────────────────────────────────────────────────────────────
@@ -465,6 +465,7 @@ const OrderSummaryVisible = ({ clientId, token }) => {
 
   // ── Singular filter state ─────────────────────────────────────────────────
   const todayDate = new Date().toISOString().split('T')[0];
+  const [selectedDate, setSelectedDate] = useState(todayDate);
   const [filterMode, setFilterMode] = useState(0);
   // Single order-mode selection — NOT multi-select
   const [selectedOrderMode, setSelectedOrderMode] = useState('all');
@@ -490,11 +491,7 @@ const OrderSummaryVisible = ({ clientId, token }) => {
   const [selectedMainItem, setSelectedMainItem] = useState(null);
   const [lineItemsDetails, setLineItemsDetails] = useState([]);
   const [pendingOrderId, setPendingOrderId] = useState(null);
-const [datePreset, setDatePreset] = useState('today');
-const [customFrom, setCustomFrom] = useState(todayDate);
-const [customTo, setCustomTo] = useState(todayDate);
-const customFromRef = useRef(null);
-const customToRef = useRef(null);
+
   // ─────────────────────────────────────────────────────────────────────────
   // localStorage helpers (preserved exactly from original)
   // ─────────────────────────────────────────────────────────────────────────
@@ -1322,12 +1319,12 @@ const customToRef = useRef(null);
   // Singular filtering
   // ─────────────────────────────────────────────────────────────────────────
 
-
-  const { from, to } = getDateRange(datePreset, customFrom, customTo);
-  let filteredOrders = orders.filter(order => {
-    const orderDate = new Date(order.created_at).toLocaleDateString('en-CA');
-    return orderDate >= from && orderDate <= to;
-  });
+  let filteredOrders = selectedDate
+    ? orders.filter(order => {
+      const orderDate = new Date(order.created_at).toLocaleDateString('en-CA');
+      return orderDate === selectedDate;
+    })
+    : orders;
 
   // Single mode selection (not multi)
   if (selectedOrderMode !== 'all') {
@@ -1429,56 +1426,13 @@ const customToRef = useRef(null);
                 </select>
               </div>
 
-              <div className="relative flex items-center gap-2">
-                <select
-                  value={datePreset}
-                  onChange={e => {
-                    const val = e.target.value;
-                    setDatePreset(val);
-                    if (val === 'custom') {
-                      // open the from-date picker immediately
-                      setTimeout(() => customFromRef.current?.showPicker?.(), 50);
-                    }
-                  }}
-                  className="pl-3 pr-8 py-2 rounded-lg bg-bg-primary border border-border-default text-text-primary text-sm appearance-none cursor-pointer"
-                >
-                  <option value="today">Today</option>
-                  <option value="1w">Last 1 Week</option>
-                  <option value="15d">Last 15 Days</option>
-                  <option value="1m">Last 1 Month</option>
-                  <option value="3m">Last 3 Months</option>
-                  <option value="6m">Last 6 Months</option>
-                  <option value="custom">Custom Range</option>
-                </select>
-
-                {/* Hidden date pickers — only mount when custom is selected */}
-                {datePreset === 'custom' && (
-                  <>
-                    <input
-                      ref={customFromRef}
-                      type="date"
-                      value={customFrom}
-                      max={customTo}
-                      onChange={e => {
-                        setCustomFrom(e.target.value);
-                        // after picking from-date, auto-open the to-date picker
-                        setTimeout(() => customToRef.current?.showPicker?.(), 50);
-                      }}
-                      className="px-3 py-2 rounded-lg bg-bg-primary border border-border-default text-text-primary text-sm"
-                    />
-                    <span className="text-text-secondary text-xs font-medium">→</span>
-                    <input
-                      ref={customToRef}
-                      type="date"
-                      value={customTo}
-                      min={customFrom}
-                      max={todayDate}
-                      onChange={e => setCustomTo(e.target.value)}
-                      className="px-3 py-2 rounded-lg bg-bg-primary border border-border-default text-text-primary text-sm"
-                    />
-                  </>
-                )}
-              </div>
+              {/* Date */}
+              <input
+                type="date"
+                value={selectedDate}
+                onChange={e => setSelectedDate(e.target.value)}
+                className="w-full sm:w-auto px-3 py-2 rounded-lg bg-bg-primary border border-border-default text-text-primary text-sm"
+              />
 
               <div className="text-sm font-semibold text-text-secondary whitespace-nowrap xl:ml-auto">
                 {filteredOrders.length} order{filteredOrders.length !== 1 ? 's' : ''}

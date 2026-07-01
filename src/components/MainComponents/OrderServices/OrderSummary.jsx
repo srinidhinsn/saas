@@ -7,7 +7,7 @@ import {
   Users, Package, Truck, Eye, AlertTriangle,
 } from 'lucide-react';
 import { useNavigate } from "react-router-dom";
-import { getDateRange } from "../../utils/Menu-utils/menuUtils";
+import { menuCache } from '../../utils/Menu-utils/menuCache';
 Modal.setAppElement("#root");
 
 // ─────────────────────────────────────────────────────────────────────────────
@@ -355,7 +355,7 @@ const OrderItemsViewModal = ({ isOpen, onClose, order, inventoryMap, onRequestDe
               </tr>
             </thead>
             <tbody className="divide-y divide-border-default">
-             {order.items.map((item, idx) => {
+            {order.items.map((item, idx) => {
                 const unitPrice =
                   item.unit_price ??
                   item.price ??
@@ -455,6 +455,10 @@ const normaliseItem = (item) => {
 
 const OrderSummaryVisible = ({ clientId, token }) => {
   const navigate = useNavigate();
+  const hasFetchedStaticRef = useRef(false);
+  const hasFetchedOrdersRef = useRef(false);
+  const inventoryMapRef = useRef({});
+  const tablesMapRef = useRef({});
 
   // ── Data ──────────────────────────────────────────────────────────────────
   const [orders, setOrders] = useState([]);
@@ -497,9 +501,13 @@ const OrderSummaryVisible = ({ clientId, token }) => {
   const [lineItemsDetails, setLineItemsDetails] = useState([]);
   const [pendingOrderId, setPendingOrderId] = useState(null);
 
- // ─────────────────────────────────────────────────────────────────────────
- // localStorage helpers (preserved exactly from original)
- // ─────────────────────────────────────────────────────────────────────────
+  // ─────────────────────────────────────────────────────────────────────────
+  // localStorage helpers (preserved exactly from original)
+  // ─────────────────────────────────────────────────────────────────────────
+
+  useEffect(() => {
+    tablesMapRef.current = tablesMap;
+  }, [tablesMap]);
 
   const generateSlug = name => name.toLowerCase().replace(/[\s]+/g, '-');
 
@@ -626,38 +634,23 @@ const OrderSummaryVisible = ({ clientId, token }) => {
   // Fetch helpers
   // ─────────────────────────────────────────────────────────────────────────
 
-  const fetchTables = async () => {
-    try {
-      const res = await axios.get(
-        `${import.meta.env.VITE_API_TABLE_SERVICE_URL}/${clientId}/tables/read`,
-        { headers: { Authorization: `Bearer ${token}` } }
-      );
-      setTables(res.data?.data || []);
-      const map = {};
-      (res.data?.data || []).forEach(t => (map[t.id] = t.name));
-      setTablesMap(map);
-    } catch (e) {
-      console.error('fetchTables', e);
-    }
-  };
-
   useEffect(() => {
-    if (clientId) fetchTables();
-  }, [clientId]);
+    if (!clientId || !token) return;
+    if (hasFetchedStaticRef.current) return;
+    hasFetchedStaticRef.current = true;
 
-  useEffect(() => {
-    axios
-      .get(
-        `${import.meta.env.VITE_API_INVENTORY_SERVICE_URL}/${clientId}/menu/read`,
-        { headers: { Authorization: `Bearer ${token}` } }
-      )
-      .then(res => {
-        setAllInventoryItems(res.data.data || []);
-        const map = {};
-        (res.data.data || []).forEach(i => (map[i.id] = i));
-        setInventoryMap(map);
-      })
-      .catch(() => { });
+    const fetchStaticData = async () => {
+      const { list: tableList, map: tableMap } = await menuCache.fetchTables(clientId, token);
+      setTables(tableList);
+      setTablesMap(tableMap);
+
+      const { list: menuList, map: menuMap } = await menuCache.fetchMenuItems(clientId, token);
+      setAllInventoryItems(menuList);
+      setInventoryMap(menuMap);
+      inventoryMapRef.current = menuMap;
+    };
+
+    fetchStaticData();
   }, [clientId, token]);
 
   // ─────────────────────────────────────────────────────────────────────────
@@ -703,7 +696,7 @@ const OrderSummaryVisible = ({ clientId, token }) => {
       clearNewItemsStorage(order.id);
       return {
         ...order,
-        _fixedOrderMode: order._fixedOrderMode ?? getInitialOrderMode(order, tablesMap),
+        _fixedOrderMode: order._fixedOrderMode ?? getInitialOrderMode(order, tablesMapRef.current),
       };
     }
 
@@ -792,7 +785,7 @@ const OrderSummaryVisible = ({ clientId, token }) => {
       if (!si || !si.unique_key) return;
       if (backendUniqueKeys.has(String(si.unique_key))) return;
       if (!si.batch_timestamp || !si.item_id) return;
-      const itemInfo = inventoryMap[si.item_id];
+      const itemInfo = inventoryMapRef.current[si.item_id];
       if (!itemInfo) return;
       pushToBatch(si.batch_timestamp, {
         item_id: si.item_id,
@@ -846,7 +839,7 @@ const OrderSummaryVisible = ({ clientId, token }) => {
 
     return {
       ...order,
-      _fixedOrderMode: order._fixedOrderMode ?? getInitialOrderMode(order, tablesMap),
+      _fixedOrderMode: order._fixedOrderMode ?? getInitialOrderMode(order, tablesMapRef.current),
       items: deduped.map(normaliseItem),
       has_new_items: batchItemsMap.size > 0,
     };
@@ -857,6 +850,10 @@ const OrderSummaryVisible = ({ clientId, token }) => {
   // ─────────────────────────────────────────────────────────────────────────
 
   useEffect(() => {
+    if (!token || !clientId) return;
+    if (hasFetchedOrdersRef.current) return;
+    hasFetchedOrdersRef.current = true;
+
     const fetchOrders = async () => {
       if (!token || !clientId) { setLoading(false); return; }
       try {
@@ -877,7 +874,7 @@ const OrderSummaryVisible = ({ clientId, token }) => {
     fetchOrders();
     const interval = setInterval(fetchOrders, 10000);
     return () => clearInterval(interval);
-  }, [clientId, token, inventoryMap]);
+  }, [clientId, token]);
 
   // ─────────────────────────────────────────────────────────────────────────
   // Actions (preserved from original)
@@ -1271,7 +1268,25 @@ const OrderSummaryVisible = ({ clientId, token }) => {
   // Singular filtering
   // ─────────────────────────────────────────────────────────────────────────
 
-  const { from, to } = getDateRange(datePreset, customFrom, customTo);
+  const getDateRange = () => {
+    const now = new Date();
+    const toStr = (d) => d.toISOString().split('T')[0];
+    const today = toStr(now);
+    const subtractDays = (n) => { const d = new Date(now); d.setDate(d.getDate() - n); return toStr(d); };
+    const subtractMonths = (n) => { const d = new Date(now); d.setMonth(d.getMonth() - n); return toStr(d); };
+    switch (datePreset) {
+      case 'today': return { from: today, to: today };
+      case '1w': return { from: subtractDays(7), to: today };
+      case '15d': return { from: subtractDays(15), to: today };
+      case '1m': return { from: subtractMonths(1), to: today };
+      case '3m': return { from: subtractMonths(3), to: today };
+      case '6m': return { from: subtractMonths(6), to: today };
+      case 'custom': return { from: customFrom, to: customTo };
+      default: return { from: today, to: today };
+    }
+  };
+
+  const { from, to } = getDateRange();
   let filteredOrders = orders.filter(order => {
     const orderDate = new Date(order.created_at).toLocaleDateString('en-CA');
     return orderDate >= from && orderDate <= to;
@@ -1300,6 +1315,9 @@ const OrderSummaryVisible = ({ clientId, token }) => {
       break;
     case 5:
       filteredOrders = filteredOrders.filter(o => o.status?.toLowerCase() === 'served');
+      break;
+    case 6:
+      filteredOrders = filteredOrders.filter(o => o.status?.toLowerCase() === 'cancelled');
       break;
     default:
       break;
@@ -1374,6 +1392,7 @@ const OrderSummaryVisible = ({ clientId, token }) => {
                   <option value={3}>Preparing</option>
                   <option value={4}>Ready</option>
                   <option value={5}>Served</option>
+                  <option value={6}>Cancelled</option>
                 </select>
               </div>
 
@@ -1445,7 +1464,7 @@ const OrderSummaryVisible = ({ clientId, token }) => {
           <div className="rounded-xl overflow-hidden border border-border-default shadow-card bg-bg-primary">
             <div className="w-full overflow-x-auto">
               <table className="min-w-[1100px] w-full">
-              <thead className="bg-bg-tertiary border-b border-border-default">
+                <thead className="bg-bg-tertiary border-b border-border-default">
                 <tr>
                   {['Order #', 'Table / Customer', 'Mode', 'Items', 'Total Price', 'Status', 'Actions'].map(h => (
                     <th key={h} className="px-6 py-4 text-left text-xs font-bold text-text-primary uppercase tracking-wider">{h}</th>
