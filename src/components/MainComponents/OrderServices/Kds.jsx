@@ -4,8 +4,9 @@ import { useParams } from 'react-router-dom';
 import { toast } from 'react-toastify';
 import 'react-toastify/dist/ReactToastify.css';
 import { FaCheckCircle, FaClock, FaHourglassHalf, FaConciergeBell } from 'react-icons/fa';
-import { Filter, Clock, Users, Package, Truck, Trash2, BarChart2, X, ChevronRight } from 'lucide-react';
+import { Filter, Clock, Users, Package, Truck, Trash2, BarChart2, X, ChevronRight, Calendar, RotateCcw } from 'lucide-react';
 import { menuCache } from '../../utils/Menu-utils/menuCache';
+import { parseISTTimestamp, getDateRangeFromPreset, DateRangeFilter } from '../../utils/dateRange';
 // ─── Constants ─────────────────────────────────────────────────────────────────
 
 
@@ -44,21 +45,6 @@ const ORDER_FILTER_OPTIONS = [
   { key: KDS_CONFIG.FILTERS.TAKEAWAY, label: 'Takeaway', Icon: Package },
   { key: KDS_CONFIG.FILTERS.DELIVERY, label: 'Delivery', Icon: Truck },
 ];
-
-const IST_OFFSET_MS = 5.5 * 60 * 60 * 1000;
-
-const parseISTTimestamp = (createdAt) => {
-  if (!createdAt) return 0;
-  const raw = typeof createdAt === 'string'
-    ? createdAt.replace(' ', 'T').split('.')[0]
-    : String(createdAt);
-  // If the string already carries timezone info, parse as-is
-  const hasZone = raw.endsWith('Z') || /[+-]\d{2}:\d{2}$/.test(raw);
-  return hasZone
-    ? new Date(raw).getTime()
-    : new Date(raw + 'Z').getTime() - IST_OFFSET_MS;
-};
-
 
 // ─── Elapsed time helper ───────────────────────────────────────────────────────
 
@@ -605,6 +591,21 @@ const KitchenDisplay = ({clientId, token}) => {
   const [orderFilter, setOrderFilter] = useState('ALL');
   const [showAggregate, setShowAggregate] = useState(false);
 
+  // ── Date filter ──────────────────────────────────────────────────────────
+  // Defaults to today (live view). Selecting an earlier date switches the
+  // page into a "missed orders" lookup mode: same hide-served filtering,
+  // but no polling, since past orders don't change on their own.
+const todayDate = new Date().toISOString().split('T')[0];
+const [datePreset, setDatePreset] = useState('today');
+const [customFrom, setCustomFrom] = useState(todayDate);
+const [customTo, setCustomTo] = useState(todayDate);
+const datePresetRef = useRef('today');
+const customFromValRef = useRef(todayDate);
+const customToValRef = useRef(todayDate);
+useEffect(() => { datePresetRef.current = datePreset; }, [datePreset]);
+useEffect(() => { customFromValRef.current = customFrom; }, [customFrom]);
+useEffect(() => { customToValRef.current = customTo; }, [customTo]);
+
   // Stores the canonical item order (array of item ids) per card_id.
   // Persists across re-renders and poll ticks so item positions never shift.
   const itemOrderRef = useRef({});
@@ -704,6 +705,7 @@ const KitchenDisplay = ({clientId, token}) => {
   const fetchOrders = useCallback(async () => {
     const clientId = clientIdRef.current;
     const token = tokenRef.current;
+    const { from, to } = getDateRangeFromPreset(datePresetRef.current, customFromValRef.current, customToValRef.current);
 
     if (!token || !clientId) {
       setLoading(false);
@@ -726,7 +728,6 @@ const KitchenDisplay = ({clientId, token}) => {
       // Check again after the await — a user may have clicked in the meantime
       if (inflightUpdatesRef.current > 0) return;
 
-      const today = new Date().toLocaleDateString(KDS_CONFIG.DATE_FORMAT);
       const allCards = [];
 
       (res.data?.data || []).forEach((mergedOrder) => {
@@ -736,7 +737,10 @@ const KitchenDisplay = ({clientId, token}) => {
         const createdAt = mergedOrder.created_at;
         if (createdAt) {
           const orderDate = new Date(parseISTTimestamp(createdAt)).toLocaleDateString(KDS_CONFIG.DATE_FORMAT);
-          if (orderDate !== today) return;
+          if (orderDate < from || orderDate > to) return;
+        } else {
+          // No created_at at all — can't place it on the selected date, skip.
+          return;
         }
 
         // Skip fully-served groups
@@ -819,8 +823,14 @@ const KitchenDisplay = ({clientId, token}) => {
 
     fetchOrders();
     const interval = setInterval(fetchOrders, KDS_CONFIG.POLL_INTERVAL_MS);
+
     return () => clearInterval(interval);
   }, [fetchOrders]);
+
+  useEffect(() => {
+  setLoading(true);
+  fetchOrders();
+}, [datePreset, customFrom, customTo]);
 
   // ─── Item status change ───────────────────────────────────────────────────────
 
@@ -919,7 +929,6 @@ const KitchenDisplay = ({clientId, token}) => {
       return true;
     });
 
-
   // ─── Render ───────────────────────────────────────────────────────────────────
 
   return (
@@ -956,6 +965,17 @@ const KitchenDisplay = ({clientId, token}) => {
                   </span>
                 )}
               </button>
+
+              {/* ── Date filter — defaults to today, lets staff look back for
+                   missed orders on a previous date. Future dates disabled. ── */}
+              <DateRangeFilter
+                datePreset={datePreset}
+                setDatePreset={setDatePreset}
+                customFrom={customFrom}
+                setCustomFrom={setCustomFrom}
+                customTo={customTo}
+                setCustomTo={setCustomTo}
+              />
             </div>
           </div>
 
@@ -964,6 +984,12 @@ const KitchenDisplay = ({clientId, token}) => {
             {loading ? (
               <div className="flex items-center justify-center py-12">
                 <div className="text-lg font-medium text-gray-500">Loading orders...</div>
+              </div>
+            ) : filteredCards.length === 0 ? (
+              <div className="flex items-center justify-center py-12">
+                <div className="text-lg font-medium text-gray-400">
+                  { 'No active orders'}
+                </div>
               </div>
             ) : (
               <div className="grid grid-cols-1 sm:grid-cols-2 lg:grid-cols-3 xl:grid-cols-4 gap-5">
