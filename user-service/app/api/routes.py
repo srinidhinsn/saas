@@ -392,13 +392,15 @@ async def refresh_token(req: Request, db: Session = Depends(get_db)):
     body = await req.json()
     result = refresh_access_token(body.get("refresh_token"), db)
     return ResponseModel(data=result)
+  
 @router.post("/customer/find_or_create")
 async def find_or_create_customer(client_id: str, payload: dict, context: SaasContext = Depends(verify_token), db: Session = Depends(get_db)):
     result = await find_or_create_customer_service(
         email=payload.get("contact_email"),
         phone=payload.get("contact_phone"),
         shipping_address=payload.get("shipping_address"),
-        contact_name=payload.get("customer_id"),
+        customer_id=payload.get("customer_id"),
+        address_id=payload.get("address_id"),
         db=db,
     )
     return ResponseModel(screen_id=context.screen_id, data=result)
