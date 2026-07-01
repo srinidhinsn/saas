@@ -286,31 +286,3 @@ export function deduplicateOrderItems(items) {
   });
   return result;
 }
-export const getDateRange = (datePreset, customFrom = null, customTo = null) => {
-  const now = new Date();
-  const toStr = (d) => d.toISOString().split('T')[0];
-  const today = toStr(now);
-
-  const subtractDays = (n) => {
-    const d = new Date(now);
-    d.setDate(d.getDate() - n);
-    return toStr(d);
-  };
-
-  const subtractMonths = (n) => {
-    const d = new Date(now);
-    d.setMonth(d.getMonth() - n);
-    return toStr(d);
-  };
-
-  switch (datePreset) {
-    case 'today': return { from: today, to: today };
-    case '1w': return { from: subtractDays(7), to: today };
-    case '15d': return { from: subtractDays(15), to: today };
-    case '1m': return { from: subtractMonths(1), to: today };
-    case '3m': return { from: subtractMonths(3), to: today };
-    case '6m': return { from: subtractMonths(6), to: today };
-    case 'custom': return { from: customFrom, to: customTo };
-    default: return { from: today, to: today };
-  }
-};
