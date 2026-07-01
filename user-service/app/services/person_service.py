@@ -180,23 +180,31 @@ async def set_primary_address_service(address_id: int, context, db: Session):
         db.commit()
     return {"message": "Primary address set"}
 
-async def find_or_create_customer_service(email, phone, shipping_address, contact_name, db: Session):
+async def find_or_create_customer_service(email, phone, shipping_address, customer_id, address_id, db: Session):
     person = None
-    if phone:
+
+    if customer_id:
+        try:
+            candidate_uuid = uuid.UUID(str(customer_id))
+            person = db.query(Person).filter(Person.id == candidate_uuid).first()
+        except ValueError:
+            pass
+
+    if not person and phone:
         person = db.query(Person).filter(Person.phone == phone).first()
     if not person and email:
         person = db.query(Person).filter(Person.email == email).first()
 
     if not person:
         is_real_name = (
-            contact_name
-            and contact_name.strip()
-            and contact_name != phone
-            and contact_name != email
+            customer_id
+            and customer_id.strip()
+            and customer_id != phone
+            and customer_id != email
         )
 
         if is_real_name:
-            fallback_name = contact_name.strip()
+            fallback_name = customer_id.strip()
         else:
             next_index = db.query(Person).count() + 1
             fallback_name = f"customer_{next_index}"
@@ -216,26 +224,60 @@ async def find_or_create_customer_service(email, phone, shipping_address, contac
         db.add(person)
         db.flush()
     else:
-        if email and not person.email:
+        if email:
             person.email = email
-        if phone and not person.phone:
+        if phone:
             person.phone = phone
+
+    resolved_address_id = None
 
     if shipping_address:
         existing_ids = list(person.saved_address_ids or [])
-        existing = db.query(Address).filter(Address.id.in_(existing_ids)).all() if existing_ids else []
-        match = next((a for a in existing if a.address_line1 == shipping_address), None)
-        if not match:
-            address = Address(address_line1=shipping_address, contact_name=person.first_name, contact_number=phone)
-            db.add(address)
-            db.flush()
-            person.saved_address_ids = existing_ids + [address.id]
+        target = None
+        if address_id:
+            try:
+                target_id = int(address_id)
+                if target_id in existing_ids:
+                    target = db.query(Address).filter(Address.id == target_id).first()
+            except (TypeError, ValueError):
+                pass
+
+        if target:
+            if target.address_line1 != shipping_address:
+                target.address_line1 = shipping_address
+                target.contact_name = person.first_name
+                target.contact_number = phone
+            resolved_address_id = target.id
+
+        else:
+            existing = db.query(Address).filter(Address.id.in_(existing_ids)).all() if existing_ids else []
+            match = next((a for a in existing if a.address_line1 == shipping_address), None)
+
+            if match:
+                resolved_address_id = match.id
+            else:
+                new_address = Address(
+                    address_line1=shipping_address,
+                    contact_name=person.first_name,
+                    contact_number=phone,
+                )
+                db.add(new_address)
+                db.flush()
+                person.saved_address_ids = existing_ids + [new_address.id]
+                resolved_address_id = new_address.id
 
     db.commit()
     db.refresh(person)
 
-    return {"person_id": str(person.id),"first_name": person.first_name,"email": person.email,
-        "phone": person.phone,"shipping_address": shipping_address or "",}
+    return {
+        "person_id": str(person.id),
+        "first_name": person.first_name,
+        "email": person.email,
+        "phone": person.phone,
+        "shipping_address": shipping_address or "",
+        "address_id": resolved_address_id,
+        "saved_address_ids": person.saved_address_ids or [],
+    }
 
 async def search_customers_service(q: str, db: Session):
     query = db.query(Person)
