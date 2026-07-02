@@ -222,33 +222,10 @@ export default function InvoiceModal({
   const fetchUniqueCustomers = async () => {
     try {
       const res = await axios.get(
-        `${import.meta.env.VITE_API_BILLING_SERVICE_URL}/${clientId}/invoice/read_document`,
-        {
-          headers: { Authorization: `Bearer ${token}` },
-          params: { client_id: clientId }
-        }
+        `${import.meta.env.VITE_API_USER_SERVICE_URL}/${clientId}/users/customer/search`,
+        { headers: { Authorization: `Bearer ${token}` }, params: { client_id: clientId } }
       );
-      const invoices = res.data?.data || [];
-      const customersMap = new Map();
-      invoices.forEach(inv => {
-        if (inv.customer_id) {
-          if (!customersMap.has(inv.customer_id) ||
-            new Date(inv.created_at) > new Date(customersMap.get(inv.customer_id).created_at)) {
-            customersMap.set(inv.customer_id, {
-              customer_id: inv.customer_id,
-              contact_email: inv.contact_email || "",
-              contact_phone: inv.contact_phone || "", shipping_address: inv.shipping_address || "",
-              created_at: inv.created_at
-            });
-          }
-        }
-      });
-      console.log("raw invoices:", invoices.length, "customers built:", customersMap.size);
-      console.log("customersList sample:", Array.from(customersMap.values()).slice(0, 3));
-
-      const uniqueCustomers = Array.from(customersMap.values())
-        .sort((a, b) => a.customer_id.localeCompare(b.customer_id));
-      setCustomersList(uniqueCustomers);
+      setCustomersList(res.data?.data?.customers || []);
     } catch (err) {
       console.error("Failed to fetch customers:", err);
       setCustomersList([]);
@@ -416,6 +393,25 @@ export default function InvoiceModal({
     }
 
     setSaving(true);
+    let resolvedCustomerId = selectedOrder.customer_id;
+if (selectedOrder.contact_phone || selectedOrder.contact_email || selectedOrder.customer_id) {
+  try {
+    const custRes = await axios.post(
+      `${import.meta.env.VITE_API_USER_SERVICE_URL}/${clientId}/users/customer/find_or_create`,
+      {
+        contact_email: selectedOrder.contact_email,
+        contact_phone: selectedOrder.contact_phone,
+        shipping_address: selectedOrder.shipping_address,
+        customer_id: selectedOrder.customer_id,
+      },
+      { headers: { Authorization: `Bearer ${token}` } }
+    );
+    resolvedCustomerId = custRes.data?.data?.person_id || resolvedCustomerId;
+    console.log("find_or_create response:", custRes.data); // temporary debug
+  } catch (err) {
+    console.error("Failed to resolve/create customer:", err.response?.data || err.message);
+  }
+}
     try {
       const payload = {
         client_id: clientId,
@@ -431,12 +427,9 @@ export default function InvoiceModal({
         total_amount: calculatedTotal,
         payment_status: paymentStatus,
         payment_method: paymentMethodArray,
-        single_payment_amount: splitPaymentEnabled ? null : Number(paymentSplits[0]?.amount ?? total),  // ✅ also fixed here
-        status: status,
-        customer_id:
-          selectedOrder.customer_id ??
-          initialOrder.customer_id ??
-          undefined,
+        single_payment_amount: splitPaymentEnabled ? null : Number(paymentSplits[0]?.amount ?? total),
+        status: "Draft",
+        customer_id: resolvedCustomerId ?? initialOrder.customer_id ?? undefined,
         contact_email: selectedOrder.contact_email || "",
         contact_phone: selectedOrder.contact_phone || "",
         shipping_address:
@@ -481,13 +474,11 @@ export default function InvoiceModal({
         `${import.meta.env.VITE_API_ORDER_SERVICE_URL}/${clientId}/dinein/update`,
         {
           id: selectedOrder.id,
-          // REQ 2: Only update invoice_status; do not change order status to served yet.
           invoice_status: paymentStatus.toLowerCase(),
         },
         { headers: { Authorization: `Bearer ${token}` } }
       );
 
-      // REQ 2: Table is NOT freed here. It is freed only after payment confirmation.
       toast.success("Invoice saved successfully!");
       if (onSave) onSave(draftId);
       return draftId;
@@ -509,21 +500,39 @@ export default function InvoiceModal({
     setShowPayConfirm(false);
     setSaving(true);
     try {
-      // 1. Update the billing document payment_status to Paid
-      if (invoiceDraftId) {
-        await axios.post(
-          `${import.meta.env.VITE_API_BILLING_SERVICE_URL}/${clientId}/invoice/update_document`,
-          {
-            id: invoiceDraftId,
-            client_id: clientId,
-            payment_status: "Paid",
-            status: "Issued",
-          },
-          { headers: { Authorization: `Bearer ${token}` } }
-        );
+      const invoiceDraft = await fetchInvoiceDraft(selectedOrder.id);
+      const correctInvoiceDraftId = invoiceDraft?.id || invoiceDraftId;
+      
+      if (!correctInvoiceDraftId) {
+        throw new Error("No invoice draft found");
       }
 
-      // 2. Mark dine-in order as served and invoice_status as paid
+      if (!documentNumber || documentNumber.toLowerCase() === "draft") {
+        try {
+          const res = await axios.post(
+            `${import.meta.env.VITE_API_BILLING_SERVICE_URL}/${clientId}/invoice/issue?invoice_id=${correctInvoiceDraftId}`,
+            null,
+            { headers: { Authorization: `Bearer ${token}` } }
+          );
+          
+          const newDocumentNumber = res?.data?.data?.document_number || res?.data?.document_number;
+          if (newDocumentNumber) {
+            setDocumentNumber(newDocumentNumber);
+          }
+        } catch (err) {
+          throw new Error("Failed to generate invoice number: " + (err.response?.data?.detail || err.message));
+        }
+      }
+      await axios.post(
+        `${import.meta.env.VITE_API_BILLING_SERVICE_URL}/${clientId}/invoice/update_document`,
+        {
+          id: correctInvoiceDraftId,
+          client_id: clientId,
+          payment_status: "Paid",
+          status: "Issued",
+        },
+        { headers: { Authorization: `Bearer ${token}` } }
+      );
       await axios.post(
         `${import.meta.env.VITE_API_ORDER_SERVICE_URL}/${clientId}/dinein/update`,
         {
@@ -534,7 +543,6 @@ export default function InvoiceModal({
         { headers: { Authorization: `Bearer ${token}` } }
       );
 
-      // 3. Free the table (REQ 2: only HERE, not on save)
       await freeTable({
         clientId,
         token,
@@ -543,11 +551,9 @@ export default function InvoiceModal({
       });
 
       setPaymentStatus("Paid");
-      toast.success("Payment confirmed! Table is now free.");
       onClose();
     } catch (err) {
-      console.error("[handleConfirmPayment]", err);
-      toast.error("Failed to confirm payment");
+      console.error("Payment Confirmation Failed:", err.message);
     } finally {
       setSaving(false);
     }
@@ -598,7 +604,7 @@ export default function InvoiceModal({
         const updated = await fetchInvoiceDraft(selectedOrder.id);
         if (updated?.id) {
           setInvoiceDraftId(updated.id);
-          setPaymentStatus(updated.payment_status || "Paid");
+          setPaymentStatus(updated.payment_status || "Pending");
         }
         if (updated) {
           setSelectedOrder(prev => ({
@@ -615,21 +621,8 @@ export default function InvoiceModal({
     }
 
     if (!currentInvoiceNumber || currentInvoiceNumber.toLowerCase() === "draft") {
-      try {
-        const res = await axios.post(
-          `${import.meta.env.VITE_API_BILLING_SERVICE_URL}/${clientId}/invoice/issue?invoice_id=${currentInvoiceDraftId}`,
-          null,
-          { headers: { Authorization: `Bearer ${token}` } }
-        );
-        currentInvoiceNumber = res?.data?.data?.document_number;
-        if (!currentInvoiceNumber) throw new Error("Invoice number generation failed");
-        setDocumentNumber(currentInvoiceNumber);
-        setStatus("Issued");
-      } catch (err) {
-        console.error("Invoice issue error: ", err);
-        toast.error("Failed to generate invoice number");
-        return;
-      }
+      toast.error("Invoice number will be generated after payment confirmation. Please confirm payment first.");
+      return;
     }
 
     try {
