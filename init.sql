@@ -904,3 +904,7 @@ ALTER TABLE inventory ALTER COLUMN id DROP DEFAULT;   -- stopping the sequence o
 
 ALTER TABLE dinein_order ADD COLUMN customer_id text;
 ALTER TABLE dinein_order ADD COLUMN delivery_address text;
+
+UPDATE category
+SET sub_categories = array_cat(sub_categories, ARRAY['customer'])
+WHERE id = 'users' AND client_id = 'saas';

@@ -1,11 +1,21 @@
 from fastapi import HTTPException
 from sqlalchemy.orm import Session
-from models.user_model import UserModel, PersonModel
+from models.user_model import UserModel, PersonModel, ResetpasswordRequest
 from models.response_model import ResponseModel
 from entity.user_entity import User, Person,PageDefinition
+from entity.client_entity import Client
 from utils.auth import hash_password, SECRET_KEY, ALGORITHM,get_page_definition, get_screen_id
 from jose import jwt,JWTError
-from sqlalchemy import func
+from sqlalchemy import func , and_
+from utils.auth import (verify_password,create_access_token,create_refresh_token)
+import os, uuid, random
+from utils.send_email_otp import otpEmailService, otp_store
+from utils.create_notification import get_template_body, render_template
+from zoneinfo import ZoneInfo
+from datetime import datetime, timedelta
+from dotenv import load_dotenv
+load_dotenv()
+TIMEZONE = os.getenv("TIMEZONE", "UTC") 
 
 async def create_user_and_person(client_id: str, userReq: UserModel, db: Session, token_realm: str = None):
     if not userReq.username or not userReq.password:
@@ -113,3 +123,213 @@ def has_user_permission(role_perms, module: str, operation: str | None = None):
             for op in ops
         )
     return bool(ops)
+
+# Login Service
+
+def login_user_service(client_id: str,username: str,password: str,db: Session):
+    user = db.query(User).filter(and_(User.username == username,User.client_id == client_id)).first()
+
+    if not user or not verify_password(password,user.hashed_password):
+        raise HTTPException(status_code=400,detail="Invalid credentials")
+
+    user_model = User.copyToModel(user)
+
+    client = db.query(Client).filter(Client.id == client_id).first()
+    client_model = Client.copyToModel(client)
+
+    roles = [str(r).strip()for r in (user_model.roles or [])]
+
+    payload = {
+        "user_id": str(user_model.id),
+        "roles": roles,
+        "client_id": user_model.client_id,
+        "grants": user_model.grants,
+        "realm": client_model.realm
+    }
+
+    access_token = create_access_token(payload)
+
+    refresh_token = create_refresh_token({    "user_id": str(user_model.id),
+    "roles": roles,
+    "client_id": user_model.client_id,
+    "grants": user_model.grants,
+    "realm": client_model.realm})
+
+    screen_id = getting_screen_id(access_token,db)
+
+    return {"screen_id": screen_id,"access_token": access_token,"refresh_token": refresh_token,"token_type": "bearer"}
+
+# Delete User
+def delete_user_service(client_id: str,user_id: str,context,db: Session):
+    perms = get_user_perms(context,db,client_id)
+
+    if not has_user_permission(perms,"users","delete"):
+        raise HTTPException(status_code=403,detail="User delete not allowed")
+
+    try:
+        user_uuid = uuid.UUID(str(user_id))
+    except ValueError:
+        raise HTTPException(status_code=400,detail="Invalid user_id")
+
+    user = (db.query(User).filter(User.id == user_uuid,User.client_id == client_id).first())
+
+    if not user:
+        raise HTTPException(status_code=404,detail="User not found")
+
+    if str(context.user_id) == str(user_uuid):
+        raise HTTPException(status_code=400,detail="You cannot delete yourself")
+
+    person = (db.query(Person).filter(Person.id == user_uuid).first())
+    if person:
+        db.delete(person)
+    db.delete(user)
+    db.commit()
+
+    return {"message": "User deleted successfully","user_id": str(user_uuid)}
+
+# Forgot Password
+async def forgot_password_service(client_id: str,req_data: ResetpasswordRequest,db: Session):
+    if not req_data.username:
+        raise HTTPException(status_code=400,detail="Username is required")
+    user = db.query(User).filter(and_(User.username == req_data.username,User.client_id == client_id)).first()
+    if not user:
+        raise HTTPException(status_code=404,detail="User not found")
+
+    user_model = User.copyToModel(user)
+    person = db.query(Person).filter(Person.id == user_model.id).first()
+
+    if not person or not person.email:
+        raise HTTPException(status_code=404,detail="Email not found")
+    # Send OTP
+    if not req_data.otp and not req_data.new_password:
+        otp = str(random.randint(100000, 999999))
+
+        otp_store[user_model.id] = {"otp": otp,"expires": datetime.now(ZoneInfo(TIMEZONE)) + timedelta(minutes=10)}
+
+        metadata = {"username": user_model.username,"clientId": client_id,"otp": otp}
+
+        template_body = (get_template_body(db,client_id,"forgot_password","template") or "Dear {username}, your OTP is {otp}")
+
+        notification_text = render_template(template_body,metadata)
+
+        if not otpEmailService(person.email,notification_text):
+            raise HTTPException(status_code=500,detail="Failed to send OTP")
+
+        return ResponseModel(data={"message": "OTP sent successfully"})
+
+    # Verify OTP & Reset Password
+    if req_data.otp and req_data.new_password:
+        otp_data = otp_store.get(user_model.id)
+
+        if not otp_data:
+            raise HTTPException(400,"OTP not requested")
+
+        if otp_data["otp"] != req_data.otp:
+            raise HTTPException(400,"Invalid OTP")
+
+        if datetime.now(ZoneInfo(TIMEZONE)) > otp_data["expires"]:
+            raise HTTPException(400,"OTP expired")
+
+        if (req_data.new_password != req_data.confirm_password):
+            raise HTTPException(400,"Passwords do not match")
+
+        user.hashed_password = hash_password(req_data.new_password)
+        db.commit()
+        otp_store.pop(user_model.id,None)
+
+        metadata = {"username": user_model.username,"clientId": client_id}
+
+        template_body = (get_template_body(db,client_id,"reset_password_success","template") or "Password reset successful")
+        otpEmailService(person.email,render_template(template_body,metadata))
+
+        return ResponseModel(data={"message":"Password reset successfully"})
+
+    raise HTTPException(400,"Invalid request data")
+
+# Reset Password
+async def reset_password_service(client_id: str,req_data: ResetpasswordRequest,context,db: Session):
+    user = db.query(User).filter(and_(User.username == req_data.username,User.client_id == client_id)).first()
+
+    if not user:
+        raise HTTPException(status_code=404,detail="User not found")
+
+    user_model = User.copyToModel(user)
+
+    # OTP request flow
+    if not req_data.otp and not req_data.old_password:
+        person = db.query(Person).filter(Person.id == user_model.id).first()
+        if not person or not person.email:
+            raise HTTPException(status_code=404,detail="User email not found")
+
+        otp = str(random.randint(100000, 999999))
+        otp_store[user_model.id] = {"otp": otp,"expires": datetime.now(ZoneInfo(TIMEZONE)) + timedelta(minutes=10)}
+
+        metadata = {"username": user_model.username,"clientId": client_id,"otp": otp}
+        template_body = (
+            get_template_body(
+                db,
+                client_id,
+                "reset_password",
+                "template"
+            )
+            or
+            "Dear {username}, your OTP is {otp}"
+        )
+
+        otpEmailService(person.email,render_template(template_body,metadata))
+
+        return ResponseModel(screen_id=context.screen_id,data={"message": "OTP sent successfully"})
+
+    # OTP validation flow
+    if req_data.otp:
+        otp_data = otp_store.get(user_model.id)
+
+        if not otp_data:
+            raise HTTPException(status_code=400,detail="OTP not requested")
+
+        if otp_data["otp"] != req_data.otp:
+            raise HTTPException(status_code=400,detail="Invalid OTP")
+
+        if datetime.now(ZoneInfo(TIMEZONE)) > otp_data["expires"]:
+            raise HTTPException(status_code=400,detail="OTP expired")
+
+    # Old password validation flow
+    elif req_data.old_password:
+
+        if not verify_password(req_data.old_password,user.hashed_password):
+            raise HTTPException(status_code=400,detail="Invalid old password")
+
+    if req_data.new_password != req_data.confirm_password:
+        raise HTTPException(status_code=400,detail="Passwords do not match")
+
+    user.hashed_password = hash_password(req_data.new_password)
+    db.commit()
+
+    otp_store.pop(
+        user_model.id,
+        None
+    )
+
+    # Success email for OTP flow
+    if req_data.otp:
+
+        person = db.query(Person).filter(Person.id == user_model.id).first()
+
+        if person and person.email:
+
+            metadata = {"username": user_model.username,"clientId": client_id}
+            template_body = (
+                get_template_body(
+                    db,
+                    client_id,
+                    "reset_password_success",
+                    "template"
+                )
+                or
+                "Password reset successful"
+            )
+
+            otpEmailService(person.email,
+                render_template(template_body,metadata))
+
+    return ResponseModel(screen_id=context.screen_id,data={"message": "Password reset successfully"})
