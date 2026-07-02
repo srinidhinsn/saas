@@ -250,18 +250,18 @@ async function upsertBillingDocumentForCustomer({
 // ItemStatusBadge
 // ─────────────────────────────────────────────────────────────────────────────
 
-const ItemStatusBadge = ({ status }) => {
+const ItemStatusBadge = ({ status, statusLabel }) => {
   const cfg = {
-    pending: { bg: 'bg-blue-100', text: 'text-blue-700', label: 'Pending' },
-    preparing: { bg: 'bg-orange-100', text: 'text-orange-700', label: 'Preparing' },
-    ready: { bg: 'bg-green-100', text: 'text-green-700', label: 'Ready' },
-    served: { bg: 'bg-gray-100', text: 'text-gray-600', label: 'Served' },
-    cancelled: { bg: 'bg-red-50', text: 'text-red-400', label: 'Cancelled' },
-  }[status] || { bg: 'bg-gray-100', text: 'text-gray-500', label: status || '—' };
+    pending: { bg: 'bg-blue-100', text: 'text-blue-700' },
+    preparing: { bg: 'bg-orange-100', text: 'text-orange-700' },
+    ready: { bg: 'bg-green-100', text: 'text-green-700' },
+    served: { bg: 'bg-gray-100', text: 'text-gray-600' },
+    cancelled: { bg: 'bg-red-50', text: 'text-red-400' },
+  }[status] || { bg: 'bg-gray-100', text: 'text-gray-500' };
 
   return (
     <span className={`text-xs font-semibold px-2 py-0.5 rounded-full ${cfg.bg} ${cfg.text}`}>
-      {cfg.label}
+      {statusLabel || status || '—'}
     </span>
   );
 };
@@ -949,7 +949,7 @@ const OldItemRow = ({ group, clientId, token, activeDineinOrderId, onRequestDele
                   #{main.batch_label}
                 </span>
               )}
-              {main.status && <ItemStatusBadge status={main.status} />}
+              {main.status && <ItemStatusBadge status={main.status} statusLabel={main.status_label} />}
             </div>
           </div>
         </div>
@@ -1252,7 +1252,7 @@ const TableReservation = ({
                               {hasViewableOrder && (
                                 <>
                                   <span className={`text-xs px-2 py-0.5 rounded-full font-semibold ${getOrderStatusStyle(orderInfo.status)}`}>
-                                    {orderInfo.status?.toUpperCase()}
+                                  {(orderInfo.status_label || orderInfo.status)?.toUpperCase()}
                                   </span>
                                   <span className="text-xl opacity-80 font-bold">
                                     #{orderInfo.dinein_order_id || orderInfo.id}
@@ -1832,7 +1832,7 @@ const TakeOrder = ({ clientId, token, onOrderUpdate, realm }) => {
             map[table.id] = {
               id: o.id,
               dinein_order_id: o.dinein_order_id,
-              status: o.status,
+              status: o.status, status_label: o.status_label,
               created_at: o.created_at,
               order_count: o.order_count || 1,
               total_price: o.total_price || 0,
