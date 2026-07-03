@@ -14,9 +14,26 @@ import { OperationGuardProvider } from './components/utils/Interceptors/Operatio
 import { jwtDecode } from 'jwt-decode';
 import { setupAxiosInterceptors } from './components/utils/axiosConfig'
 import { menuCache } from './components/utils/Menu-utils/menuCache';
-// ─── Screen → Route mapping (keep in sync with Login.jsx) ───────────────────
+import { NAV_TABS } from './components/Constants/Headers/Navtabs';
+
+const getVisibleNav = (token) => {
+  try {
+    const decoded = jwtDecode(token);
+    const subscription = decoded.subscription || [];
+    const allowedScreenIds = new Set(decoded.allowed_screen_ids || []);
+    return allowedScreenIds.size > 0
+      ? subscription.filter(tabId => {
+          const tab = NAV_TABS.find(t => t.id === tabId);
+          return tab && allowedScreenIds.has(tab.screen_id);
+        })
+      : subscription;
+  } catch {
+    return [];
+  }
+};
+
 const screenRouteMap = {
-  super_admin_v1: 'customer-data',
+  super_admin_v1: 'customer-data',  
   default_user: 'home',
   ecommerce_user_v1: 'home',
   super_user_v1: 'super-user-data',
@@ -28,11 +45,13 @@ const LoginWrapper = ({ onLoginSuccess }) => {
   return <LoginPage clientId={clientId || 'easyfood'} onLoginSuccess={onLoginSuccess} />;
 };
 
-
 const NavigateAfterLogin = ({ authState }) => {
   const { clientId } = useParams();
   const finalClientId = clientId || authState.clientId || 'easyfood';
-  const route = screenRouteMap[authState.screenId] || 'home';
+  const specialRoute = screenRouteMap[authState.screenId];
+  const visibleNav = getVisibleNav(authState.token);
+  const firstAllowedTab = visibleNav[0] || 'home';
+  const route = specialRoute || firstAllowedTab;
   return <Navigate to={`/saas/${finalClientId}/${route}`} replace />;
 };
 
@@ -57,14 +76,14 @@ const InnerAuthenticatedApp = ({ token, onLogout }) => {
   const decoded=jwtDecode(token);
   const { clientId } = useParams();
   const finalClientId = clientId || 'easyfood';
-  const subscription = decoded.subscription || [];
+  const visibleNav = getVisibleNav(token);
 
   return (
     <OperationGuardProvider clientId={finalClientId} requesterId={decoded.user_id}>
       <HeaderSwitcher
         clientId={finalClientId}
         onLogout={onLogout}
-        subscription={subscription}
+        subscription={visibleNav}
       />
 
       <main>
