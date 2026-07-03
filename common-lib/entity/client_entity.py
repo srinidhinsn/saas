@@ -17,6 +17,7 @@ class Client(Base):
     saved_address_ids = Column(ARRAY(Text), nullable=True)
     created_date_time = Column(DateTime, default=func.now())
     updated_date_time = Column(DateTime, default=func.now(), onupdate=func.now())
+    subscription = Column(ARRAY(String), nullable=True)
 
 
     @staticmethod

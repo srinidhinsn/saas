@@ -908,3 +908,6 @@ ALTER TABLE dinein_order ADD COLUMN delivery_address text;
 UPDATE category
 SET sub_categories = array_cat(sub_categories, ARRAY['customer'])
 WHERE id = 'users' AND client_id = 'saas';
+
+
+ALTER TABLE client ADD COLUMN subscription TEXT[] DEFAULT ARRAY['home']::TEXT[];
