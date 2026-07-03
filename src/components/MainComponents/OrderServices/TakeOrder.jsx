@@ -884,7 +884,8 @@ const printKOT = ({ counterTree, categoriesFlat, itemsToPrint, meta }) => {
             <tr style="border-bottom:2px solid #000;">
               <th style="text-align:left;font-size:12px;padding:3px 2px;">Item</th>
               <th style="text-align:center;font-size:12px;padding:3px 2px;">Qty</th>
-              <th style="text-align:right;font-size:12px;padding:3px 2px;">price</th>
+              <th style="text-align:left;font-size:12px;padding:3px 2px;">Note</th>
+              <th style="text-align:right;font-size:12px;padding:3px 2px;">Price</th>
             </tr>
           </thead>
           <tbody>${rows}</tbody>
