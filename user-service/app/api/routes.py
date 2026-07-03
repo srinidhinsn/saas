@@ -65,13 +65,22 @@ async def login_user(client_id: str, userReq: LoginRequest, db: Session = Depend
 
     # newly added to handle roles in case insenesitive manner
     roles = [str(r).strip() for r in (userModel.roles or [])]
+    
+    page_defs = db.query(PageDefinition).filter(
+        PageDefinition.role.in_(roles),
+        PageDefinition.client_id == client_id
+    ).all()
+    
+    allowed_screen_ids = list({pd.screen_id for pd in page_defs})
 
     token = create_access_token({
         "user_id": str(userModel.id),
         "roles": roles,
         "client_id": userModel.client_id,
         "grants": userModel.grants,
-        "realm": client_model.realm
+        "realm": client_model.realm,
+        "subscription": client_model.subscription or [],
+        "allowed_screen_ids": allowed_screen_ids
     })
     screen_id = getting_screen_id(token, db)
 

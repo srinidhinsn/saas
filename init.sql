@@ -904,3 +904,5 @@ ALTER TABLE inventory ALTER COLUMN id DROP DEFAULT;   -- stopping the sequence o
 
 ALTER TABLE dinein_order ADD COLUMN customer_id text;
 ALTER TABLE dinein_order ADD COLUMN delivery_address text;
+
+ALTER TABLE client ADD COLUMN subscription TEXT[] DEFAULT ARRAY['home']::TEXT[];
