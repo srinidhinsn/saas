@@ -33,11 +33,13 @@ const getVisibleNav = (token) => {
 };
 
 const screenRouteMap = {
-  super_admin_v1: 'customer-data',
+  super_admin_v1: 'customer-data',  
+  default_user: 'home',
   ecommerce_user_v1: 'home',
   super_user_v1: 'super-user-data',
 };
 
+// ─── Login wrapper ────────────────────────────────────────────────────────────
 const LoginWrapper = ({ onLoginSuccess }) => {
   const { clientId } = useParams();
   return <LoginPage clientId={clientId || 'easyfood'} onLoginSuccess={onLoginSuccess} />;
@@ -65,9 +67,11 @@ const HeaderSwitcher = ({ clientId, onLogout, subscription }) => {
   if (screenId === 'super_user_v1') {
     return <Header_Super_User clientId={clientId} onLogout={onLogout} />;
   }
-  return <HeaderShared clientId={clientId} onLogout={onLogout} subscription={subscription} />;
+  // default fallback
+  return <HeaderShared clientId={clientId} onLogout={onLogout} subscription={subscription} />;  {/* ← NEW */}
 };
 
+// ─── Authenticated app shell ──────────────────────────────────────────────────
 const InnerAuthenticatedApp = ({ token, onLogout }) => {
   const decoded=jwtDecode(token);
   const { clientId } = useParams();
@@ -113,6 +117,7 @@ const FallbackPreserveClient = () => {
   return <Navigate to={`/saas/${localStorage.getItem('client_id') || 'easyfood'}/login`} replace />;
 };
 
+// ─── Root App ─────────────────────────────────────────────────────────────────
 const App = () => {
   const [checkingAuth, setCheckingAuth] = useState(true);
   const [authState, setAuthState] = useState(() => {
@@ -242,7 +247,7 @@ if (token) {
     setAuthState(prev => ({
       token: null,
       screenId: null,
-      clientId: prev.clientId,
+      clientId: prev.clientId, // keep clientId so redirect lands on correct tenant login
       isAuthenticated: false,
     }));
   };

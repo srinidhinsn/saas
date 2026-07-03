@@ -12,9 +12,9 @@ import ImagePreview from '../../utils/ImagePreview';
 import InvoiceModal from '../BillingServices/InvoiceModal';
 import { getMenuConfig } from '../../utils/menuConfigResolver';
 import { menuCache } from '../../utils/Menu-utils/menuCache';
-import { getDietaryFromSlug, isItemActive, buildCartItem, getGroupedCartItems, deduplicateOrderItems, getCategoryAndChildrenIds }
-  from '../../utils/Menu-utils/menuUtils';
-import { useDietaryTypes, useTimings, useZoneConfig, useMenuData, useCounterTree } from '../../utils/Menu-utils/useMenuData';
+import { getDietaryFromSlug, isItemActive,buildCartItem, getGroupedCartItems, deduplicateOrderItems,getCategoryAndChildrenIds}
+         from '../../utils/Menu-utils/menuUtils';
+import {useDietaryTypes, useTimings, useZoneConfig, useMenuData,useCounterTree} from '../../utils/Menu-utils/useMenuData';
 // ─────────────────────────────────────────────────────────────────────────────
 // Constants
 // ─────────────────────────────────────────────────────────────────────────────
@@ -831,78 +831,67 @@ const printKOT = ({ counterTree, categoriesFlat, itemsToPrint, meta }) => {
 
   const slipHtml = groupEntries.map(([, group]) => {
     const rows = group.items.map(item => {
-  const price = Number(item.unit_price) || 0;
-  const mainRow = `
-    <tr>
-      <td style="padding:4px 2px;border-bottom:1px dashed #ccc;font-size:13px;font-weight:bold;">
-        ${item.name}
-      </td>
-      <td style="padding:4px 2px;border-bottom:1px dashed #ccc;font-size:13px;text-align:center;font-weight:bold;">
-        ${item.quantity}
-      </td>
-      <td style="padding:4px 2px;border-bottom:1px dashed #ccc;font-size:12px;text-align:right;">
-        ₹${price.toFixed(2)}
-      </td>
-    </tr>
-    ${item.note ? `
-    <tr>
-      <td colspan="3" style="padding:0 2px 4px;border-bottom:1px dashed #ccc;font-size:11px;color:#555;font-style:italic;">
-        Note: ${item.note}
-      </td>
-    </tr>` : ''}
-  `;
-  const addonRows = (item.linkedAddons || []).map(addon => {
-    const aPrice = Number(addon.unit_price) || 0;
-    return `
-    <tr>
-      <td style="padding:2px 2px 2px 16px;border-bottom:1px dashed #eee;font-size:11px;color:#555;">
-        ↳ ${addon.name}
-      </td>
-      <td style="padding:2px 2px;border-bottom:1px dashed #eee;font-size:11px;text-align:center;color:#555;">
-        ${addon.quantity}
-      </td>
-      <td style="padding:2px 2px;border-bottom:1px dashed #eee;font-size:11px;text-align:right;color:#555;">
-        ₹${aPrice.toFixed(2)}
-      </td>
-    </tr>`;
-  }).join('');
-  return mainRow + addonRows;
-}).join('');
-
-    const groupTotal = group.items.reduce((sum, item) => {
-      const itemTotal = (Number(item.unit_price) || 0) * item.quantity;
-      const addonTotal = (item.linkedAddons || []).reduce(
-        (s, a) => s + (Number(a.unit_price) || 0) * a.quantity, 0
-      );
-      return sum + itemTotal + addonTotal;
-    }, 0);
-
-    return `
-  <div class="kot-slip">
-    <div style="text-align:center;border-bottom:2px solid #000;padding-bottom:6px;margin-bottom:8px;">
-      <div style="font-size:16px;font-weight:bold;letter-spacing:1px;">KOT</div>
-      <div style="font-size:13px;font-weight:bold;margin-top:2px;">Counter: ${group.counterName}</div>
-    </div>
-    <div style="display:flex;justify-content:space-between;font-size:13px;font-weight:bold;margin-bottom:4px;">
-      <span>${meta.orderMode === 'takeaway' ? '🛍 Takeaway' : `Table: ${meta.tableNumber}`}</span>
-      <span>${dateStr} ${timeStr}</span>
-    </div>
-    ${meta.dineinOrderId
-      ? `<div style="font-size:12px;font-weight:bold;margin-bottom:6px;color:#333;">Order #${meta.dineinOrderId}</div>`
-      : ''}
-    <table style="width:100%;border-collapse:collapse;">
-      <thead>
-        <tr style="border-bottom:2px solid #000;">
-          <th style="text-align:left;font-size:12px;padding:3px 2px;">Item</th>
-          <th style="text-align:center;font-size:12px;padding:3px 2px;">Qty</th>
-          <th style="text-align:right;font-size:12px;padding:3px 2px;">Price</th>
+      const price = Number(item.unit_price) || 0;
+      const mainRow = `
+        <tr>
+          <td style="padding:4px 2px;border-bottom:1px dashed #ccc;font-size:13px;font-weight:bold;">
+            ${item.name}
+          </td>
+          <td style="padding:4px 2px;border-bottom:1px dashed #ccc;font-size:13px;text-align:center;font-weight:bold;">
+            ${item.quantity}
+          </td>
+          <td style="padding:4px 2px;border-bottom:1px dashed #ccc;font-size:12px;text-align:right;">
+            ₹${price.toFixed(2)}
+          </td>
+          ${item.note
+          ? `<td style="padding:4px 2px;border-bottom:1px dashed #ccc;font-size:11px;color:#555;font-style:italic;">${item.note}</td>`
+          : '<td></td>'}
         </tr>
-      </thead>
-      <tbody>${rows}</tbody>
-    </table>
-    <div style="text-align:center;margin-top:10px;font-size:11px;color:#888;">— End of KOT —</div>
-  </div>
-`;
+      `;
+      const addonRows = (item.linkedAddons || []).map(addon => `
+        const aPrice = Number(addon.unit_price) || 0;
+        <tr>
+          <td style="padding:2px 2px 2px 16px;border-bottom:1px dashed #eee;font-size:11px;color:#555;">
+            ↳ ${addon.name}
+          </td>
+          <td style="padding:2px 2px;border-bottom:1px dashed #eee;font-size:11px;text-align:center;color:#555;">
+            ${addon.quantity}
+          </td>
+          <td style="padding:2px 2px;border-bottom:1px dashed #eee;font-size:11px;text-align:right;color:#555;">
+            ₹${aPrice.toFixed(2)}
+          </td>
+          <td></td>
+        </tr>
+      `).join('');
+      return mainRow + addonRows;
+    }).join('');
+
+    return `
+      <div class="kot-slip">
+        <div style="text-align:center;border-bottom:2px solid #000;padding-bottom:6px;margin-bottom:8px;">
+          <div style="font-size:16px;font-weight:bold;letter-spacing:1px;">KOT</div>
+          <div style="font-size:13px;font-weight:bold;margin-top:2px;">Counter: ${group.counterName}</div>
+        </div>
+        <div style="display:flex;justify-content:space-between;font-size:13px;font-weight:bold;margin-bottom:4px;">
+          <span>${meta.orderMode === 'takeaway' ? '🛍 Takeaway' : `Table: ${meta.tableNumber}`}</span>
+          <span>${dateStr} ${timeStr}</span>
+        </div>
+        ${meta.dineinOrderId
+        ? `<div style="font-size:12px;font-weight:bold;margin-bottom:6px;color:#333;">Order #${meta.dineinOrderId}</div>`
+        : ''}
+        <table style="width:100%;border-collapse:collapse;">
+          <thead>
+            <tr style="border-bottom:2px solid #000;">
+              <th style="text-align:left;font-size:12px;padding:3px 2px;">Item</th>
+              <th style="text-align:center;font-size:12px;padding:3px 2px;">Qty</th>
+              <th style="text-align:right;font-size:12px;padding:3px 2px;">price</th>
+            </tr>
+          </thead>
+          <tbody>${rows}</tbody>
+        </table>
+        <div style="text-align:center;margin-top:10px;font-size:11px;color:#888;">— End of KOT —</div>
+      </div>
+    `;
   }).join('<div class="page-break"></div>');
 
   const printWindow = window.open('', '_blank', 'width=400,height=600');
@@ -911,28 +900,28 @@ const printKOT = ({ counterTree, categoriesFlat, itemsToPrint, meta }) => {
     return;
   }
   printWindow.document.write(`
-  <!DOCTYPE html><html><head><title>KOT</title>
-  <style>
-    * { margin: 0; padding: 0; box-sizing: border-box; }
+    <!DOCTYPE html><html><head><title>KOT</title>
+    <style>
+      * { margin: 0; padding: 0; box-sizing: border-box; }
     @page { size: 80mm auto; margin: 0; }
-    body { font-family: 'Courier New', monospace; background: #fff; }
-    .kot-slip { width: 72mm; padding: 6px 8px; margin: 0 auto; }
-    .page-break { page-break-after: always; }
-    @media print {
-      body { -webkit-print-color-adjust: exact; }
-      .kot-slip { page-break-inside: avoid; }
-      .page-break { page-break-after: always; height: 0; }
-    }
-  </style></head><body>
-  ${slipHtml}
-  <script>
-    window.onload = function() {
-      window.print();
-      window.onafterprint = function() { window.close(); };
-    };
-  <\/script>
-  </body></html>
-`);
+      body { font-family: 'Courier New', monospace; background: #fff; }
+      .kot-slip { width: 72mm; padding: 6px 8px; margin: 0 auto; }
+      .page-break { page-break-after: always; }
+      @media print {
+        body { -webkit-print-color-adjust: exact; }
+        .kot-slip { page-break-inside: avoid; }
+        .page-break { page-break-after: always; height: 0; }
+      }
+    </style></head><body>
+    ${slipHtml}
+    <script>
+      window.onload = function() {
+        window.print();
+        window.onafterprint = function() { window.close(); };
+      };
+    <\/script>
+    </body></html>
+  `);
   printWindow.document.close();
 };
 
@@ -961,7 +950,7 @@ const OldItemRow = ({ group, clientId, token, activeDineinOrderId, onRequestDele
           <div className="min-w-0 flex-1">
             <h4 className="text-sm font-semibold truncate text-gray-800">{main.name}</h4>
             <p className="text-xs font-bold text-action-primary">
-              ₹{(main.unit_price * (1 - (Number(main.discount) || 0) / 100)).toFixed(2)}
+            ₹{(main.unit_price * (1 - (Number(main.discount) || 0) / 100)).toFixed(2)}
             </p>
             <div className="flex items-center gap-1.5 mt-1 flex-wrap">
               {main.batch_label && main.batch_label !== activeDineinOrderId && (
@@ -993,7 +982,7 @@ const OldItemRow = ({ group, clientId, token, activeDineinOrderId, onRequestDele
           <span className="text-xs text-blue-600">↳</span>
           <span className="text-sm text-gray-700 truncate flex-1">{addon.name}</span>
           <span className="text-xs font-semibold text-blue-600">
-            ₹{(addon.unit_price * (1 - (Number(addon.discount) || 0) / 100)).toFixed(2)}
+          ₹{(addon.unit_price * (1 - (Number(addon.discount) || 0) / 100)).toFixed(2)}
           </span>
           <span className="text-xs text-gray-500 w-6 text-center">×{addon.quantity}</span>
         </div>
@@ -1027,7 +1016,7 @@ const NewItemRow = ({ group, clientId, token, onUpdateQuantity, onRemove }) => {
           <div className="min-w-0 flex-1">
             <h4 className="text-sm font-semibold truncate text-gray-800">{main.name}</h4>
             <p className="text-xs font-bold text-action-primary">
-              ₹{(main.unit_price * (1 - (Number(main.discount) || 0) / 100)).toFixed(2)}
+            ₹{(main.unit_price * (1 - (Number(main.discount) || 0) / 100)).toFixed(2)}
             </p>
           </div>
         </div>
@@ -1064,7 +1053,7 @@ const NewItemRow = ({ group, clientId, token, onUpdateQuantity, onRemove }) => {
           <span className="text-xs text-orange-600">↳</span>
           <span className="text-sm text-gray-700 truncate flex-1">{addon.name}</span>
           <span className="text-xs font-semibold text-orange-600">
-            ₹{(addon.unit_price * (1 - (Number(addon.discount) || 0) / 100)).toFixed(2)}
+          ₹{(addon.unit_price * (1 - (Number(addon.discount) || 0) / 100)).toFixed(2)}
           </span>
           <span className="text-xs text-gray-500 w-6 text-center">×{addon.quantity}</span>
         </div>
@@ -1531,9 +1520,9 @@ const TakeOrder = ({ clientId, token, onOrderUpdate, realm }) => {
   // const [counterTree, setCounterTree] = useState([]);
   const [inventoryMap, setInventoryMap] = useState({});
   // const [loading, setLoading] = useState(true);
-  //   const { dietaryOptions, dietaryColorMap } = useDietaryTypes({ clientId, token });
-  // const { timingOptions }                   = useTimings({ clientId, token });
-  // const { sections, zones }                 = useZoneConfig({ clientId, token });
+//   const { dietaryOptions, dietaryColorMap } = useDietaryTypes({ clientId, token });
+// const { timingOptions }                   = useTimings({ clientId, token });
+// const { sections, zones }                 = useZoneConfig({ clientId, token });
   // ── Order context ─────────────────────────────────────────────────────────
   const [selectedTable, setSelectedTable] = useState('');
   const [takeawayTables, setTakeawayTables] = useState([]);
@@ -1655,7 +1644,7 @@ const TakeOrder = ({ clientId, token, onOrderUpdate, realm }) => {
     clientId,
     token,
   });
-
+  
   const {
     sections,
     takeawaySections,
@@ -1666,7 +1655,7 @@ const TakeOrder = ({ clientId, token, onOrderUpdate, realm }) => {
     takeawayRootEnv:
       import.meta.env.VITE_TAKEAWAY_TABLE_DEFAULT_ROOT,
   });
-
+  
   const {
     dietaryOptions,
     dietaryColorMap,
@@ -1674,7 +1663,7 @@ const TakeOrder = ({ clientId, token, onOrderUpdate, realm }) => {
     clientId,
     token,
   });
-
+  
   const {
     timingOptions,
   } = useTimings({
@@ -1870,18 +1859,18 @@ const TakeOrder = ({ clientId, token, onOrderUpdate, realm }) => {
   // REMOVE the old fetchTables and REPLACE WITH:
   const fetchTables = useCallback(async () => {
     const prefix = String(clientId)
-      .trim().toLowerCase().split('/').pop()
-      .replace(/[^a-z0-9]/g, '_').toUpperCase();
+    .trim().toLowerCase().split('/').pop()
+    .replace(/[^a-z0-9]/g, '_').toUpperCase();
 
-    const takeawayRoots = (
-      import.meta.env[`VITE_${prefix}_TAKEAWAY_TABLE_DEFAULT_ROOT`] ||
-      import.meta.env.VITE_TAKEAWAY_TABLE_DEFAULT_ROOT ||
-      ''
-    )
-      .split(',')
-      .map(v => v.trim().toLowerCase())
-      .filter(Boolean);
-
+  const takeawayRoots = (
+    import.meta.env[`VITE_${prefix}_TAKEAWAY_TABLE_DEFAULT_ROOT`] ||
+    import.meta.env.VITE_TAKEAWAY_TABLE_DEFAULT_ROOT ||
+    ''
+  )
+    .split(',')
+    .map(v => v.trim().toLowerCase())
+    .filter(Boolean);
+  
     const [tableRes, configRes] = await Promise.all([
       axios.get(
         `${import.meta.env.VITE_API_TABLE_SERVICE_URL}/${clientId}/tables/read`,
@@ -1892,22 +1881,22 @@ const TakeOrder = ({ clientId, token, onOrderUpdate, realm }) => {
         { headers: { Authorization: `Bearer ${token}` } }
       ),
     ]);
-
+  
     const freshConfigs = configRes.data || [];
-
+  
     const list = Array.isArray(tableRes.data?.data)
       ? tableRes.data.data.map(t => {
-        const matchedConfig = freshConfigs.find(
-          c =>
-            c.section?.trim().toLowerCase() === t.section?.trim().toLowerCase() &&
-            c.zone?.trim().toLowerCase() === t.location_zone?.trim().toLowerCase()
-        );
-        return {
-          ...t,
-          table_number: t.name || t.table_number || '-',
-          config_id: matchedConfig?.id || null,
-        };
-      })
+          const matchedConfig = freshConfigs.find(
+            c =>
+              c.section?.trim().toLowerCase() === t.section?.trim().toLowerCase() &&
+              c.zone?.trim().toLowerCase() === t.location_zone?.trim().toLowerCase()
+          );
+          return {
+            ...t,
+            table_number: t.name || t.table_number || '-',
+            config_id: matchedConfig?.id || null,
+          };
+        })
       : [];
 
     const takeaway = list.filter(t =>
@@ -1926,7 +1915,7 @@ const TakeOrder = ({ clientId, token, onOrderUpdate, realm }) => {
     );
     setTables(list);
     await fetchTableOrders(list);
-  }, [clientId, token])
+  },[clientId,token])
 
   // ─────────────────────────────────────────────────────────────────────────
   // Initial data load
@@ -1938,7 +1927,7 @@ const TakeOrder = ({ clientId, token, onOrderUpdate, realm }) => {
   }, [clientId, token, realm, menuConfig]);
 
   useEffect(() => {
-    if (!clientId || !token || !menuConfig) return;
+    if ( !clientId || !token || !menuConfig) return;
 
     const refetchMenu = async () => {
       try {
@@ -2067,13 +2056,13 @@ const TakeOrder = ({ clientId, token, onOrderUpdate, realm }) => {
     } catch (err) {
       console.error('[Transfer] Failed:', err);
       toast.error('Transfer failed');
-    } finally {
+    } finally { 
       console.log("error");
-
+      
       // setLoading(false);
     }
   };
-
+  
   const selectOrderTable = async ({
     table,
     mode = "dinein",
@@ -2082,33 +2071,33 @@ const TakeOrder = ({ clientId, token, onOrderUpdate, realm }) => {
   }) => {
     const tableIdStr = table.id.toString();
     const resolvedZoneConfigId = table.config_id || null;
-
+  
     setActiveOrderId(null);
     setActiveDineinOrderId(null);
     setHasNewItems(false);
     setCurrentBatchTimestamp(null);
-
+  
     setOrderMode(mode);
     setSelectedTable(tableIdStr);
     setZoneConfigId(resolvedZoneConfigId);
-
+  
     if (mode === "dinein") {
       setDineinTableId(tableIdStr);
     }
-
+  
     if (restoreDraft) {
       const draft = await readDraft(tableIdStr, clientId, token);
-
+  
       if (draft) {
         const restoredCart = (draft.items || []).flatMap(item => {
           const menuItem = menuItems.find(
             mi => Number(mi.id) === Number(item.item_id)
           );
-
+  
           const mainKey =
             item.frontend_unique_key ||
             `${item.item_id}_restored_${Date.now()}`;
-
+  
           const mainEntry = {
             id: Number(item.item_id),
             name: item.item_name || menuItem?.name || "Item",
@@ -2128,15 +2117,15 @@ const TakeOrder = ({ clientId, token, onOrderUpdate, realm }) => {
             is_addon: false,
             parent_item_key: null,
           };
-
+  
           const addonEntries = (item.line_item_id || [])
             .map((addonId, idx) => {
               const addonMenuItem = menuItems.find(
                 mi => Number(mi.id) === Number(addonId)
               );
-
+  
               if (!addonMenuItem) return null;
-
+  
               return {
                 id: Number(addonId),
                 name: addonMenuItem.name,
@@ -2158,19 +2147,19 @@ const TakeOrder = ({ clientId, token, onOrderUpdate, realm }) => {
               };
             })
             .filter(Boolean);
-
+  
           return [mainEntry, ...addonEntries];
         });
-
+  
         setCart(restoredCart);
         setHasNewItems(true);
         setDraftSavedAt(Date.now());
-
+  
         setCustomerDetails({
           customer_id: draft.customer_id || "",
           contact_phone: draft.contact_phone || "",
         });
-
+  
         toast.info("Draft restored for this table.", {
           autoClose: 2000,
         });
@@ -2189,13 +2178,13 @@ const TakeOrder = ({ clientId, token, onOrderUpdate, realm }) => {
         contact_phone: "",
       });
     }
-
+  
     setShowCart(true);
-
+  
     if (openTakeawayModal) {
       setShowTakeawayOrdersModal(true);
     }
-
+  
     goToOrderView();
   };
   const handleTableSelect = async (table) => {
@@ -2211,15 +2200,15 @@ const TakeOrder = ({ clientId, token, onOrderUpdate, realm }) => {
       toast.error("No takeaway table configured");
       return;
     }
-
+  
     const tableIdStr = (
       takeawayTableId || takeawayTables[0].id
     ).toString();
-
+  
     const takeawayTable = tables.find(
       t => String(t.id) === tableIdStr
     );
-
+  
     await selectOrderTable({
       table: takeawayTable,
       mode: "takeaway",
@@ -2230,11 +2219,11 @@ const TakeOrder = ({ clientId, token, onOrderUpdate, realm }) => {
   const handleTakeawayOrderSelected = async (existingOrder) => {
     const tableIdStr = (takeawayTableId || takeawayTables[0].id).toString();
     const takeawayTable = tables.find(t => String(t.id) === tableIdStr);
-    const takeawayZoneConfigId = takeawayTable?.config_id || null;
+    const takeawayZoneConfigId = takeawayTable?.config_id || null; 
     setOrderMode('takeaway');
     setSelectedTable(tableIdStr);
     setZoneConfigId(takeawayZoneConfigId);
-
+  
     if (!existingOrder) {
       setActiveOrderId(null);
       setActiveDineinOrderId(null);
@@ -2339,7 +2328,7 @@ const TakeOrder = ({ clientId, token, onOrderUpdate, realm }) => {
       alert('Failed to load order');
     } finally {
       console.log("error");
-
+      
       // setLoading(false);
     }
   };
@@ -2350,7 +2339,7 @@ const TakeOrder = ({ clientId, token, onOrderUpdate, realm }) => {
   };
   const initializeTakeOrder = useCallback(async () => {
     if (!clientId || !token) return;
-
+  
     try {
       await Promise.all([
         fetchTables(),
@@ -2574,7 +2563,7 @@ const TakeOrder = ({ clientId, token, onOrderUpdate, realm }) => {
       toast.error('Failed to update item quantity.');
     } finally {
       console.log("error");
-
+      
       // setLoading(false);
     }
   };
@@ -2623,7 +2612,7 @@ const TakeOrder = ({ clientId, token, onOrderUpdate, realm }) => {
       toast.error('Failed to remove item.');
     } finally {
       console.log("error");
-
+      
       // setLoading(false);
     }
   };
@@ -2655,54 +2644,54 @@ const TakeOrder = ({ clientId, token, onOrderUpdate, realm }) => {
       .map(id => menuItems.find(mi => Number(mi.id) === Number(id)))
       .filter(Boolean);
 
-    if (isCombo) {
-      // ✅ Add combo directly without modal
-      let batch = currentBatchTimestamp;
-      if (!batch) { batch = Date.now(); setCurrentBatchTimestamp(batch); }
-
-      setCart(prev => {
-        const existingCombo = prev.find(
-          i => i.id === Number(item.id) &&
-            i.is_new_item &&
-            !i.saved_sub_order &&
-            !i.is_addon &&
-            (i.frontend_unique_key || '').startsWith('combo_')
-        );
-
-        if (existingCombo) {
-          return prev.map(i => {
-            if (i.frontend_unique_key === existingCombo.frontend_unique_key) {
-              return { ...i, quantity: i.quantity + 1 };
-            }
-            if (i.parent_item_key === existingCombo.frontend_unique_key && i.is_addon) {
-              return { ...i, quantity: i.quantity + 1 };
-            }
-            return i;
-          });
-        }
-
-        const comboParentEntry = buildCartItem(item, {
-          batch_timestamp: batch,
-          is_addon: false,
-          _item_type: 'combo',
-        });
-
-        const childEntries = linkedItems.map(comp =>
-          buildCartItem(comp, {
+      if (isCombo) {
+        // ✅ Add combo directly without modal
+        let batch = currentBatchTimestamp;
+        if (!batch) { batch = Date.now(); setCurrentBatchTimestamp(batch); }
+    
+        setCart(prev => {
+          const existingCombo = prev.find(
+            i => i.id === Number(item.id) &&
+                 i.is_new_item &&
+                 !i.saved_sub_order &&
+                 !i.is_addon &&
+                 (i.frontend_unique_key || '').startsWith('combo_')
+          );
+    
+          if (existingCombo) {
+            return prev.map(i => {
+              if (i.frontend_unique_key === existingCombo.frontend_unique_key) {
+                return { ...i, quantity: i.quantity + 1 };
+              }
+              if (i.parent_item_key === existingCombo.frontend_unique_key && i.is_addon) {
+                return { ...i, quantity: i.quantity + 1 };
+              }
+              return i;
+            });
+          }
+    
+          const comboParentEntry = buildCartItem(item, {
             batch_timestamp: batch,
-            parent_item_key: comboParentEntry.frontend_unique_key,
-            is_addon: true,
-            _item_type: 'cchild',
-          })
-        );
-
-        return [...prev, comboParentEntry, ...childEntries];
-      });
-
-      setHasNewItems(true);
-      if (!isMobile) setShowCart(true);
-
-    } else {
+            is_addon: false,
+            _item_type: 'combo',
+          });
+    
+          const childEntries = linkedItems.map(comp =>
+            buildCartItem(comp, {
+              batch_timestamp: batch,
+              parent_item_key: comboParentEntry.frontend_unique_key,
+              is_addon: true,
+              _item_type: 'cchild',
+            })
+          );
+    
+          return [...prev, comboParentEntry, ...childEntries];
+        });
+    
+        setHasNewItems(true);
+        if (!isMobile) setShowCart(true);
+    
+      } else {
       // Show addon picker
       if (linkedItems.length > 0) {
         setSelectedMainItem(item);
@@ -2730,7 +2719,7 @@ const TakeOrder = ({ clientId, token, onOrderUpdate, realm }) => {
         const addonEntry = buildCartItem(addon, {
           batch_timestamp: batch,
           parent_item_key: mainKey,
-          is_addon: true, _item_type: 'addon',
+          is_addon: true, _item_type: 'addon', 
         });
         setCart(prev => [...prev, addonEntry]);
       });
@@ -2770,19 +2759,19 @@ const TakeOrder = ({ clientId, token, onOrderUpdate, realm }) => {
     const itemsToPrintKOT = newItems.length > 0 ? [...newItems] : [...cart];
 
     // For the order API we only send parent (non-addon) items
-    const buildOrderPayload = (items) =>
-      items
-        .filter(i => !(i.frontend_unique_key || '').startsWith('cchild_'))
-        .map(i => ({
-          item_id: i.id,
-          item_name: i.name,
-          quantity: i.quantity,
-          unit_price: i.unit_price,
-          line_total: i.unit_price * i.quantity,
-          status: 'pending',
-          slug: i.slug || '',
-          frontend_unique_key: i.frontend_unique_key,
-        }));
+const buildOrderPayload = (items) =>
+  items
+    .filter(i => !(i.frontend_unique_key || '').startsWith('cchild_'))
+    .map(i => ({
+      item_id: i.id,
+      item_name: i.name,
+      quantity: i.quantity,
+      unit_price: i.unit_price,
+      line_total: i.unit_price * i.quantity,
+      status: 'pending',
+      slug: i.slug || '',
+      frontend_unique_key: i.frontend_unique_key,
+    }));
     try {
       const headers = { Authorization: `Bearer ${token}` };
       let placedOrderId = null;
@@ -2805,7 +2794,7 @@ const TakeOrder = ({ clientId, token, onOrderUpdate, realm }) => {
       } else {
         const existingDraft = await readDraft(selectedTable, clientId, token);
         const total = cart.filter(i => !(i.frontend_unique_key || '').startsWith('cchild_'))
-          .reduce((s, i) => s + (i.unit_price || 0) * i.quantity, 0);
+                          .reduce((s, i) => s + (i.unit_price || 0) * i.quantity, 0);
         const itemsPayload = buildOrderPayload(cart);
 
         if (existingDraft) {
@@ -2870,7 +2859,7 @@ const TakeOrder = ({ clientId, token, onOrderUpdate, realm }) => {
       if (placedOrderId && (customerDetails.customer_id || customerDetails.contact_phone)) {
         const tableObj = tables.find(t => t.id.toString() === selectedTable);
         const orderSubtotal = cart.filter(i => !(i.frontend_unique_key || '').startsWith('cchild_'))
-          .reduce((s, i) => s + (i.unit_price || 0) * i.quantity, 0);
+                                  .reduce((s, i) => s + (i.unit_price || 0) * i.quantity, 0);
         await upsertBillingDocumentForCustomer({
           clientId,
           token,
@@ -3044,7 +3033,7 @@ const TakeOrder = ({ clientId, token, onOrderUpdate, realm }) => {
       toast.error('Failed to confirm payment');
     } finally {
       console.log("error");
-
+      
       // setLoading(false);
     }
   };
@@ -3096,7 +3085,7 @@ const TakeOrder = ({ clientId, token, onOrderUpdate, realm }) => {
       );
       const order = (r.data?.data || []).find(o => o.id === orderId);
       if (!order) { toast.error('Order not found'); return; }
-
+  
       const enriched = (order.items || []).map(item => {
         const inv = inventoryMap[item.item_id] || {};
         return {
@@ -3105,9 +3094,9 @@ const TakeOrder = ({ clientId, token, onOrderUpdate, realm }) => {
           name: item.item_name ?? inv.name ?? 'Unnamed Item',
         };
       });
-
+  
       const deduplicatedItems = deduplicateOrderItems(enriched);
-
+  
       const billingDoc = await fetchBillingDocumentForOrder(orderId);
       setInvoiceOrderData({
         ...order,
@@ -3122,7 +3111,7 @@ const TakeOrder = ({ clientId, token, onOrderUpdate, realm }) => {
       toast.error('Failed to load order');
     } finally {
       console.log("error");
-
+      
       // setLoading(false);
     }
   };
@@ -3137,7 +3126,7 @@ const TakeOrder = ({ clientId, token, onOrderUpdate, realm }) => {
       );
       const order = (r.data?.data || []).find(o => o.id === activeOrderId);
       if (!order) { toast.error('Order not found'); return; }
-
+  
       const enriched = (order.items || []).map(item => {
         const inv = inventoryMap[item.item_id] || {};
         return {
@@ -3146,9 +3135,9 @@ const TakeOrder = ({ clientId, token, onOrderUpdate, realm }) => {
           name: item.item_name ?? inv.name ?? 'Unnamed',
         };
       });
-
+  
       const deduplicatedItems = deduplicateOrderItems(enriched);
-
+  
       const billingDoc = await fetchBillingDocumentForOrder(activeOrderId);
       setInvoiceOrderData({
         ...order,
@@ -3163,7 +3152,7 @@ const TakeOrder = ({ clientId, token, onOrderUpdate, realm }) => {
       toast.error('Failed to load order');
     } finally {
       console.log("error");
-
+      
       // setLoading(false);
     }
   };
@@ -3184,14 +3173,14 @@ const TakeOrder = ({ clientId, token, onOrderUpdate, realm }) => {
     // ── 2. Dietary filter ──
     if (selectedDietary) {
       items = items.filter(item => {
-        const dietary = getDietaryFromSlug(item, dietaryOptions);
+        const dietary = getDietaryFromSlug(item,dietaryOptions);
         return dietary !== null && dietary === selectedDietary;
       });
     }
 
     // ── 3. Category filter — uses flat list for reliable traversal ──
     if (selectedCategoryId) {
-      const ids = getCategoryAndChildrenIds(selectedCategoryId, categoriesFlat); // ← no categories arg needed now
+      const ids = getCategoryAndChildrenIds(selectedCategoryId,categoriesFlat); // ← no categories arg needed now
       items = items.filter(i => ids.includes(i.category_id));
     }
 
@@ -3302,7 +3291,7 @@ const TakeOrder = ({ clientId, token, onOrderUpdate, realm }) => {
                       </button>
                       {dietaryOptions.map(type => {
                         const key = type.toLowerCase().replace(/[-_\s]/g, '');
-                        const count = menuItems.filter(item => getDietaryFromSlug(item, dietaryOptions) === key).length;
+                        const count = menuItems.filter(item => getDietaryFromSlug(item,dietaryOptions) === key).length;
                         return (
                           <button
                             key={key}
@@ -3341,7 +3330,7 @@ const TakeOrder = ({ clientId, token, onOrderUpdate, realm }) => {
                     const dp = item.discount && Number(item.discount) > 0
                       ? Number(item.discount).toFixed(0) : null;
                     const ac = item.line_item_id?.length || 0;
-                    const dietary = getDietaryFromSlug(item, dietaryOptions);
+                    const dietary = getDietaryFromSlug(item,dietaryOptions);
                     const dietaryColor = dietary ? (dietaryColorMap[dietary] || '') : '';
                     return (
                       <div
@@ -3841,57 +3830,57 @@ const TakeOrder = ({ clientId, token, onOrderUpdate, realm }) => {
         }}
         comboItem={comboModalItem}
         comboComponents={comboModalComponents}
-        onAddCombo={() => {
-          if (!comboModalItem) return;
-          let batch = currentBatchTimestamp;
-          if (!batch) { batch = Date.now(); setCurrentBatchTimestamp(batch); }
+  onAddCombo={() => {
+  if (!comboModalItem) return;
+  let batch = currentBatchTimestamp;
+  if (!batch) { batch = Date.now(); setCurrentBatchTimestamp(batch); }
 
-          setCart(prev => {
-            const existingCombo = prev.find(
-              i => i.id === Number(comboModalItem.id) &&
-                i.is_new_item &&
-                !i.saved_sub_order &&
-                !i.is_addon &&
-                (i.frontend_unique_key || '').startsWith('combo_')
-            );
+  setCart(prev => {
+    const existingCombo = prev.find(
+      i => i.id === Number(comboModalItem.id) &&
+           i.is_new_item &&
+           !i.saved_sub_order &&
+           !i.is_addon &&
+           (i.frontend_unique_key || '').startsWith('combo_')
+    );
 
-            if (existingCombo) {
-              const updated = prev.map(i => {
-                if (i.frontend_unique_key === existingCombo.frontend_unique_key) {
-                  return { ...i, quantity: i.quantity + 1 };
-                }
-                if (
-                  i.parent_item_key === existingCombo.frontend_unique_key &&
-                  i.is_addon
-                ) {
-                  return { ...i, quantity: i.quantity + 1 };
-                }
-                return i;
-              });
-              return updated;
-            }
+    if (existingCombo) {
+      const updated = prev.map(i => {
+        if (i.frontend_unique_key === existingCombo.frontend_unique_key) {
+          return { ...i, quantity: i.quantity + 1 };
+        }
+        if (
+          i.parent_item_key === existingCombo.frontend_unique_key &&
+          i.is_addon
+        ) {
+          return { ...i, quantity: i.quantity + 1 };
+        }
+        return i;
+      });
+      return updated;
+    }
 
-            const comboParentEntry = buildCartItem(comboModalItem, {
-              batch_timestamp: batch,
-              is_addon: false,
-              _item_type: 'combo',
-            });
+    const comboParentEntry = buildCartItem(comboModalItem, {
+      batch_timestamp: batch,
+      is_addon: false,
+      _item_type: 'combo',
+    });
 
-            const childEntries = comboModalComponents.map(comp =>
-              buildCartItem(comp, {
-                batch_timestamp: batch,
-                parent_item_key: comboParentEntry.frontend_unique_key,
-                is_addon: true,
-                _item_type: 'cchild',
-              })
-            );
+    const childEntries = comboModalComponents.map(comp =>
+      buildCartItem(comp, {
+        batch_timestamp: batch,
+        parent_item_key: comboParentEntry.frontend_unique_key,
+        is_addon: true,
+        _item_type: 'cchild',
+      })
+    );
 
-            return [...prev, comboParentEntry, ...childEntries];
-          });
+    return [...prev, comboParentEntry, ...childEntries];
+  });
 
-          setHasNewItems(true);
-          if (!isMobile) setShowCart(true);
-        }}
+  setHasNewItems(true);
+  if (!isMobile) setShowCart(true);
+}}
       />
 
       <CancelOrderConfirmModal
