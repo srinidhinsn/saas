@@ -138,13 +138,22 @@ def login_user_service(client_id: str,username: str,password: str,db: Session):
     client_model = Client.copyToModel(client)
 
     roles = [str(r).strip()for r in (user_model.roles or [])]
+    
+    page_defs = db.query(PageDefinition).filter(
+        PageDefinition.role.in_(roles),
+        PageDefinition.client_id == client_id
+    ).all()
+    
+    allowed_screen_ids = list({pd.screen_id for pd in page_defs})
 
     payload = {
         "user_id": str(user_model.id),
         "roles": roles,
         "client_id": user_model.client_id,
         "grants": user_model.grants,
-        "realm": client_model.realm
+        "realm": client_model.realm,
+        "subscription": client_model.subscription or [],
+        "allowed_screen_ids": allowed_screen_ids
     }
 
     access_token = create_access_token(payload)
@@ -153,11 +162,14 @@ def login_user_service(client_id: str,username: str,password: str,db: Session):
     "roles": roles,
     "client_id": user_model.client_id,
     "grants": user_model.grants,
-    "realm": client_model.realm})
+    "realm": client_model.realm,
+    "subscription": client_model.subscription or [],
+    "allowed_screen_ids": allowed_screen_ids})
 
     screen_id = getting_screen_id(access_token,db)
 
     return {"screen_id": screen_id,"access_token": access_token,"refresh_token": refresh_token,"token_type": "bearer"}
+
 
 # Delete User
 def delete_user_service(client_id: str,user_id: str,context,db: Session):

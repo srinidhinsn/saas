@@ -10,6 +10,7 @@ class ClientModel(BaseModel):
     email: Optional[str] = None
     phone: Optional[str] = None
     logo: Optional[str] = None
+    subscription: list[str] | None = None
 
 class AddressModel(BaseModel):
     id: Optional[int] = None
