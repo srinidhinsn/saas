@@ -20,7 +20,7 @@ from services.add_users import (create_user_and_person, login_user_service, get_
                                   forgot_password_service ,reset_password_service)
 from services.person_service import (update_person_details_service, get_person_details_service, get_all_persons_service, 
                                        save_address_service, get_addresses_service, update_address_service, get_customer_addresses_service, set_primary_address_service,
-find_or_create_customer,search_customers_service)
+find_or_create_customer_service,search_customers_service)
 from services.auth_service import refresh_access_token
 from jose import jwt
 import uuid , os
