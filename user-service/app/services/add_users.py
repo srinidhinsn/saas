@@ -168,7 +168,7 @@ def login_user_service(client_id: str,username: str,password: str,db: Session):
 
     screen_id = getting_screen_id(access_token,db)
 
-    return {"screen_id": screen_id,"access_token": access_token,"refresh_token": refresh_token,"token_type": "bearer", "client": client_model,}
+    return {"screen_id": screen_id,"access_token": access_token,"refresh_token": refresh_token,"token_type": "bearer","client_name": client_model.name, "client": client_model}
 
 
 # Delete User
