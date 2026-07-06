@@ -14,6 +14,7 @@ import { OperationGuardProvider } from './components/utils/Interceptors/Operatio
 import { jwtDecode } from 'jwt-decode';
 import { setupAxiosInterceptors } from './components/utils/axiosConfig'
 import { menuCache } from './components/utils/Menu-utils/menuCache';
+import RegisterPage from './components/MainComponents/UserServices/ClientRegister/Register';
 // ─── Screen → Route mapping (keep in sync with Login.jsx) ───────────────────
 const screenRouteMap = {
   super_admin_v1: 'customer-data',
@@ -201,12 +202,12 @@ if (token) {
       setCheckingAuth(false);
     }
   }, []);
-  const handleLoginSuccess = (accessToken, refreshToken,screenId, clientId) => {
+  const handleLoginSuccess = (accessToken, refreshToken,screenId, clientId, clientName) => {
     localStorage.setItem('access_token', accessToken);
     localStorage.setItem("refresh_token", refreshToken);
     localStorage.setItem('screen_id', screenId || '');
     localStorage.setItem('client_id', clientId);
-
+    localStorage.setItem('client_name', clientName || '');
     setAuthState({
       token: accessToken,
       screenId,
@@ -223,6 +224,7 @@ if (token) {
     localStorage.removeItem("refresh_token");
     localStorage.removeItem("selected_client_id");
     localStorage.removeItem('menu_selected_category'); 
+    localStorage.removeItem('client_name');   
     setAuthState(prev => ({
       token: null,
       screenId: null,
@@ -251,7 +253,7 @@ if (token) {
             }
           />
 
-          <Route path="/saas/:clientId/register" element={<div className="p-8">Register (placeholder)</div>} />
+          <Route path="/saas/:clientId/register" element={<RegisterPage/>} />
           <Route path="/saas/:clientId/forgot" element={<div className="p-8">Forgot Password (placeholder)</div>} />
           <Route path="/saas/:clientId/reset" element={<div className="p-8">Reset Password (placeholder)</div>} />
 

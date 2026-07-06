@@ -202,7 +202,6 @@ const HeaderShared = ({ onLogout }) => {
   const [mobileOpen, setMobileOpen] = useState(false);
   const [darkMode, setDarkMode] = useState(false);
   const [profileOpen, setProfileOpen] = useState(false);
-  const [clientName, setClientName] = useState('');
 
   // Initialize theme on mount
   useEffect(() => {
@@ -270,24 +269,7 @@ const HeaderShared = ({ onLogout }) => {
       </button>
     );
   };
-  useEffect(() => {
-    if (!clientId) return;
-    const token = getValidToken();
-    if (!token) return;
-
-    axios
-      .get(
-        `${import.meta.env.VITE_API_USER_SERVICE_URL}/${clientId}/users/realm`,
-        { headers: { Authorization: `Bearer ${token}` } }
-      )
-      .then((res) => {
-        const clients = res.data?.data?.clients || [];
-        const match = clients.find((c) => c.id === clientId);
-        if (match?.name) setClientName(match.name);
-      })
-      .catch(() => {
-      });
-  }, [clientId]);
+  const clientName = localStorage.getItem('client_name');
   const displayLabel = clientName || (clientId || 'APP').toUpperCase();
   return (
     <header className="shadow-md sticky top-0 z-50 bg-bg-primary dark:bg-bg-primary-dark border-b border-border-default dark:border-border-default-dark transition-colors duration-300">

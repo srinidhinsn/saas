@@ -44,13 +44,14 @@ const MenuManagement = ({ clientId, token,screenIds, userId, realm }) => {
   const [showDeleteModal, setShowDeleteModal] = useState(false);
   const [showBulkModal, setShowBulkModal] = useState(false);
   const [units, setUnits] = useState([]);
-
+  const [duplicateCodeAlert, setDuplicateCodeAlert] = useState(null);
   const [newItemImage, setNewItemImage] = useState(null);
   const [newItemImageUrl, setNewItemImageUrl] = useState('');
   const [editItemImage, setEditItemImage] = useState(null);
   const [editItemImageUrl, setEditItemImageUrl] = useState('');
   const [importValidationModal, setImportValidationModal] = useState(null);
-  const [importSuccess, setImportSuccess] = useState(false);
+  const [importSuccess, setImportSuccess] = useState(null);
+  const [importConfirm, setImportConfirm] = useState(null);
   const [importError, setImportError] = useState(null);
   const [editingItem, setEditingItem] = useState(null);
   const [deleteTarget, setDeleteTarget] = useState(null);
@@ -254,7 +255,18 @@ if (cachedAddon) return cachedAddon;
     });
     // eslint-disable-next-line react-hooks/exhaustive-deps
   }, []);  
-
+  const findDuplicateCodeItem = (code, excludeId = null) => {
+    const codeStr = String(code ?? '').trim();
+    if (!codeStr) return null;
+  
+    return allMenuItemsRaw.find(item => {
+      const isBaseRecord =
+        item.zone_config_id === 0 || item.zone_config_id === null || item.zone_config_id === undefined;
+      const sameCode = String(item.code ?? '').trim() === codeStr;
+      const isDifferentItem = Number(item.id) !== Number(excludeId);
+      return isBaseRecord && sameCode && isDifferentItem;
+    });
+  };
   const openAddModal = () => {
     setNewItem({
       name: '', description: '', category_id: selectedCategoryId || '',
@@ -386,6 +398,15 @@ if (cachedAddon) return cachedAddon;
   };
 
   const handleAddItem = async () => {
+    if (newItem.code) {
+      const duplicate = findDuplicateCodeItem(newItem.code);
+      if (duplicate) {
+        setDuplicateCodeAlert({
+          message: `Code "${newItem.code}" is already used by "${duplicate.name}".`
+        });
+        return;
+      }
+    }
     menuCache.invalidate(clientId);
     try {
       let imageId = null;
@@ -503,6 +524,15 @@ if (cachedAddon) return cachedAddon;
   };
 
   const handleEditItem = async () => {
+    if (editingItem.code) {
+      const duplicate = findDuplicateCodeItem(editingItem.code, editingItem.id);
+      if (duplicate) {
+        setDuplicateCodeAlert({
+          message: `Code "${editingItem.code}" is already used by "${duplicate.name}". Item codes must be unique.`
+        });
+        return;
+      }
+    }
     menuCache.invalidate(clientId);
     try {
       let imageId = editingItem.image_id;
@@ -834,8 +864,43 @@ if (cachedAddon) return cachedAddon;
 
 // Find and replace the entire handleBulkUpdate function:
 const handleBulkUpdate = async () => {
-  menuCache.invalidate(clientId);
   if (selectedRows.length === 0) return;
+  const proposedCodes = new Map(); 
+  for (const id of selectedRows) {
+    const edited = bulkEditData[id] || {};
+    const baseItem = menuItems.find(
+      item => item.id === id && (item.zone_config_id === 0 || item.zone_config_id === null)
+    );
+    const finalCode = 'code' in edited ? edited.code : baseItem?.code;
+    const codeStr = String(finalCode ?? '').trim();
+    if (codeStr) proposedCodes.set(id, codeStr);
+  }
+
+  const seenInBatch = new Map();
+  for (const [id, code] of proposedCodes) {
+    if (seenInBatch.has(code) && seenInBatch.get(code) !== id) {
+      const itemA = menuItems.find(i => i.id === id)?.name || id;
+      const itemB = menuItems.find(i => i.id === seenInBatch.get(code))?.name || seenInBatch.get(code);
+      setDuplicateCodeAlert({
+        message: `Code "${code}" is duplicated between "${itemA}" and "${itemB}" in this bulk update. Item codes must be unique — please change one of them, or use item names instead.`
+      });
+      return;
+    }
+    seenInBatch.set(code, id);
+  }
+
+  for (const [id, code] of proposedCodes) {
+    const duplicate = findDuplicateCodeItem(code, id);
+    if (duplicate && !selectedRows.includes(duplicate.id)) {
+      setDuplicateCodeAlert({
+        message: `Code "${code}" is already used by "${duplicate.name}". Item codes must be unique.`
+      });
+      return;
+    }
+  }
+
+  if (!window.confirm(`Update ${selectedRows.length} selected item(s)?`)) return;
+  menuCache.invalidate(clientId);
   try {
     for (const id of selectedRows) {
       const { dietary_type: ed, zonePrices: zp, ...cleanEditedData } = bulkEditData[id] || {};
@@ -931,6 +996,8 @@ const handleBulkUpdate = async () => {
     setSelectedRows([]);
     setBulkEditData({});
     setSelectAllChecked(false);
+    setImportSuccess(`${selectedRows.length} item(s) updated successfully`);
+    setTimeout(() => setImportSuccess(null), 3000);
   } catch (error) {
     console.error('Error updating items:', error);
   }
@@ -1174,8 +1241,8 @@ return suffixParts.length > 0 ? `${base}__${suffixParts.join('+')}` : base;
     }
     menuCache.invalidate(clientId);
     await fetchData({ silent: false, force: true });
-    setImportSuccess(true);
-    setTimeout(() => setImportSuccess(false), 3000);
+    setImportSuccess("Import completed successfully");
+    setTimeout(() => setImportSuccess(null), 3000);
   };
   const handleImportFromExcel = async (e) => {
     const file = e.target.files[0];
@@ -1230,6 +1297,7 @@ return suffixParts.length > 0 ? `${base}__${suffixParts.join('+')}` : base;
         const invalidDietarySet = new Set();
         const invalidTimingSet = new Set();
         const invalidCategorySet = new Set();
+        const duplicateCodeMap = new Map(); 
         for (const row of parsedData) {
           if (!row.Name?.trim()) continue;
           const rawCategory = (row.Category || "").trim();
@@ -1253,13 +1321,42 @@ return suffixParts.length > 0 ? `${base}__${suffixParts.join('+')}` : base;
               if (!matched) invalidTimingSet.add(key);
             }
           }
+          const rowCode = String(row.Code ?? '').trim();
+          if (rowCode) {
+            // Does this code collide with a DIFFERENT existing item (not this same-named item)?
+            const existingConflict = allMenuItems.find(item => {
+              const isBase = item.zone_config_id === 0 || item.zone_config_id === null;
+              const sameCode = String(item.code ?? '').trim() === rowCode;
+              const differentName = (item.name || '').trim().toLowerCase() !== row.Name.trim().toLowerCase();
+              return isBase && sameCode && differentName;
+            });
+        
+            if (existingConflict) {
+              if (!duplicateCodeMap.has(rowCode)) duplicateCodeMap.set(rowCode, new Set());
+              duplicateCodeMap.get(rowCode).add(row.Name.trim());
+              duplicateCodeMap.get(rowCode).add(existingConflict.name);
+            }
+        
+            // Does this code collide with ANOTHER row in the same file?
+            const otherRowsWithSameCode = parsedData.filter(
+              r => r !== row && String(r.Code ?? '').trim() === rowCode && r.Name?.trim().toLowerCase() !== row.Name?.trim().toLowerCase()
+            );
+            if (otherRowsWithSameCode.length > 0) {
+              if (!duplicateCodeMap.has(rowCode)) duplicateCodeMap.set(rowCode, new Set());
+              duplicateCodeMap.get(rowCode).add(row.Name.trim());
+              otherRowsWithSameCode.forEach(r => duplicateCodeMap.get(rowCode).add(r.Name.trim()));
+            }
+          }
         }
-
-        if (invalidDietarySet.size > 0 || invalidTimingSet.size > 0) {
+        const invalidCodeDetails = Array.from(duplicateCodeMap.entries()).map(
+          ([code, names]) => `${code} → ${Array.from(names).join(', ')}`
+        );
+        if (invalidDietarySet.size > 0 || invalidTimingSet.size > 0 || invalidCodeDetails.length > 0) {
           setImportValidationModal({
             invalidCategory: [...invalidCategorySet],
             invalidDietary: [...invalidDietarySet],
             invalidTiming: [...invalidTimingSet],
+            invalidCode: invalidCodeDetails,  
             parsedData,
             priceColumns,
             allMenuItems,
@@ -1272,13 +1369,28 @@ return suffixParts.length > 0 ? `${base}__${suffixParts.join('+')}` : base;
           });
           return;
         }
-
-        await runImport({
-          parsedData, priceColumns, allMenuItems,
-          created_by, updated_by,
-          currentCategoriesFlat, currentSelectedCategoryId, currentSections,
+        setImportConfirm({
+          count: parsedData.length,
+          onConfirm: async () => {
+            setImportConfirm(null);
+            try {
+              await runImport({
+                parsedData, priceColumns, allMenuItems,
+                created_by, updated_by,
+                currentCategoriesFlat, currentSelectedCategoryId, currentSections,
+              });
+            } catch (err) {
+              console.error("Import Error:", err);
+              setImportError(err.message || "Something went wrong during import.");
+              setTimeout(() => setImportError(null), 4000);
+            }
+            e.target.value = "";
+          },
+          onCancel: () => {
+            setImportConfirm(null);
+            e.target.value = "";
+          },
         });
-        e.target.value = "";
       } catch (err) {
         console.error("Import Error:", err);
         setImportError(err.message || "Something went wrong during import.");
@@ -1590,7 +1702,26 @@ return suffixParts.length > 0 ? `${base}__${suffixParts.join('+')}` : base;
                   </p>
                 </div>
               )}
-
+      {/* ── DUPLICATE CODE ERRORS ── */}
+      {importValidationModal.invalidCode?.length > 0 && (
+       <div>
+           <p className="text-xs font-semibold text-text-secondary uppercase tracking-wide mb-2">
+               Duplicate item codes
+           </p>
+        <div className="flex flex-col gap-1.5 mb-2">
+           {importValidationModal.invalidCode.map(v => (
+              <span key={v} className="px-2.5 py-1.5 rounded-lg text-xs bg-red-100 text-red-800 font-medium">
+                {v}
+              </span>
+           ))}
+        </div>
+          <p className="text-xs text-text-secondary leading-relaxed">
+      Two or more items share the same code. Item codes must be unique — please
+      go back to your file and change the duplicated codes, or leave the code
+      blank and identify those items by name instead.
+          </p>
+        </div>
+      )}
               {/* ── DIETARY ERRORS ── */}
               {importValidationModal.invalidDietary?.length > 0 && (
                 <div>
@@ -1683,9 +1814,10 @@ return suffixParts.length > 0 ? `${base}__${suffixParts.join('+')}` : base;
                   }
                   if (ctx.fileEvent) ctx.fileEvent.target.value = "";
                 }}
+                disabled={importValidationModal.invalidCode?.length > 0}
                 className="flex-1 h-9 rounded-lg border border-yellow-400 text-sm font-semibold bg-yellow-50 text-yellow-900 hover:bg-yellow-100 transition-colors"
               >
-                Import anyway
+                 {importValidationModal.invalidCode?.length > 0 ? "Fix duplicates to continue" : "Import anyway"}
               </button>
             </div>
 
@@ -1697,9 +1829,9 @@ return suffixParts.length > 0 ? `${base}__${suffixParts.join('+')}` : base;
           <svg width="18" height="18" viewBox="0 0 24 24" fill="none" stroke="currentColor" strokeWidth="2.5" strokeLinecap="round" strokeLinejoin="round">
             <path d="M20 6L9 17l-5-5" />
           </svg>
-          <span className="text-sm font-semibold">Import completed successfully</span>
+          <span className="text-sm font-semibold">{importSuccess}</span>
           <button
-            onClick={() => setImportSuccess(false)}
+            onClick={() => setImportSuccess(null)}
             className="ml-1 opacity-70 hover:opacity-100 transition-opacity"
           >
             <svg width="14" height="14" viewBox="0 0 24 24" fill="none" stroke="currentColor" strokeWidth="2.5" strokeLinecap="round" strokeLinejoin="round">
@@ -1729,6 +1861,78 @@ return suffixParts.length > 0 ? `${base}__${suffixParts.join('+')}` : base;
           </button>
         </div>
       )}
+      {/* Duplicate Code Alert Modal */}
+{duplicateCodeAlert && (
+  <div className="fixed inset-0 z-[100] flex items-center justify-center p-4 bg-black/50">
+    <div className="bg-bg-primary rounded-2xl w-full max-w-sm shadow-xl border border-border-default overflow-hidden">
+      <div className="flex items-center gap-3 px-5 py-4 border-b border-border-default bg-red-50">
+        <div className="w-9 h-9 rounded-full bg-red-100 flex items-center justify-center shrink-0">
+          <svg width="18" height="18" viewBox="0 0 24 24" fill="none" stroke="#b91c1c" strokeWidth="2" strokeLinecap="round" strokeLinejoin="round">
+            <circle cx="12" cy="12" r="10" />
+            <line x1="12" y1="8" x2="12" y2="12" />
+            <line x1="12" y1="16" x2="12.01" y2="16" />
+          </svg>
+        </div>
+        <div>
+          <h3 className="text-base font-semibold text-red-900">Duplicate item code</h3>
+          <p className="text-xs text-red-700 mt-0.5">This code is already in use</p>
+        </div>
+      </div>
+
+      <div className="px-5 py-4">
+        <p className="text-sm text-text-secondary leading-relaxed">
+          {duplicateCodeAlert.message}
+        </p>
+      </div>
+
+      <div className="flex px-5 py-4 border-t border-border-default">
+        <button
+          onClick={() => setDuplicateCodeAlert(null)}
+          className="flex-1 h-9 rounded-lg bg-action-primary text-text-white text-sm font-semibold hover:opacity-90 transition-opacity"
+        >
+          Got it
+        </button>
+      </div>
+    </div>
+  </div>
+)}  
+      {/* Import Confirm Modal */}
+{importConfirm && (
+  <div className="fixed inset-0 z-[100] flex items-center justify-center p-4 bg-black/50">
+    <div className="bg-bg-primary rounded-2xl w-full max-w-sm shadow-xl border border-border-default overflow-hidden">
+      <div className="flex items-center gap-3 px-5 py-4 border-b border-border-default bg-blue-50">
+        <div className="w-9 h-9 rounded-full bg-blue-100 flex items-center justify-center shrink-0">
+          <Upload size={16} className="text-blue-700" />
+        </div>
+        <div>
+          <h3 className="text-base font-semibold text-blue-900">Confirm import</h3>
+          <p className="text-xs text-blue-700 mt-0.5">Review before proceeding</p>
+        </div>
+      </div>
+
+      <div className="px-5 py-4">
+        <p className="text-sm text-text-secondary leading-relaxed">
+          Import <strong className="text-text-primary">{importConfirm.count}</strong> item(s) from this file?
+        </p>
+      </div>
+
+      <div className="flex gap-2 px-5 py-4 border-t border-border-default">
+        <button
+          onClick={importConfirm.onCancel}
+          className="flex-1 h-9 rounded-lg border border-border-default text-sm font-semibold bg-bg-tertiary hover:bg-bg-secondary transition-colors"
+        >
+          Cancel
+        </button>
+        <button
+          onClick={importConfirm.onConfirm}
+          className="flex-1 h-9 rounded-lg bg-action-primary text-text-white text-sm font-semibold hover:opacity-90 transition-opacity"
+        >
+          Import
+        </button>
+      </div>
+    </div>
+  </div>
+)}
       <UniversalAddModal clientId={clientId}
         token={token}
         showModal={showAddModal} setShowModal={setShowAddModal} modalType="menu"
