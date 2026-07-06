@@ -10,7 +10,7 @@ from decimal import Decimal
 from models.response_model import ResponseModel
 from fastapi import HTTPException
 from models.order_model import DineinOrderModel 
-
+from .order_status import _status_label
 
 def build_billing_payload_from_order(order: DBOrder, items: List[DBOrderItem]) -> Dict[str, Any]:
     return {
@@ -336,7 +336,7 @@ def update_order_status_service(client_id: str, body: DineinOrderModel, context,
         )
 
         for o in related_orders:
-            o.status = OrderStatusEnum.cancelled
+            o.status = _status_label(context, body.status) or body.status
 
             order_items = (
                 db.query(Db_OrderItem_Entity)
@@ -348,7 +348,7 @@ def update_order_status_service(client_id: str, body: DineinOrderModel, context,
             )
 
             for item in order_items:
-                item.status = OrderStatusEnum.cancelled
+                item.status = _status_label(context, OrderStatusEnum.cancelled) or OrderStatusEnum.cancelled
 
         cancellation_reason = getattr(body, "cancellation_reason", None)
         if cancellation_reason:
@@ -409,7 +409,7 @@ def update_order_status_service(client_id: str, body: DineinOrderModel, context,
     # ── Normal single order update (for other statuses) ────────────────────
     if body.status not in [OrderStatusEnum.cancelled, OrderStatusEnum.served, OrderStatusEnum.completed]:
         if body.status is not None:
-            order.status = body.status
+            order.status = _status_label(context, body.status) or body.status
 
         if body.total_price is not None:
             order.total_price = body.total_price
@@ -427,7 +427,7 @@ def update_order_status_service(client_id: str, body: DineinOrderModel, context,
             screen_id=context.screen_id,
             data={
                 "message": "Status updated",
-                "new_status": order.status,
+                "new_status": order.status,"new_status_label": _status_label(context, order.status),
             },
         )
 
