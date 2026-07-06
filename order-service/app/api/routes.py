@@ -29,6 +29,7 @@ from services.order_service import (
     _convert,
     update_order_status_service,
 )
+from services.order_status import _status_label
 from decimal import Decimal
 
 
@@ -46,7 +47,7 @@ def create_order(client_id: str, order: DineinOrderModel, context: SaasContext =
             raise HTTPException(status_code=404,detail=f"Address id '{order.delivery_address}' not found")
         delivery_address_id = str(selected_address.id)
     db_order = Db_Order_Entity( customer_id=order.customer_id,delivery_address=delivery_address_id,
-        client_id=client_id, table_id=order.table_id, status=order.status,
+        client_id=client_id, table_id=order.table_id, status=_status_label(context, order.status) or order.status,
         price=order.price, gst=order.gst, cst=order.cst, discount=order.discount,
         invoice_status=order.invoice_status, total_price=order.total_price,
         invoice_id=order.invoice_id, dinein_order_id=None,
@@ -63,7 +64,7 @@ def create_order(client_id: str, order: DineinOrderModel, context: SaasContext =
            order_id=db_order.id, client_id=client_id, item_id=item.item_id,
            item_name=item.item_name, slug=item.slug, quantity=item.quantity,
            unit_price=item.unit_price,   line_total=item.line_total,
-        frontend_unique_key=item.frontend_unique_key, status=item.status,
+        frontend_unique_key=item.frontend_unique_key,  status=_status_label(context, item.status) or item.status,
         )
         db.add(db_item)
     db.commit()
@@ -109,7 +110,7 @@ def create_sub_order(
         client_id=client_id,
         dinein_order_id=sub_dinein_order_id,
         table_id=root_order.table_id,
-        status=OrderStatusEnum.pending,
+        status=_status_label(context, OrderStatusEnum.pending) or OrderStatusEnum.pending,
         price=order.price, gst=0, cst=0, total_price=order.total_price,
         created_by=order.created_by, invoice_id=None, invoice_status=None,
     )
@@ -122,7 +123,7 @@ def create_sub_order(
             item_id=item.item_id, item_name=item.item_name, slug=item.slug,
             quantity=item.quantity, unit_price=item.unit_price,
              line_total=item.line_total,  
-            status=OrderStatusEnum.pending,
+            status=_status_label(context, OrderStatusEnum.pending) or OrderStatusEnum.pending,
             frontend_unique_key=item.frontend_unique_key,
         )
         db.add(db_item)
@@ -146,7 +147,8 @@ def create_sub_order(
         created_at=db_sub_order.created_at, items=order_items,
     )
     return ResponseModel(
-        screen_id=context.screen_id, data=sub_order_model,
+        screen_id=context.screen_id, data={**sub_order_model.dict(),
+        "status_label": _status_label(context, db_sub_order.status),},
         message=f"Sub-order {sub_dinein_order_id} created successfully",
     )
 
@@ -160,12 +162,12 @@ def get_orders_for_order_id(client_id: str, order_id: Optional[str] = None, cont
     if not order:
         return ResponseModel(screen_id=context.screen_id, data=None, status="not_found")
 
-    db_items = db.query(Db_OrderItem_Entity).filter(Db_OrderItem_Entity.order_id == order.id, Db_OrderItem_Entity.status != OrderStatusEnum.cancelled,).all()
+    db_items = db.query(Db_OrderItem_Entity).filter(Db_OrderItem_Entity.order_id == order.id, Db_OrderItem_Entity.status != (_status_label(context, OrderStatusEnum.cancelled) or OrderStatusEnum.cancelled),).all()
     item_models = [Db_OrderItem_Entity.copyToModel(item) for item in db_items]
     result = {
         "id": order.id, "dinein_order_id": order.dinein_order_id,
         "table_id": order.table_id, "client_id": order.client_id,
-        "status": order.status, "created_at": order.created_at,
+        "status": order.status, "status_label": _status_label(context, order.status), "created_at": order.created_at,
         "items": [i.dict() for i in item_models], "total_price": order.total_price,
     }
     return ResponseModel(screen_id=context.screen_id, data=result)
@@ -190,6 +192,8 @@ def get_orders_for_table(client_id: str, table_id: Optional[str] = None, context
         groups.setdefault(root, []).append(order)
 
     result = [_merge_group(group) for group in groups.values()]
+    for r in result:
+        r["status_label"] = _status_label(context, r.get("status"))
     return ResponseModel(screen_id=context.screen_id, data=result)
 
 
@@ -252,14 +256,14 @@ def update_order_items(
         if db_item:
             db_item.quantity = incoming.quantity
             db_item.line_total = (incoming.unit_price or 0) * (incoming.quantity or 1)
-            db_item.status = incoming.status
+            db_item.status = _status_label(context, incoming.status) or incoming.status
         else:
             db.add(Db_OrderItem_Entity(
                 client_id=client_id, order_id=order_id,
                 item_id=incoming.item_id, item_name=incoming.item_name,
                 quantity=incoming.quantity, unit_price=incoming.unit_price,
                 line_total=(incoming.unit_price or 0) * (incoming.quantity or 1),
-                status="pending", frontend_unique_key=incoming.frontend_unique_key,
+                 status=_status_label(context, OrderStatusEnum.pending) or "pending", frontend_unique_key=incoming.frontend_unique_key,
             ))
 
     db.commit()
@@ -357,7 +361,7 @@ def delete_order_items( client_id: str, order_item_id: Optional[str] = Query(Non
                 .filter(
                     Db_OrderItem_Entity.order_id == order_id,
                     Db_OrderItem_Entity.client_id == client_id,
-                    Db_OrderItem_Entity.status != OrderStatusEnum.cancelled,
+                    Db_OrderItem_Entity.status != (_status_label(context, OrderStatusEnum.cancelled) or OrderStatusEnum.cancelled),
                 )
                 .all()
             )
@@ -453,7 +457,7 @@ def delete_order_items( client_id: str, order_item_id: Optional[str] = Query(Non
             else:
                 _record_item_transaction(menu_item, ordered_qty)
 
-    item.status     = OrderStatusEnum.cancelled
+    item.status     = _status_label(context, OrderStatusEnum.cancelled) or OrderStatusEnum.cancelled
     item.line_total = 0
     db.flush()
 
@@ -462,7 +466,7 @@ def delete_order_items( client_id: str, order_item_id: Optional[str] = Query(Non
         .filter(
             Db_OrderItem_Entity.order_id == order_id,
             Db_OrderItem_Entity.client_id == client_id,
-            Db_OrderItem_Entity.status != OrderStatusEnum.cancelled,
+            Db_OrderItem_Entity.status != (_status_label(context, OrderStatusEnum.cancelled) or OrderStatusEnum.cancelled),
         )
         .all()
     )
@@ -481,7 +485,7 @@ def delete_order_items( client_id: str, order_item_id: Optional[str] = Query(Non
         root_dinein_id = _root_dinein_id(order_row.dinein_order_id or str(order_row.id))
 
         # Cancel THIS order
-        order_row.status = OrderStatusEnum.cancelled
+        order_row.status = _status_label(context, OrderStatusEnum.cancelled) or OrderStatusEnum.cancelled
         order_row.total_price = 0
         db.flush()
 
@@ -491,7 +495,7 @@ def delete_order_items( client_id: str, order_item_id: Optional[str] = Query(Non
             .filter(
                 Db_Order_Entity.client_id == client_id,
                 Db_Order_Entity.dinein_order_id.like(f"{root_dinein_id}%"),
-                Db_Order_Entity.status != OrderStatusEnum.cancelled,
+                Db_Order_Entity.status != (_status_label(context, OrderStatusEnum.cancelled) or OrderStatusEnum.cancelled),
                 )
                 .all()
             )
@@ -576,14 +580,14 @@ def cancel_order(
     processed_keys = set()
 
     for order in related_orders:
-        order.status = OrderStatusEnum.cancelled
+        order.status = _status_label(context, OrderStatusEnum.cancelled) or OrderStatusEnum.cancelled
 
         items = (
             db.query(Db_OrderItem_Entity)
             .filter(
                 Db_OrderItem_Entity.order_id == order.id,
                 Db_OrderItem_Entity.client_id == client_id,
-                Db_OrderItem_Entity.status != OrderStatusEnum.cancelled,
+                Db_OrderItem_Entity.status != (_status_label(context, OrderStatusEnum.cancelled) or OrderStatusEnum.cancelled),
             )
             .all()
         )
@@ -593,8 +597,8 @@ def cancel_order(
             if item_key in processed_keys:
                 continue
             processed_keys.add(item_key)
-            is_served   = item.status == OrderStatusEnum.served
-            item.status = OrderStatusEnum.cancelled
+            is_served   = item.status == (_status_label(context, OrderStatusEnum.served) or OrderStatusEnum.served)
+            item.status = _status_label(context, OrderStatusEnum.cancelled) or OrderStatusEnum.cancelled
 
             menu_item = (
                 db.query(InventoryEntity)
@@ -859,10 +863,11 @@ def get_kds_orders(client_id: str, context: SaasContext = Depends(verify_token),
     """
     orders = db.query(Db_Order_Entity).filter(
         Db_Order_Entity.client_id == str(client_id),
-        Db_Order_Entity.status.in_([OrderStatusEnum.pending, OrderStatusEnum.preparing, OrderStatusEnum.ready]),
+        Db_Order_Entity.status.in_([_status_label(context, s) or s.value for s in [OrderStatusEnum.pending, OrderStatusEnum.preparing, OrderStatusEnum.ready]]),
     ).order_by(Db_Order_Entity.created_at.asc()).all()
 
-    result = [_order_row_to_flat(order) for order in orders]
+    result = [{**_order_row_to_flat(order), "status_label": _status_label(context, order.status)}
+    for order in orders]
     return ResponseModel(screen_id=context.screen_id, data=result)
 
 @router.get("/dinein/customer-orders")
@@ -873,7 +878,7 @@ def get_customer_orders(
 ):
     orders = db.query(Db_Order_Entity).filter(
         Db_Order_Entity.customer_id == customer_id,
-        Db_Order_Entity.status != OrderStatusEnum.cancelled,
+        Db_Order_Entity.status != (_status_label(context, OrderStatusEnum.cancelled) or OrderStatusEnum.cancelled),
     ).all()
 
     groups = {}
@@ -883,6 +888,8 @@ def get_customer_orders(
         groups.setdefault(root, []).append(order)
 
     result = [_merge_group(group) for group in groups.values()]
+    for r in result:
+        r["status_label"] = _status_label(context, r.get("status"))
 
     return ResponseModel(
         screen_id=context.screen_id,
