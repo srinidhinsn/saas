@@ -5,6 +5,7 @@ import jsPDF from "jspdf";
 import CustomerAutocomplete from './CustomerAutocomplete';
 import { X, Save, Printer, CreditCard, CheckCircle } from 'lucide-react';
 import RazorpayPayment from "../../Constants/RazorPay/RazorpayPayment";
+import { useClient } from "../../../context/ClientContext";
 
 // ─────────────────────────────────────────────────────────────────────────────
 // REQ 2 helpers
@@ -87,6 +88,170 @@ const _isChildItem = (fkey) => {
   const k = fkey || '';
   return k.startsWith('cchild_') || k.startsWith('addon_');
 };
+
+// ─────────────────────────────────────────────────────────────────────────────
+// printBillSlip — thermal receipt-style print of the bill (mirrors printKOT)
+// Excludes customer details; includes client info, items, prices, tax, discount, total.
+// ─────────────────────────────────────────────────────────────────────────────
+
+const printBillSlip = ({
+  clientId,
+  gstNumber,
+  invoiceNumber,
+  tableName,
+  orderMode,
+  orderId,
+  items,           // parent items array: { name, quantity, unit_price }
+  addonsByParent,  // map: parentKey -> [{ name, quantity, unit_price }]
+  subtotal,
+  discount,
+  taxPercent,
+  gstAmount,
+  total,
+  paymentInfo,     // [{ method, amount }]
+  paymentStatus,
+}) => {
+  const now = new Date();
+  const timeStr = now.toLocaleTimeString([], { hour: '2-digit', minute: '2-digit' });
+  const dateStr = now.toLocaleDateString();
+  const restaurantAddress = localStorage.getItem('restaurant_address') || '';
+
+  const rows = items.map(item => {
+    const price = Number(item.unit_price) || 0;
+    const lineTotal = (price * item.quantity).toFixed(2);
+    const mainRow = `
+      <tr>
+        <td style="padding:4px 2px;border-bottom:1px dashed #ccc;font-size:13px;font-weight:bold;">
+          ${item.name}
+        </td>
+        <td style="padding:4px 2px;border-bottom:1px dashed #ccc;font-size:13px;text-align:center;font-weight:bold;">
+          ${item.quantity}
+        </td>
+        <td style="padding:4px 2px;border-bottom:1px dashed #ccc;font-size:12px;text-align:right;">
+          ₹${price.toFixed(2)}
+        </td>
+        <td style="padding:4px 2px;border-bottom:1px dashed #ccc;font-size:12px;text-align:right;font-weight:bold;">
+          ₹${lineTotal}
+        </td>
+      </tr>
+    `;
+    const addons = (addonsByParent[item.frontend_unique_key] || []);
+    const addonRows = addons.map(addon => {
+      const aPrice = Number(addon.unit_price) || 0;
+      const aTotal = (aPrice * addon.quantity).toFixed(2);
+      return `
+      <tr>
+        <td style="padding:2px 2px 2px 16px;border-bottom:1px dashed #eee;font-size:11px;color:#555;">
+          ↳ ${addon.name}
+        </td>
+        <td style="padding:2px 2px;border-bottom:1px dashed #eee;font-size:11px;text-align:center;color:#555;">
+          ${addon.quantity}
+        </td>
+        <td style="padding:2px 2px;border-bottom:1px dashed #eee;font-size:11px;text-align:right;color:#555;">
+          ₹${aPrice.toFixed(2)}
+        </td>
+        <td style="padding:2px 2px;border-bottom:1px dashed #eee;font-size:11px;text-align:right;color:#555;">
+          ₹${aTotal}
+        </td>
+      </tr>`;
+    }).join('');
+    return mainRow + addonRows;
+  }).join('');
+
+  const paymentRows = (paymentInfo || []).map(p => `
+    <div style="display:flex;justify-content:space-between;font-size:12px;">
+      <span>${p.method}</span>
+      <span>₹${Number(p.amount).toFixed(2)}</span>
+    </div>
+  `).join('');
+
+  const slipHtml = `
+    <div class="bill-slip">
+      <div style="text-align:center;border-bottom:2px solid #000;padding-bottom:6px;margin-bottom:8px;">
+        <div style="font-size:17px;font-weight:bold;letter-spacing:1px;">${clientId.toUpperCase()}</div>
+        ${restaurantAddress ? `<div style="font-size:10px;color:#555;margin-top:2px;">${restaurantAddress}</div>` : ''}
+        ${gstNumber ? `<div style="font-size:15px;font-weight:bold;color:#555;margin-top:2px;">GSTIN: ${gstNumber}</div>` : ''}
+        <div style="font-size:14px;font-weight:bold;margin-top:6px;">BILL</div>
+      </div>
+      <div style="display:flex;justify-content:space-between;font-size:13px;font-weight:bold;margin-bottom:4px;">
+        <span>${orderMode === 'takeaway' ? '🛍 Takeaway' : `Table: ${tableName}`}</span>
+        <span>${dateStr} ${timeStr}</span>
+      </div>
+      <div style="font-size:12px;font-weight:bold;margin-bottom:2px;color:#333;">
+        Order #${orderId}
+      </div>
+      <div style="font-size:11px;margin-bottom:6px;color:#555;">
+        Invoice: ${invoiceNumber || 'Draft'}
+      </div>
+      <table style="width:100%;border-collapse:collapse;">
+        <thead>
+          <tr style="border-bottom:2px solid #000;">
+            <th style="text-align:left;font-size:12px;padding:3px 2px;">Item</th>
+            <th style="text-align:center;font-size:12px;padding:3px 2px;">Qty</th>
+            <th style="text-align:right;font-size:12px;padding:3px 2px;">Price</th>
+            <th style="text-align:right;font-size:12px;padding:3px 2px;">Total</th>
+          </tr>
+        </thead>
+        <tbody>${rows}</tbody>
+      </table>
+
+      <div style="margin-top:10px;padding-top:6px;border-top:1px dashed #000;font-size:12px;">
+        <div style="display:flex;justify-content:space-between;">
+          <span>Subtotal</span><span>₹${subtotal.toFixed(2)}</span>
+        </div>
+        <div style="display:flex;justify-content:space-between;">
+          <span>Discount</span><span>-₹${discount.toFixed(2)}</span>
+        </div>
+        <div style="display:flex;justify-content:space-between;">
+          <span>GST (${taxPercent}%)</span><span>₹${gstAmount.toFixed(2)}</span>
+        </div>
+      </div>
+
+      <div style="display:flex;justify-content:space-between;margin-top:8px;padding-top:6px;border-top:2px solid #000;font-size:15px;font-weight:bold;">
+        <span>TOTAL</span>
+        <span>₹${total.toFixed(2)}</span>
+      </div>
+
+      <div style="margin-top:10px;padding-top:6px;border-top:1px dashed #000;font-size:11px;">
+        ${paymentRows}
+        <div style="display:flex;justify-content:space-between;font-weight:bold;margin-top:2px;">
+          <span>Status</span><span>${paymentStatus}</span>
+        </div>
+      </div>
+
+      <div style="text-align:center;margin-top:10px;font-size:11px;color:#888;">Thank you for your visit!</div>
+    </div>
+  `;
+
+  const printWindow = window.open('', '_blank', 'width=400,height=600');
+  if (!printWindow) {
+    toast.error('Popup blocked. Please allow popups to print the bill.');
+    return;
+  }
+  printWindow.document.write(`
+    <!DOCTYPE html><html><head><title>Bill</title>
+    <style>
+      * { margin: 0; padding: 0; box-sizing: border-box; }
+      @page { size: 80mm auto; margin: 0; }
+      body { font-family: 'Courier New', monospace; background: #fff; }
+      .bill-slip { width: 72mm; padding: 6px 8px; margin: 0 auto; }
+      @media print {
+        body { -webkit-print-color-adjust: exact; }
+        .bill-slip { page-break-inside: avoid; }
+      }
+    </style></head><body>
+    ${slipHtml}
+    <script>
+      window.onload = function() {
+        window.print();
+        window.onafterprint = function() { window.close(); };
+      };
+    <\/script>
+    </body></html>
+  `);
+  printWindow.document.close();
+};
+
 export default function InvoiceModal({
   clientId,
   token,
@@ -114,6 +279,8 @@ export default function InvoiceModal({
   const [gstManuallyEdited, setGstManuallyEdited] = useState(false);
   const [showRazorpayModal, setShowRazorpayModal] = useState(false);
   const [showPayConfirm, setShowPayConfirm] = useState(false); // REQ 2
+  const { clientDetails } = useClient();
+  const clientGstNumber = clientDetails?.gst_number || "";
 
   const safeNum = (num) => (typeof num === "number" && !isNaN(num) ? num : 0);
 
@@ -422,6 +589,7 @@ export default function InvoiceModal({
         document_type: "Invoice",
         document_date: new Date().toISOString(),
         order_id: selectedOrder.id.toString(),
+        gst_number: clientGstNumber,
         reference_number: tablesMap[selectedOrder.table_id]?.name || `Table ${selectedOrder.table_id}`,
         subtotal: orderSubtotal,
         tax_amount: calculatedGST,
@@ -664,6 +832,9 @@ export default function InvoiceModal({
       doc.setFont("helvetica", "normal");
       doc.setFontSize(9);
       doc.text(localStorage.getItem("restaurant_address") || "Address not available", 40, y + 15);
+      if (clientGstNumber) {
+        doc.text(`GSTIN: ${clientGstNumber}`, 40, y + 28); // NEW
+      }
 
       y += 50;
 
@@ -803,6 +974,41 @@ export default function InvoiceModal({
 
       doc.save(`Invoice_${currentInvoiceNumber}_${selectedOrder.id}.pdf`);
       toast.success("Invoice PDF downloaded successfully!");
+      const addonsByParent = {};
+(selectedOrder.items || []).forEach(item => {
+  if (_isChildItem(item.frontend_unique_key)) {
+    const parentKey = item.frontend_unique_key.split('_addon_')[1]?.split('_')[0]
+      || item.frontend_unique_key.replace('cchild_', '').split('_')[0];
+    // fallback: use parent_item_key if present on the item itself
+  }
+});
+
+// Simpler: reuse the same parent/addon split logic as the PDF loop
+const parentItemsForSlip = (selectedOrder.items || []).filter(i => !_isChildItem(i.frontend_unique_key));
+const addonsMapForSlip = {};
+parentItemsForSlip.forEach(item => {
+  addonsMapForSlip[item.frontend_unique_key] = (selectedOrder.items || []).filter(a =>
+    (a.frontend_unique_key || '').startsWith(`addon_${item.frontend_unique_key}_`)
+  );
+});
+
+printBillSlip({
+  clientId,
+  gstNumber: clientGstNumber,
+  invoiceNumber: currentInvoiceNumber,
+  tableName: tablesMap[selectedOrder.table_id]?.name || `Table ${selectedOrder.table_id}`,
+  orderMode: selectedOrder.mode || 'Dine-In',
+  orderId: selectedOrder.id,
+  items: parentItemsForSlip,
+  addonsByParent: addonsMapForSlip,
+  subtotal: orderSubtotal,
+  discount: calculatedDiscount,
+  taxPercent,
+  gstAmount: calculatedGST,
+  total,
+  paymentInfo: splitPaymentEnabled ? paymentSplits : [{ method, amount: total }],
+  paymentStatus,
+});
     } catch (err) {
       console.error("Error generating PDF:", err);
       toast.error("Failed to generate invoice PDF");

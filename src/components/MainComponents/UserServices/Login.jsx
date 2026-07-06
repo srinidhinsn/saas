@@ -60,13 +60,16 @@ export default function LoginPage({ onLoginSuccess ,clientId}) {
       const accessToken = data.data.access_token;
       const refreshToken = data.data.refresh_token;
       const screen_id = data.screen_id || "default_user";
+      const clientDetails = data.data.client || null;
+      console.log('Login successful:', { accessToken, refreshToken, screen_id, clientDetails });
       
       if (onLoginSuccess) {
         onLoginSuccess(
           accessToken,
           refreshToken,
           screen_id,
-          clientId
+          clientId,
+          clientDetails
         );
       }
 

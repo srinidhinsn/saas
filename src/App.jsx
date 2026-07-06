@@ -15,6 +15,7 @@ import { jwtDecode } from 'jwt-decode';
 import { setupAxiosInterceptors } from './components/utils/axiosConfig'
 import { menuCache } from './components/utils/Menu-utils/menuCache';
 import { NAV_TABS } from './components/Constants/Headers/Navtabs';
+import { useClient } from './context/ClientContext.jsx';
 
 const getVisibleNav = (token) => {
   try {
@@ -119,6 +120,7 @@ const FallbackPreserveClient = () => {
 
 // ─── Root App ─────────────────────────────────────────────────────────────────
 const App = () => {
+  const { setClientDetails } = useClient();
   const [checkingAuth, setCheckingAuth] = useState(true);
   const [authState, setAuthState] = useState(() => {
    const token= localStorage.getItem('access_token');
@@ -222,11 +224,17 @@ if (token) {
       setCheckingAuth(false);
     }
   }, []);
-  const handleLoginSuccess = (accessToken, refreshToken,screenId, clientId) => {
+
+  const handleLoginSuccess = (accessToken, refreshToken,screenId, clientId, clientDetails) => {
+    console.log("handleLoginSuccess received clientDetails:", clientDetails);
     localStorage.setItem('access_token', accessToken);
     localStorage.setItem("refresh_token", refreshToken);
     localStorage.setItem('screen_id', screenId || '');
     localStorage.setItem('client_id', clientId);
+
+    if (clientDetails) {
+      setClientDetails(clientDetails);
+    }
 
     setAuthState({
       token: accessToken,
