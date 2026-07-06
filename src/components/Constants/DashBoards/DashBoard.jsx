@@ -810,8 +810,48 @@ const latestCancellation =
   return (
     <>
       <style>{`
-        @import url('https://fonts.googleapis.com/css2?family=Plus+Jakarta+Sans:wght@400;500;600;700;800&display=swap');
-        .dash-root * { font-family: 'Plus Jakarta Sans', sans-serif !important; }
+        /* plus-jakarta-sans-regular - latin */
+@font-face {
+  font-display: swap;
+  font-family: 'Plus Jakarta Sans';
+  font-style: normal;
+  font-weight: 400;
+  src: url('/fonts/plus-jakarta-sans-v12-latin-regular.woff2') format('woff2');
+}
+/* plus-jakarta-sans-500 - latin */
+@font-face {
+  font-display: swap;
+  font-family: 'Plus Jakarta Sans';
+  font-style: normal;
+  font-weight: 500;
+  src: url('/fonts/plus-jakarta-sans-v12-latin-500.woff2') format('woff2');
+}
+/* plus-jakarta-sans-600 - latin */
+@font-face {
+  font-display: swap;
+  font-family: 'Plus Jakarta Sans';
+  font-style: normal;
+  font-weight: 600;
+  src: url('/fonts/plus-jakarta-sans-v12-latin-600.woff2') format('woff2');
+}
+/* plus-jakarta-sans-700 - latin */
+@font-face {
+  font-display: swap;
+  font-family: 'Plus Jakarta Sans';
+  font-style: normal;
+  font-weight: 700;
+  src: url('/fonts/plus-jakarta-sans-v12-latin-700.woff2') format('woff2');
+}
+/* plus-jakarta-sans-800 - latin */
+@font-face {
+  font-display: swap;
+  font-family: 'Plus Jakarta Sans';
+  font-style: normal;
+  font-weight: 800;
+  src: url('/fonts/plus-jakarta-sans-v12-latin-800.woff2') format('woff2');
+}
+
+.dash-root * { font-family: 'Plus Jakarta Sans', sans-serif !important; }
 
         @keyframes fadeUp {
           from { opacity:0; transform:translateY(14px); }
