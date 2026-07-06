@@ -61,7 +61,7 @@ async def login_user(client_id: str,userReq: LoginRequest,db: Session = Depends(
     result = login_user_service(client_id=client_id,username=userReq.username,password=userReq.password,db=db)
 
     return ResponseModel(screen_id=result["screen_id"],
-        data={"access_token": result["access_token"],"refresh_token": result["refresh_token"],"token_type": result["token_type"]})
+        data={"access_token": result["access_token"],"refresh_token": result["refresh_token"],"token_type": result["token_type"],"client_name": result["client_name"]})
 
 # ================== DELETE USER ==================
 @router.delete("/delete")
