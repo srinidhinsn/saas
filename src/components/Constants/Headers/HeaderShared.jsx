@@ -203,7 +203,6 @@ const HeaderShared = ({ onLogout, subscription = [] }) => {
   const [mobileOpen, setMobileOpen] = useState(false);
   const [darkMode, setDarkMode] = useState(false);
   const [profileOpen, setProfileOpen] = useState(false);
-  const [clientName, setClientName] = useState('');
 
   const subscribedSet = new Set(subscription);
   const visibleTabs = NAV_TABS.filter(tab => subscribedSet.has(tab.id));
@@ -270,24 +269,7 @@ const HeaderShared = ({ onLogout, subscription = [] }) => {
     );
   };
 
-  useEffect(() => {
-    if (!clientId) return;
-    const token = getValidToken();
-    if (!token) return;
-
-    axios
-      .get(
-        `${import.meta.env.VITE_API_USER_SERVICE_URL}/${clientId}/users/realm`,
-        { headers: { Authorization: `Bearer ${token}` } }
-      )
-      .then((res) => {
-        const clients = res.data?.data?.clients || [];
-        const match = clients.find((c) => c.id === clientId);
-        if (match?.name) setClientName(match.name);
-      })
-      .catch(() => {});
-  }, [clientId]);
-
+  const clientName = localStorage.getItem('client_name');
   const displayLabel = clientName || (clientId || 'APP').toUpperCase();
 
   return (
