@@ -162,7 +162,7 @@ def create_transaction(
         if tx_type_str in ["WASTAGE"]:
          if before <= 0:
            movement = "out"
-           after = before
+           after = before - qty
          else:
            movement = "OUT"
            after = before
@@ -181,7 +181,7 @@ def create_transaction(
         elif tx_type_str in ["ORDER_DEDUCTION", "STOCK_OUT", "CANCELLATION"]:
             if before <= 0:
              movement = "OUT"
-             after = before
+             after = before- qty
             else:
              movement = "OUT"
              after = before - qty
