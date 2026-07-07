@@ -2,7 +2,11 @@ from pydantic import BaseModel
 from typing import Optional, List
 import datetime
 from enum import Enum
+import os, re
+from dotenv import load_dotenv
+from functools import lru_cache
 
+load_dotenv()
 
 class OrderStatusEnum(str, Enum):
     draft = "draft"
@@ -13,6 +17,54 @@ class OrderStatusEnum(str, Enum):
     cancelled = "cancelled"
     completed = "completed"
 
+_BASE_STATUS_KEYS: List[str] = list(OrderStatusEnum.__members__)
+
+_REALM_ENV_PATTERN = re.compile(
+    r"^ORDERSTATUS_(.+)_(" + "|".join(k.upper() for k in _BASE_STATUS_KEYS) + r")$"
+) 
+
+@lru_cache(maxsize=None)
+def _discover_realms():
+    realms = set()
+    for env_key in os.environ:
+        m = _REALM_ENV_PATTERN.match(env_key)
+        if m:
+            realms.add(m.group(1).lower())
+    return frozenset(realms)
+
+@lru_cache(maxsize=None)
+def get_order_status_enum(realm):
+    realm_key = (realm or "").strip().upper()
+    prefix = f"ORDERSTATUS_{realm_key}_"
+
+    members = {
+        status_key: os.getenv(f"{prefix}{status_key.upper()}", status_key)
+        for status_key in _BASE_STATUS_KEYS
+    }
+    return Enum(f"OrderStatusEnum_{realm_key or 'DEFAULT'}", members, type=str)
+
+def resolve_realm_from_context(context):
+    known_realms = _discover_realms()
+    grants = getattr(context, "grants", None) or []
+    for g in grants:
+        if isinstance(g, str) and g.lower() in known_realms:
+            return g.lower()
+    return None
+
+def resolve_base_status(context, realm_status_value):
+    if realm_status_value is None:
+        return None
+    realm = resolve_realm_from_context(context)
+    if not realm:
+        return realm_status_value
+    try:
+        realm_enum = get_order_status_enum(realm)
+        for member in realm_enum:
+            if member.value == realm_status_value:
+                return member.name
+    except Exception:
+        pass
+    return realm_status_value
 
 class TransactionTypeEnum(str, Enum):
     order_deduction = "ORDER_DEDUCTION"
@@ -42,7 +94,7 @@ class OrderItemModel(BaseModel):
     quantity: Optional[int] = None
     unit_price: Optional[float] = None
     line_total: Optional[float] = None
-    status: Optional[OrderStatusEnum] = None
+    status: Optional[str] = None
     frontend_unique_key: Optional[str] = None
 
     class Config:
@@ -66,7 +118,7 @@ class DineinOrderModel(BaseModel):
     updated_by: Optional[str] = None
     created_at: Optional[datetime.datetime] = None
     updated_at: Optional[datetime.datetime] = None
-    status: Optional[OrderStatusEnum] = None
+    status: Optional[str] = None
     items: Optional[List[OrderItemModel]] = []
     customer_id: Optional[str] = None
     delivery_address: Optional[str] = None
