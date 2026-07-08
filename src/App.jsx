@@ -226,16 +226,15 @@ if (token) {
     }
   }, []);
 
-  const handleLoginSuccess = (accessToken, refreshToken,screenId, clientId, clientDetails) => {
-    console.log("handleLoginSuccess received clientDetails:", clientDetails);
+  const handleLoginSuccess = (accessToken, refreshToken,screenId, clientId, client) => {
     localStorage.setItem('access_token', accessToken);
     localStorage.setItem("refresh_token", refreshToken);
     localStorage.setItem('screen_id', screenId || '');
     localStorage.setItem('client_id', clientId);
     localStorage.setItem('client', JSON.stringify(client || {}));
 
-    if (clientDetails) {
-      setClientDetails(clientDetails);
+    if (client) {
+      setClientDetails(client);
     }
 
     setAuthState({
