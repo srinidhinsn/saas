@@ -16,6 +16,7 @@ import { setupAxiosInterceptors } from './components/utils/axiosConfig'
 import { menuCache } from './components/utils/Menu-utils/menuCache';
 import { NAV_TABS } from './components/Constants/Headers/Navtabs';
 import { useClient } from './context/ClientContext.jsx';
+import RegisterPage from './components/MainComponents/UserServices/ClientRegister/Register';
 
 const getVisibleNav = (token) => {
   try {
@@ -231,6 +232,7 @@ if (token) {
     localStorage.setItem("refresh_token", refreshToken);
     localStorage.setItem('screen_id', screenId || '');
     localStorage.setItem('client_id', clientId);
+    localStorage.setItem('client', JSON.stringify(client || {}));
 
     if (clientDetails) {
       setClientDetails(clientDetails);
@@ -252,6 +254,7 @@ if (token) {
     localStorage.removeItem("refresh_token");
     localStorage.removeItem("selected_client_id");
     localStorage.removeItem('menu_selected_category'); 
+    localStorage.removeItem('client');   
     setAuthState(prev => ({
       token: null,
       screenId: null,
@@ -280,7 +283,7 @@ if (token) {
             }
           />
 
-          <Route path="/saas/:clientId/register" element={<div className="p-8">Register (placeholder)</div>} />
+          <Route path="/saas/:clientId/register" element={<RegisterPage/>} />
           <Route path="/saas/:clientId/forgot" element={<div className="p-8">Forgot Password (placeholder)</div>} />
           <Route path="/saas/:clientId/reset" element={<div className="p-8">Reset Password (placeholder)</div>} />
 

@@ -24,7 +24,7 @@ export default function LoginPage({ onLoginSuccess ,clientId}) {
   const [forgotError, setForgotError] = useState('');
   const [forgotLoading, setForgotLoading] = useState(false);
   const [showAnimation, setShowAnimation] = useState(false);
-  const navigate = useNavigate();
+  const nav = useNavigate();
   const handleChange = (e) => {
     const { name, value } = e.target;
     setForm((prev) => ({ ...prev, [name]: value }));
@@ -60,8 +60,7 @@ export default function LoginPage({ onLoginSuccess ,clientId}) {
       const accessToken = data.data.access_token;
       const refreshToken = data.data.refresh_token;
       const screen_id = data.screen_id || "default_user";
-      const clientDetails = data.data.client || null;
-      console.log('Login successful:', { accessToken, refreshToken, screen_id, clientDetails });
+      const client = data.data.client;
       
       if (onLoginSuccess) {
         onLoginSuccess(
@@ -69,7 +68,7 @@ export default function LoginPage({ onLoginSuccess ,clientId}) {
           refreshToken,
           screen_id,
           clientId,
-          clientDetails
+          client
         );
       }
 
@@ -127,7 +126,9 @@ export default function LoginPage({ onLoginSuccess ,clientId}) {
       setForgotLoading(false);
     }
   };
-
+function navigation(){
+   nav(`/saas/${clientId}/register`);
+}
   const handleResetPassword = async (e) => {
     e.preventDefault();
     setForgotError('');
@@ -332,7 +333,16 @@ export default function LoginPage({ onLoginSuccess ,clientId}) {
             </div>
 
             {/* Forgot Password Link */}
-            <div className="flex items-center justify-end">
+            <div className="flex items-center justify-between">
+              <span
+                onClick={() => navigation()}
+                className="text-sm cursor-pointer transition-colors font-medium"
+                style={{ color: '#f97316' }}
+                onMouseOver={(e) => e.target.style.textDecoration = 'underline'}
+                onMouseOut={(e) => e.target.style.textDecoration = 'none'}
+              >
+                Register here...
+              </span>
               <span
                 onClick={() => setShowForgot(true)}
                 className="text-sm cursor-pointer transition-colors font-medium"
