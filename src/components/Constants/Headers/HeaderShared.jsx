@@ -269,8 +269,8 @@ const HeaderShared = ({ onLogout, subscription = [] }) => {
     );
   };
 
-  const clientName = localStorage.getItem('client_name');
-  const displayLabel = clientName || (clientId || 'APP').toUpperCase();
+  const clientData = JSON.parse(localStorage.getItem('client') || 'null');
+  const displayLabel = clientData?.name || (clientId || 'APP').toUpperCase();
 
   return (
     <header className="shadow-md sticky top-0 z-50 bg-bg-primary dark:bg-bg-primary-dark border-b border-border-default dark:border-border-default-dark transition-colors duration-300">

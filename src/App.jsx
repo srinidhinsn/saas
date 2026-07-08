@@ -223,12 +223,12 @@ if (token) {
       setCheckingAuth(false);
     }
   }, []);
-  const handleLoginSuccess = (accessToken, refreshToken,screenId, clientId, clientName) => {
+  const handleLoginSuccess = (accessToken, refreshToken,screenId, clientId, client) => {
     localStorage.setItem('access_token', accessToken);
     localStorage.setItem("refresh_token", refreshToken);
     localStorage.setItem('screen_id', screenId || '');
     localStorage.setItem('client_id', clientId);
-    localStorage.setItem('client_name', clientName || '');
+    localStorage.setItem('client', JSON.stringify(client || {}));
 
     setAuthState({
       token: accessToken,
@@ -246,7 +246,7 @@ if (token) {
     localStorage.removeItem("refresh_token");
     localStorage.removeItem("selected_client_id");
     localStorage.removeItem('menu_selected_category'); 
-    localStorage.removeItem('client_name');   
+    localStorage.removeItem('client');   
     setAuthState(prev => ({
       token: null,
       screenId: null,

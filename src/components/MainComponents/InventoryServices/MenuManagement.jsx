@@ -1339,7 +1339,7 @@ return suffixParts.length > 0 ? `${base}__${suffixParts.join('+')}` : base;
         
             // Does this code collide with ANOTHER row in the same file?
             const otherRowsWithSameCode = parsedData.filter(
-              r => r !== row && String(r.Code ?? '').trim() === rowCode && r.Name?.trim().toLowerCase() !== row.Name?.trim().toLowerCase()
+              r => r !== row && String(r.Code ?? '').trim() === rowCode
             );
             if (otherRowsWithSameCode.length > 0) {
               if (!duplicateCodeMap.has(rowCode)) duplicateCodeMap.set(rowCode, new Set());
@@ -1351,7 +1351,7 @@ return suffixParts.length > 0 ? `${base}__${suffixParts.join('+')}` : base;
         const invalidCodeDetails = Array.from(duplicateCodeMap.entries()).map(
           ([code, names]) => `${code} → ${Array.from(names).join(', ')}`
         );
-        if (invalidDietarySet.size > 0 || invalidTimingSet.size > 0 || invalidCodeDetails.length > 0) {
+        if (invalidDietarySet.size > 0 || invalidCategorySet.size > 0 ||invalidTimingSet.size > 0 || invalidCodeDetails.length > 0) {
           setImportValidationModal({
             invalidCategory: [...invalidCategorySet],
             invalidDietary: [...invalidDietarySet],
@@ -1674,7 +1674,6 @@ return suffixParts.length > 0 ? `${base}__${suffixParts.join('+')}` : base;
               </div>
               <div>
                 <h3 className="text-base font-semibold text-yellow-900">Invalid values detected</h3>
-                <p className="text-xs text-yellow-700 mt-0.5">Some values in your file don't match existing categories</p>
               </div>
             </div>
 
@@ -1716,9 +1715,7 @@ return suffixParts.length > 0 ? `${base}__${suffixParts.join('+')}` : base;
            ))}
         </div>
           <p className="text-xs text-text-secondary leading-relaxed">
-      Two or more items share the same code. Item codes must be unique — please
-      go back to your file and change the duplicated codes, or leave the code
-      blank and identify those items by name instead.
+      Two or more items share the same code. Item codes must be unique .
           </p>
         </div>
       )}
@@ -1770,15 +1767,6 @@ return suffixParts.length > 0 ? `${base}__${suffixParts.join('+')}` : base;
                 </div>
               )}
 
-              {/* ── FOOTER NOTE ── */}
-              <div className="pt-1 border-t border-border-default">
-                <p className="text-xs text-text-secondary leading-relaxed">
-                  {importValidationModal.invalidCategory?.length > 0
-                    ? <>Items with <strong className="text-text-primary">missing categories will always be skipped</strong> even if you proceed. Fix those categories first for a clean import.</>
-                    : <>Clicking <strong className="text-text-primary">Import anyway</strong> will use the raw values as-is. Go to <strong className="text-text-primary">Config</strong> to create missing categories first.</>
-                  }
-                </p>
-              </div>
             </div>
 
             {/* Footer buttons */}
@@ -1790,35 +1778,39 @@ return suffixParts.length > 0 ? `${base}__${suffixParts.join('+')}` : base;
                 }}
                 className="flex-1 h-9 rounded-lg border border-border-default text-sm font-semibold bg-bg-tertiary hover:bg-bg-secondary transition-colors"
               >
-                Cancel
+                OK
               </button>
-              <button
-                onClick={async () => {
-                  const ctx = importValidationModal;
-                  setImportValidationModal(null);
-                  try {
-                    await runImport({
-                      parsedData: ctx.parsedData,
-                      priceColumns: ctx.priceColumns,
-                      allMenuItems: ctx.allMenuItems,
-                      created_by: ctx.created_by,
-                      updated_by: ctx.updated_by,
-                      currentCategoriesFlat: ctx.currentCategoriesFlat,
-                      currentSelectedCategoryId: ctx.currentSelectedCategoryId,
-                      currentSections: ctx.currentSections,
-                    });
-                  } catch (err) {
-                    console.error("Import Error:", err);
-                    setImportError(err.message || "Something went wrong during import.");
-                    setTimeout(() => setImportError(null), 4000);
-                  }
-                  if (ctx.fileEvent) ctx.fileEvent.target.value = "";
-                }}
-                disabled={importValidationModal.invalidCode?.length > 0}
-                className="flex-1 h-9 rounded-lg border border-yellow-400 text-sm font-semibold bg-yellow-50 text-yellow-900 hover:bg-yellow-100 transition-colors"
-              >
-                 {importValidationModal.invalidCode?.length > 0 ? "Fix duplicates to continue" : "Import anyway"}
-              </button>
+              {(!importValidationModal.invalidCode || importValidationModal.invalidCode.length === 0) && (
+    <button
+      onClick={async () => {
+        const {
+          parsedData, priceColumns, allMenuItems,
+          created_by, updated_by,
+          currentCategoriesFlat, currentSelectedCategoryId, currentSections,
+          fileEvent,
+        } = importValidationModal;
+
+        setImportValidationModal(null);
+
+        try {
+          await runImport({
+            parsedData, priceColumns, allMenuItems,
+            created_by, updated_by,
+            currentCategoriesFlat, currentSelectedCategoryId, currentSections,
+          });
+        } catch (err) {
+          console.error("Import Error:", err);
+          setImportError(err.message || "Something went wrong during import.");
+          setTimeout(() => setImportError(null), 4000);
+        }
+
+        if (fileEvent) fileEvent.target.value = "";
+      }}
+      className="flex-1 h-9 rounded-lg bg-action-primary text-text-white text-sm font-semibold hover:opacity-90 transition-opacity"
+    >
+      Import Anyway
+    </button>
+  )}
             </div>
 
           </div>

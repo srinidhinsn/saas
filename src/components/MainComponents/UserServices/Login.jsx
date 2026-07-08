@@ -60,7 +60,7 @@ export default function LoginPage({ onLoginSuccess ,clientId}) {
       const accessToken = data.data.access_token;
       const refreshToken = data.data.refresh_token;
       const screen_id = data.screen_id || "default_user";
-      const clientName = data.data.client_name;
+      const client = data.data.client;
       
       if (onLoginSuccess) {
         onLoginSuccess(
@@ -68,7 +68,7 @@ export default function LoginPage({ onLoginSuccess ,clientId}) {
           refreshToken,
           screen_id,
           clientId,
-          clientName
+          client
         );
       }
 
