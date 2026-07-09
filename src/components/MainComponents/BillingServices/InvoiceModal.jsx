@@ -90,11 +90,16 @@ const _isChildItem = (fkey) => {
 };
 
 // ─────────────────────────────────────────────────────────────────────────────
-// printBillSlip — thermal receipt-style print of the bill (mirrors printKOT)
-// Excludes customer details; includes client info, items, prices, tax, discount, total.
+// generateInvoiceOutput — REQ 2: single generator for both the PDF invoice and
+// the thermal bill slip. Everything (items, addons, subtotal, discount, tax,
+// total, payment info) is common between the two; the only real difference is
+// that customer details (customerId, contactPhone, contactEmail) are only
+// shown when type === 'pdf'. The output mechanism (jsPDF download vs a print
+// window) is chosen based on `type` as well.
 // ─────────────────────────────────────────────────────────────────────────────
 
-const printBillSlip = ({
+const generateInvoiceOutput = ({
+  type,            // 'pdf' | 'slip'
   clientId,
   gstNumber,
   invoiceNumber,
@@ -110,7 +115,187 @@ const printBillSlip = ({
   total,
   paymentInfo,     // [{ method, amount }]
   paymentStatus,
+  customerId,      // only used when type === 'pdf'
+  contactPhone,    // only used when type === 'pdf'
+  contactEmail,    // only used when type === 'pdf'
 }) => {
+  if (type === 'pdf') {
+    const doc = new jsPDF({ unit: "pt", format: "a4" });
+    const pageWidth = doc.internal.pageSize.width;
+    const pageHeight = doc.internal.pageSize.height;
+    const x = 40;
+    let y = 50;
+
+    doc.setFillColor(102, 126, 234);
+    doc.rect(0, 0, pageWidth, 120, 'F');
+
+    doc.setFont("helvetica", "bold");
+    doc.setFontSize(26);
+
+    doc.setTextColor(255, 255, 255);
+    doc.text(clientId.toUpperCase(), x, y);
+
+    doc.setFontSize(18);
+    doc.text("INVOICE", x, y + 30);
+
+    doc.setFontSize(11);
+    doc.setFont("helvetica", "normal");
+    doc.text(`Invoice No: ${invoiceNumber}`, pageWidth - x, y, { align: "right" });
+    doc.text(`Date: ${new Date().toLocaleDateString()}`, pageWidth - x, y + 20, { align: "right" });
+    doc.text(`Time: ${new Date().toLocaleTimeString([], { hour: "2-digit", minute: "2-digit" })}`, pageWidth - x, y + 35, { align: "right" });
+
+    y = 140;
+    doc.setTextColor(0, 0, 0);
+    doc.setFont("helvetica", "bold");
+    doc.setFontSize(10);
+    doc.text("FROM", x, y);
+    doc.setFont("helvetica", "normal");
+    doc.setFontSize(9);
+    doc.text(localStorage.getItem("restaurant_address") || "Address not available", x, y + 15);
+    if (gstNumber) {
+      doc.text(`GSTIN: ${gstNumber}`, x, y + 28); // NEW
+    }
+
+    y += 50;
+
+    doc.setDrawColor(200, 200, 200);
+    doc.setLineWidth(1);
+    doc.line(x, y, pageWidth - x, y);
+
+    y += 25;
+
+    // Customer details — PDF only, the thermal slip skips this block entirely
+    doc.setFont("helvetica", "bold");
+    doc.setFontSize(10);
+    doc.text("BILL TO", x, y);
+    doc.setFont("helvetica", "normal");
+    doc.setFontSize(9);
+    doc.text(`Customer: ${customerId || "Walk-in Customer"}`, x, y + 18);
+    doc.text(`Phone: ${contactPhone || "N/A"}`, x, y + 32);
+    doc.text(`Email: ${contactEmail || "N/A"}`, x, y + 46);
+
+    doc.setFont("helvetica", "bold");
+    doc.text("ORDER DETAILS", pageWidth - 180, y);
+    doc.setFont("helvetica", "normal");
+    doc.text(`Table: ${tableName || "N/A"}`, pageWidth - 180, y + 18);
+    doc.text(`Type: ${orderMode || "Dine-In"}`, pageWidth - 180, y + 32);
+    doc.text(`Order #${orderId}`, pageWidth - 180, y + 46);
+
+    y += 70;
+
+    doc.setFillColor(248, 250, 252);
+    doc.rect(x, y - 5, pageWidth - 80, 25, 'F');
+
+    doc.setFont("helvetica", "bold");
+    doc.setFontSize(10);
+    doc.setTextColor(30, 41, 59);
+    doc.text("ITEM", 45, y + 10);
+    doc.text("QTY", pageWidth - 260, y + 10);
+    doc.text("PRICE", pageWidth - 180, y + 10);
+    doc.text("AMOUNT", pageWidth - 80, y + 10);
+
+    y += 30;
+    doc.setFont("helvetica", "normal");
+    doc.setFontSize(9);
+    doc.setTextColor(0, 0, 0);
+
+    items.forEach((item, index) => {
+      if (y > pageHeight - 150) { doc.addPage(); y = 50; }
+      if (index % 2 === 0) {
+        doc.setFillColor(249, 250, 251);
+        doc.rect(x, y - 8, pageWidth - 80, 20, 'F');
+      }
+      doc.text(item.name || "Unnamed", 45, y);
+      doc.text(`${item.quantity || 0}`, pageWidth - 260, y);
+      doc.text(`₹${(item.unit_price ?? 0).toFixed(2)}`, pageWidth - 180, y);
+      doc.text(`₹${((item.unit_price ?? 0) * (item.quantity ?? 0)).toFixed(2)}`, pageWidth - 80, y);
+      y += 20;
+
+      // Print addons indented below
+      const addons = addonsByParent[item.frontend_unique_key] || [];
+      addons.forEach(addon => {
+        doc.setTextColor(100, 100, 200);
+        doc.text(`  ↳ ${addon.name}`, 55, y);
+        doc.text(`${addon.quantity || 0}`, pageWidth - 260, y);
+        doc.text(`₹${(addon.unit_price ?? 0).toFixed(2)}`, pageWidth - 180, y);
+        doc.text(`+₹${((addon.unit_price ?? 0) * (addon.quantity ?? 0)).toFixed(2)}`, pageWidth - 80, y);
+        y += 16;
+        doc.setTextColor(0, 0, 0);
+      });
+    });
+
+    y += 15;
+    doc.setDrawColor(200, 200, 200);
+    doc.line(x, y, pageWidth - x, y);
+    y += 20;
+
+    doc.setFont("helvetica", "normal");
+    doc.setFontSize(10);
+    doc.text("Subtotal:", pageWidth - 200, y);
+    doc.text(`₹${subtotal.toFixed(2)}`, pageWidth - 80, y, { align: "right" });
+    y += 18;
+
+    doc.text("Discount:", pageWidth - 200, y);
+    doc.setTextColor(239, 68, 68);
+    doc.text(`-₹${discount.toFixed(2)}`, pageWidth - 80, y, { align: "right" });
+    y += 18;
+
+    doc.setTextColor(0, 0, 0);
+    doc.text(`GST (${taxPercent}%):`, pageWidth - 200, y);
+    doc.text(`₹${gstAmount.toFixed(2)}`, pageWidth - 80, y, { align: "right" });
+    y += 25;
+
+    doc.setFillColor(239, 246, 255);
+    doc.rect(pageWidth - 220, y - 12, 180, 30, 'F');
+    doc.setFont("helvetica", "bold");
+    doc.setFontSize(14);
+    doc.setTextColor(59, 130, 246);
+    doc.text("TOTAL:", pageWidth - 200, y);
+    doc.text(`₹${total.toFixed(2)}`, pageWidth - 80, y, { align: "right" });
+
+    y += 40;
+    doc.setTextColor(0, 0, 0);
+    doc.setFont("helvetica", "bold");
+    doc.setFontSize(10);
+    doc.text("PAYMENT INFORMATION", x, y);
+    y += 18;
+
+    doc.setFont("helvetica", "normal");
+    doc.setFontSize(9);
+
+    if (paymentInfo.length > 1) {
+      paymentInfo.forEach((split, idx) => {
+        doc.text(`${idx + 1}. ${split.method}:`, 45, y);
+        doc.text(`₹${Number(split.amount).toFixed(2)}`, 200, y);
+        y += 15;
+      });
+    } else {
+      const paymentMethod = paymentInfo[0]?.method;
+      const paymentAmount = paymentInfo[0]?.amount ?? total;
+      doc.text(`Payment Method: ${paymentMethod}`, 45, y);
+      y += 15;
+      doc.text(`Amount Paid: ₹${Number(paymentAmount).toFixed(2)}`, 45, y);
+      y += 15;
+    }
+
+    doc.text(`Payment Status: ${paymentStatus}`, 45, y);
+    y += 30;
+
+    doc.setDrawColor(200, 200, 200);
+    doc.line(x, pageHeight - 80, pageWidth - x, pageHeight - 80);
+    doc.setFont("helvetica", "italic");
+    doc.setFontSize(10);
+    doc.setTextColor(100, 116, 139);
+    doc.text("Thank you for your business!", pageWidth / 2, pageHeight - 50, { align: "center" });
+    doc.setFontSize(8);
+    doc.text(`Generated on ${new Date().toLocaleString()}`, pageWidth / 2, pageHeight - 35, { align: "center" });
+
+    doc.save(`Invoice_${invoiceNumber}_${orderId}.pdf`);
+    return;
+  }
+
+  // type === 'slip': thermal receipt-style print of the bill (mirrors printKOT)
+  // Excludes customer details; includes client info, items, prices, tax, discount, total.
   const now = new Date();
   const timeStr = now.toLocaleTimeString([], { hour: '2-digit', minute: '2-digit' });
   const dateStr = now.toLocaleDateString();
@@ -794,214 +979,50 @@ if (selectedOrder.contact_phone || selectedOrder.contact_email || selectedOrder.
     }
 
     try {
-      const doc = new jsPDF({ unit: "pt", format: "a4" });
-      const pageWidth = doc.internal.pageSize.width;
-      const pageHeight = doc.internal.pageSize.height;
-      let y = 50;
-
-      doc.setFillColor(102, 126, 234);
-      doc.rect(0, 0, pageWidth, 120, 'F');
-
-      doc.setFont("helvetica", "bold");
-      doc.setFontSize(26);
-
-      doc.setTextColor(255, 255, 255);
-      doc.text(clientId.toUpperCase(), 40, y);
-
-      doc.setFontSize(18);
-      doc.text("INVOICE", 40, y + 30);
-
-      doc.setFontSize(11);
-      doc.setFont("helvetica", "normal");
-      doc.text(`Invoice No: ${currentInvoiceNumber}`, pageWidth - 40, y, { align: "right" });
-      doc.text(`Date: ${new Date().toLocaleDateString()}`, pageWidth - 40, y + 20, { align: "right" });
-      doc.text(`Time: ${new Date().toLocaleTimeString([], { hour: "2-digit", minute: "2-digit" })}`, pageWidth - 40, y + 35, { align: "right" });
-
-      y = 140;
-      doc.setTextColor(0, 0, 0);
-      doc.setFont("helvetica", "bold");
-      doc.setFontSize(10);
-      doc.text("FROM", 40, y);
-      doc.setFont("helvetica", "normal");
-      doc.setFontSize(9);
-      doc.text(localStorage.getItem("restaurant_address") || "Address not available", 40, y + 15);
-      if (clientGstNumber) {
-        doc.text(`GSTIN: ${clientGstNumber}`, 40, y + 28); // NEW
-      }
-
-      y += 50;
-
-      doc.setDrawColor(200, 200, 200);
-      doc.setLineWidth(1);
-      doc.line(40, y, pageWidth - 40, y);
-
-      y += 25;
-
-      doc.setFont("helvetica", "bold");
-      doc.setFontSize(10);
-      doc.text("BILL TO", 40, y);
-      doc.setFont("helvetica", "normal");
-      doc.setFontSize(9);
-      doc.text(`Customer: ${selectedOrder.customer_id || "Walk-in Customer"}`, 40, y + 18);
-      doc.text(`Phone: ${selectedOrder.contact_phone || "N/A"}`, 40, y + 32);
-      doc.text(`Email: ${selectedOrder.contact_email || "N/A"}`, 40, y + 46);
-
-      doc.setFont("helvetica", "bold");
-      doc.text("ORDER DETAILS", pageWidth - 180, y);
-      doc.setFont("helvetica", "normal");
-      doc.text(`Table: ${tablesMap[selectedOrder.table_id]?.name || "N/A"}`, pageWidth - 180, y + 18);
-      doc.text(`Type: ${selectedOrder.mode || "Dine-In"}`, pageWidth - 180, y + 32);
-      doc.text(`Order #${selectedOrder.id}`, pageWidth - 180, y + 46);
-
-      y += 70;
-
-      doc.setFillColor(248, 250, 252);
-      doc.rect(40, y - 5, pageWidth - 80, 25, 'F');
-
-      doc.setFont("helvetica", "bold");
-      doc.setFontSize(10);
-      doc.setTextColor(30, 41, 59);
-      doc.text("ITEM", 45, y + 10);
-      doc.text("QTY", pageWidth - 260, y + 10);
-      doc.text("PRICE", pageWidth - 180, y + 10);
-      doc.text("AMOUNT", pageWidth - 80, y + 10);
-
-      y += 30;
-      doc.setFont("helvetica", "normal");
-      doc.setFontSize(9);
-      doc.setTextColor(0, 0, 0);
-
-      const parentItems = (selectedOrder.items || []).filter(i => !_isChildItem(i.frontend_unique_key));
-      parentItems.forEach((item, index) => {
-        if (y > pageHeight - 150) { doc.addPage(); y = 50; }
-        if (index % 2 === 0) {
-          doc.setFillColor(249, 250, 251);
-          doc.rect(40, y - 8, pageWidth - 80, 20, 'F');
-        }
-        doc.text(item.name || "Unnamed", 45, y);
-        doc.text(`${item.quantity || 0}`, pageWidth - 260, y);
-        doc.text(`₹${(item.unit_price ?? 0).toFixed(2)}`, pageWidth - 180, y);
-        doc.text(`₹${((item.unit_price ?? 0) * (item.quantity ?? 0)).toFixed(2)}`, pageWidth - 80, y);
-        y += 20;
-
-        // Print addons indented below
-        const addons = (selectedOrder.items || []).filter(a =>
+      // REQ 2: everything below is common data shared by both the PDF and the
+      // slip — only the customer fields differ, and those are only passed to
+      // the 'pdf' call further down.
+      const parentItemsForPrint = (selectedOrder.items || []).filter(i => !_isChildItem(i.frontend_unique_key));
+      const addonsMapForPrint = {};
+      parentItemsForPrint.forEach(item => {
+        addonsMapForPrint[item.frontend_unique_key] = (selectedOrder.items || []).filter(a =>
           (a.frontend_unique_key || '').startsWith(`addon_${item.frontend_unique_key}_`)
         );
-        addons.forEach(addon => {
-          doc.setTextColor(100, 100, 200);
-          doc.text(`  ↳ ${addon.name}`, 55, y);
-          doc.text(`${addon.quantity || 0}`, pageWidth - 260, y);
-          doc.text(`₹${(addon.unit_price ?? 0).toFixed(2)}`, pageWidth - 180, y);
-          doc.text(`+₹${((addon.unit_price ?? 0) * (addon.quantity ?? 0)).toFixed(2)}`, pageWidth - 80, y);
-          y += 16;
-          doc.setTextColor(0, 0, 0);
-        });
       });
 
-      y += 15;
-      doc.setDrawColor(200, 200, 200);
-      doc.line(40, y, pageWidth - 40, y);
-      y += 20;
+      const sharedPrintData = {
+        clientId,
+        gstNumber: clientGstNumber,
+        invoiceNumber: currentInvoiceNumber,
+        tableName: tablesMap[selectedOrder.table_id]?.name || `Table ${selectedOrder.table_id}`,
+        orderMode: selectedOrder.mode || 'Dine-In',
+        orderId: selectedOrder.id,
+        items: parentItemsForPrint,
+        addonsByParent: addonsMapForPrint,
+        subtotal: orderSubtotal,
+        discount: calculatedDiscount,
+        taxPercent,
+        gstAmount: calculatedGST,
+        total,
+        paymentInfo: splitPaymentEnabled ? paymentSplits : [{ method, amount: total }],
+        paymentStatus,
+      };
 
-      doc.setFont("helvetica", "normal");
-      doc.setFontSize(10);
-      doc.text("Subtotal:", pageWidth - 200, y);
-      doc.text(`₹${orderSubtotal.toFixed(2)}`, pageWidth - 80, y, { align: "right" });
-      y += 18;
-
-      doc.text("Discount:", pageWidth - 200, y);
-      doc.setTextColor(239, 68, 68);
-      doc.text(`-₹${calculatedDiscount.toFixed(2)}`, pageWidth - 80, y, { align: "right" });
-      y += 18;
-
-      doc.setTextColor(0, 0, 0);
-      doc.text(`GST (${taxPercent}%):`, pageWidth - 200, y);
-      doc.text(`₹${calculatedGST.toFixed(2)}`, pageWidth - 80, y, { align: "right" });
-      y += 25;
-
-      doc.setFillColor(239, 246, 255);
-      doc.rect(pageWidth - 220, y - 12, 180, 30, 'F');
-      doc.setFont("helvetica", "bold");
-      doc.setFontSize(14);
-      doc.setTextColor(59, 130, 246);
-      doc.text("TOTAL:", pageWidth - 200, y);
-      doc.text(`₹${total.toFixed(2)}`, pageWidth - 80, y, { align: "right" });
-
-      y += 40;
-      doc.setTextColor(0, 0, 0);
-      doc.setFont("helvetica", "bold");
-      doc.setFontSize(10);
-      doc.text("PAYMENT INFORMATION", 40, y);
-      y += 18;
-
-      doc.setFont("helvetica", "normal");
-      doc.setFontSize(9);
-
-      if (splitPaymentEnabled && paymentSplits.length > 1) {
-        paymentSplits.forEach((split, idx) => {
-          doc.text(`${idx + 1}. ${split.method}:`, 45, y);
-          doc.text(`₹${Number(split.amount).toFixed(2)}`, 200, y);
-          y += 15;
-        });
-      } else {
-        const paymentMethod = splitPaymentEnabled && paymentSplits.length > 0 ? paymentSplits[0].method : method;
-        const paymentAmount = splitPaymentEnabled && paymentSplits.length > 0 ? paymentSplits[0].amount : total;
-        doc.text(`Payment Method: ${paymentMethod}`, 45, y);
-        y += 15;
-        doc.text(`Amount Paid: ₹${Number(paymentAmount).toFixed(2)}`, 45, y);
-        y += 15;
-      }
-
-      doc.text(`Payment Status: ${paymentStatus}`, 45, y);
-      y += 30;
-
-      doc.setDrawColor(200, 200, 200);
-      doc.line(40, pageHeight - 80, pageWidth - 40, pageHeight - 80);
-      doc.setFont("helvetica", "italic");
-      doc.setFontSize(10);
-      doc.setTextColor(100, 116, 139);
-      doc.text("Thank you for your business!", pageWidth / 2, pageHeight - 50, { align: "center" });
-      doc.setFontSize(8);
-      doc.text(`Generated on ${new Date().toLocaleString()}`, pageWidth / 2, pageHeight - 35, { align: "center" });
-
-      doc.save(`Invoice_${currentInvoiceNumber}_${selectedOrder.id}.pdf`);
+      // PDF copy — includes customer details
+      generateInvoiceOutput({
+        type: 'pdf',
+        ...sharedPrintData,
+        customerId: selectedOrder.customer_id,
+        contactPhone: selectedOrder.contact_phone,
+        contactEmail: selectedOrder.contact_email,
+      });
       toast.success("Invoice PDF downloaded successfully!");
-      const addonsByParent = {};
-(selectedOrder.items || []).forEach(item => {
-  if (_isChildItem(item.frontend_unique_key)) {
-    const parentKey = item.frontend_unique_key.split('_addon_')[1]?.split('_')[0]
-      || item.frontend_unique_key.replace('cchild_', '').split('_')[0];
-    // fallback: use parent_item_key if present on the item itself
-  }
-});
 
-// Simpler: reuse the same parent/addon split logic as the PDF loop
-const parentItemsForSlip = (selectedOrder.items || []).filter(i => !_isChildItem(i.frontend_unique_key));
-const addonsMapForSlip = {};
-parentItemsForSlip.forEach(item => {
-  addonsMapForSlip[item.frontend_unique_key] = (selectedOrder.items || []).filter(a =>
-    (a.frontend_unique_key || '').startsWith(`addon_${item.frontend_unique_key}_`)
-  );
-});
-
-printBillSlip({
-  clientId,
-  gstNumber: clientGstNumber,
-  invoiceNumber: currentInvoiceNumber,
-  tableName: tablesMap[selectedOrder.table_id]?.name || `Table ${selectedOrder.table_id}`,
-  orderMode: selectedOrder.mode || 'Dine-In',
-  orderId: selectedOrder.id,
-  items: parentItemsForSlip,
-  addonsByParent: addonsMapForSlip,
-  subtotal: orderSubtotal,
-  discount: calculatedDiscount,
-  taxPercent,
-  gstAmount: calculatedGST,
-  total,
-  paymentInfo: splitPaymentEnabled ? paymentSplits : [{ method, amount: total }],
-  paymentStatus,
-});
+      // Thermal slip copy — customer details intentionally omitted
+      generateInvoiceOutput({
+        type: 'slip',
+        ...sharedPrintData,
+      });
     } catch (err) {
       console.error("Error generating PDF:", err);
       toast.error("Failed to generate invoice PDF");
