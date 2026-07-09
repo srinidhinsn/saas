@@ -136,21 +136,21 @@ def create_transaction(
         after = Decimal(str(after_stock))
 
         if after > before:
-            movement = "IN"
+            movement = MovementTypeEnum.in_
         elif after < before:
-            movement = "OUT"
+            movement = MovementTypeEnum.out
         else:
-            movement = "NONE"
+            movement = MovementTypeEnum.none
 
     # =========================================================
     # ✅ 2. PRIORITY: Explicit movement_type (inventory service)
     # =========================================================
     elif movement_type:
-        movement = movement_type.upper()
+        movement = MovementTypeEnum(movement_type.upper())
 
-        if movement == "IN":
+        if movement == MovementTypeEnum.in_:
             after = before + qty
-        elif movement == "OUT":
+        elif movement == MovementTypeEnum.out:
             after = before - qty
         else:
             after = before
@@ -160,35 +160,27 @@ def create_transaction(
     # =========================================================
     else:
         if tx_type_str in ["WASTAGE"]:
-         if before <= 0:
-           movement = "out"
-           after = before - qty
-         else:
-           movement = "OUT"
+           movement = MovementTypeEnum.out
            after = before
 
         elif tx_type_str in ["ITEM_CANCELLED"]:
-            movement = "NONE"
+            movement = MovementTypeEnum.none
             after = before
 
         # =====================================================
         # ✅ 4. GENERIC DEFAULT (inventory-safe fallback)
         # =====================================================
         elif tx_type_str in ["STOCK_IN", "RETURN"]:
-            movement = "IN"
+            movement = MovementTypeEnum.in_
             after = before + qty
 
         elif tx_type_str in ["ORDER_DEDUCTION", "STOCK_OUT", "CANCELLATION"]:
-            if before <= 0:
-             movement = "OUT"
-             after = before- qty
-            else:
-             movement = "OUT"
+             movement = MovementTypeEnum.out
              after = before - qty
 
         else:
             # safest fallback
-            movement = "NONE"
+            movement = MovementTypeEnum.none
             after = before
 
     # =========================================================
@@ -203,7 +195,7 @@ def create_transaction(
         name=item.name,
 
         transaction_type=tx_type_str,
-        movement_type=movement,
+        movement_type=movement.value,
 
         quantity=qty,
         unit=item.unit or "pcs",
