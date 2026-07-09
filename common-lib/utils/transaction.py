@@ -143,19 +143,6 @@ def create_transaction(
             movement = MovementTypeEnum.none
 
     # =========================================================
-    # ✅ 2. PRIORITY: Explicit movement_type (inventory service)
-    # =========================================================
-    elif movement_type:
-        movement = MovementTypeEnum(movement_type.upper())
-
-        if movement == MovementTypeEnum.in_:
-            after = before + qty
-        elif movement == MovementTypeEnum.out:
-            after = before - qty
-        else:
-            after = before
-
-    # =========================================================
     # ✅ 3. FALLBACK: Order-service logic (existing behavior)
     # =========================================================
     else:
