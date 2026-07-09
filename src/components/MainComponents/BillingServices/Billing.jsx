@@ -102,6 +102,8 @@ export default function BillingPage({ clientId, token }) {
   useEffect(() => {
     let filtered = [...orders];
 
+    filtered = filtered.filter(order => order.status?.toLowerCase() !== 'cancelled');
+
     // Date filter
     const { from, to } = getDateRange();
     filtered = filtered.filter(order => {

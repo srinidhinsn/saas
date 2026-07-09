@@ -525,7 +525,7 @@ export default function StockRecipeManager({ clientId: propClientId, token: prop
       );
       setIsAddStockModalOpen(false);
       setAddStockForm({ stock_item_id: null, stock_name: "", quantity: "", unit: "", remarks: "" });
-      await fetchStocks();
+      await Promise.all([fetchStocks(), fetchMenuItems(), fetchMenuAvailability()]);
     } catch (err) {
       console.error("submitAddStock failed:", err);
       setError(err.response?.data?.detail || "Failed to add stock quantity");
@@ -573,7 +573,7 @@ export default function StockRecipeManager({ clientId: propClientId, token: prop
         transaction_type: "RETURN",
         remarks: "",
       });
-      await fetchStocks();
+      await Promise.all([fetchStocks(), fetchMenuItems(), fetchMenuAvailability()]);
     } catch (err) {
       console.error("submitDeductStock failed:", err);
       setError(err.response?.data?.detail || "Failed to deduct stock quantity");
@@ -807,6 +807,7 @@ export default function StockRecipeManager({ clientId: propClientId, token: prop
 
         <div className="grid lg:grid-cols-12 gap-6">
           <main className="lg:col-span-9 space-y-6 min-w-0">
+            <div className="max-h-[75vh] overflow-y-auto pr-1">
             {/* Dynamic Inventory Category Tabs */}
             {inventoryCategories.some(cat => cat.id === activeTab) && activeTab !== "menu" && (
               <InventoryCategoryTab
@@ -833,6 +834,8 @@ export default function StockRecipeManager({ clientId: propClientId, token: prop
                 menuItems={menuItems}
                 loading={loading}
                 onUpdateAvailability={updateMenuAvailability}
+                onAddQty={openAddStockModal}
+                onDeduct={openDeductModal} 
                 allCategories={allCategories}
                 units={units}
                 searchQuery={menuSearchQuery}
@@ -855,6 +858,7 @@ export default function StockRecipeManager({ clientId: propClientId, token: prop
                 units={units}
               />
             )}
+            </div>
           </main>
 
           <aside className="lg:col-span-3 space-y-6 min-w-0">
@@ -1344,7 +1348,7 @@ function RecipeTab({
   );
 }
 
-function MenuAvailabilityTab({ menuItems, loading, onUpdateAvailability, allCategories, units, searchQuery, onSearchChange }) {
+function MenuAvailabilityTab({ menuItems, loading, onUpdateAvailability, onAddQty, onDeduct, allCategories, units, searchQuery, onSearchChange }) {
   const [editingItem, setEditingItem] = useState(null);
   const [editForm, setEditForm] = useState({ availability: "", unit: "" });
 
@@ -1454,7 +1458,7 @@ function MenuAvailabilityTab({ menuItems, loading, onUpdateAvailability, allCate
           <table className="w-full min-w-[700px] divide-y divide-gray-200">
             <thead className="bg-gray-50">
               <tr>
-                <th className="px-6 py-3 text-left text-xs font-medium text-gray-500 uppercase tracking-wider">
+                <th className="px-3 py-3 text-left text-xs font-medium text-gray-500 uppercase tracking-wider">
                   Menu Item
                 </th>
                 <th className="px-6 py-3 text-left text-xs font-medium text-gray-500 uppercase tracking-wider">
@@ -1463,7 +1467,7 @@ function MenuAvailabilityTab({ menuItems, loading, onUpdateAvailability, allCate
                 <th className="px-6 py-3 text-left text-xs font-medium text-gray-500 uppercase tracking-wider">
                   Availability
                 </th>
-                <th className="px-6 py-3 text-left text-xs font-medium text-gray-500 uppercase tracking-wider">
+                <th className="px-4 py-3 text-left text-xs font-medium text-gray-500 uppercase tracking-wider">
                   Unit
                 </th>
                 <th className="px-6 py-3 text-right text-xs font-medium text-gray-500 uppercase tracking-wider">
@@ -1474,7 +1478,7 @@ function MenuAvailabilityTab({ menuItems, loading, onUpdateAvailability, allCate
             <tbody className="bg-bg-primary divide-y divide-gray-200">
               {filteredItems.map((item) => (
                 <tr key={item.id} className="hover:bg-gray-50 transition-colors">
-                  <td className="px-6 py-4 whitespace-nowrap">
+                  <td className="px-3 py-2 whitespace-nowrap">
                     <div className="font-medium text-gray-900">{item.name}</div>
                     {item.description && (
                       <div className="text-sm text-gray-500">{item.description}</div>
@@ -1537,12 +1541,21 @@ function MenuAvailabilityTab({ menuItems, loading, onUpdateAvailability, allCate
                         </button>
                       </div>
                     ) : (
+                      <div className="flex justify-end gap-2">
+                      <button
+                        onClick={() => onAddQty(item)}
+                        className="text-green-700 hover:text-green-900 border border-green-300 px-4 py-2 rounded-lg font-medium text-sm transition-all"
+                      >
+                        + Add Qty
+                      </button>
+
                       <button
                         onClick={() => handleEdit(item)}
                         className="text-action-primary hover:text-action-primary mr-4 border gap-2 px-4 py-2 rounded-lg font-medium text-sm transition-all"
                       >
                         Edit
                       </button>
+                      </div>
                     )}
                   </td>
                 </tr>

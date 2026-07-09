@@ -848,8 +848,9 @@ const printKOT = ({ counterTree, categoriesFlat, itemsToPrint, meta }) => {
           : '<td></td>'}
         </tr>
       `;
-      const addonRows = (item.linkedAddons || []).map(addon => `
+      const addonRows = (item.linkedAddons || []).map(addon => {
         const aPrice = Number(addon.unit_price) || 0;
+        return `
         <tr>
           <td style="padding:2px 2px 2px 16px;border-bottom:1px dashed #eee;font-size:11px;color:#555;">
             ↳ ${addon.name}
@@ -862,7 +863,7 @@ const printKOT = ({ counterTree, categoriesFlat, itemsToPrint, meta }) => {
           </td>
           <td></td>
         </tr>
-      `).join('');
+      `}).join('');
       return mainRow + addonRows;
     }).join('');
 
@@ -2790,6 +2791,7 @@ const buildOrderPayload = (items) =>
             { headers, params: { client_id: clientId, parent_dinein_order_id: activeDineinOrderId } }
           );
           placedOrderId = activeOrderId;
+          placedDineinOrderId = r?.data?.data?.dinein_order_id || activeDineinOrderId;
           // toast.success(`Sub-order ${r.data.data.dinein_order_id} created!`);
         }
       } else {
