@@ -80,7 +80,7 @@ const normalizeRoles = (data) => {
 
   return data.map((r) => {
     if (typeof r === "string") return r;
-    if (typeof r === "object" && r !== null) return r.name || r.id;
+    if (typeof r === "object" && r !== null) return r.id || r.name;
     return "";
   }).filter(Boolean);
 };

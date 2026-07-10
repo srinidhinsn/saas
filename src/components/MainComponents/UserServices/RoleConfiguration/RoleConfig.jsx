@@ -4,7 +4,7 @@ import { Check, Shield } from "lucide-react";
 import { jwtDecode } from "jwt-decode";
 const HIDDEN_MODULES = [
   "realm",
-  "realms",
+  "realms", 
   "restaurant"
 ];
 
@@ -33,14 +33,17 @@ const RoleConfig = ({ token, clientId }) => {
 const saveModuleScreenId = async (mod) => {
   setSavingModule(mod);
   try {
+    const modulesPayload = {};
     const normalizedScreenIds = {};
-    Object.keys(roleConfig).forEach(m => {
+
+    modules.forEach(({ module: m }) => {
+      modulesPayload[m] = roleConfig[m] || [];           
       normalizedScreenIds[m] = screenIds[m]?.trim() || `default_${m}`;
     });
 
     await axios.post(
       `${API}/${clientId}/users/roles/${selectedRole}/config`,
-      { modules: roleConfig, screen_ids: normalizedScreenIds },
+      { modules: modulesPayload, screen_ids: normalizedScreenIds },
       { headers: { Authorization: `Bearer ${token}` } }
     );
   } catch {
@@ -130,19 +133,32 @@ const saveModuleScreenId = async (mod) => {
       };
     });
   };
-
+  const toggleSelectAll = (module, allOps) => {
+    setRoleConfig(prev => {
+      const current = prev[module] || [];
+      const isAllSelected = allOps.length > 0 && allOps.every(op => current.includes(op));
+  
+      return {
+        ...prev,
+        [module]: isAllSelected ? [] : [...allOps],
+      };
+    });
+  };
   /* ===================== SAVE ===================== */
   const saveConfig = async () => {
     setLoading(true);
     try {
+      const modulesPayload = {};
       const normalizedScreenIds = {};
-      Object.keys(roleConfig).forEach(mod => {
-        normalizedScreenIds[mod] = screenIds[mod]?.trim() || `default_${mod}`;
+  
+      modules.forEach(({ module: m }) => {
+        modulesPayload[m] = roleConfig[m] || [];
+        normalizedScreenIds[m] = screenIds[m]?.trim() || `default_${m}`;
       });
   
       await axios.post(
         `${API}/${clientId}/users/roles/${selectedRole}/config`,
-        { modules: roleConfig, screen_ids: normalizedScreenIds },
+        { modules: modulesPayload, screen_ids: normalizedScreenIds },
         { headers: { Authorization: `Bearer ${token}` } }
       );
     } catch {
@@ -166,7 +182,7 @@ const saveModuleScreenId = async (mod) => {
           </h2>
           <ul className="space-y-4">
             {roles.map((role,index) => {
-              const roleName = typeof role === "string" ? role : role.name || role.id || "UNKNOWN";
+              const roleName = typeof role === "string" ? role : role.id || role.name || "UNKNOWN";
               return (
                 <li
                 key={`${roleName}-${index}`}
@@ -174,7 +190,7 @@ const saveModuleScreenId = async (mod) => {
                   className={`p-3 rounded-lg cursor-pointer text-sm font-medium transition
         ${selectedRole === roleName? "bg-blue-600 text-white" : "hover:bg-gray-100"}`}
                 >
-                  {roleName.toUpperCase()}
+                  {roleName}
                 </li>
               );
             })}
@@ -194,15 +210,27 @@ const saveModuleScreenId = async (mod) => {
                 Permissions for <span className="text-blue-600">{selectedRole}</span>
               </h2>
 
-              <div className="space-y-6">
-              {modules 
+              {modules
   .filter(mod => !HIDDEN_MODULES.includes(mod.module))
-  .map(mod => (
-                  <div key={mod.module}>
-                    <h3>
-                      {mod.label}
-                    </h3>
-                    <div className="flex items-center gap-1">
+  .map(mod => {
+    const allOps = mod.operations || [];
+    const selectedOps = roleConfig[mod.module] || [];
+    const isAllSelected = allOps.length > 0 && allOps.every(op => selectedOps.includes(op));
+
+    return (
+      <div key={mod.module}>
+        <div className="flex items-center justify-between">
+          <h3>{mod.label}</h3>
+          <button
+            type="button"
+            onClick={() => toggleSelectAll(mod.module, allOps)}
+            className="text-xs px-2 py-1 rounded border border-gray-300 hover:bg-gray-100"
+          >
+            {isAllSelected ? "Deselect All" : "Select All"}
+          </button>
+        </div>
+
+        <div className="flex items-center gap-1">
           <span className="text-xs text-gray-400">screen_id:</span>
           <input
             type="text"
@@ -213,33 +241,32 @@ const saveModuleScreenId = async (mod) => {
             placeholder={`default_${mod.module}`}
             className="text-xs font-mono px-2 py-1 border border-gray-300 rounded w-44 focus:outline-none focus:ring-1 focus:ring-blue-500"
           />
-            <button
-    type="button"
-    disabled={savingModule === mod.module}
-    onClick={() => saveModuleScreenId(mod.module)}
-    className="flex items-center gap-1 text-xs px-2 py-1 rounded bg-blue-600 text-white hover:bg-blue-700 disabled:opacity-50"
-  >
-    <Check size={12} />
-    {savingModule === mod.module ? "Saving..." : "Save"}
-  </button>
+          <button
+            type="button"
+            disabled={savingModule === mod.module}
+            onClick={() => saveModuleScreenId(mod.module)}
+            className="flex items-center gap-1 text-xs px-2 py-1 rounded bg-blue-600 text-white hover:bg-blue-700 disabled:opacity-50"
+          >
+            <Check size={12} />
+            {savingModule === mod.module ? "Saving..." : "Save"}
+          </button>
         </div>
-                    <div>
-                      {mod.operations?.map((op,index) => (
-                        <label key={`${mod.module}-${op}-${index}`} className="flex items-center gap-2 p-3">
-                          <input
-                            type="checkbox"
-                            checked={(roleConfig[mod.module] || []).includes(op)}
-                            onChange={() => toggleOperation(mod.module, op)}
-                          />
-                          <span >{op}</span>
-                        </label>
-                      ))}
 
-                    </div>
-                  </div>
-                ))}
-              </div>
-
+        <div>
+          {allOps.map((op, index) => (
+            <label key={`${mod.module}-${op}-${index}`} className="flex items-center gap-2 p-3">
+              <input
+                type="checkbox"
+                checked={selectedOps.includes(op)}
+                onChange={() => toggleOperation(mod.module, op)}
+              />
+              <span>{op}</span>
+            </label>
+          ))}
+        </div>
+      </div>
+    );
+  })}
               <div className="mt-8 flex justify-end">
                 <button
                   disabled={loading}
