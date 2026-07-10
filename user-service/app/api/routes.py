@@ -410,78 +410,78 @@ async def search_customers(client_id: str, q: str = "", context: SaasContext = D
     result = await search_customers_service(q, db)
     return ResponseModel(screen_id=context.screen_id, data={"customers": result})
 
-@router.post("/chat")
-async def chat(client_id: str,req: ChatRequest,db: Session = Depends(get_db)):
-    inventory_items = db.query(InventoryEntity).filter(InventoryEntity.client_id == client_id).all()
-    categories = db.query(CategoryEntity).filter(CategoryEntity.client_id == client_id).all()
+# @router.post("/chat")
+# async def chat(client_id: str,req: ChatRequest,db: Session = Depends(get_db)):
+#     inventory_items = db.query(InventoryEntity).filter(InventoryEntity.client_id == client_id).all()
+#     categories = db.query(CategoryEntity).filter(CategoryEntity.client_id == client_id).all()
 
-    orders = db.query(DineinOrder).filter(DineinOrder.client_id == client_id).all()
+#     orders = db.query(DineinOrder).filter(DineinOrder.client_id == client_id).all()
 
-    menu_context = []
-    menu_unique_items = set()
+#     menu_context = []
+#     menu_unique_items = set()
 
-    for category in categories:
-        category_items = [
-            item for item in inventory_items
-            if item.category_id == category.id
-        ]
+#     for category in categories:
+#         category_items = [
+#             item for item in inventory_items
+#             if item.category_id == category.id
+#         ]
 
-        item_lines = []
+#         item_lines = []
 
-        for item in category_items:
-            if not item.name:
-                continue
+#         for item in category_items:
+#             if not item.name:
+#                 continue
 
-            clean_name = item.name.strip()
+#             clean_name = item.name.strip()
 
-            # Remove duplicate menu items
-            if clean_name.lower() in menu_unique_items:
-                continue
+#             # Remove duplicate menu items
+#             if clean_name.lower() in menu_unique_items:
+#                 continue
 
-            menu_unique_items.add(clean_name.lower())
-            item_lines.append(f"{clean_name} - ₹{item.price}")
+#             menu_unique_items.add(clean_name.lower())
+#             item_lines.append(f"{clean_name} - ₹{item.price}")
 
-        # Add category only if items exist
-        if item_lines:
-            menu_context.append(f"{category.name}: {', '.join(item_lines)}")
+#         # Add category only if items exist
+#         if item_lines:
+#             menu_context.append(f"{category.name}: {', '.join(item_lines)}")
           
-    # ================= BUILD ORDER ITEMS CONTEXT =================
-    ordered_items_context = []
+#     # ================= BUILD ORDER ITEMS CONTEXT =================
+#     ordered_items_context = []
 
-    total_orders = len(orders)
+#     total_orders = len(orders)
 
-    for order in orders:
-        order_items = []
-        for item in order.items:
+#     for order in orders:
+#         order_items = []
+#         for item in order.items:
 
-            if not item.item_name:
-                continue
+#             if not item.item_name:
+#                 continue
 
-            order_items.append(f"{item.item_name} x {item.quantity}")
+#             order_items.append(f"{item.item_name} x {item.quantity}")
 
-        if order_items:
-            ordered_items_context.append(
-                f"Order #{order.id}: {', '.join(order_items)}"
-            )
+#         if order_items:
+#             ordered_items_context.append(
+#                 f"Order #{order.id}: {', '.join(order_items)}"
+#             )
 
-    # ================= FINAL CONTEXT =================
+#     # ================= FINAL CONTEXT =================
 
-    realtime_context = f"""
-    MENU:
+#     realtime_context = f"""
+#     MENU:
 
-    {'\n'.join(menu_context)}
+#     {'\n'.join(menu_context)}
 
-    TOTAL MENU ITEMS:
-    {len(menu_unique_items)}
+#     TOTAL MENU ITEMS:
+#     {len(menu_unique_items)}
 
-    TOTAL ORDERS:
-    {total_orders}
+#     TOTAL ORDERS:
+#     {total_orders}
 
-    ORDER ITEMS:
+#     ORDER ITEMS:
 
-    {'\n'.join(ordered_items_context)}
-    """
-    # ================= ASK AI =================
-    reply = await ask_restaurant_ai(req.message,realtime_context)
+#     {'\n'.join(ordered_items_context)}
+#     """
+#     # ================= ASK AI =================
+#     reply = await ask_restaurant_ai(req.message,realtime_context)
 
-    return {"reply": reply}
+#     return {"reply": reply}

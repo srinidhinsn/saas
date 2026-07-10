@@ -9,7 +9,7 @@ import time
 from config.settings import LOGGING_CONFIG
 from fastapi.middleware.cors import CORSMiddleware
 from dotenv import load_dotenv
-from services.chat_service import chat_service
+# from services.chat_service import chat_service
 load_dotenv()
 
 app = FastAPI()
