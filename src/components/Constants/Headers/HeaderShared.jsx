@@ -177,6 +177,7 @@ import React, { useEffect, useState } from 'react';
 import { useNavigate, useParams, useLocation } from 'react-router-dom';
 import { getValidToken } from '../../utils/Interceptors/Api';
 import axios from 'axios';
+import { NAV_TABS } from './Navtabs';
 
 export const navMap = {
   home: (clientId) => `/${APP_ROOT}/${clientId}/home`,
@@ -195,23 +196,23 @@ export const navMap = {
   counter: (clientId) => `/${APP_ROOT}/${clientId}/counter`,
 };
 
-const HeaderShared = ({ onLogout }) => {
+const HeaderShared = ({ onLogout, subscription = [] }) => {
   const navigate = useNavigate();
   const { clientId } = useParams();
   const location = useLocation();
   const [mobileOpen, setMobileOpen] = useState(false);
   const [darkMode, setDarkMode] = useState(false);
   const [profileOpen, setProfileOpen] = useState(false);
-  const [clientName, setClientName] = useState('');
 
-  // Initialize theme on mount
+  const subscribedSet = new Set(subscription);
+  const visibleTabs = NAV_TABS.filter(tab => subscribedSet.has(tab.id));
+  const isVisible = (id) => subscribedSet.has(id);
+
   useEffect(() => {
     const savedTheme = localStorage.getItem('theme');
     const systemPrefersDark = window.matchMedia('(prefers-color-scheme: dark)').matches;
     const isDark = savedTheme === 'dark' || (!savedTheme && systemPrefersDark);
-
     setDarkMode(isDark);
-
     if (isDark) {
       document.documentElement.classList.add('dark');
     } else {
@@ -219,11 +220,9 @@ const HeaderShared = ({ onLogout }) => {
     }
   }, []);
 
-  // Toggle theme when clicking clientId
   const toggleTheme = () => {
     const newDarkMode = !darkMode;
     setDarkMode(newDarkMode);
-
     if (newDarkMode) {
       document.documentElement.classList.add('dark');
       localStorage.setItem('theme', 'dark');
@@ -239,7 +238,6 @@ const HeaderShared = ({ onLogout }) => {
     return () => { document.body.style.overflow = ''; };
   }, [mobileOpen]);
 
-  // Derive active key from pathname
   const deriveActive = () => {
     if (!clientId) return 'home';
     const path = location.pathname.replace(/\/+$/, '');
@@ -270,104 +268,66 @@ const HeaderShared = ({ onLogout }) => {
       </button>
     );
   };
-  useEffect(() => {
-    if (!clientId) return;
-    const token = getValidToken();
-    if (!token) return;
 
-    axios
-      .get(
-        `${import.meta.env.VITE_API_USER_SERVICE_URL}/${clientId}/users/realm`,
-        { headers: { Authorization: `Bearer ${token}` } }
-      )
-      .then((res) => {
-        const clients = res.data?.data?.clients || [];
-        const match = clients.find((c) => c.id === clientId);
-        if (match?.name) setClientName(match.name);
-      })
-      .catch(() => {
-      });
-  }, [clientId]);
-  const displayLabel = clientName || (clientId || 'APP').toUpperCase();
+  const clientData = JSON.parse(localStorage.getItem('client') || 'null');
+  const displayLabel = clientData?.name || (clientId || 'APP').toUpperCase();
+
   return (
     <header className="shadow-md sticky top-0 z-50 bg-bg-primary dark:bg-bg-primary-dark border-b border-border-default dark:border-border-default-dark transition-colors duration-300">
       <div className="mx-auto px-4 md:px-2 py-3 lg:py-4 flex items-center justify-between">
-        <div className="hidden lg:flex items-center space-x-8 md:space-x-2 text-text-primary">
-          <NavLink id="home">DashBoard</NavLink>
-          <NavLink id="table">Table</NavLink>
-          <NavLink id="menu">Menu</NavLink>
-          <NavLink id="billing">Billing</NavLink>
-          <NavLink id="inventory">Inventory</NavLink>
 
+        <div className="hidden lg:flex items-center space-x-8 md:space-x-2 text-text-primary">
+          {visibleTabs
+            .filter(tab => ['home', 'table', 'menu', 'billing', 'inventory'].includes(tab.id))
+            .map(tab => (
+              <NavLink key={tab.id} id={tab.id}>{tab.label}</NavLink>
+            ))}
         </div>
 
         <button
-    onClick={() => handleNavigate('home')}
-    className="text-2xl lg:text-3xl font-serif italic text-action-primary hover:text-action-primary-hover transition-colors duration-300"
-  >
-    <span className="text-action-primary">
-      {displayLabel}
-    </span>
-  </button>
+          onClick={() => handleNavigate('home')}
+          className="text-2xl lg:text-3xl font-serif italic text-action-primary hover:text-action-primary-hover transition-colors duration-300"
+        >
+          <span className="text-action-primary">{displayLabel}</span>
+        </button>
 
         <div className="hidden lg:flex items-center space-x-8 text-text-primary">
-          <NavLink id="users">Users</NavLink>
-          {/* <NavLink id="role">Role</NavLink> */}
-          <NavLink id="order">Order</NavLink>
-          <NavLink id="summary">Summary</NavLink>
-          <NavLink id="kds">KDS</NavLink>
-          <NavLink id="counter">Counters</NavLink>
-          {/* <NavLink id="details">Details</NavLink>
-          <NavLink id="documents">Documents</NavLink> */}
+          {visibleTabs
+            .filter(tab => ['users', 'order', 'summary', 'kds', 'counter'].includes(tab.id))
+            .map(tab => (
+              <NavLink key={tab.id} id={tab.id}>{tab.label}</NavLink>
+            ))}
 
-          <div
-            className="relative group"
-            onClick={() => setProfileOpen(prev => !prev)}
-          >
-            <div
-              className="cursor-pointer px-2 py-1 rounded hover:text-action-primary transition-colors"
-            >
-              Profile
-            </div>
-
-            {/* DROPDOWN MENU */}
-            <div
-              className={`
-        absolute right-4 mt-2 w-28 bg-bg-primary rounded shadow-lg border 
-        transition-all duration-200
-        opacity-0 invisible translate-y-2 
-        group-hover:opacity-100 group-hover:visible group-hover:translate-y-0
-        ${profileOpen ? "opacity-100 visible translate-y-0" : ""}
-      `}
-            >
-              <ul className="py-2">
-                <li>
-                  <NavLink
-                    id="profile"
-                    className="block px-4 py-2 hover:bg-bg-tertiary"
+          {isVisible('profile') && (
+            <div className="relative group" onClick={() => setProfileOpen(prev => !prev)}>
+              <div className="cursor-pointer px-2 py-1 rounded hover:text-action-primary transition-colors">
+                Profile
+              </div>
+              <div
+                className={`
+                  absolute right-4 mt-2 w-28 bg-bg-primary rounded shadow-lg border
+                  transition-all duration-200
+                  opacity-0 invisible translate-y-2
+                  group-hover:opacity-100 group-hover:visible group-hover:translate-y-0
+                  ${profileOpen ? "opacity-100 visible translate-y-0" : ""}
+                `}
+              >
+                <ul className="py-2">
+                  <li>
+                    <NavLink id="profile">Profile</NavLink>
+                  </li>
+                  <li
+                    onClick={() => onLogout?.()}
+                    className="block px-4 py-2 cursor-pointer hover:bg-bg-tertiary"
                   >
-                    Profile
-                  </NavLink>
-                </li>
-                <li
-                  onClick={() => onLogout?.()}
-                  className="block px-4 py-2 cursor-pointer hover:bg-bg-tertiary"
-                >
-                  Logout
-                </li>
-              </ul>
+                    Logout
+                  </li>
+                </ul>
+              </div>
             </div>
-          </div>
-          {/* <button
-            onClick={() => onLogout?.()}
-            className="px-2 py-1 rounded text-text-primary dark:text-text-secondary-dark hover:text-action-primary transition-colors"
-            aria-label="Logout"
-          >
-            Logout
-          </button> */}
+          )}
         </div>
 
-        {/* Mobile hamburger */}
         <div className="lg:hidden flex items-center">
           <button
             onClick={() => setMobileOpen(prev => !prev)}
@@ -384,14 +344,13 @@ const HeaderShared = ({ onLogout }) => {
         </div>
       </div>
 
-      {/* overlay */}
       <div
         className={`lg:hidden fixed inset-0 z-40 pointer-events-none transition-opacity duration-300 bg-black ${mobileOpen ? 'opacity-60 pointer-events-auto' : 'opacity-0'}`}
         onClick={() => setMobileOpen(false)}
         aria-hidden={!mobileOpen}
       />
 
-     <nav
+      <nav
         className={`lg:hidden fixed right-0 top-0 z-50 w-full max-w-xs h-full shadow-lg transform transition-transform duration-300 bg-bg-primary dark:bg-bg-primary-dark ${mobileOpen ? 'translate-x-0' : 'translate-x-full'}`}
         aria-hidden={!mobileOpen}
       >
@@ -407,22 +366,14 @@ const HeaderShared = ({ onLogout }) => {
 
         <div className="p-4 space-y-3 h-full overflow-y-auto">
           <div className="flex flex-col space-y-1">
-            <NavLink id="home">DashBoard</NavLink>
-            <NavLink id="table">Table</NavLink>
-            <NavLink id="menu">Menu</NavLink>
-            <NavLink id="billing">Billing</NavLink>
-            <NavLink id="users">Users</NavLink>
+            {visibleTabs.map(tab => (
+              <NavLink key={tab.id} id={tab.id}>{tab.label}</NavLink>
+            ))}
           </div>
 
           <hr className="my-2 border-border-default dark:border-border-default-dark" />
 
           <div className="flex flex-col space-y-1">
-            <NavLink id="inventory">Inventory</NavLink>
-            <NavLink id="order">Order</NavLink>
-            <NavLink id="summary">Summary</NavLink>
-            <NavLink id="kds">KDS</NavLink>
-            <NavLink id="counter">Counters</NavLink>
-            <NavLink id="profile">Profile</NavLink>
             <button
               onClick={() => { onLogout?.(); setMobileOpen(false); }}
               className="px-2 py-1 rounded text-text-primary dark:text-text-secondary-dark text-left hover:text-action-primary"

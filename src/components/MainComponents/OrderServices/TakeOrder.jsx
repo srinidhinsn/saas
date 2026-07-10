@@ -831,6 +831,7 @@ const printKOT = ({ counterTree, categoriesFlat, itemsToPrint, meta }) => {
 
   const slipHtml = groupEntries.map(([, group]) => {
     const rows = group.items.map(item => {
+      const price = Number(item.unit_price) || 0;
       const mainRow = `
         <tr>
           <td style="padding:4px 2px;border-bottom:1px dashed #ccc;font-size:13px;font-weight:bold;">
@@ -839,12 +840,17 @@ const printKOT = ({ counterTree, categoriesFlat, itemsToPrint, meta }) => {
           <td style="padding:4px 2px;border-bottom:1px dashed #ccc;font-size:13px;text-align:center;font-weight:bold;">
             ${item.quantity}
           </td>
+          <td style="padding:4px 2px;border-bottom:1px dashed #ccc;font-size:12px;text-align:right;">
+            ₹${price.toFixed(2)}
+          </td>
           ${item.note
           ? `<td style="padding:4px 2px;border-bottom:1px dashed #ccc;font-size:11px;color:#555;font-style:italic;">${item.note}</td>`
           : '<td></td>'}
         </tr>
       `;
-      const addonRows = (item.linkedAddons || []).map(addon => `
+      const addonRows = (item.linkedAddons || []).map(addon => {
+        const aPrice = Number(addon.unit_price) || 0;
+        return `
         <tr>
           <td style="padding:2px 2px 2px 16px;border-bottom:1px dashed #eee;font-size:11px;color:#555;">
             ↳ ${addon.name}
@@ -852,9 +858,12 @@ const printKOT = ({ counterTree, categoriesFlat, itemsToPrint, meta }) => {
           <td style="padding:2px 2px;border-bottom:1px dashed #eee;font-size:11px;text-align:center;color:#555;">
             ${addon.quantity}
           </td>
+          <td style="padding:2px 2px;border-bottom:1px dashed #eee;font-size:11px;text-align:right;color:#555;">
+            ₹${aPrice.toFixed(2)}
+          </td>
           <td></td>
         </tr>
-      `).join('');
+      `}).join('');
       return mainRow + addonRows;
     }).join('');
 
@@ -864,12 +873,12 @@ const printKOT = ({ counterTree, categoriesFlat, itemsToPrint, meta }) => {
           <div style="font-size:16px;font-weight:bold;letter-spacing:1px;">KOT</div>
           <div style="font-size:13px;font-weight:bold;margin-top:2px;">Counter: ${group.counterName}</div>
         </div>
-        <div style="display:flex;justify-content:space-between;font-size:11px;margin-bottom:6px;">
+        <div style="display:flex;justify-content:space-between;font-size:13px;font-weight:bold;margin-bottom:4px;">
           <span>${meta.orderMode === 'takeaway' ? '🛍 Takeaway' : `Table: ${meta.tableNumber}`}</span>
           <span>${dateStr} ${timeStr}</span>
         </div>
         ${meta.dineinOrderId
-        ? `<div style="font-size:11px;margin-bottom:6px;color:#555;">Order #${meta.dineinOrderId}</div>`
+        ? `<div style="font-size:12px;font-weight:bold;margin-bottom:6px;color:#333;">Order #${meta.dineinOrderId}</div>`
         : ''}
         <table style="width:100%;border-collapse:collapse;">
           <thead>
@@ -877,6 +886,7 @@ const printKOT = ({ counterTree, categoriesFlat, itemsToPrint, meta }) => {
               <th style="text-align:left;font-size:12px;padding:3px 2px;">Item</th>
               <th style="text-align:center;font-size:12px;padding:3px 2px;">Qty</th>
               <th style="text-align:left;font-size:12px;padding:3px 2px;">Note</th>
+              <th style="text-align:right;font-size:12px;padding:3px 2px;">Price</th>
             </tr>
           </thead>
           <tbody>${rows}</tbody>
@@ -895,8 +905,9 @@ const printKOT = ({ counterTree, categoriesFlat, itemsToPrint, meta }) => {
     <!DOCTYPE html><html><head><title>KOT</title>
     <style>
       * { margin: 0; padding: 0; box-sizing: border-box; }
+    @page { size: 80mm auto; margin: 0; }
       body { font-family: 'Courier New', monospace; background: #fff; }
-      .kot-slip { width: 72mm; padding: 8px; margin: 0 auto; }
+      .kot-slip { width: 72mm; padding: 6px 8px; margin: 0 auto; }
       .page-break { page-break-after: always; }
       @media print {
         body { -webkit-print-color-adjust: exact; }
@@ -1921,13 +1932,6 @@ const TakeOrder = ({ clientId, token, onOrderUpdate, realm }) => {
     if ( !clientId || !token || !menuConfig) return;
 
     const refetchMenu = async () => {
-      // Check zone-specific cache first
-      const zoneSlice = `menuData_zone_${zoneConfigId}`;
-      const cached = menuCache.get(zoneSlice, clientId);
-      if (cached) {
-        setMenuItems(cached.menuItems);
-        return;
-      }
       try {
         const itemRes = await axios.get(
           `${import.meta.env.VITE_API_INVENTORY_SERVICE_URL}/${clientId}/menu/read`,
@@ -2773,6 +2777,7 @@ const buildOrderPayload = (items) =>
     try {
       const headers = { Authorization: `Bearer ${token}` };
       let placedOrderId = null;
+      let placedDineinOrderId = activeDineinOrderId;
 
       if (activeOrderId && activeDineinOrderId) {
         const newOnly = cart.filter(i => i.is_new_item && !i.saved_sub_order);
@@ -2786,6 +2791,7 @@ const buildOrderPayload = (items) =>
             { headers, params: { client_id: clientId, parent_dinein_order_id: activeDineinOrderId } }
           );
           placedOrderId = activeOrderId;
+          placedDineinOrderId = r?.data?.data?.dinein_order_id || activeDineinOrderId;
           // toast.success(`Sub-order ${r.data.data.dinein_order_id} created!`);
         }
       } else {
@@ -2815,6 +2821,7 @@ const buildOrderPayload = (items) =>
             { headers }
           );
           placedOrderId = existingDraft.id;
+          placedDineinOrderId = String(existingDraft.id);
         } else {
           const createRes = await axios.post(
             `${import.meta.env.VITE_API_ORDER_SERVICE_URL}/${clientId}/dinein/create`,
@@ -2831,6 +2838,7 @@ const buildOrderPayload = (items) =>
             { headers }
           );
           placedOrderId = createRes?.data?.data?.id;
+          placedDineinOrderId = createRes?.data?.data?.dinein_order_id || String(placedOrderId);
         }
 
         if (orderMode !== 'takeaway') {
@@ -2882,7 +2890,7 @@ const buildOrderPayload = (items) =>
         meta: {
           tableNumber: tableObj?.table_number || selectedTable,
           orderMode,
-          dineinOrderId: activeDineinOrderId,
+          dineinOrderId: placedDineinOrderId,
           timestamp: new Date(),
         },
       });

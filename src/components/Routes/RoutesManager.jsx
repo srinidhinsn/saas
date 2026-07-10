@@ -58,6 +58,7 @@ const RoutesManager = ({ token: appToken }) => {
     try {
       const decoded = jwtDecode(token);
       const userRole = decoded.roles && decoded.roles[0]; // pick first role
+      const subscription = decoded.subscription || [];
       setRole(userRole);
       setRealm(decoded.realm)
       setUserId(decoded.user_id)
