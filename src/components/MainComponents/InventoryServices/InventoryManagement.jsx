@@ -1645,32 +1645,30 @@ function StockModal({
           </div>
 
           <div>
-  <label className="block text-sm font-medium text-gray-700 mb-1">Availability</label>
-  <input
-    type="number"
-    step="0.01"
-    min="0"
-    value={form.availability}
-    onChange={(e) => onChange((prev) => ({ ...prev, availability: e.target.value }))}
-    disabled={isEditing}
-    className="w-full px-4 py-2 border border-gray-300 rounded-lg focus:ring-2 focus:ring-indigo-500 focus:border-indigo-500 disabled:bg-gray-100 disabled:cursor-not-allowed"
-  />
-</div>
+            <label className="block text-sm font-medium text-gray-700 mb-1">Availability</label>
+            <input
+              type="number"
+              step="0.01"
+              min="0"
+              value={form.availability}
+              onChange={(e) => onChange((prev) => ({ ...prev, availability: e.target.value }))}
+              className="w-full px-4 py-2 border border-gray-300 rounded-lg focus:ring-2 focus:ring-indigo-500 focus:border-indigo-500 disabled:bg-gray-100 disabled:cursor-not-allowed"
+            />
+          </div>
 
-<div>
-  <label className="block text-sm font-medium text-gray-700 mb-1">Unit</label>
-  <select
-    value={form.unit}
-    onChange={(e) => onChange((prev) => ({ ...prev, unit: e.target.value }))}
-    disabled={isEditing}
-    className="w-full px-4 py-2 border border-gray-300 rounded-lg focus:ring-2 focus:ring-indigo-500 focus:border-indigo-500 disabled:bg-gray-100 disabled:cursor-not-allowed"
-  >
-    <option value="">Select unit</option>
-    {units.map((u) => (
-      <option key={u} value={u}>{u}</option>
-    ))}
-  </select>
-</div>
+          <div>
+            <label className="block text-sm font-medium text-gray-700 mb-1">Unit</label>
+            <select
+              value={form.unit}
+              onChange={(e) => onChange((prev) => ({ ...prev, unit: e.target.value }))}
+              className="w-full px-4 py-2 border border-gray-300 rounded-lg focus:ring-2 focus:ring-indigo-500 focus:border-indigo-500 disabled:bg-gray-100 disabled:cursor-not-allowed"
+            >
+              <option value="">Select unit</option>
+              {units.map((u) => (
+                <option key={u} value={u}>{u}</option>
+              ))}
+            </select>
+          </div>
 
           <div className="sm:col-span-2">
             <label className="block text-sm font-medium text-gray-700 mb-1">Unit Price (₹)</label>
