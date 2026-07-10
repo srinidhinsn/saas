@@ -1550,10 +1550,10 @@ function MenuAvailabilityTab({ menuItems, loading, onUpdateAvailability, onAddQt
                       </button>
 
                       <button
-                        onClick={() => handleEdit(item)}
-                        className="text-action-primary hover:text-action-primary mr-4 border gap-2 px-4 py-2 rounded-lg font-medium text-sm transition-all"
+                        onClick={() => onDeduct(item)}
+                        className="text-red-700 hover:text-red-900 border border-red-300 px-4 py-2 rounded-lg font-medium text-sm transition-all"
                       >
-                        Edit
+                        Deduct
                       </button>
                       </div>
                     )}
@@ -1652,7 +1652,7 @@ function StockModal({
               min="0"
               value={form.availability}
               onChange={(e) => onChange((prev) => ({ ...prev, availability: e.target.value }))}
-              className="w-full px-4 py-2 border border-gray-300 rounded-lg focus:ring-2 focus:ring-indigo-500 focus:border-indigo-500"
+              className="w-full px-4 py-2 border border-gray-300 rounded-lg focus:ring-2 focus:ring-indigo-500 focus:border-indigo-500 disabled:bg-gray-100 disabled:cursor-not-allowed"
             />
           </div>
 
@@ -1661,7 +1661,7 @@ function StockModal({
             <select
               value={form.unit}
               onChange={(e) => onChange((prev) => ({ ...prev, unit: e.target.value }))}
-              className="w-full px-4 py-2 border border-gray-300 rounded-lg focus:ring-2 focus:ring-indigo-500 focus:border-indigo-500"
+              className="w-full px-4 py-2 border border-gray-300 rounded-lg focus:ring-2 focus:ring-indigo-500 focus:border-indigo-500 disabled:bg-gray-100 disabled:cursor-not-allowed"
             >
               <option value="">Select unit</option>
               {units.map((u) => (
