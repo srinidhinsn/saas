@@ -130,66 +130,44 @@ def create_transaction(
     tx_type_str = str(tx_type).upper()
 
     # =========================================================
-    # ✅ 1. PRIORITY: Explicit after_stock (used in adjustments)
+    # Movement resolution — switch-style via match/case
     # =========================================================
+    # ✅ 1. PRIORITY: Explicit after_stock (used in adjustments)
     if after_stock is not None:
         after = Decimal(str(after_stock))
 
-        if after > before:
-            movement = "IN"
-        elif after < before:
-            movement = "OUT"
-        else:
-            movement = "NONE"
+        match True:
+            case _ if after > before:
+                movement = MovementTypeEnum.in_
+            case _ if after < before:
+                movement = MovementTypeEnum.out
+            case _:
+                movement = MovementTypeEnum.none
 
-    # =========================================================
-    # ✅ 2. PRIORITY: Explicit movement_type (inventory service)
-    # =========================================================
-    elif movement_type:
-        movement = movement_type.upper()
-
-        if movement == "IN":
-            after = before + qty
-        elif movement == "OUT":
-            after = before - qty
-        else:
-            after = before
-
-    # =========================================================
-    # ✅ 3. FALLBACK: Order-service logic (existing behavior)
-    # =========================================================
+    # ✅ 2. FALLBACK: Order-service logic (existing behavior)
     else:
-        if tx_type_str in ["WASTAGE"]:
-         if before <= 0:
-           movement = "out"
-           after = before
-         else:
-           movement = "OUT"
-           after = before
+        match tx_type_str:
+            case "WASTAGE":
+                movement = MovementTypeEnum.out
+                after = before
 
-        elif tx_type_str in ["ITEM_CANCELLED"]:
-            movement = "NONE"
-            after = before
+            case "ITEM_CANCELLED":
+                movement = MovementTypeEnum.none
+                after = before
 
-        # =====================================================
-        # ✅ 4. GENERIC DEFAULT (inventory-safe fallback)
-        # =====================================================
-        elif tx_type_str in ["STOCK_IN", "RETURN"]:
-            movement = "IN"
-            after = before + qty
+            # ✅ 3. GENERIC DEFAULT (inventory-safe fallback)
+            case "STOCK_IN" | "RETURN":
+                movement = MovementTypeEnum.in_
+                after = before + qty
 
-        elif tx_type_str in ["ORDER_DEDUCTION", "STOCK_OUT", "CANCELLATION"]:
-            if before <= 0:
-             movement = "OUT"
-             after = before
-            else:
-             movement = "OUT"
-             after = before - qty
+            case "ORDER_DEDUCTION" | "STOCK_OUT" | "CANCELLATION":
+                movement = MovementTypeEnum.out
+                after = before - qty
 
-        else:
-            # safest fallback
-            movement = "NONE"
-            after = before
+            case _:
+                # safest fallback
+                movement = MovementTypeEnum.none
+                after = before
 
     # =========================================================
     # 🔹 Create transaction
@@ -203,7 +181,7 @@ def create_transaction(
         name=item.name,
 
         transaction_type=tx_type_str,
-        movement_type=movement,
+        movement_type=movement.value,
 
         quantity=qty,
         unit=item.unit or "pcs",

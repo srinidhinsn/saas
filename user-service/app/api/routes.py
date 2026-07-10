@@ -3,7 +3,8 @@ from sqlalchemy.orm import Session
 from database.postgres import get_db
 from entity.user_entity import User, Person, PageDefinition
 from entity.client_entity import Client, Address
-from utils.auth import hash_password, verify_password, create_access_token, verify_token, SECRET_KEY, ALGORITHM
+from entity.inventory_entity import InventoryEntity
+from utils.auth import hash_password, verify_password, create_access_token, verify_token, SECRET_KEY, ALGORITHM , create_refresh_token
 from models.saas_context import SaasContext
 from models.user_model import UserModel, ResetpasswordRequest, LoginRequest, PersonModel
 from models.response_model import ResponseModel
@@ -13,10 +14,14 @@ from utils.send_email_otp import otpEmailService, otp_store
 from utils.create_notification import get_template_body, render_template
 from entity.inventory_entity import CategoryEntity
 from entity.order_entity import DineinOrder
-import random
-from datetime import datetime, timedelta
-from services.add_users import create_user_and_person, getting_screen_id, get_user_perms, has_user_permission
-from services.person_service import set_primary_address_service
+from services.chat_service import ask_restaurant_ai,ChatbotService,ChatRequest
+from datetime import datetime, timedelta, time
+from services.add_users import (create_user_and_person, login_user_service, get_user_perms, has_user_permission , delete_user_service , 
+                                  forgot_password_service ,reset_password_service)
+from services.person_service import (update_person_details_service, get_person_details_service, get_all_persons_service, 
+                                       save_address_service, get_addresses_service, update_address_service, get_customer_addresses_service, set_primary_address_service,
+find_or_create_customer_service,search_customers_service)
+from services.auth_service import refresh_access_token
 from jose import jwt
 import uuid , os
 from sqlalchemy import func
@@ -24,6 +29,7 @@ from models.client_model import AddressModel
 from utils.services import add_master_value , get_master_values ,delete_master_value
 from dotenv import load_dotenv
 from zoneinfo import ZoneInfo
+from jose import JWTError
 load_dotenv()
 TIMEZONE = os.getenv("TIMEZONE", "UTC") 
 router = APIRouter()
@@ -51,83 +57,18 @@ async def register_user(client_id: str, userReq: UserModel, context: SaasContext
     return await create_user_and_person(client_id=client_id, userReq=userReq, db=db, token_realm=token_realm)
 
 @router.post("/login")
-async def login_user(client_id: str, userReq: LoginRequest, db: Session = Depends(get_db)):
-    user = db.query(User).filter(
-        and_(User.username == userReq.username, User.client_id == client_id)
-    ).first()
-    print(db ,"is my credentials")
-    if not user or not verify_password(userReq.password, user.hashed_password):
-        raise HTTPException(status_code=400, detail="Invalid credentials")
+async def login_user(client_id: str,userReq: LoginRequest,db: Session = Depends(get_db)):
+    result = login_user_service(client_id=client_id,username=userReq.username,password=userReq.password,db=db)
 
-    userModel = User.copyToModel(user)
-
-    client = db.query(Client).filter(Client.id == client_id).first()
-    client_model = Client.copyToModel(client)
-
-    # newly added to handle roles in case insenesitive manner
-    roles = [str(r).strip() for r in (userModel.roles or [])]
-
-    token = create_access_token({
-        "user_id": str(userModel.id),
-        "roles": roles,
-        "client_id": userModel.client_id,
-        "grants": userModel.grants,
-        "realm": client_model.realm
-    })
-    screen_id = getting_screen_id(token, db)
-
-    print("my screen_id : ", screen_id)
-
-    return ResponseModel(screen_id=screen_id, data={"access_token": token, "token_type": "bearer"})
+    return ResponseModel(screen_id=result["screen_id"],
+        data={"access_token": result["access_token"],"refresh_token": result["refresh_token"],"token_type": result["token_type"],"client": result["client"]})
 
 # ================== DELETE USER ==================
 @router.delete("/delete")
-async def delete_user(
-    client_id: str,
-    user_id: str,
-    context: SaasContext = Depends(verify_token),
-    db: Session = Depends(get_db)
-):
-    # Permission checking
-    perms = get_user_perms(context, db, client_id)
-    if not has_user_permission(perms, "users", "delete"):
-        raise HTTPException(status_code=403, detail="User delete not allowed")
+async def delete_user(client_id: str,user_id: str,context: SaasContext = Depends(verify_token),db: Session = Depends(get_db)):
+    result = delete_user_service(client_id=client_id,user_id=user_id,context=context,db=db)
 
-    # Validating the UUID
-    try:
-        user_uuid = uuid.UUID(str(user_id))
-    except ValueError:
-        raise HTTPException(status_code=400, detail="Invalid user_id")
-
-    #Fetching user
-    user = db.query(User).filter(
-        User.id == user_uuid,
-        User.client_id == client_id
-    ).first()
-
-    if not user:
-        raise HTTPException(status_code=404, detail="User not found")
-
-    # preventing self delete
-    if str(context.user_id) == str(user_uuid):
-        raise HTTPException(status_code=400, detail="You cannot delete yourself")
-
-    #Delete related person
-    person = db.query(Person).filter(Person.id == user_uuid).first()
-    if person:
-        db.delete(person)
-
-    # Delete user
-    db.delete(user)
-    db.commit()
-
-    return ResponseModel(
-        screen_id=context.screen_id,
-        data={
-            "message": "User deleted successfully",
-            "user_id": str(user_uuid)
-        }
-    )
+    return ResponseModel(screen_id=context.screen_id,data=result)
 
 @router.get("/test")
 async def test_msg(client_id: str, context: SaasContext = Depends(verify_token), db: Session = Depends(get_db)):
@@ -153,254 +94,39 @@ async def test_msg(client_id: str, context: SaasContext = Depends(verify_token),
 
 # ================== FORGOT PASSWORD ==================
 @router.post("/forgot-password")
-async def forgot_password(client_id: str, req_data: ResetpasswordRequest, db: Session = Depends(get_db)):
-    if not req_data.username:
-        raise HTTPException(status_code=400, detail="Username is required")
-
-    user = db.query(User).filter(
-        and_(User.username == req_data.username, User.client_id == client_id)
-    ).first()
-    if not user:
-        raise HTTPException(status_code=404, detail="User not found")
-
-    userModel = User.copyToModel(user)
-    person = db.query(Person).filter(Person.id == userModel.id).first()
-    if not person or not person.email:
-        raise HTTPException(status_code=404, detail="Email not found")
-
-    # If OTP not provided, generate and send OTP
-    if not req_data.otp and not req_data.new_password:
-        otp = str(random.randint(100000, 999999))
-        otp_store[userModel.id] = {
-            "otp": otp, "expires": datetime.now(ZoneInfo(TIMEZONE))  + timedelta(minutes=10)}
-
-        metadata = {"username": userModel.username,
-                    "clientId": client_id, "otp": otp}
-        template_body = get_template_body(db, client_id, "forgot_password", "template") \
-            or "Dear {username}, your OTP for resetting password in {clientId} is {otp}."
-
-        notification_text = render_template(template_body, metadata)
-        if not otpEmailService(person.email, notification_text):
-            raise HTTPException(status_code=500, detail="Failed to send OTP")
-
-        return ResponseModel(data={"message": "OTP sent successfully"})
-
-    # If OTP and new_password provided, verify OTP and reset password
-    if req_data.otp and req_data.new_password:
-        otp_data = otp_store.get(userModel.id)
-        if not otp_data:
-            raise HTTPException(status_code=400, detail="OTP not requested")
-        if otp_data["otp"] != req_data.otp:
-            raise HTTPException(status_code=400, detail="Invalid OTP")
-        if datetime.now(ZoneInfo(TIMEZONE)) > otp_data["expires"]:
-            raise HTTPException(status_code=400, detail="OTP expired")
-        if req_data.new_password != req_data.confirm_password:
-            raise HTTPException(
-                status_code=400, detail="Passwords do not match")
-
-        user.hashed_password = hash_password(req_data.new_password)
-        db.commit()
-        otp_store.pop(userModel.id, None)
-
-        metadata = {"username": userModel.username, "clientId": client_id}
-        template_body = get_template_body(db, client_id, "reset_password_success", "template") \
-            or "Dear {username}, your password for {clientId} has been reset successfully."
-        otpEmailService(person.email, render_template(template_body, metadata))
-
-        return ResponseModel(screen_id="default_user", data={"message": "Password reset successfully"})
-
-    raise HTTPException(status_code=400, detail="Invalid request data")
+async def forgot_password(client_id: str,req_data: ResetpasswordRequest,db: Session = Depends(get_db)):
+    return await forgot_password_service(client_id,req_data,db)
 
 # ================== RESET PASSWORD ==================
 @router.post("/reset-password")
-async def reset_password(client_id: str, req_data: ResetpasswordRequest, context: SaasContext = Depends(verify_token), db: Session = Depends(get_db)):
-    user = db.query(User).filter(
-        and_(User.username == req_data.username, User.client_id == client_id)
-    ).first()
-    if not user:
-        raise HTTPException(status_code=404, detail="User not found")
-
-    userModel = User.copyToModel(user)
-
-    # OTP request flow
-    if not req_data.otp and not req_data.old_password:
-        person = db.query(Person).filter(Person.id == userModel.id).first()
-        if not person or not person.email:
-            raise HTTPException(status_code=404, detail="User email not found")
-
-        otp = str(random.randint(100000, 999999))
-        otp_store[userModel.id] = {
-            "otp": otp, "expires": datetime.now(ZoneInfo(TIMEZONE)) + timedelta(minutes=10)}
-
-        metadata = {"username": userModel.username,
-                    "clientId": client_id, "otp": otp}
-        template_body = get_template_body(db, client_id, "reset_password", "template") \
-            or "Dear {username}, your reset-password OTP for {clientId} is {otp}"
-
-        otpEmailService(person.email, render_template(template_body, metadata))
-
-        return ResponseModel(screen_id=context.screen_id, data={"message": "OTP sent successfully"})
-
-    # OTP verification
-    if req_data.otp:
-        otp_data = otp_store.get(userModel.id)
-        if not otp_data:
-            raise HTTPException(status_code=400, detail="OTP not requested")
-        if otp_data["otp"] != req_data.otp:
-            raise HTTPException(status_code=400, detail="Invalid OTP")
-        if datetime.now(ZoneInfo(TIMEZONE)) > otp_data["expires"]:
-            raise HTTPException(status_code=400, detail="OTP expired")
-
-    # Old password verification
-    elif req_data.old_password:
-        if not verify_password(req_data.old_password, user.hashed_password):
-            raise HTTPException(status_code=400, detail="Invalid old password")
-
-    if req_data.new_password != req_data.confirm_password:
-        raise HTTPException(status_code=400, detail="Passwords do not match")
-
-    user.hashed_password = hash_password(req_data.new_password)
-    db.commit()
-    otp_store.pop(userModel.id, None)
-
-    # Success notification if OTP flow
-    if req_data.otp:
-        person = db.query(Person).filter(Person.id == userModel.id).first()
-        if person and person.email:
-            metadata = {"username": userModel.username, "clientId": client_id}
-            template_body = get_template_body(db, client_id, "reset_password_success", "template") \
-                or "Dear {username}, your password for {clientId} has been reset successfully."
-            otpEmailService(person.email, render_template(
-                template_body, metadata))
-
-    return ResponseModel(screen_id=context.screen_id, data={"message": "Password reset successfully"})
+async def reset_password(client_id: str,req_data: ResetpasswordRequest,context: SaasContext = Depends(verify_token),db: Session = Depends(get_db)):
+    return await reset_password_service(client_id,req_data,context,db)
 
 # ================== PERSON DETAILS ==================
 @router.post("/person-details")
-async def update_person_details(request: Request, client_id: str, person_req: PersonModel,
-                                context: SaasContext = Depends(verify_token), db: Session = Depends(get_db)):
+async def update_person_details(request: Request,client_id: str,person_req: PersonModel,context: SaasContext = Depends(verify_token),db: Session = Depends(get_db)):
     body = await request.json()
 
-    # If admin edit, user_id comes from body
-    target_user_id = body.get("user_id") or context.user_id
-    roles = body.get("roles")
+    result = await update_person_details_service(client_id,person_req,body,context,db)
 
-    try:
-        user_uuid = uuid.UUID(str(target_user_id))
-    except ValueError:
-        raise HTTPException(status_code=400, detail="Invalid user_id")
-
-    # Fetch user using entity and convert to model
-    user_entity = db.query(User).filter(
-        User.id == user_uuid,
-        User.client_id == client_id
-    ).first()
-
-    if not user_entity:
-        raise HTTPException(status_code=404, detail="User not found")
-
-    user_model = User.copyToModel(user_entity)
-
-    # Fetch person using entity and convert to model
-    person_entity = db.query(Person).filter(Person.id == user_uuid).first()
-
-    if person_entity:
-        # Update existing person
-        person_model = Person.copyToModel(person_entity)
-        person_entity.first_name = person_req.first_name
-        person_entity.last_name = person_req.last_name
-        person_entity.dob = person_req.dob
-        person_entity.email = person_req.email
-        person_entity.phone = person_req.phone
-        action = "updated"
-    else:
-        # Create new person
-        person_entity = Person(
-            id=user_model.id,
-            first_name=person_req.first_name,
-            last_name=person_req.last_name,
-            dob=person_req.dob,
-            email=person_req.email,
-            phone=person_req.phone
-        )
-        db.add(person_entity)
-        action = "added"
-
-    # Role update
-    if roles is not None:
-        user_entity.roles = [str(r).strip() for r in roles]
-
-    db.commit()
-    db.refresh(user_entity)
-
-    # Convert updated entity to model for response
-    updated_user_model = User.copyToModel(user_entity)
-
-    return ResponseModel(
-        screen_id=context.screen_id,
-        data={
-            "message": f"User details {action} successfully",
-            "user_id": str(updated_user_model.id)
-        }
-    )
+    return ResponseModel(screen_id=context.screen_id,data=result)
 
 @router.get("/person-details")
-async def get_person_details(client_id: str, context: SaasContext = Depends(verify_token), db: Session = Depends(get_db)):
-    try:
-        user_uuid = uuid.UUID(str(context.user_id))
-    except ValueError:
-        raise HTTPException(
-            status_code=400, detail="Invalid user_id format in token")
+async def get_person_details(client_id: str,context: SaasContext = Depends(verify_token),db: Session = Depends(get_db)):
+    result = await get_person_details_service(context,db)
 
-    person = db.query(Person).filter(Person.id == user_uuid).first()
-
-    if not person:
-        person = Person(id=user_uuid, email=None, phone=None,
-                        first_name=None, last_name=None, dob=None)
-        db.add(person)
-        db.commit()
-        db.refresh(person)
-
-    return ResponseModel(screen_id=context.screen_id, data={"person": PersonModel.from_orm(person)})
+    return ResponseModel(screen_id=context.screen_id,data=result)
 
 @router.get("/notifications")
-def get_notifications(
-    client_id: str,
-    context: SaasContext = Depends(verify_token),
-    db: Session = Depends(get_db),
-):
-    return ResponseModel(
-        screen_id=context.screen_id,
-        data={"notifications": []}
-    )
+def get_notifications(client_id: str,context: SaasContext = Depends(verify_token),db: Session = Depends(get_db),):
+    return ResponseModel(screen_id=context.screen_id,data={"notifications": []})
+
 
 @router.get("/persons")
-async def get_all_persons(client_id: str, context: SaasContext = Depends(verify_token), db: Session = Depends(get_db)):
-    results = (
-        db.query(Person, User.username, User.roles)
-        .join(User, Person.id == User.id)
-        .filter(User.client_id == client_id)
-        .all()
-    )
-
-    persons = []
-    for person, username, roles in results:
-        if isinstance(roles, str):
-            roles = [roles.strip("{}")]
-        elif roles is None:
-            roles = []
-
-        persons.append({
-            **Person.copyToModel(person).dict(),
-            "username": username,
-            "role": (roles[0] if roles else "")
-        })
-
-    return ResponseModel(
-        screen_id=context.screen_id,
-        data={"persons": persons}
-    )
-
+async def get_all_persons(client_id: str,context: SaasContext = Depends(verify_token),db: Session = Depends(get_db)):
+    result = await get_all_persons_service(client_id,db)
+    return ResponseModel(screen_id=context.screen_id,data=result)
+  
 @router.post("/delegate-access")
 async def delegate_access(
     client_id: str,
@@ -446,16 +172,10 @@ async def delegate_access(
     return {"delegated_token": token, "expires_at": expire}
 
 @router.get("/users")
-async def get_users_by_client(
-    client_id: str,
-    context: SaasContext = Depends(verify_token),
-    db: Session = Depends(get_db)
-):
+async def get_users_by_client(client_id: str,context: SaasContext = Depends(verify_token),db: Session = Depends(get_db)):
     users = db.query(User).filter(User.client_id == client_id).all()
-
     if not users:
-        raise HTTPException(
-            status_code=404, detail="No users found for this client")
+        raise HTTPException(status_code=404, detail="No users found for this client")
 
     user_models = User.copyToModels(users)
     return ResponseModel(screen_id=context.screen_id, data={"users": user_models})
@@ -578,17 +298,12 @@ async def get_order_summary_by_realm(realm: str = None, context: SaasContext = D
 
 @router.get("/realms")
 async def get_realms(realm: str, context: SaasContext = Depends(verify_token), db: Session = Depends(get_db)):
-    category = db.query(CategoryEntity).filter(
-        CategoryEntity.id == realm).first()
+    category = db.query(CategoryEntity).filter(CategoryEntity.id == realm).first()
 
     if not category:
-        raise HTTPException(
-            status_code=404,
-            detail=f"Category with id '{realm}' not found"
-        )
+        raise HTTPException(status_code=404,detail=f"Category with id '{realm}' not found")
 
-    return ResponseModel(screen_id=context.screen_id,
-                         data={"realms": category.sub_categories or []})
+    return ResponseModel(screen_id=context.screen_id,data={"realms": category.sub_categories or []})
 
 # ========================================= Role Configurations ================================================ #
 @router.get("/permissions/catalog")
@@ -602,7 +317,6 @@ def get_permissions_catalog(client_id: str, context: SaasContext = Depends(verif
 def get_role_config(client_id: str, role: str, context: SaasContext = Depends(verify_token), db: Session = Depends(get_db)):
     rows = (db.query(PageDefinition).filter(PageDefinition.client_id == client_id,
                                             func.lower(PageDefinition.role) == role.lower()).all())
-
     config = {}
     for r in rows:
         config.setdefault(r.module, []).extend(r.operations or [])
@@ -612,14 +326,8 @@ def get_role_config(client_id: str, role: str, context: SaasContext = Depends(ve
 
 @router.post("/roles/{role}/config")
 def save_role_config(client_id: str, role: str, payload: dict, context: SaasContext = Depends(verify_token), db: Session = Depends(get_db)):
-
     role = role.strip()
-
-    db.query(PageDefinition).filter(
-        PageDefinition.client_id == client_id,
-        PageDefinition.role == role
-    ).delete()
-
+    db.query(PageDefinition).filter(PageDefinition.client_id == client_id,PageDefinition.role == role).delete()
     modules = payload.get("modules", {})
 
     for module, ops in modules.items():
@@ -628,56 +336,26 @@ def save_role_config(client_id: str, role: str, payload: dict, context: SaasCont
 
         db.add(PageDefinition(client_id=client_id, role=role, module=module,
                screen_id=f"default_{module}", load_type="include", operations=ops))
-
     db.commit()
     return ResponseModel(screen_id=context.screen_id, message="Role configuration saved")
 
 
 @router.post("/address")
 async def save_address(client_id: str,add: AddressModel,context: SaasContext = Depends(verify_token),db: Session = Depends(get_db)):
-    try:
-        user_uuid = uuid.UUID(str(context.user_id))
-    except ValueError:
-        raise HTTPException(status_code=400, detail="Invalid user id")
-    person = db.query(Person).filter(Person.id == user_uuid).first()
-    if not person:
-        raise HTTPException(status_code=404, detail="Person not found")
-    # Otherwise CREATE
-    new_address = Address(
-        address_line1=add.address_line1,
-        address_line2=add.address_line2,
-        name=add.name,
-        city=add.city,
-        state=add.state,
-        country=add.country,
-        pincode=add.pincode,
-        contact_name=add.contact_name,
-        contact_number=add.contact_number
-    )
+    result = await save_address_service(add,context,db)
 
-    db.add(new_address)
-    db.flush()
-
-    existing_ids = person.saved_address_ids or []
-    existing_ids = list(existing_ids)
-    existing_ids.append(new_address.id)
-    person.saved_address_ids = existing_ids
-    db.commit()
-    return ResponseModel(screen_id=context.screen_id,
-    data={"message": "Address added successfully","address_id": new_address.id}
-    )
+    return ResponseModel(screen_id=context.screen_id,data=result)
 
 @router.get("/address")
-async def get_addresses(client_id: str, context: SaasContext = Depends(verify_token), db: Session = Depends(get_db)):
-    person = db.query(Person).filter(Person.id == context.user_id).first()
+async def get_addresses(client_id: str,context: SaasContext = Depends(verify_token),db: Session = Depends(get_db)):
+    result = await get_addresses_service(context,db)
 
-    if not person or not person.saved_address_ids:
-        return ResponseModel(screen_id=context.screen_id, data={"addresses": []})
+    return ResponseModel(screen_id=context.screen_id,data=result)
 
-    addresses = db.query(Address).filter(Address.id.in_(person.saved_address_ids)).all()
-    address_models = [Address.copyToModel(a) for a in addresses]
-
-    return ResponseModel(screen_id=context.screen_id,data={"addresses": address_models})
+@router.post("/address/{address_id}/set-primary")
+async def set_primary(address_id: int, client_id: str, context: SaasContext = Depends(verify_token), db: Session = Depends(get_db)):
+    result = await set_primary_address_service(address_id, context, db)
+    return ResponseModel(screen_id=context.screen_id, data=result)
 
 @router.get("/roles")
 def get_roles(client_id: str, category_id: str,context: SaasContext = Depends(verify_token),db: Session = Depends(get_db)):
@@ -699,44 +377,111 @@ def delete_role(client_id: str, category_id: str, value: str,context: SaasContex
 
 @router.get("/customer/{customer_id}/addresses")
 async def get_customer_addresses(client_id: str,customer_id: str,context: SaasContext = Depends(verify_token),db: Session = Depends(get_db)):
-    try:
-        customer_uuid = uuid.UUID(str(customer_id))
-    except ValueError:
-        raise HTTPException(status_code=400, detail="Invalid customer_id")
+    result = await get_customer_addresses_service(customer_id,db)
 
-    person = db.query(Person).filter(Person.id == customer_uuid).first()
-
-    if not person or not person.saved_address_ids:
-        return ResponseModel(screen_id=context.screen_id,data=[])
-
-    addresses = (db.query(Address).filter(Address.id.in_(person.saved_address_ids)).all())
-    return ResponseModel(screen_id=context.screen_id,data=[Address.copyToModel(a).dict() for a in addresses])
+    return ResponseModel(screen_id=context.screen_id,data=result)
 
 @router.put("/address/{address_id}")
 async def update_address(address_id: int,add: AddressModel,client_id: str,context: SaasContext = Depends(verify_token),db: Session = Depends(get_db)):
-    address = db.query(Address).filter(
-        Address.id == address_id
-    ).first()
+    result = await update_address_service(address_id,add,db)
 
-    if not address:
-        raise HTTPException(status_code=404,detail="Address not found")
+    return ResponseModel(screen_id=context.screen_id,data=result)
 
-    address.address_line1 = add.address_line1
-    address.address_line2 = add.address_line2
-    address.name = add.name
-    address.city = add.city
-    address.state = add.state
-    address.country = add.country
-    address.pincode = add.pincode
-    address.contact_name = add.contact_name
-    address.contact_number = add.contact_number
-
-    db.commit()
-    db.refresh(address)
-
-    return ResponseModel(screen_id=context.screen_id,data={"message": "Address updated successfully"})
-
-@router.post("/address/{address_id}/set-primary")
-async def set_primary(address_id: int, client_id: str, context: SaasContext = Depends(verify_token), db: Session = Depends(get_db)):
-    result = await set_primary_address_service(address_id, context, db)
+@router.post("/refresh")
+async def refresh_token(req: Request, db: Session = Depends(get_db)):
+    body = await req.json()
+    result = refresh_access_token(body.get("refresh_token"), db)
+    return ResponseModel(data=result)
+  
+@router.post("/customer/find_or_create")
+async def find_or_create_customer(client_id: str, payload: dict, context: SaasContext = Depends(verify_token), db: Session = Depends(get_db)):
+    result = await find_or_create_customer_service(
+        email=payload.get("contact_email"),
+        phone=payload.get("contact_phone"),
+        shipping_address=payload.get("shipping_address"),
+        customer_id=payload.get("customer_id"),
+        address_id=payload.get("address_id"),
+        db=db,
+    )
     return ResponseModel(screen_id=context.screen_id, data=result)
+
+@router.get("/customer/search")
+async def search_customers(client_id: str, q: str = "", context: SaasContext = Depends(verify_token), db: Session = Depends(get_db)):
+    result = await search_customers_service(q, db)
+    return ResponseModel(screen_id=context.screen_id, data={"customers": result})
+
+@router.post("/chat")
+async def chat(client_id: str,req: ChatRequest,db: Session = Depends(get_db)):
+    inventory_items = db.query(InventoryEntity).filter(InventoryEntity.client_id == client_id).all()
+    categories = db.query(CategoryEntity).filter(CategoryEntity.client_id == client_id).all()
+
+    orders = db.query(DineinOrder).filter(DineinOrder.client_id == client_id).all()
+
+    menu_context = []
+    menu_unique_items = set()
+
+    for category in categories:
+        category_items = [
+            item for item in inventory_items
+            if item.category_id == category.id
+        ]
+
+        item_lines = []
+
+        for item in category_items:
+            if not item.name:
+                continue
+
+            clean_name = item.name.strip()
+
+            # Remove duplicate menu items
+            if clean_name.lower() in menu_unique_items:
+                continue
+
+            menu_unique_items.add(clean_name.lower())
+            item_lines.append(f"{clean_name} - ₹{item.price}")
+
+        # Add category only if items exist
+        if item_lines:
+            menu_context.append(f"{category.name}: {', '.join(item_lines)}")
+          
+    # ================= BUILD ORDER ITEMS CONTEXT =================
+    ordered_items_context = []
+
+    total_orders = len(orders)
+
+    for order in orders:
+        order_items = []
+        for item in order.items:
+
+            if not item.item_name:
+                continue
+
+            order_items.append(f"{item.item_name} x {item.quantity}")
+
+        if order_items:
+            ordered_items_context.append(
+                f"Order #{order.id}: {', '.join(order_items)}"
+            )
+
+    # ================= FINAL CONTEXT =================
+
+    realtime_context = f"""
+    MENU:
+
+    {'\n'.join(menu_context)}
+
+    TOTAL MENU ITEMS:
+    {len(menu_unique_items)}
+
+    TOTAL ORDERS:
+    {total_orders}
+
+    ORDER ITEMS:
+
+    {'\n'.join(ordered_items_context)}
+    """
+    # ================= ASK AI =================
+    reply = await ask_restaurant_ai(req.message,realtime_context)
+
+    return {"reply": reply}
