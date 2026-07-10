@@ -808,56 +808,56 @@ export default function StockRecipeManager({ clientId: propClientId, token: prop
         <div className="grid lg:grid-cols-12 gap-6">
           <main className="lg:col-span-9 space-y-6 min-w-0">
             <div className="max-h-[75vh] overflow-y-auto pr-1">
-              {/* Dynamic Inventory Category Tabs */}
-              {inventoryCategories.some(cat => cat.id === activeTab) && activeTab !== "menu" && (
-                <InventoryCategoryTab
-                  category={inventoryCategories.find(cat => cat.id === activeTab)}
-                  stocks={getStocksForInventory(activeTab)}
-                  loading={loading}
-                  searchQuery={searchQuery}
-                  onSearchChange={setSearchQuery}
-                  sortBy={stockSortBy}
-                  onSortChange={setStockSortBy}
-                  onAddNew={() => openStockModal(null, activeTab)}
-                  onEdit={openStockModal}
-                  onDelete={deleteStock}
-                  allCategories={allCategories}
-                  onAddQty={openAddStockModal}
-                  onDeduct={openDeductModal}
-                />
-              )}
+            {/* Dynamic Inventory Category Tabs */}
+            {inventoryCategories.some(cat => cat.id === activeTab) && activeTab !== "menu" && (
+              <InventoryCategoryTab
+                category={inventoryCategories.find(cat => cat.id === activeTab)}
+                stocks={getStocksForInventory(activeTab)}
+                loading={loading}
+                searchQuery={searchQuery}
+                onSearchChange={setSearchQuery}
+                sortBy={stockSortBy}
+                onSortChange={setStockSortBy}
+                onAddNew={() => openStockModal(null, activeTab)}
+                onEdit={openStockModal}
+                onDelete={deleteStock}
+                allCategories={allCategories}
+                onAddQty={openAddStockModal}
+                onDeduct={openDeductModal}
+              />
+            )}
 
 
-              {/* Menu Availability Tab */}
-              {activeTab === "menu" && (
-                <MenuAvailabilityTab
-                  menuItems={menuItems}
-                  loading={loading}
-                  onUpdateAvailability={updateMenuAvailability}
-                  onAddQty={openAddStockModal}
-                  onDeduct={openDeductModal}
-                  allCategories={allCategories}
-                  units={units}
-                  searchQuery={menuSearchQuery}
-                  onSearchChange={setMenuSearchQuery}
-                />
-              )}
+            {/* Menu Availability Tab */}
+            {activeTab === "menu" && (
+              <MenuAvailabilityTab
+                menuItems={menuItems}
+                loading={loading}
+                onUpdateAvailability={updateMenuAvailability}
+                onAddQty={openAddStockModal}
+                onDeduct={openDeductModal} 
+                allCategories={allCategories}
+                units={units}
+                searchQuery={menuSearchQuery}
+                onSearchChange={setMenuSearchQuery}
+              />
+            )}
 
-              {activeTab === "recipe" && (
-                <RecipeTab
-                  menuItems={menuItems}
-                  selectedMenuId={selectedMenuId}
-                  recipe={recipe}
-                  stocks={stocks}
-                  newIngredient={newIngredient}
-                  setNewIngredient={setNewIngredient}
-                  onSelectMenu={selectMenu}
-                  onAddIngredient={addIngredient}
-                  onUpdateIngredient={updateIngredient}
-                  onDeleteIngredient={deleteIngredient}
-                  units={units}
-                />
-              )}
+            {activeTab === "recipe" && (
+              <RecipeTab
+                menuItems={menuItems}
+                selectedMenuId={selectedMenuId}
+                recipe={recipe}
+                stocks={stocks}
+                newIngredient={newIngredient}
+                setNewIngredient={setNewIngredient}
+                onSelectMenu={selectMenu}
+                onAddIngredient={addIngredient}
+                onUpdateIngredient={updateIngredient}
+                onDeleteIngredient={deleteIngredient}
+                units={units}
+              />
+            )}
             </div>
           </main>
 
@@ -1031,31 +1031,31 @@ function InventoryCategoryTab({
   };
 
   const sortedStocks = useMemo(() => {
-    const sorted = [...stocks];
-    switch (sortBy) {
-      case "name_asc":
-        sorted.sort((a, b) => (a.name || "").localeCompare(b.name || ""));
-        break;
-      case "name_desc":
-        sorted.sort((a, b) => (b.name || "").localeCompare(a.name || ""));
-        break;
-      case "availability_asc":
-        sorted.sort((a, b) => Number(a.effectiveAvailability || 0) - Number(b.effectiveAvailability || 0));
-        break;
-      case "availability_desc":
-        sorted.sort((a, b) => Number(b.effectiveAvailability || 0) - Number(a.effectiveAvailability || 0));
-        break;
-      case "price_asc":
-        sorted.sort((a, b) => Number(a.unit_price || 0) - Number(b.unit_price || 0));
-        break;
-      case "price_desc":
-        sorted.sort((a, b) => Number(b.unit_price || 0) - Number(a.unit_price || 0));
-        break;
-      default:
-        break;
-    }
-    return sorted;
-  }, [stocks, sortBy]);
+  const sorted = [...stocks];
+  switch (sortBy) {
+    case "name_asc":
+      sorted.sort((a, b) => (a.name || "").localeCompare(b.name || ""));
+      break;
+    case "name_desc":
+      sorted.sort((a, b) => (b.name || "").localeCompare(a.name || ""));
+      break;
+    case "availability_asc":
+      sorted.sort((a, b) => Number(a.effectiveAvailability || 0) - Number(b.effectiveAvailability || 0));
+      break;
+    case "availability_desc":
+      sorted.sort((a, b) => Number(b.effectiveAvailability || 0) - Number(a.effectiveAvailability || 0));
+      break;
+    case "price_asc":
+      sorted.sort((a, b) => Number(a.unit_price || 0) - Number(b.unit_price || 0));
+      break;
+    case "price_desc":
+      sorted.sort((a, b) => Number(b.unit_price || 0) - Number(a.unit_price || 0));
+      break;
+    default:
+      break;
+  }
+  return sorted;
+}, [stocks, sortBy]);
 
   if (!category) return null;
 
@@ -1542,19 +1542,19 @@ function MenuAvailabilityTab({ menuItems, loading, onUpdateAvailability, onAddQt
                       </div>
                     ) : (
                       <div className="flex justify-end gap-2">
-                        <button
-                          onClick={() => onAddQty(item)}
-                          className="text-green-700 hover:text-green-900 border border-green-300 px-4 py-2 rounded-lg font-medium text-sm transition-all"
-                        >
-                          + Add Qty
-                        </button>
+                      <button
+                        onClick={() => onAddQty(item)}
+                        className="text-green-700 hover:text-green-900 border border-green-300 px-4 py-2 rounded-lg font-medium text-sm transition-all"
+                      >
+                        + Add Qty
+                      </button>
 
-                        <button
-                          onClick={() => onDeduct(item)}
-                          className="text-red-700 hover:text-red-900 border border-red-300 px-4 py-2 rounded-lg font-medium text-sm transition-all"
-                        >
-                          Deduct
-                        </button>
+                      <button
+                        onClick={() => onDeduct(item)}
+                        className="text-red-700 hover:text-red-900 border border-red-300 px-4 py-2 rounded-lg font-medium text-sm transition-all"
+                      >
+                        Deduct
+                      </button>
                       </div>
                     )}
                   </td>
@@ -1645,32 +1645,32 @@ function StockModal({
           </div>
 
           <div>
-            <label className="block text-sm font-medium text-gray-700 mb-1">Availability</label>
-            <input
-              type="number"
-              step="0.01"
-              min="0"
-              value={form.availability}
-              onChange={(e) => onChange((prev) => ({ ...prev, availability: e.target.value }))}
-              disabled={isEditing}
-              className="w-full px-4 py-2 border border-gray-300 rounded-lg focus:ring-2 focus:ring-indigo-500 focus:border-indigo-500 disabled:bg-gray-100 disabled:cursor-not-allowed"
-            />
-          </div>
+  <label className="block text-sm font-medium text-gray-700 mb-1">Availability</label>
+  <input
+    type="number"
+    step="0.01"
+    min="0"
+    value={form.availability}
+    onChange={(e) => onChange((prev) => ({ ...prev, availability: e.target.value }))}
+    disabled={isEditing}
+    className="w-full px-4 py-2 border border-gray-300 rounded-lg focus:ring-2 focus:ring-indigo-500 focus:border-indigo-500 disabled:bg-gray-100 disabled:cursor-not-allowed"
+  />
+</div>
 
-          <div>
-            <label className="block text-sm font-medium text-gray-700 mb-1">Unit</label>
-            <select
-              value={form.unit}
-              onChange={(e) => onChange((prev) => ({ ...prev, unit: e.target.value }))}
-              disabled={isEditing}
-              className="w-full px-4 py-2 border border-gray-300 rounded-lg focus:ring-2 focus:ring-indigo-500 focus:border-indigo-500 disabled:bg-gray-100 disabled:cursor-not-allowed"
-            >
-              <option value="">Select unit</option>
-              {units.map((u) => (
-                <option key={u} value={u}>{u}</option>
-              ))}
-            </select>
-          </div>
+<div>
+  <label className="block text-sm font-medium text-gray-700 mb-1">Unit</label>
+  <select
+    value={form.unit}
+    onChange={(e) => onChange((prev) => ({ ...prev, unit: e.target.value }))}
+    disabled={isEditing}
+    className="w-full px-4 py-2 border border-gray-300 rounded-lg focus:ring-2 focus:ring-indigo-500 focus:border-indigo-500 disabled:bg-gray-100 disabled:cursor-not-allowed"
+  >
+    <option value="">Select unit</option>
+    {units.map((u) => (
+      <option key={u} value={u}>{u}</option>
+    ))}
+  </select>
+</div>
 
           <div className="sm:col-span-2">
             <label className="block text-sm font-medium text-gray-700 mb-1">Unit Price (₹)</label>
