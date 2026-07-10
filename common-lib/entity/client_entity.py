@@ -18,6 +18,7 @@ class Client(Base):
     created_date_time = Column(DateTime, default=func.now())
     updated_date_time = Column(DateTime, default=func.now(), onupdate=func.now())
     subscription = Column(ARRAY(String), nullable=True)
+    gst_number = Column(Text, nullable=True)
 
 
     @staticmethod

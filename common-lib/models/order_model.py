@@ -79,6 +79,7 @@ class TransactionTypeEnum(str, Enum):
 
 
 class MovementTypeEnum(str, Enum):
+    in_ = "IN"
     out = "OUT"
     reversal = "REVERSAL"
     none = "NONE"
