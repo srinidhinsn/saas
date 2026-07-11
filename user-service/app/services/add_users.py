@@ -97,9 +97,10 @@ def get_user_role_permissions(db, client_id: str, role: str):
     return perms
 
 def get_user_perms(context, db, client_id):
-    perms = {}
     roles = [r.lower().strip() for r in (context.roles or [])]
-
+    if "super_admin" in roles:
+        return {"__super_admin__": {"ALL"}}
+    perms = {}    
     for role in roles:
         rows = (db.query(PageDefinition).filter(
                 PageDefinition.client_id == client_id,func.lower(PageDefinition.role) == role).all())
@@ -113,6 +114,8 @@ def get_user_perms(context, db, client_id):
     return perms
 
 def has_user_permission(role_perms, module: str, operation: str | None = None):
+    if "ALL" in role_perms.get("__super_admin__", set()):
+        return True
     ops = role_perms.get(module, set())
     if "ALL" in ops:
         return True
