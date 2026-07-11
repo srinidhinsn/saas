@@ -308,8 +308,12 @@ async def get_realms(realm: str, context: SaasContext = Depends(verify_token), d
 # ========================================= Role Configurations ================================================ #
 @router.get("/permissions/catalog")
 def get_permissions_catalog(client_id: str, context: SaasContext = Depends(verify_token), db: Session = Depends(get_db)):
+    realm_row = (db.query(CategoryEntity).filter(CategoryEntity.client_id == "saas", CategoryEntity.id == "realm").first())
+    excluded_ids = {"realm"}
+    if realm_row and realm_row.sub_categories:
+        excluded_ids.update(realm_row.sub_categories)
     categories = (db.query(CategoryEntity).filter(
-        CategoryEntity.client_id=="saas").all())
+        CategoryEntity.client_id=="saas",CategoryEntity.id.notin_(excluded_ids)).all())
     return ResponseModel(screen_id=context.screen_id,
                          data={"modules": [{"module": c.id, "label": c.name, "operations": c.sub_categories or []}for c in categories]})
 
@@ -318,27 +322,36 @@ def get_role_config(client_id: str, role: str, context: SaasContext = Depends(ve
     rows = (db.query(PageDefinition).filter(PageDefinition.client_id == client_id,
                                             func.lower(PageDefinition.role) == role.lower()).all())
     config = {}
+    screen_ids = {}
     for r in rows:
         config.setdefault(r.module, []).extend(r.operations or [])
+        screen_ids[r.module] = r.screen_id
 
-    return ResponseModel(screen_id=context.screen_id, data={"config": config})
-
+    return ResponseModel(screen_id=context.screen_id, data={"config": config, "screen_ids": screen_ids})
 
 @router.post("/roles/{role}/config")
 def save_role_config(client_id: str, role: str, payload: dict, context: SaasContext = Depends(verify_token), db: Session = Depends(get_db)):
     role = role.strip()
-    db.query(PageDefinition).filter(PageDefinition.client_id == client_id,PageDefinition.role == role).delete()
+    db.query(PageDefinition).filter(PageDefinition.client_id == client_id, PageDefinition.role == role).delete()
+
     modules = payload.get("modules", {})
+    screen_ids = payload.get("screen_ids", {})
 
     for module, ops in modules.items():
-        if not ops:
+        screen_id_val = screen_ids.get(module)
+        if not ops and not screen_id_val:
             continue
 
-        db.add(PageDefinition(client_id=client_id, role=role, module=module,
-               screen_id=f"default_{module}", load_type="include", operations=ops))
+        db.add(PageDefinition(
+            client_id=client_id,
+            role=role,
+            module=module,
+            screen_id=screen_id_val or f"default_{module}",
+            load_type="include",
+            operations=ops
+        ))
     db.commit()
     return ResponseModel(screen_id=context.screen_id, message="Role configuration saved")
-
 
 @router.post("/address")
 async def save_address(client_id: str,add: AddressModel,context: SaasContext = Depends(verify_token),db: Session = Depends(get_db)):
