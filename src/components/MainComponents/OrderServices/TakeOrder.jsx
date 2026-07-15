@@ -12,7 +12,7 @@ import ImagePreview from '../../utils/ImagePreview';
 import InvoiceModal from '../BillingServices/InvoiceModal';
 import { getMenuConfig } from '../../utils/menuConfigResolver';
 import { menuCache } from '../../utils/Menu-utils/menuCache';
-import { getDietaryFromSlug, isItemActive,buildCartItem, getGroupedCartItems, deduplicateOrderItems,getCategoryAndChildrenIds}
+import { getDietaryFromSlug, isItemActive,buildCartItem, getGroupedCartItems, deduplicateOrderItems,getCategoryAndChildrenIds, isPackagingCategoryId, excludePackagingItems}
          from '../../utils/Menu-utils/menuUtils';
 import {useDietaryTypes, useTimings, useZoneConfig, useMenuData,useCounterTree} from '../../utils/Menu-utils/useMenuData';
 // ─────────────────────────────────────────────────────────────────────────────
@@ -1571,6 +1571,8 @@ const TakeOrder = ({ clientId, token, onOrderUpdate, realm }) => {
   const searchInputRef = useRef(null);
   const isMobile = window.matchMedia('(max-width: 1024px)').matches;
 
+  const [pendingPackagingItems, setPendingPackagingItems] = useState([]);
+
   // const [takeawaySections, setTakeawaySections] = useState([]);
   const [zoneConfigId, setZoneConfigId] = useState(null);
   const [selectedDietary, setSelectedDietary] = useState(null);
@@ -1687,6 +1689,23 @@ const TakeOrder = ({ clientId, token, onOrderUpdate, realm }) => {
       toast.error('Failed to save draft.');
     }
   }, [selectedTable, cart, clientId, token, customerDetails]);
+
+  const attachPackagingIfTakeaway = (mainKey, batch, packagingItems) => {
+  if (orderMode !== 'takeaway' || !mainKey || !packagingItems?.length) return;
+  packagingItems.forEach(pkg => {
+    const pkgEntry = buildCartItem(pkg, {
+      batch_timestamp: batch,
+      parent_item_key: mainKey,
+      is_addon: true,
+      _item_type: 'addon',       // reuse the known-good addon path for pricing
+      is_container: true,        // custom flag for later identification only
+    });
+    setCart(prev => [...prev, {
+      ...pkgEntry,
+      unit_price: Number(pkg.unit_price) || 0,   // force-cast in case buildCartItem left it stringy/undefined
+    }]);
+  });
+};
 
   // ─────────────────────────────────────────────────────────────────────────
   // Category / tree utilities
@@ -2694,52 +2713,70 @@ const TakeOrder = ({ clientId, token, onOrderUpdate, realm }) => {
         if (!isMobile) setShowCart(true);
     
       } else {
-      // Show addon picker
-      if (linkedItems.length > 0) {
-        setSelectedMainItem(item);
-        setLineItemsDetails(linkedItems);
-        setLineItemsModalOpen(true);
-      } else {
-        addToCart(item);
-      }
+    // Split real add-ons from packaging/container items
+    const packagingItems = linkedItems.filter(li => isPackagingCategoryId(li.category_id, categoriesFlat));
+    const regularAddons = linkedItems.filter(li => !isPackagingCategoryId(li.category_id, categoriesFlat));
+
+    if (regularAddons.length > 0) {
+      // Show modal with ONLY real add-ons; packaging is auto-handled after selection
+      setSelectedMainItem(item);
+      setLineItemsDetails(regularAddons);
+      setPendingPackagingItems(packagingItems);
+      setLineItemsModalOpen(true);
+    } else {
+      // Nothing but packaging linked — skip modal, add item directly
+      let batch = currentBatchTimestamp;
+      if (!batch) { batch = Date.now(); setCurrentBatchTimestamp(batch); }
+      const mainKey = addToCart(item);
+      attachPackagingIfTakeaway(mainKey, batch, packagingItems);
     }
-  };
+  }
+};
 
   const handleAddMainItemWithSelectedAddons = (selectedAddonIds) => {
-    if (!selectedMainItem) return;
-    let batch = currentBatchTimestamp;
-    if (!batch) {
-      batch = Date.now();
-      setCurrentBatchTimestamp(batch);
-    }
+  if (!selectedMainItem) return;
+  let batch = currentBatchTimestamp;
+  if (!batch) {
+    batch = Date.now();
+    setCurrentBatchTimestamp(batch);
+  }
 
-    const mainKey = addToCart(selectedMainItem);
+  const mainKey = addToCart(selectedMainItem);
 
-    lineItemsDetails
-      .filter(i => selectedAddonIds.includes(i.id))
-      .forEach(addon => {
-        const addonEntry = buildCartItem(addon, {
-          batch_timestamp: batch,
-          parent_item_key: mainKey,
-          is_addon: true, _item_type: 'addon', 
-        });
-        setCart(prev => [...prev, addonEntry]);
+  lineItemsDetails
+    .filter(i => selectedAddonIds.includes(i.id))
+    .forEach(addon => {
+      const addonEntry = buildCartItem(addon, {
+        batch_timestamp: batch,
+        parent_item_key: mainKey,
+        is_addon: true, _item_type: 'addon', 
       });
+      setCart(prev => [...prev, addonEntry]);
+    });
 
-    setHasNewItems(true);
-    setLineItemsModalOpen(false);
-    setSelectedMainItem(null);
-    setLineItemsDetails([]);
-  };
+  attachPackagingIfTakeaway(mainKey, batch, pendingPackagingItems);
+
+  setHasNewItems(true);
+  setLineItemsModalOpen(false);
+  setSelectedMainItem(null);
+  setLineItemsDetails([]);
+  setPendingPackagingItems([]);
+};
 
   const handleAddMainItemOnly = () => {
-    if (!selectedMainItem) return;
-    addToCart(selectedMainItem);
-    setLineItemsModalOpen(false);
-    setSelectedMainItem(null);
-    setLineItemsDetails([]);
-    if (!isMobile) setShowCart(true);
-  };
+  if (!selectedMainItem) return;
+  let batch = currentBatchTimestamp;
+  if (!batch) { batch = Date.now(); setCurrentBatchTimestamp(batch); }
+
+  const mainKey = addToCart(selectedMainItem);
+  attachPackagingIfTakeaway(mainKey, batch, pendingPackagingItems);
+
+  setLineItemsModalOpen(false);
+  setSelectedMainItem(null);
+  setLineItemsDetails([]);
+  setPendingPackagingItems([]);
+  if (!isMobile) setShowCart(true);
+};
 
   // ─────────────────────────────────────────────────────────────────────────
   // Place order
@@ -3332,7 +3369,11 @@ const buildOrderPayload = (items) =>
                   {filteredItems.map(item => {
                     const dp = item.discount && Number(item.discount) > 0
                       ? Number(item.discount).toFixed(0) : null;
-                    const ac = item.line_item_id?.length || 0;
+                    {/* OLD: const ac = item.line_item_id?.length || 0; */}
+                    const ac = (item.line_item_id || []).filter(id => {
+                      const li = menuItems.find(mi => Number(mi.id) === Number(id));
+                      return li ? !isPackagingCategoryId(li.category_id, categoriesFlat) : true;
+                    }).length;
                     const dietary = getDietaryFromSlug(item,dietaryOptions);
                     const dietaryColor = dietary ? (dietaryColorMap[dietary] || '') : '';
                     return (
@@ -3504,7 +3545,7 @@ const buildOrderPayload = (items) =>
                     ) : (
                       <>
                         <div className="flex-1 overflow-y-auto mt-4 space-y-2">
-                          {getGroupedCartItems(oldItems).map((group, idx) => (
+                          {getGroupedCartItems(excludePackagingItems(oldItems, categoriesFlat)).map((group, idx) => (
                             <OldItemRow
                               key={`old-${idx}`}
                               group={group}
@@ -3534,7 +3575,7 @@ const buildOrderPayload = (items) =>
                                   <div className="flex-1 h-px bg-gradient-to-r from-orange-400 via-transparent to-transparent" />
                                 </div>
                               )}
-                              {getGroupedCartItems(groupedNewItems[ts]).map((group, idx) => (
+                              {getGroupedCartItems(excludePackagingItems(groupedNewItems[ts], categoriesFlat)).map((group, idx) => (
                                 <NewItemRow
                                   key={`new-${ts}-${idx}`}
                                   group={group}
@@ -3699,7 +3740,7 @@ const buildOrderPayload = (items) =>
 
               {/* Scrollable cart items */}
               <div className="flex-1 overflow-y-auto space-y-2">
-                {getGroupedCartItems(oldItems).map((group, idx) => (
+                {getGroupedCartItems(excludePackagingItems(oldItems, categoriesFlat)).map((group, idx) => (
                   <OldItemRow
                     key={`old-${idx}`}
                     group={group}
@@ -3727,7 +3768,7 @@ const buildOrderPayload = (items) =>
                         <div className="flex-1 h-px bg-gradient-to-r from-orange-400 via-transparent to-transparent" />
                       </div>
                     )}
-                    {getGroupedCartItems(groupedNewItems[ts]).map((group, idx) => (
+                    {getGroupedCartItems(excludePackagingItems(groupedNewItems[ts], categoriesFlat)).map((group, idx) => (
                       <NewItemRow
                         key={`new-${ts}-${idx}`}
                         group={group}
@@ -3817,6 +3858,7 @@ const buildOrderPayload = (items) =>
           setLineItemsModalOpen(false);
           setSelectedMainItem(null);
           setLineItemsDetails([]);
+          setPendingPackagingItems([]);
         }}
         mainItem={selectedMainItem}
         lineItems={lineItemsDetails}

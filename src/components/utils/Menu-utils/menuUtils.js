@@ -286,3 +286,69 @@ export function deduplicateOrderItems(items) {
   });
   return result;
 }
+
+
+export const isPackagingCategoryId = (categoryId, categoriesFlat) => {
+  if (!categoryId || !categoriesFlat?.length) return false;
+  let currentId = categoryId;
+  const visited = new Set();
+  while (currentId && !visited.has(currentId)) {
+    visited.add(currentId);
+    const cat = categoriesFlat.find(c => c.id === currentId);
+    if (!cat) break;
+    if ((cat.name || '').toLowerCase().includes('packaging')) return true;
+    currentId = cat.parentId ?? null;
+  }
+  return false;
+};
+
+
+// ── Packaging add-on helpers (shared across TakeOrder, KDS, Billing) ──
+
+// Cart-item level check: works for freshly-added items (is_container flag,
+// set at add-to-cart time) AND for items reconstructed from the server on
+// reload/draft-restore/view-order (falls back to category_id walk).
+export const isPackagingCartItem = (item, categoriesFlat) => {
+  if (!item) return false;
+  if (item.is_container) return true;
+  return isPackagingCategoryId(item.category_id, categoriesFlat);
+};
+
+export const excludePackagingItems = (items, categoriesFlat) => {
+  return (items || []).filter(i => !isPackagingCartItem(i, categoriesFlat));
+};
+
+export const getPackagingItems = (items, categoriesFlat) => {
+  return (items || []).filter(i => isPackagingCartItem(i, categoriesFlat));
+};
+
+export const getPackagingChargesTotal = (items, categoriesFlat) => {
+  return getPackagingItems(items, categoriesFlat)
+    .reduce((sum, i) => sum + (Number(i.unit_price) || 0) * (Number(i.quantity) || 0), 0);
+};
+
+export const isPackagingMenuRecord = (menuRecord) => {
+  if (!menuRecord) return false;
+  const categoryId = String(menuRecord.category_id || '').toLowerCase();
+  const categoryName = String(menuRecord.category_name || '').toLowerCase();
+  return categoryId.includes('packaging') || categoryName.includes('packaging');
+};
+
+
+// Slug-based packaging check — for contexts where category data isn't
+// available (e.g. billing, where order items only round-trip with
+// id/name/price/slug, not category_id).
+export const isPackagingSlug = (slug) => {
+  if (!slug) return false;
+  const mainPart = slug.includes('__') ? slug.split('__')[0] : slug;
+  return mainPart.toLowerCase().split('_').includes('packaging');
+};
+
+export const isPackagingOrderItem = (item, inventoryMap = {}) => {
+  if (!item) return false;
+  if (isPackagingSlug(item.slug)) return true;
+  const inv = inventoryMap?.[item.item_id ?? item.id];
+  return inv
+    ? String(inv.category_id || inv.category_name || '').toLowerCase().includes('packaging')
+    : false;
+};
