@@ -479,7 +479,7 @@ async def register_client_service(reg_type: str,user: UserModel,address: Address
         grants = user.grants or ["admin"]
         realm = client.realm
     else:
-        roles =  ["super_user"]
+        roles =  [SUPER_USER_REALM]
         grants = [SUPER_USER_REALM]
         realm = SUPER_USER_REALM
     if db.query(Client).filter(Client.id == target_client_id).first():
