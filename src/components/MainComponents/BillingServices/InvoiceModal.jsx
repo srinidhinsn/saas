@@ -620,9 +620,9 @@ if (selectedOrder.contact_phone || selectedOrder.contact_email || selectedOrder.
       }
     }
 
-    if (!currentInvoiceNumber || currentInvoiceNumber.toLowerCase() === "draft") {
-      toast.error("Invoice number will be generated after payment confirmation. Please confirm payment first.");
-      return;
+    const isDraft = !currentInvoiceNumber || currentInvoiceNumber.toLowerCase() === "draft";
+    if (isDraft) {
+      currentInvoiceNumber = "DRAFT";
     }
 
     try {
@@ -795,7 +795,7 @@ if (selectedOrder.contact_phone || selectedOrder.contact_email || selectedOrder.
       doc.text(`Generated on ${new Date().toLocaleString()}`, pageWidth / 2, pageHeight - 35, { align: "center" });
 
       doc.save(`Invoice_${currentInvoiceNumber}_${selectedOrder.id}.pdf`);
-      toast.success("Invoice PDF downloaded successfully!");
+      toast.success(isDraft ? "Draft invoice PDF downloaded!" : "Invoice PDF downloaded successfully!");
     } catch (err) {
       console.error("Error generating PDF:", err);
       toast.error("Failed to generate invoice PDF");

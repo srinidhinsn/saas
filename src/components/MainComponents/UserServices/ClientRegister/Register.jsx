@@ -1,4 +1,5 @@
 import React, { useEffect, useState } from 'react';
+import axios from 'axios';
 import {
   Building2,
   UserPlus,
@@ -23,30 +24,17 @@ const slugify = (value) =>
     .replace(/[^a-z0-9]+/g, '-')
     .replace(/(^-|-$)/g, '');
 
-const inputStyle = {
-  borderColor: '#e5e7eb',
-  backgroundColor: '#ffffff',
-  color: '#111827',
-};
-
-const focusInput = (e) => {
-  e.target.style.borderColor = '#f97316';
-  e.target.style.boxShadow = '0 0 0 3px rgba(249, 115, 22, 0.1)';
-};
-
-const blurInput = (e) => {
-  e.target.style.borderColor = '#e5e7eb';
-  e.target.style.boxShadow = 'none';
-};
-
-// ─── Reusable field ─────────────────────────────────────────────────────────
-const Field = ({ icon: Icon, label, type = 'text', name, value, onChange, placeholder, required = false }) => (
+// ─── Reusable field with inline error support ──────────────────────────────
+const Field = ({ icon: Icon, label, type = 'text', name, value, onChange, placeholder, required = false, error }) => (
   <div>
     <label className="block text-sm font-medium mb-2" style={{ color: '#111827' }}>
       {label}{required && <span style={{ color: '#f97316' }}> *</span>}
     </label>
     <div className="relative">
-      <div className="absolute left-4 top-1/2 -translate-y-1/2 pointer-events-none" style={{ color: '#9ca3af' }}>
+      <div
+        className="absolute left-4 top-1/2 -translate-y-1/2 pointer-events-none"
+        style={{ color: error ? '#ef4444' : '#9ca3af' }}
+      >
         <Icon size={20} />
       </div>
       <input
@@ -56,11 +44,29 @@ const Field = ({ icon: Icon, label, type = 'text', name, value, onChange, placeh
         value={value}
         onChange={onChange}
         className="w-full pl-12 pr-4 py-3 border-2 rounded-lg text-base transition-all outline-none"
-        style={inputStyle}
-        onFocus={focusInput}
-        onBlur={blurInput}
+        style={{
+          borderColor: error ? '#ef4444' : '#e5e7eb',
+          backgroundColor: error ? '#fef2f2' : '#ffffff',
+          color: '#111827',
+        }}
+        onFocus={(e) => {
+          e.target.style.borderColor = error ? '#ef4444' : '#f97316';
+          e.target.style.boxShadow = error
+            ? '0 0 0 3px rgba(239, 68, 68, 0.15)'
+            : '0 0 0 3px rgba(249, 115, 22, 0.1)';
+        }}
+        onBlur={(e) => {
+          e.target.style.borderColor = error ? '#ef4444' : '#e5e7eb';
+          e.target.style.boxShadow = 'none';
+        }}
       />
     </div>
+    {error && (
+      <p className="mt-1.5 text-xs flex items-center gap-1" style={{ color: '#ef4444' }}>
+        <AlertCircle size={12} />
+        {error}
+      </p>
+    )}
   </div>
 );
 
@@ -77,7 +83,9 @@ export default function RegisterPage({ onRegisterSuccess }) {
   const [regType, setRegType] = useState('merchant'); // 'merchant' | 'user'
   const [submitting, setSubmitting] = useState(false);
   const [error, setError] = useState('');
+  const [fieldErrors, setFieldErrors] = useState({});
   const [success, setSuccess] = useState(false);
+  const [duplicateClientModal, setDuplicateClientModal] = useState(false);
 
   const [realmOptions, setRealmOptions] = useState([]);
   const [business, setBusiness] = useState({ client_name: '', client_id: '', realm: '' });
@@ -93,34 +101,34 @@ export default function RegisterPage({ onRegisterSuccess }) {
   const [credentials, setCredentials] = useState({ username: '', password: '', confirm_password: '' });
 
   useEffect(() => {
-    if (regType !== "merchant") return;
-  
+    if (regType !== 'merchant') return;
     const fetchRealms = async () => {
       try {
-        const res = await fetch(
-          `${API_BASE}/${routeClientId || "saas"}/users/realms?realm=realm`
+        const res = await axios.get(
+          `${API_BASE}/${routeClientId || 'saas'}/users/realms`,
+          { params: { realm: 'realm' } }
         );
-  
-        if (!res.ok) throw new Error();
-  
-        const data = await res.json();
-  
         setRealmOptions(
-          (data.data.realms || []).map(r => ({
-            value: r,
-            label: r
-          }))
+          (res.data?.data?.realms || []).map((r) => ({ value: r, label: r }))
         );
       } catch (err) {
-        console.error("Failed to load realms", err);
+        console.error('Failed to load realms', err);
         setRealmOptions([]);
       }
     };
-  
     fetchRealms();
   }, [regType, routeClientId]);
 
-  // ── Keep client_id in sync with client_name unless the user edits it ──
+  // ── Clear a single field's error once the user edits it ──
+  const clearFieldError = (name) => {
+    setFieldErrors((prev) => {
+      if (!prev[name]) return prev;
+      const next = { ...prev };
+      delete next[name];
+      return next;
+    });
+  };
+
   const [clientIdTouched, setClientIdTouched] = useState(false);
   const handleBusinessNameChange = (e) => {
     const value = e.target.value;
@@ -130,150 +138,104 @@ export default function RegisterPage({ onRegisterSuccess }) {
       client_id: clientIdTouched ? prev.client_id : slugify(value),
     }));
     setError('');
+    clearFieldError('client_name');
+    clearFieldError('client_id');
   };
   const handleClientIdChange = (e) => {
     setClientIdTouched(true);
     setBusiness((prev) => ({ ...prev, client_id: slugify(e.target.value) }));
+    clearFieldError('client_id');
   };
 
   const handleChange = (setter) => (e) => {
     const { name, value } = e.target;
     setter((prev) => ({ ...prev, [name]: value }));
     setError('');
+    clearFieldError(name);
   };
 
-  const validate = () => {
-    if (regType === 'merchant') {
-      if (!business.client_name || !business.client_id || !business.realm) {
-        return 'Please complete all business details, including realm.';
-      }
+  // ── Returns { fieldName: errorMessage } for every invalid/missing field ──
+  const validateFields = () => {
+    const errors = {};
+
+    if (!business.client_name.trim()) errors.client_name = 'Please enter a name.';
+    if (!business.client_id.trim()) errors.client_id = 'Client ID is required.';
+    if (regType === 'merchant' && !business.realm) errors.realm = 'Please select a realm.';
+
+    if (!person.first_name.trim()) errors.first_name = 'First name is required.';
+    if (!person.email.trim()) errors.email = 'Email is required.';
+    else if (!/^[^\s@]+@[^\s@]+\.[^\s@]+$/.test(person.email)) errors.email = 'Enter a valid email.';
+    if (!person.phone.trim()) errors.phone = 'Phone number is required.';
+
+    if (!address.address_line1.trim()) errors.address_line1 = 'Address is required.';
+    if (!address.city.trim()) errors.city = 'City is required.';
+    if (!address.pincode.trim()) errors.pincode = 'Pincode is required.';
+    if (!address.country.trim()) errors.country = 'Country is required.';
+
+    if (!credentials.username.trim()) errors.username = 'Please choose a username.';
+    if (!credentials.password) errors.password = 'Please choose a password.';
+    if (!credentials.confirm_password) errors.confirm_password = 'Please confirm your password.';
+    else if (credentials.password && credentials.password !== credentials.confirm_password) {
+      errors.confirm_password = 'Passwords do not match.';
     }
-    if (!person.first_name || !person.email || !person.phone) {
-      return 'Please complete the contact / person details.';
-    }
-    if (!address.address_line1 || !address.city || !address.pincode || !address.country) {
-      return 'Please complete the address details.';
-    }
-    if (!credentials.username || !credentials.password) {
-      return 'Please choose a username and password.';
-    }
-    if (credentials.password !== credentials.confirm_password) {
-      return 'Passwords do not match.';
-    }
-    return '';
+
+    return errors;
   };
 
-  // Best-guess UserModel payload - adjust field names to match your schema.
-  const buildUserPayload = () => {
-    if (regType === 'user') {
-      return {
-        username: credentials.username,
-        password: credentials.password,
-        first_name: person.first_name,
-        last_name: person.last_name,
-        email: person.email,
-        phone: person.phone,
-        // Fixed defaults for the "super user" registration path per spec.
-        realm: 'super_user',
-        grants: ['super_user'],
-      };
-    }
-    return {
-      username: credentials.username,
-      password: credentials.password,
+  const buildClientRegisterPayload = () => ({
+    user: {
       first_name: person.first_name,
       last_name: person.last_name,
       email: person.email,
       phone: person.phone,
-      realm: business.realm,
-      // Registering merchant is treated as the admin / point of contact.
-      grants: ['admin'],
-    };
-  };
-
-  // Best-guess AddressModel payload - adjust field names to match your schema.
-  const buildAddressPayload = () => ({
-    address_line1: address.address_line1,
-    address_line2: address.address_line2,
-    city: address.city,
-    state: address.state,
-    pincode: address.pincode,
-    country: address.country,
-    is_primary: true,
+      username: credentials.username,
+      password: credentials.password,
+      roles: regType === 'merchant' ? ['admin'] : ['super_user'],
+      grants: regType === 'merchant' ? ['admin'] : ['super_user'],
+    },
+    address: {
+      address_line1: address.address_line1,
+      address_line2: address.address_line2,
+      city: address.city,
+      state: address.state,
+      country: address.country,
+      pincode: address.pincode,
+      contact_name: `${person.first_name} ${person.last_name || ''}`.trim(),
+      contact_number: person.phone,
+    },
+    client: {
+      id: business.client_id,
+      name: business.client_name,
+      realm: regType === 'merchant' ? business.realm : undefined,
+    },
   });
 
   const handleRegister = async () => {
-    const validationError = validate();
-    if (validationError) {
-      setError(validationError);
+    const errors = validateFields();
+    if (Object.keys(errors).length > 0) {
+      setFieldErrors(errors);
+      setError('Please fix the highlighted fields below.');
       return;
     }
 
+    setFieldErrors({});
     setError('');
     setSubmitting(true);
 
-    // "user" registrations always live under the fixed "user" tenant per spec;
-    // merchant registrations mint a brand-new client_id.
-    const effectiveClientId = regType === 'user' ? 'user' : business.client_id;
+    const routeScopeClientId = routeClientId || 'saas';
 
     try {
-      // 1) Merchant only: create the Client (tenant) record first.
-      if (regType === 'merchant') {
-        // TODO(api): placeholder endpoint - no client-creation route exists
-        // in the provided user_routes.py yet. Point this at the real one.
-        const clientRes = await fetch(`${API_BASE}/${effectiveClientId}/users/client-register`, {
-          method: 'POST',
-          headers: { 'Content-Type': 'application/json' },
-          body: JSON.stringify({
-            client_id: business.client_id,
-            client_name: business.client_name,
-            realm: business.realm,
-          }),
-        });
-        if (!clientRes.ok) {
-          const errData = await clientRes.json().catch(() => ({}));
-          throw new Error(errData.detail || 'Could not create the business account.');
-        }
-      }
+      const res = await axios.post(
+        `${API_BASE}/${routeScopeClientId}/users/client-register`,
+        buildClientRegisterPayload(),
+        { params: { reg_type: regType } }
+      );
 
-      // 2) Create the person + user record.
-      const registerRes = await fetch(`${API_BASE}/${effectiveClientId}/users/register`, {
-        method: 'POST',
-        headers: { 'Content-Type': 'application/json' },
-        body: JSON.stringify(buildUserPayload()),
-      });
-      if (!registerRes.ok) {
-        const errData = await registerRes.json().catch(() => ({}));
-        throw new Error(errData.detail || 'Registration failed.');
-      }
-
-      // 3) Log in immediately to obtain a token, since /address requires one.
-      const loginRes = await fetch(`${API_BASE}/${effectiveClientId}/users/login`, {
-        method: 'POST',
-        headers: { 'Content-Type': 'application/json' },
-        body: JSON.stringify({ username: credentials.username, password: credentials.password }),
-      });
-      if (!loginRes.ok) {
-        throw new Error('Account created, but automatic login failed. Please log in manually.');
-      }
-      const loginData = await loginRes.json();
-      const accessToken = loginData?.data?.access_token;
-      const refreshToken = loginData?.data?.refresh_token;
-      const screenId = loginData?.screen_id;
-
-      // 4) Save the address using the freshly-issued token.
-      const addressRes = await fetch(`${API_BASE}/${effectiveClientId}/users/address`, {
-        method: 'POST',
-        headers: {
-          'Content-Type': 'application/json',
-          Authorization: `Bearer ${accessToken}`,
-        },
-        body: JSON.stringify(buildAddressPayload()),
-      });
-      if (!addressRes.ok) {
-        const errData = await addressRes.json().catch(() => ({}));
-        throw new Error(errData.detail || 'Account created, but saving the address failed.');
-      }
+      const result = res.data;
+      const accessToken = result?.data?.access_token;
+      const refreshToken = result?.data?.refresh_token;
+      const screenId = result?.data?.screen_id;
+      const effectiveClientId = result?.data?.client_id;
 
       setSuccess(true);
 
@@ -285,7 +247,16 @@ export default function RegisterPage({ onRegisterSuccess }) {
         navigate(`/saas/${effectiveClientId}/login`, { replace: true });
       }, 1800);
     } catch (err) {
-      setError(err.message || 'Something went wrong. Please try again.');
+      const detail = err.response?.data?.detail;
+
+      if (err.response?.status === 400 && detail?.toLowerCase().includes('client id already exists')) {
+        setDuplicateClientModal(true);
+      } else if (err.response?.status === 400 && detail?.toLowerCase().includes('username already exists')) {
+        setFieldErrors((prev) => ({ ...prev, username: 'This username is already taken.' }));
+        setError('Please fix the highlighted fields below.');
+      } else {
+        setError(detail || err.message || 'Something went wrong. Please try again.');
+      }
     } finally {
       setSubmitting(false);
     }
@@ -311,7 +282,6 @@ export default function RegisterPage({ onRegisterSuccess }) {
     <div className="min-h-screen flex items-center justify-center p-4" style={{ backgroundColor: '#f9fafb' }}>
       <div className="w-full max-w-2xl">
         <div className="bg-white rounded-xl shadow-md p-8 md:p-10">
-          {/* Header */}
           <div className="text-center mb-6">
             <div
               className="w-16 h-16 rounded-full flex items-center justify-center mx-auto mb-4 shadow-lg"
@@ -327,11 +297,14 @@ export default function RegisterPage({ onRegisterSuccess }) {
             </p>
           </div>
 
-          {/* Registration type toggle */}
           <div className="grid grid-cols-2 gap-3 mb-8">
             <button
               type="button"
-              onClick={() => setError('') || setRegType('merchant')}
+              onClick={() => {
+                setError('');
+                setFieldErrors({});
+                setRegType('merchant');
+              }}
               className="flex items-center justify-center gap-2 py-3 rounded-lg font-semibold border-2 transition-all"
               style={{
                 borderColor: regType === 'merchant' ? '#f97316' : '#e5e7eb',
@@ -344,7 +317,11 @@ export default function RegisterPage({ onRegisterSuccess }) {
             </button>
             <button
               type="button"
-              onClick={() => setError('') || setRegType('user')}
+              onClick={() => {
+                setError('');
+                setFieldErrors({});
+                setRegType('user');
+              }}
               className="flex items-center justify-center gap-2 py-3 rounded-lg font-semibold border-2 transition-all"
               style={{
                 borderColor: regType === 'user' ? '#f97316' : '#e5e7eb',
@@ -353,7 +330,7 @@ export default function RegisterPage({ onRegisterSuccess }) {
               }}
             >
               <User size={18} />
-              Super User
+              User
             </button>
           </div>
 
@@ -365,37 +342,39 @@ export default function RegisterPage({ onRegisterSuccess }) {
           )}
 
           <div className="space-y-8">
-            {/* Business details - merchant only */}
-            {regType === 'merchant' && (
-              <div>
-                <SectionTitle>Business Details</SectionTitle>
-                <div className="space-y-4">
-                  <Field
-                    icon={Building2}
-                    label="Business Name"
-                    name="client_name"
-                    value={business.client_name}
-                    onChange={handleBusinessNameChange}
-                    placeholder="e.g. Spice Route Kitchen"
-                    required
-                  />
-                  <Field
-                    icon={Hash}
-                    label="Client ID"
-                    name="client_id"
-                    value={business.client_id}
-                    onChange={handleClientIdChange}
-                    placeholder="auto-generated from business name"
-                    required
-                  />
+            <div>
+              <SectionTitle>{regType === 'merchant' ? 'Business Details' : 'Account / Tenant Details'}</SectionTitle>
+              <div className="space-y-4">
+                <Field
+                  icon={Building2}
+                  label={regType === 'merchant' ? 'Business Name' : 'Account Name'}
+                  name="client_name"
+                  value={business.client_name}
+                  onChange={handleBusinessNameChange}
+                  placeholder={regType === 'merchant' ? 'e.g. Spice Route Kitchen' : 'e.g. Jane Doe Admin'}
+                  required
+                  error={fieldErrors.client_name}
+                />
+                <Field
+                  icon={Hash}
+                  label="Client ID"
+                  name="client_id"
+                  value={business.client_id}
+                  onChange={handleClientIdChange}
+                  placeholder="auto-generated from name"
+                  required
+                  error={fieldErrors.client_id}
+                />
+
+                {regType === 'merchant' && (
                   <div>
                     <label className="block text-sm font-medium mb-2" style={{ color: '#111827' }}>
-                      Realm <span style={{ color: '#f97316' }}>*</span>
+                      Realm <span style={{ color: '#f97316' }}> *</span>
                     </label>
                     <div className="relative">
                       <div
                         className="absolute left-4 top-1/2 -translate-y-1/2 pointer-events-none"
-                        style={{ color: '#9ca3af' }}
+                        style={{ color: fieldErrors.realm ? '#ef4444' : '#9ca3af' }}
                       >
                         <Globe size={20} />
                       </div>
@@ -404,24 +383,39 @@ export default function RegisterPage({ onRegisterSuccess }) {
                         value={business.realm}
                         onChange={handleChange(setBusiness)}
                         className="w-full pl-12 pr-4 py-3 border-2 rounded-lg text-base transition-all outline-none appearance-none"
-                        style={inputStyle}
-                        onFocus={focusInput}
-                        onBlur={blurInput}
+                        style={{
+                          borderColor: fieldErrors.realm ? '#ef4444' : '#e5e7eb',
+                          backgroundColor: fieldErrors.realm ? '#fef2f2' : '#ffffff',
+                          color: '#111827',
+                        }}
+                        onFocus={(e) => {
+                          e.target.style.borderColor = fieldErrors.realm ? '#ef4444' : '#f97316';
+                          e.target.style.boxShadow = fieldErrors.realm
+                            ? '0 0 0 3px rgba(239, 68, 68, 0.15)'
+                            : '0 0 0 3px rgba(249, 115, 22, 0.1)';
+                        }}
+                        onBlur={(e) => {
+                          e.target.style.borderColor = fieldErrors.realm ? '#ef4444' : '#e5e7eb';
+                          e.target.style.boxShadow = 'none';
+                        }}
                       >
                         <option value="">Select a realm</option>
                         {realmOptions.map((r) => (
-                          <option key={r.value} value={r.value}>
-                            {r.label}
-                          </option>
+                          <option key={r.value} value={r.value}>{r.label}</option>
                         ))}
                       </select>
                     </div>
+                    {fieldErrors.realm && (
+                      <p className="mt-1.5 text-xs flex items-center gap-1" style={{ color: '#ef4444' }}>
+                        <AlertCircle size={12} />
+                        {fieldErrors.realm}
+                      </p>
+                    )}
                   </div>
-                </div>
+                )}
               </div>
-            )}
+            </div>
 
-            {/* Point of contact / super user person details */}
             <div>
               <SectionTitle>{regType === 'merchant' ? 'Point of Contact' : 'Your Details'}</SectionTitle>
               <div className="grid grid-cols-1 md:grid-cols-2 gap-4">
@@ -433,6 +427,7 @@ export default function RegisterPage({ onRegisterSuccess }) {
                   onChange={handleChange(setPerson)}
                   placeholder="First name"
                   required
+                  error={fieldErrors.first_name}
                 />
                 <Field
                   icon={User}
@@ -451,6 +446,7 @@ export default function RegisterPage({ onRegisterSuccess }) {
                   onChange={handleChange(setPerson)}
                   placeholder="name@example.com"
                   required
+                  error={fieldErrors.email}
                 />
                 <Field
                   icon={Phone}
@@ -461,11 +457,11 @@ export default function RegisterPage({ onRegisterSuccess }) {
                   onChange={handleChange(setPerson)}
                   placeholder="Phone number"
                   required
+                  error={fieldErrors.phone}
                 />
               </div>
             </div>
 
-            {/* Address */}
             <div>
               <SectionTitle>Address</SectionTitle>
               <div className="grid grid-cols-1 md:grid-cols-2 gap-4">
@@ -478,6 +474,7 @@ export default function RegisterPage({ onRegisterSuccess }) {
                     onChange={handleChange(setAddress)}
                     placeholder="Street address"
                     required
+                    error={fieldErrors.address_line1}
                   />
                 </div>
                 <div className="md:col-span-2">
@@ -498,6 +495,7 @@ export default function RegisterPage({ onRegisterSuccess }) {
                   onChange={handleChange(setAddress)}
                   placeholder="City"
                   required
+                  error={fieldErrors.city}
                 />
                 <Field
                   icon={MapPin}
@@ -515,6 +513,7 @@ export default function RegisterPage({ onRegisterSuccess }) {
                   onChange={handleChange(setAddress)}
                   placeholder="Postal / ZIP code"
                   required
+                  error={fieldErrors.pincode}
                 />
                 <Field
                   icon={Globe}
@@ -524,11 +523,11 @@ export default function RegisterPage({ onRegisterSuccess }) {
                   onChange={handleChange(setAddress)}
                   placeholder="Country"
                   required
+                  error={fieldErrors.country}
                 />
               </div>
             </div>
 
-            {/* Credentials */}
             <div>
               <SectionTitle>Login Credentials</SectionTitle>
               <div className="grid grid-cols-1 md:grid-cols-2 gap-4">
@@ -541,6 +540,7 @@ export default function RegisterPage({ onRegisterSuccess }) {
                     onChange={handleChange(setCredentials)}
                     placeholder="Choose a username"
                     required
+                    error={fieldErrors.username}
                   />
                 </div>
                 <Field
@@ -552,6 +552,7 @@ export default function RegisterPage({ onRegisterSuccess }) {
                   onChange={handleChange(setCredentials)}
                   placeholder="Choose a password"
                   required
+                  error={fieldErrors.password}
                 />
                 <Field
                   icon={Lock}
@@ -562,6 +563,7 @@ export default function RegisterPage({ onRegisterSuccess }) {
                   onChange={handleChange(setCredentials)}
                   placeholder="Re-enter password"
                   required
+                  error={fieldErrors.confirm_password}
                 />
               </div>
             </div>
@@ -592,6 +594,32 @@ export default function RegisterPage({ onRegisterSuccess }) {
           </div>
         </div>
       </div>
+
+      {duplicateClientModal && (
+        <div className="fixed inset-0 flex items-center justify-center bg-black/40 z-[9999] p-4">
+          <div className="bg-white rounded-xl shadow-xl p-6 max-w-sm w-full text-center">
+            <AlertCircle size={40} style={{ color: '#f97316' }} className="mx-auto mb-3" />
+            <h3 className="text-lg font-semibold mb-2" style={{ color: '#111827' }}>
+              Client already exists
+            </h3>
+            <p className="text-sm mb-6" style={{ color: '#6b7280' }}>
+              An account with the Client ID "<strong>{business.client_id}</strong>" already exists.
+              Please choose a different name or ID and try again.
+            </p>
+            <button
+              onClick={() => {
+                setDuplicateClientModal(false);
+                setFieldErrors((prev) => ({ ...prev, client_id: 'This Client ID is already taken.' }));
+                setClientIdTouched(true);
+              }}
+              className="w-full py-2.5 rounded-lg font-semibold text-white"
+              style={{ backgroundColor: '#f97316' }}
+            >
+              Try another Client ID
+            </button>
+          </div>
+        </div>
+      )}
     </div>
   );
 }
