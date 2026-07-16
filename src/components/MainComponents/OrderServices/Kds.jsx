@@ -840,17 +840,13 @@ useEffect(() => { customToValRef.current = customTo; }, [customTo]);
   // ─── Item status change ───────────────────────────────────────────────────────
 
   const handleItemStatusChange = async (cardId, itemId, newStatus) => {
-  const card = cards.find((c) => c.card_id === cardId);
-  if (!card) return;
+    const card = cards.find((c) => c.card_id === cardId);
+    if (!card) return;
 
-  const targetItem = (card.items || []).find((i) => String(i.id) === String(itemId));
-  if (!targetItem) return;
+    const targetItem = (card.items || []).find((i) => String(i.id) === String(itemId));
+    if (!targetItem) return;
 
-  // Packaging add-ons are hidden from the KDS UI and have no buttons of
-  // their own, so their status must follow their parent item — otherwise
-  // they stay "pending" forever and the card's derived status (and the
-  // dinein order status) never reaches "served".
-  const fkey = targetItem.frontend_unique_key || '';
+    const fkey = targetItem.frontend_unique_key || '';
   const isParentItem = !fkey.startsWith('addon_') && !fkey.startsWith('cchild_');
 
   const packagingChildren = isParentItem
@@ -867,22 +863,24 @@ useEffect(() => { customToValRef.current = customTo; }, [customTo]);
     if (changedIds.has(String(i.id))) previousStatusMap[i.id] = i.status;
   });
 
-  const updatedItems = (card.items || []).map((i) =>
-    changedIds.has(String(i.id)) && !isCancelledStatus(i.status)
-      ? { ...i, status: newStatus }
-      : i
-  );
-  const derivedStatus = deriveStatus(updatedItems);
+    const updatedItems = (card.items || []).map((i) =>
+      changedIds.has(String(i.id)) && !isCancelledStatus(i.status)
+        ? { ...i, status: newStatus }
+        : i
+    );
+    const derivedStatus = deriveStatus(updatedItems);
 
-  setCards((prev) =>
-    prev.map((c) =>
-      c.card_id !== cardId ? c : { ...c, items: updatedItems, status: derivedStatus }
-    )
-  );
+    setCards((prev) =>
+      prev.map((c) =>
+        c.card_id !== cardId
+          ? c
+          : { ...c, items: updatedItems, status: derivedStatus }
+      )
+    );
 
-  inflightUpdatesRef.current += 1;
+    inflightUpdatesRef.current += 1;
 
-  try {
+    try {
     const buildPayload = (item) => ({
       id: item.id,
       item_id: item.item_id,
@@ -900,46 +898,46 @@ useEffect(() => { customToValRef.current = customTo; }, [customTo]);
       parent_item_key: item.id !== targetItem.id ? targetItem.frontend_unique_key : null,
     });
 
-    const itemsPayload = [targetItem, ...packagingChildren].map(buildPayload);
+      const itemsPayload = [targetItem, ...packagingChildren].map(buildPayload);
 
-    await axios.post(
-      `${import.meta.env.VITE_API_ORDER_SERVICE_URL}/${clientIdRef.current}/order_items/update?order_id=${card.sub_order_id}`,
-      itemsPayload,
-      { headers: { Authorization: `Bearer ${tokenRef.current}` } }
-    );
+      await axios.post(
+        `${import.meta.env.VITE_API_ORDER_SERVICE_URL}/${clientIdRef.current}/order_items/update?order_id=${card.sub_order_id}`,
+        itemsPayload,
+        { headers: { Authorization: `Bearer ${tokenRef.current}` } }
+      );
 
-    await axios.post(
-      `${import.meta.env.VITE_API_ORDER_SERVICE_URL}/${clientIdRef.current}/dinein/update`,
-      { id: card.sub_order_id, status: derivedStatus },
-      { headers: { Authorization: `Bearer ${tokenRef.current}` } }
-    );
+      await axios.post(
+        `${import.meta.env.VITE_API_ORDER_SERVICE_URL}/${clientIdRef.current}/dinein/update`,
+        { id: card.sub_order_id, status: derivedStatus },
+        { headers: { Authorization: `Bearer ${tokenRef.current}` } }
+      );
 
-    if (derivedStatus === KDS_CONFIG.STATUS.READY && card.status !== KDS_CONFIG.STATUS.READY) {
-      window.dispatchEvent(
-        new CustomEvent('orderCollect', {
-          detail: {
-            tableName: tablesMap[card.table_id] || KDS_CONFIG.DEFAULT_UNKNOWN_LABEL,
-            orderId: card.sub_order_id,
-          },
+      if (derivedStatus === KDS_CONFIG.STATUS.READY && card.status !== KDS_CONFIG.STATUS.READY) {
+        window.dispatchEvent(
+          new CustomEvent('orderCollect', {
+            detail: {
+              tableName: tablesMap[card.table_id] || KDS_CONFIG.DEFAULT_UNKNOWN_LABEL,
+              orderId: card.sub_order_id,
+            },
+          })
+        );
+      }
+    } catch (err) {
+      console.error(err);
+      toast.error('Failed to update item status');
+      setCards((prev) =>
+        prev.map((c) => {
+          if (c.card_id !== cardId) return c;
+          const rolledBackItems  = c.items.map((i) =>
+            changedIds.has(String(i.id)) ? { ...i, status: previousStatusMap[i.id] } : i
+          );
+          return { ...c, items: rolledBackItems, status: deriveStatus(rolledBackItems) };
         })
       );
+    } finally {
+      inflightUpdatesRef.current = Math.max(0, inflightUpdatesRef.current - 1);
     }
-  } catch (err) {
-    console.error(err);
-    toast.error('Failed to update item status');
-    setCards((prev) =>
-      prev.map((c) => {
-        if (c.card_id !== cardId) return c;
-        const rolledBackItems = c.items.map((i) =>
-          changedIds.has(String(i.id)) ? { ...i, status: previousStatusMap[i.id] } : i
-        );
-        return { ...c, items: rolledBackItems, status: deriveStatus(rolledBackItems) };
-      })
-    );
-  } finally {
-    inflightUpdatesRef.current = Math.max(0, inflightUpdatesRef.current - 1);
-  }
-};
+  };
 
 
   // ─── Filter cards (sort already applied at fetch time) ───────────────────────
