@@ -302,13 +302,13 @@ async def get_order_summary_by_realm(realm: str = None, context: SaasContext = D
                          data={"total_orders": total_orders, "pending_orders": pending_orders})
 
 @router.get("/realms")
-async def get_realms(realm: str, context: SaasContext = Depends(verify_token), db: Session = Depends(get_db)):
+async def get_realms(realm: str, db: Session = Depends(get_db)):
     category = db.query(CategoryEntity).filter(CategoryEntity.id == realm).first()
 
     if not category:
         raise HTTPException(status_code=404,detail=f"Category with id '{realm}' not found")
 
-    return ResponseModel(screen_id=context.screen_id,data={"realms": category.sub_categories or []})
+    return ResponseModel(data={"realms": category.sub_categories or []})
 
 # ========================================= Role Configurations ================================================ #
 @router.get("/permissions/catalog")
