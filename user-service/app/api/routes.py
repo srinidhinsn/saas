@@ -17,7 +17,7 @@ from entity.order_entity import DineinOrder
 from services.chat_service import ask_restaurant_ai,ChatbotService,ChatRequest
 from datetime import datetime, timedelta, time
 from services.add_users import (create_user_and_person, login_user_service, get_user_perms, has_user_permission , delete_user_service , 
-                                  forgot_password_service ,reset_password_service)
+                                  forgot_password_service ,reset_password_service,register_client_service)
 from services.person_service import (update_person_details_service, get_person_details_service, get_all_persons_service, 
                                        save_address_service, get_addresses_service, update_address_service, get_customer_addresses_service, set_primary_address_service,
 find_or_create_customer_service,search_customers_service)
@@ -55,7 +55,12 @@ async def register_user(client_id: str, userReq: UserModel, context: SaasContext
 
     token_realm = context.grants[0] if context.grants else None
     return await create_user_and_person(client_id=client_id, userReq=userReq, db=db, token_realm=token_realm)
-
+  
+@router.post("/client-register")
+async def client_register(client_id: str,reg_type: str,user: UserModel,address: AddressModel,client: ClientModel | None = None,db: Session = Depends(get_db),):
+    result = await register_client_service(reg_type=reg_type, user=user, address=address, client=client, db=db)
+    return ResponseModel(screen_id=result["screen_id"], data=result)
+  
 @router.post("/login")
 async def login_user(client_id: str,userReq: LoginRequest,db: Session = Depends(get_db)):
     result = login_user_service(client_id=client_id,username=userReq.username,password=userReq.password,db=db)
@@ -297,13 +302,13 @@ async def get_order_summary_by_realm(realm: str = None, context: SaasContext = D
                          data={"total_orders": total_orders, "pending_orders": pending_orders})
 
 @router.get("/realms")
-async def get_realms(realm: str, context: SaasContext = Depends(verify_token), db: Session = Depends(get_db)):
+async def get_realms(realm: str, db: Session = Depends(get_db)):
     category = db.query(CategoryEntity).filter(CategoryEntity.id == realm).first()
 
     if not category:
         raise HTTPException(status_code=404,detail=f"Category with id '{realm}' not found")
 
-    return ResponseModel(screen_id=context.screen_id,data={"realms": category.sub_categories or []})
+    return ResponseModel(data={"realms": category.sub_categories or []})
 
 # ========================================= Role Configurations ================================================ #
 @router.get("/permissions/catalog")
