@@ -7,6 +7,7 @@ import { FaCheckCircle, FaClock, FaHourglassHalf, FaConciergeBell } from 'react-
 import { Filter, Clock, Users, Package, Truck, Trash2, BarChart2, X, ChevronRight, Calendar, RotateCcw } from 'lucide-react';
 import { menuCache } from '../../utils/Menu-utils/menuCache';
 import { parseISTTimestamp, getDateRangeFromPreset, DateRangeFilter } from '../../utils/dateRange';
+import { isPackagingMenuRecord } from '../../utils/Menu-utils/menuUtils';
 // ─── Constants ─────────────────────────────────────────────────────────────────
 
 
@@ -184,7 +185,7 @@ const DeleteOrderModal = ({ isOpen, onClose, onConfirm, cardToDelete }) => {
 
 // ─── AggregatePanel ─────────────────────────────────────────────────────────────
 
-const AggregatePanel = ({ cards, tablesMap, onClose }) => {
+const AggregatePanel = ({ cards, tablesMap,menuItemsMap, onClose }) => {
   const aggregateMap = {};
 
   cards.forEach((card) => {
@@ -355,7 +356,7 @@ const ComboComponentsList = ({ menuRecord, menuItemsMap, parentQuantity = 1 }) =
 
 // ─── KDS card ─────────────────────────────────────────────────────────────────
 
-const groupItemsWithAddons = (items) => {
+const groupItemsWithAddons = (items, menuItemsMap) => {
   const groups = [];
   const processed = new Set();
 
@@ -366,14 +367,18 @@ const groupItemsWithAddons = (items) => {
     const isChild = fkey.startsWith('addon_') || fkey.startsWith('cchild_');
 
     if (!isChild) {
-      // Find addon children: their key starts with "addon_{thisItemsKey}_"
       const addonPrefix = `addon_${fkey}_`;
-      const addons = (items || []).filter(
+      const allAddons = (items || []).filter(
         a => (a.frontend_unique_key || '').startsWith(addonPrefix)
+      );
+      // Packaging add-ons (containers etc.) are billed but need no kitchen
+      // prep — hide them from the KDS card.
+      const addons = allAddons.filter(
+        a => !isPackagingMenuRecord(menuItemsMap[String(a.item_id)])
       );
       groups.push({ main: item, addons });
       processed.add(item.id);
-      addons.forEach(a => processed.add(a.id));
+      allAddons.forEach(a => processed.add(a.id));
     }
   });
   return groups;
@@ -445,7 +450,7 @@ const KitchenCard = ({
 
       {/* ── Card body — item list ── */}
       <div className="bg-bg-primary px-4 py-4 space-y-3 flex-1">
-        {groupItemsWithAddons(card.items).map(({ main: item, addons }, idx) => {
+        {groupItemsWithAddons(card.items, menuItemsMap).map(({ main: item, addons }, idx) => {
           const menuRecord = menuItemsMap[String(item.item_id)];
           const combo = isComboItem(item, menuRecord);
           const isPending = pendingItemIds.has(item.id);
@@ -841,10 +846,25 @@ useEffect(() => { customToValRef.current = customTo; }, [customTo]);
     const targetItem = (card.items || []).find((i) => String(i.id) === String(itemId));
     if (!targetItem) return;
 
-    const previousStatus = targetItem.status;
+    const fkey = targetItem.frontend_unique_key || '';
+  const isParentItem = !fkey.startsWith('addon_') && !fkey.startsWith('cchild_');
+
+  const packagingChildren = isParentItem
+    ? (card.items || []).filter(i =>
+        (i.frontend_unique_key || '').startsWith(`addon_${fkey}_`) &&
+        isPackagingMenuRecord(menuItemsMap[String(i.item_id)]) &&
+        !isCancelledStatus(i.status)
+      )
+    : [];
+
+  const changedIds = new Set([String(itemId), ...packagingChildren.map(c => String(c.id))]);
+  const previousStatusMap = {};
+  (card.items || []).forEach(i => {
+    if (changedIds.has(String(i.id))) previousStatusMap[i.id] = i.status;
+  });
 
     const updatedItems = (card.items || []).map((i) =>
-      String(i.id) === String(itemId) && !isCancelledStatus(i.status)
+      changedIds.has(String(i.id)) && !isCancelledStatus(i.status)
         ? { ...i, status: newStatus }
         : i
     );
@@ -861,26 +881,28 @@ useEffect(() => { customToValRef.current = customTo; }, [customTo]);
     inflightUpdatesRef.current += 1;
 
     try {
-      const singleItemPayload = [{
-        id: targetItem.id,
-        item_id: targetItem.item_id,
-        item_name: targetItem.item_name,
-        quantity: targetItem.quantity,
-        status: newStatus,
-        note: targetItem.note || '',
-        slug: targetItem.slug || '',
-        unit_price: targetItem.unit_price || 0,
-        line_total: (targetItem.unit_price || 0) * (targetItem.quantity || 1),
-        client_id: clientIdRef.current,
-        order_id: card.sub_order_id,
-        frontend_unique_key: targetItem.frontend_unique_key || null,
-        is_addon: false,
-        parent_item_key: null,
-      }];
+    const buildPayload = (item) => ({
+      id: item.id,
+      item_id: item.item_id,
+      item_name: item.item_name,
+      quantity: item.quantity,
+      status: newStatus,
+      note: item.note || '',
+      slug: item.slug || '',
+      unit_price: item.unit_price || 0,
+      line_total: (item.unit_price || 0) * (item.quantity || 1),
+      client_id: clientIdRef.current,
+      order_id: card.sub_order_id,
+      frontend_unique_key: item.frontend_unique_key || null,
+      is_addon: item.id !== targetItem.id,
+      parent_item_key: item.id !== targetItem.id ? targetItem.frontend_unique_key : null,
+    });
+
+      const itemsPayload = [targetItem, ...packagingChildren].map(buildPayload);
 
       await axios.post(
         `${import.meta.env.VITE_API_ORDER_SERVICE_URL}/${clientIdRef.current}/order_items/update?order_id=${card.sub_order_id}`,
-        singleItemPayload,
+        itemsPayload,
         { headers: { Authorization: `Bearer ${tokenRef.current}` } }
       );
 
@@ -907,7 +929,7 @@ useEffect(() => { customToValRef.current = customTo; }, [customTo]);
         prev.map((c) => {
           if (c.card_id !== cardId) return c;
           const rolledBackItems  = c.items.map((i) =>
-            String(i.id) === String(itemId) ? { ...i, status: previousStatus } : i
+            changedIds.has(String(i.id)) ? { ...i, status: previousStatusMap[i.id] } : i
           );
           return { ...c, items: rolledBackItems, status: deriveStatus(rolledBackItems) };
         })
@@ -1012,6 +1034,7 @@ useEffect(() => { customToValRef.current = customTo; }, [customTo]);
         <AggregatePanel
           cards={filteredCards}
           tablesMap={tablesMap}
+          menuItemsMap={menuItemsMap}
           onClose={() => setShowAggregate(false)}
         />
       )}
