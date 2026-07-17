@@ -25,7 +25,7 @@ from services.auth_service import refresh_access_token
 from jose import jwt
 import uuid , os
 from sqlalchemy import func
-from models.client_model import AddressModel 
+from models.client_model import AddressModel ,ClientModel
 from utils.services import add_master_value , get_master_values ,delete_master_value
 from dotenv import load_dotenv
 from zoneinfo import ZoneInfo
