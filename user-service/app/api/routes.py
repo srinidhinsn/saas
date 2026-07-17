@@ -57,7 +57,7 @@ async def register_user(client_id: str, userReq: UserModel, context: SaasContext
     return await create_user_and_person(client_id=client_id, userReq=userReq, db=db, token_realm=token_realm)
   
 @router.post("/client-register")
-async def client_register(client_id: str,reg_type: str,user: UserModel,address: AddressModel,client: ClientModel | None = None,db: Session = Depends(get_db),):
+async def client_register(client_id: str,reg_type: str,user: UserModel,address: AddressModel| None = None,client: ClientModel | None = None,db: Session = Depends(get_db),):
     result = await register_client_service(reg_type=reg_type, user=user, address=address, client=client, db=db)
     return ResponseModel(screen_id=result["screen_id"], data=result)
   
