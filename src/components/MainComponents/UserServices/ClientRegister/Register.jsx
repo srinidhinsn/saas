@@ -167,10 +167,10 @@ export default function RegisterPage({ onRegisterSuccess }) {
     else if (!/^[^\s@]+@[^\s@]+\.[^\s@]+$/.test(person.email)) errors.email = 'Enter a valid email.';
     if (!person.phone.trim()) errors.phone = 'Phone number is required.';
 
-    if (!address.address_line1.trim()) errors.address_line1 = 'Address is required.';
-    if (!address.city.trim()) errors.city = 'City is required.';
-    if (!address.pincode.trim()) errors.pincode = 'Pincode is required.';
-    if (!address.country.trim()) errors.country = 'Country is required.';
+    // if (!address.address_line1.trim()) errors.address_line1 = 'Address is required.';
+    // if (!address.city.trim()) errors.city = 'City is required.';
+    // if (!address.pincode.trim()) errors.pincode = 'Pincode is required.';
+    // if (!address.country.trim()) errors.country = 'Country is required.';
 
     if (!credentials.username.trim()) errors.username = 'Please choose a username.';
     if (!credentials.password) errors.password = 'Please choose a password.';
@@ -473,7 +473,6 @@ export default function RegisterPage({ onRegisterSuccess }) {
                     value={address.address_line1}
                     onChange={handleChange(setAddress)}
                     placeholder="Street address"
-                    required
                     error={fieldErrors.address_line1}
                   />
                 </div>
@@ -494,7 +493,6 @@ export default function RegisterPage({ onRegisterSuccess }) {
                   value={address.city}
                   onChange={handleChange(setAddress)}
                   placeholder="City"
-                  required
                   error={fieldErrors.city}
                 />
                 <Field
@@ -512,7 +510,6 @@ export default function RegisterPage({ onRegisterSuccess }) {
                   value={address.pincode}
                   onChange={handleChange(setAddress)}
                   placeholder="Postal / ZIP code"
-                  required
                   error={fieldErrors.pincode}
                 />
                 <Field
@@ -522,7 +519,6 @@ export default function RegisterPage({ onRegisterSuccess }) {
                   value={address.country}
                   onChange={handleChange(setAddress)}
                   placeholder="Country"
-                  required
                   error={fieldErrors.country}
                 />
               </div>
