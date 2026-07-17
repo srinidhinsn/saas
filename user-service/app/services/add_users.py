@@ -3,7 +3,9 @@ from sqlalchemy.orm import Session
 from models.user_model import UserModel, PersonModel, ResetpasswordRequest
 from models.response_model import ResponseModel
 from entity.user_entity import User, Person,PageDefinition
-from entity.client_entity import Client
+from entity.client_entity import Client, Address
+from models.client_model import ClientModel , AddressModel
+from entity.inventory_entity import CategoryEntity
 from utils.auth import hash_password, SECRET_KEY, ALGORITHM,get_page_definition, get_screen_id
 from jose import jwt,JWTError
 from sqlalchemy import func , and_
@@ -14,6 +16,9 @@ from utils.create_notification import get_template_body, render_template
 from zoneinfo import ZoneInfo
 from datetime import datetime, timedelta
 from dotenv import load_dotenv
+import logging
+logger = logging.getLogger(__name__)
+
 load_dotenv()
 TIMEZONE = os.getenv("TIMEZONE", "UTC") 
 
@@ -348,3 +353,216 @@ async def reset_password_service(client_id: str,req_data: ResetpasswordRequest,c
                 render_template(template_body,metadata))
 
     return ResponseModel(screen_id=context.screen_id,data={"message": "Password reset successfully"})
+
+SUPER_USER_REALM = "super_user"
+DEFAULT_CLIENT_CATEGORIES = [
+    {
+        "id": "dietery",
+        "name": "Dietery",
+        "description": "Dietry type",
+        "sub_categories": ["dietery_01"],
+        "slug": "_Dietery",
+    },
+    {
+        "id": "roles",
+        "name": "Roles",
+        "description": "Roles definition",
+        "sub_categories": ["admin"],
+        "slug": "_Roles",
+    },
+    {
+        "id": "admin",
+        "name": "Admin",
+        "description": "admin",
+        "sub_categories": None,
+        "slug": "_Roles_Admin",
+    },
+    {
+        "id": "section",
+        "name": "Section",
+        "description": "Section Selection",
+        "sub_categories": ["Base"],
+        "slug": "_Section",
+    },
+    {
+        "id": "available_timings",
+        "name": "Availability Time",
+        "description": "Food Availability Timings",
+        "sub_categories": ["general(08:00-20:00)"],
+        "slug": "_AvailabilityTime",
+    },
+    {
+        "id": "zone",
+        "name": "Zones",
+        "description": "Zone Selection",
+        "sub_categories": ["General"],
+        "slug": "_Zones",
+    },
+]
+
+def seed_default_categories(client_id: str, created_by: str, db: Session, admin_role: str = "admin"):
+    now = datetime.now(ZoneInfo(TIMEZONE))
+    categories = [
+        {
+            "id": "dietery",
+            "name": "Dietery",
+            "description": "Dietry type",
+            "sub_categories": ["dietery_01"],
+            "slug": "_Dietery",
+        },
+        {
+            "id": "roles",
+            "name": "Roles",
+            "description": "Roles definition",
+            "sub_categories": [admin_role],
+            "slug": "_Roles",
+        },
+        {
+            "id": admin_role,
+            "name": admin_role.replace("_", " ").title(),
+            "description": admin_role,
+            "sub_categories": None,
+            "slug": f"_Roles_{admin_role.title()}",
+        },
+        {
+            "id": "section",
+            "name": "Section",
+            "description": "Section Selection",
+            "sub_categories": ["Base"],
+            "slug": "_Section",
+        },
+        {
+            "id": "available_timings",
+            "name": "Availability Time",
+            "description": "Food Availability Timings",
+            "sub_categories": ["morning(08:00-20:00)"],
+            "slug": "_AvailabilityTime",
+        },
+        {
+            "id": "zone",
+            "name": "Zones",
+            "description": "Zone Selection",
+            "sub_categories": ["General"],
+            "slug": "_Zones",
+        },
+    ]
+
+    for cat in categories:
+        db.add(CategoryEntity(
+            id=cat["id"],
+            client_id=client_id,
+            name=cat["name"],
+            description=cat["description"],
+            sub_categories=cat["sub_categories"],
+            slug=cat["slug"],
+            created_by=created_by,
+            updated_by=created_by,
+            created_at=now,
+            updated_at=now,
+        ))
+async def register_client_service(reg_type: str,user: UserModel,address: AddressModel,client: ClientModel | None,db: Session):
+    if reg_type not in ("merchant", "user"):
+        raise HTTPException(status_code=400, detail="reg_type must be 'merchant' or 'user'")
+
+    if not user.username or not user.password:
+        raise HTTPException(status_code=400, detail="Username and password are required.")
+
+    if not client or not client.id or not client.name:
+        raise HTTPException(status_code=400,detail="client.id and client.name  are required for registration",)
+    if reg_type == "merchant" and not client.realm:
+        raise HTTPException(status_code=400, detail="client.realm is required for merchant registration")
+
+    target_client_id = client.id
+    
+    if reg_type == "merchant":
+        roles = user.roles or ["admin"]
+        grants = user.grants or ["admin"]
+        realm = client.realm
+    else:
+        roles =  [SUPER_USER_REALM]
+        grants = [SUPER_USER_REALM]
+        realm = SUPER_USER_REALM
+    if db.query(Client).filter(Client.id == target_client_id).first():
+        raise HTTPException(status_code=400, detail="Client ID already exists")
+
+    existing_user = (db.query(User).filter(User.username == user.username, User.client_id == target_client_id).first())
+    if existing_user:
+        raise HTTPException(status_code=400, detail="Username already exists for this client.")
+
+    try:
+        client_entity = Client(
+            id=target_client_id,
+            name=client.name,
+            realm=realm,
+            email=user.email,
+            phone=user.phone,
+        )
+        db.add(client_entity)
+
+        person = Person(
+            first_name=user.first_name,
+            last_name=user.last_name,
+            dob=user.dob,
+            email=user.email,
+            phone=user.phone,
+        )
+        db.add(person)
+        db.flush()  
+
+        full_name = f"{user.first_name or ''} {user.last_name or ''}".strip()
+        address_entity = Address(
+            address_line1=address.address_line1,
+            address_line2=address.address_line2 or "",
+            name=full_name,
+            city=address.city,
+            state=address.state or "",
+            country=address.country,
+            pincode=address.pincode,
+            contact_name=address.contact_name or full_name,
+            contact_number=address.contact_number or user.phone,
+        )
+        db.add(address_entity)
+        db.flush()
+
+        person.saved_address_ids = [address_entity.id]
+        client_entity.saved_address_ids = [str(address_entity.id)]
+
+        user_entity = User(
+            id=person.id,
+            username=user.username,
+            hashed_password=hash_password(user.password),
+            client_id=target_client_id,
+            roles=roles,
+            grants=grants,
+        )
+        db.add(user_entity)
+
+        admin_role = SUPER_USER_REALM if reg_type == "user" else "admin"
+        seed_default_categories(client_id=target_client_id, created_by=str(person.id), db=db,admin_role=admin_role,)
+
+        db.commit()
+        db.refresh(user_entity)
+        db.refresh(client_entity)
+
+    except HTTPException:
+        db.rollback()
+        raise
+    except Exception as e:
+        db.rollback()
+        logger.exception("register_client_service failed for reg_type=%s client_id=%s", reg_type, target_client_id)
+        raise HTTPException(status_code=500, detail=f"Registration failed: {str(e)}")
+
+    payload = {
+        "user_id": str(user_entity.id),
+        "roles": roles,
+        "client_id": target_client_id,
+        "grants": grants,
+        "realm": realm,
+        "subscription": [],
+        "allowed_screen_ids": [],
+    }
+    access_token = create_access_token(payload)
+    refresh_token = create_refresh_token(payload)
+    screen_id = getting_screen_id(access_token, db)
+
+    return {"screen_id": screen_id,"client_id": target_client_id,"user_id": str(user_entity.id),"access_token": access_token,"refresh_token": refresh_token,"token_type": "bearer",}
