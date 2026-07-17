@@ -1,7 +1,7 @@
 from fastapi import HTTPException
 from jose import jwt, JWTError
 from sqlalchemy.orm import Session
-from entity.user_entity import User
+from entity.user_entity import User, PageDefinition
 from entity.client_entity import Client
 from utils.auth import (SECRET_KEY,ALGORITHM,create_access_token)
 
@@ -27,14 +27,21 @@ def refresh_access_token(refresh_token: str, db: Session):
             raise HTTPException(status_code=401, detail="Client not found")
         
         client_model = Client.copyToModel(client)
-        
+        roles = [str(r).strip() for r in (user.roles or [])]
+        page_defs = db.query(PageDefinition).filter(
+            PageDefinition.role.in_(roles),
+            PageDefinition.client_id == user.client_id
+        ).all()
+        allowed_screen_ids = list({pd.screen_id for pd in page_defs})
         # Creates new access token with all claims
         access_token = create_access_token({
             "user_id": str(user.id),
             "roles": user.roles,
             "client_id": user.client_id,
             "grants": user.grants,
-            "realm": client_model.realm  
+            "realm": client_model.realm,
+            "subscription": client_model.subscription or [],
+            "allowed_screen_ids": allowed_screen_ids,  
         })
         
         return {"access_token": access_token, "token_type": "bearer"}
