@@ -460,7 +460,7 @@ def seed_default_categories(client_id: str, created_by: str, db: Session, admin_
             created_at=now,
             updated_at=now,
         ))
-async def register_client_service(reg_type: str,user: UserModel,address: AddressModel,client: ClientModel | None,db: Session):
+async def register_client_service(reg_type: str,user: UserModel,address: AddressModel | None,client: ClientModel | None,db: Session):
     if reg_type not in ("merchant", "user"):
         raise HTTPException(status_code=400, detail="reg_type must be 'merchant' or 'user'")
 
@@ -509,8 +509,9 @@ async def register_client_service(reg_type: str,user: UserModel,address: Address
         db.add(person)
         db.flush()  
 
-        full_name = f"{user.first_name or ''} {user.last_name or ''}".strip()
-        address_entity = Address(
+        if address is not None:
+           full_name = f"{user.first_name or ''} {user.last_name or ''}".strip()
+           address_entity = Address(
             address_line1=address.address_line1,
             address_line2=address.address_line2 or "",
             name=full_name,
@@ -521,11 +522,11 @@ async def register_client_service(reg_type: str,user: UserModel,address: Address
             contact_name=address.contact_name or full_name,
             contact_number=address.contact_number or user.phone,
         )
-        db.add(address_entity)
-        db.flush()
+           db.add(address_entity)
+           db.flush()
 
-        person.saved_address_ids = [address_entity.id]
-        client_entity.saved_address_ids = [str(address_entity.id)]
+           person.saved_address_ids = [address_entity.id]
+           client_entity.saved_address_ids = [str(address_entity.id)]
 
         user_entity = User(
             id=person.id,
