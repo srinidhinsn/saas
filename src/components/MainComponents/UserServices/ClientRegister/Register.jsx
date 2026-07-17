@@ -106,7 +106,8 @@ export default function RegisterPage({ onRegisterSuccess }) {
       try {
         const res = await axios.get(
           `${API_BASE}/${routeClientId || 'saas'}/users/realms`,
-          { params: { realm: 'realm' } }
+          { params: { realm: 'realm' },
+          headers: { 'Content-Type': 'application/json' }, }
         );
         setRealmOptions(
           (res.data?.data?.realms || []).map((r) => ({ value: r, label: r }))
@@ -228,7 +229,8 @@ export default function RegisterPage({ onRegisterSuccess }) {
       const res = await axios.post(
         `${API_BASE}/${routeScopeClientId}/users/client-register`,
         buildClientRegisterPayload(),
-        { params: { reg_type: regType } }
+        { params: { reg_type: regType },
+        headers: { 'Content-Type': 'application/json' }, }
       );
 
       const result = res.data;
