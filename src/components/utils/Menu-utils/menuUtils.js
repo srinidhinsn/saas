@@ -352,3 +352,27 @@ export const isPackagingOrderItem = (item, inventoryMap = {}) => {
     ? String(inv.category_id || inv.category_name || '').toLowerCase().includes('packaging')
     : false;
 };
+
+// Reconstructs parent_item_key / is_addon on cart items rebuilt from server
+// order data (view order, resume takeaway order, reload after item delete),
+// which only round-trips frontend_unique_key — not parent_item_key. Without
+// this, getGroupedCartItems() can't nest addons under their main item and
+// every item renders as a standalone row.
+export function relinkCartItemsToParents(items) {
+  const mainKeys = items
+    .filter(i => {
+      const k = i.frontend_unique_key || '';
+      return !k.startsWith('addon_') && !k.startsWith('cchild_');
+    })
+    .map(i => i.frontend_unique_key);
+
+  return items.map(item => {
+    const fkey = item.frontend_unique_key || '';
+    const prefix = fkey.startsWith('addon_') ? 'addon_' : fkey.startsWith('cchild_') ? 'cchild_' : null;
+    if (!prefix) return { ...item, is_addon: false, parent_item_key: null };
+
+    const rest = fkey.slice(prefix.length);
+    const parentKey = mainKeys.find(k => rest.startsWith(`${k}_`)) || null;
+    return { ...item, is_addon: true, parent_item_key: parentKey };
+  });
+}

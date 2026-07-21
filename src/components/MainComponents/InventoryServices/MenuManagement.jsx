@@ -377,27 +377,23 @@ if (cachedAddon) return cachedAddon;
   };
 
   // ✅ FIXED — uses the same axios pattern as the rest of MenuManagement
-  const fetchUnits = useCallback(async () => {
-    const cached = menuCache.get('units', clientId);
-  if (cached) {  setUnits(cached); return; }
+ const fetchUnits = useCallback(async () => {
+  const cached = menuCache.get('units', clientId);
+  if (cached) { setUnits(cached); return; }
 
-    try {
-      const res = await axios.get(
-        `${import.meta.env.VITE_API_INVENTORY_SERVICE_URL}/${clientId}/menu/read_category?category_id=units`,
-        { headers: { Authorization: `Bearer ${token}` } }
-      );
-      const data = res.data?.data || [];
-      const unitsNode = Array.isArray(data) ? data.find((d) => d.id === "units") : data;
-      const subCats = unitsNode?.subCategories || [];
-      const unitList = subCats.map((u) => (typeof u === "string" ? u : u.id));
-      setUnits(unitList.length > 0 ? unitList : ["g", "kg", "ml", "litre", "pcs"]);
-      menuCache.set('units', clientId, unitList.length > 0 ? unitList : ["g", "kg", "ml", "litre", "pcs"]);
-    } catch (err) {
-      console.error("fetchUnits failed:", err);
-      setUnits();
-    }
-  }, [clientId, token]);
-
+  try {
+    const res = await axios.get(
+      `${import.meta.env.VITE_API_INVENTORY_SERVICE_URL}/${clientId}/inventory/item-types?category_id=units`,
+      { headers: { Authorization: `Bearer ${token}` } }
+    );
+    const unitList = res.data?.data || [];
+    setUnits(unitList);
+    menuCache.set('units', clientId, unitList);
+  } catch (err) {
+    console.error("fetchUnits failed:", err);
+    setUnits();
+  }
+}, [clientId, token]);
   useEffect(() => {
     fetchUnits();
   }, [fetchUnits]);
