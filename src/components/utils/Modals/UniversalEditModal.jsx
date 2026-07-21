@@ -28,7 +28,7 @@ const UniversalEditModal = ({
   fetchAddonData, setAddonSubcategories, setAllAddonItems, units,
   // Combo props
   dedupedMenuItems, categoriesFlat,
-
+  dietaryColorMap,
   // Table-specific props
   editRowId,
   setEditRowId,
@@ -296,6 +296,40 @@ const UniversalEditModal = ({
                     rows="3"
                   />
                 </div>
+                {normalizedRealm === 'restaurant' && (
+  <div>
+    <label className="block text-sm font-medium mb-1 text-gray-700">
+      Dietary Type
+    </label>
+    <div className="flex flex-wrap gap-2">
+    {dietaryOptions.map((d) => {
+  const key = (d || '').toLowerCase().replace(/[-_\s]/g, '');
+  const selected = (editingItem?.dietary_type || '').toLowerCase().replace(/[-_\s]/g, '') === key;
+  const colorClass = dietaryColorMap?.[d] || dietaryColorMap?.[key] || 'border-gray-300';
+  return (
+    <button
+      key={d}
+      type="button"
+      onClick={() =>
+        setEditingItem(prev => ({ ...prev, dietary_type: selected ? '' : d }))
+      }
+      className={`px-3 py-1.5 rounded-lg text-sm border transition-all capitalize flex items-center gap-2 ${
+        selected
+          ? 'bg-red-700 text-text-white border-red-600 shadow-sm'
+          : 'bg-gray-50 border-gray-300 text-gray-700'
+      }`}
+    >
+      <span className={`w-2.5 h-2.5 rounded-full ${colorClass}`} />
+      {d}
+    </button>
+  );
+})}
+    </div>
+    {!editingItem?.dietary_type && (
+      <p className="text-xs text-gray-400 mt-1">No dietary type selected</p>
+    )}
+  </div>
+)}
                 {normalizedRealm === 'restaurant' && (
                   <div>
                     <label className="block text-sm font-medium mb-1 text-gray-700">
