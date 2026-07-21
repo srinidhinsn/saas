@@ -11,7 +11,7 @@ import { jwtDecode } from "jwt-decode";
 import { getMenuConfig } from '../../utils/menuConfigResolver';
 import MenuConfigModal from '../../utils/Modals/MenuConfigModal';
 import { menuCache } from '../../utils/Menu-utils/menuCache';
-import { getDietaryFromSlug, isItemActive, generateSlug, toSlugSegment} from '../../utils/Menu-utils/menuUtils';
+import { getDietaryFromSlug, isItemActive, generateSlug, toSlugSegment, isPackagingCategoryId} from '../../utils/Menu-utils/menuUtils';
 import {useDietaryTypes, useTimings, useZoneConfig, useMenuData} from '../../utils/Menu-utils/useMenuData';
 
 const MenuManagement = ({ clientId, token,screenIds, userId, realm }) => {
@@ -94,6 +94,18 @@ const MenuManagement = ({ clientId, token,screenIds, userId, realm }) => {
     }
     return false;
   }, [selectedCategoryId, categoriesFlat]);
+
+// Counts only non-packaging linked items — used for the "+N add-ons" badge
+const getNonPackagingAddonCount = useCallback((item) => {
+  if (!item.line_item_id?.length) return 0;
+  return item.line_item_id.filter(id => {
+    const linked =
+      allMenuItemsRaw.find(mi => Number(mi.id) === Number(id) && (mi.zone_config_id === 0 || mi.zone_config_id == null))
+      || allMenuItemsRaw.find(mi => Number(mi.id) === Number(id));
+    if (!linked) return true;
+    return !isPackagingCategoryId(linked.category_id, categoriesFlat);
+  }).length;
+}, [allMenuItemsRaw, categoriesFlat]);
 
   useEffect(() => {
     const interval = setInterval(() => {
@@ -1622,11 +1634,11 @@ return suffixParts.length > 0 ? `${base}__${suffixParts.join('+')}` : base;
 
                       <div className={`w-[3px] h-full rounded-l-xl ${dietaryColor}`} /> <div className="absolute inset-0 bg-black/40 backdrop-blur-[2px] opacity-0 pointer-events-none z-10 group-hover:animate-overlayFade" />
 
-                      {item.line_item_id?.length > 0 && (
+                      {getNonPackagingAddonCount(item) > 0 && (
                         <div className="absolute bottom-2 right-2 bg-orange-500 text-white text-[7px] p-1 rounded-md z-10 shadow-md flex items-center gap-1">
-                          <Plus size={10} /><span>{item.line_item_id.length} add-ons</span>
-                        </div>
-                      )}
+                          <Plus size={10} /><span>{getNonPackagingAddonCount(item)} add-ons</span>
+                          </div>
+                        )}
                       <div className="relative w-10 h-12 md:h-16 md:w-14 rounded-lg overflow-hidden shrink-0 bg-gray-100">
                         {discountPercent && (
                           <div className="absolute top-1 left-1 bg-action-danger text-text-white text-[7px] md:text-[10px] px-1 rounded z-10">

@@ -1,5 +1,6 @@
 import React, { useEffect, useState } from "react";
 import axios from "axios";
+import {X} from 'lucide-react';
 
 const API = import.meta.env.VITE_API_INVENTORY_SERVICE_URL;
 const defaultRoot = import.meta.env.VITE_MENU_DEFAULT_ROOT;
@@ -481,9 +482,18 @@ export default function CounterManager({ clientId, token }) {
       {selectedCounter && (
         <div className="fixed inset-0 bg-black bg-opacity-40 flex items-center justify-center">
           <div className="bg-white rounded-2xl p-6 w-[500px] max-h-[80vh] overflow-y-auto shadow-xl">
-            <h3 className="text-lg font-bold mb-4">
-              Assign Categories to {selectedCounter.name}
-            </h3>
+            <div className="flex justify-between items-center mb-4">
+              <h3 className="text-lg font-bold">
+                Assign Categories to {selectedCounter.name}
+              </h3>
+              <button
+                onClick={() => setSelectedCounter(null)}
+                className="p-1.5 rounded-lg bg-action-primary text-text-white hover:opacity-90 transition-opacity"
+                aria-label="Close"
+              >
+                <X className="w-5 h-5" />
+              </button>
+            </div>
 
             <div className="space-y-4">
               {allCategories.map((group) => {

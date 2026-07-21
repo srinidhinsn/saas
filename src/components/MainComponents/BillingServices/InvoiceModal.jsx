@@ -6,6 +6,7 @@ import CustomerAutocomplete from './CustomerAutocomplete';
 import { X, Save, Printer, CreditCard, CheckCircle } from 'lucide-react';
 import RazorpayPayment from "../../Constants/RazorPay/RazorpayPayment";
 import { useClient } from "../../../context/ClientContext";
+import { isPackagingOrderItem } from '../../utils/Menu-utils/menuUtils';
 
 // ─────────────────────────────────────────────────────────────────────────────
 // REQ 2 helpers
@@ -468,6 +469,14 @@ export default function InvoiceModal({
   const clientGstNumber = clientDetails?.gst_number || "";
 
   const safeNum = (num) => (typeof num === "number" && !isNaN(num) ? num : 0);
+
+  const allOrderItems = selectedOrder?.items || [];
+const packagingChargeTotal = Number(
+  allOrderItems
+    .filter(i => isPackagingOrderItem(i, inventoryMap))
+    .reduce((sum, i) => sum + (Number(i.unit_price) || 0) * (Number(i.quantity) || 0), 0)
+    .toFixed(2)
+);
 
   // 1️⃣ Subtotal
   const orderSubtotal = Number(
@@ -986,7 +995,8 @@ if (selectedOrder.contact_phone || selectedOrder.contact_email || selectedOrder.
       const addonsMapForPrint = {};
       parentItemsForPrint.forEach(item => {
         addonsMapForPrint[item.frontend_unique_key] = (selectedOrder.items || []).filter(a =>
-          (a.frontend_unique_key || '').startsWith(`addon_${item.frontend_unique_key}_`)
+          (a.frontend_unique_key || '').startsWith(`addon_${item.frontend_unique_key}_`) &&
+          !isPackagingOrderItem(a, inventoryMap)
         );
       });
 
@@ -1003,6 +1013,7 @@ if (selectedOrder.contact_phone || selectedOrder.contact_email || selectedOrder.
         discount: calculatedDiscount,
         taxPercent,
         gstAmount: calculatedGST,
+        packagingCharge: packagingChargeTotal,
         total,
         paymentInfo: splitPaymentEnabled ? paymentSplits : [{ method, amount: total }],
         paymentStatus,
@@ -1104,7 +1115,8 @@ if (selectedOrder.contact_phone || selectedOrder.contact_email || selectedOrder.
                       return parents.map((item, idx) => {
 
                         const addons = items.filter(i =>
-                          (i.frontend_unique_key || '').startsWith(`addon_${item.frontend_unique_key}_`)
+                          (i.frontend_unique_key || '').startsWith(`addon_${item.frontend_unique_key}_`) &&
+                          !isPackagingOrderItem(i, inventoryMap)
                         );
 
                         return (
@@ -1158,6 +1170,12 @@ if (selectedOrder.contact_phone || selectedOrder.contact_email || selectedOrder.
                         <span>GST ({taxPercent}%)</span>
                         <span className="font-semibold">₹{calculatedGST.toFixed(2)}</span>
                       </div>
+                      {packagingChargeTotal > 0 && (
+                        <div className="flex justify-between text-text-secondary">
+                          <span>Packaging Charges</span>
+                          <span className="font-semibold">₹{packagingChargeTotal.toFixed(2)}</span>
+                        </div>
+                      )}
                       <div className="pt-3 border-t border-border-default flex justify-between items-center">
                         <span className="text-lg font-bold text-text-primary">TOTAL</span>
                         <span className="text-2xl font-bold text-action-primary">
