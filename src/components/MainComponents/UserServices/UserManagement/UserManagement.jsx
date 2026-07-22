@@ -768,7 +768,7 @@ const AddUserForm = ({ onCancel, onSave, clientId, token, editUser = null, isEdi
     role: "",
   });
   const [resetPassword, setResetPassword] = useState(false);
-
+  const [errorMessage, setErrorMessage] = useState("");
   const [roles, setRoles] = useState([]);
   const [loading, setLoading] = useState(false);
 
@@ -863,6 +863,10 @@ const AddUserForm = ({ onCancel, onSave, clientId, token, editUser = null, isEdi
       if (onSave) onSave();
     } catch (error) {
       console.error(`Failed to ${isEdit ? 'update' : 'add'} user:`, error);
+      const backendMessage = error.response?.data?.detail;
+    setErrorMessage(
+      backendMessage || `Failed to ${isEdit ? "update" : "add"} user. Please try again.`
+    );
     } finally {
       setLoading(false);
     }
@@ -1059,6 +1063,15 @@ const AddUserForm = ({ onCancel, onSave, clientId, token, editUser = null, isEdi
           </button>
         </div>
       </form>
+      <ConfirmModal
+        open={!!errorMessage}
+        title="Something went wrong"
+        description={errorMessage}
+        confirmText="OK"
+        cancelText="Close"
+        onClose={() => setErrorMessage("")}
+        onConfirm={() => setErrorMessage("")}
+      />
     </div>
   );
 };
