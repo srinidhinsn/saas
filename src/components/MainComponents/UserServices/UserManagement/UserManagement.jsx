@@ -911,7 +911,6 @@ const AddUserForm = ({ onCancel, onSave, clientId, token, editUser = null, isEdi
               type="email"
               value={formData.email}
               onChange={handleChange}
-              required
               className="w-full px-4 py-2.5 rounded-lg border border-gray-200 focus:border-action-success focus:outline-none transition-colors text-text-primary placeholder-text-secondary"
               placeholder="Enter email"
             />
