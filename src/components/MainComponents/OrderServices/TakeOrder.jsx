@@ -1611,46 +1611,6 @@ const TakeOrder = ({ clientId, token, onOrderUpdate, realm }) => {
     zoneConfigId,
     includeAllRaw: true,
   });
-  // const fetchZoneConfig = async () => {
-  //   try {
-  //     const res = await axios.get(
-  //       `${import.meta.env.VITE_API_TABLE_SERVICE_URL}/${clientId}/tables/config`,
-  //       { headers: { Authorization: `Bearer ${token}` } }
-  //     );
-
-  //     const takeawayRoots =
-  //       (import.meta.env.VITE_EASYFOOD_TAKEAWAY_TABLE_DEFAULT_ROOT || '')
-  //         .split(',')
-  //         .map(v => v.trim().toLowerCase())
-  //         .filter(Boolean);
-
-  //     const allSections = res.data || [];
-
-  //     // Dine-in sections — exclude anything that matches takeaway roots
-  //     const dineInSections = takeawayRoots.length > 0
-  //       ? allSections.filter(s =>
-  //         !takeawayRoots.some(root =>
-  //           (s.zone || '').toLowerCase().startsWith(root) ||
-  //           (s.section || '').toLowerCase().startsWith(root)
-  //         )
-  //       )
-  //       : allSections;
-
-  //     // Takeaway sections — only those matching takeaway roots
-  //     const takeawaySectionsFiltered = takeawayRoots.length > 0
-  //       ? allSections.filter(s =>
-  //         takeawayRoots.some(root =>
-  //           (s.zone || '').toLowerCase().startsWith(root) ||
-  //           (s.section || '').toLowerCase().startsWith(root)
-  //         )
-  //       )
-  //       : [];
-
-  //     setTakeawaySections(takeawaySectionsFiltered);
-  //   } catch (err) {
-  //     console.error('Zone config fetch failed', err);
-  //   }
-  // };
 
   // ─────────────────────────────────────────────────────────────────────────
   // Draft helpers
@@ -1860,30 +1820,6 @@ const syncPackagingForOrderMode = (newMode) => {
     return false;
   }, [categoriesFlat]);
 
-  // ─────────────────────────────────────────────────────────────────────────
-  // Data fetching
-  // ─────────────────────────────────────────────────────────────────────────
-
-  // const fetchCounterTree = async () => {
-  //   const cached = menuCache.get('counterTree', clientId);
-  //   if (cached) { setCounterTree(cached); return; }
-  //   try {
-  //     const res = await axios.get(
-  //       `${import.meta.env.VITE_API_INVENTORY_SERVICE_URL}/${clientId}/menu/read_category`,
-  //       {
-  //         params: { client_id: clientId, category_id: 'counter' },
-  //         headers: { Authorization: `Bearer ${token}` },
-  //       }
-  //     );
-  //     const data = res.data.data?.[0]?.subCategories || [];
-  //     setCounterTree(data);
-  //     menuCache.set('counterTree', clientId, data);
-  //   } catch (err) {
-  //     console.error('Failed to fetch counter tree:', err);
-  //   }
-  // };
-
-
   const fetchTableOrders = async (tableList = []) => {
     try {
       const r = await axios.get(
@@ -1987,54 +1923,6 @@ const syncPackagingForOrderMode = (newMode) => {
     await fetchTableOrders(list);
   },[clientId,token])
 
-  // ─────────────────────────────────────────────────────────────────────────
-  // Initial data load
-  // ─────────────────────────────────────────────────────────────────────────
-
-  useEffect(() => {
-    fetchData();
-    // eslint-disable-next-line react-hooks/exhaustive-deps
-  }, [clientId, token, realm, menuConfig]);
-
-  useEffect(() => {
-    if ( !clientId || !token || !menuConfig) return;
-
-    const refetchMenu = async () => {
-      try {
-        const itemRes = await axios.get(
-          `${import.meta.env.VITE_API_INVENTORY_SERVICE_URL}/${clientId}/menu/read`,
-          {
-            headers: { Authorization: `Bearer ${token}` },
-            params: {
-              inventory_id: menuConfig.menuInventoryId,
-              zone_config_id: zoneConfigId,
-            }
-          }
-        );
-
-        // Deduplicate: prefer base record (zone_config_id === 0) when no zone match
-        const allItems = itemRes.data.data || [];
-        const uniqueKeyToItemMap = new Map();
-        allItems.forEach(item => {
-          const existing = uniqueKeyToItemMap.get(item.id);
-          if (!existing || item.zone_config_id === zoneConfigId) {
-            uniqueKeyToItemMap.set(item.id, item);
-          }
-        });
-
-        const enriched = Array.from(uniqueKeyToItemMap.values()).map(item => {
-          const cat = categoriesFlat.find(c => c.id === item.category_id);
-          return { ...item, category_name: cat?.name || 'Uncategorized' };
-        });
-        enriched.sort((a, b) => (a.name || '').localeCompare(b.name || ''));
-        // setMenuItems(enriched);
-      } catch (err) {
-        console.error('Zone menu refetch failed:', err);
-      }
-    };
-
-    refetchMenu();
-  }, [zoneConfigId, clientId, token, menuConfig]);
   // ─────────────────────────────────────────────────────────────────────────
   // Browser history (back button) — push initial floor state once
   // ─────────────────────────────────────────────────────────────────────────
@@ -2983,7 +2871,37 @@ const buildOrderPayload = (items) =>
           timestamp: new Date(),
         },
       });
+// ── Decrement stock for each parent item actually ordered ──
+const orderedQtyMap = {};
+cart
+  .filter(i => i.is_new_item && !i.saved_sub_order && !i.is_addon && !(i.frontend_unique_key || '').startsWith('cchild_'))
+  .forEach(i => {
+    orderedQtyMap[i.id] = (orderedQtyMap[i.id] || 0) + i.quantity;
+  });
 
+await Promise.all(
+  Object.entries(orderedQtyMap).map(async ([itemId, qty]) => {
+    const baseRecord = allMenuItemsRaw.find(
+      m => Number(m.id) === Number(itemId) && (m.zone_config_id === 0 || m.zone_config_id === null)
+    );
+    if (!baseRecord || baseRecord.availability == null) return; // skip untracked-stock items
+
+    const newAvailability = Math.max(0, (Number(baseRecord.availability) || 0) - qty);
+    try {
+      await axios.post(
+        `${import.meta.env.VITE_API_INVENTORY_SERVICE_URL}/${clientId}/menu/update`,
+        { id: Number(itemId), client_id: clientId, availability: newAvailability, zone_config_id: 0 },
+        { headers: { Authorization: `Bearer ${token}` } }
+      );
+    } catch (err) {
+      console.error(`Stock update failed for item ${itemId}:`, err);
+    }
+  })
+);
+
+// ── Invalidate + refresh the menu cache so the new stock is reflected everywhere ──
+menuCache.invalidate(clientId);
+await fetchData({ silent: true });
       setCart([]);
       setActiveOrderId(null);
       setActiveDineinOrderId(null);

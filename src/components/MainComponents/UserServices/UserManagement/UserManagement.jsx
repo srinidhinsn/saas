@@ -234,6 +234,9 @@ const UsersList = ({ onAddNew, clientId, token, onEdit,isSuperAdminScreen}) => {
           const persons = res.data.data.persons.map((person) => ({
             id: person.id,
             username: person.username,
+            first_name: person.first_name || "",
+            last_name: person.last_name || "",
+            dob: person.dob || "",
             name: `${person.first_name || ""} ${person.last_name || ""}`.trim(),
             email: person.email,
             phone: person.phone || "",
@@ -761,10 +764,11 @@ const AddUserForm = ({ onCancel, onSave, clientId, token, editUser = null, isEdi
     lastName: "",
     dob: "",
     phone: "",
-    password: "",
+    password: "", confirmPassword: "",
     role: "",
   });
-
+  const [resetPassword, setResetPassword] = useState(false);
+  const [errorMessage, setErrorMessage] = useState("");
   const [roles, setRoles] = useState([]);
   const [loading, setLoading] = useState(false);
 
@@ -777,7 +781,7 @@ const AddUserForm = ({ onCancel, onSave, clientId, token, editUser = null, isEdi
         lastName: editUser.last_name || "",
         dob: editUser.dob || "",
         phone: editUser.phone || "",
-        password: "",
+        password: "",confirmPassword: "",
         role: editUser.role || "",
       });
     }
@@ -818,6 +822,10 @@ const AddUserForm = ({ onCancel, onSave, clientId, token, editUser = null, isEdi
 
   const handleSubmit = async (e) => {
     e.preventDefault();
+    if ((!isEdit || formData.password) && formData.password !== formData.confirmPassword) {
+      alert("Passwords do not match");
+      return;
+    }
     setLoading(true);
 
     const payload = {
@@ -844,6 +852,7 @@ const AddUserForm = ({ onCancel, onSave, clientId, token, editUser = null, isEdi
           email: formData.email,
           phone: formData.phone,
           roles: [formData.role],
+          ...(formData.password ? { password: formData.password } : {}),
         }
         : payload;
 
@@ -854,6 +863,10 @@ const AddUserForm = ({ onCancel, onSave, clientId, token, editUser = null, isEdi
       if (onSave) onSave();
     } catch (error) {
       console.error(`Failed to ${isEdit ? 'update' : 'add'} user:`, error);
+      const backendMessage = error.response?.data?.detail;
+    setErrorMessage(
+      backendMessage || `Failed to ${isEdit ? "update" : "add"} user. Please try again.`
+    );
     } finally {
       setLoading(false);
     }
@@ -902,7 +915,6 @@ const AddUserForm = ({ onCancel, onSave, clientId, token, editUser = null, isEdi
               type="email"
               value={formData.email}
               onChange={handleChange}
-              required
               className="w-full px-4 py-2.5 rounded-lg border border-gray-200 focus:border-action-success focus:outline-none transition-colors text-text-primary placeholder-text-secondary"
               placeholder="Enter email"
             />
@@ -972,23 +984,40 @@ const AddUserForm = ({ onCancel, onSave, clientId, token, editUser = null, isEdi
           </div>
 
           {/* Password - Only show for new users */}
-          {!isEdit && (
-            <div>
-              <label className="flex items-center gap-2 text-sm font-medium text-text-primary mb-1.5">
-                <FaLock className="text-action-danger text-xs" />
-                Password <span className="text-action-danger">*</span>
-              </label>
-              <input
-                name="password"
-                type="password"
-                value={formData.password}
-                onChange={handleChange}
-                required={!isEdit}
-                className="w-full px-4 py-2.5 rounded-lg border border-border-default focus:border-action-success focus:outline-none transition-colors text-text-primary placeholder-text-secondary"
-                placeholder="Enter password"
-              />
-            </div>
-          )}
+          {/* Password */}
+<div>
+  <label className="flex items-center gap-2 text-sm font-medium text-text-primary mb-1.5">
+    <FaLock className="text-action-danger text-xs" />
+    {isEdit ? "New Password" : "Password"} {!isEdit && <span className="text-action-danger">*</span>}
+  </label>
+  <input
+    name="password"
+    type="password"
+    value={formData.password}
+    onChange={handleChange}
+    required={!isEdit}
+    className="w-full px-4 py-2.5 rounded-lg border border-border-default focus:border-action-success focus:outline-none transition-colors text-text-primary placeholder-text-secondary"
+    placeholder={isEdit ? "Leave blank to keep current password" : "Enter password"}
+  />
+</div>
+
+{/* Confirm Password */}
+<div>
+  <label className="flex items-center gap-2 text-sm font-medium text-text-primary mb-1.5">
+    <FaLock className="text-action-danger text-xs" />
+    Confirm Password {!isEdit && <span className="text-action-danger">*</span>}
+  </label>
+  <input
+    name="confirmPassword"
+    type="password"
+    value={formData.confirmPassword}
+    onChange={handleChange}
+    required={!isEdit || !!formData.password}
+    className="w-full px-4 py-2.5 rounded-lg border border-border-default focus:border-action-success focus:outline-none transition-colors text-text-primary placeholder-text-secondary"
+    placeholder={isEdit ? "Confirm new password" : "Re-enter password"}
+  />
+</div>
+
 
           {/* Role */}
           <div>
@@ -1034,6 +1063,15 @@ const AddUserForm = ({ onCancel, onSave, clientId, token, editUser = null, isEdi
           </button>
         </div>
       </form>
+      <ConfirmModal
+        open={!!errorMessage}
+        title="Something went wrong"
+        description={errorMessage}
+        confirmText="OK"
+        cancelText="Close"
+        onClose={() => setErrorMessage("")}
+        onConfirm={() => setErrorMessage("")}
+      />
     </div>
   );
 };

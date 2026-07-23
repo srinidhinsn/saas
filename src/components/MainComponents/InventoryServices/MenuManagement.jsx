@@ -30,6 +30,8 @@ const MenuManagement = ({ clientId, token,screenIds, userId, realm }) => {
   const savedCategoryRef = useRef(localStorage.getItem("menu_selected_category"));
   const [showMenuConfig, setShowMenuConfig] = useState(false);
   const [timeTick, setTimeTick] = useState(Date.now());
+  const isAddingItemRef = useRef(false);
+  const [isAddingItem, setIsAddingItem] = useState(false);
   // All IDs and keywords come from menuConfigResolver — nothing hardcoded here
   const menuConfig = React.useMemo(() => {
     if (!clientId) return null;
@@ -283,7 +285,7 @@ if (cachedAddon) return cachedAddon;
     setNewItem({
       name: '', description: '', category_id: selectedCategoryId || '',
       unit_price: '', discount: '', code: '', unit: '',
-      serving_quantity: "", serving_unit: "", line_item_id: [], inventory_id: 'menu', zone_config_id: zoneConfigId || null
+      serving_quantity: "", serving_unit: "", line_item_id: [], inventory_id: 'menu', zone_config_id: zoneConfigId || null,dietary_type: ''
     });
     setNewItemImage(null);
     setNewItemImageUrl('');
@@ -326,12 +328,20 @@ if (cachedAddon) return cachedAddon;
 
     const slug = baseRecord.slug || '';
     const doubleUnderIdx = slug.lastIndexOf('__');
+    const rawSuffix = doubleUnderIdx !== -1
+    ? slug.slice(doubleUnderIdx + 2).toLowerCase()
+    : '';
+    const dietaryKeySet = new Set(
+      dietaryOptions.map(d => d.toLowerCase().replace(/[-_\s]/g, ''))
+    );
     // CHANGED: parse as array, not single string
-    const timingsFromSlug = doubleUnderIdx !== -1
-      ? slug.slice(doubleUnderIdx + 2).toLowerCase().split('+').filter(Boolean)
-      : [];
+    const timingsFromSlug = rawSuffix
+    .split('+')
+    .filter(Boolean)
+    .filter(tok => tok !== 'unavailable' && tok !== 'allday' && !dietaryKeySet.has(tok));
 
-    const dietaryFromSlug = getDietaryFromSlug({ ...baseRecord, category_id: resolvedCategoryId });
+
+    const dietaryFromSlug = getDietaryFromSlug({ ...baseRecord, category_id: resolvedCategoryId },dietaryOptions);
 
     setEditingItem({
       ...baseRecord,
@@ -406,6 +416,7 @@ if (cachedAddon) return cachedAddon;
   };
 
   const handleAddItem = async () => {
+    if (isAddingItemRef.current) return; 
     if (newItem.code) {
       const duplicate = findDuplicateCodeItem(newItem.code);
       if (duplicate) {
@@ -415,6 +426,8 @@ if (cachedAddon) return cachedAddon;
         return;
       }
     }
+    isAddingItemRef.current = true;
+    setIsAddingItem(true);
     menuCache.invalidate(clientId);
     try {
       let imageId = null;
@@ -433,14 +446,35 @@ if (cachedAddon) return cachedAddon;
       const finalCategoryId = resolvedCat.id;
       if (!finalCategoryId) return;
 
-      const { dietary_type, ...cleanNewItem } = newItem;
+// AFTER
+const { dietary_type, ...cleanNewItem } = newItem;
 
-      const slug = generateSlug(
-        newItem.name,
-        finalCategoryId,
-        newItem.availability_time ?? [],
-        categoriesFlat
-      );
+const slug = (() => {
+  const parts = [];
+  let currentId = finalCategoryId;
+  const visited = new Set();
+  while (currentId && !visited.has(currentId)) {
+    visited.add(currentId);
+    const cat = categoriesFlat.find(c => c.id === currentId);
+    if (!cat) break;
+    parts.unshift(toSlugSegment(cat.name));
+    currentId = cat.parentId ?? cat.parent_id ?? null;
+  }
+  const itemPart = toSlugSegment(newItem.name);
+  const normalizedDietary = (dietary_type || '').toLowerCase().replace(/[-_\s]/g, '');
+  const base = [...parts, itemPart].filter(Boolean).join('_');
+
+  const timingArr = Array.isArray(newItem.availability_time)
+    ? newItem.availability_time.filter(Boolean)
+    : (newItem.availability_time ? [newItem.availability_time] : []);
+
+  const suffixParts = [
+    ...(normalizedDietary ? [normalizedDietary] : []),
+    ...timingArr,
+  ].filter(Boolean);
+
+  return suffixParts.length > 0 ? `${base}__${suffixParts.join('+')}` : base;
+})();
 
       const created_by =
         currentUserId || localStorage.getItem("user_id") || "system";
@@ -1947,6 +1981,8 @@ return suffixParts.length > 0 ? `${base}__${suffixParts.join('+')}` : base;
         isComboCategory={isComboCategory}
         dedupedMenuItems={dedupedMenuItems}
         categoriesFlat={categoriesFlat}
+        dietaryColorMap={dietaryColorMap}
+        isSubmitting={isAddingItem}
       />
 
       <UniversalEditModal
@@ -1960,7 +1996,7 @@ return suffixParts.length > 0 ? `${base}__${suffixParts.join('+')}` : base;
         fetchAddonData={fetchAddonData} setAddonSubcategories={setAddonSubcategories} setAllAddonItems={setAllAddonItems}
         units={units} normalizedRealm={normalizedRealm}
         dedupedMenuItems={dedupedMenuItems}
-        categoriesFlat={categoriesFlat}
+        categoriesFlat={categoriesFlat}dietaryColorMap={dietaryColorMap}
       />
 
       <UniversalBulkUpdateModal clientId={clientId}
