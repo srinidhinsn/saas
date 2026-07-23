@@ -4,6 +4,7 @@ from sqlalchemy.orm import Session
 from entity.user_entity import User, Person
 from entity.client_entity import Address
 from models.user_model import  PersonModel
+from utils.auth import hash_password
 
 async def get_person_details_service(context,db: Session):
     try:
@@ -24,6 +25,7 @@ async def get_person_details_service(context,db: Session):
 async def update_person_details_service(client_id: str,person_req,body: dict,context,db: Session):
     target_user_id = (body.get("user_id") or context.user_id)
     roles = body.get("roles")
+    new_password = body.get("password")
     try:
         user_uuid = uuid.UUID(str(target_user_id))
     except ValueError:
@@ -63,7 +65,10 @@ async def update_person_details_service(client_id: str,person_req,body: dict,con
             str(r).strip()
             for r in roles
         ]
-
+    if new_password:
+        if len(new_password) < 6:
+            raise HTTPException(status_code=400, detail="Password must be at least 6 characters")
+        user_entity.hashed_password = hash_password(new_password)
     db.commit()
     db.refresh(user_entity)
 
