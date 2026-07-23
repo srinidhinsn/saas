@@ -2,7 +2,7 @@ import React, { useState, useEffect, useRef, useCallback, useMemo } from 'react'
 import {
   ShoppingCart, Plus, Minus, X, Check, Search,
   Users, Package, Trash2, ArrowLeft, FileText,
-  Printer as PrinterIcon, Clock, Save, User, Phone,
+  Printer as PrinterIcon, Clock, Save, User, Phone,Truck,
 } from 'lucide-react';
 import { Eye, Lock, Printer } from 'lucide-react';
 import axios from 'axios';
@@ -12,9 +12,10 @@ import ImagePreview from '../../utils/ImagePreview';
 import InvoiceModal from '../BillingServices/InvoiceModal';
 import { getMenuConfig } from '../../utils/menuConfigResolver';
 import { menuCache } from '../../utils/Menu-utils/menuCache';
-import { getDietaryFromSlug, isItemActive,buildCartItem, getGroupedCartItems, deduplicateOrderItems,getCategoryAndChildrenIds, isPackagingCategoryId, excludePackagingItems}
+import { getDietaryFromSlug, isItemActive,buildCartItem, getGroupedCartItems, deduplicateOrderItems,getCategoryAndChildrenIds, isPackagingCategoryId, excludePackagingItems, relinkCartItemsToParents}
          from '../../utils/Menu-utils/menuUtils';
 import {useDietaryTypes, useTimings, useZoneConfig, useMenuData,useCounterTree} from '../../utils/Menu-utils/useMenuData';
+import { parseISTTimestamp } from '../../utils/dateRange';
 // ─────────────────────────────────────────────────────────────────────────────
 // Constants
 // ─────────────────────────────────────────────────────────────────────────────
@@ -1110,10 +1111,7 @@ const TableReservation = ({
 
   const calcElapsed = (createdAt) => {
     if (!createdAt) return null;
-    const utc = typeof createdAt === 'string'
-      ? createdAt.replace(' ', 'T').split('.')[0] + 'Z'
-      : createdAt;
-    const diff = Date.now() - new Date(utc).getTime();
+    const diff = Date.now() - parseISTTimestamp(createdAt);
     if (diff < 0) return 'Just now';
     const s = Math.floor(diff / 1000);
     const m = Math.floor(s / 60);
@@ -1203,6 +1201,22 @@ const TableReservation = ({
             >
               <Package size={12} /> Takeaway
             </button>
+            <button
+    className={`px-4 py-1.5 text-xs font-semibold rounded-full transition-all flex items-center gap-1
+      ${orderMode === 'walkin'
+        ? 'bg-teal-500 text-white shadow'
+        : 'text-gray-600 hover:bg-gray-100'}`}
+  >
+    <User size={12} /> Walk In
+  </button>
+<button
+    className={`px-4 py-1.5 text-xs font-semibold rounded-full transition-all flex items-center gap-1
+      ${orderMode === 'delivery'
+        ? 'bg-purple-500 text-white shadow'
+        : 'text-gray-600 hover:bg-gray-100'}`}
+  >
+    <Truck size={12} /> Delivery
+  </button>
           </div>
         </div>
       </div>
@@ -1419,10 +1433,7 @@ const TakeawayOrdersModal = ({ isOpen, onClose, clientId, token, takeawayTableId
 
   const calcElapsed = (createdAt) => {
     if (!createdAt) return '';
-    const utc = typeof createdAt === 'string'
-      ? createdAt.replace(' ', 'T').split('.')[0] + 'Z'
-      : createdAt;
-    const diff = Date.now() - new Date(utc).getTime();
+    const diff = Date.now() - parseISTTimestamp(createdAt);
     const m = Math.floor(diff / 60000);
     if (m < 1) return 'Just now';
     if (m < 60) return `${m} min ago`;
@@ -1704,6 +1715,44 @@ const TakeOrder = ({ clientId, token, onOrderUpdate, realm }) => {
       ...pkgEntry,
       unit_price: Number(pkg.unit_price) || 0,   // force-cast in case buildCartItem left it stringy/undefined
     }]);
+  });
+};
+
+const syncPackagingForOrderMode = (newMode) => {
+  setCart(prev => {
+    if (newMode === 'takeaway') {
+      const additions = [];
+      prev
+        .filter(i => !i.parent_item_key && !i.saved_sub_order)
+        .forEach(mainItem => {
+          const menuRecord = menuItems.find(mi => Number(mi.id) === Number(mainItem.id));
+          const linkedIds = menuRecord?.line_item_id || [];
+          if (!linkedIds.length) return;
+
+          const alreadyHasPackaging = prev.some(
+            i => i.parent_item_key === mainItem.frontend_unique_key && i.is_container
+          );
+          if (alreadyHasPackaging) return;
+
+          linkedIds
+            .map(id => menuItems.find(mi => Number(mi.id) === Number(id)))
+            .filter(li => li && isPackagingCategoryId(li.category_id, categoriesFlat))
+            .forEach(pkg => {
+              const batch = mainItem.batch_timestamp || currentBatchTimestamp || Date.now();
+              const entry = buildCartItem(pkg, {
+                batch_timestamp: batch,
+                parent_item_key: mainItem.frontend_unique_key,
+                is_addon: true,
+                _item_type: 'addon',
+                is_container: true,
+              });
+              additions.push({ ...entry, unit_price: Number(pkg.unit_price) || 0 });
+            });
+        });
+      return [...prev, ...additions];
+    }
+    // Switching back to dine-in — drop any unsaved packaging containers
+    return prev.filter(i => !(i.is_container && !i.saved_sub_order));
   });
 };
 
@@ -2253,7 +2302,8 @@ const TakeOrder = ({ clientId, token, onOrderUpdate, realm }) => {
       setCurrentBatchTimestamp(null);
       setDraftSavedAt(null);
     } else {
-      const reconstructedCart = (existingOrder.items || []).map(item => {
+      const reconstructedCart = relinkCartItemsToParents(
+         (existingOrder.items || []).map(item => {
         const menuItem = menuItems.find(mi => Number(mi.id) === Number(item.item_id));
         return {
           id: Number(item.item_id),
@@ -2274,7 +2324,7 @@ const TakeOrder = ({ clientId, token, onOrderUpdate, realm }) => {
           batch_label: item.batch_label,
           sub_order_id: item.sub_order_id,
         };
-      });
+      }));
       setCart(reconstructedCart);
       setActiveOrderId(existingOrder.id);
       setActiveDineinOrderId(existingOrder.dinein_order_id);
@@ -2309,7 +2359,8 @@ const TakeOrder = ({ clientId, token, onOrderUpdate, realm }) => {
         (a, b) => new Date(b.created_at) - new Date(a.created_at)
       )[0];
 
-      const reconstructedCart = (activeOrder.items || []).map(item => {
+      const reconstructedCart = relinkCartItemsToParents(
+        (activeOrder.items || []).map(item => {
         const menuItem = menuItems.find(mi => Number(mi.id) === Number(item.item_id));
         return {
           id: Number(item.item_id),
@@ -2331,7 +2382,7 @@ const TakeOrder = ({ clientId, token, onOrderUpdate, realm }) => {
           batch_label: item.batch_label,
           sub_order_id: item.sub_order_id,
         };
-      });
+      }));
 
       setCart(reconstructedCart);
       setSelectedTable(table.id.toString());
@@ -2486,7 +2537,8 @@ const TakeOrder = ({ clientId, token, onOrderUpdate, realm }) => {
         return;
       }
 
-      const rebuiltOldItems = order.items.map(item => {
+      const rebuiltOldItems = relinkCartItemsToParents(
+        order.items.map(item => {
         const menuItem = menuItems.find(mi => Number(mi.id) === Number(item.item_id));
         return {
           id: Number(item.item_id),
@@ -2509,7 +2561,7 @@ const TakeOrder = ({ clientId, token, onOrderUpdate, realm }) => {
           sub_order_id: item.sub_order_id,
           parent_item_key: item.parent_item_key || null,
         };
-      });
+      }));
 
       setCart(prev => {
         const unsavedNew = prev.filter(ci => ci.is_new_item && !ci.saved_sub_order);
@@ -3514,6 +3566,7 @@ const buildOrderPayload = (items) =>
                           onClick={() => {
                             setOrderMode('dinein');
                             if (dineinTableId) setSelectedTable(dineinTableId);
+                            syncPackagingForOrderMode('dinein');
                           }}
                           className={`flex-1 py-2 rounded-md text-sm font-medium flex items-center justify-center gap-2
                             ${orderMode === 'dinein'
@@ -3526,6 +3579,7 @@ const buildOrderPayload = (items) =>
                           onClick={() => {
                             setOrderMode('takeaway');
                             setSelectedTable(takeawayTableId?.toString());
+                            syncPackagingForOrderMode('takeaway');
                           }}
                           className={`flex-1 py-2 rounded-md text-sm font-medium flex items-center justify-center gap-2
                             ${orderMode === 'takeaway'
@@ -3545,7 +3599,7 @@ const buildOrderPayload = (items) =>
                     ) : (
                       <>
                         <div className="flex-1 overflow-y-auto mt-4 space-y-2">
-                          {getGroupedCartItems(excludePackagingItems(oldItems, categoriesFlat)).map((group, idx) => (
+                          {getGroupedCartItems(oldItems).map((group, idx) => (
                             <OldItemRow
                               key={`old-${idx}`}
                               group={group}
@@ -3575,7 +3629,7 @@ const buildOrderPayload = (items) =>
                                   <div className="flex-1 h-px bg-gradient-to-r from-orange-400 via-transparent to-transparent" />
                                 </div>
                               )}
-                              {getGroupedCartItems(excludePackagingItems(groupedNewItems[ts], categoriesFlat)).map((group, idx) => (
+                              {getGroupedCartItems(groupedNewItems[ts]).map((group, idx) => (
                                 <NewItemRow
                                   key={`new-${ts}-${idx}`}
                                   group={group}
@@ -3723,14 +3777,14 @@ const buildOrderPayload = (items) =>
               {/* Dine-in / Takeaway toggle */}
               <div className="flex bg-gray-100 rounded-lg p-1 mb-3 flex-shrink-0">
                 <button
-                  onClick={() => { setOrderMode('dinein'); if (dineinTableId) setSelectedTable(dineinTableId); }}
+                  onClick={() => { setOrderMode('dinein'); if (dineinTableId) setSelectedTable(dineinTableId); syncPackagingForOrderMode('dinein'); }}
                   className={`flex-1 py-2 rounded-md text-sm font-medium flex items-center justify-center gap-2
                     ${orderMode === 'dinein' ? 'bg-action-primary text-white shadow-sm' : 'text-gray-600'}`}
                 >
                   <Users size={16} /> Dine In
                 </button>
                 <button
-                  onClick={() => { setOrderMode('takeaway'); setSelectedTable(takeawayTableId?.toString()); }}
+                  onClick={() => { setOrderMode('takeaway'); setSelectedTable(takeawayTableId?.toString()); syncPackagingForOrderMode('takeaway'); }}
                   className={`flex-1 py-2 rounded-md text-sm font-medium flex items-center justify-center gap-2
                     ${orderMode === 'takeaway' ? 'bg-action-primary text-white shadow-sm' : 'text-gray-600'}`}
                 >
@@ -3740,7 +3794,7 @@ const buildOrderPayload = (items) =>
 
               {/* Scrollable cart items */}
               <div className="flex-1 overflow-y-auto space-y-2">
-                {getGroupedCartItems(excludePackagingItems(oldItems, categoriesFlat)).map((group, idx) => (
+                {getGroupedCartItems(oldItems).map((group, idx) => (
                   <OldItemRow
                     key={`old-${idx}`}
                     group={group}
@@ -3768,7 +3822,7 @@ const buildOrderPayload = (items) =>
                         <div className="flex-1 h-px bg-gradient-to-r from-orange-400 via-transparent to-transparent" />
                       </div>
                     )}
-                    {getGroupedCartItems(excludePackagingItems(groupedNewItems[ts], categoriesFlat)).map((group, idx) => (
+                    {getGroupedCartItems(groupedNewItems[ts]).map((group, idx) => (
                       <NewItemRow
                         key={`new-${ts}-${idx}`}
                         group={group}

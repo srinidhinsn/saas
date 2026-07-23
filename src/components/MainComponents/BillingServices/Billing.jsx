@@ -352,7 +352,7 @@ export default function BillingPage({ clientId, token }) {
                               {/* Payment Status */}
                               <td className="px-6 py-4 whitespace-nowrap">
                                 {billingDoc ? (
-                                  <span className={`inline-flex px-2.5 py-1 rounded-full text-xs font-semibold ${billingDoc.payment_status === "paid"
+                                  <span className={`inline-flex px-2.5 py-1 rounded-full text-xs font-semibold ${billingDoc.payment_status === "Paid"
                                       ? "bg-green-100 text-green-700"
                                       : billingDoc.status === "partial"
                                         ? "bg-yellow-100 text-yellow-700"

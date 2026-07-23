@@ -166,19 +166,13 @@ export default function StockRecipeManager({ clientId: propClientId, token: prop
   const fetchUnits = async () => {
     try {
       const res = await axios.get(
-        `${API_CONFIG.baseMenu(clientId)}/read_category?client_id=${clientId}&category_id=units`,
+        `${API_CONFIG.baseInventory(clientId)}/item-types?client_id=${clientId}&category_id=units`,
         getAuthHeaders(token)
       );
-      const data = res.data?.data || [];
-      const unitsNode = Array.isArray(data) ? data.find((d) => d.id === "units") : data;
-      const subCats = unitsNode?.subCategories || [];
-      // subCategories may be objects {id, name, ...} or plain strings
-      const unitList = subCats.map((u) => (typeof u === "string" ? u : u.id));
+      const unitList = res.data?.data || [];
       setUnits(unitList);
     } catch (err) {
       console.error("fetchUnits failed:", err);
-      // Fallback to standard units if API fails
-      setUnits(["g", "kg", "ml", "litre", "pcs"]);
     }
   };
 
