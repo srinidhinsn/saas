@@ -329,7 +329,10 @@ def get_role_config(client_id: str, role: str, context: SaasContext = Depends(ve
     config = {}
     screen_ids = {}
     for r in rows:
-        config.setdefault(r.module, []).extend(r.operations or [])
+        existing = config.setdefault(r.module, [])
+        for op in (r.operations or []):
+            if op not in existing:
+                existing.append(op)
         screen_ids[r.module] = r.screen_id
 
     return ResponseModel(screen_id=context.screen_id, data={"config": config, "screen_ids": screen_ids})
@@ -337,13 +340,14 @@ def get_role_config(client_id: str, role: str, context: SaasContext = Depends(ve
 @router.post("/roles/{role}/config")
 def save_role_config(client_id: str, role: str, payload: dict, context: SaasContext = Depends(verify_token), db: Session = Depends(get_db)):
     role = role.strip()
-    db.query(PageDefinition).filter(PageDefinition.client_id == client_id, PageDefinition.role == role).delete()
+    db.query(PageDefinition).filter(PageDefinition.client_id == client_id, func.lower(PageDefinition.role) == role.lower()).delete()
 
     modules = payload.get("modules", {})
     screen_ids = payload.get("screen_ids", {})
 
     for module, ops in modules.items():
         screen_id_val = screen_ids.get(module)
+        ops = list(dict.fromkeys(ops or [])) 
         if not ops and not screen_id_val:
             continue
 
