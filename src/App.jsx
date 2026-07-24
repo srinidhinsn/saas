@@ -17,7 +17,8 @@ import { menuCache } from './components/utils/Menu-utils/menuCache';
 import { NAV_TABS } from './components/Constants/Headers/Navtabs';
 import { useClient } from './context/ClientContext.jsx';
 import RegisterPage from './components/MainComponents/UserServices/ClientRegister/Register';
-
+import { useIdleLogout, clearIdleActivity, markIdleActivity } from './components/utils/hooks/useIdleLogout.js';
+const IDLE_TIMEOUT_MS = Number(import.meta.env.VITE_IDLE_TIMEOUT_MS) || 15 * 60 * 1000;
 const getVisibleNav = (token) => {
   try {
     const decoded = jwtDecode(token);
@@ -142,6 +143,9 @@ if (token) {
     validToken = null;
   }
 }
+if (validToken) {
+  markIdleActivity(); 
+}
    const screenId= localStorage.getItem('screen_id');
    const clientId= localStorage.getItem('client_id');
     return {
@@ -210,6 +214,7 @@ if (token) {
           clientId: localStorage.getItem("client_id"),
           isAuthenticated: true,
         });
+        markIdleActivity();
       } catch (err) {
         handleLogout();
       } finally {
@@ -232,7 +237,7 @@ if (token) {
     localStorage.setItem('screen_id', screenId || '');
     localStorage.setItem('client_id', clientId);
     localStorage.setItem('client', JSON.stringify(client || {}));
-
+    markIdleActivity(); 
     if (client) {
       setClientDetails(client);
     }
@@ -253,7 +258,8 @@ if (token) {
     localStorage.removeItem("refresh_token");
     localStorage.removeItem("selected_client_id");
     localStorage.removeItem('menu_selected_category'); 
-    localStorage.removeItem('client');   
+    localStorage.removeItem('client');
+    clearIdleActivity();  
     setAuthState(prev => ({
       token: null,
       screenId: null,
@@ -261,6 +267,7 @@ if (token) {
       isAuthenticated: false,
     }));
   };
+  useIdleLogout(authState.isAuthenticated, handleLogout,  IDLE_TIMEOUT_MS);
   if (checkingAuth) {
     return (
       <div className="min-h-screen flex items-center justify-center">

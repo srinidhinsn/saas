@@ -26,7 +26,7 @@ const UniversalAddModal = ({
   handleAddItem,
   getCategoryIdByName,
   inventoryIds,
-
+  dietaryColorMap,isSubmitting,
   isComboCategory, dedupedMenuItems, categoriesFlat,
   fetchAddonData,
   // Table-specific props
@@ -315,6 +315,41 @@ const UniversalAddModal = ({
                   placeholder={isComboCategory ? "What's included, portion details…" : "Enter item description"} rows="3" />
               </div>
               {normalizedRealm === 'restaurant' && (
+  <div>
+    <label className="block text-sm font-medium mb-2 text-text-primary">
+      Dietary Type
+    </label>
+    <div className="flex flex-wrap gap-2">
+    {dietaryOptions.map((d) => {
+  const key = (d || '').toLowerCase().replace(/[-_\s]/g, '');
+  const selected = (newItem?.dietary_type || '').toLowerCase().replace(/[-_\s]/g, '') === key;
+  const colorClass = dietaryColorMap?.[d] || dietaryColorMap?.[key] || 'bg-gray-300';
+  return (
+    <button
+      key={d}
+      type="button"
+      onClick={() =>
+        setNewItem(prev => ({ ...prev, dietary_type: selected ? '' : d }))
+      }
+      className={`px-3 py-1.5 rounded-lg text-sm border-2 transition-all capitalize flex items-center gap-2 ${
+        selected
+          ? 'bg-bg-tertiary text-text-primary shadow-sm'
+          : 'bg-bg-tertiary text-text-primary hover:opacity-80'
+      }`}
+      style={{ borderColor: 'transparent' }}
+    >
+      <span className={`w-2.5 h-2.5 rounded-full ${colorClass}`} />
+      {d}
+    </button>
+  );
+})}
+    </div>
+    {!newItem?.dietary_type && (
+      <p className="text-xs text-text-secondary mt-1">No dietary type selected</p>
+    )}
+  </div>
+)}
+              {normalizedRealm === 'restaurant' && (
                 <div>
                   <label className="block text-sm font-medium mb-2">
                     Availability Timing
@@ -593,7 +628,8 @@ const UniversalAddModal = ({
                 </button>
                 <button
                   onClick={handleAddItem}
-                  className="flex-1 px-4 py-2 rounded-lg bg-action-primary text-text-white hover:opacity-90 transition-opacity"
+                  disabled={isSubmitting}
+                  className={`flex-1 px-4 py-2 rounded-lg bg-action-primary text-text-white hover:opacity-90 transition-opacity ${isSubmitting ? 'bg-gray-400 cursor-not-allowed' : 'bg-action-primary hover:opacity-90'}`}
                 >
                   {isComboCategory ? 'Add Combo' : 'Add Item'}
                 </button>
