@@ -1,4 +1,4 @@
-from fastapi import APIRouter, Depends, HTTPException, Query
+from fastapi import APIRouter, Depends, HTTPException, Query, Body
 from sqlalchemy.orm import Session
 from sqlalchemy import text
 from typing import List, Optional, Dict, Any
@@ -73,10 +73,52 @@ def create_inventory(item: Inventory, client_id: str, context: SaasContext = Dep
 @router.post("/update", response_model=ResponseModel[Inventory])
 def update_inventory(
     client_id: str,
-    updates: Inventory,
+    payload: Dict[str, Any] = Body(),
     context: SaasContext = Depends(verify_token),
     db: Session = Depends(get_db)
 ):
+    if "items" in payload:
+        items = payload.get("items") or []
+        if not items:
+            raise HTTPException(status_code=400, detail="Missing items")
+
+        updated = []
+        for item in items:
+            item_id = item.get("id")
+            new_availability = item.get("availability")
+            if item_id is None or new_availability is None:
+                continue
+
+            record = db.query(InventoryEntity).filter(
+                InventoryEntity.id == int(item_id),
+                InventoryEntity.client_id == client_id,
+            ).first()
+            if not record:
+                continue
+
+            new_qty = Decimal(str(new_availability))
+            before_stock = Decimal(str(record.availability or 0))
+
+            if new_qty != before_stock:
+                create_transaction(
+                    db=db, client_id=client_id,
+                    payload=TxPayload(
+                        item_id=record.id, tx_type="MENU_AVAILABILITY_ADJUSTMENT",
+                        ref_id=record.id, qty=abs(new_qty - before_stock),
+                        after_stock=new_qty,
+                        remarks=f"Bulk availability update for '{record.name}'",
+                    ),
+                )
+            record.availability = new_qty
+            updated.append(item_id)
+
+        db.commit()
+        return ResponseModel(
+            screen_id=context.screen_id, status="success",
+            message="Bulk availability updated",
+            data={"updated_ids": updated},
+        )    
+    updates = Inventory(**payload)
     if not updates.id:
         raise HTTPException(status_code=400, detail="Missing item ID")
 
