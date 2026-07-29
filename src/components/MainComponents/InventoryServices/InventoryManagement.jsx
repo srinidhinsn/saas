@@ -1276,7 +1276,8 @@ function RecipeTab({
               <AgGridTable
                 columnDefs={ingredientColumnDefs}
                 rowData={recipe}
-                domLayout="autoHeight"
+                domLayout="normal"
+                height={400}
                 exportFileName="recipe_ingredients"
                 gridOptions={{ getRowId: (params) => String(params.data.stock_item_id) }}
               />
@@ -1533,7 +1534,8 @@ function MenuAvailabilityTab({ menuItems, loading, onUpdateAvailability, onAddQt
           <AgGridTable
             columnDefs={menuColumnDefs}
             rowData={filteredItems}
-            domLayout="autoHeight"
+            domLayout="normal"
+            height={600}
             exportFileName="menu_availability"
             gridOptions={{ getRowId: (params) => String(params.data.id) }}
           />

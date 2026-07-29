@@ -251,7 +251,8 @@ export default function BillingPage_Super_User({  token }) {
               <AgGridTable
                 columnDefs={billingColumnDefs}
                 rowData={filteredOrders}
-                domLayout="autoHeight"
+                domLayout="normal"
+                height={600}
                 exportFileName="billing_super_user"
                 gridOptions={{ getRowId: (params) => String(params.data.id) }}
               />

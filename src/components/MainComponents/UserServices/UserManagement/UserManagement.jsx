@@ -632,7 +632,8 @@ const UsersList = ({ onAddNew, clientId, token, onEdit,isSuperAdminScreen}) => {
           <AgGridTable
             columnDefs={userColumnDefs}
             rowData={filteredUsers}
-            domLayout="autoHeight"
+            domLayout="normal"
+            height={600}
             pagination={true}
             paginationPageSize={itemsPerPage}
           />

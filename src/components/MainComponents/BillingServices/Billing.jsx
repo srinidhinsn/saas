@@ -399,7 +399,7 @@ export default function BillingPage({ clientId, token }) {
           </div>
         ) : (
           <div className="bg-bg-primary rounded-xl shadow-lg border border-border-default overflow-hidden">
-            <AgGridTable columnDefs={billingColumnDefs} rowData={filteredOrders} domLayout="autoHeight" />
+            <AgGridTable columnDefs={billingColumnDefs} rowData={filteredOrders} domLayout="normal" height={600} />
           </div>
         )}
 

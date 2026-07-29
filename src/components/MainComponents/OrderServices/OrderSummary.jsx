@@ -1146,7 +1146,7 @@ const OrderSummaryVisible = ({ clientId, token }) => {
           <div className="rounded-xl p-16 text-center bg-bg-primary border border-border-default shadow-card"><ShoppingBag size={40} className="mx-auto mb-3 text-text-secondary opacity-40" /><p className="text-text-secondary text-base font-medium">No orders found</p></div>
         ) : (
           <div className="rounded-xl overflow-hidden border border-border-default shadow-card bg-bg-primary">
-            <AgGridTable columnDefs={orderColumnDefs} rowData={filteredOrders} domLayout="autoHeight" />
+            <AgGridTable columnDefs={orderColumnDefs} rowData={filteredOrders} domLayout="normal" height={600} />
           </div>
         )}
       </div>
