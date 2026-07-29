@@ -5,6 +5,7 @@ from typing import List, Optional, Dict, Any
 from decimal import Decimal, getcontext
 from database.postgres import get_db
 from models.inventory_model import Inventory, Category, InventoryTransaction
+from models.order_model import TransactionTypeEnum
 from entity.inventory_entity import InventoryEntity, CategoryEntity, InventoryTransactionEntity
 from models.response_model import ResponseModel
 from models.saas_context import SaasContext
@@ -70,7 +71,7 @@ def create_inventory(item: Inventory, client_id: str, context: SaasContext = Dep
     return ResponseModel[Inventory](screen_id=context.screen_id,status="success",message="Inventory item created",data=model)
 
 
-@router.post("/update", response_model=ResponseModel[Inventory])
+@router.post("/update", response_model=ResponseModel)
 def update_inventory(
     client_id: str,
     payload: Dict[str, Any] = Body(),
@@ -103,7 +104,7 @@ def update_inventory(
                 create_transaction(
                     db=db, client_id=client_id,
                     payload=TxPayload(
-                        item_id=record.id, tx_type="MENU_AVAILABILITY_ADJUSTMENT",
+                        item_id=record.id,tx_type=TransactionTypeEnum.menu_availability_adjustment.value,
                         ref_id=record.id, qty=abs(new_qty - before_stock),
                         after_stock=new_qty,
                         remarks=f"Bulk availability update for '{record.name}'",
@@ -840,3 +841,36 @@ def delete_item_type(client_id: str, category_id: str, value: str,context: SaasC
     data = delete_master_value(db, client_id, category_id, value)
 
     return ResponseModel(screen_id=context.screen_id,status="success",message="Config deleted",data=data)
+
+@router.post("/bulk_update_availability")
+def bulk_update_availability(
+    client_id: str,
+    body: dict = Body(),
+    context: SaasContext = Depends(verify_token),
+    db: Session = Depends(get_db),
+):
+    items = body.get("items", [])
+    if not items:
+        raise HTTPException(status_code=400, detail="Missing items")
+
+    updated = []
+    for item in items:
+        item_id = item.get("id")
+        availability = item.get("availability")
+
+        if item_id is None or availability is None:
+            continue
+
+        result = db.query(InventoryEntity).filter(
+            InventoryEntity.id == int(item_id),
+            InventoryEntity.client_id == client_id,
+        ).update({"availability": availability}, synchronize_session="fetch")
+
+        if result:
+            updated.append(item_id)
+
+    db.commit()
+    return ResponseModel(
+        screen_id=context.screen_id,
+        data={"updated_ids": updated},
+    )
