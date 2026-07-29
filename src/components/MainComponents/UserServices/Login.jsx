@@ -334,7 +334,7 @@ function navigation(){
 
             {/* Forgot Password Link */}
             <div className="flex items-center justify-between">
-              <span
+              {/* <span
                 onClick={() => navigation()}
                 className="text-sm cursor-pointer transition-colors font-medium"
                 style={{ color: '#f97316' }}
@@ -342,7 +342,7 @@ function navigation(){
                 onMouseOut={(e) => e.target.style.textDecoration = 'none'}
               >
                 Register here...
-              </span>
+              </span> */}
               <span
                 onClick={() => setShowForgot(true)}
                 className="text-sm cursor-pointer transition-colors font-medium"
