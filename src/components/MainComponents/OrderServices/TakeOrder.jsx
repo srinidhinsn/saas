@@ -1512,6 +1512,28 @@ const TakeawayOrdersModal = ({ isOpen, onClose, clientId, token, takeawayTableId
     </div>
   );
 };
+const StockConfirmModal = ({ pending, onCancel, onConfirmed }) => {
+  if (!pending) return null;
+  const { item } = pending;
+  return (
+    <div className="fixed inset-0 z-50 flex items-center justify-center p-4 bg-black/50">
+      <div className="rounded-xl w-full max-w-sm bg-white shadow-xl">
+        <div className="px-6 py-4 border-b flex justify-between items-center">
+          <h2 className="text-lg font-bold text-red-600">Stock Alert</h2>
+          <button onClick={onCancel} className="text-gray-500 hover:text-gray-700"><X size={20} /></button>
+        </div>
+        <div className="px-6 py-5">
+          <p className="text-sm text-gray-700 font-semibold mb-1">{item?.name}</p>
+          <p className="text-sm text-gray-500">Availability reached zero. Do you still want to proceed?</p>
+        </div>
+        <div className="px-6 py-4 flex gap-3 bg-gray-50 rounded-b-lg">
+          <button onClick={onCancel} className="flex-1 py-2.5 rounded-lg font-medium text-sm border border-gray-300 bg-white text-gray-700 hover:bg-gray-50">Cancel</button>
+          <button onClick={onConfirmed} className="flex-1 py-2.5 rounded-lg font-bold text-sm bg-red-600 hover:bg-red-700 text-white">Proceed</button>
+        </div>
+      </div>
+    </div>
+  );
+};
 // ─────────────────────────────────────────────────────────────────────────────
 // TakeOrder — main component
 // ─────────────────────────────────────────────────────────────────────────────
@@ -1587,7 +1609,6 @@ const TakeOrder = ({ clientId, token, onOrderUpdate, realm }) => {
   // const [takeawaySections, setTakeawaySections] = useState([]);
   const [zoneConfigId, setZoneConfigId] = useState(null);
   const [selectedDietary, setSelectedDietary] = useState(null);
-  const [stockWarning, setStockWarning] = useState(null);
   const [showTakeawayOrdersModal, setShowTakeawayOrdersModal] = useState(false);
   const hasFetchedRef = useRef(false);
   const menuConfig = useMemo(
@@ -1611,7 +1632,24 @@ const TakeOrder = ({ clientId, token, onOrderUpdate, realm }) => {
     zoneConfigId,
     includeAllRaw: true,
   });
-
+  const [availabilityMap, setAvailabilityMap] = useState({});
+  const [pendingStockConfirm, setPendingStockConfirm] = useState(null);
+  
+  const getAvailability = useCallback((item) => {
+    if (!item) return null;
+    const override = availabilityMap[item.id];
+    return override !== undefined ? override : (item.availability != null ? Number(item.availability) : null);
+  }, [availabilityMap]);
+  
+  const adjustAvailability = useCallback((itemId, delta) => {
+    setAvailabilityMap(prev => {
+      const current = prev[itemId] !== undefined
+        ? prev[itemId]
+        : (menuItems.find(mi => Number(mi.id) === Number(itemId))?.availability ?? null);
+      if (current == null) return prev; // item doesn't track stock at all
+      return { ...prev, [itemId]: Number(current) + delta };
+    });
+  }, [menuItems]);
   // ─────────────────────────────────────────────────────────────────────────
   // Draft helpers
   // ─────────────────────────────────────────────────────────────────────────
@@ -1942,7 +1980,13 @@ const syncPackagingForOrderMode = (newMode) => {
     return () => window.removeEventListener('popstate', onBack);
     // eslint-disable-next-line react-hooks/exhaustive-deps
   }, [currentView]);
-
+  useEffect(() => {
+    if (menuItems.length > 0 && Object.keys(availabilityMap).length === 0) {
+      const seed = {};
+      menuItems.forEach(mi => { if (mi.availability != null) seed[mi.id] = Number(mi.availability); });
+      setAvailabilityMap(seed);
+    }
+  }, [menuItems]);
   // ─────────────────────────────────────────────────────────────────────────
   // Navigation helpers
   // ─────────────────────────────────────────────────────────────────────────
@@ -2322,79 +2366,90 @@ const syncPackagingForOrderMode = (newMode) => {
       .reduce((t, i) => t + (i.unit_price || 0) * i.quantity, 0)
       .toFixed(2);
 
-  const addToCart = (item, parentItemKey = null) => {
-    // Count how many of this item are already in the new (unsaved) cart
-    const alreadyInCart = cart
-      .filter(i => i.id === item.id && i.is_new_item && !i.saved_sub_order)
-      .reduce((sum, i) => sum + i.quantity, 0);
+      const addToCart = (item, parentItemKey = null) => {
+        const currentAvailability = getAvailability(item);
+        const hasStockTracking = currentAvailability != null;
+      
+        const commit = () => {
+          setHasNewItems(true);
+          let batch = currentBatchTimestamp;
+          if (!batch) { batch = Date.now(); setCurrentBatchTimestamp(batch); }
+      
+          if (hasStockTracking) adjustAvailability(item.id, -1);
+      
+          if (!parentItemKey) {
+            const existingIndex = cart.findIndex(
+              ci => ci.id === Number(item.id) && ci.is_new_item && !ci.saved_sub_order && !ci.is_addon
+            );
+            if (existingIndex !== -1) {
+              setCart(prev => prev.map((ci, idx) => idx === existingIndex ? { ...ci, quantity: ci.quantity + 1 } : ci));
+              if (!isMobile) setShowCart(true);
+              return cart[existingIndex].frontend_unique_key;
+            }
+          }
+      
+          const newItem = buildCartItem(item, {
+            batch_timestamp: batch,
+            parent_item_key: parentItemKey,
+            is_addon: !!parentItemKey,
+          });
+          setCart(prev => [...prev, newItem]);
+          if (!isMobile) setShowCart(true);
+          return newItem.frontend_unique_key;
+        };
+      
+        if (hasStockTracking && currentAvailability <= 0) {
+          setPendingStockConfirm({ item, onConfirm: commit });
+          return null; // added only if user confirms
+        }
+      
+        return commit();
+      };
 
-    const available = Number(item.availability ?? Infinity);
-
-    if (available > 0 && alreadyInCart >= available) {
-      setStockWarning({
-        itemName: item.name,
-        available,
-      });
-      return null;
-    }
-
-    setHasNewItems(true);
-    let batch = currentBatchTimestamp;
-    if (!batch) {
-      batch = Date.now();
-      setCurrentBatchTimestamp(batch);
-    }
-
-    if (!parentItemKey) {
-      const existingIndex = cart.findIndex(
-        ci => ci.id === Number(item.id) && ci.is_new_item && !ci.saved_sub_order && !ci.is_addon
-      );
-      if (existingIndex !== -1) {
-        setCart(prev =>
-          prev.map((ci, idx) =>
-            idx === existingIndex ? { ...ci, quantity: ci.quantity + 1 } : ci
-          )
-        );
-        if (!isMobile) setShowCart(true);
-        return cart[existingIndex].frontend_unique_key;
-      }
-    }
-
-    const newItem = buildCartItem(item, {
-      batch_timestamp: batch,
-      parent_item_key: parentItemKey,
-      is_addon: !!parentItemKey,
-    });
-    setCart(prev => [...prev, newItem]);
-    if (!isMobile) setShowCart(true);
-    return newItem.frontend_unique_key;
-  };
-
-  const removeFromCart = (itemId, uniqueKey = null) => {
-    setHasNewItems(true);
-    if (uniqueKey) {
-      setCart(prev =>
-        prev.filter(i =>
-          i.frontend_unique_key !== uniqueKey && i.parent_item_key !== uniqueKey
-        )
-      );
-    } else {
-      setCart(prev => prev.filter(i => i.id !== itemId));
-    }
-  };
+      const removeFromCart = (itemId, uniqueKey = null) => {
+        setHasNewItems(true);
+        const removed = uniqueKey
+          ? cart.filter(i => i.frontend_unique_key === uniqueKey || i.parent_item_key === uniqueKey)
+          : cart.filter(i => i.id === itemId);
+      
+        removed.forEach(i => {
+          if (getAvailability(i) != null) adjustAvailability(i.id, i.quantity);
+        });
+      
+        if (uniqueKey) {
+          setCart(prev => prev.filter(i => i.frontend_unique_key !== uniqueKey && i.parent_item_key !== uniqueKey));
+        } else {
+          setCart(prev => prev.filter(i => i.id !== itemId));
+        }
+      };
 
   const updateQuantity = (itemId, change, uniqueKey = null) => {
-    setHasNewItems(true);
-    setCart(prev =>
-      prev.map(item => {
-        const match = uniqueKey
-          ? item.frontend_unique_key === uniqueKey
-          : item.id === itemId && !item.frontend_unique_key;
-        if (!match) return item;
-        const q = item.quantity + change;
-        return q > 0 ? { ...item, quantity: q } : null;
-      }).filter(Boolean)
+    const cartItem = cart.find(i =>
+      uniqueKey ? i.frontend_unique_key === uniqueKey : (i.id === itemId && !i.frontend_unique_key)
     );
+    const currentAvailability = cartItem ? getAvailability(cartItem) : null;
+    const hasStockTracking = currentAvailability != null;
+  
+    const commit = () => {
+      setHasNewItems(true);
+      if (hasStockTracking) adjustAvailability(itemId, -change); // change>0 decrements, change<0 gives back
+      setCart(prev =>
+        prev.map(item => {
+          const match = uniqueKey
+            ? item.frontend_unique_key === uniqueKey
+            : item.id === itemId && !item.frontend_unique_key;
+          if (!match) return item;
+          const q = item.quantity + change;
+          return q > 0 ? { ...item, quantity: q } : null;
+        }).filter(Boolean)
+      );
+    };
+  
+    if (change > 0 && hasStockTracking && currentAvailability <= 0) {
+      setPendingStockConfirm({ item: cartItem, onConfirm: commit });
+      return;
+    }
+    commit();
   };
 
   // ─────────────────────────────────────────────────────────────────────────
@@ -2513,6 +2568,26 @@ const syncPackagingForOrderMode = (newMode) => {
           ));
         }
       }
+      if (transactionType === 'ITEM_CANCELLED') {
+        const currentAvail = availabilityMap[item.id];
+        if (currentAvail != null) {
+          const restored = Number(currentAvail) + removeQty;
+          const menuRecord = menuItems.find(mi => Number(mi.id) === Number(item.id));
+          if (menuRecord) {
+            adjustAvailability(item.id, removeQty);
+            try {
+              await axios.post(
+                `${import.meta.env.VITE_API_INVENTORY_SERVICE_URL}/${clientId}/menu/update`,
+                { id: item.id, client_id: clientId, availability: restored, zone_config_id: menuRecord.zone_config_id ?? null },
+                { headers: { Authorization: `Bearer ${token}` } }
+              );
+              menuCache.patchAvailability(clientId, { [item.id]: restored });
+            } catch (err) {
+              console.error(`Failed to restore stock for item ${item.id}:`, err);
+            }
+          }
+        }
+      }
       toast.success(
         newQty > 0
           ? `Quantity reduced to ${newQty}. (${transactionType})`
@@ -2550,7 +2625,26 @@ const syncPackagingForOrderMode = (newMode) => {
               i.parent_item_key === item.frontend_unique_key
           ),
         ];
-
+        if (transactionType === 'ITEM_CANCELLED') {
+          const currentAvail = availabilityMap[item.id];
+          if (currentAvail != null) {
+            const restored = Number(currentAvail) + item.quantity;
+            const menuRecord = menuItems.find(mi => Number(mi.id) === Number(item.id));
+            if (menuRecord) {
+              adjustAvailability(item.id, item.quantity);
+              try {
+                await axios.post(
+                  `${import.meta.env.VITE_API_INVENTORY_SERVICE_URL}/${clientId}/menu/update`,
+                  { id: item.id, client_id: clientId, availability: restored, zone_config_id: menuRecord.zone_config_id ?? null },
+                  { headers: { Authorization: `Bearer ${token}` } }
+                );
+                menuCache.patchAvailability(clientId, { [item.id]: restored });
+              } catch (err) {
+                console.error(`Failed to restore stock for item ${item.id}:`, err);
+              }
+            }
+          }
+        }
       await Promise.all(itemsToDelete.map(targetItem =>
         axios.delete(
           `${import.meta.env.VITE_API_ORDER_SERVICE_URL}/${clientId}/order_item/delete`,
@@ -2645,10 +2739,12 @@ const syncPackagingForOrderMode = (newMode) => {
               _item_type: 'cchild',
             })
           );
-    
           return [...prev, comboParentEntry, ...childEntries];
         });
-    
+        if (getAvailability(item) != null) adjustAvailability(item.id, -1);
+        linkedItems.forEach(comp => {
+          if (getAvailability(comp) != null) adjustAvailability(comp.id, -1);
+        });
         setHasNewItems(true);
         if (!isMobile) setShowCart(true);
     
@@ -2692,6 +2788,7 @@ const syncPackagingForOrderMode = (newMode) => {
         is_addon: true, _item_type: 'addon', 
       });
       setCart(prev => [...prev, addonEntry]);
+      if (getAvailability(addon) != null) adjustAvailability(addon.id, -1);
     });
 
   attachPackagingIfTakeaway(mainKey, batch, pendingPackagingItems);
@@ -2871,37 +2968,26 @@ const buildOrderPayload = (items) =>
           timestamp: new Date(),
         },
       });
-// ── Decrement stock for each parent item actually ordered ──
-const orderedQtyMap = {};
-cart
-  .filter(i => i.is_new_item && !i.saved_sub_order && !i.is_addon && !(i.frontend_unique_key || '').startsWith('cchild_'))
-  .forEach(i => {
-    orderedQtyMap[i.id] = (orderedQtyMap[i.id] || 0) + i.quantity;
-  });
-
-await Promise.all(
-  Object.entries(orderedQtyMap).map(async ([itemId, qty]) => {
-    const baseRecord = allMenuItemsRaw.find(
-      m => Number(m.id) === Number(itemId) && (m.zone_config_id === 0 || m.zone_config_id === null)
-    );
-    if (!baseRecord || baseRecord.availability == null) return; // skip untracked-stock items
-
-    const newAvailability = Math.max(0, (Number(baseRecord.availability) || 0) - qty);
-    try {
-      await axios.post(
-        `${import.meta.env.VITE_API_INVENTORY_SERVICE_URL}/${clientId}/menu/update`,
-        { id: Number(itemId), client_id: clientId, availability: newAvailability, zone_config_id: 0 },
-        { headers: { Authorization: `Bearer ${token}` } }
+      const orderedItemIds = new Set(
+        cart
+          .filter(i => i.is_new_item && !i.saved_sub_order && !i.is_addon && !(i.frontend_unique_key || '').startsWith('cchild_'))
+          .map(i => i.id)
       );
-    } catch (err) {
-      console.error(`Stock update failed for item ${itemId}:`, err);
-    }
-  })
-);
-
-// ── Invalidate + refresh the menu cache so the new stock is reflected everywhere ──
-menuCache.invalidate(clientId);
-await fetchData({ silent: true });
+      
+      // ✅ Reflect the reservation in the UI immediately — but do NOT persist to
+      // the DB here. Real deduction happens server-side only when the order is
+      // marked "served" (via _deduct_stock_for_order in update_order_status_service).
+      const idToAvailability = {};
+      Array.from(orderedItemIds).forEach(itemId => {
+        const newAvailability = availabilityMap[itemId];
+        if (newAvailability == null) return; // item doesn't track stock
+        idToAvailability[itemId] = newAvailability;
+      });
+      
+      if (Object.keys(idToAvailability).length > 0) {
+        // client-side cache only — no axios call, so DB availability is untouched
+        menuCache.patchAvailability(clientId, idToAvailability);
+      }
       setCart([]);
       setActiveOrderId(null);
       setActiveDineinOrderId(null);
@@ -2950,13 +3036,60 @@ await fetchData({ silent: true });
   const handleCancelOrder = async (orderId, tableId, reason) => {
     try {
       const headers = { Authorization: `Bearer ${token}` };
-
+  
+      // 1. Fetch the order's items BEFORE cancelling, so we know what to restore
+      const orderRes = await axios.get(
+        `${import.meta.env.VITE_API_ORDER_SERVICE_URL}/${clientId}/dinein/table`,
+        { headers }
+      );
+      const orderGroup = (orderRes.data?.data || []).find(o => o.id === orderId);
+  
+      // 2. Cancel the order (unchanged)
       await axios.post(
         `${import.meta.env.VITE_API_ORDER_SERVICE_URL}/${clientId}/dinein/cancel?order_id=${orderId}&reason=${encodeURIComponent(reason || '')}`,
         {},
         { headers }
       );
-
+  
+      // 3. Restore availability for every non-cancelled item in that order
+      if (orderGroup?.items?.length) {
+        const restoreQtyByItemId = {};
+        orderGroup.items.forEach(item => {
+          if ((item.status || '').toLowerCase() === 'cancelled') return;
+          const id = Number(item.item_id);
+          restoreQtyByItemId[id] = (restoreQtyByItemId[id] || 0) + (item.quantity || 0);
+        });
+  
+        const idToNewAvailability = {};
+        Object.entries(restoreQtyByItemId).forEach(([itemId, qty]) => {
+          const menuRecord = menuItems.find(mi => Number(mi.id) === Number(itemId));
+          const currentAvail = availabilityMap[itemId] ??
+            (menuRecord?.availability != null ? Number(menuRecord.availability) : null);
+          if (currentAvail == null) return; // item doesn't track stock
+          const restored = Number(currentAvail) + qty;
+          idToNewAvailability[itemId] = restored;
+          adjustAvailability(itemId, qty); // updates local state immediately
+        });
+  
+        const bulkItems = Object.entries(idToNewAvailability).map(([id, availability]) => ({
+          id: Number(id),
+          availability,
+        }));
+  
+        if (bulkItems.length > 0) {
+          try {
+            await axios.post(
+              `${import.meta.env.VITE_API_INVENTORY_SERVICE_URL}/${clientId}/menu/update`,
+              { items: bulkItems },
+              { headers }
+            );
+            menuCache.patchAvailability(clientId, idToNewAvailability);
+          } catch (err) {
+            console.error('Failed to restore stock after order cancel:', err);
+          }
+        }
+      }
+  
       toast.success('Order cancelled and transaction recorded.');
       await fetchTables();
     } catch (err) {
@@ -3386,14 +3519,11 @@ await fetchData({ silent: true });
                               </span>
                             )}
                           </div>
-                          {item.availability != null && (
-                            <p className={`text-[10px] font-semibold mt-0.5
-    ${Number(item.availability) <= 5
-                                ? 'text-red-500'
-                                : 'text-text-secondary'}`}>
-                              Qty: {Number(item.availability)}
-                            </p>
-                          )}
+                          {getAvailability(item) != null && (
+  <p className={`text-[10px] font-semibold mt-0.5 ${getAvailability(item) <= 5 ? 'text-red-500' : 'text-text-secondary'}`}>
+    Qty: {getAvailability(item)}
+  </p>
+)}
                           {ac > 0 && (
                             <span className={`text-xs px-2 py-0.5 rounded-full font-semibold
                               ${isComboCategoryId(item.category_id)
@@ -3894,7 +4024,10 @@ await fetchData({ silent: true });
 
     return [...prev, comboParentEntry, ...childEntries];
   });
-
+  if (getAvailability(comboModalItem) != null) adjustAvailability(comboModalItem.id, -1);
+  comboModalComponents.forEach(comp => {
+    if (getAvailability(comp) != null) adjustAvailability(comp.id, -1);
+  });
   setHasNewItems(true);
   if (!isMobile) setShowCart(true);
 }}
@@ -3960,26 +4093,15 @@ await fetchData({ silent: true });
           }}
         />
       )}
-      {stockWarning && (
-        <div className="fixed inset-0 z-50 flex items-center justify-center bg-black/40">
-          <div className="bg-white rounded-xl p-6 w-80 shadow-xl">
-            <h3 className="text-base font-bold text-red-600 mb-2">Stock Limit Reached</h3>
-            <p className="text-sm text-gray-600 mb-1">
-              <span className="font-semibold text-gray-800">{stockWarning.itemName}</span>
-            </p>
-            <p className="text-sm text-gray-500 mb-4">
-              Only <span className="font-bold text-red-500">{stockWarning.available}</span> available.
-              You've already added the maximum quantity.
-            </p>
-            <button
-              onClick={() => setStockWarning(null)}
-              className="w-full py-2.5 bg-action-primary text-white rounded-lg font-semibold text-sm hover:bg-action-danger"
-            >
-              OK
-            </button>
-          </div>
-        </div>
-      )}
+      <StockConfirmModal
+  pending={pendingStockConfirm}
+  onCancel={() => setPendingStockConfirm(null)}
+  onConfirmed={() => {
+    const { onConfirm } = pendingStockConfirm;
+    setPendingStockConfirm(null);
+    onConfirm && onConfirm();
+  }}
+/>
     </div>
   );
 };

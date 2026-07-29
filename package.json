@@ -10,6 +10,8 @@
     "preview": "vite preview"
   },
   "dependencies": {
+    "ag-grid-community": "^36.0.2",
+    "ag-grid-react": "^36.0.2",
     "axios": "^1.13.2",
     "caniuse-lite": "^1.0.30001793",
     "express": "^4.19.2",
