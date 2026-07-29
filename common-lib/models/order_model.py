@@ -76,7 +76,7 @@ class TransactionTypeEnum(str, Enum):
     combo_child_cancelled = "COMBO_CHILD_CANCELLED"
     recipe_cancel = "RECIPE_CANCEL"
     ingredient_reversal = "INGREDIENT_REVERSAL"
-
+    menu_availability_adjustment = "MENU_AVAILABILITY_ADJUSTMENT"
 
 class MovementTypeEnum(str, Enum):
     in_ = "IN"
