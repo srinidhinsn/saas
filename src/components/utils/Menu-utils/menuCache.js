@@ -1,6 +1,5 @@
 import axios from 'axios';
 const CACHE_VERSION = 1;
-const TTL_MS = 10 * 60 * 1000;
 
 const buildKey = (slice, clientId) => `mc_v${CACHE_VERSION}_${clientId}_${slice}`;
 
@@ -37,10 +36,6 @@ export const menuCache = {
     if (!clientId) return null;
     const entry = safeRead(buildKey(slice, clientId));
     if (!entry) return null;
-    if (Date.now() - entry.ts > TTL_MS) {
-      this.remove(slice, clientId);
-      return null;
-    }
     return entry.data;
   },
 
@@ -173,6 +168,56 @@ export const menuCache = {
       console.error('[menuCache.fetchTablesConfig]', err);
       return { sections: [], zones: [] };
     }
+  },
+
+  patchAvailability(clientId, idToAvailability /* { [id]: number } */) {
+    if (!clientId || !idToAvailability || Object.keys(idToAvailability).length === 0) return;
+
+    const prefix = `mc_v${CACHE_VERSION}_${clientId}_`;
+    let keys;
+    try {
+      keys = Object.keys(localStorage).filter(k => k.startsWith(prefix));
+    } catch {
+      return;
+    }
+
+    keys.forEach(key => {
+      let parsed;
+      try {
+        const raw = localStorage.getItem(key);
+        if (!raw) return;
+        parsed = JSON.parse(raw);
+      } catch {
+        return;
+      }
+
+      let changed = false;
+      const visit = (node) => {
+        if (Array.isArray(node)) {
+          node.forEach(visit);
+          return;
+        }
+        if (node && typeof node === 'object') {
+          if (
+            'id' in node &&
+            'availability' in node &&
+            Object.prototype.hasOwnProperty.call(idToAvailability, node.id) 
+          ) {
+            node.availability = idToAvailability[node.id];
+            changed = true;
+          }
+          // also handle numeric-string-keyed maps like { [id]: item }
+          Object.values(node).forEach(v => {
+            if (v && typeof v === 'object') visit(v);
+          });
+        }
+      };
+
+      visit(parsed);
+      if (changed) {
+        try { localStorage.setItem(key, JSON.stringify(parsed)); } catch {}
+      }
+    });
   },
 };
 
