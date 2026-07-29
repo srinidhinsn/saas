@@ -841,36 +841,3 @@ def delete_item_type(client_id: str, category_id: str, value: str,context: SaasC
     data = delete_master_value(db, client_id, category_id, value)
 
     return ResponseModel(screen_id=context.screen_id,status="success",message="Config deleted",data=data)
-
-@router.post("/bulk_update_availability")
-def bulk_update_availability(
-    client_id: str,
-    body: dict = Body(),
-    context: SaasContext = Depends(verify_token),
-    db: Session = Depends(get_db),
-):
-    items = body.get("items", [])
-    if not items:
-        raise HTTPException(status_code=400, detail="Missing items")
-
-    updated = []
-    for item in items:
-        item_id = item.get("id")
-        availability = item.get("availability")
-
-        if item_id is None or availability is None:
-            continue
-
-        result = db.query(InventoryEntity).filter(
-            InventoryEntity.id == int(item_id),
-            InventoryEntity.client_id == client_id,
-        ).update({"availability": availability}, synchronize_session="fetch")
-
-        if result:
-            updated.append(item_id)
-
-    db.commit()
-    return ResponseModel(
-        screen_id=context.screen_id,
-        data={"updated_ids": updated},
-    )
