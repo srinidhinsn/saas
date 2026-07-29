@@ -529,7 +529,8 @@ const UsersList = ({ onAddNew, clientId, token, onEdit,isSuperAdminScreen}) => {
                 <Plus size={16} />
                 User
               </button>
-
+              {isSuperAdminScreen && (
+                <>
               <button
                 onClick={() => setShowAddRole(true)}
                 className="flex items-center justify-center gap-2
@@ -550,7 +551,7 @@ const UsersList = ({ onAddNew, clientId, token, onEdit,isSuperAdminScreen}) => {
                 <Trash2 size={16} />
                 Delete
               </button>
-
+             </> )}
               {isSuperAdminScreen && (     
                 <button
                   onClick={navigator}
@@ -575,7 +576,8 @@ const UsersList = ({ onAddNew, clientId, token, onEdit,isSuperAdminScreen}) => {
                 <Plus size={16} />
                 Add User
               </button>
-
+              {isSuperAdminScreen && (
+                <>
               <button
                 onClick={() => setShowAddRole(true)}
                 className="flex items-center gap-2 px-4 py-2 rounded-lg border"
@@ -591,7 +593,7 @@ const UsersList = ({ onAddNew, clientId, token, onEdit,isSuperAdminScreen}) => {
               >
                 <Trash2 size={16} />
                 Delete Role
-              </button>
+              </button> </>)}
 
               {isSuperAdminScreen && (
                 <button
