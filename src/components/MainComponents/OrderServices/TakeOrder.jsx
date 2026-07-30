@@ -1,4 +1,5 @@
 import React, { useState, useEffect, useRef, useCallback, useMemo } from 'react';
+import { jwtDecode } from 'jwt-decode';
 import {
   ShoppingCart, Plus, Minus, X, Check, Search,
   Users, Package, Trash2, ArrowLeft, FileText,
@@ -12,7 +13,7 @@ import ImagePreview from '../../utils/ImagePreview';
 import InvoiceModal from '../BillingServices/InvoiceModal';
 import { getMenuConfig } from '../../utils/menuConfigResolver';
 import { menuCache } from '../../utils/Menu-utils/menuCache';
-import { getDietaryFromSlug, isItemActive,buildCartItem, getGroupedCartItems, deduplicateOrderItems,getCategoryAndChildrenIds, isPackagingCategoryId, excludePackagingItems, relinkCartItemsToParents}
+import { getDietaryFromSlug, isItemActive,buildCartItem, getGroupedCartItems, deduplicateOrderItems,getCategoryAndChildrenIds, isPackagingCategoryId,isDeliveryChargeCategoryId, excludePackagingItems, relinkCartItemsToParents}
          from '../../utils/Menu-utils/menuUtils';
 import {useDietaryTypes, useTimings, useZoneConfig, useMenuData,useCounterTree} from '../../utils/Menu-utils/useMenuData';
 import { parseISTTimestamp } from '../../utils/dateRange';
@@ -20,6 +21,15 @@ import { parseISTTimestamp } from '../../utils/dateRange';
 // Constants
 // ─────────────────────────────────────────────────────────────────────────────
 
+function getUserIdFromToken(token) {
+  if (!token) return null;
+  try {
+    const payload = jwtDecode(token);
+    return payload.user_id || payload.sub || null;
+  } catch {
+    return null;
+  }
+}
 const TABLE_STATUS_CONFIG = {
   vacant: { clickable: true, bg: 'bg-action-success', border: 'border-border-default', badge: 'bg-green-100 text-action-success' },
   available: { clickable: true, bg: 'bg-action-success', border: 'border-border-default', badge: 'bg-green-100 text-green-700' },
@@ -522,7 +532,31 @@ const CustomerCapturePanel = ({ value, onChange }) => {
     </div>
   );
 };
-
+const AddressSelectPanel = ({ addresses, selectedAddressId, setSelectedAddressId }) => {
+  if (!addresses || addresses.length === 0) {
+    return (
+      <div className="px-3 py-2 rounded-xl border border-red-200 bg-red-50 text-xs text-red-600">
+        No saved address found for this customer.
+      </div>
+    );
+  }
+  return (
+    <div className="px-3 py-2 rounded-xl border border-border-default bg-bg-tertiary shadow-sm">
+      <select
+        value={selectedAddressId}
+        onChange={e => setSelectedAddressId(e.target.value)}
+        className="w-full text-sm px-2 py-1.5 rounded-lg border border-border-default bg-bg-primary focus:outline-none focus:ring-2 focus:ring-action-primary"
+      >
+        <option value="">Select delivery address</option>
+        {addresses.map(addr => (
+          <option key={addr.id} value={addr.id}>
+            {[addr.name, addr.address_line1, addr.city].filter(Boolean).join(', ') || 'Address'}
+          </option>
+        ))}
+      </select>
+    </div>
+  );
+};
 // ─────────────────────────────────────────────────────────────────────────────
 // TablePaymentConfirmModal
 // ─────────────────────────────────────────────────────────────────────────────
@@ -1077,6 +1111,8 @@ const TableReservation = ({
   onSelectTable,
   onSelectTakeaway,
   onSelectDineIn,
+  onSelectWalkIn,
+  onSelectDelivery,
   onViewOrder,
   onPrintBill,
   onCancelOrder,
@@ -1193,6 +1229,15 @@ const TableReservation = ({
               Dine In
             </button>
             <button
+    onClick={onSelectWalkIn}
+    className={`px-4 py-1.5 text-xs font-semibold rounded-full transition-all flex items-center gap-1
+      ${orderMode === 'walkin'
+        ? 'bg-teal-500 text-white shadow'
+        : 'text-gray-600 hover:bg-gray-100'}`}
+  >
+    <User size={12} /> Walk In
+  </button>
+            <button
               onClick={onSelectTakeaway}
               className={`px-4 py-1.5 text-xs font-semibold rounded-full transition-all flex items-center gap-1
                 ${orderMode === 'takeaway'
@@ -1201,15 +1246,9 @@ const TableReservation = ({
             >
               <Package size={12} /> Takeaway
             </button>
+   
             <button
-    className={`px-4 py-1.5 text-xs font-semibold rounded-full transition-all flex items-center gap-1
-      ${orderMode === 'walkin'
-        ? 'bg-teal-500 text-white shadow'
-        : 'text-gray-600 hover:bg-gray-100'}`}
-  >
-    <User size={12} /> Walk In
-  </button>
-<button
+    onClick={onSelectDelivery}
     className={`px-4 py-1.5 text-xs font-semibold rounded-full transition-all flex items-center gap-1
       ${orderMode === 'delivery'
         ? 'bg-purple-500 text-white shadow'
@@ -1561,6 +1600,10 @@ const TakeOrder = ({ clientId, token, onOrderUpdate, realm }) => {
   // ── Order context ─────────────────────────────────────────────────────────
   const [selectedTable, setSelectedTable] = useState('');
   const [takeawayTables, setTakeawayTables] = useState([]);
+  const [walkinTables, setWalkinTables] = useState([]);
+  const [deliveryTables, setDeliveryTables] = useState([]);
+  const [walkinTableId, setWalkinTableId] = useState(null);
+  const [deliveryTableId, setDeliveryTableId] = useState(null);
   const [dineinTableId, setDineinTableId] = useState(null);
   const [takeawayTableId, setTakeawayTableId] = useState(null);
   const [activeOrderId, setActiveOrderId] = useState(null);
@@ -1579,7 +1622,8 @@ const TakeOrder = ({ clientId, token, onOrderUpdate, realm }) => {
   const [draftTableIds, setDraftTableIds] = useState([]);   // for floor DRAFT badges
 
   const [customerDetails, setCustomerDetails] = useState({ customer_id: '', contact_phone: '' });
-
+  const [customerAddresses, setCustomerAddresses] = useState([]);
+  const [selectedAddressId, setSelectedAddressId] = useState('');
   // ── UI state ──────────────────────────────────────────────────────────────
   const [selectedCategoryId, setSelectedCategoryId] = useState(null);
   const [searchQuery, setSearchQuery] = useState('');
@@ -1665,8 +1709,7 @@ const TakeOrder = ({ clientId, token, onOrderUpdate, realm }) => {
   } = useZoneConfig({
     clientId,
     token,
-    takeawayRootEnv:
-      import.meta.env.VITE_TAKEAWAY_TABLE_DEFAULT_ROOT,
+    takeawayRootEnv: menuConfig?.takeawayTableRoot,
   });
   
   const {
@@ -1700,7 +1743,7 @@ const TakeOrder = ({ clientId, token, onOrderUpdate, realm }) => {
   }, [selectedTable, cart, clientId, token, customerDetails]);
 
   const attachPackagingIfTakeaway = (mainKey, batch, packagingItems) => {
-  if (orderMode !== 'takeaway' || !mainKey || !packagingItems?.length) return;
+  if (!['takeaway', 'delivery'].includes(orderMode) || !mainKey || !packagingItems?.length) return;
   packagingItems.forEach(pkg => {
     const pkgEntry = buildCartItem(pkg, {
       batch_timestamp: batch,
@@ -1718,7 +1761,7 @@ const TakeOrder = ({ clientId, token, onOrderUpdate, realm }) => {
 
 const syncPackagingForOrderMode = (newMode) => {
   setCart(prev => {
-    if (newMode === 'takeaway') {
+    if (['takeaway', 'delivery'].includes(newMode)) {
       const additions = [];
       prev
         .filter(i => !i.parent_item_key && !i.saved_sub_order)
@@ -1753,7 +1796,33 @@ const syncPackagingForOrderMode = (newMode) => {
     return prev.filter(i => !(i.is_container && !i.saved_sub_order));
   });
 };
+const syncDeliveryChargeForOrderMode = (newMode) => {
+  setCart(prev => {
+    if (newMode === 'delivery') {
+      const already = prev.some(i => i.is_delivery_charge && !i.saved_sub_order);
+      if (already) return prev;
 
+      const chargeItem = menuItems.find(mi =>
+        isDeliveryChargeCategoryId(mi.category_id, categoriesFlat)
+      );
+      if (!chargeItem) return prev; // not configured — silently skip
+
+      const batch = currentBatchTimestamp || Date.now();
+      const entry = buildCartItem(chargeItem, {
+        batch_timestamp: batch,
+        is_addon: false,
+        _item_type: 'delivery_charge',
+      });
+      return [...prev, {
+        ...entry,
+        unit_price: Number(chargeItem.unit_price) || 0,
+        quantity: 1,
+        is_delivery_charge: true,
+      }];
+    }
+    return prev.filter(i => !(i.is_delivery_charge && !i.saved_sub_order));
+  });
+};
   // ─────────────────────────────────────────────────────────────────────────
   // Category / tree utilities
   // ─────────────────────────────────────────────────────────────────────────
@@ -1900,20 +1969,21 @@ const syncPackagingForOrderMode = (newMode) => {
     }
   };
 
-  // REMOVE the old fetchTables and REPLACE WITH:
   const fetchTables = useCallback(async () => {
-    const prefix = String(clientId)
-    .trim().toLowerCase().split('/').pop()
-    .replace(/[^a-z0-9]/g, '_').toUpperCase();
-
-  const takeawayRoots = (
-    import.meta.env[`VITE_${prefix}_TAKEAWAY_TABLE_DEFAULT_ROOT`] ||
-    import.meta.env.VITE_TAKEAWAY_TABLE_DEFAULT_ROOT ||
-    ''
-  )
-    .split(',')
-    .map(v => v.trim().toLowerCase())
-    .filter(Boolean);
+    const takeawayRoots = (menuConfig?.takeawayTableRoot || 'takeaway')
+      .split(',')
+      .map(v => v.trim().toLowerCase())
+      .filter(Boolean);
+  
+    const walkinRoots = (menuConfig?.walkinTableRoot || 'walkin')
+      .split(',')
+      .map(v => v.trim().toLowerCase())
+      .filter(Boolean);
+  
+    const deliveryRoots = (menuConfig?.deliveryTableRoot || 'delivery')
+      .split(',')
+      .map(v => v.trim().toLowerCase())
+      .filter(Boolean);
   
     const [tableRes, configRes] = await Promise.all([
       axios.get(
@@ -1942,24 +2012,31 @@ const syncPackagingForOrderMode = (newMode) => {
           };
         })
       : [];
-
+  
     const takeaway = list.filter(t =>
-      takeawayRoots.some(root =>
-        (t.name || '').toLowerCase().startsWith(root)
-      )
+      takeawayRoots.some(root => (t.name || '').toLowerCase().startsWith(root))
     );
-
     setTakeawayTables(takeaway);
-    if (takeaway.length > 0) {
-      setTakeawayTableId(takeaway[0].id);
-    }
-
+    if (takeaway.length > 0) setTakeawayTableId(takeaway[0].id);
+  
+    const walkin = list.filter(t =>
+      walkinRoots.some(root => (t.name || '').toLowerCase().startsWith(root))
+    );
+    setWalkinTables(walkin);
+    if (walkin.length > 0) setWalkinTableId(walkin[0].id);
+  
+    const delivery = list.filter(t =>
+      deliveryRoots.some(root => (t.name || '').toLowerCase().startsWith(root))
+    );
+    setDeliveryTables(delivery);
+    if (delivery.length > 0) setDeliveryTableId(delivery[0].id);
+  
     list.sort((a, b) =>
       a.table_number.localeCompare(b.table_number, undefined, { numeric: true })
     );
     setTables(list);
     await fetchTableOrders(list);
-  },[clientId,token])
+  }, [clientId, token, menuConfig]);
 
   // ─────────────────────────────────────────────────────────────────────────
   // Browser history (back button) — push initial floor state once
@@ -1992,6 +2069,82 @@ const syncPackagingForOrderMode = (newMode) => {
   // ─────────────────────────────────────────────────────────────────────────
 
 
+const handleDeliverySelect = async () => {
+  const t = deliveryTables[0];
+  if (!t) { toast.error('Delivery table not configured. Check VITE_DELIVERY_TABLE_DEFAULT_ROOT.'); return; }
+
+  setOrderMode('delivery');
+  setActiveOrderId(null);
+  setActiveDineinOrderId(null);
+  setHasNewItems(false);
+  setCurrentBatchTimestamp(null);
+  setSelectedTable(t.id.toString());
+  setDeliveryTableId(t.id);
+  setZoneConfigId(t.config_id || null);
+  setCart([]);
+  setSelectedAddressId(customerAddresses[0]?.id ? String(customerAddresses[0].id) : '');
+  setShowCart(true);
+  syncDeliveryChargeForOrderMode('delivery');
+  goToOrderView();
+};
+
+const handleWalkInSelect = async () => {
+  const t = walkinTables[0];
+  if (!t) { toast.error('Walk-in table not configured. Check VITE_WALKIN_TABLE_DEFAULT_ROOT.'); return; }
+
+  setOrderMode('walkin');
+  setActiveOrderId(null);
+  setActiveDineinOrderId(null);
+  setHasNewItems(false);
+  setCurrentBatchTimestamp(null);
+  setSelectedTable(t.id.toString());
+  setWalkinTableId(t.id);
+  setZoneConfigId(t.config_id || null);
+  setCart([]);
+  setSelectedAddressId('');
+  setShowCart(true);
+  goToOrderView();
+};
+  useEffect(() => {
+    if (!token || !clientId) return;
+  
+    const fetchUsernameAndAddresses = async () => {
+      try {
+        const userId = getUserIdFromToken(token);
+        if (!userId) return;
+  
+        const usersRes = await axios.get(
+          `${import.meta.env.VITE_API_USER_SERVICE_URL}/${clientId}/users/users`,
+          { headers: { Authorization: `Bearer ${token}` } }
+        );
+        const users = usersRes.data?.data?.users || [];
+        const match = users.find(u => u.client_id === clientId) || users[0];
+  
+        setCustomerDetails(prev => ({
+          ...prev,
+          customer_id: userId,
+          customer_name: match?.username || '',
+        }));
+  
+        if (match?.id) {
+          try {
+            const addrRes = await axios.get(
+              `${import.meta.env.VITE_API_USER_SERVICE_URL}/${clientId}/users/address`,
+              { headers: { Authorization: `Bearer ${token}` } }
+            );
+            const addresses = addrRes.data?.data?.addresses || [];
+            setCustomerAddresses(addresses);
+          } catch {
+            setCustomerAddresses([]);
+          }
+        }
+      } catch (err) {
+        console.error('Failed to fetch user info:', err?.response?.data || err.message);
+      }
+    };
+  
+    fetchUsernameAndAddresses();
+  }, [clientId, token]);
   /**
    * goToOrderView — switches to the order view and ensures the cart panel
    * is always visible so the waiter sees items immediately.
@@ -2827,6 +2980,10 @@ const syncPackagingForOrderMode = (newMode) => {
 
   const handlePlaceOrder = async () => {
     if (isPlacingRef.current || !canPlaceOrder) return;
+    if (orderMode === 'delivery' && !selectedAddressId) {
+      toast.error('Please select a delivery address');
+      return;
+    }
     isPlacingRef.current = true;
     setIsPlacingOrder(true);
 
@@ -2907,7 +3064,9 @@ const buildOrderPayload = (items) =>
               cst: 0,
               total_price: total,
               status: 'pending',
-              items: itemsPayload,
+              items: itemsPayload,    customer_id: customerDetails.customer_id || getUserIdFromToken(token) || '',
+              delivery_address: orderMode === 'delivery' ? (selectedAddressId || '') : '',
+          
             },
             { headers }
           );
@@ -2915,7 +3074,7 @@ const buildOrderPayload = (items) =>
           placedDineinOrderId = createRes?.data?.data?.dinein_order_id || String(placedOrderId);
         }
 
-        if (orderMode !== 'takeaway') {
+        if (!['takeaway', 'walkin', 'delivery'].includes(orderMode)) {
           const tableToUpdate = tables.find(t => t.id.toString() === selectedTable);
           if (tableToUpdate) {
             await axios.post(
@@ -2996,6 +3155,7 @@ const buildOrderPayload = (items) =>
       setCurrentBatchTimestamp(null);
       setHasNewItems(false);
       setCustomerDetails({ customer_id: '', contact_phone: '' });
+      setSelectedAddressId('');
       // toast.success('Order placed!');
     } catch (err) {
       console.error('ORDER ERROR:', err);
@@ -3346,7 +3506,7 @@ const buildOrderPayload = (items) =>
   }, {});
   const batchTimestamps = Object.keys(groupedNewItems).sort();
 
-  const canPlaceOrder = orderMode === 'takeaway'
+  const canPlaceOrder = ['takeaway', 'walkin', 'delivery'].includes(orderMode)
     ? cart.filter(i => !i.parent_item_key).length > 0
     : activeOrderId
       ? hasNewItems && newItems.filter(i => !i.parent_item_key).length > 0
@@ -3365,13 +3525,19 @@ const buildOrderPayload = (items) =>
       {/* ══════════════ FLOOR VIEW ══════════════ */}
       {currentView === 'floor' && (
         <TableReservation
-          tables={tables.filter(t => !takeawayTables.some(tw => tw.id === t.id))}
+        tables={tables.filter(t =>
+          !takeawayTables.some(tw => tw.id === t.id) &&
+          !walkinTables.some(w => w.id === t.id) &&
+          !deliveryTables.some(d => d.id === t.id)
+        )}
           orderMode={orderMode}
           tableOrders={tableOrders}
           draftTableIds={draftTableIds}
           onSelectTable={handleTableSelect}
           onSelectTakeaway={handleTakeawaySelect}
           onSelectDineIn={() => setOrderMode('dinein')}
+          onSelectWalkIn={handleWalkInSelect}
+    onSelectDelivery={handleDeliverySelect}
           onViewOrder={handleViewOrder}
           onPrintBill={handlePrintBill}
           onCancelOrder={(orderId, tableId) =>
@@ -3550,7 +3716,13 @@ const buildOrderPayload = (items) =>
                     {/* Cart header */}
                     <div className="pb-3 border-b space-y-2">
                       <h2 className="text-lg font-semibold text-gray-800">Your Order</h2>
-
+                      {orderMode === 'delivery' && (
+    <AddressSelectPanel
+      addresses={customerAddresses}
+      selectedAddressId={selectedAddressId}
+      setSelectedAddressId={setSelectedAddressId}
+    />
+  )}
                       <div className="flex items-center justify-between text-sm bg-gray-50 px-3 py-2 rounded-lg">
                         <div className="flex items-center gap-2">
                           {orderMode === 'dinein' && selectedTable && (
