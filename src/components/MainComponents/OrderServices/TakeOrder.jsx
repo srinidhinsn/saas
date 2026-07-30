@@ -3939,36 +3939,32 @@ const buildOrderPayload = (items) =>
                     </div>
 
                     {/* Dine-in / Takeaway toggle */}
-                    <div className="mt-3">
-                      <div className="flex bg-gray-100 rounded-lg p-1">
-                        <button
-                          onClick={() => {
-                            setOrderMode('dinein');
-                            if (dineinTableId) setSelectedTable(dineinTableId);
-                            syncPackagingForOrderMode('dinein');
-                          }}
-                          className={`flex-1 py-2 rounded-md text-sm font-medium flex items-center justify-center gap-2
-                            ${orderMode === 'dinein'
-                              ? 'bg-action-primary text-white shadow-sm'
-                              : 'text-gray-600 hover:text-gray-800'}`}
-                        >
-                          <Users size={16} /> Dine In
-                        </button>
-                        <button
-                          onClick={() => {
-                            setOrderMode('takeaway');
-                            setSelectedTable(takeawayTableId?.toString());
-                            syncPackagingForOrderMode('takeaway');
-                          }}
-                          className={`flex-1 py-2 rounded-md text-sm font-medium flex items-center justify-center gap-2
-                            ${orderMode === 'takeaway'
-                              ? 'bg-action-primary text-white shadow-sm'
-                              : 'text-gray-600 hover:text-gray-800'}`}
-                        >
-                          <Package size={16} /> Takeaway
-                        </button>
-                      </div>
-                    </div>
+                  {['dinein', 'takeaway'].includes(orderMode) && (
+                      <div className="mt-3">
+                          <div className="flex bg-gray-100 rounded-lg p-1">
+                               <button onClick={() => {
+                                                      setOrderMode('dinein');
+                                                      if (dineinTableId) setSelectedTable(dineinTableId);
+                                                      syncPackagingForOrderMode('dinein'); }}
+                                        className={`flex-1 py-2 rounded-md text-sm font-medium flex items-center justify-center gap-2
+                                                    ${orderMode === 'dinein'
+                                                                      ? 'bg-action-primary text-white shadow-sm'
+                                                                      : 'text-gray-600 hover:text-gray-800'}`}>
+                                <Users size={16} /> Dine In
+                               </button>
+                               <button
+                                       onClick={() => {
+                                                      setOrderMode('takeaway');
+                                                      setSelectedTable(takeawayTableId?.toString());
+                                                      syncPackagingForOrderMode('takeaway'); }}
+                                        className={`flex-1 py-2 rounded-md text-sm font-medium flex items-center justify-center gap-2
+                                                    ${orderMode === 'takeaway'
+                                                                     ? 'bg-action-primary text-white shadow-sm'
+                                                                     : 'text-gray-600 hover:text-gray-800'}`}>
+                                <Package size={16} /> Takeaway
+                               </button>
+                          </div>
+                    </div>)}
 
                     {/* Cart body */}
                     {cart.length === 0 ? (
