@@ -2,7 +2,7 @@ import React, { useState, useEffect, useRef, useCallback, useMemo } from 'react'
 import { jwtDecode } from 'jwt-decode';
 import {
   ShoppingCart, Plus, Minus, X, Check, Search,
-  Users, Package, Trash2, ArrowLeft, FileText,
+  Users, Package, Trash2, ArrowLeft, FileText, Mail, MapPin,  
   Printer as PrinterIcon, Clock, Save, User, Phone,Truck,
 } from 'lucide-react';
 import { Eye, Lock, Printer } from 'lucide-react';
@@ -243,6 +243,7 @@ async function upsertBillingDocumentForCustomer({
       customer_id: customerDetails.customer_id || '',
       contact_email: customerDetails.contact_email || '',
       contact_phone: customerDetails.contact_phone || '',
+      shipping_address: customerDetails.shipping_address || '', 
     };
 
     const res = await axios.post(
@@ -554,6 +555,140 @@ const AddressSelectPanel = ({ addresses, selectedAddressId, setSelectedAddressId
           </option>
         ))}
       </select>
+    </div>
+  );
+};
+// ─── Compact trigger shown inside the cart ─────────────────────────────────
+const DeliveryDetailsSummary = ({ value, onClick }) => {
+  const isComplete = value.contact_phone?.trim() && value.shipping_address?.trim();
+  return (
+    <button
+      type="button"
+      onClick={onClick}
+      className={`w-full flex items-center gap-2 px-3 py-2 rounded-xl border text-left shadow-sm transition
+        ${isComplete ? 'border-purple-200 bg-purple-50 hover:bg-purple-100' : 'border-red-300 bg-red-50 hover:bg-red-100'}`}
+    >
+      <MapPin size={16} className={isComplete ? 'text-purple-600 shrink-0' : 'text-red-500 shrink-0'} />
+      <div className="flex-1 min-w-0">
+        {isComplete ? (
+          <>
+            <div className="text-xs font-semibold text-purple-700 truncate">
+              {value.customer_id || 'Customer'} · {value.contact_phone}
+            </div>
+            <div className="text-xs text-purple-600 truncate">{value.shipping_address}</div>
+          </>
+        ) : (
+          <div className="text-xs font-semibold text-red-600">Tap to add delivery details</div>
+        )}
+      </div>
+      <span className="text-xs font-semibold text-purple-500 shrink-0">Edit</span>
+    </button>
+  );
+};
+
+// ─── Full delivery details modal ───────────────────────────────────────────
+const DeliveryDetailsModal = ({ isOpen, onClose, value, onSave }) => {
+  const [draft, setDraft] = useState(value);
+
+  useEffect(() => {
+    if (isOpen) setDraft(value);
+  }, [isOpen, value]);
+
+  if (!isOpen) return null;
+
+  const canSave = draft.contact_phone?.trim() && draft.shipping_address?.trim();
+
+  return (
+    <div className="fixed inset-0 z-50 flex items-center justify-center p-4 bg-black/50">
+      <div className="rounded-lg w-full max-w-sm bg-white shadow-xl">
+        <div className="px-6 py-4 border-b flex justify-between items-center">
+          <h2 className="text-lg font-bold text-gray-800 flex items-center gap-2">
+            <Truck size={18} className="text-purple-600" />
+            Delivery Details
+          </h2>
+          <button onClick={onClose} className="text-gray-500 hover:text-gray-700">
+            <X size={20} />
+          </button>
+        </div>
+
+        <div className="px-6 py-5 space-y-3 max-h-[65vh] overflow-y-auto">
+          <div>
+            <label className="text-xs font-semibold text-gray-600 mb-1 block">Customer Name / ID</label>
+            <div className="flex items-center gap-2 border border-gray-300 rounded-lg px-3 py-2">
+              <User size={15} className="text-gray-400 shrink-0" />
+              <input
+                value={draft.customer_id}
+                onChange={e => setDraft(d => ({ ...d, customer_id: e.target.value }))}
+                placeholder="Customer name / ID"
+                className="flex-1 min-w-0 text-sm outline-none"
+              />
+            </div>
+          </div>
+
+          <div>
+            <label className="text-xs font-semibold text-gray-600 mb-1 block">
+              Phone <span className="text-red-500">*</span>
+            </label>
+            <div className="flex items-center gap-2 border border-gray-300 rounded-lg px-3 py-2">
+              <Phone size={15} className="text-gray-400 shrink-0" />
+              <input
+                value={draft.contact_phone}
+                onChange={e => setDraft(d => ({ ...d, contact_phone: e.target.value }))}
+                placeholder="Phone number"
+                inputMode="tel"
+                className="flex-1 min-w-0 text-sm outline-none"
+              />
+            </div>
+          </div>
+
+          <div>
+            <label className="text-xs font-semibold text-gray-600 mb-1 block">Email</label>
+            <div className="flex items-center gap-2 border border-gray-300 rounded-lg px-3 py-2">
+              <Mail size={15} className="text-gray-400 shrink-0" />
+              <input
+                value={draft.contact_email}
+                onChange={e => setDraft(d => ({ ...d, contact_email: e.target.value }))}
+                placeholder="Email (optional)"
+                type="email"
+                className="flex-1 min-w-0 text-sm outline-none"
+              />
+            </div>
+          </div>
+
+          <div>
+            <label className="text-xs font-semibold text-gray-600 mb-1 block">
+              Delivery Address <span className="text-red-500">*</span>
+            </label>
+            <div className="flex items-start gap-2 border border-gray-300 rounded-lg px-3 py-2">
+              <MapPin size={15} className="text-gray-400 shrink-0 mt-1" />
+              <textarea
+                value={draft.shipping_address}
+                onChange={e => setDraft(d => ({ ...d, shipping_address: e.target.value }))}
+                placeholder="Full delivery address"
+                rows={3}
+                className="flex-1 min-w-0 text-sm outline-none resize-none"
+              />
+            </div>
+          </div>
+        </div>
+
+        <div className="px-6 py-4 flex gap-3 bg-gray-50 rounded-b-lg">
+          <button
+            onClick={onClose}
+            className="flex-1 py-2.5 rounded-lg font-medium text-sm border border-gray-300 bg-white text-gray-700 hover:bg-gray-50"
+          >
+            Cancel
+          </button>
+          <button
+            onClick={() => { onSave(draft); onClose(); }}
+            disabled={!canSave}
+            className={`flex-1 py-2.5 rounded-lg font-bold text-sm text-white transition
+              ${canSave ? 'bg-purple-600 hover:bg-purple-700' : 'bg-gray-300 cursor-not-allowed'}`}
+          >
+            Save Details
+          </button>
+        </div>
+      </div>
     </div>
   );
 };
@@ -1620,8 +1755,8 @@ const TakeOrder = ({ clientId, token, onOrderUpdate, realm }) => {
   // ── Drafts ────────────────────────────────────────────────────────────────
   const [draftSavedAt, setDraftSavedAt] = useState(null);
   const [draftTableIds, setDraftTableIds] = useState([]);   // for floor DRAFT badges
-
-  const [customerDetails, setCustomerDetails] = useState({ customer_id: '', contact_phone: '' });
+  const [showDeliveryDetailsModal, setShowDeliveryDetailsModal] = useState(false);
+  const [customerDetails, setCustomerDetails] = useState({ customer_id: '', contact_phone: '',contact_email: '',shipping_address: '', });
   const [customerAddresses, setCustomerAddresses] = useState([]);
   const [selectedAddressId, setSelectedAddressId] = useState('');
   // ── UI state ──────────────────────────────────────────────────────────────
@@ -2082,7 +2217,8 @@ const handleDeliverySelect = async () => {
   setDeliveryTableId(t.id);
   setZoneConfigId(t.config_id || null);
   setCart([]);
-  setSelectedAddressId(customerAddresses[0]?.id ? String(customerAddresses[0].id) : '');
+  setCustomerDetails({ customer_id: '', contact_phone: '', contact_email: '', shipping_address: '' });
+  setShowDeliveryDetailsModal(true); 
   setShowCart(true);
   syncDeliveryChargeForOrderMode('delivery');
   goToOrderView();
@@ -2980,8 +3116,8 @@ const handleWalkInSelect = async () => {
 
   const handlePlaceOrder = async () => {
     if (isPlacingRef.current || !canPlaceOrder) return;
-    if (orderMode === 'delivery' && !selectedAddressId) {
-      toast.error('Please select a delivery address');
+    if (orderMode === 'delivery' && !customerDetails.shipping_address?.trim()) {
+      toast.error('Please enter a delivery address');
       return;
     }
     isPlacingRef.current = true;
@@ -3065,8 +3201,9 @@ const buildOrderPayload = (items) =>
               total_price: total,
               status: 'pending',
               items: itemsPayload,    customer_id: customerDetails.customer_id || getUserIdFromToken(token) || '',
-              delivery_address: orderMode === 'delivery' ? (selectedAddressId || '') : '',
-          
+              customer_id: customerDetails.customer_id || getUserIdFromToken(token) || '',
+              contact_phone: customerDetails.contact_phone || '',
+              contact_email: customerDetails.contact_email || '',          
             },
             { headers }
           );
@@ -3096,12 +3233,28 @@ const buildOrderPayload = (items) =>
         const tableObj = tables.find(t => t.id.toString() === selectedTable);
         const orderSubtotal = cart.filter(i => !(i.frontend_unique_key || '').startsWith('cchild_'))
                                   .reduce((s, i) => s + (i.unit_price || 0) * i.quantity, 0);
+        let resolvedCustomerId = customerDetails.customer_id;
+        try {
+          const custRes = await axios.post(
+            `${import.meta.env.VITE_API_USER_SERVICE_URL}/${clientId}/users/customer/find_or_create`,
+            {
+              contact_email: customerDetails.contact_email,
+              contact_phone: customerDetails.contact_phone,
+              shipping_address: customerDetails.shipping_address,
+              customer_id: customerDetails.customer_id,
+            },
+            { headers: { Authorization: `Bearer ${token}` } }
+          );
+          resolvedCustomerId = custRes.data?.data?.person_id || resolvedCustomerId;
+        } catch (err) {
+          console.error('Failed to resolve/create customer:', err.response?.data || err.message);
+        }
         await upsertBillingDocumentForCustomer({
           clientId,
           token,
           orderId: placedOrderId,
           tableRef: tableObj?.table_number || `Table ${selectedTable}`,
-          customerDetails,
+          customerDetails: { ...customerDetails, customer_id: resolvedCustomerId },
           orderSubtotal,
         });
       }
@@ -3154,7 +3307,7 @@ const buildOrderPayload = (items) =>
       setCurrentView('floor');
       setCurrentBatchTimestamp(null);
       setHasNewItems(false);
-      setCustomerDetails({ customer_id: '', contact_phone: '' });
+      setCustomerDetails({ customer_id: '', contact_phone: '', contact_email: '', shipping_address: '' });
       setSelectedAddressId('');
       // toast.success('Order placed!');
     } catch (err) {
@@ -3186,7 +3339,7 @@ const buildOrderPayload = (items) =>
     setActiveDineinOrderId(null);
     setCurrentBatchTimestamp(null);
     setHasNewItems(false);
-    setCustomerDetails({ customer_id: '', contact_phone: '' });
+    setCustomerDetails({ customer_id: '', contact_phone: '', contact_email: '', shipping_address: '' });
   };
 
   // ─────────────────────────────────────────────────────────────────────────
@@ -3404,9 +3557,10 @@ const buildOrderPayload = (items) =>
       setInvoiceOrderData({
         ...order,
         items: deduplicatedItems,
-        customer_id: billingDoc?.customer_id || order.customer_id || '',
-        contact_phone: billingDoc?.contact_phone || order.contact_phone || '',
-        contact_email: billingDoc?.contact_email || order.contact_email || '',
+        customer_id: customerDetails.customer_id || billingDoc?.customer_id || order.customer_id || '',
+        contact_phone: customerDetails.contact_phone || billingDoc?.contact_phone || order.contact_phone || '',
+        contact_email: customerDetails.contact_email || billingDoc?.contact_email || order.contact_email || '',
+        shipping_address: customerDetails.shipping_address || billingDoc?.shipping_address || order.delivery_address || '', // ← add      
       });
       setInvoiceModalOpen(true);
     } catch (e) {
@@ -3717,12 +3871,17 @@ const buildOrderPayload = (items) =>
                     <div className="pb-3 border-b space-y-2">
                       <h2 className="text-lg font-semibold text-gray-800">Your Order</h2>
                       {orderMode === 'delivery' && (
-    <AddressSelectPanel
-      addresses={customerAddresses}
-      selectedAddressId={selectedAddressId}
-      setSelectedAddressId={setSelectedAddressId}
-    />
+    <DeliveryDetailsSummary
+    value={customerDetails}
+    onClick={() => setShowDeliveryDetailsModal(true)}
+  />
   )}
+  <DeliveryDetailsModal
+  isOpen={showDeliveryDetailsModal}
+  onClose={() => setShowDeliveryDetailsModal(false)}
+  value={customerDetails}
+  onSave={setCustomerDetails}
+/>
                       <div className="flex items-center justify-between text-sm bg-gray-50 px-3 py-2 rounded-lg">
                         <div className="flex items-center gap-2">
                           {orderMode === 'dinein' && selectedTable && (

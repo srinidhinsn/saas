@@ -81,7 +81,7 @@ export const menuCache = {
       }));
  
       const map = {};
-      list.forEach(t => (map[t.id] = t.name));
+      list.forEach(t => (map[t.id] = t.table_number));
  
       const result = { list, map };
       this.set('tablesData', clientId, result);
