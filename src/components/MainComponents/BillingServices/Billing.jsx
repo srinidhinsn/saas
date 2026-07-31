@@ -6,6 +6,7 @@ import InvoiceModal from './InvoiceModal';
 import { Search, Calendar, Eye } from 'lucide-react';
 import { menuCache } from '../../utils/Menu-utils/menuCache';
 import AgGridTable from '../../utils/AgGridTable';
+import { fmt } from '../../utils/Menu-utils/menuUtils';
 
 export default function BillingPage({ clientId, token }) {
   const navigate = useNavigate();
@@ -248,7 +249,7 @@ export default function BillingPage({ clientId, token }) {
       },
       cellRenderer: (params) => (
         <div className="text-sm font-bold text-action-primary">
-          {params.value != null ? `₹${params.value.toFixed(2)}` : "—"}
+          {params.value != null ? `₹${fmt(params.value)}` : "—"}
         </div>
       ),
     },
