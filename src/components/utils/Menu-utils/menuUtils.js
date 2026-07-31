@@ -301,8 +301,19 @@ export const isPackagingCategoryId = (categoryId, categoriesFlat) => {
   }
   return false;
 };
-
-
+export const isDeliveryChargeCategoryId = (categoryId, categoriesFlat) => {
+  if (!categoryId || !categoriesFlat?.length) return false;
+  let currentId = categoryId;
+  const visited = new Set();
+  while (currentId && !visited.has(currentId)) {
+    visited.add(currentId);
+    const cat = categoriesFlat.find(c => c.id === currentId);
+    if (!cat) break;
+    if ((cat.name || '').toLowerCase().includes('delivery charge')) return true;
+    currentId = cat.parentId ?? null;
+  }
+  return false;
+};
 // ── Packaging add-on helpers (shared across TakeOrder, KDS, Billing) ──
 
 // Cart-item level check: works for freshly-added items (is_container flag,
