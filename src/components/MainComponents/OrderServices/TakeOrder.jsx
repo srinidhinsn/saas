@@ -17,6 +17,7 @@ import { getDietaryFromSlug, isItemActive,buildCartItem, getGroupedCartItems, de
          from '../../utils/Menu-utils/menuUtils';
 import {useDietaryTypes, useTimings, useZoneConfig, useMenuData,useCounterTree} from '../../utils/Menu-utils/useMenuData';
 import { parseISTTimestamp } from '../../utils/dateRange';
+import CustomerAutocomplete from '../BillingServices/CustomerAutocomplete';
 // ─────────────────────────────────────────────────────────────────────────────
 // Constants
 // ─────────────────────────────────────────────────────────────────────────────
@@ -573,7 +574,7 @@ const DeliveryDetailsSummary = ({ value, onClick }) => {
         {isComplete ? (
           <>
             <div className="text-xs font-semibold text-purple-700 truncate">
-              {value.customer_id || 'Customer'} · {value.contact_phone}
+               {value.contact_phone}
             </div>
             <div className="text-xs text-purple-600 truncate">{value.shipping_address}</div>
           </>
@@ -587,7 +588,7 @@ const DeliveryDetailsSummary = ({ value, onClick }) => {
 };
 
 // ─── Full delivery details modal ───────────────────────────────────────────
-const DeliveryDetailsModal = ({ isOpen, onClose, value, onSave }) => {
+const DeliveryDetailsModal = ({ isOpen, onClose, value, onSave, customers = [] }) => {
   const [draft, setDraft] = useState(value);
 
   useEffect(() => {
@@ -597,6 +598,16 @@ const DeliveryDetailsModal = ({ isOpen, onClose, value, onSave }) => {
   if (!isOpen) return null;
 
   const canSave = draft.contact_phone?.trim() && draft.shipping_address?.trim();
+
+  const applyCustomer = (c) => {
+    setDraft(d => ({
+      ...d,
+      customer_id: c.customer_id || d.customer_id,
+      contact_phone: c.contact_phone || d.contact_phone,
+      contact_email: c.contact_email || d.contact_email,
+      shipping_address: c.shipping_address || d.shipping_address,
+    }));
+  };
 
   return (
     <div className="fixed inset-0 z-50 flex items-center justify-center p-4 bg-black/50">
@@ -612,63 +623,56 @@ const DeliveryDetailsModal = ({ isOpen, onClose, value, onSave }) => {
         </div>
 
         <div className="px-6 py-5 space-y-3 max-h-[65vh] overflow-y-auto">
-          <div>
-            <label className="text-xs font-semibold text-gray-600 mb-1 block">Customer Name / ID</label>
-            <div className="flex items-center gap-2 border border-gray-300 rounded-lg px-3 py-2">
-              <User size={15} className="text-gray-400 shrink-0" />
-              <input
-                value={draft.customer_id}
-                onChange={e => setDraft(d => ({ ...d, customer_id: e.target.value }))}
-                placeholder="Customer name / ID"
-                className="flex-1 min-w-0 text-sm outline-none"
-              />
-            </div>
-          </div>
+          {/* <div>
+            <label className="text-xs font-semibold text-gray-600 mb-1 block">Customer Name</label>
+            <CustomerAutocomplete
+              value={draft.customer_id}
+              onChange={(val) => setDraft(d => ({ ...d, customer_id: val }))}
+              onSelectCustomer={applyCustomer}
+              customers={customers}
+              placeholder="Customer name / ID"
+              valueField="customer_id"
+            />
+          </div> */}
 
           <div>
             <label className="text-xs font-semibold text-gray-600 mb-1 block">
               Phone <span className="text-red-500">*</span>
             </label>
-            <div className="flex items-center gap-2 border border-gray-300 rounded-lg px-3 py-2">
-              <Phone size={15} className="text-gray-400 shrink-0" />
-              <input
-                value={draft.contact_phone}
-                onChange={e => setDraft(d => ({ ...d, contact_phone: e.target.value }))}
-                placeholder="Phone number"
-                inputMode="tel"
-                className="flex-1 min-w-0 text-sm outline-none"
-              />
-            </div>
+            <CustomerAutocomplete
+              value={draft.contact_phone}
+              onChange={(val) => setDraft(d => ({ ...d, contact_phone: val }))}
+              onSelectCustomer={applyCustomer}
+              customers={customers}
+              placeholder="Phone number"
+              valueField="contact_phone"
+            />
           </div>
 
           <div>
             <label className="text-xs font-semibold text-gray-600 mb-1 block">Email</label>
-            <div className="flex items-center gap-2 border border-gray-300 rounded-lg px-3 py-2">
-              <Mail size={15} className="text-gray-400 shrink-0" />
-              <input
-                value={draft.contact_email}
-                onChange={e => setDraft(d => ({ ...d, contact_email: e.target.value }))}
-                placeholder="Email (optional)"
-                type="email"
-                className="flex-1 min-w-0 text-sm outline-none"
-              />
-            </div>
+            <CustomerAutocomplete
+              value={draft.contact_email}
+              onChange={(val) => setDraft(d => ({ ...d, contact_email: val }))}
+              onSelectCustomer={applyCustomer}
+              customers={customers}
+              placeholder="Email (optional)"
+              valueField="contact_email"
+            />
           </div>
 
           <div>
             <label className="text-xs font-semibold text-gray-600 mb-1 block">
               Delivery Address <span className="text-red-500">*</span>
             </label>
-            <div className="flex items-start gap-2 border border-gray-300 rounded-lg px-3 py-2">
-              <MapPin size={15} className="text-gray-400 shrink-0 mt-1" />
-              <textarea
-                value={draft.shipping_address}
-                onChange={e => setDraft(d => ({ ...d, shipping_address: e.target.value }))}
-                placeholder="Full delivery address"
-                rows={3}
-                className="flex-1 min-w-0 text-sm outline-none resize-none"
-              />
-            </div>
+            <CustomerAutocomplete
+              value={draft.shipping_address}
+              onChange={(val) => setDraft(d => ({ ...d, shipping_address: val }))}
+              onSelectCustomer={applyCustomer}
+              customers={customers}
+              placeholder="Full delivery address"
+              valueField="shipping_address"
+            />
           </div>
         </div>
 
@@ -1757,6 +1761,7 @@ const TakeOrder = ({ clientId, token, onOrderUpdate, realm }) => {
   const [draftTableIds, setDraftTableIds] = useState([]);   // for floor DRAFT badges
   const [showDeliveryDetailsModal, setShowDeliveryDetailsModal] = useState(false);
   const [customerDetails, setCustomerDetails] = useState({ customer_id: '', contact_phone: '',contact_email: '',shipping_address: '', });
+  const [customersList, setCustomersList] = useState([]);
   const [customerAddresses, setCustomerAddresses] = useState([]);
   const [selectedAddressId, setSelectedAddressId] = useState('');
   // ── UI state ──────────────────────────────────────────────────────────────
@@ -3200,7 +3205,7 @@ const buildOrderPayload = (items) =>
               cst: 0,
               total_price: total,
               status: 'pending',
-              items: itemsPayload,    customer_id: customerDetails.customer_id || getUserIdFromToken(token) || '',
+              items: itemsPayload,
               customer_id: customerDetails.customer_id || getUserIdFromToken(token) || '',
               contact_phone: customerDetails.contact_phone || '',
               contact_email: customerDetails.contact_email || '',          
@@ -3319,6 +3324,24 @@ const buildOrderPayload = (items) =>
     }
   };
 
+  const fetchUniqueCustomers = async () => {
+    try {
+      const res = await axios.get(
+        `${import.meta.env.VITE_API_USER_SERVICE_URL}/${clientId}/users/customer/search`,
+        { headers: { Authorization: `Bearer ${token}` }, params: { client_id: clientId } }
+      );
+      setCustomersList(res.data?.data?.customers || []);
+    } catch (err) {
+      console.error('Failed to fetch customers:', err);
+      setCustomersList([]);
+    }
+  };
+  
+  useEffect(() => {
+    if (clientId && token) {
+      fetchUniqueCustomers();
+    }
+  }, [clientId, token]);
   // ─────────────────────────────────────────────────────────────────────────
   // Clear cart
   // ─────────────────────────────────────────────────────────────────────────
@@ -3876,12 +3899,12 @@ const buildOrderPayload = (items) =>
     onClick={() => setShowDeliveryDetailsModal(true)}
   />
   )}
-  <DeliveryDetailsModal
-  isOpen={showDeliveryDetailsModal}
-  onClose={() => setShowDeliveryDetailsModal(false)}
-  value={customerDetails}
-  onSave={setCustomerDetails}
-/>
+                          <DeliveryDetailsModal
+                                   isOpen={showDeliveryDetailsModal}
+                                   onClose={() => setShowDeliveryDetailsModal(false)}
+                                   value={customerDetails}
+                                   onSave={setCustomerDetails}
+                                   customers={customersList} />
                       <div className="flex items-center justify-between text-sm bg-gray-50 px-3 py-2 rounded-lg">
                         <div className="flex items-center gap-2">
                           {orderMode === 'dinein' && selectedTable && (

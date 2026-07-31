@@ -253,13 +253,9 @@ if (validToken) {
   const handleLogout = () => {
     const clientId = localStorage.getItem('client_id');
     if (clientId) menuCache.invalidate(clientId);
-    localStorage.removeItem('access_token');
-    localStorage.removeItem('screen_id');
-    localStorage.removeItem("refresh_token");
-    localStorage.removeItem("selected_client_id");
-    localStorage.removeItem('menu_selected_category'); 
-    localStorage.removeItem('client');
-    clearIdleActivity();  
+    clearIdleActivity(); 
+    localStorage.clear(); 
+    if (clientId) localStorage.setItem('client_id', clientId);
     setAuthState(prev => ({
       token: null,
       screenId: null,
