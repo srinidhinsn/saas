@@ -239,16 +239,6 @@ export default function BillingPage({ clientId, token }) {
       valueGetter: (params) => `${params.data?.items?.length || 0} items`,
     },
     {
-      headerName: 'Total',
-      field: 'total_price',
-      minWidth: 130,
-      valueGetter: (params) => Number(params.data?.total_price ?? 0),
-      valueFormatter: (params) => `₹${(params.value || 0).toFixed(2)}`,
-      cellRenderer: (params) => (
-        <div className="text-sm font-bold text-action-primary">₹{Number(params.value || 0).toFixed(2)}</div>
-      ),
-    },
-    {
       headerName: 'Total Amount',
       colId: 'total_amount',
       minWidth: 150,

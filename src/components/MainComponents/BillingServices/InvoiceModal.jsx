@@ -35,54 +35,6 @@ async function freeTable({ clientId, token, tableId, tablesMap }) {
 }
 
 // ─────────────────────────────────────────────────────────────────────────────
-// REQ 2: PaymentConfirmModal
-// Shown when user clicks "Confirm Payment" for a saved-but-unpaid invoice.
-// ─────────────────────────────────────────────────────────────────────────────
-
-const PaymentConfirmModal = ({ isOpen, total, onConfirm, onClose }) => {
-  if (!isOpen) return null;
-  return (
-    <div className="fixed inset-0 z-50 flex items-center justify-center bg-black/60 p-4">
-      <div className="bg-white rounded-2xl shadow-2xl w-full max-w-sm">
-        <div className="px-6 py-5 border-b">
-          <h3 className="text-lg font-bold text-gray-800 flex items-center gap-2">
-            <CreditCard size={20} className="text-green-600" />
-            Confirm Payment
-          </h3>
-        </div>
-        <div className="px-6 py-5 space-y-3">
-          <p className="text-sm text-gray-600">
-            Confirm that the customer has paid the full amount?
-          </p>
-          <div className="bg-green-50 border border-green-200 rounded-xl px-4 py-3 text-center">
-            <p className="text-xs text-green-600 font-semibold uppercase tracking-wide mb-1">Amount Due</p>
-            <p className="text-3xl font-bold text-green-700">₹{Number(total).toFixed(2)}</p>
-          </div>
-          <p className="text-xs text-gray-400 text-center">
-            This will mark the invoice as <span className="font-semibold text-green-600">Paid</span> and free the table.
-          </p>
-        </div>
-        <div className="px-6 py-4 flex gap-3 bg-gray-50 rounded-b-2xl">
-          <button
-            onClick={onClose}
-            className="flex-1 py-2.5 rounded-xl font-medium text-sm border border-gray-300 bg-white text-gray-700 hover:bg-gray-50"
-          >
-            Cancel
-          </button>
-          <button
-            onClick={onConfirm}
-            className="flex-1 py-2.5 rounded-xl font-bold text-sm bg-green-600 hover:bg-green-700 text-white flex items-center justify-center gap-2 transition-colors"
-          >
-            <CheckCircle size={16} />
-            Confirm Paid
-          </button>
-        </div>
-      </div>
-    </div>
-  );
-};
-
-// ─────────────────────────────────────────────────────────────────────────────
 // Main InvoiceModal
 // ─────────────────────────────────────────────────────────────────────────────
 const _isChildItem = (fkey) => {
@@ -464,7 +416,6 @@ export default function InvoiceModal({
   const [customersList, setCustomersList] = useState([]);
   const [gstManuallyEdited, setGstManuallyEdited] = useState(false);
   const [showRazorpayModal, setShowRazorpayModal] = useState(false);
-  const [showPayConfirm, setShowPayConfirm] = useState(false); // REQ 2
   const { clientDetails } = useClient();
   const clientGstNumber = clientDetails?.gst_number || "";
 
@@ -507,6 +458,24 @@ const packagingChargeTotal = Number(
   );
 
   const total = calculatedTotal;
+
+  const activePaymentEntries = splitPaymentEnabled
+  ? paymentSplits
+  : [{ method, amount: total }];
+
+const paidAmount = Number(
+  activePaymentEntries
+    .filter(p => p.method !== "Due")
+    .reduce((sum, p) => sum + Number(p.amount || 0), 0)
+    .toFixed(2)
+);
+
+const dueAmount = Number(
+  activePaymentEntries
+    .filter(p => p.method === "Due")
+    .reduce((sum, p) => sum + Number(p.amount || 0), 0)
+    .toFixed(2)
+);
 
   // ─── Split payment helpers ─────────────────────────────────────────────────
 
@@ -818,6 +787,21 @@ if (selectedOrder.contact_phone || selectedOrder.contact_email || selectedOrder.
         );
       }
 
+      // REQ 2: Always issue an invoice number on save, not just on payment confirmation
+if (!documentNumber || documentNumber.toLowerCase() === "draft") {
+  try {
+    const issueRes = await axios.post(
+      `${import.meta.env.VITE_API_BILLING_SERVICE_URL}/${clientId}/invoice/issue?invoice_id=${draftId}`,
+      null,
+      { headers: { Authorization: `Bearer ${token}` } }
+    );
+    const newDocumentNumber = issueRes?.data?.data?.document_number || issueRes?.data?.document_number;
+    if (newDocumentNumber) setDocumentNumber(newDocumentNumber);
+  } catch (err) {
+    console.error("Failed to generate invoice number:", err.response?.data || err.message);
+  }
+}
+
       const itemsPayload = selectedOrder.items.map((item) => ({
         item_ref_id: item.item_id?.toString(),
         description: item.description || "",
@@ -859,95 +843,74 @@ if (selectedOrder.contact_phone || selectedOrder.contact_email || selectedOrder.
   // and THEN frees the table.
 
   const handleConfirmPayment = async () => {
-    setShowPayConfirm(false);
-    setSaving(true);
-    try {
-      const invoiceDraft = await fetchInvoiceDraft(selectedOrder.id);
-      const correctInvoiceDraftId = invoiceDraft?.id || invoiceDraftId;
-      
-      if (!correctInvoiceDraftId) {
-        throw new Error("No invoice draft found");
-      }
+  setSaving(true);
+  try {
+    const invoiceDraft = await fetchInvoiceDraft(selectedOrder.id);
+    const correctInvoiceDraftId = invoiceDraft?.id || invoiceDraftId;
 
-      if (!documentNumber || documentNumber.toLowerCase() === "draft") {
-        try {
-          const res = await axios.post(
-            `${import.meta.env.VITE_API_BILLING_SERVICE_URL}/${clientId}/invoice/issue?invoice_id=${correctInvoiceDraftId}`,
-            null,
-            { headers: { Authorization: `Bearer ${token}` } }
-          );
-          
-          const newDocumentNumber = res?.data?.data?.document_number || res?.data?.document_number;
-          if (newDocumentNumber) {
-            setDocumentNumber(newDocumentNumber);
-          }
-        } catch (err) {
-          throw new Error("Failed to generate invoice number: " + (err.response?.data?.detail || err.message));
-        }
-      }
-      await axios.post(
-        `${import.meta.env.VITE_API_BILLING_SERVICE_URL}/${clientId}/invoice/update_document`,
-        {
-          id: correctInvoiceDraftId,
-          client_id: clientId,
-          payment_status: "Paid",
-          status: "Issued",
-        },
-        { headers: { Authorization: `Bearer ${token}` } }
-      );
-      await axios.post(
-        `${import.meta.env.VITE_API_ORDER_SERVICE_URL}/${clientId}/dinein/update`,
-        {
-          id: selectedOrder.id,
-          status: "served",
-          invoice_status: "paid",
-        },
-        { headers: { Authorization: `Bearer ${token}` } }
-      );
-
-      await freeTable({
-        clientId,
-        token,
-        tableId: selectedOrder.table_id,
-        tablesMap,
-      });
-
-      setPaymentStatus("Paid");
-      onClose();
-    } catch (err) {
-      console.error("Payment Confirmation Failed:", err.message);
-    } finally {
-      setSaving(false);
+    if (!correctInvoiceDraftId) {
+      throw new Error("No invoice draft found");
     }
-  };
+
+    await axios.post(
+      `${import.meta.env.VITE_API_BILLING_SERVICE_URL}/${clientId}/invoice/update_document`,
+      {
+        id: correctInvoiceDraftId,
+        client_id: clientId,
+        payment_status: paymentStatus, // "Paid" or "Partial"
+        status: "Issued",
+      },
+      { headers: { Authorization: `Bearer ${token}` } }
+    );
+    await axios.post(
+      `${import.meta.env.VITE_API_ORDER_SERVICE_URL}/${clientId}/dinein/update`,
+      {
+        id: selectedOrder.id,
+        status: "served",
+        invoice_status: paymentStatus.toLowerCase(),
+      },
+      { headers: { Authorization: `Bearer ${token}` } }
+    );
+
+    // Table is freed for both full and partial payment
+    await freeTable({
+      clientId,
+      token,
+      tableId: selectedOrder.table_id,
+      tablesMap,
+    });
+
+    onClose();
+  } catch (err) {
+    console.error("Payment Confirmation Failed:", err.message);
+  } finally {
+    setSaving(false);
+  }
+};
 
   // ─── handlePaymentClick ────────────────────────────────────────────────────
 
   const handlePaymentClick = async () => {
-    let draftId = invoiceDraftId;
-    try {
-      draftId = await saveInvoiceDraft();
-    } catch {
-      return;
-    }
-    if (!draftId) return;
+  let draftId = invoiceDraftId;
+  try {
+    draftId = await saveInvoiceDraft();
+  } catch {
+    return;
+  }
+  if (!draftId) return;
 
-    const isOnlineMethod = (m) => m === "razorpay_upi" || m === "razorpay_card";
-    const needsRazorpay = splitPaymentEnabled
-      ? paymentSplits.some(s => isOnlineMethod(s.method))
-      : isOnlineMethod(method);
+  const isOnlineMethod = (m) => m === "razorpay_upi" || m === "razorpay_card";
+  const needsRazorpay = splitPaymentEnabled
+    ? paymentSplits.some(s => isOnlineMethod(s.method))
+    : isOnlineMethod(method);
 
-    if (needsRazorpay) {
-      setShowRazorpayModal(true);
-    } else {
-      // REQ 2: For non-Razorpay, show payment confirmation before clearing table
-      if (paymentStatus !== "Paid") {
-        setShowPayConfirm(true);
-      } else {
-        await handleConfirmPayment();
-      }
-    }
-  };
+  if (needsRazorpay) {
+    setShowRazorpayModal(true);
+  } else if (paymentStatus === "Paid" || paymentStatus === "Partial") {
+    await handleConfirmPayment();
+  }
+  // Pending / Due: draft already saved above — nothing further to do
+};
 
   // ─── Print invoice ─────────────────────────────────────────────────────────
 
@@ -1039,12 +1002,6 @@ if (selectedOrder.contact_phone || selectedOrder.contact_email || selectedOrder.
       toast.error("Failed to generate invoice PDF");
     }
   };
-
-  // ─── Render ────────────────────────────────────────────────────────────────
-
-  // REQ 2: Determine if invoice is saved but not yet paid
-  const isInvoiceSavedButUnpaid =
-    !!invoiceDraftId && paymentStatus !== "Paid";
 
   return (
     <div className="fixed inset-0 bg-black/60 backdrop-blur-sm flex items-center justify-center z-50 p-4">
@@ -1182,6 +1139,18 @@ if (selectedOrder.contact_phone || selectedOrder.contact_email || selectedOrder.
                           ₹{calculatedTotal.toFixed(2)}
                         </span>
                       </div>
+                        {dueAmount > 0 && (
+                          <>
+                          <div className="flex justify-between text-text-secondary">
+                            <span>Paid</span>
+                            <span className="font-semibold">₹{paidAmount.toFixed(2)}</span>
+                          </div>
+                          <div className="flex justify-between text-text-secondary">
+                            <span>Due</span>
+                            <span className="font-semibold">₹{dueAmount.toFixed(2)}</span>
+                          </div>
+                          </>
+                        )}
                     </div>
                   </div>
                 </div>
@@ -1198,20 +1167,6 @@ if (selectedOrder.contact_phone || selectedOrder.contact_email || selectedOrder.
                     </h3>
                   </div>
                   <div className="p-4 space-y-3">
-                    <CustomerAutocomplete
-                      value={selectedOrder.customer_id || ""}
-                      onChange={(val) => setSelectedOrder((p) => ({ ...p, customer_id: val }))}
-                      onSelectCustomer={(c) => {
-                        setSelectedOrder((p) => ({
-                          ...p,
-                          customer_id: c.customer_id,
-                          contact_email: c.contact_email || "",
-                          contact_phone: c.contact_phone || "", shipping_address: c.shipping_address || "",
-                        }));
-                      }}
-                      customers={customersList}
-                      placeholder="Walk-in / Customer ID"
-                    />
                     <CustomerAutocomplete
                       value={selectedOrder.contact_phone || ""}
                       onChange={(val) => setSelectedOrder((p) => ({ ...p, contact_phone: val }))}
@@ -1442,19 +1397,7 @@ if (selectedOrder.contact_phone || selectedOrder.contact_email || selectedOrder.
                       <Printer size={18} />
                       Print
                     </button>
-                  </div>
-
-                  {/* REQ 2: "Confirm Payment" button — shown when invoice saved but not paid */}
-                  {isInvoiceSavedButUnpaid && (
-                    <button
-                      onClick={() => setShowPayConfirm(true)}
-                      disabled={saving}
-                      className="w-full bg-green-600 hover:bg-green-700 text-white px-4 py-3 rounded-xl font-bold shadow-lg transition-all disabled:opacity-50 flex items-center justify-center gap-2"
-                    >
-                      <CheckCircle size={18} />
-                      Confirm Payment · ₹{total.toFixed(2)}
-                    </button>
-                  )}
+                  </div>  
 
                   {/* REQ 2: Already paid indicator */}
                   {invoiceDraftId && paymentStatus === "Paid" && (
@@ -1470,14 +1413,6 @@ if (selectedOrder.contact_phone || selectedOrder.contact_email || selectedOrder.
           </div>
         </div>
       </div>
-
-      {/* ── REQ 2: Payment confirmation modal ── */}
-      <PaymentConfirmModal
-        isOpen={showPayConfirm}
-        total={total}
-        onClose={() => setShowPayConfirm(false)}
-        onConfirm={handleConfirmPayment}
-      />
 
       {/* ── Razorpay modal ── */}
       {showRazorpayModal && (
