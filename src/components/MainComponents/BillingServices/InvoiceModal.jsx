@@ -891,25 +891,27 @@ if (!documentNumber || documentNumber.toLowerCase() === "draft") {
   // ─── handlePaymentClick ────────────────────────────────────────────────────
 
   const handlePaymentClick = async () => {
-  let draftId = invoiceDraftId;
-  try {
-    draftId = await saveInvoiceDraft();
-  } catch {
-    return;
-  }
-  if (!draftId) return;
+    let draftId = invoiceDraftId;
+    try {
+      draftId = await saveInvoiceDraft();
+    } catch {
+      return;
+    }
+    if (!draftId) return;
 
-  const isOnlineMethod = (m) => m === "razorpay_upi" || m === "razorpay_card";
-  const needsRazorpay = splitPaymentEnabled
-    ? paymentSplits.some(s => isOnlineMethod(s.method))
-    : isOnlineMethod(method);
+    const isOnlineMethod = (m) => m === "razorpay_upi" || m === "razorpay_card";
+    const needsRazorpay = splitPaymentEnabled
+      ? paymentSplits.some(s => isOnlineMethod(s.method))
+      : isOnlineMethod(method);
 
   if (needsRazorpay) {
-    setShowRazorpayModal(true);
-  } else if (paymentStatus === "Paid" || paymentStatus === "Partial") {
-    await handleConfirmPayment();
+      setShowRazorpayModal(true);
+    } else {
+      // REQ 2: For non-Razorpay, show payment confirmation before clearing table
+      if (paymentStatus !== "Paid" || paymentStatus === "Partial") {
+       await handleConfirmPayment();
+      }
   }
-  // Pending / Due: draft already saved above — nothing further to do
 };
 
   // ─── Print invoice ─────────────────────────────────────────────────────────
