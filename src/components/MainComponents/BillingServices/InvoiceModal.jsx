@@ -7,6 +7,18 @@ import { X, Save, Printer, CreditCard, CheckCircle } from 'lucide-react';
 import RazorpayPayment from "../../Constants/RazorPay/RazorpayPayment";
 import { useClient } from "../../../context/ClientContext";
 import { isPackagingOrderItem, fmt } from '../../utils/Menu-utils/menuUtils';
+import {
+  PAYMENT_METHODS,
+  needsRazorpay,
+  sumSplits,
+  getBalance,
+  updateSplitAmount as updateSplitAmountUtil,
+  addSplitRow as addSplitRowUtil,
+  removeSplitRow as removeSplitRowUtil,
+  rebalanceOnBlur,
+  validateSplitTotal,
+  getPaidAndDue,
+} from '../../utils/BillingUtils';
 
 // ─────────────────────────────────────────────────────────────────────────────
 // REQ 2 helpers
@@ -459,81 +471,36 @@ const packagingChargeTotal = Number(
 
   const total = calculatedTotal;
 
-const paidAmount = Number(
-  paymentSplits
-    .filter(p => p.method !== "Due")
-    .reduce((sum, p) => sum + Number(p.amount || 0), 0)
-    .toFixed(2)
-);
-
-const dueAmount = Number(
-  paymentSplits
-    .filter(p => p.method === "Due")
-    .reduce((sum, p) => sum + Number(p.amount || 0), 0)
-    .toFixed(2)
-);
+const { paidAmount, dueAmount } = getPaidAndDue(paymentSplits);
 
   // ─── Split payment helpers ─────────────────────────────────────────────────
 
   const sumSplits = (splits) => splits.reduce((sum, s) => sum + Number(s.amount), 0);
 
-  const updateBalance = (sumOfPayments) => {
-    const bal = total - sumOfPayments;
-    setBalanceAmount(bal < 0 ? 0 : Number(bal.toFixed(2)));
-  };
+  const updateBalance = (splits) => setBalanceAmount(getBalance(splits, total));
 
-  const updateSplitAmount = (index, value) => {
-    let newAmount = Number(value);
-    if (isNaN(newAmount) || newAmount < 0) newAmount = 0;
-    let splits = [...paymentSplits];
-    splits[index].amount = newAmount;
-    if (splits.length > 1) {
-      const sumOthers = splits.filter((_, idx) => idx !== splits.length - 1).reduce((sum, s) => sum + Number(s.amount), 0);
-      const remainder = Number((total - sumOthers).toFixed(2));
-      splits[splits.length - 1].amount = remainder >= 0 ? remainder : 0;
-    }
-    let sumTotal = sumSplits(splits);
-    while (sumTotal > total) {
-      const excess = sumTotal - total;
-      if (splits[splits.length - 1].amount >= excess) {
-        splits[splits.length - 1].amount -= excess;
-      } else {
-        splits[splits.length - 1].amount = 0;
-      }
-      sumTotal = sumSplits(splits);
-    }
-    setPaymentSplits(splits);
-    updateBalance(sumSplits(splits));
-  };
+const updateSplitAmount = (index, value) => {
+  const next = updateSplitAmountUtil(paymentSplits, index, value, total);
+  setPaymentSplits(next);
+  updateBalance(next);
+};
 
-  const addSplitRow = () => {
-    const used = sumSplits(paymentSplits);
-    const remainder = Number((total - used).toFixed(2));
-    setPaymentSplits((prev) => [...prev, { method: "Cash", amount: remainder >= 0 ? remainder : 0 }]);
-    setBalanceAmount(Number(0));
-  };
+const addSplitRow = () => {
+  setPaymentSplits(prev => addSplitRowUtil(prev, total));
+  setBalanceAmount(0);
+};
 
-  const removeSplitRow = (index) => {
-    if (paymentSplits.length <= 1) return;
-    let updated = paymentSplits.filter((_, idx) => idx !== index);
-    const sum = sumSplits(updated);
-    const remainder = Number((total - sum).toFixed(2));
-    if (updated.length > 0) updated[updated.length - 1].amount += remainder;
-    setPaymentSplits(updated);
-    setBalanceAmount(Number((total - sumSplits(updated)).toFixed(2)));
-  };
+const removeSplitRow = (index) => {
+  const updated = removeSplitRowUtil(paymentSplits, index);
+  setPaymentSplits(updated);
+  setBalanceAmount(getBalance(updated, total));
+};
 
-  const onSplitAmountBlur = () => {
-    let splits = [...paymentSplits];
-    if (splits.length > 1) {
-      const sumOthers = splits.filter((_, idx) => idx !== splits.length - 1).reduce((sum, s) => sum + Number(s.amount), 0);
-      const remainder = Number((total - sumOthers).toFixed(2));
-      splits[splits.length - 1].amount = remainder >= 0 ? remainder : 0;
-    }
-    setPaymentSplits(splits);
-    updateBalance(sumSplits(splits));
-    setBalanceAmount(Number((total - sumSplits(splits)).toFixed(2)));
-  };
+const onSplitAmountBlur = () => {
+  const next = rebalanceOnBlur(paymentSplits, total);
+  setPaymentSplits(next);
+  updateBalance(next);
+};
 
   // ─── Fetch customers & invoice draft ──────────────────────────────────────
   const searchCustomersLocally = (q) => {
@@ -690,18 +657,9 @@ const dueAmount = Number(
     }
 
     if (splitPaymentEnabled) {
-      if (paymentSplits.length < 2) {
-        toast.error("Add at least two payment methods for split payment");
-        return;
-      }
-      const roundedSum = Number(sumSplits(paymentSplits).toFixed(2));
-      const roundedTotal = Number(total.toFixed(2));
-      if (roundedSum < roundedTotal) {
-        toast.error(`Split payment total ₹${roundedSum.toFixed(2)} is less than invoice total ₹${roundedTotal.toFixed(2)}`);
-        return;
-      }
-      if (roundedSum > roundedTotal) {
-        toast.error(`Split payment total ₹${roundedSum.toFixed(2)} exceeds invoice total ₹${roundedTotal.toFixed(2)}`);
+      const result = validateSplitTotal(paymentSplits, total);
+      if (!result.valid) {
+        toast.error(result.message);
         return;
       }
     } else {
@@ -895,20 +853,13 @@ if (!documentNumber || documentNumber.toLowerCase() === "draft") {
     }
     if (!draftId) return;
 
-    const isOnlineMethod = (m) => m === "razorpay_upi" || m === "razorpay_card";
-    const needsRazorpay = splitPaymentEnabled
-      ? paymentSplits.some(s => isOnlineMethod(s.method))
-      : isOnlineMethod(method);
-
-  if (needsRazorpay) {
+    const requiresRazorpay = needsRazorpay(splitPaymentEnabled, paymentSplits, method);
+    if (requiresRazorpay) {
       setShowRazorpayModal(true);
-    } else {
-      // REQ 2: For non-Razorpay, show payment confirmation before clearing table
-      if (paymentStatus !== "Pending") {
-       await handleConfirmPayment();
-      }
-  }
-};
+    } else if (paymentStatus !== "Pending") {
+      await handleConfirmPayment();
+    }
+  };
 
   // ─── Print invoice ─────────────────────────────────────────────────────────
 
@@ -1319,10 +1270,9 @@ if (!documentNumber || documentNumber.toLowerCase() === "draft") {
                               }}
                               className="flex-1 border border-border-default rounded-lg px-2 py-1.5 text-sm bg-bg-primary text-text-primary focus:ring-2 focus:ring-action-primary"
                             >
-                              <option>Cash</option>
-                              <option value="razorpay_upi">UPI (Razorpay)</option>
-                              <option value="razorpay_card">Card (Razorpay)</option>
-                              <option>Due</option>
+                              {PAYMENT_METHODS.map(m => (
+                                <option key={m.value} value={m.value}>{m.label}</option>
+                              ))}
                             </select>
                             <input
                               type="number"
