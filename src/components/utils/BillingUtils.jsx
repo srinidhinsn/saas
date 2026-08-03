@@ -1,9 +1,3 @@
-// ─────────────────────────────────────────────────────────────────────────────
-// Split payment utilities — shared across InvoiceModal, TakeOrder checkout,
-// or any other screen that supports splitting a bill across multiple
-// payment methods (Cash, UPI, Card, Due, etc).
-// ─────────────────────────────────────────────────────────────────────────────
-
 export const PAYMENT_METHODS = [
   { value: "Cash", label: "Cash" },
   { value: "razorpay_upi", label: "UPI (Razorpay)" },
