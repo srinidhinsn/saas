@@ -102,7 +102,7 @@ def update_inventory(
 
             if new_qty != before_stock:
                 create_transaction(
-                    db=db, client_id=client_id,
+                    db=db, context=context,
                     payload=TxPayload(
                         item_id=record.id,tx_type=TransactionTypeEnum.menu_availability_adjustment.value,
                         ref_id=record.id, qty=abs(new_qty - before_stock),
@@ -184,7 +184,7 @@ def update_inventory(
         before_stock = Decimal(str(record.availability or 0))
 
         if new_qty != before_stock:
-            create_transaction(db=db, client_id=client_id, payload=TxPayload(item_id=record.id,
+            create_transaction(db=db, context=context, payload=TxPayload(item_id=record.id,
                                 tx_type="MENU_AVAILABILITY_ADJUSTMENT",ref_id=record.id,qty=abs(new_qty - before_stock),
                                 after_stock=new_qty,remarks=f"Manual availability update for '{record.name}'",))
 
@@ -396,7 +396,7 @@ def create_stock_item(
 
     # 🔥 Use unified transaction engine
     if opening_qty != Decimal("0"):
-        create_transaction(db=db, client_id=client_id, payload=TxPayload(item_id=db_item.id,tx_type="STOCK_IN",
+        create_transaction(db=db, context=context, payload=TxPayload(item_id=db_item.id,tx_type="STOCK_IN",
                            ref_id=db_item.id,qty=opening_qty,movement_type="IN",remarks="Opening stock on item creation",))
 
     db.commit()
@@ -441,7 +441,7 @@ def add_stock_quantity(
     if qty <= 0:
         raise HTTPException(status_code=400, detail="Quantity must be greater than 0")
 
-    create_transaction(db=db, client_id=client_id, payload=TxPayload(item_id=record.id,tx_type="STOCK_IN",
+    create_transaction(db=db, context=context, payload=TxPayload(item_id=record.id,tx_type="STOCK_IN",
                        ref_id=reference_id or record.id,qty=qty,movement_type="IN",remarks=remarks or "Stock replenishment",))
 
     db.commit()
@@ -494,7 +494,7 @@ def deduct_stock_quantity(
         )
 
     # 🔥 Unified transaction
-    create_transaction(db=db, client_id=client_id, payload=TxPayload(item_id=record.id,tx_type=transaction_type,
+    create_transaction(db=db, context=context, payload=TxPayload(item_id=record.id,tx_type=transaction_type,
                     ref_id=reference_id or record.id,qty=qty,after_stock=after_stock,
                     remarks=remarks or f"Stock deduction ({transaction_type})",))
 
@@ -573,7 +573,7 @@ def manual_deduct_stock(
         )
 
     # 🔥 Unified transaction
-    create_transaction(db=db, client_id=client_id, payload=TxPayload(item_id=record.id,tx_type=tx_type,ref_id=record.id,
+    create_transaction(db=db, context=context, payload=TxPayload(item_id=record.id,tx_type=tx_type,ref_id=record.id,
                         qty=converted_qty,after_stock=after_stock,remarks=remarks or f"Manual deduction ({tx_type})",))
 
     db.commit()
@@ -630,7 +630,7 @@ def update_stock_item(
         delta = new_qty - before_stock
  
         if delta != Decimal("0"):
-            create_transaction(db=db, client_id=client_id, payload=TxPayload(item_id=record.id,tx_type="ADJUSTMENT",ref_id=record.id,
+            create_transaction(db=db, context=context, payload=TxPayload(item_id=record.id,tx_type="ADJUSTMENT",ref_id=record.id,
                                qty=abs(delta),after_stock=new_qty,remarks="Manual stock adjustment via update",))
 
     db.commit()
