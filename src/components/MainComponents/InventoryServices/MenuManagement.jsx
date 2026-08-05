@@ -562,7 +562,12 @@ const slug = (() => {
 
     } catch (error) {
       console.error("Error adding item:", error);
-    }
+    } finally {
+    // ✅ Always re-enable, whether it succeeded, threw, or failed category resolution
+    isAddingItemRef.current = false;
+    setIsAddingItem(false);
+  }
+
   };
 
   const handleEditItem = async () => {

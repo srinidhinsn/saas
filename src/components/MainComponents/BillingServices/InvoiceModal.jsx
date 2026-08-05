@@ -6,7 +6,19 @@ import CustomerAutocomplete from './CustomerAutocomplete';
 import { X, Save, Printer, CreditCard, CheckCircle } from 'lucide-react';
 import RazorpayPayment from "../../Constants/RazorPay/RazorpayPayment";
 import { useClient } from "../../../context/ClientContext";
-import { isPackagingOrderItem } from '../../utils/Menu-utils/menuUtils';
+import { isPackagingOrderItem, fmt } from '../../utils/Menu-utils/menuUtils';
+import {
+  PAYMENT_METHODS,
+  needsRazorpay,
+  sumSplits,
+  getBalance,
+  updateSplitAmount as updateSplitAmountUtil,
+  addSplitRow as addSplitRowUtil,
+  removeSplitRow as removeSplitRowUtil,
+  rebalanceOnBlur,
+  validateSplitTotal,
+  getPaidAndDue,
+} from '../../utils/BillingUtils';
 
 // ─────────────────────────────────────────────────────────────────────────────
 // REQ 2 helpers
@@ -33,54 +45,6 @@ async function freeTable({ clientId, token, tableId, tablesMap }) {
     console.error("[freeTable] failed:", err?.response?.data || err.message);
   }
 }
-
-// ─────────────────────────────────────────────────────────────────────────────
-// REQ 2: PaymentConfirmModal
-// Shown when user clicks "Confirm Payment" for a saved-but-unpaid invoice.
-// ─────────────────────────────────────────────────────────────────────────────
-
-const PaymentConfirmModal = ({ isOpen, total, onConfirm, onClose }) => {
-  if (!isOpen) return null;
-  return (
-    <div className="fixed inset-0 z-50 flex items-center justify-center bg-black/60 p-4">
-      <div className="bg-white rounded-2xl shadow-2xl w-full max-w-sm">
-        <div className="px-6 py-5 border-b">
-          <h3 className="text-lg font-bold text-gray-800 flex items-center gap-2">
-            <CreditCard size={20} className="text-green-600" />
-            Confirm Payment
-          </h3>
-        </div>
-        <div className="px-6 py-5 space-y-3">
-          <p className="text-sm text-gray-600">
-            Confirm that the customer has paid the full amount?
-          </p>
-          <div className="bg-green-50 border border-green-200 rounded-xl px-4 py-3 text-center">
-            <p className="text-xs text-green-600 font-semibold uppercase tracking-wide mb-1">Amount Due</p>
-            <p className="text-3xl font-bold text-green-700">₹{Number(total).toFixed(2)}</p>
-          </div>
-          <p className="text-xs text-gray-400 text-center">
-            This will mark the invoice as <span className="font-semibold text-green-600">Paid</span> and free the table.
-          </p>
-        </div>
-        <div className="px-6 py-4 flex gap-3 bg-gray-50 rounded-b-2xl">
-          <button
-            onClick={onClose}
-            className="flex-1 py-2.5 rounded-xl font-medium text-sm border border-gray-300 bg-white text-gray-700 hover:bg-gray-50"
-          >
-            Cancel
-          </button>
-          <button
-            onClick={onConfirm}
-            className="flex-1 py-2.5 rounded-xl font-bold text-sm bg-green-600 hover:bg-green-700 text-white flex items-center justify-center gap-2 transition-colors"
-          >
-            <CheckCircle size={16} />
-            Confirm Paid
-          </button>
-        </div>
-      </div>
-    </div>
-  );
-};
 
 // ─────────────────────────────────────────────────────────────────────────────
 // Main InvoiceModal
@@ -464,7 +428,6 @@ export default function InvoiceModal({
   const [customersList, setCustomersList] = useState([]);
   const [gstManuallyEdited, setGstManuallyEdited] = useState(false);
   const [showRazorpayModal, setShowRazorpayModal] = useState(false);
-  const [showPayConfirm, setShowPayConfirm] = useState(false); // REQ 2
   const { clientDetails } = useClient();
   const clientGstNumber = clientDetails?.gst_number || "";
 
@@ -508,67 +471,36 @@ const packagingChargeTotal = Number(
 
   const total = calculatedTotal;
 
+const { paidAmount, dueAmount } = getPaidAndDue(paymentSplits);
+
   // ─── Split payment helpers ─────────────────────────────────────────────────
 
   const sumSplits = (splits) => splits.reduce((sum, s) => sum + Number(s.amount), 0);
 
-  const updateBalance = (sumOfPayments) => {
-    const bal = total - sumOfPayments;
-    setBalanceAmount(bal < 0 ? 0 : Number(bal.toFixed(2)));
-  };
+  const updateBalance = (splits) => setBalanceAmount(getBalance(splits, total));
 
-  const updateSplitAmount = (index, value) => {
-    let newAmount = Number(value);
-    if (isNaN(newAmount) || newAmount < 0) newAmount = 0;
-    let splits = [...paymentSplits];
-    splits[index].amount = newAmount;
-    if (splits.length > 1) {
-      const sumOthers = splits.filter((_, idx) => idx !== splits.length - 1).reduce((sum, s) => sum + Number(s.amount), 0);
-      const remainder = Number((total - sumOthers).toFixed(2));
-      splits[splits.length - 1].amount = remainder >= 0 ? remainder : 0;
-    }
-    let sumTotal = sumSplits(splits);
-    while (sumTotal > total) {
-      const excess = sumTotal - total;
-      if (splits[splits.length - 1].amount >= excess) {
-        splits[splits.length - 1].amount -= excess;
-      } else {
-        splits[splits.length - 1].amount = 0;
-      }
-      sumTotal = sumSplits(splits);
-    }
-    setPaymentSplits(splits);
-    updateBalance(sumSplits(splits));
-  };
+const updateSplitAmount = (index, value) => {
+  const next = updateSplitAmountUtil(paymentSplits, index, value, total);
+  setPaymentSplits(next);
+  updateBalance(next);
+};
 
-  const addSplitRow = () => {
-    const used = sumSplits(paymentSplits);
-    const remainder = Number((total - used).toFixed(2));
-    setPaymentSplits((prev) => [...prev, { method: "Cash", amount: remainder >= 0 ? remainder : 0 }]);
-    setBalanceAmount(Number(0));
-  };
+const addSplitRow = () => {
+  setPaymentSplits(prev => addSplitRowUtil(prev, total));
+  setBalanceAmount(0);
+};
 
-  const removeSplitRow = (index) => {
-    if (paymentSplits.length <= 1) return;
-    let updated = paymentSplits.filter((_, idx) => idx !== index);
-    const sum = sumSplits(updated);
-    const remainder = Number((total - sum).toFixed(2));
-    if (updated.length > 0) updated[updated.length - 1].amount += remainder;
-    setPaymentSplits(updated);
-    setBalanceAmount(Number((total - sumSplits(updated)).toFixed(2)));
-  };
+const removeSplitRow = (index) => {
+  const updated = removeSplitRowUtil(paymentSplits, index);
+  setPaymentSplits(updated);
+  setBalanceAmount(getBalance(updated, total));
+};
 
-  const onSplitAmountBlur = () => {
-    let splits = [...paymentSplits];
-    if (splits.length > 1) {
-      const sumOthers = splits.filter((_, idx) => idx !== splits.length - 1).reduce((sum, s) => sum + Number(s.amount), 0);
-      const remainder = Number((total - sumOthers).toFixed(2));
-      splits[splits.length - 1].amount = remainder >= 0 ? remainder : 0;
-    }
-    setPaymentSplits(splits);
-    updateBalance(sumSplits(splits));
-    setBalanceAmount(Number((total - sumSplits(splits)).toFixed(2)));
-  };
+const onSplitAmountBlur = () => {
+  const next = rebalanceOnBlur(paymentSplits, total);
+  setPaymentSplits(next);
+  updateBalance(next);
+};
 
   // ─── Fetch customers & invoice draft ──────────────────────────────────────
   const searchCustomersLocally = (q) => {
@@ -725,18 +657,9 @@ const packagingChargeTotal = Number(
     }
 
     if (splitPaymentEnabled) {
-      if (paymentSplits.length < 2) {
-        toast.error("Add at least two payment methods for split payment");
-        return;
-      }
-      const roundedSum = Number(sumSplits(paymentSplits).toFixed(2));
-      const roundedTotal = Number(total.toFixed(2));
-      if (roundedSum < roundedTotal) {
-        toast.error(`Split payment total ₹${roundedSum.toFixed(2)} is less than invoice total ₹${roundedTotal.toFixed(2)}`);
-        return;
-      }
-      if (roundedSum > roundedTotal) {
-        toast.error(`Split payment total ₹${roundedSum.toFixed(2)} exceeds invoice total ₹${roundedTotal.toFixed(2)}`);
+      const result = validateSplitTotal(paymentSplits, total);
+      if (!result.valid) {
+        toast.error(result.message);
         return;
       }
     } else {
@@ -818,6 +741,21 @@ if (selectedOrder.contact_phone || selectedOrder.contact_email || selectedOrder.
         );
       }
 
+      // REQ 2: Always issue an invoice number on save, not just on payment confirmation
+if (!documentNumber || documentNumber.toLowerCase() === "draft") {
+  try {
+    const issueRes = await axios.post(
+      `${import.meta.env.VITE_API_BILLING_SERVICE_URL}/${clientId}/invoice/issue?invoice_id=${draftId}`,
+      null,
+      { headers: { Authorization: `Bearer ${token}` } }
+    );
+    const newDocumentNumber = issueRes?.data?.data?.document_number || issueRes?.data?.document_number;
+    if (newDocumentNumber) setDocumentNumber(newDocumentNumber);
+  } catch (err) {
+    console.error("Failed to generate invoice number:", err.response?.data || err.message);
+  }
+}
+
       const itemsPayload = selectedOrder.items.map((item) => ({
         item_ref_id: item.item_id?.toString(),
         description: item.description || "",
@@ -859,67 +797,50 @@ if (selectedOrder.contact_phone || selectedOrder.contact_email || selectedOrder.
   // and THEN frees the table.
 
   const handleConfirmPayment = async () => {
-    setShowPayConfirm(false);
-    setSaving(true);
-    try {
-      const invoiceDraft = await fetchInvoiceDraft(selectedOrder.id);
-      const correctInvoiceDraftId = invoiceDraft?.id || invoiceDraftId;
-      
-      if (!correctInvoiceDraftId) {
-        throw new Error("No invoice draft found");
-      }
+  setSaving(true);
+  try {
+    const invoiceDraft = await fetchInvoiceDraft(selectedOrder.id);
+    const correctInvoiceDraftId = invoiceDraft?.id || invoiceDraftId;
 
-      if (!documentNumber || documentNumber.toLowerCase() === "draft") {
-        try {
-          const res = await axios.post(
-            `${import.meta.env.VITE_API_BILLING_SERVICE_URL}/${clientId}/invoice/issue?invoice_id=${correctInvoiceDraftId}`,
-            null,
-            { headers: { Authorization: `Bearer ${token}` } }
-          );
-          
-          const newDocumentNumber = res?.data?.data?.document_number || res?.data?.document_number;
-          if (newDocumentNumber) {
-            setDocumentNumber(newDocumentNumber);
-          }
-        } catch (err) {
-          throw new Error("Failed to generate invoice number: " + (err.response?.data?.detail || err.message));
-        }
-      }
-      await axios.post(
-        `${import.meta.env.VITE_API_BILLING_SERVICE_URL}/${clientId}/invoice/update_document`,
-        {
-          id: correctInvoiceDraftId,
-          client_id: clientId,
-          payment_status: "Paid",
-          status: "Issued",
-        },
-        { headers: { Authorization: `Bearer ${token}` } }
-      );
-      await axios.post(
-        `${import.meta.env.VITE_API_ORDER_SERVICE_URL}/${clientId}/dinein/update`,
-        {
-          id: selectedOrder.id,
-          status: "served",
-          invoice_status: "paid",
-        },
-        { headers: { Authorization: `Bearer ${token}` } }
-      );
-
-      await freeTable({
-        clientId,
-        token,
-        tableId: selectedOrder.table_id,
-        tablesMap,
-      });
-
-      setPaymentStatus("Paid");
-      onClose();
-    } catch (err) {
-      console.error("Payment Confirmation Failed:", err.message);
-    } finally {
-      setSaving(false);
+    if (!correctInvoiceDraftId) {
+      throw new Error("No invoice draft found");
     }
-  };
+
+    await axios.post(
+      `${import.meta.env.VITE_API_BILLING_SERVICE_URL}/${clientId}/invoice/update_document`,
+      {
+        id: correctInvoiceDraftId,
+        client_id: clientId,
+        payment_status: paymentStatus, // "Paid" or "Partial"
+        status: "Issued",
+      },
+      { headers: { Authorization: `Bearer ${token}` } }
+    );
+    await axios.post(
+      `${import.meta.env.VITE_API_ORDER_SERVICE_URL}/${clientId}/dinein/update`,
+      {
+        id: selectedOrder.id,
+        status: "served",
+        invoice_status: paymentStatus.toLowerCase(),
+      },
+      { headers: { Authorization: `Bearer ${token}` } }
+    );
+
+    // Table is freed for both full and partial payment
+    await freeTable({
+      clientId,
+      token,
+      tableId: selectedOrder.table_id,
+      tablesMap,
+    });
+
+    onClose();
+  } catch (err) {
+    console.error("Payment Confirmation Failed:", err.message);
+  } finally {
+    setSaving(false);
+  }
+};
 
   // ─── handlePaymentClick ────────────────────────────────────────────────────
 
@@ -932,20 +853,11 @@ if (selectedOrder.contact_phone || selectedOrder.contact_email || selectedOrder.
     }
     if (!draftId) return;
 
-    const isOnlineMethod = (m) => m === "razorpay_upi" || m === "razorpay_card";
-    const needsRazorpay = splitPaymentEnabled
-      ? paymentSplits.some(s => isOnlineMethod(s.method))
-      : isOnlineMethod(method);
-
-    if (needsRazorpay) {
+    const requiresRazorpay = needsRazorpay(splitPaymentEnabled, paymentSplits, method);
+    if (requiresRazorpay) {
       setShowRazorpayModal(true);
-    } else {
-      // REQ 2: For non-Razorpay, show payment confirmation before clearing table
-      if (paymentStatus !== "Paid") {
-        setShowPayConfirm(true);
-      } else {
-        await handleConfirmPayment();
-      }
+    } else if (paymentStatus !== "Pending") {
+      await handleConfirmPayment();
     }
   };
 
@@ -1040,12 +952,6 @@ if (selectedOrder.contact_phone || selectedOrder.contact_email || selectedOrder.
     }
   };
 
-  // ─── Render ────────────────────────────────────────────────────────────────
-
-  // REQ 2: Determine if invoice is saved but not yet paid
-  const isInvoiceSavedButUnpaid =
-    !!invoiceDraftId && paymentStatus !== "Paid";
-
   return (
     <div className="fixed inset-0 bg-black/60 backdrop-blur-sm flex items-center justify-center z-50 p-4">
       <div className="bg-bg-primary rounded-2xl shadow-2xl w-full max-w-[1600px] h-[90vh] flex flex-col relative">
@@ -1129,11 +1035,11 @@ if (selectedOrder.contact_phone || selectedOrder.contact_email || selectedOrder.
                                   <span className="inline-flex items-center px-2 py-0.5 rounded-md bg-bg-primary text-text-primary font-medium text-xs">
                                     {item.quantity}x
                                   </span>
-                                  <span>@ ₹{item.unit_price?.toFixed(2)}</span>
+                                  <span>@ ₹{fmt(item.unit_price || 0)}</span>
                                 </div>
                               </div>
                               <div className="font-bold text-text-primary text-lg">
-                                ₹{((item.unit_price || 0) * (item.quantity || 0)).toFixed(2)}
+                                ₹{fmt((item.unit_price || 0) * (item.quantity || 0))}
                               </div>
                             </div>
                             {/* Addon rows indented below */}
@@ -1145,7 +1051,7 @@ if (selectedOrder.contact_phone || selectedOrder.contact_email || selectedOrder.
                                   <span className="text-xs text-blue-500">×{addon.quantity}</span>
                                 </div>
                                 <span className="text-xs font-semibold text-blue-600">
-                                  +₹{((addon.unit_price || 0) * (addon.quantity || 0)).toFixed(2)}
+                                  +₹{fmt((addon.unit_price || 0) * (addon.quantity || 0))}
                                 </span>
                               </div>
                             ))}
@@ -1160,28 +1066,40 @@ if (selectedOrder.contact_phone || selectedOrder.contact_email || selectedOrder.
                     <div className="space-y-2">
                       <div className="flex justify-between text-text-secondary">
                         <span>Subtotal</span>
-                        <span className="font-semibold">₹{orderSubtotal.toFixed(2)}</span>
+                        <span className="font-semibold">₹{fmt(orderSubtotal)}</span>
                       </div>
                       <div className="flex justify-between text-action-danger">
                         <span>Discount</span>
-                        <span className="font-semibold">-₹{calculatedDiscount.toFixed(2)}</span>
+                        <span className="font-semibold">-₹{fmt(calculatedDiscount)}</span>
                       </div>
                       <div className="flex justify-between text-text-secondary">
                         <span>GST ({taxPercent}%)</span>
-                        <span className="font-semibold">₹{calculatedGST.toFixed(2)}</span>
+                        <span className="font-semibold">₹{fmt(calculatedGST)}</span>
                       </div>
                       {packagingChargeTotal > 0 && (
                         <div className="flex justify-between text-text-secondary">
                           <span>Packaging Charges</span>
-                          <span className="font-semibold">₹{packagingChargeTotal.toFixed(2)}</span>
+                          <span className="font-semibold">₹{fmt(packagingChargeTotal)}</span>
                         </div>
                       )}
                       <div className="pt-3 border-t border-border-default flex justify-between items-center">
                         <span className="text-lg font-bold text-text-primary">TOTAL</span>
                         <span className="text-2xl font-bold text-action-primary">
-                          ₹{calculatedTotal.toFixed(2)}
+                          ₹{fmt(calculatedTotal)}
                         </span>
                       </div>
+                        {dueAmount > 0 && (
+                          <>
+                          <div className="flex justify-between text-text-secondary">
+                            <span>Paid</span>
+                            <span className="font-semibold">₹{fmt(paidAmount)}</span>
+                          </div>
+                          <div className="flex justify-between text-text-secondary">
+                            <span>Due</span>
+                            <span className="font-semibold">₹{fmt(dueAmount)}</span>
+                          </div>
+                          </>
+                        )}
                     </div>
                   </div>
                 </div>
@@ -1198,20 +1116,6 @@ if (selectedOrder.contact_phone || selectedOrder.contact_email || selectedOrder.
                     </h3>
                   </div>
                   <div className="p-4 space-y-3">
-                    <CustomerAutocomplete
-                      value={selectedOrder.customer_id || ""}
-                      onChange={(val) => setSelectedOrder((p) => ({ ...p, customer_id: val }))}
-                      onSelectCustomer={(c) => {
-                        setSelectedOrder((p) => ({
-                          ...p,
-                          customer_id: c.customer_id,
-                          contact_email: c.contact_email || "",
-                          contact_phone: c.contact_phone || "", shipping_address: c.shipping_address || "",
-                        }));
-                      }}
-                      customers={customersList}
-                      placeholder="Walk-in / Customer ID"
-                    />
                     <CustomerAutocomplete
                       value={selectedOrder.contact_phone || ""}
                       onChange={(val) => setSelectedOrder((p) => ({ ...p, contact_phone: val }))}
@@ -1366,10 +1270,9 @@ if (selectedOrder.contact_phone || selectedOrder.contact_email || selectedOrder.
                               }}
                               className="flex-1 border border-border-default rounded-lg px-2 py-1.5 text-sm bg-bg-primary text-text-primary focus:ring-2 focus:ring-action-primary"
                             >
-                              <option>Cash</option>
-                              <option value="razorpay_upi">UPI (Razorpay)</option>
-                              <option value="razorpay_card">Card (Razorpay)</option>
-                              <option>Due</option>
+                              {PAYMENT_METHODS.map(m => (
+                                <option key={m.value} value={m.value}>{m.label}</option>
+                              ))}
                             </select>
                             <input
                               type="number"
@@ -1442,19 +1345,7 @@ if (selectedOrder.contact_phone || selectedOrder.contact_email || selectedOrder.
                       <Printer size={18} />
                       Print
                     </button>
-                  </div>
-
-                  {/* REQ 2: "Confirm Payment" button — shown when invoice saved but not paid */}
-                  {isInvoiceSavedButUnpaid && (
-                    <button
-                      onClick={() => setShowPayConfirm(true)}
-                      disabled={saving}
-                      className="w-full bg-green-600 hover:bg-green-700 text-white px-4 py-3 rounded-xl font-bold shadow-lg transition-all disabled:opacity-50 flex items-center justify-center gap-2"
-                    >
-                      <CheckCircle size={18} />
-                      Confirm Payment · ₹{total.toFixed(2)}
-                    </button>
-                  )}
+                  </div>  
 
                   {/* REQ 2: Already paid indicator */}
                   {invoiceDraftId && paymentStatus === "Paid" && (
@@ -1470,14 +1361,6 @@ if (selectedOrder.contact_phone || selectedOrder.contact_email || selectedOrder.
           </div>
         </div>
       </div>
-
-      {/* ── REQ 2: Payment confirmation modal ── */}
-      <PaymentConfirmModal
-        isOpen={showPayConfirm}
-        total={total}
-        onClose={() => setShowPayConfirm(false)}
-        onConfirm={handleConfirmPayment}
-      />
 
       {/* ── Razorpay modal ── */}
       {showRazorpayModal && (
