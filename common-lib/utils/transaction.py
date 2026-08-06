@@ -8,6 +8,7 @@ from typing import Optional
 import uuid
 from pydantic import BaseModel
 from entity.inventory_entity import InventoryEntity
+from models.saas_context import SaasContext;
 # ─────────────────────────────────────────────────────────────────────────────
 # Shared transaction helpers — used by order_service and order_router
 # ─────────────────────────────────────────────────────────────────────────────
@@ -104,9 +105,12 @@ def _convert(recipe_qty: float, recipe_unit: str, stock_unit: str) -> float:
 def create_transaction(
     db: Session,
     *,
-    client_id: str,
+    context: SaasContext,
     payload: TxPayload
 ):
+    client_id = context.client_id
+    created_by = context.user_id 
+    
     item_id       = payload.item_id
     tx_type       = payload.tx_type
     ref_id        = payload.ref_id
@@ -192,6 +196,7 @@ def create_transaction(
         reference_id=str(ref_id),
         reference_type="order",  # you can override later if needed
         remarks=remarks or tx_type_str,
+        created_by=created_by,
     )
 
     db.add(tx)
@@ -216,7 +221,9 @@ def record_partial_transaction(
     transaction_type: TransactionTypeEnum,
     reason: Optional[str],
     order_id: int,
+    context: SaasContext, 
 ) -> None:
+    client_id = context.client_id
 
     menu_item = db.query(InventoryEntity).filter(
         InventoryEntity.id == item.item_id,
@@ -234,7 +241,7 @@ def record_partial_transaction(
 
     # 🔹 ITEM CANCELLED (no stock change)
     if transaction_type == TransactionTypeEnum.item_cancelled:
-        create_transaction(db=db, client_id=client_id,
+        create_transaction(db=db, context=context,
     payload=TxPayload(item_id=menu_item.id, tx_type=TransactionTypeEnum.item_cancelled,
         ref_id=order_id, qty=remove_qty,
         remarks=build_remark(TransactionTypeEnum.item_cancelled.value, order_id, item.item_name, remove_qty, effective_reason),
@@ -245,7 +252,7 @@ def record_partial_transaction(
     elif transaction_type == TransactionTypeEnum.wastage:
 
         # 🔸 Always record wastage transaction
-        create_transaction(db=db, client_id=client_id,
+        create_transaction(db=db, context=context,
             payload=TxPayload(item_id=menu_item.id, tx_type=TransactionTypeEnum.wastage,
                 ref_id=order_id, qty=remove_qty,
                 remarks=build_remark(TransactionTypeEnum.wastage.value, order_id, item.item_name, remove_qty, effective_reason),
@@ -273,7 +280,7 @@ def record_partial_transaction(
                 reversal = _convert(recipe_qty, recipe_unit, ing_stock_unit) * remove_qty
                 reversal_qty = round(reversal, 6)
 
-                create_transaction(db=db, client_id=client_id,
+                create_transaction(db=db, context=context,
                     payload=TxPayload(item_id=stock_item.id, tx_type=TransactionTypeEnum.wastage,
         ref_id=order_id, qty=reversal_qty,
         remarks=build_remark(TransactionTypeEnum.wastage.value, order_id, item.item_name, remove_qty, effective_reason),
