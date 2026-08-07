@@ -801,7 +801,6 @@ export default function StockRecipeManager({ clientId: propClientId, token: prop
 
         <div className="grid lg:grid-cols-12 gap-6">
           <main className="lg:col-span-9 space-y-6 min-w-0">
-            <div className="max-h-[75vh] overflow-y-auto pr-1">
             {/* Dynamic Inventory Category Tabs */}
             {inventoryCategories.some(cat => cat.id === activeTab) && activeTab !== "menu" && (
               <InventoryCategoryTab
@@ -850,7 +849,6 @@ export default function StockRecipeManager({ clientId: propClientId, token: prop
                 units={units}
               />
             )}
-            </div>
           </main>
 
           <aside className="lg:col-span-3 space-y-6 min-w-0">
