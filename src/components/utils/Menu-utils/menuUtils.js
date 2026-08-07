@@ -387,3 +387,6 @@ export function relinkCartItemsToParents(items) {
     return { ...item, is_addon: true, parent_item_key: parentKey };
   });
 }
+
+
+export const fmt = (num) => Math.round(Number(num) || 0).toString();

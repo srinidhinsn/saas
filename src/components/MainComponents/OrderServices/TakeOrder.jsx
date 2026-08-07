@@ -2,7 +2,7 @@ import React, { useState, useEffect, useRef, useCallback, useMemo } from 'react'
 import { jwtDecode } from 'jwt-decode';
 import {
   ShoppingCart, Plus, Minus, X, Check, Search,
-  Users, Package, Trash2, ArrowLeft, FileText,
+  Users, Package, Trash2, ArrowLeft, FileText, Mail, MapPin,  
   Printer as PrinterIcon, Clock, Save, User, Phone,Truck,
 } from 'lucide-react';
 import { Eye, Lock, Printer } from 'lucide-react';
@@ -17,6 +17,7 @@ import { getDietaryFromSlug, isItemActive,buildCartItem, getGroupedCartItems, de
          from '../../utils/Menu-utils/menuUtils';
 import {useDietaryTypes, useTimings, useZoneConfig, useMenuData,useCounterTree} from '../../utils/Menu-utils/useMenuData';
 import { parseISTTimestamp } from '../../utils/dateRange';
+import CustomerAutocomplete from '../BillingServices/CustomerAutocomplete';
 // ─────────────────────────────────────────────────────────────────────────────
 // Constants
 // ─────────────────────────────────────────────────────────────────────────────
@@ -243,6 +244,7 @@ async function upsertBillingDocumentForCustomer({
       customer_id: customerDetails.customer_id || '',
       contact_email: customerDetails.contact_email || '',
       contact_phone: customerDetails.contact_phone || '',
+      shipping_address: customerDetails.shipping_address || '', 
     };
 
     const res = await axios.post(
@@ -557,6 +559,143 @@ const AddressSelectPanel = ({ addresses, selectedAddressId, setSelectedAddressId
     </div>
   );
 };
+// ─── Compact trigger shown inside the cart ─────────────────────────────────
+const DeliveryDetailsSummary = ({ value, onClick }) => {
+  const isComplete = value.contact_phone?.trim() && value.shipping_address?.trim();
+  return (
+    <button
+      type="button"
+      onClick={onClick}
+      className={`w-full flex items-center gap-2 px-3 py-2 rounded-xl border text-left shadow-sm transition
+        ${isComplete ? 'border-purple-200 bg-purple-50 hover:bg-purple-100' : 'border-red-300 bg-red-50 hover:bg-red-100'}`}
+    >
+      <MapPin size={16} className={isComplete ? 'text-purple-600 shrink-0' : 'text-red-500 shrink-0'} />
+      <div className="flex-1 min-w-0">
+        {isComplete ? (
+          <>
+            <div className="text-xs font-semibold text-purple-700 truncate">
+               {value.contact_phone}
+            </div>
+            <div className="text-xs text-purple-600 truncate">{value.shipping_address}</div>
+          </>
+        ) : (
+          <div className="text-xs font-semibold text-red-600">Tap to add delivery details</div>
+        )}
+      </div>
+      <span className="text-xs font-semibold text-purple-500 shrink-0">Edit</span>
+    </button>
+  );
+};
+
+// ─── Full delivery details modal ───────────────────────────────────────────
+const DeliveryDetailsModal = ({ isOpen, onClose, value, onSave, customers = [] }) => {
+  const [draft, setDraft] = useState(value);
+
+  useEffect(() => {
+    if (isOpen) setDraft(value);
+  }, [isOpen, value]);
+
+  if (!isOpen) return null;
+
+  const canSave = draft.contact_phone?.trim() && draft.shipping_address?.trim();
+
+  const applyCustomer = (c) => {
+    setDraft(d => ({
+      ...d,
+      customer_id: c.customer_id || d.customer_id,
+      contact_phone: c.contact_phone || d.contact_phone,
+      contact_email: c.contact_email || d.contact_email,
+      shipping_address: c.shipping_address || d.shipping_address,
+    }));
+  };
+
+  return (
+    <div className="fixed inset-0 z-50 flex items-center justify-center p-4 bg-black/50">
+      <div className="rounded-lg w-full max-w-sm bg-white shadow-xl">
+        <div className="px-6 py-4 border-b flex justify-between items-center">
+          <h2 className="text-lg font-bold text-gray-800 flex items-center gap-2">
+            <Truck size={18} className="text-purple-600" />
+            Delivery Details
+          </h2>
+          <button onClick={onClose} className="text-gray-500 hover:text-gray-700">
+            <X size={20} />
+          </button>
+        </div>
+
+        <div className="px-6 py-5 space-y-3 max-h-[65vh] overflow-y-auto">
+          {/* <div>
+            <label className="text-xs font-semibold text-gray-600 mb-1 block">Customer Name</label>
+            <CustomerAutocomplete
+              value={draft.customer_id}
+              onChange={(val) => setDraft(d => ({ ...d, customer_id: val }))}
+              onSelectCustomer={applyCustomer}
+              customers={customers}
+              placeholder="Customer name / ID"
+              valueField="customer_id"
+            />
+          </div> */}
+
+          <div>
+            <label className="text-xs font-semibold text-gray-600 mb-1 block">
+              Phone <span className="text-red-500">*</span>
+            </label>
+            <CustomerAutocomplete
+              value={draft.contact_phone}
+              onChange={(val) => setDraft(d => ({ ...d, contact_phone: val }))}
+              onSelectCustomer={applyCustomer}
+              customers={customers}
+              placeholder="Phone number"
+              valueField="contact_phone"
+            />
+          </div>
+
+          <div>
+            <label className="text-xs font-semibold text-gray-600 mb-1 block">Email</label>
+            <CustomerAutocomplete
+              value={draft.contact_email}
+              onChange={(val) => setDraft(d => ({ ...d, contact_email: val }))}
+              onSelectCustomer={applyCustomer}
+              customers={customers}
+              placeholder="Email (optional)"
+              valueField="contact_email"
+            />
+          </div>
+
+          <div>
+            <label className="text-xs font-semibold text-gray-600 mb-1 block">
+              Delivery Address <span className="text-red-500">*</span>
+            </label>
+            <CustomerAutocomplete
+              value={draft.shipping_address}
+              onChange={(val) => setDraft(d => ({ ...d, shipping_address: val }))}
+              onSelectCustomer={applyCustomer}
+              customers={customers}
+              placeholder="Full delivery address"
+              valueField="shipping_address"
+            />
+          </div>
+        </div>
+
+        <div className="px-6 py-4 flex gap-3 bg-gray-50 rounded-b-lg">
+          <button
+            onClick={onClose}
+            className="flex-1 py-2.5 rounded-lg font-medium text-sm border border-gray-300 bg-white text-gray-700 hover:bg-gray-50"
+          >
+            Cancel
+          </button>
+          <button
+            onClick={() => { onSave(draft); onClose(); }}
+            disabled={!canSave}
+            className={`flex-1 py-2.5 rounded-lg font-bold text-sm text-white transition
+              ${canSave ? 'bg-purple-600 hover:bg-purple-700' : 'bg-gray-300 cursor-not-allowed'}`}
+          >
+            Save Details
+          </button>
+        </div>
+      </div>
+    </div>
+  );
+};
 // ─────────────────────────────────────────────────────────────────────────────
 // TablePaymentConfirmModal
 // ─────────────────────────────────────────────────────────────────────────────
@@ -600,9 +739,10 @@ const TablePaymentConfirmModal = ({ isOpen, orderId, onClose, onConfirm }) => {
 
 const LineItemsModal = ({ isOpen, onClose, mainItem, lineItems, onAddWithSelectedAddons, onAddMainOnly }) => {
   const [selectedAddons, setSelectedAddons] = useState([]);
+  const [addonSearch, setAddonSearch] = useState(''); // ← add this
 
   useEffect(() => {
-    if (isOpen) setSelectedAddons([]);
+    if (isOpen) setSelectedAddons([]); setAddonSearch('');
   }, [isOpen]);
 
   const toggleAddon = (id) => {
@@ -611,41 +751,60 @@ const LineItemsModal = ({ isOpen, onClose, mainItem, lineItems, onAddWithSelecte
     );
   };
 
+  const filteredLineItems = lineItems.filter(item =>
+  (item.name || '').toLowerCase().includes(addonSearch.trim().toLowerCase())
+);
+
   if (!isOpen) return null;
 
   return (
     <div className="fixed inset-0 z-50 flex items-center justify-center p-4 bg-black/50">
-      <div className="rounded-lg max-w-lg w-full p-6 bg-bg-primary max-h-[80vh] overflow-y-auto">
+      <div className="rounded-lg max-w-lg w-full bg-bg-primary max-h-[80vh] flex flex-col overflow-hidden">
+        <div className="px-6 pt-6 pb-2 shrink-0">
         <h3 className="text-xl font-semibold mb-2 text-text-primary">{mainItem?.name}</h3>
         <p className="mb-4 text-text-secondary">Select add-ons:</p>
-
-        <div className="space-y-2 mb-6">
-          {lineItems.map(item => (
-            <div
-              key={item.id}
-              onClick={() => toggleAddon(item.id)}
-              className={`flex justify-between items-center p-3 rounded-lg cursor-pointer transition-all
-                ${selectedAddons.includes(item.id)
-                  ? 'bg-action-primary/10 border-2 border-action-primary'
-                  : 'bg-bg-tertiary border border-border-default hover:border-action-primary/50'}`}
-            >
-              <div className="flex items-center gap-3 flex-1">
-                <div
-                  className={`w-5 h-5 rounded border-2 flex items-center justify-center transition-all
-                    ${selectedAddons.includes(item.id)
-                      ? 'bg-action-primary border-action-primary'
-                      : 'border-gray-300'}`}
-                >
-                  {selectedAddons.includes(item.id) && <Check size={14} className="text-white" />}
-                </div>
-                <span className="text-text-primary font-medium">{item.name}</span>
-              </div>
-              <span className="font-semibold text-action-primary">₹{item.unit_price}</span>
-            </div>
-          ))}
+        <div className="relative mt-3">
+    <Search size={15} className="absolute left-3 top-1/2 -translate-y-1/2 text-text-secondary" />
+    <input
+      value={addonSearch}
+      onChange={e => setAddonSearch(e.target.value)}
+      placeholder="Search add-ons..."
+      className="w-full pl-8 pr-3 py-2 text-sm rounded-lg border border-border-default bg-bg-primary focus:outline-none focus:ring-2 focus:ring-action-primary"
+    />
+  </div>
         </div>
 
-        <div className="flex gap-3">
+        <div className="flex-1 overflow-y-auto px-6 py-2 space-y-2">
+  {filteredLineItems.length === 0 ? (
+    <p className="text-sm text-text-secondary text-center py-6">No add-ons match "{addonSearch}"</p>
+  ) : (
+    filteredLineItems.map(item => (
+      <div
+        key={item.id}
+        onClick={() => toggleAddon(item.id)}
+        className={`flex justify-between items-center p-3 rounded-lg cursor-pointer transition-all
+          ${selectedAddons.includes(item.id)
+            ? 'bg-action-primary/10 border-2 border-action-primary'
+            : 'bg-bg-tertiary border border-border-default hover:border-action-primary/50'}`}
+      >
+        <div className="flex items-center gap-3 flex-1">
+          <div
+            className={`w-5 h-5 rounded border-2 flex items-center justify-center transition-all
+              ${selectedAddons.includes(item.id)
+                ? 'bg-action-primary border-action-primary'
+                : 'border-gray-300'}`}
+          >
+            {selectedAddons.includes(item.id) && <Check size={14} className="text-white" />}
+          </div>
+          <span className="text-text-primary font-medium">{item.name}</span>
+        </div>
+        <span className="font-semibold text-action-primary">₹{item.unit_price}</span>
+      </div>
+    ))
+  )}
+</div>
+
+        <div className="flex gap-3 px-6 py-4 border-t border-border-default shrink-0 bg-bg-primary">
           <button
             onClick={onClose}
             className="flex-1 px-4 py-2 rounded-lg border border-border-default bg-bg-tertiary text-text-primary hover:bg-gray-100"
@@ -1620,8 +1779,9 @@ const TakeOrder = ({ clientId, token, onOrderUpdate, realm }) => {
   // ── Drafts ────────────────────────────────────────────────────────────────
   const [draftSavedAt, setDraftSavedAt] = useState(null);
   const [draftTableIds, setDraftTableIds] = useState([]);   // for floor DRAFT badges
-
-  const [customerDetails, setCustomerDetails] = useState({ customer_id: '', contact_phone: '' });
+  const [showDeliveryDetailsModal, setShowDeliveryDetailsModal] = useState(false);
+  const [customerDetails, setCustomerDetails] = useState({ customer_id: '', contact_phone: '',contact_email: '',shipping_address: '', });
+  const [customersList, setCustomersList] = useState([]);
   const [customerAddresses, setCustomerAddresses] = useState([]);
   const [selectedAddressId, setSelectedAddressId] = useState('');
   // ── UI state ──────────────────────────────────────────────────────────────
@@ -2082,7 +2242,8 @@ const handleDeliverySelect = async () => {
   setDeliveryTableId(t.id);
   setZoneConfigId(t.config_id || null);
   setCart([]);
-  setSelectedAddressId(customerAddresses[0]?.id ? String(customerAddresses[0].id) : '');
+  setCustomerDetails({ customer_id: '', contact_phone: '', contact_email: '', shipping_address: '' });
+  setShowDeliveryDetailsModal(true); 
   setShowCart(true);
   syncDeliveryChargeForOrderMode('delivery');
   goToOrderView();
@@ -2980,8 +3141,8 @@ const handleWalkInSelect = async () => {
 
   const handlePlaceOrder = async () => {
     if (isPlacingRef.current || !canPlaceOrder) return;
-    if (orderMode === 'delivery' && !selectedAddressId) {
-      toast.error('Please select a delivery address');
+    if (orderMode === 'delivery' && !customerDetails.shipping_address?.trim()) {
+      toast.error('Please enter a delivery address');
       return;
     }
     isPlacingRef.current = true;
@@ -3064,9 +3225,10 @@ const buildOrderPayload = (items) =>
               cst: 0,
               total_price: total,
               status: 'pending',
-              items: itemsPayload,    customer_id: customerDetails.customer_id || getUserIdFromToken(token) || '',
-              delivery_address: orderMode === 'delivery' ? (selectedAddressId || '') : '',
-          
+              items: itemsPayload,
+              customer_id: customerDetails.customer_id || getUserIdFromToken(token) || '',
+              contact_phone: customerDetails.contact_phone || '',
+              contact_email: customerDetails.contact_email || '',          
             },
             { headers }
           );
@@ -3096,12 +3258,28 @@ const buildOrderPayload = (items) =>
         const tableObj = tables.find(t => t.id.toString() === selectedTable);
         const orderSubtotal = cart.filter(i => !(i.frontend_unique_key || '').startsWith('cchild_'))
                                   .reduce((s, i) => s + (i.unit_price || 0) * i.quantity, 0);
+        let resolvedCustomerId = customerDetails.customer_id;
+        try {
+          const custRes = await axios.post(
+            `${import.meta.env.VITE_API_USER_SERVICE_URL}/${clientId}/users/customer/find_or_create`,
+            {
+              contact_email: customerDetails.contact_email,
+              contact_phone: customerDetails.contact_phone,
+              shipping_address: customerDetails.shipping_address,
+              customer_id: customerDetails.customer_id,
+            },
+            { headers: { Authorization: `Bearer ${token}` } }
+          );
+          resolvedCustomerId = custRes.data?.data?.person_id || resolvedCustomerId;
+        } catch (err) {
+          console.error('Failed to resolve/create customer:', err.response?.data || err.message);
+        }
         await upsertBillingDocumentForCustomer({
           clientId,
           token,
           orderId: placedOrderId,
           tableRef: tableObj?.table_number || `Table ${selectedTable}`,
-          customerDetails,
+          customerDetails: { ...customerDetails, customer_id: resolvedCustomerId },
           orderSubtotal,
         });
       }
@@ -3154,7 +3332,7 @@ const buildOrderPayload = (items) =>
       setCurrentView('floor');
       setCurrentBatchTimestamp(null);
       setHasNewItems(false);
-      setCustomerDetails({ customer_id: '', contact_phone: '' });
+      setCustomerDetails({ customer_id: '', contact_phone: '', contact_email: '', shipping_address: '' });
       setSelectedAddressId('');
       // toast.success('Order placed!');
     } catch (err) {
@@ -3166,6 +3344,24 @@ const buildOrderPayload = (items) =>
     }
   };
 
+  const fetchUniqueCustomers = async () => {
+    try {
+      const res = await axios.get(
+        `${import.meta.env.VITE_API_USER_SERVICE_URL}/${clientId}/users/customer/search`,
+        { headers: { Authorization: `Bearer ${token}` }, params: { client_id: clientId } }
+      );
+      setCustomersList(res.data?.data?.customers || []);
+    } catch (err) {
+      console.error('Failed to fetch customers:', err);
+      setCustomersList([]);
+    }
+  };
+  
+  useEffect(() => {
+    if (clientId && token) {
+      fetchUniqueCustomers();
+    }
+  }, [clientId, token]);
   // ─────────────────────────────────────────────────────────────────────────
   // Clear cart
   // ─────────────────────────────────────────────────────────────────────────
@@ -3186,7 +3382,7 @@ const buildOrderPayload = (items) =>
     setActiveDineinOrderId(null);
     setCurrentBatchTimestamp(null);
     setHasNewItems(false);
-    setCustomerDetails({ customer_id: '', contact_phone: '' });
+    setCustomerDetails({ customer_id: '', contact_phone: '', contact_email: '', shipping_address: '' });
   };
 
   // ─────────────────────────────────────────────────────────────────────────
@@ -3404,9 +3600,10 @@ const buildOrderPayload = (items) =>
       setInvoiceOrderData({
         ...order,
         items: deduplicatedItems,
-        customer_id: billingDoc?.customer_id || order.customer_id || '',
-        contact_phone: billingDoc?.contact_phone || order.contact_phone || '',
-        contact_email: billingDoc?.contact_email || order.contact_email || '',
+        customer_id: customerDetails.customer_id || billingDoc?.customer_id || order.customer_id || '',
+        contact_phone: customerDetails.contact_phone || billingDoc?.contact_phone || order.contact_phone || '',
+        contact_email: customerDetails.contact_email || billingDoc?.contact_email || order.contact_email || '',
+        shipping_address: customerDetails.shipping_address || billingDoc?.shipping_address || order.delivery_address || '', // ← add      
       });
       setInvoiceModalOpen(true);
     } catch (e) {
@@ -3717,12 +3914,17 @@ const buildOrderPayload = (items) =>
                     <div className="pb-3 border-b space-y-2">
                       <h2 className="text-lg font-semibold text-gray-800">Your Order</h2>
                       {orderMode === 'delivery' && (
-    <AddressSelectPanel
-      addresses={customerAddresses}
-      selectedAddressId={selectedAddressId}
-      setSelectedAddressId={setSelectedAddressId}
-    />
+    <DeliveryDetailsSummary
+    value={customerDetails}
+    onClick={() => setShowDeliveryDetailsModal(true)}
+  />
   )}
+                          <DeliveryDetailsModal
+                                   isOpen={showDeliveryDetailsModal}
+                                   onClose={() => setShowDeliveryDetailsModal(false)}
+                                   value={customerDetails}
+                                   onSave={setCustomerDetails}
+                                   customers={customersList} />
                       <div className="flex items-center justify-between text-sm bg-gray-50 px-3 py-2 rounded-lg">
                         <div className="flex items-center gap-2">
                           {orderMode === 'dinein' && selectedTable && (
@@ -3780,36 +3982,32 @@ const buildOrderPayload = (items) =>
                     </div>
 
                     {/* Dine-in / Takeaway toggle */}
-                    <div className="mt-3">
-                      <div className="flex bg-gray-100 rounded-lg p-1">
-                        <button
-                          onClick={() => {
-                            setOrderMode('dinein');
-                            if (dineinTableId) setSelectedTable(dineinTableId);
-                            syncPackagingForOrderMode('dinein');
-                          }}
-                          className={`flex-1 py-2 rounded-md text-sm font-medium flex items-center justify-center gap-2
-                            ${orderMode === 'dinein'
-                              ? 'bg-action-primary text-white shadow-sm'
-                              : 'text-gray-600 hover:text-gray-800'}`}
-                        >
-                          <Users size={16} /> Dine In
-                        </button>
-                        <button
-                          onClick={() => {
-                            setOrderMode('takeaway');
-                            setSelectedTable(takeawayTableId?.toString());
-                            syncPackagingForOrderMode('takeaway');
-                          }}
-                          className={`flex-1 py-2 rounded-md text-sm font-medium flex items-center justify-center gap-2
-                            ${orderMode === 'takeaway'
-                              ? 'bg-action-primary text-white shadow-sm'
-                              : 'text-gray-600 hover:text-gray-800'}`}
-                        >
-                          <Package size={16} /> Takeaway
-                        </button>
-                      </div>
-                    </div>
+                  {['dinein', 'takeaway'].includes(orderMode) && (
+                      <div className="mt-3">
+                          <div className="flex bg-gray-100 rounded-lg p-1">
+                               <button onClick={() => {
+                                                      setOrderMode('dinein');
+                                                      if (dineinTableId) setSelectedTable(dineinTableId);
+                                                      syncPackagingForOrderMode('dinein'); }}
+                                        className={`flex-1 py-2 rounded-md text-sm font-medium flex items-center justify-center gap-2
+                                                    ${orderMode === 'dinein'
+                                                                      ? 'bg-action-primary text-white shadow-sm'
+                                                                      : 'text-gray-600 hover:text-gray-800'}`}>
+                                <Users size={16} /> Dine In
+                               </button>
+                               <button
+                                       onClick={() => {
+                                                      setOrderMode('takeaway');
+                                                      setSelectedTable(takeawayTableId?.toString());
+                                                      syncPackagingForOrderMode('takeaway'); }}
+                                        className={`flex-1 py-2 rounded-md text-sm font-medium flex items-center justify-center gap-2
+                                                    ${orderMode === 'takeaway'
+                                                                     ? 'bg-action-primary text-white shadow-sm'
+                                                                     : 'text-gray-600 hover:text-gray-800'}`}>
+                                <Package size={16} /> Takeaway
+                               </button>
+                          </div>
+                    </div>)}
 
                     {/* Cart body */}
                     {cart.length === 0 ? (

@@ -6,6 +6,7 @@ import InvoiceModal from './InvoiceModal';
 import { Search, Calendar, Eye } from 'lucide-react';
 import { menuCache } from '../../utils/Menu-utils/menuCache';
 import AgGridTable from '../../utils/AgGridTable';
+import { fmt } from '../../utils/Menu-utils/menuUtils';
 
 export default function BillingPage({ clientId, token }) {
   const navigate = useNavigate();
@@ -239,16 +240,6 @@ export default function BillingPage({ clientId, token }) {
       valueGetter: (params) => `${params.data?.items?.length || 0} items`,
     },
     {
-      headerName: 'Total',
-      field: 'total_price',
-      minWidth: 130,
-      valueGetter: (params) => Number(params.data?.total_price ?? 0),
-      valueFormatter: (params) => `₹${(params.value || 0).toFixed(2)}`,
-      cellRenderer: (params) => (
-        <div className="text-sm font-bold text-action-primary">₹{Number(params.value || 0).toFixed(2)}</div>
-      ),
-    },
-    {
       headerName: 'Total Amount',
       colId: 'total_amount',
       minWidth: 150,
@@ -258,7 +249,7 @@ export default function BillingPage({ clientId, token }) {
       },
       cellRenderer: (params) => (
         <div className="text-sm font-bold text-action-primary">
-          {params.value != null ? `₹${params.value.toFixed(2)}` : "—"}
+          {params.value != null ? `₹${fmt(params.value)}` : "—"}
         </div>
       ),
     },
