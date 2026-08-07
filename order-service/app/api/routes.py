@@ -320,7 +320,7 @@ def delete_order_items( client_id: str, order_item_id: Optional[str] = Query(Non
 
     def _tx(item_id, tx_type, qty, tag, name):
         create_transaction(
-            db=db, client_id=client_id,
+            db=db, context=context,
             payload=TxPayload(
                 item_id=item_id,
                 tx_type=tx_type,
@@ -336,7 +336,7 @@ def delete_order_items( client_id: str, order_item_id: Optional[str] = Query(Non
         if tx_type in (TransactionTypeEnum.wastage, TransactionTypeEnum.item_cancelled):
             record_partial_transaction(
                 db,
-                client_id=client_id,
+                context=context,
                 item=item,
                 remove_qty=remove_qty,
                 transaction_type=tx_type,
@@ -556,7 +556,7 @@ def cancel_order(
 
     def _tx(item_id, tx_type, qty, tag, name, ref_id=None):
         create_transaction(
-            db=db, client_id=client_id,
+            db=db, context=context,
             payload=TxPayload(item_id=item_id, tx_type=tx_type, ref_id=ref_id or order_id, qty=qty, remarks=build_remark(tag, ref_id or order_id, name, qty, effective_reason))
         )
 

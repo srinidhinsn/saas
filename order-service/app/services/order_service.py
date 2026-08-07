@@ -11,6 +11,7 @@ from models.response_model import ResponseModel
 from fastapi import HTTPException
 from models.order_model import DineinOrderModel 
 from .order_status import _status_label
+from models.saas_context import SaasContext
 
 def build_billing_payload_from_order(order: DBOrder, items: List[DBOrderItem]) -> Dict[str, Any]:
     return {
@@ -177,11 +178,11 @@ def _convert(recipe_qty: float, recipe_unit: str, stock_unit: str) -> float:
     raise ValueError(f"Incompatible unit dimensions: recipe='{ru}', stock='{su}'")
 
 # ── Stock deduction ──────────────────────────────────────────────────────────
-def _deduct_stock_for_order(db: Session, client_id: str, order_id: int) -> None:
+def _deduct_stock_for_order(db: Session, client_id: str, order_id: int, context: SaasContext) -> None:
 
     def _tx(item_id, tx_type, qty, remarks):
         create_transaction(
-            db=db, client_id=client_id,
+            db=db, context=context,
             payload=TxPayload(item_id=item_id, tx_type=tx_type, ref_id=order_id, qty=qty, remarks=remarks)
         )
 
@@ -392,7 +393,7 @@ def update_order_status_service(client_id: str, body: DineinOrderModel, context,
 
         deducted_count = 0
         if should_deduct:
-            _deduct_stock_for_order(db=db, client_id=client_id, order_id=order.id)
+            _deduct_stock_for_order(db=db, client_id=client_id, order_id=order.id, context=context)
             deducted_count += 1
 
         db.commit()
