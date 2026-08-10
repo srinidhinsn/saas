@@ -11,6 +11,8 @@ from models.response_model import ResponseModel
 from fastapi import HTTPException
 from models.order_model import DineinOrderModel 
 from .order_status import _status_label
+from models.saas_context import SaasContext
+from datetime import datetime
 
 def build_billing_payload_from_order(order: DBOrder, items: List[DBOrderItem]) -> Dict[str, Any]:
     return {
@@ -177,12 +179,12 @@ def _convert(recipe_qty: float, recipe_unit: str, stock_unit: str) -> float:
     raise ValueError(f"Incompatible unit dimensions: recipe='{ru}', stock='{su}'")
 
 # ── Stock deduction ──────────────────────────────────────────────────────────
-def _deduct_stock_for_order(db: Session, client_id: str, order_id: int) -> None:
+def _deduct_stock_for_order(db: Session, client_id: str, order_id: int, context=SaasContext, rental_only: bool = False) -> None:
 
-    def _tx(item_id, tx_type, qty, remarks):
+    def _tx(item_id, tx_type, qty, remarks, ref_id=None, reference_type=None):
         create_transaction(
-            db=db, client_id=client_id,
-            payload=TxPayload(item_id=item_id, tx_type=tx_type, ref_id=order_id, qty=qty, remarks=remarks)
+            db=db, context=context,
+            payload=TxPayload(item_id=item_id, tx_type=tx_type, ref_id=ref_id or order_id, qty=qty, remarks=remarks, reference_type=reference_type)
         )
 
     def _deduct_single_item(menu_item, ordered_qty, label):
@@ -262,11 +264,15 @@ def _deduct_stock_for_order(db: Session, client_id: str, order_id: int) -> None:
         )
         .all()
     )
-
+    rented_label = (_status_label(context, OrderStatusEnum.served) if context else None) or "rented"
     for order_item in order_items:
 
         ordered_qty = order_item.quantity or 1
-
+        is_rental = '||RENTAL|' in (order_item.slug or '')
+        if rental_only and not is_rental:
+           continue
+        if not rental_only and is_rental:
+            continue
         menu_item = (
             db.query(InventoryEntity)
             .filter(InventoryEntity.id == int(order_item.item_id), InventoryEntity.client_id == client_id)
@@ -275,7 +281,17 @@ def _deduct_stock_for_order(db: Session, client_id: str, order_id: int) -> None:
 
         if not menu_item:
             continue
-
+        if is_rental:
+            _tx(
+                menu_item.id,
+                TransactionTypeEnum.order_deduction,
+                ordered_qty,
+                f"[RENTAL_OUT] Order #{order_id} | OrderItem #{order_item.id} | {menu_item.name} x{ordered_qty}",
+                ref_id=order_item.id,          # order_item id, so returns can match back to exactly this deduction
+                reference_type="order_item",
+            )
+            order_item.status = rented_label
+            continue
         # Check if this is a combo by category name
         category = (
             db.query(CategoryEntity)
@@ -392,7 +408,7 @@ def update_order_status_service(client_id: str, body: DineinOrderModel, context,
 
         deducted_count = 0
         if should_deduct:
-            _deduct_stock_for_order(db=db, client_id=client_id, order_id=order.id)
+            _deduct_stock_for_order(db=db, client_id=client_id, order_id=order.id,context=context)
             deducted_count += 1
 
         db.commit()
