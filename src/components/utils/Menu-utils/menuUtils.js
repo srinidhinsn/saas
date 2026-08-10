@@ -387,3 +387,57 @@ export function relinkCartItemsToParents(items) {
     return { ...item, is_addon: true, parent_item_key: parentKey };
   });
 }
+
+export const isRentalCategoryId = (categoryId, categoriesFlat) => {
+  if (!categoryId || !categoriesFlat?.length) return false;
+  let currentId = categoryId;
+  const visited = new Set();
+  while (currentId && !visited.has(currentId)) {
+    visited.add(currentId);
+    const cat = categoriesFlat.find(c => c.id === currentId);
+    if (!cat) break;
+    if ((cat.name || '').toLowerCase().includes('rental')) return true;
+    currentId = cat.parentId ?? null;
+  }
+  return false;
+};
+export const isRentalMenuItem = (item) => {
+  return Array.isArray(item?.recipe) && item.recipe.length > 0 && !!item.recipe[0]?.rental_tier_id;
+};
+
+
+export const buildRentalSlug = (baseSlug, { tierId, durationMinutes, startEpoch, dueEpoch }) =>
+  `${baseSlug}||RENTAL|${tierId}|${durationMinutes}|${startEpoch}|${dueEpoch}|-|0`;
+
+export const parseRentalSlug = (slug) => {
+  if (!slug || !slug.includes('||RENTAL|')) return null;
+  const [, meta] = slug.split('||RENTAL|');
+  const [tierId, durationMinutes, startEpoch, dueEpoch, returnedEpoch, lateFee] = meta.split('|');
+  return {
+    tierId,
+    durationMinutes: Number(durationMinutes),
+    startEpoch: Number(startEpoch),
+    dueEpoch: Number(dueEpoch),
+    returnedEpoch: returnedEpoch === '-' ? null : Number(returnedEpoch),
+    lateFee: Number(lateFee) || 0,
+  };
+};
+
+export const getRentalStatus = (slug) => {
+  const parsed = parseRentalSlug(slug);
+  if (!parsed) return null;
+  if (parsed.returnedEpoch) return parsed.returnedEpoch > parsed.dueEpoch ? 'returned_late' : 'returned';
+  return Date.now() > parsed.dueEpoch ? 'overdue' : 'on_rent';
+};
+export const isRentalRealm = (realm) => {
+  const configured = (import.meta.env.VITE_RENTAL_REALMS || '')
+    .split(',')
+    .map(r => r.trim().toLowerCase())
+    .filter(Boolean);
+  return configured.includes((realm || '').trim().toLowerCase());
+};
+export const findRentalCategoryId = (categoriesFlat) => {
+  if (!categoriesFlat?.length) return null;
+  const match = categoriesFlat.find(c => (c.name || '').toLowerCase().includes('rental'));
+  return match?.id || null;
+};

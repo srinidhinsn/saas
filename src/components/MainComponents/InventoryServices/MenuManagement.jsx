@@ -11,7 +11,7 @@ import { jwtDecode } from "jwt-decode";
 import { getMenuConfig } from '../../utils/menuConfigResolver';
 import MenuConfigModal from '../../utils/Modals/MenuConfigModal';
 import { menuCache } from '../../utils/Menu-utils/menuCache';
-import { getDietaryFromSlug, isItemActive, generateSlug, toSlugSegment, isPackagingCategoryId} from '../../utils/Menu-utils/menuUtils';
+import { getDietaryFromSlug, isItemActive, generateSlug, toSlugSegment, isPackagingCategoryId, isRentalRealm, isRentalCategoryId} from '../../utils/Menu-utils/menuUtils';
 import {useDietaryTypes, useTimings, useZoneConfig, useMenuData} from '../../utils/Menu-utils/useMenuData';
 
 const MenuManagement = ({ clientId, token,screenIds, userId, realm }) => {
@@ -415,7 +415,7 @@ if (cachedAddon) return cachedAddon;
     )?.id || null;
   };
 
-  const handleAddItem = async () => {
+  const handleAddItem = async (rentalTiers = []) => {
     if (isAddingItemRef.current) return; 
     if (newItem.code) {
       const duplicate = findDuplicateCodeItem(newItem.code);
@@ -479,8 +479,11 @@ const slug = (() => {
       const created_by =
         currentUserId || localStorage.getItem("user_id") || "system";
 
-      const basePrice = parseFloat(newItem.unit_price) || 0;
-      const zonePrices = newItem.zonePrices || {};
+        const isRentalItem = isRentalRealm(normalizedRealm) && isRentalCategoryId(finalCategoryId, categoriesFlat);
+
+        const basePrice = parseFloat(newItem.unit_price) || (isRentalItem && rentalTiers.length > 0
+                          ? Math.min(...rentalTiers.map(t => Number(t.price) || 0)) : 0);
+        const zonePrices = newItem.zonePrices || {};
 
       const basePayload = {
         ...cleanNewItem,
@@ -517,7 +520,16 @@ const slug = (() => {
       );
 
       const sharedId = baseRes.data.data.id;
-
+      if (rentalTiers.length > 0) {
+        await axios.post(
+          `${import.meta.env.VITE_API_INVENTORY_SERVICE_URL}/${clientId}/menu/recipe/update`,
+          { recipe: rentalTiers },
+          {
+            params: { menu_item_id: sharedId, menu_inventory_id: 'menu' },
+            headers: { Authorization: `Bearer ${token}` },
+          }
+        );
+      }
       // STEP 2: Create records for ALL sections
       if (sections && sections.length > 0) {
         for (const section of sections) {
@@ -565,7 +577,7 @@ const slug = (() => {
     }
   };
 
-  const handleEditItem = async () => {
+  const handleEditItem = async (rentalTiers = []) => {
     if (editingItem.code) {
       const duplicate = findDuplicateCodeItem(editingItem.code, editingItem.id);
       if (duplicate) {
@@ -651,12 +663,27 @@ const slug = (() => {
       };
 
       // Always update base record (zone_config_id = 0)
-      await axios.post(
-        `${import.meta.env.VITE_API_INVENTORY_SERVICE_URL}/${clientId}/menu/update`,
-        { ...basePayload, unit_price: Number(editingItem.unit_price) || 0, zone_config_id: 0 },
-        { headers: { Authorization: `Bearer ${token}` } }
-      );
+      const isRentalItem = isRentalRealm(normalizedRealm) && isRentalCategoryId(finalCategoryId, categoriesFlat);
+      const resolvedBasePrice = Number(editingItem.unit_price) ||
+      (isRentalItem && rentalTiers.length > 0
+        ? Math.min(...rentalTiers.map(t => Number(t.price) || 0))
+        : 0);
 
+await axios.post(
+  `${import.meta.env.VITE_API_INVENTORY_SERVICE_URL}/${clientId}/menu/update`,
+  { ...basePayload, unit_price: resolvedBasePrice, zone_config_id: 0 },
+  { headers: { Authorization: `Bearer ${token}` } }
+);
+      if (rentalTiers.length > 0) {
+        await axios.post(
+          `${import.meta.env.VITE_API_INVENTORY_SERVICE_URL}/${clientId}/menu/recipe/update`,
+          { recipe: rentalTiers },
+          {
+            params: { menu_item_id: Number(editingItem.id), menu_inventory_id: 'menu' },
+            headers: { Authorization: `Bearer ${token}` },
+          }
+        );
+      }
       // Always sync ALL zone records — category_id, slug, and other fields
       // must be consistent across every zone variant
       for (const section of sections) {
@@ -674,7 +701,7 @@ const slug = (() => {
             ? parseFloat(enteredPrice)
             : existingZoneRecord
               ? Number(existingZoneRecord.unit_price)
-              : Number(editingItem.unit_price) || 0;
+              : resolvedBasePrice;
 
               if (existingZoneRecord) {
                 await axios.post(
@@ -1583,11 +1610,9 @@ return suffixParts.length > 0 ? `${base}__${suffixParts.join('+')}` : base;
                   />
                 </div>
                 <div className="flex gap-2 flex-wrap justify-end">
-
-                  {normalizedRealm === 'restaurant' &&
                     <button onClick={() => setShowMenuConfig(true)} className="h-9 px-3 flex items-center gap-2 rounded-lg bg-action-success text-text-white text-sm font-semibold shadow-sm hover:opacity-90">
                       <span>Config</span>
-                    </button>}
+                    </button>
                   <button onClick={openAddModal} className="h-9 px-3 flex items-center gap-2 rounded-lg bg-action-primary text-text-white text-sm font-semibold shadow-sm hover:opacity-90">
                     <Plus size={14} /><span>{isComboCategory ? 'Add Combo' : 'Add Item'}</span>
                   </button>

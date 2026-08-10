@@ -28,6 +28,7 @@ import TenantSwitcher from '../Constants/TenanatFloater/TenantFloater';
 import CustomerChat from '../Constants/Chatbots/CustomerChat';
 import Super_User_Data from '../Super_User/Header/Super_User_Data';
 import Super_User_Tenant from '../Super_User/Header/Super_User_tenat';
+import RentalTrackingDisplay from '../Rental-system/Rental_Display/RentalTrackingDisplay';
 
 const RoutesManager = ({ token: appToken }) => {
   const { clientId: paramClientId } = useParams();
@@ -181,6 +182,10 @@ const RoutesManager = ({ token: appToken }) => {
       <Route
         path="super-user-tenant"
         element={<Super_User_Tenant clientId={clientId} token={token} userId={userId} realm={realm} screenIds={screenIds} />}
+      />
+            <Route
+        path="rental-display"
+        element={<RentalTrackingDisplay clientId={clientId} token={token} userId={userId} realm={realm} screenIds={screenIds} />}
       />
       <Route path="*" element={<Navigate to="home" replace />} />
       <Route path='user-profile' element={<UserProfile token={token} clientId={clientId} realm={realm} screenIds={screenIds}/>} />

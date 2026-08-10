@@ -18,6 +18,7 @@ import { getDietaryFromSlug, isItemActive,buildCartItem, getGroupedCartItems, de
 import {useDietaryTypes, useTimings, useZoneConfig, useMenuData,useCounterTree} from '../../utils/Menu-utils/useMenuData';
 import { parseISTTimestamp } from '../../utils/dateRange';
 import CustomerAutocomplete from '../BillingServices/CustomerAutocomplete';
+import { isRentalMenuItem,buildRentalSlug,parseRentalSlug,getRentalStatus,isRentalRealm } from '../../utils/Menu-utils/menuUtils';
 // ─────────────────────────────────────────────────────────────────────────────
 // Constants
 // ─────────────────────────────────────────────────────────────────────────────
@@ -270,6 +271,8 @@ const ItemStatusBadge = ({ status }) => {
     ready: { bg: 'bg-green-100', text: 'text-green-700', label: 'Ready' },
     served: { bg: 'bg-gray-100', text: 'text-gray-600', label: 'Served' },
     cancelled: { bg: 'bg-red-50', text: 'text-red-400', label: 'Cancelled' },
+    rented: { bg: 'bg-purple-100', text: 'text-purple-700', label: 'Rented Out' },   // ← add
+    returned: { bg: 'bg-teal-100', text: 'text-teal-700', label: 'Returned' }, 
   }[status] || { bg: 'bg-gray-100', text: 'text-gray-500', label: status || '—' };
 
   return (
@@ -898,6 +901,30 @@ const ComboDetailModal = ({ isOpen, onClose, comboItem, comboComponents, onAddCo
     </div>
   );
 };
+const RentalTierModal = ({ isOpen, onClose, item, onSelectTier }) => {
+  if (!isOpen || !item) return null;
+  return (
+    <div className="fixed inset-0 z-50 flex items-center justify-center p-4 bg-black/50">
+      <div className="rounded-xl w-full max-w-sm bg-white shadow-xl">
+        <div className="px-5 py-4 border-b flex justify-between items-center">
+          <h3 className="font-bold text-gray-800">{item.name}</h3>
+          <button onClick={onClose} className="text-gray-400 hover:text-gray-600"><X size={20} /></button>
+        </div>
+        <div className="px-5 py-4 space-y-2">
+          <p className="text-xs text-gray-500 mb-2">Select rental duration</p>
+          {item.recipe.map(tier => (
+            <button key={tier.rental_tier_id}
+              onClick={() => { onSelectTier(tier); onClose(); }}
+              className="w-full flex justify-between items-center px-3 py-2.5 rounded-lg border hover:border-action-primary hover:bg-orange-50 transition">
+              <span className="text-sm font-medium text-gray-700">{tier.label}</span>
+              <span className="text-sm font-bold text-action-primary">₹{tier.price}</span>
+            </button>
+          ))}
+        </div>
+      </div>
+    </div>
+  );
+};
 
 // ─────────────────────────────────────────────────────────────────────────────
 // printKOT
@@ -1140,13 +1167,10 @@ const OldItemRow = ({ group, clientId, token, activeDineinOrderId, onRequestDele
         </div>
         <div className="flex items-center gap-2 self-center">
           <span className="text-sm font-semibold text-gray-500">×{main.quantity}</span>
-          <button
-            onClick={() => onRequestDelete && onRequestDelete(main)}
-            className="text-red-400 hover:text-red-600 transition-colors"
-            title="Remove item"
-          >
-            <Trash2 size={15} />
-          </button>
+          <button onClick={() => onRequestDelete && onRequestDelete(main)}
+          className="text-red-400 hover:text-red-600 transition-colors" title="Remove item">
+           <Trash2 size={15} />
+       </button>
         </div>
       </div>
 
@@ -1246,7 +1270,7 @@ const TableReservation = ({
   tables = [],
   orderMode = 'dinein',
   tableOrders = {},
-  draftTableIds = [],
+  draftTableIds = [],rentalOnly = false,
   onSelectTable,
   onSelectTakeaway,
   onSelectDineIn,
@@ -1358,7 +1382,7 @@ const TableReservation = ({
 
           {/* Dine-in / Takeaway toggle */}
           <div className="ml-auto flex bg-bg-primary border-2 rounded-full border-action-primary p-1 shadow-sm">
-            <button
+          {!rentalOnly && (    <button
               onClick={onSelectDineIn}
               className={`px-4 py-1.5 text-xs font-semibold rounded-full transition-all
                 ${orderMode === 'dinein'
@@ -1366,7 +1390,7 @@ const TableReservation = ({
                   : 'text-text-secondary hover:bg-gray-100'}`}
             >
               Dine In
-            </button>
+            </button>)}
             <button
     onClick={onSelectWalkIn}
     className={`px-4 py-1.5 text-xs font-semibold rounded-full transition-all flex items-center gap-1
@@ -1376,7 +1400,7 @@ const TableReservation = ({
   >
     <User size={12} /> Walk In
   </button>
-            <button
+    {!rentalOnly && (         <button
               onClick={onSelectTakeaway}
               className={`px-4 py-1.5 text-xs font-semibold rounded-full transition-all flex items-center gap-1
                 ${orderMode === 'takeaway'
@@ -1385,7 +1409,8 @@ const TableReservation = ({
             >
               <Package size={12} /> Takeaway
             </button>
-   
+    )}
+     {!rentalOnly && (
             <button
     onClick={onSelectDelivery}
     className={`px-4 py-1.5 text-xs font-semibold rounded-full transition-all flex items-center gap-1
@@ -1394,7 +1419,7 @@ const TableReservation = ({
         : 'text-gray-600 hover:bg-gray-100'}`}
   >
     <Truck size={12} /> Delivery
-  </button>
+  </button>)}
           </div>
         </div>
       </div>
@@ -1725,10 +1750,8 @@ const TakeOrder = ({ clientId, token, onOrderUpdate, realm }) => {
   // ── Remote data ───────────────────────────────────────────────────────────
   const [tables, setTables] = useState([]);
   const [tableOrders, setTableOrders] = useState({});
-  // const [menuItems, setMenuItems] = useState([]);
-  // const [categories, setCategories] = useState([]);
-  // const [categoriesFlat, setCategoriesFlat] = useState([]);
-  // const [dieterySubCategories, setDieterySubCategories] = useState([]);
+  const normalizedRealm = (realm || '').toLowerCase();
+  const rentalRealmActive = isRentalRealm(normalizedRealm);
   const [sidebarCategories, setSidebarCategories] = useState([]);
   // const [counterTree, setCounterTree] = useState([]);
   const [inventoryMap, setInventoryMap] = useState({});
@@ -1779,7 +1802,8 @@ const TakeOrder = ({ clientId, token, onOrderUpdate, realm }) => {
   const [comboModalOpen, setComboModalOpen] = useState(false);
   const [comboModalItem, setComboModalItem] = useState(null);
   const [comboModalComponents, setComboModalComponents] = useState([]);
-
+  const [rentalModalOpen, setRentalModalOpen] = useState(false);
+  const [rentalModalItem, setRentalModalItem] = useState(null);
   const [invoiceModalOpen, setInvoiceModalOpen] = useState(false);
   const [invoiceOrderData, setInvoiceOrderData] = useState(null);
 
@@ -1834,6 +1858,16 @@ const TakeOrder = ({ clientId, token, onOrderUpdate, realm }) => {
       return { ...prev, [itemId]: Number(current) + delta };
     });
   }, [menuItems]);
+  const getDisplayPrice = useCallback((item) => {
+    if (rentalRealmActive) {
+      const baseRecord = allMenuItemsRaw.find(
+        mi => Number(mi.id) === Number(item.id) &&
+              (mi.zone_config_id === 0 || mi.zone_config_id === null || mi.zone_config_id === undefined)
+      );
+      return Number(baseRecord?.unit_price ?? item.unit_price) || 0;
+    }
+    return Number(item.unit_price) || 0;
+  }, [rentalRealmActive, allMenuItemsRaw]);
   // ─────────────────────────────────────────────────────────────────────────
   // Draft helpers
   // ─────────────────────────────────────────────────────────────────────────
@@ -2650,6 +2684,12 @@ const handleWalkInSelect = async () => {
   useEffect(() => {
     initializeTakeOrder();
   }, [initializeTakeOrder]);
+  useEffect(() => {
+    if (!rentalRealmActive) return;
+    if (currentView !== 'floor') return;
+    if (walkinTables.length === 0) return; 
+    handleWalkInSelect();
+  }, [rentalRealmActive, walkinTables, currentView]);
   // ─────────────────────────────────────────────────────────────────────────
   // Cart operations
   // ─────────────────────────────────────────────────────────────────────────
@@ -2970,7 +3010,11 @@ const handleWalkInSelect = async () => {
   // ─────────────────────────────────────────────────────────────────────────
 
   const handleItemClick = (item) => {
-
+    if (rentalRealmActive && isRentalMenuItem(item)) {
+      setRentalModalItem(item);
+      setRentalModalOpen(true);
+      return;
+    }
     // if (item.category_id === 'Combos') {
     //   // Add the item to the cart directly
     //   addToCart(item);
@@ -3108,7 +3152,52 @@ const handleWalkInSelect = async () => {
   setPendingPackagingItems([]);
   if (!isMobile) setShowCart(true);
 };
+const handleSelectRentalTier = (tier) => {
+  if (!rentalModalItem) return;
+  const existingIndex = cart.findIndex(
+    ci => ci.id === Number(rentalModalItem.id)
+      && ci.is_new_item
+      && !ci.saved_sub_order
+      && ci.rental_tier_id === tier.rental_tier_id
+  );
 
+  if (existingIndex !== -1) {
+    setCart(prev => prev.map((ci, idx) =>
+      idx === existingIndex ? { ...ci, quantity: ci.quantity + 1 } : ci
+    ));
+    if (getAvailability(rentalModalItem) != null) adjustAvailability(rentalModalItem.id, -1);
+    setHasNewItems(true);
+    if (!isMobile) setShowCart(true);
+    setRentalModalItem(null);
+    return;
+  }
+
+  const now = Date.now();
+  const dueEpoch = now + Number(tier.duration_minutes) * 60 * 1000;
+  const rentalSlug = buildRentalSlug(rentalModalItem.slug || '', {
+    tierId: tier.rental_tier_id,
+    durationMinutes: tier.duration_minutes,
+    startEpoch: now,
+    dueEpoch,
+  });
+
+  let batch = currentBatchTimestamp;
+  if (!batch) { batch = now; setCurrentBatchTimestamp(batch); }
+
+  const entry = buildCartItem(rentalModalItem, { batch_timestamp: batch });
+  setCart(prev => [...prev, {
+    ...entry,
+    unit_price: Number(tier.price) || 0,
+    slug: rentalSlug,
+    name: `${rentalModalItem.name} (${tier.label})`,
+    rental_tier_id: tier.rental_tier_id,
+  }]);
+
+  if (getAvailability(rentalModalItem) != null) adjustAvailability(rentalModalItem.id, -1);
+  setHasNewItems(true);
+  if (!isMobile) setShowCart(true);
+  setRentalModalItem(null);
+};
   // ─────────────────────────────────────────────────────────────────────────
   // Place order
   //
@@ -3710,6 +3799,7 @@ const buildOrderPayload = (items) =>
           orderMode={orderMode}
           tableOrders={tableOrders}
           draftTableIds={draftTableIds}
+          rentalOnly={rentalRealmActive}
           onSelectTable={handleTableSelect}
           onSelectTakeaway={handleTakeawaySelect}
           onSelectDineIn={() => setOrderMode('dinein')}
@@ -3757,15 +3847,15 @@ const buildOrderPayload = (items) =>
                 {/* Top controls */}
                 <div className="space-y-2 mb-2">
                   <div className="flex flex-wrap sm:flex-nowrap items-center gap-2 w-full min-w-0">
-                    <button
+                  {!rentalRealmActive &&(       <button
                       onClick={handleBackToTables}
                       className="p-2 rounded-lg bg-bg-tertiary border border-border-default hover:bg-bg-secondary flex-shrink-0"
                     >
                       <ArrowLeft size={20} />
-                    </button>
+                    </button>)}
 
                     {/* Dietary type pills */}
-                    <div className="flex gap-1.5 overflow-x-auto scrollbar-hide flex-1 min-w-0 whitespace-nowrap py-1">
+                    {!rentalRealmActive &&(  <div className="flex gap-1.5 overflow-x-auto scrollbar-hide flex-1 min-w-0 whitespace-nowrap py-1">
                       <button
                         onClick={() => setSelectedDietary(null)}
                         className={`px-3 py-1.5 rounded-full text-xs font-semibold whitespace-nowrap flex-shrink-0 transition-all border
@@ -3794,7 +3884,7 @@ const buildOrderPayload = (items) =>
                           </button>
                         );
                       })}
-                    </div>
+                    </div>)}
 
                     {/* Search */}
                     <div className="relative w-full sm:w-64 md:w-72 lg:w-80 xl:w-72 flex-shrink-0">
@@ -3849,16 +3939,16 @@ const buildOrderPayload = (items) =>
                             {dp ? (
                               <>
                                 <span className="text-sm font-bold text-action-primary">
-                                  ₹{(item.unit_price * (1 - Number(item.discount) / 100)).toFixed(0)}
+                                ₹{(getDisplayPrice(item) * (1 - Number(item.discount) / 100)).toFixed(0)}
                                 </span>
                                 <span className="text-xs line-through text-text-secondary">
-                                  ₹{item.unit_price}
+                                ₹{getDisplayPrice(item)}
                                 </span>
                                 <span className="text-xs text-action-danger font-semibold">{dp}% OFF</span>
                               </>
                             ) : (
                               <span className="text-sm font-bold text-action-primary">
-                                ₹{item.unit_price}
+                               {rentalRealmActive && isRentalMenuItem(item) ? 'from ' : ''}₹{getDisplayPrice(item)}
                               </span>
                             )}
                           </div>
@@ -4382,6 +4472,12 @@ const buildOrderPayload = (items) =>
   if (!isMobile) setShowCart(true);
 }}
       />
+<RentalTierModal
+  isOpen={rentalModalOpen}
+  onClose={() => { setRentalModalOpen(false); setRentalModalItem(null); }}
+  item={rentalModalItem}
+  onSelectTier={handleSelectRentalTier}
+/>
 
       <CancelOrderConfirmModal
         isOpen={cancelOrderModal.isOpen}

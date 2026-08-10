@@ -58,7 +58,7 @@ const NavigateAfterLogin = ({ authState }) => {
   return <Navigate to={`/saas/${finalClientId}/${route}`} replace />;
 };
 
-const HeaderSwitcher = ({ clientId, onLogout, subscription }) => {
+const HeaderSwitcher = ({ clientId, onLogout, subscription , realm }) => {
   const screenId = localStorage.getItem('screen_id');
 
   if (screenId === 'ecommerce_user_v1') {
@@ -71,7 +71,7 @@ const HeaderSwitcher = ({ clientId, onLogout, subscription }) => {
     return <Header_Super_User clientId={clientId} onLogout={onLogout} />;
   }
   // default fallback
-  return <HeaderShared clientId={clientId} onLogout={onLogout} subscription={subscription} />;  {/* ← NEW */}
+  return <HeaderShared clientId={clientId} onLogout={onLogout} subscription={subscription}realm={realm} />;  
 };
 
 // ─── Authenticated app shell ──────────────────────────────────────────────────
@@ -87,6 +87,7 @@ const InnerAuthenticatedApp = ({ token, onLogout }) => {
         clientId={finalClientId}
         onLogout={onLogout}
         subscription={visibleNav}
+        realm={decoded.realm}
       />
 
       <main>
