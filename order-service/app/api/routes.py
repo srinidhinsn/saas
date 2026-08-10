@@ -17,7 +17,7 @@ from utils.auth import verify_token
 from utils.transaction import record_partial_transaction, create_transaction , TxPayload, resolve_reason, build_remark
 from models.saas_context import SaasContext
 from typing import Optional
-from entity.inventory_entity import InventoryEntity, CategoryEntity
+from entity.inventory_entity import InventoryEntity, CategoryEntity, InventoryTransactionEntity
 from entity.client_entity import Address
 from models.inventory_model import InventoryTransaction
 from services.order_service import (
@@ -31,7 +31,7 @@ from services.order_service import (
 )
 from services.order_status import _status_label
 from decimal import Decimal
-
+from datetime import datetime
 
 router = APIRouter()
 
@@ -69,6 +69,8 @@ def create_order(client_id: str, order: DineinOrderModel, context: SaasContext =
         db.add(db_item)
     db.commit()
     db.refresh(db_order)
+    _deduct_stock_for_order(db, client_id, db_order.id,  context=context, rental_only=True)
+    db.commit()
 
     db_items = db.query(Db_OrderItem_Entity).filter(Db_OrderItem_Entity.order_id == db_order.id).all()
     order_items = [
@@ -130,6 +132,8 @@ def create_sub_order(
 
     db.commit()
     db.refresh(db_sub_order)
+    _deduct_stock_for_order(db, client_id, db_sub_order.id,  context=context, rental_only=True)
+    db.commit()
 
     order_items = [
         OrderItemModel(
@@ -310,6 +314,81 @@ def delete_order_items( client_id: str, order_item_id: Optional[str] = Query(Non
 
     if not item:
         raise HTTPException(status_code=404, detail="Order item not found")
+    if '||RENTAL|' in (item.slug or ''):
+        returned_label = _status_label(context, OrderStatusEnum.completed) or "returned"
+        if item.status == returned_label:
+            raise HTTPException(status_code=409, detail="Item has already been returned")
+        base, meta = item.slug.split('||RENTAL|')
+        tier_id, duration_min, start_epoch, due_epoch, _, _ = meta.split('|')
+        now_ms = int(datetime.utcnow().timestamp() * 1000)
+
+        late_fee = 0.0
+        if now_ms > int(due_epoch):
+            overdue_hours = (now_ms - int(due_epoch)) / (1000 * 60 * 60)
+            hourly_rate = (item.unit_price or 0) / max(int(duration_min) / 60, 1e-6)
+            late_fee = round(overdue_hours * hourly_rate, 2)
+
+        item.slug = f"{base}||RENTAL|{tier_id}|{duration_min}|{start_epoch}|{due_epoch}|{now_ms}|{late_fee}"
+        item.status = returned_label
+
+        if late_fee > 0:
+            db.add(Db_OrderItem_Entity(
+                client_id=client_id, order_id=item.order_id, item_id=item.item_id,
+                item_name=f"Late fee — {item.item_name}", quantity=1,
+                unit_price=late_fee, line_total=late_fee,
+                status=_status_label(context, OrderStatusEnum.served) or "served",
+                frontend_unique_key=f"latefee_{item.id}_{now_ms}",
+            ))
+
+        menu_item = (
+            db.query(InventoryEntity)
+            .filter(InventoryEntity.id == item.item_id, InventoryEntity.client_id == client_id)
+            .first()
+        )
+        matching_deduction = (
+            db.query(InventoryTransactionEntity)
+            .filter(
+                InventoryTransactionEntity.client_id == client_id,
+                InventoryTransactionEntity.stock_item_id == item.item_id,
+                InventoryTransactionEntity.reference_id == str(item.id),
+                InventoryTransactionEntity.transaction_type == TransactionTypeEnum.order_deduction.value,
+            )
+            .first()
+        )
+
+        new_availability = None
+        restored = False
+        skipped_reason = None
+
+        if not matching_deduction:
+            skipped_reason = "No matching deduction found for this order item — stock not restored to avoid over-crediting."
+        elif menu_item and menu_item.availability is not None:
+            qty = Decimal(str(item.quantity or 1))
+            tx = create_transaction(
+                db=db, context=context,
+                payload=TxPayload(
+                    item_id=menu_item.id, tx_type="RETURN", ref_id=item.id, qty=qty,
+                    remarks=f"[RENTAL_RETURN] Order #{item.order_id} | {menu_item.name} x{int(qty)}",
+                    reference_type="order_item",
+                ),
+            )
+            if tx is not None:
+                restored = True
+                new_availability = tx.after_stock
+
+        db.commit()
+        return ResponseModel(
+            screen_id=context.screen_id,
+            data={
+                "late_fee": late_fee,
+                "returned_at": now_ms,
+                "item_id": item.item_id,
+                "status": item.status,
+                "availability": float(new_availability) if new_availability is not None else None,
+                "stock_restored": restored,
+                "skipped_reason": skipped_reason,
+            },
+        )
 
     order_id          = item.order_id
     ordered_qty       = item.quantity
@@ -320,7 +399,7 @@ def delete_order_items( client_id: str, order_item_id: Optional[str] = Query(Non
 
     def _tx(item_id, tx_type, qty, tag, name):
         create_transaction(
-            db=db, client_id=client_id,
+            db=db, context=context,
             payload=TxPayload(
                 item_id=item_id,
                 tx_type=tx_type,
@@ -336,7 +415,7 @@ def delete_order_items( client_id: str, order_item_id: Optional[str] = Query(Non
         if tx_type in (TransactionTypeEnum.wastage, TransactionTypeEnum.item_cancelled):
             record_partial_transaction(
                 db,
-                client_id=client_id,
+                context=context,
                 item=item,
                 remove_qty=remove_qty,
                 transaction_type=tx_type,
@@ -556,7 +635,7 @@ def cancel_order(
 
     def _tx(item_id, tx_type, qty, tag, name, ref_id=None):
         create_transaction(
-            db=db, client_id=client_id,
+            db=db, context=context,
             payload=TxPayload(item_id=item_id, tx_type=tx_type, ref_id=ref_id or order_id, qty=qty, remarks=build_remark(tag, ref_id or order_id, name, qty, effective_reason))
         )
 
