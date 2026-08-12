@@ -10,7 +10,7 @@ from decimal import Decimal
 from models.response_model import ResponseModel
 from fastapi import HTTPException
 from models.order_model import DineinOrderModel 
-from .order_status import _status_label
+from .order_status import _status_label,resolve_realm_from_context, resolve_base_status
 from models.saas_context import SaasContext
 from datetime import datetime
 
@@ -268,7 +268,7 @@ def _deduct_stock_for_order(db: Session, client_id: str, order_id: int, context=
     for order_item in order_items:
 
         ordered_qty = order_item.quantity or 1
-        is_rental = '||RENTAL|' in (order_item.slug or '')
+        is_rental = resolve_realm_from_context(context) == "rental"
         if rental_only and not is_rental:
            continue
         if not rental_only and is_rental:
@@ -384,12 +384,14 @@ def update_order_status_service(client_id: str, body: DineinOrderModel, context,
 
     # ── Served / completed — only the single order passed in ───────────────
     if body.status in [OrderStatusEnum.served, OrderStatusEnum.completed]:
-        should_deduct = order.status not in [
-            OrderStatusEnum.served,
-            OrderStatusEnum.completed
+        mapped_status = _status_label(context, body.status) or body.status
+        current_base_status = resolve_base_status(context, order.status)
+        should_deduct = current_base_status not in [
+            OrderStatusEnum.served.value,
+            OrderStatusEnum.completed.value
         ]
 
-        order.status = body.status
+        order.status = mapped_status
 
         order_items = (
             db.query(Db_OrderItem_Entity)
@@ -399,10 +401,11 @@ def update_order_status_service(client_id: str, body: DineinOrderModel, context,
             )
             .all()
         )
+        cancelled_label = _status_label(context, OrderStatusEnum.cancelled) or OrderStatusEnum.cancelled
 
         for item in order_items:
-            if item.status != OrderStatusEnum.cancelled:
-                item.status = body.status
+            if item.status != cancelled_label:
+                item.status = mapped_status
 
         db.flush()
 
@@ -448,3 +451,161 @@ def update_order_status_service(client_id: str, body: DineinOrderModel, context,
         )
 
     return returnResponseModel
+
+def _deduct_rental_items_for_order(db: Session, client_id: str, order_id: int, context) -> int:
+    order_items = (
+        db.query(Db_OrderItem_Entity)
+        .filter(
+            Db_OrderItem_Entity.order_id == order_id,
+            Db_OrderItem_Entity.client_id == client_id,
+        )
+        .all()
+    )
+
+    rented_label = _status_label(context, OrderStatusEnum.served) or "rented"
+    deducted = 0
+
+    for order_item in order_items:
+        if '||RENTAL|' not in (order_item.slug or ''):
+            continue
+
+        menu_item = (
+            db.query(InventoryEntity)
+            .filter(
+                InventoryEntity.id == int(order_item.item_id),
+                InventoryEntity.client_id == client_id,
+            )
+            .first()
+        )
+        if not menu_item:
+            continue
+
+        qty = Decimal(str(order_item.quantity or 1))
+
+        stock_before = Decimal(str(menu_item.availability or 0))
+        stock_after = stock_before - qty
+        menu_item.availability = stock_after
+
+        db.add(InventoryTransactionEntity(
+            client_id=client_id,
+            stock_item_id=menu_item.id,
+            inventory_id=str(menu_item.id),
+            name=menu_item.name,
+            transaction_type=TransactionTypeEnum.menu_item_deduction.value,
+            movement_type=MovementTypeEnum.out.value,
+            quantity=qty,
+            unit="pcs",
+            before_stock=stock_before,
+            after_stock=stock_after,
+            reference_id=str(order_item.id),  
+            reference_type="order",
+            created_by=getattr(context, "user_id", None),
+            created_at=datetime.utcnow(),
+            remarks=f"[menu_item_deduction] Order #{order_id} | OrderItem #{order_item.id} | {menu_item.name} x{int(qty)}",
+        ))
+
+        order_item.status = rented_label
+        deducted += 1
+
+    return deducted
+
+def process_rental_return(db: Session, client_id: str, order_item_id: int, context) -> dict:
+    item = (
+        db.query(Db_OrderItem_Entity)
+        .filter(
+            Db_OrderItem_Entity.id == order_item_id,
+            Db_OrderItem_Entity.client_id == client_id,
+        )
+        .first()
+    )
+    if not item or '||RENTAL|' not in (item.slug or ''):
+        raise HTTPException(status_code=404, detail="Rental item not found")
+
+    returned_label = _status_label(context, OrderStatusEnum.completed) or "returned"
+    if item.status == returned_label:
+        raise HTTPException(status_code=409, detail="Item has already been returned")
+
+    base, meta = item.slug.split('||RENTAL|')
+    tier_id, duration_min, start_epoch, due_epoch, _, _ = meta.split('|')
+    now_ms = int(datetime.utcnow().timestamp() * 1000)
+
+    late_fee = 0.0
+    if now_ms > int(due_epoch):
+        overdue_hours = (now_ms - int(due_epoch)) / (1000 * 60 * 60)
+        hourly_rate = (item.unit_price or 0) / max(int(duration_min) / 60, 1e-6)
+        late_fee = round(overdue_hours * hourly_rate, 2)
+
+    item.slug = f"{base}||RENTAL|{tier_id}|{duration_min}|{start_epoch}|{due_epoch}|{now_ms}|{late_fee}"
+    item.status = returned_label
+
+    if late_fee > 0:
+        db.add(Db_OrderItem_Entity(
+            client_id=client_id, order_id=item.order_id, item_id=item.item_id,
+            item_name=f"Late fee — {item.item_name}", quantity=1,
+            unit_price=late_fee, line_total=late_fee,
+            status=_status_label(context, OrderStatusEnum.served) or "served",
+            frontend_unique_key=f"latefee_{item.id}_{now_ms}",
+        ))
+
+    # Only restore stock if we can find the matching menu_item_deduction deduction for
+    # THIS order item — skip rather than risk over-crediting if it's missing
+    # (e.g. a legacy order placed before deduction-at-creation existed).
+    new_availability = None
+    restored = False
+    skipped_reason = None
+
+    menu_item = (
+        db.query(InventoryEntity)
+        .filter(InventoryEntity.id == item.item_id, InventoryEntity.client_id == client_id)
+        .first()
+    )
+
+    matching_deduction = (
+        db.query(InventoryTransactionEntity)
+        .filter(
+            InventoryTransactionEntity.client_id == client_id,
+            InventoryTransactionEntity.stock_item_id == item.item_id,
+            InventoryTransactionEntity.reference_id == str(item.id),
+            InventoryTransactionEntity.transaction_type == TransactionTypeEnum.menu_item_deduction.value,
+        )
+        .first()
+    )
+
+    if not matching_deduction:
+        skipped_reason = "No matching menu_item_deduction deduction found for this order item — stock not restored to avoid over-crediting."
+    elif menu_item and menu_item.availability is not None:
+        qty = Decimal(str(item.quantity or 1))
+        stock_before = Decimal(str(menu_item.availability or 0))
+        new_availability = stock_before + qty
+        menu_item.availability = new_availability
+        restored = True
+
+        db.add(InventoryTransactionEntity(
+            client_id=client_id,
+            stock_item_id=menu_item.id,
+            inventory_id=str(menu_item.id),
+            name=menu_item.name,
+            transaction_type=TransactionTypeEnum.item_cancelled.value,
+            movement_type=MovementTypeEnum.in_.value,
+            quantity=qty,
+            unit="pcs",
+            before_stock=stock_before,
+            after_stock=new_availability,
+            reference_id=str(item.id),
+            reference_type="order",
+            created_by=getattr(context, "user_id", None),
+            created_at=datetime.utcnow(),
+            remarks=f"[RENTAL_RETURN] Order #{item.order_id} | {menu_item.name} x{int(qty)}",
+        ))
+
+    db.flush()  # caller commits
+
+    return {
+        "late_fee": late_fee,
+        "returned_at": now_ms,
+        "item_id": item.item_id,
+        "status": item.status,
+        "availability": float(new_availability) if new_availability is not None else None,
+        "stock_restored": restored,
+        "skipped_reason": skipped_reason,
+    }
