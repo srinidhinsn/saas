@@ -11,7 +11,9 @@ import { menuCache } from '../../utils/Menu-utils/menuCache';
 Modal.setAppElement("#root");
 import { getDateRangeFromPreset, DateRangeFilter } from '../../utils/dateRange';
 import AgGridTable from '../../utils/AgGridTable';
-
+import { Printer } from 'lucide-react';
+import InvoiceModal from '../BillingServices/InvoiceModal';
+import { useInvoiceModal, fetchBillingDocumentsMap } from '../../utils/BillingUtils';
 // ─────────────────────────────────────────────────────────────────────────────
 // SimpleDeleteConfirm
 // ─────────────────────────────────────────────────────────────────────────────
@@ -434,6 +436,7 @@ const OrderSummaryVisible = ({ clientId, token }) => {
   const [selectedMainItem, setSelectedMainItem] = useState(null);
   const [lineItemsDetails, setLineItemsDetails] = useState([]);
   const [pendingOrderId, setPendingOrderId] = useState(null);
+  const [billingDocMap, setBillingDocMap] = useState({});
 
   // ─────────────────────────────────────────────────────────────────────────
   // localStorage helpers (preserved exactly from original)
@@ -563,6 +566,9 @@ const OrderSummaryVisible = ({ clientId, token }) => {
     const seq = batchMeta.seq || 1;
     return `${tableSlug}_${timeLabel}_${itemsCount}_${orderId}_${seq}`;
   };
+
+  const { invoiceModalOpen, invoiceOrderData, openInvoiceForOrder, closeInvoiceModal } =
+  useInvoiceModal({ clientId, token, inventoryMap });
 
   // ─────────────────────────────────────────────────────────────────────────
   // Fetch helpers
@@ -784,31 +790,35 @@ const OrderSummaryVisible = ({ clientId, token }) => {
   // ─────────────────────────────────────────────────────────────────────────
 
   useEffect(() => {
-    if (!token || !clientId) return;
-    if (hasFetchedOrdersRef.current) return;
-    hasFetchedOrdersRef.current = true;
+  if (!token || !clientId) return;
+  if (hasFetchedOrdersRef.current) return;
+  hasFetchedOrdersRef.current = true;
 
-    const fetchOrders = async () => {
-      if (!token || !clientId) { setLoading(false); return; }
-      try {
-        const res = await axios.get(
+  const fetchOrders = async () => {
+    if (!token || !clientId) { setLoading(false); return; }
+    try {
+      const [ordersRes, billingMap] = await Promise.all([
+        axios.get(
           `${import.meta.env.VITE_API_ORDER_SERVICE_URL}/${clientId}/dinein/table`,
           { headers: { Authorization: `Bearer ${token}` } }
-        );
-        const allOrders = res.data?.data || [];
-        setOrders(allOrders.map(processOrder));
-      } catch (err) {
-        toast.error('Failed to fetch orders');
-        console.error(err);
-      } finally {
-        setLoading(false);
-      }
-    };
+        ),
+        fetchBillingDocumentsMap({ clientId, token }),
+      ]);
+      const allOrders = ordersRes.data?.data || [];
+      setOrders(allOrders.map(processOrder));
+      setBillingDocMap(billingMap);
+    } catch (err) {
+      toast.error('Failed to fetch orders');
+      console.error(err);
+    } finally {
+      setLoading(false);
+    }
+  };
 
-    fetchOrders();
-    const interval = setInterval(fetchOrders, 10000);
-    return () => clearInterval(interval);
-  }, [clientId, token]);
+  fetchOrders();
+  const interval = setInterval(fetchOrders, 10000);
+  return () => clearInterval(interval);
+}, [clientId, token]);
 
   // ─────────────────────────────────────────────────────────────────────────
   // Actions (preserved from original)
@@ -926,11 +936,9 @@ const OrderSummaryVisible = ({ clientId, token }) => {
     } catch { toast.error('Failed to update order status.'); }
   };
 
-  const handleGenerateBill = (order) => {
-    navigate(`/saas/${clientId}/billing`, {
-      state: { orderId: order.id, tableId: order.table_id, clientId },
-    });
-  };
+  const handlePrintBill = async (orderId) => {
+  await openInvoiceForOrder(orderId);
+};
 
   const { from, to } = getDateRangeFromPreset(datePreset, customFrom, customTo);
   let filteredOrders = orders.filter(order => {
@@ -1032,37 +1040,66 @@ const OrderSummaryVisible = ({ clientId, token }) => {
       cellRenderer: (params) => <StatusBadge status={params.value} />,
     },
     {
-      headerName: 'Actions',
-      colId: 'actions',
-      minWidth: 220,
-      sortable: false,
-      filter: false,
-      floatingFilter: false,
-      cellRenderer: (params) => {
-        const order = params.data;
-        if (!order) return null;
-        const status = order.status?.toLowerCase();
-        return (
-          <div className="flex items-center justify-center gap-4 flex-wrap h-full">
-            <button
-              onClick={() => { setViewOrder({ ...order, _tableName: tablesMap[order.table_id] || order.table || String(order.table_id) }); setShowViewModal(true); }}
-              className="p-1.5 rounded-lg bg-action-primary/10 text-action-primary hover:bg-action-primary hover:text-text-white transition-colors" title="View items"
-            ><Eye size={15} /></button>
-            {status === 'ready' && (
-              <button onClick={() => handleStatusChange(order.id, 'served')} className="px-2.5 py-1 rounded-lg bg-action-success text-text-white text-xs font-semibold hover:opacity-90 transition-colors whitespace-nowrap">Mark As Served</button>
-            )}
-            {status === 'served' && (
-              <button onClick={() => handleGenerateBill(order)} className="px-2.5 py-1 rounded-lg bg-green-700 text-text-white text-xs font-semibold hover:bg-green-800 transition-colors whitespace-nowrap">Generate Bill</button>
-            )}
-            {/* REQ: trash now opens CancelOrderConfirmModal */}
-            <button
-              onClick={() => setCancelOrderModal({ isOpen: true, orderId: order.id })}
-              className="p-1.5 rounded-lg bg-action-danger/10 text-action-danger hover:bg-action-danger hover:text-text-white transition-colors" title="Cancel order"
-            ><Trash2 size={15} /></button>
-          </div>
-        );
-      },
-    },
+  headerName: 'Payment Status',
+  colId: 'payment_status',
+  minWidth: 160,
+  sortable: false,
+  valueGetter: (params) => billingDocMap[params.data?.id?.toString()]?.payment_status || '',
+  cellRenderer: (params) => {
+    const billingDoc = billingDocMap[params.data?.id?.toString()];
+    return billingDoc ? (
+      <span className={`inline-flex px-2.5 py-1 rounded-full text-xs font-semibold ${
+        billingDoc.payment_status === 'Paid'
+          ? 'bg-green-100 text-green-700'
+          : billingDoc.status === 'partial'
+            ? 'bg-yellow-100 text-yellow-700'
+            : 'bg-red-100 text-red-700'
+      }`}>
+        {billingDoc.payment_status?.toUpperCase() ?? 'UNKNOWN'}
+      </span>
+    ) : (
+      <span className="inline-flex px-2.5 py-1 rounded-full text-xs font-semibold bg-gray-100 text-gray-500">
+        NOT BILLED
+      </span>
+    );
+  },
+},
+    {
+  headerName: 'Actions',
+  colId: 'actions',
+  minWidth: 240,
+  sortable: false,
+  filter: false,
+  floatingFilter: false,
+  cellRenderer: (params) => {
+    const order = params.data;
+    if (!order) return null;
+    const status = order.status?.toLowerCase();
+    return (
+      <div className="flex items-center justify-center gap-4 flex-wrap h-full">
+        <button
+          onClick={() => { setViewOrder({ ...order, _tableName: tablesMap[order.table_id] || order.table || String(order.table_id) }); setShowViewModal(true); }}
+          className="p-1.5 rounded-lg bg-action-primary/10 text-action-primary hover:bg-action-primary hover:text-text-white transition-colors" title="View items"
+        ><Eye size={15} /></button>
+
+        <button
+          onClick={() => handlePrintBill(order.id)}
+          className="p-1.5 rounded-lg bg-green-100 text-green-700 hover:bg-green-600 hover:text-white transition-colors"
+          title="Print bill"
+        ><Printer size={15} /></button>
+
+        {status === 'ready' && (
+          <button onClick={() => handleStatusChange(order.id, 'served')} className="px-2.5 py-1 rounded-lg bg-action-success text-text-white text-xs font-semibold hover:opacity-90 transition-colors whitespace-nowrap">Mark As Served</button>
+        )}
+
+        <button
+          onClick={() => setCancelOrderModal({ isOpen: true, orderId: order.id })}
+          className="p-1.5 rounded-lg bg-action-danger/10 text-action-danger hover:bg-action-danger hover:text-text-white transition-colors" title="Cancel order"
+        ><Trash2 size={15} /></button>
+      </div>
+    );
+  },
+},
   ];
 
   // ─────────────────────────────────────────────────────────────────────────
@@ -1110,6 +1147,24 @@ const OrderSummaryVisible = ({ clientId, token }) => {
         onRemoveOne={handleItemRemoveOne}
         onRemoveAll={handleItemRemoveAll}
       />
+
+      {invoiceModalOpen && invoiceOrderData && (
+  <InvoiceModal
+    clientId={clientId}
+    token={token}
+    selectedOrder={invoiceOrderData}
+    tablesMap={tables.reduce((m, t) => { m[t.id] = t; return m; }, {})}
+    inventoryMap={inventoryMap}
+    onClose={async () => {
+      closeInvoiceModal();
+      setBillingDocMap(await fetchBillingDocumentsMap({ clientId, token }));
+    }}
+    onSave={async (id) => {
+      console.log('Invoice saved:', id);
+      setBillingDocMap(await fetchBillingDocumentsMap({ clientId, token }));
+    }}
+  />
+)}
 
       <style>{`
         .custom-scrollbar::-webkit-scrollbar { width: 8px; }
