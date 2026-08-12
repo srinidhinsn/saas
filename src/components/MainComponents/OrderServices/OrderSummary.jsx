@@ -815,10 +815,10 @@ const OrderSummaryVisible = ({ clientId, token }) => {
     }
   };
 
-  fetchOrders();
-  const interval = setInterval(fetchOrders, 10000);
-  return () => clearInterval(interval);
-}, [clientId, token]);
+    fetchOrders();
+    const interval = setInterval(fetchOrders, 10000);
+    return () => clearInterval(interval);
+  }, [clientId, token]);
 
   // ─────────────────────────────────────────────────────────────────────────
   // Actions (preserved from original)
