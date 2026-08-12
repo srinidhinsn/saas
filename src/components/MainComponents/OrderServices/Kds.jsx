@@ -1,6 +1,6 @@
 import React, { useEffect, useState, useCallback, useRef } from 'react';
 import axios from 'axios';
-import { useParams } from 'react-router-dom';
+import { jwtDecode } from 'jwt-decode';
 import { toast } from 'react-toastify';
 import 'react-toastify/dist/ReactToastify.css';
 import { FaCheckCircle, FaClock, FaHourglassHalf, FaConciergeBell } from 'react-icons/fa';
@@ -8,6 +8,8 @@ import { Filter, Clock, Users, Package, Truck, Trash2, BarChart2, X, ChevronRigh
 import { menuCache } from '../../utils/Menu-utils/menuCache';
 import { parseISTTimestamp, getDateRangeFromPreset, DateRangeFilter } from '../../utils/dateRange';
 import { isPackagingMenuRecord } from '../../utils/Menu-utils/menuUtils';
+import { CheckCircle2, AlertTriangle } from 'lucide-react';
+import { getRentalStatus, parseRentalSlug } from '../../utils/Menu-utils/menuUtils';
 // ─── Constants ─────────────────────────────────────────────────────────────────
 
 
@@ -40,6 +42,21 @@ const KDS_CONFIG = {
   COMBO_CATEGORY_ID: 'Combos',
 };
 
+const resolveRentalStatus = (item) => {
+  const status = (item.status || '').toLowerCase();
+  if (status.includes('return')) return 'returned'; 
+  return getRentalStatus(item.slug) || 'active';
+};
+const formatCountdown = (dueEpoch) => {
+  if (!dueEpoch) return null;
+  const diff = dueEpoch - Date.now();
+  const abs = Math.abs(diff);
+  const mins = Math.floor(abs / 60000);
+  const h = Math.floor(mins / 60);
+  const m = mins % 60;
+  const label = h > 0 ? `${h}h ${m}m` : `${m}m`;
+  return diff >= 0 ? `${label} left` : `${label} overdue`;
+};
 const ORDER_FILTER_OPTIONS = [
   { key: KDS_CONFIG.FILTERS.ALL, label: 'All Orders', Icon: Filter },
   { key: KDS_CONFIG.FILTERS.DINEIN, label: 'Dine-In', Icon: Users },
@@ -383,16 +400,61 @@ const groupItemsWithAddons = (items, menuItemsMap) => {
   });
   return groups;
 };
+const STATUS_STYLES = {
+  active: { badge: 'bg-blue-100 text-blue-700', border: 'border-l-blue-400', dot: 'bg-blue-500' },
+  overdue: { badge: 'bg-red-100 text-red-700', border: 'border-l-red-500', dot: 'bg-red-500' },
+  returned: { badge: 'bg-green-100 text-green-700', border: 'border-l-green-400', dot: 'bg-green-500' },
+};
 
+const RentalItemRow = ({ item, onReturn, isReturning }) => {
+  const status = resolveRentalStatus(item);
+  const style = STATUS_STYLES[status] || STATUS_STYLES.active;
+  const parsed = parseRentalSlug ? parseRentalSlug(item.slug) : null;
+  const countdown = parsed?.dueEpoch ? formatCountdown(parsed.dueEpoch) : null;
+
+  return (
+    <div className={`flex items-center justify-between gap-3 px-3 py-2.5 rounded-lg border-l-4 bg-white shadow-sm ${style.border}`}>
+      <div className="min-w-0 flex-1">
+        <p className="text-sm font-semibold text-gray-800 truncate">{item.item_name}</p>
+        <div className="flex items-center gap-2 mt-1 flex-wrap">
+          <span className={`text-[10px] font-bold px-2 py-0.5 rounded-full uppercase ${style.badge}`}>
+            {status}
+          </span>
+          {countdown && (
+            <span className="text-[11px] text-gray-500 flex items-center gap-1">
+              <Clock size={11} /> {countdown}
+            </span>
+          )}
+          <span className="text-[11px] text-gray-400">× {item.quantity}</span>
+        </div>
+      </div>
+      {status !== 'returned' && (
+        <button
+          onClick={() => onReturn(item.id)}
+          disabled={isReturning}
+          className={`shrink-0 text-xs font-semibold px-3 py-1.5 rounded-lg border transition-colors
+            ${isReturning
+              ? 'text-gray-400 border-gray-200 cursor-not-allowed'
+              : 'text-green-700 border-green-300 bg-green-50 hover:bg-green-100'}`}
+        >
+          {isReturning ? 'Returning…' : 'Mark Returned'}
+        </button>
+      )}
+      {status === 'returned' && <CheckCircle2 size={18} className="text-green-500 shrink-0" />}
+    </div>
+  );
+};
 const KitchenCard = ({
   card,
   tablesMap,
   menuItemsMap,
-  onItemStatusChange,
+  onItemStatusChange,onReturn, returningIds,realm,  
 }) => {
   // Track which item buttons are currently being saved to prevent double-clicks
   const [pendingItemIds, setPendingItemIds] = useState(new Set());
-
+  const isRentalRealm = realm === 'rental';
+  const foodItems = isRentalRealm ? [] : card.items;
+  const rentalItems = isRentalRealm ? card.items : [];
   const elapsedTime = card.created_at ? calculateElapsedTime(card.created_at) : null;
 
   const allReady =
@@ -429,7 +491,7 @@ const KitchenCard = ({
     <div className="rounded-xl shadow-md overflow-hidden border border-gray-200 bg-white transition-transform transform hover:-translate-y-0.5 flex flex-col">
 
       {/* ── Card header ── */}
-      <div className="flex items-center justify-between px-4 py-3 bg-action-primary text-text-white">
+      <div className={`flex items-center justify-between px-4 py-3 text-text-white ${rentalItems.some(i => resolveRentalStatus(i) === 'overdue') ? 'bg-red-600' : 'bg-action-primary'}`}>
         <div className="flex items-center justify-between w-full">
 
           {/* Table name */}
@@ -450,7 +512,7 @@ const KitchenCard = ({
 
       {/* ── Card body — item list ── */}
       <div className="bg-bg-primary px-4 py-4 space-y-3 flex-1">
-        {groupItemsWithAddons(card.items, menuItemsMap).map(({ main: item, addons }, idx) => {
+        {groupItemsWithAddons(foodItems, menuItemsMap).map(({ main: item, addons }, idx) => {
           const menuRecord = menuItemsMap[String(item.item_id)];
           const combo = isComboItem(item, menuRecord);
           const isPending = pendingItemIds.has(item.id);
@@ -573,6 +635,9 @@ const KitchenCard = ({
             </div>
           );
         })}
+                      {rentalItems.map(item => (
+  <RentalItemRow key={item.id} item={item} onReturn={onReturn} isReturning={returningIds.has(item.id)} />
+))}
       </div>
 
       {/* ── Card footer — status label ── */}
@@ -588,14 +653,14 @@ const KitchenCard = ({
 
 // ─── Main KitchenDisplay component ────────────────────────────────────────────
 
-const KitchenDisplay = ({clientId, token}) => {
+const KitchenDisplay = ({clientId, token,realm}) => {
   const [cards, setCards] = useState([]);
   const [tablesMap, setTablesMap] = useState({});
   const [menuItemsMap, setMenuItemsMap] = useState({});
   const [loading, setLoading] = useState(true);
   const [orderFilter, setOrderFilter] = useState('ALL');
   const [showAggregate, setShowAggregate] = useState(false);
-
+  const [returningIds, setReturningIds] = useState(new Set());
   // ── Date filter ──────────────────────────────────────────────────────────
   // Defaults to today (live view). Selecting an earlier date switches the
   // page into a "missed orders" lookup mode: same hide-served filtering,
@@ -939,6 +1004,54 @@ useEffect(() => { customToValRef.current = customTo; }, [customTo]);
     }
   };
 
+  const handleReturn = async (orderItemId) => {
+    if (returningIds.has(orderItemId)) return;
+    setReturningIds(prev => new Set(prev).add(orderItemId));
+
+    try {
+      const res = await axios.delete(
+        `${import.meta.env.VITE_API_ORDER_SERVICE_URL}/${clientIdRef.current}/order_item/delete`,
+        { params: { order_item_id: orderItemId }, headers: { Authorization: `Bearer ${tokenRef.current}` } }
+      );
+      const {
+        late_fee: lateFee = 0,
+        item_id,
+        availability,
+        stock_restored,
+        skipped_reason,
+      } = res.data?.data || {};
+
+      if (item_id != null && availability != null) {
+        menuCache.patchAvailability(clientIdRef.current, { [item_id]: availability });
+      }
+
+      if (stock_restored) {
+        toast.success(lateFee > 0 ? `Returned — late fee ₹${lateFee} added.` : 'Item returned.');
+      } else {
+        toast.warn(`Item marked returned, but stock was NOT auto-restored. ${skipped_reason || ''}`, { autoClose: 8000 });
+      }
+
+      // Optimistically flip status locally, then refresh from server
+      setCards(prev => prev.map(card => ({
+        ...card,
+        items: card.items.map(i => i.id === orderItemId ? { ...i, status: 'returned' } : i),
+      })));
+      await fetchOrders();
+    } catch (err) {
+      console.error('[RentalTrackingDisplay] return failed:', err);
+      if (err.response?.status === 409) {
+        toast.info('This item was already marked as returned.');
+      } else {
+        toast.error('Failed to mark item returned.');
+      }
+    } finally {
+      setReturningIds(prev => {
+        const next = new Set(prev);
+        next.delete(orderItemId);
+        return next;
+      });
+    }
+  };
 
   // ─── Filter cards (sort already applied at fetch time) ───────────────────────
   const filteredCards = cards
@@ -1022,6 +1135,8 @@ useEffect(() => { customToValRef.current = customTo; }, [customTo]);
                     tablesMap={tablesMap}
                     menuItemsMap={menuItemsMap}
                     onItemStatusChange={handleItemStatusChange}
+                    onReturn={handleReturn}
+                    returningIds={returningIds} realm={realm}    
                   />
                 ))}
               </div>

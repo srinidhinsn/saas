@@ -11,7 +11,7 @@ import { jwtDecode } from "jwt-decode";
 import { getMenuConfig } from '../../utils/menuConfigResolver';
 import MenuConfigModal from '../../utils/Modals/MenuConfigModal';
 import { menuCache } from '../../utils/Menu-utils/menuCache';
-import { getDietaryFromSlug, isItemActive, generateSlug, toSlugSegment, isPackagingCategoryId, isRentalRealm, isRentalCategoryId} from '../../utils/Menu-utils/menuUtils';
+import { getDietaryFromSlug, isItemActive, generateSlug, toSlugSegment, isPackagingCategoryId} from '../../utils/Menu-utils/menuUtils';
 import {useDietaryTypes, useTimings, useZoneConfig, useMenuData} from '../../utils/Menu-utils/useMenuData';
 
 const MenuManagement = ({ clientId, token,screenIds, userId, realm }) => {
@@ -479,11 +479,8 @@ const slug = (() => {
       const created_by =
         currentUserId || localStorage.getItem("user_id") || "system";
 
-        const isRentalItem = isRentalRealm(normalizedRealm) && isRentalCategoryId(finalCategoryId, categoriesFlat);
-
-        const basePrice = parseFloat(newItem.unit_price) || (isRentalItem && rentalTiers.length > 0
-                          ? Math.min(...rentalTiers.map(t => Number(t.price) || 0)) : 0);
-        const zonePrices = newItem.zonePrices || {};
+      const basePrice = parseFloat(newItem.unit_price) || 0;
+      const zonePrices = newItem.zonePrices || {};
 
       const basePayload = {
         ...cleanNewItem,
@@ -520,16 +517,16 @@ const slug = (() => {
       );
 
       const sharedId = baseRes.data.data.id;
-      if (rentalTiers.length > 0) {
-        await axios.post(
-          `${import.meta.env.VITE_API_INVENTORY_SERVICE_URL}/${clientId}/menu/recipe/update`,
-          { recipe: rentalTiers },
-          {
-            params: { menu_item_id: sharedId, menu_inventory_id: 'menu' },
-            headers: { Authorization: `Bearer ${token}` },
-          }
-        );
+if (rentalTiers.length > 0) {
+    await axios.post(
+      `${import.meta.env.VITE_API_INVENTORY_SERVICE_URL}/${clientId}/menu/recipe/update`,
+      { recipe: rentalTiers },
+      {
+        params: { menu_item_id: sharedId, menu_inventory_id: 'menu' },
+        headers: { Authorization: `Bearer ${token}` },
       }
+    );
+  }
       // STEP 2: Create records for ALL sections
       if (sections && sections.length > 0) {
         for (const section of sections) {
@@ -550,6 +547,16 @@ const slug = (() => {
             },
             { headers: { Authorization: `Bearer ${token}` } }
           );
+          if (rentalTiers.length > 0) {
+            await axios.post(
+              `${import.meta.env.VITE_API_INVENTORY_SERVICE_URL}/${clientId}/menu/recipe/update`,
+              { recipe: rentalTiers },
+              {
+                params: { menu_item_id: sharedId, menu_inventory_id: 'menu', zone_config_id: configId },
+                headers: { Authorization: `Bearer ${token}` },
+              }
+            );
+          }
         }
       } else {
         console.warn("No sections found → skipping zone creation");
@@ -574,7 +581,12 @@ const slug = (() => {
 
     } catch (error) {
       console.error("Error adding item:", error);
-    }
+    } finally {
+    // ✅ Always re-enable, whether it succeeded, threw, or failed category resolution
+    isAddingItemRef.current = false;
+    setIsAddingItem(false);
+  }
+
   };
 
   const handleEditItem = async (rentalTiers = []) => {
@@ -663,17 +675,11 @@ const slug = (() => {
       };
 
       // Always update base record (zone_config_id = 0)
-      const isRentalItem = isRentalRealm(normalizedRealm) && isRentalCategoryId(finalCategoryId, categoriesFlat);
-      const resolvedBasePrice = Number(editingItem.unit_price) ||
-      (isRentalItem && rentalTiers.length > 0
-        ? Math.min(...rentalTiers.map(t => Number(t.price) || 0))
-        : 0);
-
-await axios.post(
-  `${import.meta.env.VITE_API_INVENTORY_SERVICE_URL}/${clientId}/menu/update`,
-  { ...basePayload, unit_price: resolvedBasePrice, zone_config_id: 0 },
-  { headers: { Authorization: `Bearer ${token}` } }
-);
+      await axios.post(
+        `${import.meta.env.VITE_API_INVENTORY_SERVICE_URL}/${clientId}/menu/update`,
+        { ...basePayload, unit_price: Number(editingItem.unit_price) || 0, zone_config_id: 0 },
+        { headers: { Authorization: `Bearer ${token}` } }
+      );
       if (rentalTiers.length > 0) {
         await axios.post(
           `${import.meta.env.VITE_API_INVENTORY_SERVICE_URL}/${clientId}/menu/recipe/update`,
@@ -701,7 +707,7 @@ await axios.post(
             ? parseFloat(enteredPrice)
             : existingZoneRecord
               ? Number(existingZoneRecord.unit_price)
-              : resolvedBasePrice;
+              : Number(editingItem.unit_price) || 0;
 
               if (existingZoneRecord) {
                 await axios.post(
@@ -1610,6 +1616,7 @@ return suffixParts.length > 0 ? `${base}__${suffixParts.join('+')}` : base;
                   />
                 </div>
                 <div className="flex gap-2 flex-wrap justify-end">
+
                     <button onClick={() => setShowMenuConfig(true)} className="h-9 px-3 flex items-center gap-2 rounded-lg bg-action-success text-text-white text-sm font-semibold shadow-sm hover:opacity-90">
                       <span>Config</span>
                     </button>

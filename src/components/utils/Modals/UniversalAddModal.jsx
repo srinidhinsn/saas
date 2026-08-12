@@ -4,7 +4,7 @@ import { FaPlus } from 'react-icons/fa';
 import axios from 'axios';
 import AddonSelectionPopup from './AddonSelection';
 import ComboSelectionPopup from './CombosSelectionPopup';
-import { isRentalCategoryId ,isRentalRealm, findRentalCategoryId} from '../Menu-utils/menuUtils';
+import { isRentalCategoryId, isRentalRealm } from '../Menu-utils/menuUtils';
 
 const UniversalAddModal = ({
   // Common props
@@ -47,7 +47,6 @@ const UniversalAddModal = ({
   const [dietaryOptions, setDietaryOptions] = useState([]);
   const [timingOptions, setTimingOptions] = useState([]);
   const [rentalTiers, setRentalTiers] = useState([]);
-
   // Memoize helpers so they're stable across renders (prevents unnecessary effect runs)
   const flattenCategories = useCallback((items = [], level = 0) => {
     let result = [];
@@ -171,14 +170,7 @@ const UniversalAddModal = ({
       setAllAddonItems?.(items);
     });
   }, [showModal, modalType]);
-  useEffect(() => {
-    if (!showModal || modalType !== 'menu') return;
-    if (!isRentalRealm(normalizedRealm)) return;
-    const rentalCatId = findRentalCategoryId(categoriesFlat);
-    if (rentalCatId && newItem?.category_id !== rentalCatId) {
-      setNewItem(prev => ({ ...(prev || {}), category_id: rentalCatId }));
-    }
-  }, [showModal, modalType, normalizedRealm, categoriesFlat]);
+
   const handleDrag = (e) => {
     e.preventDefault();
     e.stopPropagation();
@@ -242,9 +234,10 @@ const UniversalAddModal = ({
         line_item_id: [],
         inventory_id: 'menu'
       });
-      setRentalTiers([]);
+
       setNewItemImage?.(null);
       setNewItemImageUrl?.('');
+      setRentalTiers([]);
     } else if (modalType === 'table') {
       setTableRanges?.([]);
       setFieldErrors?.([]);
@@ -323,6 +316,31 @@ const UniversalAddModal = ({
                   className="w-full px-4 py-2 rounded-lg bg-bg-tertiary border border-border-default text-text-primary focus:outline-none focus:ring-2 focus:ring-action-primary"
                   placeholder={isComboCategory ? "What's included, portion details…" : "Enter item description"} rows="3" />
               </div>
+              {isRentalRealm(normalizedRealm) && isRentalCategoryId(newItem?.category_id, categoriesFlat) && (
+  <div>
+    <label className="block text-sm font-medium mb-2 text-text-primary">Rental Duration *</label>
+    <div className="flex gap-2 items-center">
+      <input
+        value={rentalTiers[0]?.label || ''}
+        placeholder="e.g. Half Day"
+        onChange={(e) => setRentalTiers([{ ...(rentalTiers[0] || {}), rental_tier_id: rentalTiers[0]?.rental_tier_id || `tier_${Date.now()}`, label: e.target.value }])}
+        className="flex-1 px-3 py-2 rounded-lg border text-sm"
+      />
+      <input type="number" min="0" value={rentalTiers[0]?.days ?? ''} placeholder="Days"
+        onChange={(e) => setRentalTiers([{ ...(rentalTiers[0] || {}), rental_tier_id: rentalTiers[0]?.rental_tier_id || `tier_${Date.now()}`, days: e.target.value }])}
+        className="w-20 px-3 py-2 rounded-lg border text-sm" />
+      <input type="number" min="0" value={rentalTiers[0]?.hours ?? ''} placeholder="Hours"
+        onChange={(e) => setRentalTiers([{ ...(rentalTiers[0] || {}), rental_tier_id: rentalTiers[0]?.rental_tier_id || `tier_${Date.now()}`, hours: e.target.value }])}
+        className="w-20 px-3 py-2 rounded-lg border text-sm" />
+      <input type="number" min="0" value={rentalTiers[0]?.minutes ?? ''} placeholder="Minutes"
+        onChange={(e) => setRentalTiers([{ ...(rentalTiers[0] || {}), rental_tier_id: rentalTiers[0]?.rental_tier_id || `tier_${Date.now()}`, minutes: e.target.value }])}
+        className="w-24 px-3 py-2 rounded-lg border text-sm" />
+    </div>
+    {!rentalTiers[0]?.label && !rentalTiers[0]?.days && !rentalTiers[0]?.hours && !rentalTiers[0]?.minutes && (
+      <p className="text-xs text-red-500 mt-1">Set the rental duration</p>
+    )}
+  </div>
+)}
               {normalizedRealm === 'restaurant' && (
   <div>
     <label className="block text-sm font-medium mb-2 text-text-primary">
@@ -355,64 +373,6 @@ const UniversalAddModal = ({
     </div>
     {!newItem?.dietary_type && (
       <p className="text-xs text-text-secondary mt-1">No dietary type selected</p>
-    )}
-  </div>
-)}
-{isRentalRealm(normalizedRealm) && isRentalCategoryId(newItem?.category_id, categoriesFlat) && (
-  <div>
-    <label className="block text-sm font-medium mb-2 text-text-primary">Rental Pricing Tiers *</label>
-    {rentalTiers.map((tier, idx) => (
-  <div key={idx} className="flex gap-2 mb-2 items-center">
-    <input
-      value={tier.label}
-      placeholder="100 watts"
-      onChange={(e) => {
-        const next = [...rentalTiers];
-        next[idx] = { ...next[idx], label: e.target.value };
-        setRentalTiers(next);
-      }}
-      className="flex-1 px-3 py-2 rounded-lg bg-bg-tertiary border border-border-default text-sm"
-    />
-    <input
-      type="number"
-      value={tier.duration_minutes}
-      placeholder="Minutes"
-      onChange={(e) => {
-        const next = [...rentalTiers];
-        next[idx] = { ...next[idx], duration_minutes: e.target.value };
-        setRentalTiers(next);
-      }}
-      className="w-28 px-3 py-2 rounded-lg bg-bg-tertiary border border-border-default text-sm"
-    />
-    {/* ── NEW: price input ── */}
-    <input
-      type="number"
-      value={tier.price ?? ''}
-      placeholder="Price"
-      onChange={(e) => {
-        const next = [...rentalTiers];
-        next[idx] = { ...next[idx], price: e.target.value };
-        setRentalTiers(next);
-      }}
-      className="w-24 px-3 py-2 rounded-lg bg-bg-tertiary border border-border-default text-sm text-right"
-    />
-    <button type="button" onClick={() => setRentalTiers(rentalTiers.filter((_, i) => i !== idx))}
-      className="w-8 h-8 rounded-full bg-red-100 hover:bg-red-200 flex items-center justify-center shrink-0">
-      <X size={14} className="text-red-600" />
-    </button>
-  </div>
-))}
-<button
-  type="button"
-  onClick={() => setRentalTiers([...rentalTiers, {
-    rental_tier_id: `tier_${Date.now()}`, label: '', duration_minutes: '', price: '',
-  }])}
-  className="w-full px-3 py-2 rounded-lg bg-bg-tertiary border-2 border-dashed border-border-default text-text-primary hover:border-action-primary flex items-center justify-center gap-2 text-sm font-medium"
->
-  <Plus size={16} /> Add Duration Tier
-</button>
-    {rentalTiers.length === 0 && (
-      <p className="text-xs text-red-500 mt-1">Add at least one rental duration & price</p>
     )}
   </div>
 )}
@@ -453,7 +413,7 @@ const UniversalAddModal = ({
               )}
               {/* Unit Price & Discount */}
               <div className="grid grid-cols-2 gap-4">
-           <div>
+                <div>
                   <label className="block text-sm font-medium mb-2 text-text-primary"> {isComboCategory ? 'Combo Price * (flat, not sum of parts)' : 'Unit Price *'}</label>
                   <input
                     type="number"
@@ -464,7 +424,8 @@ const UniversalAddModal = ({
                     required
                   />
                 </div>
-               <div>
+
+                <div>
                   <label className="block text-sm font-medium mb-2 text-text-primary">Discount</label>
                   <input
                     type="number"
@@ -477,7 +438,7 @@ const UniversalAddModal = ({
               </div>
 
               {/* Zone pricing */}
-              {!isRentalRealm(normalizedRealm) &&(            <div>
+              <div>
                 <label className="block text-sm font-medium mb-2 text-text-primary">
                   Pricing by Zone & Section
                 </label>
@@ -505,10 +466,10 @@ const UniversalAddModal = ({
                     </div>
                   </div>
                 ))}
-              </div>)}
+              </div>
               {/* Code & Unit */}
               <div className="grid grid-cols-2 gap-4">
-              {!isRentalRealm(normalizedRealm) &&(    <div>
+              <div>
                   <label className="block text-sm font-medium mb-2 text-text-primary">Unit</label>
                   <select
                     value={newItem?.unit ?? ''}
@@ -520,7 +481,7 @@ const UniversalAddModal = ({
                       <option key={u} value={u}>{u}</option>
                     ))}
                   </select>
-                </div>)}
+                </div>
                 <div>
                   <label className="block text-sm font-medium mb-2 text-text-primary">
                     Availability
@@ -539,7 +500,6 @@ const UniversalAddModal = ({
                     placeholder="Enter stock / quantity"
                   />
                 </div>
-                {!isRentalRealm(normalizedRealm) &&(   
                 <div>
                   <label className="block text-sm font-medium mb-2 text-text-primary">Serving Unit</label>
                   <select
@@ -552,8 +512,8 @@ const UniversalAddModal = ({
                       <option key={u} value={u}>{u}</option>
                     ))}
                   </select>
-                </div> )}
-                {!isRentalRealm(normalizedRealm) &&(     <div>
+                </div>
+                <div>
                   <label className="block text-sm font-medium mb-2 text-text-primary">Serving Quantity</label>
                   <input
                     type="number"
@@ -563,7 +523,7 @@ const UniversalAddModal = ({
                     placeholder="0"
                   />
                 </div>
-                )}
+
                 <div>
                   <label className="block text-sm font-medium mb-2 text-text-primary">Code *</label>
                   <input
@@ -611,7 +571,7 @@ const UniversalAddModal = ({
                       </button>
                     </>
                   ) : (
-                    <>{!isRentalRealm(normalizedRealm) &&( <div>
+                    <>
                       <label className="block text-sm font-medium mb-2 text-text-primary">Add-ons</label>
                       {newItem?.line_item_id?.length > 0 && (
                         <div className="mb-3 flex flex-wrap gap-2">
@@ -628,7 +588,7 @@ const UniversalAddModal = ({
                         <Plus size={18} />
                         <span>{newItem?.line_item_id?.length > 0 ? `Manage Add-ons (${newItem.line_item_id.length} selected)` : 'Select Add-ons'}</span>
                       </button>
-                      </div>)}</>
+                    </>
                   )}
                 </div>
               </div>
@@ -694,18 +654,17 @@ const UniversalAddModal = ({
                   Cancel
                 </button>
                 <button
-                onClick={() => {
-                     const tiersToSubmit =
-                       isRentalCategoryId(newItem?.category_id, categoriesFlat)
-                         ? rentalTiers.map(t => ({
-                           rental_tier_id: t.rental_tier_id,
-                             label: t.label,
-                             duration_minutes: Number(t.duration_minutes) || 0,
-                             price: Number(t.price) || 0, 
+                  onClick={() => {
+                    const tiersToSubmit =
+                      isRentalRealm(normalizedRealm) && isRentalCategoryId(newItem?.category_id, categoriesFlat)
+                        ? rentalTiers.map(t => ({
+                            rental_tier_id: t.rental_tier_id,
+                            label: t.label,
+                            duration_minutes: (Number(t.days)||0)*1440 + (Number(t.hours)||0)*60 + (Number(t.minutes)||0),
                           }))
-                         : [];
+                        : [];
                     handleAddItem(tiersToSubmit);
-                    }}
+                  }}
                   disabled={isSubmitting}
                   className={`flex-1 px-4 py-2 rounded-lg bg-action-primary text-text-white hover:opacity-90 transition-opacity ${isSubmitting ? 'bg-gray-400 cursor-not-allowed' : 'bg-action-primary hover:opacity-90'}`}
                 >

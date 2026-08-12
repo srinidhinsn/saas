@@ -1,10 +1,11 @@
 import { APP_ROOT } from '../../config/pathConfig';
 import React, { useEffect, useState } from 'react';
 import { useNavigate, useParams, useLocation } from 'react-router-dom';
-import { isRentalRealm } from '../../utils/Menu-utils/menuUtils';
+import { getValidToken } from '../../utils/Interceptors/Api';
+import axios from 'axios';
 import { NAV_TABS } from './Navtabs';
 
-export const getNavMap = (realm) => ({
+export const navMap = {
   home: (clientId) => `/${APP_ROOT}/${clientId}/home`,
   table: (clientId) => `/${APP_ROOT}/${clientId}/sub-tables`,
   menu: (clientId) => `/${APP_ROOT}/${clientId}/menu`,
@@ -14,24 +15,21 @@ export const getNavMap = (realm) => ({
   role: (clientId) => `/${APP_ROOT}/${clientId}/role`,
   order: (clientId) => `/${APP_ROOT}/${clientId}/order`,
   summary: (clientId) => `/${APP_ROOT}/${clientId}/summary`,
-  kds: (clientId) =>
-    isRentalRealm((realm || '').toLowerCase())
-      ? `/${APP_ROOT}/${clientId}/rental-display`
-      : `/${APP_ROOT}/${clientId}/kds`,
+  kds: (clientId) => `/${APP_ROOT}/${clientId}/kds`,
   details: (clientId) => `/${APP_ROOT}/${clientId}/details`,
   documents: (clientId) => `/${APP_ROOT}/${clientId}/documents`,
   profile: (clientId) => `/${APP_ROOT}/${clientId}/user-profile`,
   counter: (clientId) => `/${APP_ROOT}/${clientId}/counter`,
-});
-export const navMap = getNavMap(null);
-const HeaderShared = ({ onLogout, subscription = [] ,realm}) => {
+};
+
+const HeaderShared = ({ onLogout, subscription = [] }) => {
   const navigate = useNavigate();
   const { clientId } = useParams();
   const location = useLocation();
   const [mobileOpen, setMobileOpen] = useState(false);
   const [darkMode, setDarkMode] = useState(false);
   const [profileOpen, setProfileOpen] = useState(false);
-  const navMap = React.useMemo(() => getNavMap(realm), [realm]);
+
   const subscribedSet = new Set(subscription);
   const visibleTabs = NAV_TABS.filter(tab => subscribedSet.has(tab.id));
   const isVisible = (id) => subscribedSet.has(id);

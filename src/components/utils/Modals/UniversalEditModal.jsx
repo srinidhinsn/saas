@@ -4,7 +4,7 @@ import MenuImagePreview from '../../MainComponents/InventoryServices/Tree&Catego
 import AddonSelectionPopup from './AddonSelection';
 import ComboSelectionPopup from './CombosSelectionPopup';
 import axios from 'axios';
-import { isRentalCategoryId,isRentalMenuItem,isRentalRealm  } from '../Menu-utils/menuUtils';
+import { isRentalCategoryId, isRentalRealm, isRentalMenuItem } from '../Menu-utils/menuUtils';
 
 const UniversalEditModal = ({
   // Common props
@@ -46,15 +46,6 @@ const UniversalEditModal = ({
   const [dietaryOptions, setDietaryOptions] = useState([]);
   const [timingOptions, setTimingOptions] = useState([]);
   const [rentalTiers, setRentalTiers] = useState([]);
-
-useEffect(() => {
-  if (showModal && isRentalMenuItem(editingItem)) {
-    setRentalTiers(editingItem.recipe);
-  } else if (showModal) {
-    setRentalTiers([]);
-  }
-}, [showModal, editingItem?.id]);
-
   const isComboItem = React.useMemo(() => {
     if (!editingItem?.category_id || !categoriesFlat?.length) return false;
     // editingItem.isCombo is pre-computed by handleItemClick in MenuManagement
@@ -171,7 +162,23 @@ useEffect(() => {
       setAllAddonItems?.(items);
     });
   }, [showModal, modalType]);
-
+  useEffect(() => {
+    if (showModal && isRentalMenuItem(editingItem)) {
+      const loaded = (editingItem.recipe || []).map(t => {
+        const total = Number(t.duration_minutes) || 0;
+        return {
+          rental_tier_id: t.rental_tier_id,
+          label: t.label,
+          days: Math.floor(total / 1440) || '',
+          hours: Math.floor((total % 1440) / 60) || '',
+          minutes: total % 60 || '',
+        };
+      });
+      setRentalTiers(loaded);
+    } else if (showModal) {
+      setRentalTiers([]);
+    }
+  }, [showModal, editingItem?.id]);
   const handleEditDrag = (e) => {
     e.preventDefault();
     e.stopPropagation();
@@ -234,6 +241,7 @@ useEffect(() => {
       setEditingItem?.(null);
       setEditItemImage?.(null);
       setEditItemImageUrl?.('');
+      setRentalTiers([]);
     } else if (modalType === 'table') {
       setEditRowId?.(null);
     }
@@ -306,6 +314,31 @@ useEffect(() => {
                     rows="3"
                   />
                 </div>
+                {isRentalRealm(normalizedRealm) && isRentalCategoryId(editingItem?.category_id, categoriesFlat) && (
+  <div>
+    <label className="block text-sm font-medium mb-1 text-gray-700">Rental Duration *</label>
+    <div className="flex gap-2 items-center">
+      <input
+        value={rentalTiers[0]?.label || ''}
+        placeholder="e.g. Half Day"
+        onChange={(e) => setRentalTiers([{ ...(rentalTiers[0] || {}), rental_tier_id: rentalTiers[0]?.rental_tier_id || `tier_${Date.now()}`, label: e.target.value }])}
+        className="flex-1 px-3 py-2 rounded-md border border-gray-300 text-sm"
+      />
+      <input type="number" min="0" value={rentalTiers[0]?.days ?? ''} placeholder="Days"
+        onChange={(e) => setRentalTiers([{ ...(rentalTiers[0] || {}), rental_tier_id: rentalTiers[0]?.rental_tier_id || `tier_${Date.now()}`, days: e.target.value }])}
+        className="w-20 px-3 py-2 rounded-md border border-gray-300 text-sm" />
+      <input type="number" min="0" value={rentalTiers[0]?.hours ?? ''} placeholder="Hours"
+        onChange={(e) => setRentalTiers([{ ...(rentalTiers[0] || {}), rental_tier_id: rentalTiers[0]?.rental_tier_id || `tier_${Date.now()}`, hours: e.target.value }])}
+        className="w-20 px-3 py-2 rounded-md border border-gray-300 text-sm" />
+      <input type="number" min="0" value={rentalTiers[0]?.minutes ?? ''} placeholder="Minutes"
+        onChange={(e) => setRentalTiers([{ ...(rentalTiers[0] || {}), rental_tier_id: rentalTiers[0]?.rental_tier_id || `tier_${Date.now()}`, minutes: e.target.value }])}
+        className="w-24 px-3 py-2 rounded-md border border-gray-300 text-sm" />
+    </div>
+    {!rentalTiers[0]?.label && !rentalTiers[0]?.days && !rentalTiers[0]?.hours && !rentalTiers[0]?.minutes && (
+      <p className="text-xs text-red-500 mt-1">Set the rental duration</p>
+    )}
+  </div>
+)}
                 {normalizedRealm === 'restaurant' && (
   <div>
     <label className="block text-sm font-medium mb-1 text-gray-700">
@@ -337,64 +370,6 @@ useEffect(() => {
     </div>
     {!editingItem?.dietary_type && (
       <p className="text-xs text-gray-400 mt-1">No dietary type selected</p>
-    )}
-  </div>
-)}
-{isRentalRealm(normalizedRealm) && isRentalCategoryId(editingItem?.category_id, categoriesFlat) && (
-  <div>
-    <label className="block text-sm font-medium mb-1 text-gray-700">Rental Pricing Tiers *</label>
-    {rentalTiers.map((tier, idx) => (
-  <div key={idx} className="flex gap-2 mb-2 items-center">
-    <input
-      value={tier.label}
-      placeholder="100 watts"
-      onChange={(e) => {
-        const next = [...rentalTiers];
-        next[idx] = { ...next[idx], label: e.target.value };
-        setRentalTiers(next);
-      }}
-      className="flex-1 px-3 py-2 rounded-md border border-gray-300 text-sm"
-    />
-    <input
-      type="number"
-      value={tier.duration_minutes}
-      placeholder="Minutes"
-      onChange={(e) => {
-        const next = [...rentalTiers];
-        next[idx] = { ...next[idx], duration_minutes: e.target.value };
-        setRentalTiers(next);
-      }}
-      className="w-28 px-3 py-2 rounded-md border border-gray-300 text-sm"
-    />
-    {/* ── NEW: price input ── */}
-    <input
-      type="number"
-      value={tier.price ?? ''}
-      placeholder="Price"
-      onChange={(e) => {
-        const next = [...rentalTiers];
-        next[idx] = { ...next[idx], price: e.target.value };
-        setRentalTiers(next);
-      }}
-      className="w-24 px-3 py-2 rounded-md border border-gray-300 text-sm text-right"
-    />
-    <button type="button" onClick={() => setRentalTiers(rentalTiers.filter((_, i) => i !== idx))}
-      className="w-8 h-8 rounded-full bg-red-100 hover:bg-red-200 flex items-center justify-center shrink-0">
-      <X size={14} className="text-red-600" />
-    </button>
-  </div>
-))}
-<button
-  type="button"
-  onClick={() => setRentalTiers([...rentalTiers, {
-    rental_tier_id: `tier_${Date.now()}`, label: '', duration_minutes: '', price: '',
-  }])}
-  className="w-full px-3 py-2 rounded-md bg-gray-50 border-2 border-dashed border-gray-300 text-gray-700 hover:border-blue-500 flex items-center justify-center gap-2 text-sm font-medium"
->
-  <Plus size={16} /> Add Duration Tier
-</button>
-    {rentalTiers.length === 0 && (
-      <p className="text-xs text-red-500 mt-1">Add at least one rental duration & price</p>
     )}
   </div>
 )}
@@ -475,7 +450,7 @@ useEffect(() => {
                   </div>
                 )}
                 {/* Unit Price & Discount */}
-                       <div className="grid grid-cols-2 gap-4">
+                <div className="grid grid-cols-2 gap-4">
                   <div>
                     <label className="block text-sm font-medium mb-1 text-gray-700">
                       {isComboItem ? 'Combo Price (flat) *' : 'Base Price (All Zones) *'}
@@ -501,7 +476,7 @@ useEffect(() => {
                 </div>
 
                 {/* Zone-wise pricing */}
-                {!isRentalRealm(normalizedRealm) &&(       <div>{configs.length > 0 && (
+                {configs.length > 0 && (
                   <div>
                     <label className="block text-sm font-medium mb-1 text-gray-700">
                       Zone-wise Pricing
@@ -533,7 +508,7 @@ useEffect(() => {
                       </div>
                     ))}
                   </div>
-                )}</div>)}
+                )}
                 {/* Code & Unit */}
                 <div className="grid grid-cols-2 gap-4">
                   <div>
@@ -571,7 +546,7 @@ useEffect(() => {
                       } className="w-full px-3 py-2 rounded-md border border-gray-300 text-gray-900 focus:outline-none focus:ring-2 focus:ring-blue-500 focus:border-transparent"
                     />
                   </div>
-                  {!isRentalRealm(normalizedRealm) &&(      <div>
+                  <div>
                     <label className="block text-sm font-medium mb-1 text-gray-700">Unit</label>
                     <select value={editingItem.unit}
                       onChange={(e) => setEditingItem({ ...editingItem, unit: e.target.value })}
@@ -581,13 +556,13 @@ useEffect(() => {
                       <option key={u} value={u}>{u}</option>
                     ))}
                     </select>
-                  </div>)}
-                    {!isRentalRealm(normalizedRealm) &&(    <div>
+                  </div>
+                  <div>
                   <label className="block text-sm font-medium mb-1 text-gray-700">Serving Quantity</label>
                   <input type="number" value={editingItem.serving_quantity ?? ''} onChange={e => setEditingItem({ ...editingItem, serving_quantity: e.target.value })}
                     className="w-full px-3 py-2 rounded-md border border-gray-300 text-gray-900 focus:outline-none focus:ring-2 focus:ring-blue-500" placeholder="0" />
-                </div>)}
-                {!isRentalRealm(normalizedRealm) &&(      <div>
+                </div>
+                <div>
                     <label className="block text-sm font-medium mb-1 text-gray-700">Serving Unit</label>
                     <select value={editingItem.serving_unit}
                       onChange={(e) => setEditingItem({ ...editingItem, serving_unit: e.target.value })}
@@ -597,7 +572,7 @@ useEffect(() => {
                       <option key={u} value={u}>{u}</option>
                     ))}
                     </select>
-                  </div>)}
+                  </div>
                 </div>
 
                 {/* Image */}
@@ -709,7 +684,7 @@ useEffect(() => {
                       </button>
                     </>
                   ) : (
-                    <>{!isRentalRealm(normalizedRealm) &&( <div>
+                    <>
                       <label className="block text-sm font-medium mb-2 text-gray-700">Add-ons</label>
                       {editingItem.line_item_id?.length > 0 && (
                         <div className="mb-3 flex flex-wrap gap-2">
@@ -726,7 +701,7 @@ useEffect(() => {
                         <Plus size={18} />
                         <span>{editingItem.line_item_id?.length > 0 ? `Manage Add-ons (${editingItem.line_item_id.length} selected)` : 'Select Add-ons'}</span>
                       </button>
-                   </div>)} </>
+                    </>
                   )}
                 </div>
               </div>
@@ -741,16 +716,19 @@ useEffect(() => {
                 Cancel
               </button>
               <button
-                  onClick={() => {
-                    const tiersToSubmit = rentalTiers.map(t => ({
-                      rental_tier_id: t.rental_tier_id,
-                      label: t.label,
-                      duration_minutes: Number(t.duration_minutes) || 0,
-                      price: Number(t.price) || 0,  
-                    }));
-                    handleEditItem(tiersToSubmit);
-                  }}
-                  className="px-6 py-2 rounded-md bg-action-primary text-text-white font-medium">
+               onClick={() => {
+                const tiersToSubmit =
+                  isRentalRealm(normalizedRealm) && isRentalCategoryId(editingItem?.category_id, categoriesFlat)
+                    ? rentalTiers.map(t => ({
+                        rental_tier_id: t.rental_tier_id,
+                        label: t.label,
+                        duration_minutes: (Number(t.days) || 0) * 1440 + (Number(t.hours) || 0) * 60 + (Number(t.minutes) || 0),
+                      }))
+                    : [];
+                handleEditItem(tiersToSubmit);
+              }}
+                className="px-6 py-2 rounded-md bg-action-primary text-text-white font-medium"
+              >
                 Save Changes
               </button>
             </div>
