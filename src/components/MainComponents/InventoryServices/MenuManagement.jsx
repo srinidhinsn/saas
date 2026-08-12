@@ -285,7 +285,8 @@ if (cachedAddon) return cachedAddon;
     setNewItem({
       name: '', description: '', category_id: selectedCategoryId || '',
       unit_price: '', discount: '', code: '', unit: '',
-      serving_quantity: "", serving_unit: "", line_item_id: [], inventory_id: 'menu', zone_config_id: zoneConfigId || null,dietary_type: ''
+      serving_quantity: "", serving_unit: "", line_item_id: [], inventory_id: 'menu', 
+      zone_config_id: zoneConfigId || null,dietary_type: '', rentalTiers: {},
     });
     setNewItemImage(null);
     setNewItemImageUrl('');
@@ -349,7 +350,10 @@ if (cachedAddon) return cachedAddon;
       zonePrices,
       isCombo: resolveCategoryIsCombo(resolvedCategoryId),
       availability_time: timingsFromSlug,   // now an array
-      dietary_type: dietaryFromSlug,
+      dietary_type: dietaryFromSlug, 
+      rentalTier: Array.isArray(baseRecord.recipe) && baseRecord.recipe.length > 0
+      ? baseRecord.recipe[0]
+      : {},
     });
     setShowEditModal(true);
   };
@@ -447,8 +451,11 @@ if (cachedAddon) return cachedAddon;
       if (!finalCategoryId) return;
 
 // AFTER
-const { dietary_type, ...cleanNewItem } = newItem;
-
+      const { dietary_type, rentalTier,...cleanNewItem } = newItem;
+      const cleanedTier = rentalTier?.label?.trim()
+                          ? { rental_tier_id: rentalTier.rental_tier_id || `tier_${Date.now()}_${Math.random().toString(36).slice(2, 7)}`,
+                              label: rentalTier.label.trim(), days: Number(rentalTier.days) || 0, hours: Number(rentalTier.hours) || 0,
+                              minutes: Number(rentalTier.minutes) || 0,}  : null;
 const slug = (() => {
   const parts = [];
   let currentId = finalCategoryId;
@@ -501,7 +508,8 @@ const slug = (() => {
         created_by,
         updated_by: created_by,
         inventory_id: newItem.inventory_id,
-        zone_config_id: 0,
+        zone_config_id: 0, 
+        recipe: cleanedTier ? [cleanedTier] : null,
       };
 
       // STEP 1: Create base record (zone_config_id = 0)
@@ -594,8 +602,16 @@ const slug = (() => {
       if (!finalCategoryId) return;
 
       // ✅ Build slug with dietary injected — same pattern as import
-      const { dietary_type, zonePrices: zp, ...cleanEditingItem } = editingItem;
-
+      const { dietary_type, zonePrices: zp,rentalTier, ...cleanEditingItem } = editingItem;
+      const cleanedTier = rentalTier?.label?.trim()
+      ? {
+          rental_tier_id: rentalTier.rental_tier_id || `tier_${Date.now()}_${Math.random().toString(36).slice(2, 7)}`,
+          label: rentalTier.label.trim(),
+          days: Number(rentalTier.days) || 0,
+          hours: Number(rentalTier.hours) || 0,
+          minutes: Number(rentalTier.minutes) || 0,
+        }
+      : null;
       const slug = (() => {
         const parts = [];
         let currentId = finalCategoryId;
@@ -653,6 +669,7 @@ const slug = (() => {
         client_id: clientId,
         inventory_id: editingItem.inventory_id,
         id: Number(editingItem.id),
+        recipe: cleanedTier ? [cleanedTier] : null,
       };
 
       // Always update base record (zone_config_id = 0)

@@ -390,3 +390,21 @@ export function relinkCartItemsToParents(items) {
 
 
 export const fmt = (num) => Math.round(Number(num) || 0).toString();
+
+export const isRentalRealm = (realm) => {
+  return (realm || '').toLowerCase() === 'rental';
+};
+
+export const isRentalCategoryId = (categoryId, categoriesFlat) => {
+  if (!categoryId || !categoriesFlat?.length) return false;
+  let currentId = categoryId;
+  const visited = new Set();
+  while (currentId && !visited.has(currentId)) {
+    visited.add(currentId);
+    const cat = categoriesFlat.find(c => c.id === currentId);
+    if (!cat) break;
+    if ((cat.name || '').toLowerCase().includes('rental')) return true;
+    currentId = cat.parentId ?? null;
+  }
+  return false;
+};
