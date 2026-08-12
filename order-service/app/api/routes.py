@@ -29,7 +29,7 @@ from services.order_service import (
     _convert,
     update_order_status_service,
 )
-from services.order_status import _status_label
+from services.order_status import _status_label,resolve_realm_from_context
 from decimal import Decimal
 from datetime import datetime
 
@@ -314,21 +314,12 @@ def delete_order_items( client_id: str, order_item_id: Optional[str] = Query(Non
 
     if not item:
         raise HTTPException(status_code=404, detail="Order item not found")
-    if '||RENTAL|' in (item.slug or ''):
+    if resolve_realm_from_context(context) == "rental":
         returned_label = _status_label(context, OrderStatusEnum.completed) or "returned"
         if item.status == returned_label:
             raise HTTPException(status_code=409, detail="Item has already been returned")
-        base, meta = item.slug.split('||RENTAL|')
-        tier_id, duration_min, start_epoch, due_epoch, _, _ = meta.split('|')
         now_ms = int(datetime.utcnow().timestamp() * 1000)
-
         late_fee = 0.0
-        if now_ms > int(due_epoch):
-            overdue_hours = (now_ms - int(due_epoch)) / (1000 * 60 * 60)
-            hourly_rate = (item.unit_price or 0) / max(int(duration_min) / 60, 1e-6)
-            late_fee = round(overdue_hours * hourly_rate, 2)
-
-        item.slug = f"{base}||RENTAL|{tier_id}|{duration_min}|{start_epoch}|{due_epoch}|{now_ms}|{late_fee}"
         item.status = returned_label
 
         if late_fee > 0:
@@ -376,7 +367,36 @@ def delete_order_items( client_id: str, order_item_id: Optional[str] = Query(Non
                 restored = True
                 new_availability = tx.after_stock
 
-        db.commit()
+        db.flush()
+        order_completed = False
+        order_row = (
+            db.query(Db_Order_Entity)
+            .filter(Db_Order_Entity.id == item.order_id, Db_Order_Entity.client_id == client_id)
+            .first()
+        )
+        if order_row:
+            cancelled_label = _status_label(context, OrderStatusEnum.cancelled) or OrderStatusEnum.cancelled
+
+            sibling_items = (
+                db.query(Db_OrderItem_Entity)
+                .filter(
+                    Db_OrderItem_Entity.order_id == item.order_id,
+                    Db_OrderItem_Entity.client_id == client_id,
+                )
+                .all()
+            )
+
+            active_items = [
+                i for i in sibling_items
+                if i.status != cancelled_label
+                and not (i.frontend_unique_key or "").startswith("latefee_")
+            ]
+
+            if active_items and all(i.status == returned_label for i in active_items):
+                completed_label = _status_label(context, OrderStatusEnum.completed) or "completed"
+                order_row.status = completed_label
+                order_completed = True
+        db.commit()        
         return ResponseModel(
             screen_id=context.screen_id,
             data={
