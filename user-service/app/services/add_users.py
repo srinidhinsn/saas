@@ -105,31 +105,64 @@ def get_user_perms(context, db, client_id):
     roles = [r.lower().strip() for r in (context.roles or [])]
     if "super_admin" in roles:
         return {"__super_admin__": {"ALL"}}
-    perms = {}    
+
+    include_ops: dict[str, set] = {}
+    exclude_ops: dict[str, set] = {}
+    modules_with_include: set = set()
+
     for role in roles:
-        rows = (db.query(PageDefinition).filter(
-                PageDefinition.client_id == client_id,func.lower(PageDefinition.role) == role).all())
+        rows = (db.query(PageDefinition)
+            .filter(PageDefinition.client_id == client_id,
+                    func.lower(PageDefinition.role) == role)
+            .all())
 
         for r in rows:
             if r.load_type == "include":
-                perms.setdefault(r.module, set()).update(r.operations or [])
+                include_ops.setdefault(r.module, set()).update(r.operations or [])
+                modules_with_include.add(r.module)
             elif r.load_type == "exclude":
-                perms.setdefault(r.module, set()).difference_update(
-                    r.operations or [])
+                exclude_ops.setdefault(r.module, set()).update(r.operations or [])
+
+    perms: dict[str, dict] = {}
+    for module in set(include_ops) | set(exclude_ops):
+        excluded = exclude_ops.get(module, set())
+        if module in modules_with_include:
+            perms[module] = {
+                "allow_all": False,
+                "ops": include_ops.get(module, set()) - excluded,
+                "excluded": excluded,
+            }
+        else:
+            perms[module] = {
+                "allow_all": True,
+                "ops": set(),
+                "excluded": excluded,
+            }
+
     return perms
+
 
 def has_user_permission(role_perms, module: str, operation: str | None = None):
     if "ALL" in role_perms.get("__super_admin__", set()):
         return True
-    ops = role_perms.get(module, set())
+
+    mod_perm = role_perms.get(module)
+    if not mod_perm:
+        return False
+
+    excluded = mod_perm.get("excluded", set())
+    if operation and operation in excluded:
+        return False
+
+    if mod_perm.get("allow_all"):
+        return True
+
+    ops = mod_perm.get("ops", set())
     if "ALL" in ops:
         return True
-    
+
     if operation:
-        return any(
-            op == operation or op.startswith(f"{operation}/")
-            for op in ops
-        )
+        return any(op == operation or op.startswith(f"{operation}/") for op in ops)
     return bool(ops)
 
 # Login Service
