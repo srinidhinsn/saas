@@ -441,3 +441,5 @@ export const findRentalCategoryId = (categoriesFlat) => {
   const match = categoriesFlat.find(c => (c.name || '').toLowerCase().includes('rental'));
   return match?.id || null;
 };
+
+export const fmt = (num) => Math.round(Number(num) || 0).toString();
