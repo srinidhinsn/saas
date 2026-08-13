@@ -64,7 +64,45 @@ const calculateElapsedTime = (createdAt) => {
   if (hours > 0) return `${hours}h ${minutes}m`;
   return `${totalMinutes}m`;
 };
+const formatRentedDate = (createdAt) => {
+  if (!createdAt) return '—';
+  const d = new Date(parseISTTimestamp(createdAt));
+  return d.toLocaleDateString('en-GB', { day: '2-digit', month: 'short', year: 'numeric' });
+};
 
+const calculateAgingDays = (createdAt) => {
+  if (!createdAt) return 0;
+  const diffMs = Date.now() - parseISTTimestamp(createdAt);
+  if (diffMs < 0) return 0;
+  return Math.floor(diffMs / (1000 * 60 * 60 * 24));
+};
+
+const getRentalTier = (menuRecord) => {
+  if (!menuRecord || !Array.isArray(menuRecord.recipe) || menuRecord.recipe.length === 0) return null;
+  const tier = menuRecord.recipe[0];
+  if (!tier) return null;
+  const days = Number(tier.days) || 0;
+  const hours = Number(tier.hours) || 0;
+  const minutes = Number(tier.minutes) || 0;
+  if (days === 0 && hours === 0 && minutes === 0) return null;
+  return { days, hours, minutes, label: tier.label || '' };
+};
+
+const computeDueTimestamp = (createdAt, tier) => {
+  if (!createdAt || !tier) return null;
+  const start = parseISTTimestamp(createdAt);
+  const durationMs = ((tier.days * 24 + tier.hours) * 60 + tier.minutes) * 60 * 1000;
+  return start + durationMs;
+};
+
+const formatDurationDDMM = (totalMs) => {
+  const totalMinutes = Math.max(0, Math.floor(totalMs / 60000));
+  const days = Math.floor(totalMinutes / (60 * 24));
+  const hours = Math.floor((totalMinutes % (60 * 24)) / 60);
+  const minutes = totalMinutes % 60;
+  const pad = (n) => String(n).padStart(2, '0');
+  return `${days}d ${pad(hours)}:${pad(minutes)}`;
+};
 const deriveStatus = (items) => {
   const { PENDING, PREPARING, READY, SERVED } = KDS_CONFIG.STATUS;
   const activeItems = (items || []).filter((item) => {
@@ -83,6 +121,10 @@ const deriveStatus = (items) => {
 const isCancelledStatus = (status) => {
   const normalized = String(status || '').toLowerCase();
   return normalized === KDS_CONFIG.STATUS.CANCELLED;
+};
+const isServedLikeStatus = (status) => {
+  const normalized = String(status || '').trim().toLowerCase();
+  return normalized === KDS_CONFIG.STATUS.SERVED || normalized.includes('return');
 };
 
 // ─── Derive card-level status from its items ───────────────────────────────────
@@ -388,13 +430,14 @@ const KitchenCard = ({
   card,
   tablesMap,
   menuItemsMap,
-  onItemStatusChange,
+  onItemStatusChange,nowTick = Date.now(), isRental = false, 
 }) => {
   // Track which item buttons are currently being saved to prevent double-clicks
   const [pendingItemIds, setPendingItemIds] = useState(new Set());
 
   const elapsedTime = card.created_at ? calculateElapsedTime(card.created_at) : null;
-
+  const rentedDateLabel = isRental ? formatRentedDate(card.created_at) : null;
+  const agingDays = isRental ? calculateAgingDays(card.created_at) : null;
   const allReady =
   card.items?.length > 0 &&
   card.items.every((i) => i.status === KDS_CONFIG.STATUS.READY || i.status === KDS_CONFIG.STATUS.SERVED) &&
@@ -455,7 +498,7 @@ const KitchenCard = ({
           const combo = isComboItem(item, menuRecord);
           const isPending = pendingItemIds.has(item.id);
           const isCancelled = isCancelledStatus(item.status);
-
+          const isReturned = isServedLikeStatus(item.status);    
           return (
             <div key={item.id || idx} className="flex flex-col w-full rounded-lg bg-white">
               {/* Main item row — unchanged */}
@@ -472,9 +515,51 @@ const KitchenCard = ({
                       </span>
                     )}
                   </div>
+                  {isRental && !isReturned && (() => {
+                    const tier = getRentalTier(menuRecord);
+                    if (!tier) return null;
+                    const due = computeDueTimestamp(card.created_at, tier);
+                    if (due == null) return null;
+                    const remainingMs = due - nowTick;
+                    const overdue = remainingMs < 0;
+                    const durationLabel = formatDurationDDMM(Math.abs(remainingMs));
+                    return (
+                      <div className="mt-1">
+                        <span
+                          className={`inline-flex items-center gap-1 text-[11px] font-semibold px-2 py-0.5 rounded-full
+                            ${overdue ? 'bg-red-100 text-red-700' : 'bg-blue-100 text-blue-700'}`}
+                          title={tier.label ? `Tier: ${tier.label}` : undefined}
+                        >
+                          {overdue ? `⚠ Overdue ${durationLabel}` : `⏳ ${durationLabel} left`}
+                        </span>
+                      </div>
+                    );
+                  })()}
                 </div>
                 <div className="flex items-center gap-1 ml-3">
-                  <button
+                {isRental ? (
+                   isReturned ? (
+                    <span
+                      className="flex items-center gap-1.5 px-3 py-1.5 rounded-md text-xs font-semibold bg-gray-100 text-gray-500"
+                    >
+                      <FaCheckCircle size={14} className="text-green-500" />
+                      Returned
+                    </span>
+                  ) : (
+                    <button
+                      type="button"
+                      disabled={isPending || isCancelled}
+                      onClick={() => handleStatusClick(card.card_id, item.id, KDS_CONFIG.STATUS.SERVED)}
+                      title="Mark as Returned"
+                      className={`flex items-center gap-1.5 px-3 py-1.5 rounded-md text-xs font-semibold transition-colors
+                        ${isPending || isCancelled
+                          ? 'opacity-40 cursor-not-allowed bg-gray-100 text-gray-400'
+                          : 'bg-green-600 text-white hover:bg-green-700'}`}
+                    >
+                      <RotateCcw size={14} />
+                      Mark as Returned
+                    </button>)
+                  ) :(<>   <button
                     type="button"
                     disabled={isPending || isCancelled}
                     onClick={() => handleStatusClick(card.card_id, item.id, KDS_CONFIG.STATUS.PENDING)}
@@ -521,7 +606,7 @@ const KitchenCard = ({
                       size={20}
                       className={item.status === 'served' ? 'text-purple-500' : 'text-gray-400'}
                     />
-                  </button>
+                  </button></>)} 
                 </div>
               </div>
 
@@ -588,14 +673,15 @@ const KitchenCard = ({
 
 // ─── Main KitchenDisplay component ────────────────────────────────────────────
 
-const KitchenDisplay = ({clientId, token}) => {
+const KitchenDisplay = ({clientId, token, realm}) => {
+  const isRental = (realm || '').trim().toLowerCase() === 'rental'; 
   const [cards, setCards] = useState([]);
   const [tablesMap, setTablesMap] = useState({});
   const [menuItemsMap, setMenuItemsMap] = useState({});
   const [loading, setLoading] = useState(true);
   const [orderFilter, setOrderFilter] = useState('ALL');
   const [showAggregate, setShowAggregate] = useState(false);
-
+  const [nowTick, setNowTick] = useState(Date.now());
   // ── Date filter ──────────────────────────────────────────────────────────
   // Defaults to today (live view). Selecting an earlier date switches the
   // page into a "missed orders" lookup mode: same hide-served filtering,
@@ -610,7 +696,11 @@ const customToValRef = useRef(todayDate);
 useEffect(() => { datePresetRef.current = datePreset; }, [datePreset]);
 useEffect(() => { customFromValRef.current = customFrom; }, [customFrom]);
 useEffect(() => { customToValRef.current = customTo; }, [customTo]);
-
+useEffect(() => {                                      // ← add
+  if (!isRental) return;
+  const t = setInterval(() => setNowTick(Date.now()), 30000);
+  return () => clearInterval(t);
+}, [isRental]);
   // Stores the canonical item order (array of item ids) per card_id.
   // Persists across re-renders and poll ticks so item positions never shift.
   const itemOrderRef = useRef({});
@@ -1021,7 +1111,7 @@ useEffect(() => { customToValRef.current = customTo; }, [customTo]);
                     card={card}
                     tablesMap={tablesMap}
                     menuItemsMap={menuItemsMap}
-                    onItemStatusChange={handleItemStatusChange}
+                    onItemStatusChange={handleItemStatusChange} nowTick={nowTick} isRental={isRental} 
                   />
                 ))}
               </div>
@@ -1043,3 +1133,7 @@ useEffect(() => { customToValRef.current = customTo; }, [customTo]);
 };
 
 export default KitchenDisplay;
+
+// ====================================================== ============================================================= //
+// ====================================================== ============================================================= //
+// ====================================================== ============================================================= //
