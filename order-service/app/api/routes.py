@@ -27,7 +27,7 @@ from services.order_service import (
     _merge_group,
     _deduct_stock_for_order,
     _convert,
-    update_order_status_service,
+    update_order_status_service,_is_rental_realm
 )
 from services.order_status import _status_label
 from decimal import Decimal
@@ -69,7 +69,9 @@ def create_order(client_id: str, order: DineinOrderModel, context: SaasContext =
         db.add(db_item)
     db.commit()
     db.refresh(db_order)
-
+    if _is_rental_realm(context):
+       _deduct_stock_for_order(db=db, client_id=client_id, order_id=db_order.id, context=context)
+    db.commit()
     db_items = db.query(Db_OrderItem_Entity).filter(Db_OrderItem_Entity.order_id == db_order.id).all()
     order_items = [
         OrderItemModel(
@@ -130,7 +132,9 @@ def create_sub_order(
 
     db.commit()
     db.refresh(db_sub_order)
-
+    if _is_rental_realm(context):
+        _deduct_stock_for_order(db=db, client_id=client_id, order_id=db_sub_order.id, context=context)
+    db.commit()
     order_items = [
         OrderItemModel(
             id=i.id, order_id=i.order_id, client_id=i.client_id,
