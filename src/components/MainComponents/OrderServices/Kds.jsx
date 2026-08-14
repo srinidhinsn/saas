@@ -928,7 +928,51 @@ useEffect(() => {                                      // ← add
 }, [datePreset, customFrom, customTo]);
 
   // ─── Item status change ───────────────────────────────────────────────────────
-
+  const restoreStockForReturnedItem = async (item) => {
+    const menuRecord = menuItemsMap[String(item.item_id)];
+    if (!menuRecord) return;
+  
+    const qty = item.quantity || 1;
+    const isCombo = isComboItem(item, menuRecord);
+  
+    // Combo parents have no stock of their own — restore each child instead
+    const targets = isCombo
+      ? (menuRecord.line_item_id || [])
+          .map((id) => menuItemsMap[String(id)])
+          .filter(Boolean)
+      : [menuRecord];
+  
+    const updates = {}; // itemId -> newAvailability
+    targets.forEach((t) => {
+      if (t.availability == null) return; // item doesn't track stock
+      updates[t.id] = Number(t.availability) + qty;
+    });
+  
+    if (Object.keys(updates).length === 0) return;
+  
+    try {
+      await axios.post(
+        `${import.meta.env.VITE_API_INVENTORY_SERVICE_URL}/${clientIdRef.current}/menu/update`,
+        { items: Object.entries(updates).map(([id, availability]) => ({ id: Number(id), availability })) },
+        { headers: { Authorization: `Bearer ${tokenRef.current}` } }
+      );
+  
+      // Instant local reflection everywhere menuCache is read (e.g. TakeOrder menu grid)
+      menuCache.patchAvailability(clientIdRef.current, updates);
+  
+      // Keep this component's own map fresh too, in case the same item shows up again
+      setMenuItemsMap((prev) => {
+        const next = { ...prev };
+        Object.entries(updates).forEach(([id, availability]) => {
+          if (next[id]) next[id] = { ...next[id], availability };
+        });
+        return next;
+      });
+    } catch (err) {
+      console.error('Failed to restore stock for returned item:', err);
+      toast.error('Stock restore failed for this item');
+    }
+  };
   const handleItemStatusChange = async (cardId, itemId, newStatus) => {
     const card = cards.find((c) => c.card_id === cardId);
     if (!card) return;
@@ -995,12 +1039,18 @@ useEffect(() => {                                      // ← add
         itemsPayload,
         { headers: { Authorization: `Bearer ${tokenRef.current}` } }
       );
-
-      await axios.post(
-        `${import.meta.env.VITE_API_ORDER_SERVICE_URL}/${clientIdRef.current}/dinein/update`,
-        { id: card.sub_order_id, status: derivedStatus },
-        { headers: { Authorization: `Bearer ${tokenRef.current}` } }
-      );
+      const wasAlreadyReturned = previousStatusMap[targetItem.id] === KDS_CONFIG.STATUS.SERVED;
+      if (isRental && newStatus === KDS_CONFIG.STATUS.SERVED && !wasAlreadyReturned) {
+        await restoreStockForReturnedItem(targetItem);
+      }
+      const shouldSkipOrderStatusPush = isRental && derivedStatus === KDS_CONFIG.STATUS.SERVED;
+      if (!shouldSkipOrderStatusPush) {
+        await axios.post(
+          `${import.meta.env.VITE_API_ORDER_SERVICE_URL}/${clientIdRef.current}/dinein/update`,
+          { id: card.sub_order_id, status: derivedStatus },
+          { headers: { Authorization: `Bearer ${tokenRef.current}` } }
+        );
+      }
 
       if (derivedStatus === KDS_CONFIG.STATUS.READY && card.status !== KDS_CONFIG.STATUS.READY) {
         window.dispatchEvent(
@@ -1133,7 +1183,3 @@ useEffect(() => {                                      // ← add
 };
 
 export default KitchenDisplay;
-
-// ====================================================== ============================================================= //
-// ====================================================== ============================================================= //
-// ====================================================== ============================================================= //
