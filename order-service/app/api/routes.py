@@ -46,8 +46,10 @@ def create_order(client_id: str, order: DineinOrderModel, context: SaasContext =
         if not selected_address:
             raise HTTPException(status_code=404,detail=f"Address id '{order.delivery_address}' not found")
         delivery_address_id = str(selected_address.id)
+    is_rental = _is_rental_realm(context)
+    order_status = OrderStatusEnum.served if is_rental else order.status    
     db_order = Db_Order_Entity( customer_id=order.customer_id,delivery_address=delivery_address_id,
-        client_id=client_id, table_id=order.table_id, status=_status_label(context, order.status) or order.status,
+        client_id=client_id, table_id=order.table_id, status=_status_label(context, order_status) or order_status,
         price=order.price, gst=order.gst, cst=order.cst, discount=order.discount,
         invoice_status=order.invoice_status, total_price=order.total_price,
         invoice_id=order.invoice_id, dinein_order_id=None,
@@ -55,21 +57,22 @@ def create_order(client_id: str, order: DineinOrderModel, context: SaasContext =
     )
     db.add(db_order)
     db.flush()
-
     # dinein_order_id for a fresh order = its own PK
     db_order.dinein_order_id = str(db_order.id)
 
     for item in order.items:
+        item_status = OrderStatusEnum.served if is_rental else item.status
         db_item = Db_OrderItem_Entity(
            order_id=db_order.id, client_id=client_id, item_id=item.item_id,
            item_name=item.item_name, slug=item.slug, quantity=item.quantity,
            unit_price=item.unit_price,   line_total=item.line_total,
-        frontend_unique_key=item.frontend_unique_key,  status=_status_label(context, item.status) or item.status,
+        frontend_unique_key=item.frontend_unique_key,  status=_status_label(context, item_status ) or item_status,
         )
         db.add(db_item)
-    db.flush()
+        db.flush()  
+    
     if _is_rental_realm(context):
-       _deduct_stock_for_order(db=db, client_id=client_id, order_id=db_order.id, context=context)
+       _deduct_stock_for_order(db=db, client_id=client_id, order_id=db_order.id, context=context) 
     db.commit()
     db.refresh(db_order)
     db_items = db.query(Db_OrderItem_Entity).filter(Db_OrderItem_Entity.order_id == db_order.id).all()
@@ -101,7 +104,8 @@ def create_sub_order(
     ).first()
     if not root_order:
         raise HTTPException(status_code=404, detail=f"Parent order '{parent_dinein_order_id}' not found")
-
+    is_rental = _is_rental_realm(context)
+    order_status = OrderStatusEnum.served if is_rental else OrderStatusEnum.pending
     existing_sub_count = db.query(Db_Order_Entity).filter(
         Db_Order_Entity.client_id == client_id,
         Db_Order_Entity.dinein_order_id.like(f"{parent_dinein_order_id}-%"),
@@ -112,7 +116,7 @@ def create_sub_order(
         client_id=client_id,
         dinein_order_id=sub_dinein_order_id,
         table_id=root_order.table_id,
-        status=_status_label(context, OrderStatusEnum.pending) or OrderStatusEnum.pending,
+        status=_status_label(context,order_status) or order_status,
         price=order.price, gst=0, cst=0, total_price=order.total_price,
         created_by=order.created_by, invoice_id=None, invoice_status=None,
     )
@@ -125,7 +129,7 @@ def create_sub_order(
             item_id=item.item_id, item_name=item.item_name, slug=item.slug,
             quantity=item.quantity, unit_price=item.unit_price,
              line_total=item.line_total,  
-            status=_status_label(context, OrderStatusEnum.pending) or OrderStatusEnum.pending,
+            status=_status_label(context, order_status) or order_status,
             frontend_unique_key=item.frontend_unique_key,
         )
         db.add(db_item)
@@ -544,6 +548,7 @@ def cancel_order(
     context: SaasContext = Depends(verify_token),
     db: Session = Depends(get_db),
 ):
+    is_rental = _is_rental_realm(context)
     root_order = (
         db.query(Db_Order_Entity)
         .filter(
@@ -559,9 +564,14 @@ def cancel_order(
     effective_reason = resolve_reason(reason, TransactionTypeEnum.order_cancelled)
 
     def _tx(item_id, tx_type, qty, tag, name, ref_id=None):
+        after_stock = None
+        inv = db.query(InventoryEntity).filter(InventoryEntity.id == item_id,InventoryEntity.client_id == client_id,).first()
+        if inv:
+           current = Decimal(str(inv.availability or 0))
+           after_stock = current + Decimal(str(qty))
         create_transaction(
             db=db, context=context,
-            payload=TxPayload(item_id=item_id, tx_type=tx_type, ref_id=ref_id or order_id, qty=qty, remarks=build_remark(tag, ref_id or order_id, name, qty, effective_reason))
+            payload=TxPayload(item_id=item_id, tx_type=tx_type, ref_id=ref_id or order_id, qty=qty,after_stock=after_stock, remarks=build_remark(tag, ref_id or order_id, name, qty, effective_reason))
         )
 
     root_dinein_id = _root_dinein_id(
@@ -617,7 +627,7 @@ def cancel_order(
                 continue
 
             ordered_qty = item.quantity or 1
-            tx_type     = TransactionTypeEnum.wastage if is_served else TransactionTypeEnum.item_cancelled
+            tx_type = (TransactionTypeEnum.item_cancelled if is_rental  else (TransactionTypeEnum.wastage if is_served else TransactionTypeEnum.item_cancelled))
 
             category = (
                 db.query(CategoryEntity)
