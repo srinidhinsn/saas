@@ -4,7 +4,7 @@ import { FaPlus } from 'react-icons/fa';
 import axios from 'axios';
 import AddonSelectionPopup from './AddonSelection';
 import ComboSelectionPopup from './CombosSelectionPopup';
-import {isRentalRealm, isRentalCategoryId} from '../Menu-utils/menuUtils'
+import {isRentalRealm} from '../Menu-utils/menuUtils'
 const UniversalAddModal = ({
   // Common props
   showModal,
@@ -314,7 +314,7 @@ const UniversalAddModal = ({
                   className="w-full px-4 py-2 rounded-lg bg-bg-tertiary border border-border-default text-text-primary focus:outline-none focus:ring-2 focus:ring-action-primary"
                   placeholder={isComboCategory ? "What's included, portion details…" : "Enter item description"} rows="3" />
               </div>
-              {isRentalRealm(normalizedRealm) && isRentalCategoryId(newItem?.category_id, categoriesFlat) && (
+              {isRentalRealm(normalizedRealm) &&  (
                   <div>
                        <label className="block text-sm font-medium mb-2 text-text-primary">
                              Rental Tier <span className="text-red-600">*</span>

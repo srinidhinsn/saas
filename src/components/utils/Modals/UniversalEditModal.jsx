@@ -4,7 +4,7 @@ import MenuImagePreview from '../../MainComponents/InventoryServices/Tree&Catego
 import AddonSelectionPopup from './AddonSelection';
 import ComboSelectionPopup from './CombosSelectionPopup';
 import axios from 'axios';
-import {isRentalRealm, isRentalCategoryId} from '../Menu-utils/menuUtils'
+import {isRentalRealm} from '../Menu-utils/menuUtils'
 const UniversalEditModal = ({
   // Common props
   showModal,
@@ -296,7 +296,7 @@ const UniversalEditModal = ({
                     rows="3"
                   />
                 </div>
-            {isRentalRealm(normalizedRealm) && isRentalCategoryId(editingItem?.category_id, categoriesFlat) && (
+            {isRentalRealm(normalizedRealm) && (
                 <div>
                      <label className="block text-sm font-medium mb-2 text-text-primary">
                            Rental Tier <span className="text-red-600">*</span>

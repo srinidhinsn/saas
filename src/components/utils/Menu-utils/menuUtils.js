@@ -395,16 +395,14 @@ export const isRentalRealm = (realm) => {
   return (realm || '').toLowerCase() === 'rental';
 };
 
-export const isRentalCategoryId = (categoryId, categoriesFlat) => {
-  if (!categoryId || !categoriesFlat?.length) return false;
-  let currentId = categoryId;
-  const visited = new Set();
-  while (currentId && !visited.has(currentId)) {
-    visited.add(currentId);
-    const cat = categoriesFlat.find(c => c.id === currentId);
-    if (!cat) break;
-    if ((cat.name || '').toLowerCase().includes('rental')) return true;
-    currentId = cat.parentId ?? null;
-  }
-  return false;
+export const generateTierId = () => {
+  const now = new Date();
+  const pad = (n) => String(n).padStart(2, '0');
+
+  const stamp =
+    `${now.getFullYear()}${pad(now.getMonth() + 1)}${pad(now.getDate())}` +
+    `${pad(now.getHours())}${pad(now.getMinutes())}${pad(now.getSeconds())}` +
+    `${now.getMilliseconds()}`;
+
+  return `tier_${stamp}`;
 };
