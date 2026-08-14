@@ -15,11 +15,7 @@ from models.saas_context import SaasContext
 
 def _is_rental_realm(context) -> bool:
     return (resolve_realm_from_context(context) or "").strip().lower() == "rental"
-def _restore_stock_for_order(db: Session, client_id: str, order_id: int, context: SaasContext) -> None:
-    _deduct_stock_for_order(
-        db=db, client_id=client_id, order_id=order_id, context=context,
-        tx_type=TransactionTypeEnum.item_cancelled,   # == "ORDER_RETURNED"
-    )
+
 def build_billing_payload_from_order(order: DBOrder, items: List[DBOrderItem]) -> Dict[str, Any]:
     return {
         "client_id": order.client_id,
@@ -186,21 +182,11 @@ def _convert(recipe_qty: float, recipe_unit: str, stock_unit: str) -> float:
     raise ValueError(f"Incompatible unit dimensions: recipe='{ru}', stock='{su}'")
 
 # ── Stock deduction ──────────────────────────────────────────────────────────
-def _deduct_stock_for_order(db: Session, client_id: str, order_id: int, context: SaasContext,tx_type: TransactionTypeEnum = TransactionTypeEnum.order_deduction) -> None:
-    is_restore = tx_type == TransactionTypeEnum.item_cancelled 
-    def _tx(item_id, qty,tag, name):
-        after_stock = None
-        if is_restore:
-            item = db.query(InventoryEntity).filter(
-                InventoryEntity.id == item_id,
-                InventoryEntity.client_id == client_id,
-            ).first()
-            if item:
-                current = Decimal(str(item.availability or 0))
-                after_stock = current + Decimal(str(qty))   
+def _deduct_stock_for_order(db: Session, client_id: str, order_id: int, context: SaasContext) -> None: 
+    def _tx(item_id, tx_type, qty, remarks):
         create_transaction(
             db=db, context=context,
-            payload=TxPayload(item_id=item_id, tx_type=tx_type, ref_id=order_id, qty=qty, after_stock=after_stock, remarks=f"[{tag}] Order #{order_id} | {name} x{qty}")
+            payload=TxPayload(item_id=item_id, tx_type=tx_type, ref_id=order_id, qty=qty, remarks=remarks)
         )
 
     def _deduct_single_item(menu_item, ordered_qty, label):
@@ -214,11 +200,27 @@ def _deduct_stock_for_order(db: Session, client_id: str, order_id: int, context:
                 total = round(
                     _convert(serving_qty, serving_unit, stock_unit) * ordered_qty, 6
                 )
-                _tx(menu_item.id, total, label, menu_item.name)  
+                _tx(
+                    menu_item.id,
+                    TransactionTypeEnum.order_deduction,
+                    total,
+                    f"[{label}] Order #{order_id} | {menu_item.name} x{ordered_qty}",
+                )
+
             except ValueError:
-                _tx(menu_item.id, ordered_qty, label, menu_item.name) 
+                _tx(
+                    menu_item.id,
+                    TransactionTypeEnum.order_deduction,
+                    ordered_qty,
+                    f"[{TransactionTypeEnum.order_deduction.value}] Order #{order_id} | {menu_item.name} x{ordered_qty}",
+                )
         else:
-            _tx(menu_item.id, ordered_qty, label, menu_item.name)  
+            _tx(
+                menu_item.id,
+                TransactionTypeEnum.order_deduction,
+                ordered_qty,
+                f"[{TransactionTypeEnum.order_deduction.value}] Order #{order_id} | {menu_item.name} x{ordered_qty}",
+            ) 
 
         # Recipe ingredients
         for ingredient in (menu_item.recipe or []):
@@ -247,7 +249,12 @@ def _deduct_stock_for_order(db: Session, client_id: str, order_id: int, context:
                 total = round(
                     _convert(recipe_qty, recipe_unit, ing_stock_unit) * ordered_qty, 6
                 )
-                _tx(stock_item.id, total, f"{label}_RECIPE", menu_item.name)
+                _tx(
+                    stock_item.id,
+                    TransactionTypeEnum.order_deduction,
+                    total,
+                    f"[{label}_RECIPE] Order #{order_id} | {menu_item.name}",
+                )
             except ValueError:
                 continue
 
@@ -366,9 +373,10 @@ def update_order_status_service(client_id: str, body: DineinOrderModel, context,
 
     # ── Served / completed — only the single order passed in ───────────────
     if body.status in [OrderStatusEnum.served, OrderStatusEnum.completed]:
-        is_rental = _is_rental_realm(context)
-        already_finalized = order.status in [OrderStatusEnum.served, OrderStatusEnum.completed]
-
+        should_deduct = order.status not in [
+            OrderStatusEnum.served,
+            OrderStatusEnum.completed
+        ]
         resolved_status = _status_label(context, body.status) or body.status
         order.status = resolved_status
 
@@ -388,11 +396,8 @@ def update_order_status_service(client_id: str, body: DineinOrderModel, context,
         db.flush()
 
         deducted_count = 0
-        if not already_finalized:
-            if is_rental:
-                _restore_stock_for_order(db=db, client_id=client_id, order_id=order.id, context=context)
-            else:
-                _deduct_stock_for_order(db=db, client_id=client_id, order_id=order.id, context=context)
+        if should_deduct:
+            _deduct_stock_for_order(db=db, client_id=client_id, order_id=order.id, context=context)
             deducted_count += 1
 
         db.commit()
