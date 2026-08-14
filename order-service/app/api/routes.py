@@ -67,11 +67,11 @@ def create_order(client_id: str, order: DineinOrderModel, context: SaasContext =
         frontend_unique_key=item.frontend_unique_key,  status=_status_label(context, item.status) or item.status,
         )
         db.add(db_item)
-    db.commit()
-    db.refresh(db_order)
+    db.flush()
     if _is_rental_realm(context):
        _deduct_stock_for_order(db=db, client_id=client_id, order_id=db_order.id, context=context)
     db.commit()
+    db.refresh(db_order)
     db_items = db.query(Db_OrderItem_Entity).filter(Db_OrderItem_Entity.order_id == db_order.id).all()
     order_items = [
         OrderItemModel(
