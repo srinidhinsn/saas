@@ -69,7 +69,7 @@ def create_order(client_id: str, order: DineinOrderModel, context: SaasContext =
         frontend_unique_key=item.frontend_unique_key,  status=_status_label(context, item_status ) or item_status,
         )
         db.add(db_item)
-        db.flush()  
+    db.flush()  
     
     if _is_rental_realm(context):
        _deduct_stock_for_order(db=db, client_id=client_id, order_id=db_order.id, context=context) 
