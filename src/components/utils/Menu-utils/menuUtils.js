@@ -406,3 +406,14 @@ export const generateTierId = () => {
 
   return `tier_${stamp}`;
 };
+export const buildRentalTier = (rentalTier) => {
+  if (!rentalTier?.label?.trim()) return null;
+
+  return {
+    rental_tier_id: rentalTier.rental_tier_id || generateTierId(),
+    label: rentalTier.label.trim(),
+    days: Number(rentalTier.days) || 0,
+    hours: Number(rentalTier.hours) || 0,
+    minutes: Number(rentalTier.minutes) || 0,
+  };
+};

@@ -11,7 +11,7 @@ import { jwtDecode } from "jwt-decode";
 import { getMenuConfig } from '../../utils/menuConfigResolver';
 import MenuConfigModal from '../../utils/Modals/MenuConfigModal';
 import { menuCache } from '../../utils/Menu-utils/menuCache';
-import { getDietaryFromSlug, isItemActive, generateSlug, toSlugSegment, isPackagingCategoryId,generateTierId,isRentalRealm} from '../../utils/Menu-utils/menuUtils';
+import { getDietaryFromSlug, isItemActive, generateSlug, toSlugSegment, isPackagingCategoryId,generateTierId,isRentalRealm,buildRentalTier} from '../../utils/Menu-utils/menuUtils';
 import {useDietaryTypes, useTimings, useZoneConfig, useMenuData} from '../../utils/Menu-utils/useMenuData';
 
 const MenuManagement = ({ clientId, token,screenIds, userId, realm }) => {
@@ -452,10 +452,7 @@ if (cachedAddon) return cachedAddon;
 
 // AFTER
       const { dietary_type, rentalTier,...cleanNewItem } = newItem;
-      const cleanedTier = rentalTier?.label?.trim()? {
-                          rental_tier_id: rentalTier.rental_tier_id || generateTierId(),label: rentalTier.label.trim(),
-                          days: Number(rentalTier.days) || 0,hours: Number(rentalTier.hours) || 0,minutes: Number(rentalTier.minutes) || 0,}
-                          : null;
+      const cleanedTier = buildRentalTier(rentalTier);
 const slug = (() => {
   const parts = [];
   let currentId = finalCategoryId;
@@ -603,10 +600,7 @@ const slug = (() => {
 
       // ✅ Build slug with dietary injected — same pattern as import
       const { dietary_type, zonePrices: zp,rentalTier, ...cleanEditingItem } = editingItem;
-      const cleanedTier = rentalTier?.label?.trim()? {
-                          rental_tier_id: rentalTier.rental_tier_id || generateTierId(),label: rentalTier.label.trim(),
-                          days: Number(rentalTier.days) || 0,hours: Number(rentalTier.hours) || 0,minutes: Number(rentalTier.minutes) || 0,}
-                          : null;
+      const cleanedTier = buildRentalTier(rentalTier);
       const slug = (() => {
         const parts = [];
         let currentId = finalCategoryId;
