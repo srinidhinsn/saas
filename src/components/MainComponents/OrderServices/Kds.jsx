@@ -549,7 +549,7 @@ const KitchenCard = ({
                     <button
                       type="button"
                       disabled={isPending || isCancelled}
-                      onClick={() => handleStatusClick(card.card_id, item.id, KDS_CONFIG.STATUS.SERVED)}
+                      onClick={() => handleStatusClick(card.card_id, item.id, KDS_CONFIG.STATUS.CANCELLED)}
                       title="Mark as Returned"
                       className={`flex items-center gap-1.5 px-3 py-1.5 rounded-md text-xs font-semibold transition-colors
                         ${isPending || isCancelled
@@ -988,13 +988,6 @@ useEffect(() => {                                      // ← add
       parent_item_key: item.id !== targetItem.id ? targetItem.frontend_unique_key : null,
     });
 
-      const itemsPayload = [targetItem, ...packagingChildren].map(buildPayload);
-
-      await axios.post(
-        `${import.meta.env.VITE_API_ORDER_SERVICE_URL}/${clientIdRef.current}/order_items/update?order_id=${card.sub_order_id}`,
-        itemsPayload,
-        { headers: { Authorization: `Bearer ${tokenRef.current}` } }
-      );
       if (isRental) {
         await axios.post(
           `${import.meta.env.VITE_API_ORDER_SERVICE_URL}/${clientIdRef.current}/dinein/cancel`,
@@ -1003,6 +996,13 @@ useEffect(() => {                                      // ← add
             params: { client_id: clientIdRef.current, order_id: card.sub_order_id, reason: 'Rental item returned' },
             headers: { Authorization: `Bearer ${tokenRef.current}` },
           }
+        );
+      } else {
+        const itemsPayload = [targetItem, ...packagingChildren].map(buildPayload);
+        await axios.post(
+          `${import.meta.env.VITE_API_ORDER_SERVICE_URL}/${clientIdRef.current}/order_items/update?order_id=${card.sub_order_id}`,
+          itemsPayload,
+          { headers: { Authorization: `Bearer ${tokenRef.current}` } }
         );
       }
 
