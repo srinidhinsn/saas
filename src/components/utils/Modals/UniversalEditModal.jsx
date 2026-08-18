@@ -4,7 +4,7 @@ import MenuImagePreview from '../../MainComponents/InventoryServices/Tree&Catego
 import AddonSelectionPopup from './AddonSelection';
 import ComboSelectionPopup from './CombosSelectionPopup';
 import axios from 'axios';
-
+import {isRentalRealm} from '../Menu-utils/menuUtils'
 const UniversalEditModal = ({
   // Common props
   showModal,
@@ -296,6 +296,31 @@ const UniversalEditModal = ({
                     rows="3"
                   />
                 </div>
+            {isRentalRealm(normalizedRealm) && (
+                <div>
+                     <label className="block text-sm font-medium mb-2 text-text-primary">
+                           Rental Tier <span className="text-red-600">*</span>
+                     </label>
+                     <div className="flex gap-2 items-center bg-bg-tertiary border border-border-default rounded-lg p-2">
+                         <input  value={editingItem?.rentalTier?.label || ''} placeholder="e.g. Half Day"
+                                 onChange={(e) => setEditingItem(prev => ({ ...prev,
+                                                  rentalTier: { ...(prev?.rentalTier || {}), label: e.target.value } }))}
+                                 className="flex-1 px-3 py-2 rounded-lg border border-border-default text-sm bg-bg-primary"/>
+                         <input type="number" min="0" value={editingItem?.rentalTier?.days ?? ''} placeholder="Days"
+                                onChange={(e) => setEditingItem(prev => ({...prev,
+                                                 rentalTier: { ...(prev?.rentalTier || {}), days: e.target.value }}))}
+                                className="w-16 px-2 py-2 rounded-lg border border-border-default text-sm bg-bg-primary"/>
+                         <input type="number" min="0" value={editingItem?.rentalTier?.hours ?? ''} placeholder="Hrs"
+                                onChange={(e) => setEditingItem(prev => ({ ...prev,
+                                                 rentalTier: { ...(prev?.rentalTier || {}), hours: e.target.value }}))}
+                                className="w-16 px-2 py-2 rounded-lg border border-border-default text-sm bg-bg-primary"/>
+                         <input type="number" min="0" value={editingItem?.rentalTier?.minutes ?? ''} placeholder="Min"
+                                onChange={(e) => setEditingItem(prev => ({ ...prev,
+                                                 rentalTier: { ...(prev?.rentalTier || {}), minutes: e.target.value }}))}
+                                className="w-16 px-2 py-2 rounded-lg border border-border-default text-sm bg-bg-primary"/>
+                     </div>
+                {!editingItem?.rentalTier?.label && ( <p className="text-xs text-red-500 mt-1">Enter rental tier details</p> )}
+                </div> )}
                 {normalizedRealm === 'restaurant' && (
   <div>
     <label className="block text-sm font-medium mb-1 text-gray-700">
