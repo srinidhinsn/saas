@@ -69,7 +69,7 @@ def resolve_base_status(context, realm_status_value):
 class TransactionTypeEnum(str, Enum):
     order_deduction = "ORDER_DEDUCTION"
     menu_item_deduction = "MENU_ITEM_DEDUCTION"
-    item_cancelled = "ITEM_CANCELLED"
+    item_cancelled = "ORDER_RETURNED"
     wastage = "WASTAGE"
     order_cancelled = "ORDER_CANCELLED"
     combo_child_wastage = "COMBO_CHILD_WASTAGE"
