@@ -41,9 +41,11 @@ async def add_user(client_id: str, userReq: UserModel, context: SaasContext = De
 
     if not has_user_permission(perms, "users", "add"):
         raise HTTPException(status_code=403, detail="User add not allowed")
-
+    client = db.query(Client).filter(Client.id == client_id).first()
+    if not client:
+        raise HTTPException(status_code=404, detail="Client not found")
     return await create_user_and_person(client_id=client_id, userReq=userReq, db=db,
-                                        token_realm=context.grants[0] if context.grants else None)
+                                        token_realm=client.realm)
 
 # ================== REGISTER USER ==================
 @router.post("/register")
@@ -52,9 +54,10 @@ async def register_user(client_id: str, userReq: UserModel, context: SaasContext
 
     if not has_user_permission(perms, "users", "register"):
         raise HTTPException(403, "User registration not allowed")
-
-    token_realm = context.grants[0] if context.grants else None
-    return await create_user_and_person(client_id=client_id, userReq=userReq, db=db, token_realm=token_realm)
+    client = db.query(Client).filter(Client.id == client_id).first()
+    if not client:
+        raise HTTPException(status_code=404, detail="Client not found")
+    return await create_user_and_person(client_id=client_id, userReq=userReq, db=db, token_realm=client.realm)
   
 @router.post("/client-register")
 async def client_register(client_id: str,reg_type: str,user: UserModel,address: AddressModel| None = None,client: ClientModel | None = None,db: Session = Depends(get_db),):

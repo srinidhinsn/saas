@@ -104,33 +104,51 @@ def get_user_role_permissions(db, client_id: str, role: str):
 def get_user_perms(context, db, client_id):
     roles = [r.lower().strip() for r in (context.roles or [])]
     if "super_admin" in roles:
-        return {"__super_admin__": {"ALL"}}
+        return {"__super_admin__": {"mode": "include", "ops": {"ALL"}}}
     perms = {}    
     for role in roles:
         rows = (db.query(PageDefinition).filter(
                 PageDefinition.client_id == client_id,func.lower(PageDefinition.role) == role).all())
 
         for r in rows:
+            ops = set(r.operations or [])
+            entry = perms.get(r.module)
+            if entry is None:
+                perms[r.module] = {"mode" : r.load_type, "ops" : ops}
+                continue
             if r.load_type == "include":
-                perms.setdefault(r.module, set()).update(r.operations or [])
-            elif r.load_type == "exclude":
-                perms.setdefault(r.module, set()).difference_update(
-                    r.operations or [])
+               if entry["mode"] == "include":
+                    entry["ops"].update(ops)
+               else:
+                    entry["ops"] -= ops 
+            else:
+                if entry["mode"] == "include":
+                    entry["ops"] -= ops
+                else:
+                    entry["ops"].update(ops)
     return perms
 
 def has_user_permission(role_perms, module: str, operation: str | None = None):
-    if "ALL" in role_perms.get("__super_admin__", set()):
+    super_admin = role_perms.get("__super_admin__")
+    if super_admin and "ALL" in super_admin["ops"]:
         return True
-    ops = role_perms.get(module, set())
-    if "ALL" in ops:
+
+    entry = role_perms.get(module)
+    if not entry:
+        return False
+
+    mode, ops = entry["mode"], entry["ops"]
+
+    if mode == "include":
+        if "ALL" in ops:
+            return True
+        if operation:
+            return any(op == operation or op.startswith(f"{operation}/") for op in ops)
+        return bool(ops)
+    else:
+        if operation:
+            return not any(op == operation or op.startswith(f"{operation}/") for op in ops)
         return True
-    
-    if operation:
-        return any(
-            op == operation or op.startswith(f"{operation}/")
-            for op in ops
-        )
-    return bool(ops)
 
 # Login Service
 
