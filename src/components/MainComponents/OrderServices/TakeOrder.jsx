@@ -3103,10 +3103,13 @@ const handleWalkInSelect = async () => {
   }
 };
 
-const handleAddMainItemWithSelectedAddons = (selectedAddonIds) => {
+  const handleAddMainItemWithSelectedAddons = (selectedAddonIds) => { 
   if (!selectedMainItem) return;
   let batch = currentBatchTimestamp;
-  if (!batch) { batch = Date.now(); setCurrentBatchTimestamp(batch); }
+  if (!batch) {
+    batch = Date.now();
+    setCurrentBatchTimestamp(batch);
+  }
 
   const selectedAddons = lineItemsDetails.filter(i => selectedAddonIds.includes(i.id));
   const packaging = pendingPackagingItems;
@@ -3116,8 +3119,7 @@ const handleAddMainItemWithSelectedAddons = (selectedAddonIds) => {
       const addonEntry = buildCartItem(addon, {
         batch_timestamp: batch,
         parent_item_key: mainKey,
-        is_addon: true,
-        _item_type: 'addon',
+        is_addon: true, _item_type: 'addon',
       });
       setCart(prev => [...prev, addonEntry]);
       if (getAvailability(addon) != null) adjustAvailability(addon.id, -1);
