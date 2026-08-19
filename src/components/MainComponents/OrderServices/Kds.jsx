@@ -4,8 +4,10 @@ import { useParams } from 'react-router-dom';
 import { toast } from 'react-toastify';
 import 'react-toastify/dist/ReactToastify.css';
 import { FaCheckCircle, FaClock, FaHourglassHalf, FaConciergeBell } from 'react-icons/fa';
-import { Filter, Clock, Users, Package, Truck, Trash2, BarChart2, X, ChevronRight } from 'lucide-react';
-
+import { Filter, Clock, Users, Package, Truck, Trash2, BarChart2, X, ChevronRight, Calendar, RotateCcw } from 'lucide-react';
+import { menuCache } from '../../utils/Menu-utils/menuCache';
+import { parseISTTimestamp, getDateRangeFromPreset, DateRangeFilter } from '../../utils/dateRange';
+import { isPackagingMenuRecord } from '../../utils/Menu-utils/menuUtils';
 // ─── Constants ─────────────────────────────────────────────────────────────────
 
 
@@ -45,21 +47,6 @@ const ORDER_FILTER_OPTIONS = [
   { key: KDS_CONFIG.FILTERS.DELIVERY, label: 'Delivery', Icon: Truck },
 ];
 
-const IST_OFFSET_MS = 5.5 * 60 * 60 * 1000;
-
-const parseISTTimestamp = (createdAt) => {
-  if (!createdAt) return 0;
-  const raw = typeof createdAt === 'string'
-    ? createdAt.replace(' ', 'T').split('.')[0]
-    : String(createdAt);
-  // If the string already carries timezone info, parse as-is
-  const hasZone = raw.endsWith('Z') || /[+-]\d{2}:\d{2}$/.test(raw);
-  return hasZone
-    ? new Date(raw).getTime()
-    : new Date(raw + 'Z').getTime() - IST_OFFSET_MS;
-};
-
-
 // ─── Elapsed time helper ───────────────────────────────────────────────────────
 
 const calculateElapsedTime = (createdAt) => {
@@ -77,24 +64,67 @@ const calculateElapsedTime = (createdAt) => {
   if (hours > 0) return `${hours}h ${minutes}m`;
   return `${totalMinutes}m`;
 };
+const formatRentedDate = (createdAt) => {
+  if (!createdAt) return '—';
+  const d = new Date(parseISTTimestamp(createdAt));
+  return d.toLocaleDateString('en-GB', { day: '2-digit', month: 'short', year: 'numeric' });
+};
 
+const calculateAgingDays = (createdAt) => {
+  if (!createdAt) return 0;
+  const diffMs = Date.now() - parseISTTimestamp(createdAt);
+  if (diffMs < 0) return 0;
+  return Math.floor(diffMs / (1000 * 60 * 60 * 24));
+};
+
+const getRentalTier = (menuRecord) => {
+  if (!menuRecord || !Array.isArray(menuRecord.recipe) || menuRecord.recipe.length === 0) return null;
+  const tier = menuRecord.recipe[0];
+  if (!tier) return null;
+  const days = Number(tier.days) || 0;
+  const hours = Number(tier.hours) || 0;
+  const minutes = Number(tier.minutes) || 0;
+  if (days === 0 && hours === 0 && minutes === 0) return null;
+  return { days, hours, minutes, label: tier.label || '' };
+};
+
+const computeDueTimestamp = (createdAt, tier) => {
+  if (!createdAt || !tier) return null;
+  const start = parseISTTimestamp(createdAt);
+  const durationMs = ((tier.days * 24 + tier.hours) * 60 + tier.minutes) * 60 * 1000;
+  return start + durationMs;
+};
+
+const formatDurationDDMM = (totalMs) => {
+  const totalMinutes = Math.max(0, Math.floor(totalMs / 60000));
+  const days = Math.floor(totalMinutes / (60 * 24));
+  const hours = Math.floor((totalMinutes % (60 * 24)) / 60);
+  const minutes = totalMinutes % 60;
+  const pad = (n) => String(n).padStart(2, '0');
+  return `${days}d ${pad(hours)}:${pad(minutes)}`;
+};
 const deriveStatus = (items) => {
   const { PENDING, PREPARING, READY, SERVED } = KDS_CONFIG.STATUS;
   const activeItems = (items || []).filter((item) => {
     const status = String(item?.status || '').toLowerCase();
     return status !== KDS_CONFIG.STATUS.CANCELLED;
   });
+
   if (!activeItems.length) return PENDING;
+  if (activeItems.every((i) => i.status === SERVED)) return SERVED;
   if (activeItems.some((i) => i.status === PENDING)) return PENDING;
   if (activeItems.some((i) => i.status === PREPARING)) return PREPARING;
   if (activeItems.every((i) => i.status === READY)) return READY;
-  if (activeItems.every((i) => i.status === SERVED)) return SERVED;
-  return PENDING;
+  return READY;
 };
 
 const isCancelledStatus = (status) => {
   const normalized = String(status || '').toLowerCase();
   return normalized === KDS_CONFIG.STATUS.CANCELLED;
+};
+const isServedLikeStatus = (status) => {
+  const normalized = String(status || '').trim().toLowerCase();
+  return normalized === KDS_CONFIG.STATUS.SERVED || normalized.includes('return');
 };
 
 // ─── Derive card-level status from its items ───────────────────────────────────
@@ -197,7 +227,7 @@ const DeleteOrderModal = ({ isOpen, onClose, onConfirm, cardToDelete }) => {
 
 // ─── AggregatePanel ─────────────────────────────────────────────────────────────
 
-const AggregatePanel = ({ cards, tablesMap, onClose }) => {
+const AggregatePanel = ({ cards, tablesMap,menuItemsMap, onClose }) => {
   const aggregateMap = {};
 
   cards.forEach((card) => {
@@ -368,7 +398,7 @@ const ComboComponentsList = ({ menuRecord, menuItemsMap, parentQuantity = 1 }) =
 
 // ─── KDS card ─────────────────────────────────────────────────────────────────
 
-const groupItemsWithAddons = (items) => {
+const groupItemsWithAddons = (items, menuItemsMap) => {
   const groups = [];
   const processed = new Set();
 
@@ -379,14 +409,18 @@ const groupItemsWithAddons = (items) => {
     const isChild = fkey.startsWith('addon_') || fkey.startsWith('cchild_');
 
     if (!isChild) {
-      // Find addon children: their key starts with "addon_{thisItemsKey}_"
       const addonPrefix = `addon_${fkey}_`;
-      const addons = (items || []).filter(
+      const allAddons = (items || []).filter(
         a => (a.frontend_unique_key || '').startsWith(addonPrefix)
+      );
+      // Packaging add-ons (containers etc.) are billed but need no kitchen
+      // prep — hide them from the KDS card.
+      const addons = allAddons.filter(
+        a => !isPackagingMenuRecord(menuItemsMap[String(a.item_id)])
       );
       groups.push({ main: item, addons });
       processed.add(item.id);
-      addons.forEach(a => processed.add(a.id));
+      allAddons.forEach(a => processed.add(a.id));
     }
   });
   return groups;
@@ -396,19 +430,23 @@ const KitchenCard = ({
   card,
   tablesMap,
   menuItemsMap,
-  onItemStatusChange,
+  onItemStatusChange,nowTick = Date.now(), isRental = false, 
 }) => {
   // Track which item buttons are currently being saved to prevent double-clicks
   const [pendingItemIds, setPendingItemIds] = useState(new Set());
 
   const elapsedTime = card.created_at ? calculateElapsedTime(card.created_at) : null;
-
+  const rentedDateLabel = isRental ? formatRentedDate(card.created_at) : null;
+  const agingDays = isRental ? calculateAgingDays(card.created_at) : null;
   const allReady =
-    card.items?.length > 0 &&
-    card.items.every((i) => i.status === KDS_CONFIG.STATUS.READY);
+  card.items?.length > 0 &&
+  card.items.every((i) => i.status === KDS_CONFIG.STATUS.READY || i.status === KDS_CONFIG.STATUS.SERVED) &&
+  !card.items.every((i) => i.status === KDS_CONFIG.STATUS.SERVED);
 
   const statusColorClass =
-    allReady
+  allReady
+    ? 'text-yellow-500'
+    : card.status === KDS_CONFIG.STATUS.SERVED
       ? 'text-green-600'
       : card.status === KDS_CONFIG.STATUS.PENDING
         ? 'text-blue-600'
@@ -455,12 +493,12 @@ const KitchenCard = ({
 
       {/* ── Card body — item list ── */}
       <div className="bg-bg-primary px-4 py-4 space-y-3 flex-1">
-        {groupItemsWithAddons(card.items).map(({ main: item, addons }, idx) => {
+        {groupItemsWithAddons(card.items, menuItemsMap).map(({ main: item, addons }, idx) => {
           const menuRecord = menuItemsMap[String(item.item_id)];
           const combo = isComboItem(item, menuRecord);
           const isPending = pendingItemIds.has(item.id);
           const isCancelled = isCancelledStatus(item.status);
-
+          const isReturned = isServedLikeStatus(item.status);    
           return (
             <div key={item.id || idx} className="flex flex-col w-full rounded-lg bg-white">
               {/* Main item row — unchanged */}
@@ -477,9 +515,51 @@ const KitchenCard = ({
                       </span>
                     )}
                   </div>
+                  {isRental && !isReturned && (() => {
+                    const tier = getRentalTier(menuRecord);
+                    if (!tier) return null;
+                    const due = computeDueTimestamp(card.created_at, tier);
+                    if (due == null) return null;
+                    const remainingMs = due - nowTick;
+                    const overdue = remainingMs < 0;
+                    const durationLabel = formatDurationDDMM(Math.abs(remainingMs));
+                    return (
+                      <div className="mt-1">
+                        <span
+                          className={`inline-flex items-center gap-1 text-[11px] font-semibold px-2 py-0.5 rounded-full
+                            ${overdue ? 'bg-red-100 text-red-700' : 'bg-blue-100 text-blue-700'}`}
+                          title={tier.label ? `Tier: ${tier.label}` : undefined}
+                        >
+                          {overdue ? `⚠ Overdue ${durationLabel}` : `⏳ ${durationLabel} left`}
+                        </span>
+                      </div>
+                    );
+                  })()}
                 </div>
                 <div className="flex items-center gap-1 ml-3">
-                  <button
+                {isRental ? (
+                   isReturned ? (
+                    <span
+                      className="flex items-center gap-1.5 px-3 py-1.5 rounded-md text-xs font-semibold bg-gray-100 text-gray-500"
+                    >
+                      <FaCheckCircle size={14} className="text-green-500" />
+                      Returned
+                    </span>
+                  ) : (
+                    <button
+                      type="button"
+                      disabled={isPending || isCancelled}
+                      onClick={() => handleStatusClick(card.card_id, item.id, KDS_CONFIG.STATUS.CANCELLED)}
+                      title="Mark as Returned"
+                      className={`flex items-center gap-1.5 px-3 py-1.5 rounded-md text-xs font-semibold transition-colors
+                        ${isPending || isCancelled
+                          ? 'opacity-40 cursor-not-allowed bg-gray-100 text-gray-400'
+                          : 'bg-green-600 text-white hover:bg-green-700'}`}
+                    >
+                      <RotateCcw size={14} />
+                      Mark as Returned
+                    </button>)
+                  ) :(<>   <button
                     type="button"
                     disabled={isPending || isCancelled}
                     onClick={() => handleStatusClick(card.card_id, item.id, KDS_CONFIG.STATUS.PENDING)}
@@ -526,7 +606,7 @@ const KitchenCard = ({
                       size={20}
                       className={item.status === 'served' ? 'text-purple-500' : 'text-gray-400'}
                     />
-                  </button>
+                  </button></>)} 
                 </div>
               </div>
 
@@ -593,14 +673,34 @@ const KitchenCard = ({
 
 // ─── Main KitchenDisplay component ────────────────────────────────────────────
 
-const KitchenDisplay = ({clientId, token}) => {
+const KitchenDisplay = ({clientId, token, realm}) => {
+  const isRental = (realm || '').trim().toLowerCase() === 'rental'; 
   const [cards, setCards] = useState([]);
   const [tablesMap, setTablesMap] = useState({});
   const [menuItemsMap, setMenuItemsMap] = useState({});
   const [loading, setLoading] = useState(true);
   const [orderFilter, setOrderFilter] = useState('ALL');
   const [showAggregate, setShowAggregate] = useState(false);
-
+  const [nowTick, setNowTick] = useState(Date.now());
+  // ── Date filter ──────────────────────────────────────────────────────────
+  // Defaults to today (live view). Selecting an earlier date switches the
+  // page into a "missed orders" lookup mode: same hide-served filtering,
+  // but no polling, since past orders don't change on their own.
+const todayDate = new Date().toISOString().split('T')[0];
+const [datePreset, setDatePreset] = useState('today');
+const [customFrom, setCustomFrom] = useState(todayDate);
+const [customTo, setCustomTo] = useState(todayDate);
+const datePresetRef = useRef('today');
+const customFromValRef = useRef(todayDate);
+const customToValRef = useRef(todayDate);
+useEffect(() => { datePresetRef.current = datePreset; }, [datePreset]);
+useEffect(() => { customFromValRef.current = customFrom; }, [customFrom]);
+useEffect(() => { customToValRef.current = customTo; }, [customTo]);
+useEffect(() => {                                      // ← add
+  if (!isRental) return;
+  const t = setInterval(() => setNowTick(Date.now()), 30000);
+  return () => clearInterval(t);
+}, [isRental]);
   // Stores the canonical item order (array of item ids) per card_id.
   // Persists across re-renders and poll ticks so item positions never shift.
   const itemOrderRef = useRef({});
@@ -608,6 +708,13 @@ const KitchenDisplay = ({clientId, token}) => {
   // ── FIX 1: track how many status updates are in-flight so polling never
   //    overwrites an optimistic update that hasn't reached the backend yet.
   const inflightUpdatesRef = useRef(0);
+
+  // ── FIX 2: stable refs for clientId and token so fetchOrders never needs
+  //    them in its useCallback dep array, preventing interval resets on re-render.
+  const clientIdRef = useRef(clientId);
+  const tokenRef = useRef(token);
+  useEffect(() => { clientIdRef.current = clientId; }, [clientId]);
+  useEffect(() => { tokenRef.current = token; }, [token]);
 
   const [showDeleteOrderModal, setShowDeleteOrderModal] = useState(false);
   const [cardToDelete, setCardToDelete] = useState(null);
@@ -617,69 +724,22 @@ const KitchenDisplay = ({clientId, token}) => {
   const [itemToDelete, setItemToDelete] = useState(null);  // { cardId, item }
 
 
-  // ─── Fetch tables ────────────────────────────────────────────────────────────
+  const hasFetchedStaticRef = useRef(false);
 
   useEffect(() => {
     if (!token || !clientId) return;
-    axios
-      .get(`${import.meta.env.VITE_API_TABLE_SERVICE_URL}/${clientId}/tables/read`, {
-        headers: { Authorization: `Bearer ${token}` },
-      })
-      .then((res) => {
-        const map = {};
-        (res.data?.data || []).forEach((t) => (map[t.id] = t.name));
-        setTablesMap(map);
-      })
-      .catch(() => toast.error('Failed to fetch tables'));
-  }, [clientId, token]);
+    if (hasFetchedStaticRef.current) return;
+    hasFetchedStaticRef.current = true;
 
+    const fetchStaticData = async () => {
+      const { map: tablesMap } = await menuCache.fetchTables(clientId, token);
+      setTablesMap(tablesMap);
 
-  // ─── Fetch inventory ─────────────────────────────────────────────────────────
+      const { map: menuMap } = await menuCache.fetchMenuItems(clientId, token);
+      setMenuItemsMap(menuMap);
+    };
 
-  useEffect(() => {
-    if (!token || !clientId) return;
-    axios
-      .get(`${import.meta.env.VITE_API_INVENTORY_SERVICE_URL}/${clientId}/inventory/read`, {
-        headers: { Authorization: `Bearer ${token}` },
-      })
-      .then((res) => {
-        const map = {};
-        (res.data?.data || []).forEach((item) => {
-          map[Number(item.id)] = item;
-          map[String(item.id)] = item;
-        });
-        setMenuItemsMap(map);
-      })
-      .catch(() => toast.error('Failed to fetch inventory'));
-  }, [clientId, token]);
-
-
-  // ─── Parse /dinein/table merged response into per-sub-order cards ─────────────
-  //
-  // Backend _merge_group() returns one merged entry per table group with:
-  //   item.batch_label  = the sub-order's dinein_order_id ("1001" or "1001-2")
-  //   item.sub_order_id = the DB pk of that sub-order row
-  //   sub_orders[]      = [{id, dinein_order_id, created_at, status, total_price}, ...]
-  //
-  // We split merged items back into individual per-sub-order cards for the KDS.
-  useEffect(() => {
-    if (!token || !clientId) return;
-    axios
-      .get(`${import.meta.env.VITE_API_INVENTORY_SERVICE_URL}/${clientId}/menu/read`, {
-        headers: { Authorization: `Bearer ${token}` },
-        params: { inventory_id: 'menu' },
-      })
-      .then((res) => {
-        const map = {};
-        (res.data?.data || []).forEach((item) => {
-          map[Number(item.id)] = item;
-          map[String(item.id)] = item;
-        });
-        setMenuItemsMap((prev) => ({ ...prev, ...map }));
-      })
-      .catch(() => {
-        // Silent — inventory/read fallback is sufficient
-      });
+    fetchStaticData();
   }, [clientId, token]);
 
   // ─── Parse merged orders into per-sub-order cards ─────────────────────────
@@ -717,6 +777,7 @@ const KitchenDisplay = ({clientId, token}) => {
     // One card per sub-order: sort strictly by created_at ascending
     return subOrders
       .slice()
+      .filter((subOrder) => !isCancelledStatus(subOrder.status)) 
       .sort((a, b) => parseISTTimestamp(a.created_at || 0) - parseISTTimestamp(b.created_at || 0))
       .map((subOrder) => ({
         card_id: subOrder.id,
@@ -733,8 +794,14 @@ const KitchenDisplay = ({clientId, token}) => {
 
 
   // ─── Fetch & poll orders ──────────────────────────────────────────────────────
+  // ── FIX 2: empty dep array — fetchOrders is stable forever.
+  //    clientId and token are read from refs so they're always current.
 
   const fetchOrders = useCallback(async () => {
+    const clientId = clientIdRef.current;
+    const token = tokenRef.current;
+    const { from, to } = getDateRangeFromPreset(datePresetRef.current, customFromValRef.current, customToValRef.current);
+
     if (!token || !clientId) {
       setLoading(false);
       return;
@@ -756,16 +823,19 @@ const KitchenDisplay = ({clientId, token}) => {
       // Check again after the await — a user may have clicked in the meantime
       if (inflightUpdatesRef.current > 0) return;
 
-      const today = new Date().toLocaleDateString(KDS_CONFIG.DATE_FORMAT);
       const allCards = [];
 
       (res.data?.data || []).forEach((mergedOrder) => {
         // Date filter using root created_at
         if (mergedOrder.status === 'draft') return;
+        if (isCancelledStatus(mergedOrder.status)) return;
         const createdAt = mergedOrder.created_at;
         if (createdAt) {
           const orderDate = new Date(parseISTTimestamp(createdAt)).toLocaleDateString(KDS_CONFIG.DATE_FORMAT);
-          if (orderDate !== today) return;
+          if (orderDate < from || orderDate > to) return;
+        } else {
+          // No created_at at all — can't place it on the selected date, skip.
+          return;
         }
 
         // Skip fully-served groups
@@ -773,6 +843,7 @@ const KitchenDisplay = ({clientId, token}) => {
 
         parseIntoCards(mergedOrder).forEach((card) => {
           if (!card.items || card.items.length === 0) return;
+          if (isCancelledStatus(card.status)) return;
           if (
             card.items.length > 0 &&
             card.items.every((i) => i.status === KDS_CONFIG.STATUS.SERVED)
@@ -836,14 +907,25 @@ const KitchenDisplay = ({clientId, token}) => {
     } finally {
       setLoading(false);
     }
-  }, [clientId, token]);
+  }, []); // ── FIX 2: empty deps — stable forever, reads clientId/token from refs
+
+  const hasFetchedOrdersRef = useRef(false);
 
   useEffect(() => {
+    if (!clientId || !token) return;
+    if (hasFetchedOrdersRef.current) return;
+    hasFetchedOrdersRef.current = true;
+
     fetchOrders();
     const interval = setInterval(fetchOrders, KDS_CONFIG.POLL_INTERVAL_MS);
+
     return () => clearInterval(interval);
   }, [fetchOrders]);
 
+  useEffect(() => {
+  setLoading(true);
+  fetchOrders();
+}, [datePreset, customFrom, customTo]);
 
   // ─── Item status change ───────────────────────────────────────────────────────
 
@@ -854,10 +936,25 @@ const KitchenDisplay = ({clientId, token}) => {
     const targetItem = (card.items || []).find((i) => String(i.id) === String(itemId));
     if (!targetItem) return;
 
-    const previousStatus = targetItem.status;
+    const fkey = targetItem.frontend_unique_key || '';
+  const isParentItem = !fkey.startsWith('addon_') && !fkey.startsWith('cchild_');
+
+  const packagingChildren = isParentItem
+    ? (card.items || []).filter(i =>
+        (i.frontend_unique_key || '').startsWith(`addon_${fkey}_`) &&
+        isPackagingMenuRecord(menuItemsMap[String(i.item_id)]) &&
+        !isCancelledStatus(i.status)
+      )
+    : [];
+
+  const changedIds = new Set([String(itemId), ...packagingChildren.map(c => String(c.id))]);
+  const previousStatusMap = {};
+  (card.items || []).forEach(i => {
+    if (changedIds.has(String(i.id))) previousStatusMap[i.id] = i.status;
+  });
 
     const updatedItems = (card.items || []).map((i) =>
-      String(i.id) === String(itemId) && !isCancelledStatus(i.status)
+      changedIds.has(String(i.id)) && !isCancelledStatus(i.status)
         ? { ...i, status: newStatus }
         : i
     );
@@ -874,34 +971,45 @@ const KitchenDisplay = ({clientId, token}) => {
     inflightUpdatesRef.current += 1;
 
     try {
-      const singleItemPayload = [{
-        id: targetItem.id,
-        item_id: targetItem.item_id,
-        item_name: targetItem.item_name,
-        quantity: targetItem.quantity,
-        status: newStatus,
-        note: targetItem.note || '',
-        slug: targetItem.slug || '',
-        unit_price: targetItem.unit_price || 0,
-        line_total: (targetItem.unit_price || 0) * (targetItem.quantity || 1),
-        client_id: clientId,
-        order_id: card.sub_order_id,
-        frontend_unique_key: targetItem.frontend_unique_key || null,
-        is_addon: false,
-        parent_item_key: null,
-      }];
+    const buildPayload = (item) => ({
+      id: item.id,
+      item_id: item.item_id,
+      item_name: item.item_name,
+      quantity: item.quantity,
+      status: newStatus,
+      note: item.note || '',
+      slug: item.slug || '',
+      unit_price: item.unit_price || 0,
+      line_total: (item.unit_price || 0) * (item.quantity || 1),
+      client_id: clientIdRef.current,
+      order_id: card.sub_order_id,
+      frontend_unique_key: item.frontend_unique_key || null,
+      is_addon: item.id !== targetItem.id,
+      parent_item_key: item.id !== targetItem.id ? targetItem.frontend_unique_key : null,
+    });
 
-      await axios.post(
-        `${import.meta.env.VITE_API_ORDER_SERVICE_URL}/${clientId}/order_items/update?order_id=${card.sub_order_id}`,
-        singleItemPayload,
-        { headers: { Authorization: `Bearer ${token}` } }
-      );
-
-      await axios.post(
-        `${import.meta.env.VITE_API_ORDER_SERVICE_URL}/${clientId}/dinein/update`,
-        { id: card.sub_order_id, status: derivedStatus },
-        { headers: { Authorization: `Bearer ${token}` } }
-      );
+      if (isRental) {
+        await axios.post(
+          `${import.meta.env.VITE_API_ORDER_SERVICE_URL}/${clientIdRef.current}/dinein/cancel`,
+          {},
+          {
+            params: { client_id: clientIdRef.current, order_id: card.sub_order_id, reason: 'Rental item returned' },
+            headers: { Authorization: `Bearer ${tokenRef.current}` },
+          }
+        );
+      } else {
+        const itemsPayload = [targetItem, ...packagingChildren].map(buildPayload);
+        await axios.post(
+          `${import.meta.env.VITE_API_ORDER_SERVICE_URL}/${clientIdRef.current}/order_items/update?order_id=${card.sub_order_id}`,
+          itemsPayload,
+          { headers: { Authorization: `Bearer ${tokenRef.current}` } }
+        );
+        await axios.post(
+          `${import.meta.env.VITE_API_ORDER_SERVICE_URL}/${clientIdRef.current}/dinein/update`,
+          { id: card.sub_order_id, status: derivedStatus },
+          { headers: { Authorization: `Bearer ${tokenRef.current}` } }
+        );
+      }
 
       if (derivedStatus === KDS_CONFIG.STATUS.READY && card.status !== KDS_CONFIG.STATUS.READY) {
         window.dispatchEvent(
@@ -920,7 +1028,7 @@ const KitchenDisplay = ({clientId, token}) => {
         prev.map((c) => {
           if (c.card_id !== cardId) return c;
           const rolledBackItems  = c.items.map((i) =>
-            String(i.id) === String(itemId) ? { ...i, status: previousStatus } : i
+            changedIds.has(String(i.id)) ? { ...i, status: previousStatusMap[i.id] } : i
           );
           return { ...c, items: rolledBackItems, status: deriveStatus(rolledBackItems) };
         })
@@ -941,7 +1049,6 @@ const KitchenDisplay = ({clientId, token}) => {
       if (orderFilter === KDS_CONFIG.FILTERS.DINEIN) return !isTakeaway;
       return true;
     });
-
 
   // ─── Render ───────────────────────────────────────────────────────────────────
 
@@ -979,6 +1086,17 @@ const KitchenDisplay = ({clientId, token}) => {
                   </span>
                 )}
               </button>
+
+              {/* ── Date filter — defaults to today, lets staff look back for
+                   missed orders on a previous date. Future dates disabled. ── */}
+              <DateRangeFilter
+                datePreset={datePreset}
+                setDatePreset={setDatePreset}
+                customFrom={customFrom}
+                setCustomFrom={setCustomFrom}
+                customTo={customTo}
+                setCustomTo={setCustomTo}
+              />
             </div>
           </div>
 
@@ -988,6 +1106,12 @@ const KitchenDisplay = ({clientId, token}) => {
               <div className="flex items-center justify-center py-12">
                 <div className="text-lg font-medium text-gray-500">Loading orders...</div>
               </div>
+            ) : filteredCards.length === 0 ? (
+              <div className="flex items-center justify-center py-12">
+                <div className="text-lg font-medium text-gray-400">
+                  { 'No active orders'}
+                </div>
+              </div>
             ) : (
               <div className="grid grid-cols-1 sm:grid-cols-2 lg:grid-cols-3 xl:grid-cols-4 gap-5">
                 {filteredCards.map((card) => (
@@ -996,7 +1120,7 @@ const KitchenDisplay = ({clientId, token}) => {
                     card={card}
                     tablesMap={tablesMap}
                     menuItemsMap={menuItemsMap}
-                    onItemStatusChange={handleItemStatusChange}
+                    onItemStatusChange={handleItemStatusChange} nowTick={nowTick} isRental={isRental} 
                   />
                 ))}
               </div>
@@ -1009,6 +1133,7 @@ const KitchenDisplay = ({clientId, token}) => {
         <AggregatePanel
           cards={filteredCards}
           tablesMap={tablesMap}
+          menuItemsMap={menuItemsMap}
           onClose={() => setShowAggregate(false)}
         />
       )}

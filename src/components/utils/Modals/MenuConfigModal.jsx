@@ -1,6 +1,7 @@
-import React, { useState, useEffect } from "react";
+import React, { useState, useEffect, useRef } from "react";
 import axios from "axios";
 import { FaTimes } from "react-icons/fa";
+import { menuCache } from "../../utils/Menu-utils/menuCache";
 
 const INV_URL = import.meta.env.VITE_API_INVENTORY_SERVICE_URL;
 
@@ -15,13 +16,23 @@ const MenuConfigModal = ({ show, onClose, clientId, token }) => {
   const [timeInput, setTimeInput] = useState("");
   const [timeStart, setTimeStart] = useState("");
   const [timeEnd, setTimeEnd] = useState("");
+  const [unitOptions, setUnitOptions] = useState([]);
+  const [unitInput, setUnitInput] = useState("");
+
+  const [saving, setSaving] = useState(false);
+
+  const dietaryOriginalRef = useRef([]);
+  const timingOriginalRef = useRef([]);
+  const unitOriginalRef = useRef([]);
 
   const auth = { Authorization: `Bearer ${token}` };
 
   // ================= FETCH =================
   const fetchMasters = async () => {
     try {
-      const [dietRes, timeRes] = await Promise.all([
+      const cachedUnits = menuCache.get('units', clientId);
+
+      const [dietRes, timeRes, unitRes] = await Promise.all([
         axios.get(`${INV_URL}/${clientId}/inventory/item-types`, {
           params: { category_id: "dietary_type" },
           headers: auth,
@@ -30,10 +41,27 @@ const MenuConfigModal = ({ show, onClose, clientId, token }) => {
           params: { category_id: "available_timings" },
           headers: auth,
         }),
+        cachedUnits
+          ? Promise.resolve(null)
+          : axios.get(`${INV_URL}/${clientId}/inventory/item-types`, {
+              params: { category_id: "units" },
+              headers: auth,
+            }),
       ]);
 
-      setDietaryOptions(dietRes.data?.data || []);
-      setTimingOptions(timeRes.data?.data || []);
+      const freshDietary = dietRes.data?.data || [];
+      const freshTimings = timeRes.data?.data || [];
+      const freshUnits = cachedUnits || unitRes?.data?.data || [];
+
+      setDietaryOptions(freshDietary);
+      setTimingOptions(freshTimings);
+      setUnitOptions(freshUnits);
+
+      dietaryOriginalRef.current = freshDietary;
+      timingOriginalRef.current = freshTimings;
+      unitOriginalRef.current = freshUnits;
+
+      if (!cachedUnits) menuCache.set('units', clientId, freshUnits);
     } catch (err) {
       console.error("Fetch masters error", err);
     }
@@ -43,41 +71,69 @@ const MenuConfigModal = ({ show, onClose, clientId, token }) => {
     if (show) fetchMasters();
   }, [show]);
 
-  // ================= ADD =================
-  const addValue = async (category, value, setter) => {
-    try {
-      await axios.post(
-        `${INV_URL}/${clientId}/inventory/item-types`,
-        null,
-        {
-          params: {
-            category_id: category,
-            value,
-          },
-          headers: auth,
-        }
-      );
-
-      setter((prev) => [...prev, value]);
-    } catch (err) {
-      console.error("Add failed", err);
-    }
+  // ================= API CALLS (used only on Save) =================
+  const callAdd = async (category, value) => {
+    await axios.post(
+      `${INV_URL}/${clientId}/inventory/item-types`,
+      null,
+      {
+        params: {
+          category_id: category,
+          value,
+        },
+        headers: auth,
+      }
+    );
   };
 
-  // ================= DELETE =================
-  const deleteValue = async (category, value, setter) => {
-    try {
-      await axios.delete(
-        `${INV_URL}/${clientId}/inventory/item-types`,
-        {
-          params: { category_id: category, value },
-          headers: auth,
-        }
-      );
+  const callDelete = async (category, value) => {
+    await axios.delete(
+      `${INV_URL}/${clientId}/inventory/item-types`,
+      {
+        params: { category_id: category, value },
+        headers: auth,
+      }
+    );
+  };
 
-      setter((prev) => prev.filter((v) => v !== value));
+  // ================= LOCAL ADD (no API call) =================
+  const addLocalValue = (value, setter) => {
+    setter((prev) => [...prev, value]);
+  };
+
+  // ================= LOCAL DELETE (no API call) =================
+  const removeLocalValue = (value, setter) => {
+    setter((prev) => prev.filter((v) => v !== value));
+  };
+
+  // ================= SAVE =================
+  const saveAll = async () => {
+    setSaving(true);
+    try {
+      const diffs = [
+        { category: "dietary_type", current: dietaryOptions, original: dietaryOriginalRef.current },
+        { category: "available_timings", current: timingOptions, original: timingOriginalRef.current },
+        { category: "units", current: unitOptions, original: unitOriginalRef.current },
+      ];
+
+      for (const { category, current, original } of diffs) {
+        const added = current.filter((v) => !original.includes(v));
+        const removed = original.filter((v) => !current.includes(v));
+
+        for (const v of added) await callAdd(category, v);
+        for (const v of removed) await callDelete(category, v);
+      }
+
+      dietaryOriginalRef.current = dietaryOptions;
+      timingOriginalRef.current = timingOptions;
+      unitOriginalRef.current = unitOptions;
+
+      menuCache.set('units', clientId, unitOptions);
+      onClose();
     } catch (err) {
-      console.error("Delete failed", err);
+      console.error("Save failed", err);
+    } finally {
+      setSaving(false);
     }
   };
 
@@ -126,13 +182,10 @@ const MenuConfigModal = ({ show, onClose, clientId, token }) => {
                 />
                 <button
                   onClick={() => {
-                    if (!dietInput.trim()) return;
+                    const value = dietInput.trim().toLowerCase();
+                    if (!value || dietaryOptions.includes(value)) return;
 
-                    addValue(
-                      "dietary_type",
-                      dietInput.trim().toLowerCase(),
-                      setDietaryOptions
-                    );
+                    addLocalValue(value, setDietaryOptions);
 
                     setDietInput("");
                   }}
@@ -151,7 +204,7 @@ const MenuConfigModal = ({ show, onClose, clientId, token }) => {
                     {v}
                     <button
                       onClick={() =>
-                        deleteValue("dietary_type", v, setDietaryOptions)
+                        removeLocalValue(v, setDietaryOptions)
                       }
                     >
                       ✕
@@ -194,7 +247,7 @@ const MenuConfigModal = ({ show, onClose, clientId, token }) => {
 
                     const value = `${timeInput.trim().toLowerCase()}(${timeStart}-${timeEnd})`;
 
-                    addValue("available_timings", value, setTimingOptions);
+                    addLocalValue(value, setTimingOptions);
 
                     setTimeInput("");
                     setTimeStart("");
@@ -239,8 +292,7 @@ const MenuConfigModal = ({ show, onClose, clientId, token }) => {
 
                         <button
                           onClick={() =>
-                            deleteValue(
-                              "available_timings",
+                            removeLocalValue(
                               v,
                               setTimingOptions
                             )
@@ -254,16 +306,68 @@ const MenuConfigModal = ({ show, onClose, clientId, token }) => {
                 </div>
               </div>
             </div>
+
+            {/* ===== UNITS ===== */}
+            <div className="border p-3 rounded bg-gray-50">
+              <h4 className="font-semibold mb-2">Units</h4>
+
+              <div className="flex gap-2 mb-2">
+                <input
+                  value={unitInput}
+                  onChange={(e) => setUnitInput(e.target.value)}
+                  placeholder="Add unit (e.g. g, kg, pcs)"
+                  className="border px-2 py-1 rounded w-full"
+                />
+                <button
+                  onClick={() => {
+                    const value = unitInput.trim().toLowerCase();
+                    if (!value || unitOptions.includes(value)) return;
+
+                    addLocalValue(value, setUnitOptions);
+
+                    setUnitInput("");
+                  }}
+                  className="bg-green-600 text-white px-3 rounded"
+                >
+                  Add
+                </button>
+              </div>
+
+              <div className="flex flex-wrap gap-2">
+                {unitOptions.length === 0 && (
+                  <span className="text-gray-400 text-sm">No units available</span>
+                )}
+
+                {unitOptions.map((v) => (
+                  <span
+                    key={v}
+                    className="bg-gray-200 px-2 py-1 rounded-full text-sm flex gap-1"
+                  >
+                    {v}
+                    <button onClick={() => removeLocalValue(v, setUnitOptions)}>✕</button>
+                  </span>
+                ))}
+              </div>
+            </div>
           </div>
         )}
 
-        {/* CLOSE */}
-        <button
-          onClick={onClose}
-          className="mt-4 w-full bg-gray-700 text-white py-2 rounded"
-        >
-          Close
-        </button>
+        {/* SAVE / CLOSE */}
+        <div className="mt-4 flex gap-2">
+          <button
+            onClick={onClose}
+            className="flex-1 bg-gray-700 text-white py-2 rounded"
+          >
+            Close
+          </button>
+          <button
+            onClick={saveAll}
+            disabled={saving}
+            className="flex-1 bg-action-primary text-white py-2 rounded disabled:opacity-60"
+          >
+            {saving ? "Saving..." : "Save"}
+          </button>
+        </div>
       </div>
     </div>
   );

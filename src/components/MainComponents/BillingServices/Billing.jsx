@@ -4,9 +4,13 @@ import { useNavigate, useSearchParams } from "react-router-dom";
 import { toast } from "react-toastify";
 import InvoiceModal from './InvoiceModal';
 import { Search, Calendar, Eye } from 'lucide-react';
+import { menuCache } from '../../utils/Menu-utils/menuCache';
+import AgGridTable from '../../utils/AgGridTable';
+import { fmt } from '../../utils/Menu-utils/menuUtils';
 
 export default function BillingPage({ clientId, token }) {
   const navigate = useNavigate();
+  const hasFetchedRef = useRef(false);
   const [searchParams] = useSearchParams();
 
   const [orders, setOrders] = useState([]);
@@ -28,26 +32,41 @@ export default function BillingPage({ clientId, token }) {
   const customToRef = useRef(null);
 
   useEffect(() => {
+    if (hasFetchedRef.current) return;
+    hasFetchedRef.current = true;
     async function fetchAll() {
       try {
         setLoading(true);
-        const [ordersRes, tablesRes, invRes, billingRes] = await Promise.all([
+
+        const cachedTables = menuCache.get('billing_tablesMap', clientId);
+        const cachedMenu = menuCache.get('billing_menuMap', clientId);
+
+        const [ordersRes, billingRes, tablesRes, invRes] = await Promise.all([
           axios.get(`${import.meta.env.VITE_API_ORDER_SERVICE_URL}/${clientId}/dinein/table`, { headers: { Authorization: `Bearer ${token}` } }),
-          axios.get(`${import.meta.env.VITE_API_TABLE_SERVICE_URL}/${clientId}/tables/read`, { headers: { Authorization: `Bearer ${token}` } }),
-          axios.get(`${import.meta.env.VITE_API_INVENTORY_SERVICE_URL}/${clientId}/inventory/read`, { headers: { Authorization: `Bearer ${token}` } }),
           axios.get(`${import.meta.env.VITE_API_BILLING_SERVICE_URL}/${clientId}/invoice/read_document`, { headers: { Authorization: `Bearer ${token}` } }),
+          cachedTables ? Promise.resolve(null) : axios.get(`${import.meta.env.VITE_API_TABLE_SERVICE_URL}/${clientId}/tables/read`, { headers: { Authorization: `Bearer ${token}` } }),
+          cachedMenu ? Promise.resolve(null) : axios.get(`${import.meta.env.VITE_API_INVENTORY_SERVICE_URL}/${clientId}/inventory/read`, { headers: { Authorization: `Bearer ${token}` } }),
         ]);
-        
-        const allOrders = ordersRes.data?.data || [];
-        setOrders(allOrders);
-        
-        const tMap = {};
-        (tablesRes.data?.data || []).forEach((t) => (tMap[t.id] = t));
-        setTablesMap(tMap);
-        
-        const iMap = {};
-        (invRes.data?.data || []).forEach((i) => (iMap[i.id] = i));
-        setInventoryMap(iMap);
+
+        setOrders(ordersRes.data?.data || []);
+
+        if (cachedTables) {
+          setTablesMap(cachedTables);
+        } else {
+          const tMap = {};
+          (tablesRes.data?.data || []).forEach((t) => (tMap[t.id] = t));
+          setTablesMap(tMap);
+          menuCache.set('billing_tablesMap', clientId, tMap);
+        }
+
+        if (cachedMenu) {
+          setInventoryMap(cachedMenu);
+        } else {
+          const iMap = {};
+          (invRes.data?.data || []).forEach((i) => (iMap[i.id] = i));
+          setInventoryMap(iMap);
+          menuCache.set('billing_menuMap', clientId, iMap);
+        }
 
         const bMap = {};
         (billingRes.data?.data || []).forEach((doc) => {
@@ -84,6 +103,8 @@ export default function BillingPage({ clientId, token }) {
 
   useEffect(() => {
     let filtered = [...orders];
+
+    filtered = filtered.filter(order => order.status?.toLowerCase() !== 'cancelled');
 
     // Date filter
     const { from, to } = getDateRange();
@@ -191,6 +212,92 @@ export default function BillingPage({ clientId, token }) {
     }
   };
 
+  const billingColumnDefs = [
+    {
+      headerName: 'Order ID',
+      field: 'id',
+      minWidth: 120,
+      cellRenderer: (params) => (
+        <div className="text-sm font-semibold text-text-primary">#{params.value}</div>
+      ),
+    },
+    {
+      headerName: 'Table',
+      field: 'table_id',
+      minWidth: 150,
+      valueGetter: (params) => tablesMap[params.data?.table_id]?.name || `Table ${params.data?.table_id}`,
+      cellRenderer: (params) => (
+        <div>
+          <div className="text-sm font-medium text-text-primary">{params.value}</div>
+          <div className="text-xs text-text-secondary">{params.data?.mode || "Dine-In"}</div>
+        </div>
+      ),
+    },
+    {
+      headerName: 'Items',
+      field: 'items',
+      minWidth: 100,
+      valueGetter: (params) => `${params.data?.items?.length || 0} items`,
+    },
+    {
+      headerName: 'Total Amount',
+      colId: 'total_amount',
+      minWidth: 150,
+      valueGetter: (params) => {
+        const billingDoc = billingDocMap[params.data?.id?.toString()];
+        return billingDoc ? Number(billingDoc.total_amount) : null;
+      },
+      cellRenderer: (params) => (
+        <div className="text-sm font-bold text-action-primary">
+          {params.value != null ? `₹${fmt(params.value)}` : "—"}
+        </div>
+      ),
+    },
+    {
+      headerName: 'Payment Status',
+      colId: 'payment_status',
+      minWidth: 160,
+      sortable: false,
+      valueGetter: (params) => billingDocMap[params.data?.id?.toString()]?.payment_status || '',
+      cellRenderer: (params) => {
+        const billingDoc = billingDocMap[params.data?.id?.toString()];
+        return billingDoc ? (
+          <span className={`inline-flex px-2.5 py-1 rounded-full text-xs font-semibold ${billingDoc.payment_status === "Paid"
+              ? "bg-green-100 text-green-700"
+              : billingDoc.status === "partial"
+                ? "bg-yellow-100 text-yellow-700"
+                : "bg-red-100 text-red-700"
+            }`}>
+            {billingDoc.payment_status?.toUpperCase() ?? "UNKNOWN"}
+          </span>
+        ) : (
+          <span className="inline-flex px-2.5 py-1 rounded-full text-xs font-semibold bg-gray-100 text-gray-500">
+            NOT BILLED
+          </span>
+        );
+      },
+    },
+    {
+      headerName: 'Action',
+      colId: 'actions',
+      minWidth: 140,
+      sortable: false,
+      filter: false,
+      floatingFilter: false,
+      cellRenderer: (params) => (
+        <div className="flex items-center justify-center w-full">
+          <button
+            onClick={() => handleSelectOrder(params.data)}
+            className="inline-flex items-center gap-2 px-4 py-2 bg-action-primary hover:bg-action-primary/90 text-text-white rounded-lg font-semibold transition-all shadow-md hover:shadow-lg"
+          >
+            <Eye size={16} />
+            View
+          </button>
+        </div>
+      ),
+    },
+  ];
+
   return (
     <div className="min-h-screen bg-bg-primary p-4 md:p-6">
       <div className="max-w-[1800px] mx-auto">
@@ -283,88 +390,7 @@ export default function BillingPage({ clientId, token }) {
           </div>
         ) : (
           <div className="bg-bg-primary rounded-xl shadow-lg border border-border-default overflow-hidden">
-            <div className="overflow-x-auto">
-              <table className="w-full">
-                <thead className="bg-bg-tertiary border-b border-border-default">
-                  <tr>
-                    <th className="px-6 py-4 text-left text-xs font-bold text-text-primary uppercase tracking-wider">Order ID</th>
-                    <th className="px-6 py-4 text-left text-xs font-bold text-text-primary uppercase tracking-wider">Table</th>
-                    <th className="px-6 py-4 text-left text-xs font-bold text-text-primary uppercase tracking-wider">Items</th>
-                    <th className="px-6 py-4 text-left text-xs font-bold text-text-primary uppercase tracking-wider">Total</th>
-                    <th className="px-6 py-4 text-left text-xs font-bold text-text-primary uppercase tracking-wider">Total Amount</th>
-                    <th className="px-6 py-4 text-left text-xs font-bold text-text-primary uppercase tracking-wider">Payment Status</th>
-                    <th className="px-6 py-4 text-center text-xs font-bold text-text-primary uppercase tracking-wider">Action</th>
-                  </tr>
-                </thead>
-                <tbody className="divide-y divide-border-default">
-                  {filteredOrders.map((order, index) => {
-                    const tableName = tablesMap[order.table_id]?.name || `Table ${order.table_id}`;
-                    const orderTotal = Number(order.total_price ?? 0);
-
-                    return (
-                      <tr 
-                        key={order.id} 
-                        className="hover:bg-bg-tertiary transition-colors"
-                      >
-                        <td className="px-6 py-4 whitespace-nowrap">
-                          <div className="text-sm font-semibold text-text-primary">#{order.id}</div>
-                        </td>
-                        <td className="px-6 py-4 whitespace-nowrap">
-                          <div className="text-sm font-medium text-text-primary">{tableName}</div>
-                          <div className="text-xs text-text-secondary">{order.mode || "Dine-In"}</div>
-                        </td>
-                        <td className="px-6 py-4 whitespace-nowrap">
-                          <div className="text-sm text-text-primary">{order.items?.length || 0} items</div>
-                        </td>
-                        <td className="px-6 py-4 whitespace-nowrap">
-                          <div className="text-sm font-bold text-action-primary">₹{orderTotal.toFixed(2)}</div>
-                        </td>
-                        {(() => {
-                          const billingDoc = billingDocMap[order.id.toString()];
-                          return (
-                            <>
-                              {/* Total Amount */}
-                              <td className="px-6 py-4 whitespace-nowrap">
-                                <div className="text-sm font-bold text-action-primary">
-                                  {billingDoc ? `₹${Number(billingDoc.total_amount).toFixed(2)}` : "—"}
-                                </div>
-                              </td>
-
-                              {/* Payment Status */}
-                              <td className="px-6 py-4 whitespace-nowrap">
-                                {billingDoc ? (
-                                  <span className={`inline-flex px-2.5 py-1 rounded-full text-xs font-semibold ${billingDoc.payment_status === "paid"
-                                      ? "bg-green-100 text-green-700"
-                                      : billingDoc.status === "partial"
-                                        ? "bg-yellow-100 text-yellow-700"
-                                        : "bg-red-100 text-red-700"
-                                    }`}>
-                                    {billingDoc.payment_status?.toUpperCase() ?? "UNKNOWN"}
-                                  </span>
-                                ) : (
-                                  <span className="inline-flex px-2.5 py-1 rounded-full text-xs font-semibold bg-gray-100 text-gray-500">
-                                    NOT BILLED
-                                  </span>
-                                )}
-                              </td>
-                            </>
-                          );
-                        })()}
-                        <td className="px-6 py-4 whitespace-nowrap text-center">
-                          <button
-                            onClick={() => handleSelectOrder(order)}
-                            className="inline-flex items-center gap-2 px-4 py-2 bg-action-primary hover:bg-action-primary/90 text-text-white rounded-lg font-semibold transition-all shadow-md hover:shadow-lg"
-                          >
-                            <Eye size={16} />
-                            View
-                          </button>
-                        </td>
-                      </tr>
-                    );
-                  })}
-                </tbody>
-              </table>
-            </div>
+            <AgGridTable columnDefs={billingColumnDefs} rowData={filteredOrders} domLayout="normal" height={600} />
           </div>
         )}
 

@@ -1,6 +1,7 @@
 import React, { useEffect, useMemo, useState } from "react";
 import axios from "axios";
 import { useParams } from "react-router-dom";
+import AgGridTable from '../../utils/AgGridTable';
 
 const API_CONFIG = {
   baseMenu: (clientId) => `${import.meta.env.VITE_API_INVENTORY_SERVICE_URL}/${clientId}/menu`,
@@ -165,19 +166,13 @@ export default function StockRecipeManager({ clientId: propClientId, token: prop
   const fetchUnits = async () => {
     try {
       const res = await axios.get(
-        `${API_CONFIG.baseMenu(clientId)}/read_category?client_id=${clientId}&category_id=units`,
+        `${API_CONFIG.baseInventory(clientId)}/item-types?client_id=${clientId}&category_id=units`,
         getAuthHeaders(token)
       );
-      const data = res.data?.data || [];
-      const unitsNode = Array.isArray(data) ? data.find((d) => d.id === "units") : data;
-      const subCats = unitsNode?.subCategories || [];
-      // subCategories may be objects {id, name, ...} or plain strings
-      const unitList = subCats.map((u) => (typeof u === "string" ? u : u.id));
+      const unitList = res.data?.data || [];
       setUnits(unitList);
     } catch (err) {
       console.error("fetchUnits failed:", err);
-      // Fallback to standard units if API fails
-      setUnits(["g", "kg", "ml", "litre", "pcs"]);
     }
   };
 
@@ -524,7 +519,7 @@ export default function StockRecipeManager({ clientId: propClientId, token: prop
       );
       setIsAddStockModalOpen(false);
       setAddStockForm({ stock_item_id: null, stock_name: "", quantity: "", unit: "", remarks: "" });
-      await fetchStocks();
+      await Promise.all([fetchStocks(), fetchMenuItems(), fetchMenuAvailability()]);
     } catch (err) {
       console.error("submitAddStock failed:", err);
       setError(err.response?.data?.detail || "Failed to add stock quantity");
@@ -572,7 +567,7 @@ export default function StockRecipeManager({ clientId: propClientId, token: prop
         transaction_type: "RETURN",
         remarks: "",
       });
-      await fetchStocks();
+      await Promise.all([fetchStocks(), fetchMenuItems(), fetchMenuAvailability()]);
     } catch (err) {
       console.error("submitDeductStock failed:", err);
       setError(err.response?.data?.detail || "Failed to deduct stock quantity");
@@ -830,8 +825,12 @@ export default function StockRecipeManager({ clientId: propClientId, token: prop
                 menuItems={menuItems}
                 loading={loading}
                 onUpdateAvailability={updateMenuAvailability}
+                onAddQty={openAddStockModal}
+                onDeduct={openDeductModal} 
                 allCategories={allCategories}
                 units={units}
+                searchQuery={menuSearchQuery}
+                onSearchChange={setMenuSearchQuery}
               />
             )}
 
@@ -1021,6 +1020,100 @@ function InventoryCategoryTab({
 
   if (!category) return null;
 
+  const stockColumnDefs = [
+    {
+      headerName: 'Item',
+      field: 'name',
+      minWidth: 220,
+      sortable: true,
+      cellRenderer: (params) => (
+        <div>
+          <div className="font-semibold text-gray-900 text-base">{params.data.name}</div>
+          {params.data.description && (
+            <div className="text-sm text-gray-500">{params.data.description}</div>
+          )}
+        </div>
+      ),
+    },
+    {
+      headerName: 'Category',
+      colId: 'category',
+      minWidth: 150,
+      sortable: true,
+      valueGetter: (params) => getCategoryName(params.data?.category_id),
+      cellRenderer: (params) => <span className="text-base text-gray-600">{params.value}</span>,
+    },
+    {
+      headerName: 'Availability',
+      field: 'effectiveAvailability',
+      minWidth: 140,
+      sortable: true,
+      cellRenderer: (params) => (
+        <span className={`inline-flex px-3 py-1.5 text-sm font-semibold rounded-full ${
+          params.data.status === "out" ? "bg-red-100 text-red-800" :
+          params.data.status === "low" ? "bg-amber-100 text-amber-800" :
+          "bg-green-100 text-green-800"
+        }`}>
+          {params.value}
+        </span>
+      ),
+    },
+    {
+      headerName: 'Unit',
+      field: 'unit',
+      minWidth: 100,
+      sortable: true,
+      valueGetter: (params) => params.data?.unit || "—",
+      cellRenderer: (params) => <span className="text-base text-gray-600">{params.value}</span>,
+    },
+    {
+      headerName: 'Price',
+      field: 'unit_price',
+      minWidth: 120,
+      sortable: true,
+      valueGetter: (params) => Number(params.data?.unit_price) || 0,
+      cellRenderer: (params) => (
+        <span className="text-base font-medium text-gray-700">₹{params.value.toFixed(2)}</span>
+      ),
+    },
+    {
+      headerName: 'Actions',
+      colId: 'actions',
+      minWidth: 380,
+      sortable: false,
+      filter: false,
+      floatingFilter: false,
+      cellRenderer: (params) => (
+        <div className="flex justify-end gap-4 w-full">
+          <button
+            onClick={() => onAddQty(params.data)}
+            className="text-green-700 hover:text-green-900 border border-green-300 px-4 py-2 rounded-lg font-medium text-sm transition-all"
+          >
+            + Add Qty
+          </button>
+          <button
+            onClick={() => onDeduct(params.data)}
+            className="text-red-700 hover:text-red-900 border border-red-300 px-4 py-2 rounded-lg font-medium text-sm transition-all"
+          >
+            Deduct
+          </button>
+          <button
+            onClick={() => onEdit(params.data)}
+            className="text-action-primary hover:text-action-primary mr-4 border gap-2 px-4 py-2 rounded-lg font-medium text-sm transition-all"
+          >
+            Edit
+          </button>
+          <button
+            onClick={() => onDelete(params.data.id)}
+            className="text-action-primary hover:text-action-primary border gap-2 px-4 py-2 rounded-lg font-medium text-sm transition-all"
+          >
+            Delete
+          </button>
+        </div>
+      ),
+    },
+  ];
+
   return (
     <div className="bg-bg-primary rounded-xl shadow border border-gray-100">
       <div className="bg-action-primary p-6 border-b border-gray-100 flex items-center justify-between">
@@ -1047,84 +1140,23 @@ function InventoryCategoryTab({
         </button>
       </div>
 
-      <div className="overflow-x-auto rounded-lg border-default border-border-default max-h-[600px] overflow-y-auto">
-        <table className="w-full min-w-[700px]">
-          <thead className="bg-gray-50 sticky top-0">
-            <tr>
-              <th className="px-6 py-4 text-left text-sm font-semibold text-gray-600 uppercase tracking-wider">Item</th>
-              <th className="px-6 py-4 text-left text-sm font-semibold text-gray-600 uppercase tracking-wider">Category</th>
-              <th className="px-6 py-4 text-left text-sm font-semibold text-gray-600 uppercase tracking-wider">Availability</th>
-              <th className="px-6 py-4 text-left text-sm font-semibold text-gray-600 uppercase tracking-wider">Unit</th>
-              <th className="px-6 py-4 text-left text-sm font-semibold text-gray-600 uppercase tracking-wider">Price</th>
-              <th className="px-6 py-4 text-right text-sm font-semibold text-gray-600 uppercase tracking-wider">Actions</th>
-            </tr>
-          </thead>
-          <tbody className="bg-bg-primary divide-y divide-gray-200">
-            {loading ? (
-              <tr>
-                <td colSpan={6} className="px-6 py-12 text-center text-gray-500 text-base">Loading...</td>
-              </tr>
-            ) : stocks.length === 0 ? (
-              <tr>
-                <td colSpan={6} className="px-6 py-12 text-center text-gray-500 text-base">
-                  No stock items found. Click "Add Stock" to create one.
-                </td>
-              </tr>
-            ) : (
-              stocks.map((item) => (
-                <tr key={item.id} className="hover:bg-gray-50 transition-colors">
-                  <td className="px-6 py-4 whitespace-nowrap">
-                    <div className="font-semibold text-gray-900 text-base">{item.name}</div>
-                    {item.description && (
-                      <div className="text-sm text-gray-500">{item.description}</div>
-                    )}
-                  </td>
-                  <td className="px-6 py-4 whitespace-nowrap text-base text-gray-600"> {getCategoryName(item.category_id)}</td>
-                  <td className="px-6 py-4 whitespace-nowrap">
-                    <span className={`inline-flex px-3 py-1.5 text-sm font-semibold rounded-full ${item.status === "out" ? "bg-red-100 text-red-800" :
-                      item.status === "low" ? "bg-amber-100 text-amber-800" :
-                        "bg-green-100 text-green-800"
-                      }`}>
-                      {item.effectiveAvailability}
-                    </span>
-                  </td>
-                  <td className="px-6 py-4 whitespace-nowrap text-base text-gray-600">{item.unit || "—"}</td>
-                  <td className="px-6 py-4 whitespace-nowrap text-base font-medium text-gray-700">
-                    ₹{(Number(item.unit_price) || 0).toFixed(2)}
-                  </td>
-                  <td className="px-6 py-4 whitespace-nowrap text-right">
-                    <div className="flex justify-end gap-4">
-                      <button
-                        onClick={() => onAddQty(item)}
-                        className="text-green-700 hover:text-green-900 border border-green-300 px-4 py-2 rounded-lg font-medium text-sm transition-all"
-                      >
-                        + Add Qty
-                      </button>
-                      <button
-                        onClick={() => onDeduct(item)}
-                        className="text-red-700 hover:text-red-900 border border-red-300 px-4 py-2 rounded-lg font-medium text-sm transition-all"
-                      >
-                        Deduct
-                      </button>
-                      <button
-                        onClick={() => onEdit(item)}
-                        className="text-action-primary hover:text-action-primary mr-4 border gap-2 px-4 py-2 rounded-lg font-medium text-sm transition-all"
-                      >
-                        Edit
-                      </button>
-                      <button
-                        onClick={() => onDelete(item.id)}
-                        className="text-action-primary hover:text-action-primary border gap-2 px-4 py-2 rounded-lg font-medium text-sm transition-all"
-                      >
-                        Delete
-                      </button>
-                    </div>
-                  </td>
-                </tr>
-              ))
-            )}
-          </tbody>
-        </table>
+      <div className="overflow-x-auto rounded-lg border-default border-border-default">
+        {loading ? (
+          <div className="px-6 py-12 text-center text-gray-500 text-base">Loading...</div>
+        ) : stocks.length === 0 ? (
+          <div className="px-6 py-12 text-center text-gray-500 text-base">
+            No stock items found. Click "Add Stock" to create one.
+          </div>
+        ) : (
+          <AgGridTable
+            columnDefs={stockColumnDefs}
+            rowData={stocks}
+            domLayout="normal"
+            height={600}
+            exportFileName="inventory_stock"
+            gridOptions={{ getRowId: (params) => String(params.data.id) }}
+          />
+        )}
       </div>
     </div>
   );
@@ -1143,6 +1175,71 @@ function RecipeTab({
   onDeleteIngredient,
   units,
 }) {
+  const ingredientColumnDefs = [
+    {
+      headerName: 'Ingredient',
+      colId: 'ingredient',
+      minWidth: 180,
+      sortable: true,
+      cellRenderer: (params) => {
+        const stockItem = stocks.find((s) => Number(s.id) === Number(params.data.stock_item_id));
+        return <span className="font-medium text-gray-900">{stockItem?.name || `Item #${params.data.stock_item_id}`}</span>;
+      },
+    },
+    {
+      headerName: 'Qty',
+      field: 'quantity_required',
+      minWidth: 120,
+      sortable: true,
+      cellRenderer: (params) => (
+        <input
+          type="number"
+          step="0.01"
+          min="0"
+          value={params.data.quantity_required}
+          onChange={(e) => onUpdateIngredient(params.node.rowIndex, "quantity_required", e.target.value)}
+          className="w-24 px-2 py-1 border border-gray-300 rounded focus:ring-indigo-500 focus:border-indigo-500"
+        />
+      ),
+    },
+    {
+      headerName: 'Unit',
+      field: 'unit',
+      minWidth: 140,
+      sortable: true,
+      cellRenderer: (params) => (
+        <select
+          value={params.data.unit || ""}
+          onChange={(e) => onUpdateIngredient(params.node.rowIndex, "unit", e.target.value)}
+          className="w-28 px-2 py-1 border border-gray-300 rounded focus:ring-indigo-500 focus:border-indigo-500"
+        >
+          <option value="">Unit</option>
+          {units.map((u) => (
+            <option key={u} value={u}>{u}</option>
+          ))}
+        </select>
+      ),
+    },
+    {
+      headerName: 'Actions',
+      colId: 'actions',
+      minWidth: 100,
+      sortable: false,
+      filter: false,
+      floatingFilter: false,
+      cellRenderer: (params) => (
+        <div className="flex justify-end w-full">
+          <button
+            onClick={() => onDeleteIngredient(params.node.rowIndex)}
+            className="text-action-primary hover:text-action-primary text-sm font-medium"
+          >
+            Remove
+          </button>
+        </div>
+      ),
+    },
+  ];
+
   return (
     <div className="bg-bg-primary rounded-xl shadow border border-gray-100">
       <div className="bg-action-primary p-3 grid md:grid-cols-2 lg:grid-cols-3 rounded-xl gap-4 mb-2">
@@ -1171,64 +1268,18 @@ function RecipeTab({
       {selectedMenuId ? (
         <>
           <div className="overflow-x-auto rounded-lg border-default border-border-default mb-6">
-            <table className="w-full min-w-[500px] divide-y divide-gray-200">
-              <thead className="bg-gray-50">
-                <tr>
-                  <th className="px-6 py-3 text-left text-xs font-medium text-gray-500 uppercase tracking-wider">Ingredient</th>
-                  <th className="px-6 py-3 text-left text-xs font-medium text-gray-500 uppercase tracking-wider">Qty</th>
-                  <th className="px-6 py-3 text-left text-xs font-medium text-gray-500 uppercase tracking-wider">Unit</th>
-                  <th className="px-6 py-3 text-right text-xs font-medium text-gray-500 uppercase tracking-wider">Actions</th>
-                </tr>
-              </thead>
-              <tbody className="bg-bg-primary divide-y divide-gray-200">
-                {recipe.length === 0 ? (
-                  <tr>
-                    <td colSpan={4} className="px-6 py-12 text-center text-gray-500">No ingredients added yet</td>
-                  </tr>
-                ) : (
-                  recipe.map((ing, index) => {
-                    const stockItem = stocks.find((s) => Number(s.id) === Number(ing.stock_item_id));
-                    return (
-                      <tr key={index} className="hover:bg-gray-50 transition-colors">
-                        <td className="px-6 py-4 font-medium text-gray-900">
-                          {stockItem?.name || `Item #${ing.stock_item_id}`}
-                        </td>
-                        <td className="px-6 py-4">
-                          <input
-                            type="number"
-                            step="0.01"
-                            min="0"
-                            value={ing.quantity_required}
-                            onChange={(e) => onUpdateIngredient(index, "quantity_required", e.target.value)}
-                            className="w-24 px-2 py-1 border border-gray-300 rounded focus:ring-indigo-500 focus:border-indigo-500"
-                          />
-                        </td>
-                        <td className="px-6 py-4">
-                          <select
-                            value={ing.unit || ""}
-                            onChange={(e) => onUpdateIngredient(index, "unit", e.target.value)}
-                            className="w-28 px-2 py-1 border border-gray-300 rounded focus:ring-indigo-500 focus:border-indigo-500"
-                          >
-                            <option value="">Unit</option>
-                            {units.map((u) => (
-                              <option key={u} value={u}>{u}</option>
-                            ))}
-                          </select>
-                        </td>
-                        <td className="px-6 py-4 text-right">
-                          <button
-                            onClick={() => onDeleteIngredient(index)}
-                            className="text-action-primary hover:text-action-primary text-sm font-medium"
-                          >
-                            Remove
-                          </button>
-                        </td>
-                      </tr>
-                    );
-                  })
-                )}
-              </tbody>
-            </table>
+            {recipe.length === 0 ? (
+              <div className="px-6 py-12 text-center text-gray-500">No ingredients added yet</div>
+            ) : (
+              <AgGridTable
+                columnDefs={ingredientColumnDefs}
+                rowData={recipe}
+                domLayout="normal"
+                height={400}
+                exportFileName="recipe_ingredients"
+                gridOptions={{ getRowId: (params) => String(params.data.stock_item_id) }}
+              />
+            )}
           </div>
 
           <div className="bg-gray-50 p-5 rounded-xl border border-gray-100">
@@ -1298,7 +1349,7 @@ function RecipeTab({
   );
 }
 
-function MenuAvailabilityTab({ menuItems, loading, onUpdateAvailability, allCategories, units }) {
+function MenuAvailabilityTab({ menuItems, loading, onUpdateAvailability, onAddQty, onDeduct, allCategories, units, searchQuery, onSearchChange }) {
   const [editingItem, setEditingItem] = useState(null);
   const [editForm, setEditForm] = useState({ availability: "", unit: "" });
 
@@ -1328,117 +1379,164 @@ function MenuAvailabilityTab({ menuItems, loading, onUpdateAvailability, allCate
     return category?.name || categoryId;
   };
 
+  const [sortBy, setSortBy] = useState("name_asc");
+
+  const filteredItems = useMemo(() => {
+    let result = menuItems;
+
+    if (searchQuery) {
+      const q = searchQuery.toLowerCase();
+      result = result.filter((item) =>
+        `${item.name} ${item.description || ""} ${getCategoryName(item.category_id)}`
+          .toLowerCase()
+          .includes(q)
+      );
+    }
+
+    return result;
+  }, [menuItems, searchQuery, allCategories]);
+
+  const menuColumnDefs = [
+    {
+      headerName: 'Menu Item',
+      field: 'name',
+      minWidth: 220,
+      sortable: true,
+      cellRenderer: (params) => (
+        <div>
+          <div className="font-medium text-gray-900">{params.data.name}</div>
+          {params.data.description && (
+            <div className="text-sm text-gray-500">{params.data.description}</div>
+          )}
+        </div>
+      ),
+    },
+    {
+      headerName: 'Category',
+      colId: 'category',
+      minWidth: 150,
+      sortable: true,
+      valueGetter: (params) => getCategoryName(params.data?.category_id),
+      cellRenderer: (params) => <span className="text-sm text-gray-600">{params.value}</span>,
+    },
+    {
+      headerName: 'Availability',
+      field: 'availability',
+      minWidth: 140,
+      sortable: true,
+      cellRenderer: (params) =>
+        editingItem === params.data.id ? (
+          <input
+            type="number"
+            step="0.01"
+            min="0"
+            value={editForm.availability}
+            onChange={(e) => setEditForm((prev) => ({ ...prev, availability: e.target.value }))}
+            className="w-24 px-3 py-2 border border-gray-300 rounded-lg focus:ring-2 focus:ring-indigo-500 focus:border-indigo-500"
+            placeholder="0"
+          />
+        ) : (
+          <span className="text-sm text-gray-900">{params.value || "—"}</span>
+        ),
+    },
+    {
+      headerName: 'Unit',
+      field: 'unit',
+      minWidth: 140,
+      sortable: true,
+      cellRenderer: (params) =>
+        editingItem === params.data.id ? (
+          <select
+            value={editForm.unit}
+            onChange={(e) => setEditForm((prev) => ({ ...prev, unit: e.target.value }))}
+            className="w-28 px-3 py-2 border border-gray-300 rounded-lg focus:ring-2 focus:ring-indigo-500 focus:border-indigo-500"
+          >
+            <option value="">Select unit</option>
+            {units.map((u) => (
+              <option key={u} value={u}>{u}</option>
+            ))}
+          </select>
+        ) : (
+          <span className="text-sm text-gray-900">{params.value || "—"}</span>
+        ),
+    },
+    {
+      headerName: 'Actions',
+      colId: 'actions',
+      minWidth: 260,
+      sortable: false,
+      filter: false,
+      floatingFilter: false,
+      cellRenderer: (params) =>
+        editingItem === params.data.id ? (
+          <div className="flex justify-end gap-2 w-full">
+            <button
+              onClick={() => handleSave(params.data.id)}
+              className="px-3 py-1 bg-indigo-600 hover:bg-indigo-700 text-white rounded-md transition-colors"
+            >
+              Save
+            </button>
+            <button
+              onClick={handleCancel}
+              className="px-3 py-1 border border-gray-300 hover:bg-gray-50 text-gray-700 rounded-md transition-colors"
+            >
+              Cancel
+            </button>
+          </div>
+        ) : (
+          <div className="flex justify-end gap-2 w-full">
+            <button
+              onClick={() => onAddQty(params.data)}
+              className="text-green-700 hover:text-green-900 border border-green-300 px-4 py-2 rounded-lg font-medium text-sm transition-all"
+            >
+              + Add Qty
+            </button>
+            <button
+              onClick={() => onDeduct(params.data)}
+              className="text-red-700 hover:text-red-900 border border-red-300 px-4 py-2 rounded-lg font-medium text-sm transition-all"
+            >
+              Deduct
+            </button>
+          </div>
+        ),
+    },
+  ];
+
   return (
     <div className="bg-bg-primary rounded-xl shadow border border-gray-100">
-      <div className="bg-action-primary p-5 border-b border-gray-100">
-        <h2 className="text-lg font-semibold text-text-white">Menu Availability</h2>
-        <p className="text-sm text-text-white mt-1">Manage availability and units for menu items</p>
+      <div className="bg-action-primary p-5 border-b border-gray-100 flex items-center justify-between gap-4 flex-wrap">
+        <div className="flex-1 min-w-[200px]">
+          <h2 className="text-lg font-semibold text-text-white">Menu Availability</h2>
+          <p className="text-sm text-text-white mt-1">Manage availability and units for menu items</p>
+        </div>
+
+        <div className="flex-1 max-w-md">
+          <input
+            type="text"
+            placeholder="Search menu items..."
+            className="w-full px-4 py-3 text-base border border-purple-300 rounded-lg focus:ring-2 focus:ring-white focus:border-white"
+            value={searchQuery}
+            onChange={(e) => onSearchChange(e.target.value)}
+          />
+        </div>
       </div>
 
       {loading ? (
         <div className="px-6 py-12 text-center text-gray-500">Loading menu items...</div>
-      ) : menuItems.length === 0 ? (
-        <div className="px-6 py-12 text-center text-gray-500">No menu items found</div>
+      ) : filteredItems.length === 0 ? (
+        <div className="px-6 py-12 text-center text-gray-500">
+          {searchQuery ? "No menu items match your search" : "No menu items found"}
+        </div>
       ) : (
         <div className="overflow-x-auto rounded-lg border-default border-border-default">
-          <table className="w-full min-w-[700px] divide-y divide-gray-200">
-            <thead className="bg-gray-50">
-              <tr>
-                <th className="px-6 py-3 text-left text-xs font-medium text-gray-500 uppercase tracking-wider">
-                  Menu Item
-                </th>
-                <th className="px-6 py-3 text-left text-xs font-medium text-gray-500 uppercase tracking-wider">
-                  Category
-                </th>
-                <th className="px-6 py-3 text-left text-xs font-medium text-gray-500 uppercase tracking-wider">
-                  Availability
-                </th>
-                <th className="px-6 py-3 text-left text-xs font-medium text-gray-500 uppercase tracking-wider">
-                  Unit
-                </th>
-                <th className="px-6 py-3 text-right text-xs font-medium text-gray-500 uppercase tracking-wider">
-                  Actions
-                </th>
-              </tr>
-            </thead>
-            <tbody className="bg-bg-primary divide-y divide-gray-200">
-              {menuItems.map((item) => (
-                <tr key={item.id} className="hover:bg-gray-50 transition-colors">
-                  <td className="px-6 py-4 whitespace-nowrap">
-                    <div className="font-medium text-gray-900">{item.name}</div>
-                    {item.description && (
-                      <div className="text-sm text-gray-500">{item.description}</div>
-                    )}
-                  </td>
-                  <td className="px-6 py-4 whitespace-nowrap text-sm text-gray-600">
-                    {getCategoryName(item.category_id)}
-                  </td>
-                  <td className="px-6 py-4 whitespace-nowrap">
-                    {editingItem === item.id ? (
-                      <input
-                        type="number"
-                        step="0.01"
-                        min="0"
-                        value={editForm.availability}
-                        onChange={(e) =>
-                          setEditForm((prev) => ({ ...prev, availability: e.target.value }))
-                        }
-                        className="w-24 px-3 py-2 border border-gray-300 rounded-lg focus:ring-2 focus:ring-indigo-500 focus:border-indigo-500"
-                        placeholder="0"
-                      />
-                    ) : (
-                      <span className="text-sm text-gray-900">
-                        {item.availability || "—"}
-                      </span>
-                    )}
-                  </td>
-                  <td className="px-6 py-4 whitespace-nowrap">
-                    {editingItem === item.id ? (
-                      <select
-                        value={editForm.unit}
-                        onChange={(e) =>
-                          setEditForm((prev) => ({ ...prev, unit: e.target.value }))
-                        }
-                        className="w-28 px-3 py-2 border border-gray-300 rounded-lg focus:ring-2 focus:ring-indigo-500 focus:border-indigo-500"
-                      >
-                        <option value="">Select unit</option>
-                        {units.map((u) => (
-                          <option key={u} value={u}>{u}</option>
-                        ))}
-                      </select>
-                    ) : (
-                      <span className="text-sm text-gray-900">{item.unit || "—"}</span>
-                    )}
-                  </td>
-                  <td className="px-6 py-4 whitespace-nowrap text-right text-sm font-medium">
-                    {editingItem === item.id ? (
-                      <div className="flex justify-end gap-2">
-                        <button
-                          onClick={() => handleSave(item.id)}
-                          className="px-3 py-1 bg-indigo-600 hover:bg-indigo-700 text-white rounded-md transition-colors"
-                        >
-                          Save
-                        </button>
-                        <button
-                          onClick={handleCancel}
-                          className="px-3 py-1 border border-gray-300 hover:bg-gray-50 text-gray-700 rounded-md transition-colors"
-                        >
-                          Cancel
-                        </button>
-                      </div>
-                    ) : (
-                      <button
-                        onClick={() => handleEdit(item)}
-                        className="text-action-primary hover:text-action-primary mr-4 border gap-2 px-4 py-2 rounded-lg font-medium text-sm transition-all"
-                      >
-                        Edit
-                      </button>
-                    )}
-                  </td>
-                </tr>
-              ))}
-            </tbody>
-          </table>
+          <AgGridTable
+            columnDefs={menuColumnDefs}
+            rowData={filteredItems}
+            domLayout="normal"
+            height={600}
+            exportFileName="menu_availability"
+            gridOptions={{ getRowId: (params) => String(params.data.id) }}
+          />
         </div>
       )}
     </div>
@@ -1529,7 +1627,7 @@ function StockModal({
               min="0"
               value={form.availability}
               onChange={(e) => onChange((prev) => ({ ...prev, availability: e.target.value }))}
-              className="w-full px-4 py-2 border border-gray-300 rounded-lg focus:ring-2 focus:ring-indigo-500 focus:border-indigo-500"
+              className="w-full px-4 py-2 border border-gray-300 rounded-lg focus:ring-2 focus:ring-indigo-500 focus:border-indigo-500 disabled:bg-gray-100 disabled:cursor-not-allowed"
             />
           </div>
 
@@ -1538,7 +1636,7 @@ function StockModal({
             <select
               value={form.unit}
               onChange={(e) => onChange((prev) => ({ ...prev, unit: e.target.value }))}
-              className="w-full px-4 py-2 border border-gray-300 rounded-lg focus:ring-2 focus:ring-indigo-500 focus:border-indigo-500"
+              className="w-full px-4 py-2 border border-gray-300 rounded-lg focus:ring-2 focus:ring-indigo-500 focus:border-indigo-500 disabled:bg-gray-100 disabled:cursor-not-allowed"
             >
               <option value="">Select unit</option>
               {units.map((u) => (

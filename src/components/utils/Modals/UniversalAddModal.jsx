@@ -4,7 +4,7 @@ import { FaPlus } from 'react-icons/fa';
 import axios from 'axios';
 import AddonSelectionPopup from './AddonSelection';
 import ComboSelectionPopup from './CombosSelectionPopup';
-
+import {isRentalRealm} from '../Menu-utils/menuUtils'
 const UniversalAddModal = ({
   // Common props
   showModal,
@@ -26,7 +26,7 @@ const UniversalAddModal = ({
   handleAddItem,
   getCategoryIdByName,
   inventoryIds,
-
+  dietaryColorMap,isSubmitting,
   isComboCategory, dedupedMenuItems, categoriesFlat,
   fetchAddonData,
   // Table-specific props
@@ -35,7 +35,7 @@ const UniversalAddModal = ({
   fieldErrors,
   setFieldErrors,
   isGenerating,
-  generateTables,
+  generateTables,setAddonSubcategories,setAllAddonItems,
   units
 }) => {
   const [dragActive, setDragActive] = useState(false);
@@ -314,6 +314,69 @@ const UniversalAddModal = ({
                   className="w-full px-4 py-2 rounded-lg bg-bg-tertiary border border-border-default text-text-primary focus:outline-none focus:ring-2 focus:ring-action-primary"
                   placeholder={isComboCategory ? "What's included, portion details…" : "Enter item description"} rows="3" />
               </div>
+              {isRentalRealm(normalizedRealm) &&  (
+                  <div>
+                       <label className="block text-sm font-medium mb-2 text-text-primary">
+                             Rental Tier <span className="text-red-600">*</span>
+                       </label>
+
+                       <div className="flex gap-2 items-center bg-bg-tertiary border border-border-default rounded-lg p-2">
+                           <input value={newItem?.rentalTier?.label || ''}  placeholder="e.g. Half Day"
+                                  onChange={(e) => setNewItem(prev => ({ ...(prev || {}),
+                                                   rentalTier: { ...(prev?.rentalTier || {}), label: e.target.value }}))}
+                                  className="flex-1 px-3 py-2 rounded-lg border border-border-default text-sm bg-bg-primary"/>
+                           <input type="number" min="0" value={newItem?.rentalTier?.days ?? ''} placeholder="Days"
+                                  onChange={(e) => setNewItem(prev => ({ ...(prev || {}),
+                                                   rentalTier: { ...(prev?.rentalTier || {}), days: e.target.value }}))}
+                                  className="w-16 px-2 py-2 rounded-lg border border-border-default text-sm bg-bg-primary"/>
+                           <input type="number" min="0"  value={newItem?.rentalTier?.hours ?? ''}  placeholder="Hrs"
+                                  onChange={(e) =>  setNewItem(prev => ({ ...(prev || {}),
+                                                    rentalTier: { ...(prev?.rentalTier || {}), hours: e.target.value }}))}
+                                  className="w-16 px-2 py-2 rounded-lg border border-border-default text-sm bg-bg-primary"/>
+                           <input type="number" min="0" value={newItem?.rentalTier?.minutes ?? ''} placeholder="Min"
+                                  onChange={(e) => setNewItem(prev => ({ ...(prev || {}),
+                                                  rentalTier: { ...(prev?.rentalTier || {}), minutes: e.target.value }}))}
+                                  className="w-16 px-2 py-2 rounded-lg border border-border-default text-sm bg-bg-primary"/>
+                       </div>
+
+                       {!newItem?.rentalTier?.label && ( <p className="text-xs text-red-500 mt-1">Enter rental tier details</p> )}
+                  </div>
+              )}
+              {normalizedRealm === 'restaurant' && (
+  <div>
+    <label className="block text-sm font-medium mb-2 text-text-primary">
+      Dietary Type
+    </label>
+    <div className="flex flex-wrap gap-2">
+    {dietaryOptions.map((d) => {
+  const key = (d || '').toLowerCase().replace(/[-_\s]/g, '');
+  const selected = (newItem?.dietary_type || '').toLowerCase().replace(/[-_\s]/g, '') === key;
+  const colorClass = dietaryColorMap?.[d] || dietaryColorMap?.[key] || 'bg-gray-300';
+  return (
+    <button
+      key={d}
+      type="button"
+      onClick={() =>
+        setNewItem(prev => ({ ...prev, dietary_type: selected ? '' : d }))
+      }
+      className={`px-3 py-1.5 rounded-lg text-sm border-2 transition-all capitalize flex items-center gap-2 ${
+        selected
+          ? 'bg-bg-tertiary text-text-primary shadow-sm'
+          : 'bg-bg-tertiary text-text-primary hover:opacity-80'
+      }`}
+      style={{ borderColor: 'transparent' }}
+    >
+      <span className={`w-2.5 h-2.5 rounded-full ${colorClass}`} />
+      {d}
+    </button>
+  );
+})}
+    </div>
+    {!newItem?.dietary_type && (
+      <p className="text-xs text-text-secondary mt-1">No dietary type selected</p>
+    )}
+  </div>
+)}
               {normalizedRealm === 'restaurant' && (
                 <div>
                   <label className="block text-sm font-medium mb-2">
@@ -593,7 +656,8 @@ const UniversalAddModal = ({
                 </button>
                 <button
                   onClick={handleAddItem}
-                  className="flex-1 px-4 py-2 rounded-lg bg-action-primary text-text-white hover:opacity-90 transition-opacity"
+                  disabled={isSubmitting}
+                  className={`flex-1 px-4 py-2 rounded-lg bg-action-primary text-text-white hover:opacity-90 transition-opacity ${isSubmitting ? 'bg-gray-400 cursor-not-allowed' : 'bg-action-primary hover:opacity-90'}`}
                 >
                   {isComboCategory ? 'Add Combo' : 'Add Item'}
                 </button>
