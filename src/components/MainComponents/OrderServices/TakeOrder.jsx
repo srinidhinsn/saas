@@ -2697,13 +2697,13 @@ const handleWalkInSelect = async () => {
       .reduce((t, i) => t + (i.unit_price || 0) * i.quantity, 0)
       .toFixed(2);
 
-      const addToCart = (item, parentItemKey = null) => {
+      const addToCart = (item, parentItemKey = null, onCommitted = null,batchOverride = null) => {
         const currentAvailability = getAvailability(item);
         const hasStockTracking = currentAvailability != null;
       
         const commit = () => {
           setHasNewItems(true);
-          let batch = currentBatchTimestamp;
+          let batch = batchOverride || currentBatchTimestamp;
           if (!batch) { batch = Date.now(); setCurrentBatchTimestamp(batch); }
       
           if (hasStockTracking) adjustAvailability(item.id, -1);
@@ -2713,9 +2713,11 @@ const handleWalkInSelect = async () => {
               ci => ci.id === Number(item.id) && ci.is_new_item && !ci.saved_sub_order && !ci.is_addon
             );
             if (existingIndex !== -1) {
+              const existingKey = cart[existingIndex].frontend_unique_key;
               setCart(prev => prev.map((ci, idx) => idx === existingIndex ? { ...ci, quantity: ci.quantity + 1 } : ci));
               if (!isMobile) setShowCart(true);
-              return cart[existingIndex].frontend_unique_key;
+              onCommitted && onCommitted(existingKey);
+              return existingKey;
             }
           }
       
@@ -2726,6 +2728,7 @@ const handleWalkInSelect = async () => {
           });
           setCart(prev => [...prev, newItem]);
           if (!isMobile) setShowCart(true);
+          onCommitted && onCommitted(newItem.frontend_unique_key);
           return newItem.frontend_unique_key;
         };
       
@@ -3100,29 +3103,29 @@ const handleWalkInSelect = async () => {
   }
 };
 
-  const handleAddMainItemWithSelectedAddons = (selectedAddonIds) => {
+const handleAddMainItemWithSelectedAddons = (selectedAddonIds) => {
   if (!selectedMainItem) return;
   let batch = currentBatchTimestamp;
-  if (!batch) {
-    batch = Date.now();
-    setCurrentBatchTimestamp(batch);
-  }
+  if (!batch) { batch = Date.now(); setCurrentBatchTimestamp(batch); }
 
-  const mainKey = addToCart(selectedMainItem);
+  const selectedAddons = lineItemsDetails.filter(i => selectedAddonIds.includes(i.id));
+  const packaging = pendingPackagingItems;
 
-  lineItemsDetails
-    .filter(i => selectedAddonIds.includes(i.id))
-    .forEach(addon => {
+  const attachDependents = (mainKey) => {
+    selectedAddons.forEach(addon => {
       const addonEntry = buildCartItem(addon, {
         batch_timestamp: batch,
         parent_item_key: mainKey,
-        is_addon: true, _item_type: 'addon', 
+        is_addon: true,
+        _item_type: 'addon',
       });
       setCart(prev => [...prev, addonEntry]);
       if (getAvailability(addon) != null) adjustAvailability(addon.id, -1);
     });
+    attachPackagingIfTakeaway(mainKey, batch, packaging);
+  };
 
-  attachPackagingIfTakeaway(mainKey, batch, pendingPackagingItems);
+  addToCart(selectedMainItem, null, attachDependents, batch);
 
   setHasNewItems(true);
   setLineItemsModalOpen(false);
