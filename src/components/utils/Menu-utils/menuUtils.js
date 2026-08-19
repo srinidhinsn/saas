@@ -390,3 +390,30 @@ export function relinkCartItemsToParents(items) {
 
 
 export const fmt = (num) => Math.round(Number(num) || 0).toString();
+
+export const isRentalRealm = (realm) => {
+  return (realm || '').toLowerCase() === 'rental';
+};
+
+export const generateTierId = () => {
+  const now = new Date();
+  const pad = (n) => String(n).padStart(2, '0');
+
+  const stamp =
+    `${now.getFullYear()}${pad(now.getMonth() + 1)}${pad(now.getDate())}` +
+    `${pad(now.getHours())}${pad(now.getMinutes())}${pad(now.getSeconds())}` +
+    `${now.getMilliseconds()}`;
+
+  return `tier_${stamp}`;
+};
+export const buildRentalTier = (rentalTier) => {
+  if (!rentalTier?.label?.trim()) return null;
+
+  return {
+    rental_tier_id: rentalTier.rental_tier_id || generateTierId(),
+    label: rentalTier.label.trim(),
+    days: Number(rentalTier.days) || 0,
+    hours: Number(rentalTier.hours) || 0,
+    minutes: Number(rentalTier.minutes) || 0,
+  };
+};

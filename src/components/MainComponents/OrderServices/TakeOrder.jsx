@@ -18,6 +18,7 @@ import { getDietaryFromSlug, isItemActive,buildCartItem, getGroupedCartItems, de
 import {useDietaryTypes, useTimings, useZoneConfig, useMenuData,useCounterTree} from '../../utils/Menu-utils/useMenuData';
 import { parseISTTimestamp } from '../../utils/dateRange';
 import CustomerAutocomplete from '../BillingServices/CustomerAutocomplete';
+import { useInvoiceModal } from '../../utils/BillingUtils';
 // ─────────────────────────────────────────────────────────────────────────────
 // Constants
 // ─────────────────────────────────────────────────────────────────────────────
@@ -1267,6 +1268,10 @@ const TableReservation = ({
   orderMode = 'dinein',
   tableOrders = {},
   draftTableIds = [],
+  hasDinein = true,
+  hasWalkin = true,
+  hasTakeaway = true,
+  hasDelivery = true,
   onSelectTable,
   onSelectTakeaway,
   onSelectDineIn,
@@ -1378,6 +1383,7 @@ const TableReservation = ({
 
           {/* Dine-in / Takeaway toggle */}
           <div className="ml-auto flex bg-bg-primary border-2 rounded-full border-action-primary p-1 shadow-sm">
+            {hasDinein && (
             <button
               onClick={onSelectDineIn}
               className={`px-4 py-1.5 text-xs font-semibold rounded-full transition-all
@@ -1387,6 +1393,8 @@ const TableReservation = ({
             >
               Dine In
             </button>
+            )}
+            {hasWalkin && (
             <button
     onClick={onSelectWalkIn}
     className={`px-4 py-1.5 text-xs font-semibold rounded-full transition-all flex items-center gap-1
@@ -1396,6 +1404,8 @@ const TableReservation = ({
   >
     <User size={12} /> Walk In
   </button>
+            )}
+            {hasTakeaway && (
             <button
               onClick={onSelectTakeaway}
               className={`px-4 py-1.5 text-xs font-semibold rounded-full transition-all flex items-center gap-1
@@ -1405,6 +1415,8 @@ const TableReservation = ({
             >
               <Package size={12} /> Takeaway
             </button>
+            )}
+            {hasDelivery && (
    
             <button
     onClick={onSelectDelivery}
@@ -1415,6 +1427,7 @@ const TableReservation = ({
   >
     <Truck size={12} /> Delivery
   </button>
+            )}
           </div>
         </div>
       </div>
@@ -1800,8 +1813,12 @@ const TakeOrder = ({ clientId, token, onOrderUpdate, realm }) => {
   const [comboModalItem, setComboModalItem] = useState(null);
   const [comboModalComponents, setComboModalComponents] = useState([]);
 
-  const [invoiceModalOpen, setInvoiceModalOpen] = useState(false);
-  const [invoiceOrderData, setInvoiceOrderData] = useState(null);
+  const {
+  invoiceModalOpen,
+  invoiceOrderData,
+  openInvoiceForOrder,
+  closeInvoiceModal,
+} = useInvoiceModal({ clientId, token, inventoryMap });
 
   const [oldItemDeleteModal, setOldItemDeleteModal] = useState({ isOpen: false, item: null });
 
@@ -3537,125 +3554,15 @@ const buildOrderPayload = (items) =>
     }
   };
 
-  // ─────────────────────────────────────────────────────────────────────────
-  // Bill / Invoice
-  // ─────────────────────────────────────────────────────────────────────────
-
-  const combineDuplicateItems = (items) => {
-    const m = new Map();
-    items.forEach(item => {
-      const k = item.item_id.toString();
-      if (m.has(k)) m.get(k).quantity += item.quantity || 0;
-      else m.set(k, { ...item });
-    });
-    return Array.from(m.values());
-  };
-
-  const fetchBillingDocumentForOrder = async (orderId) => {
-    try {
-      const res = await axios.get(
-        `${import.meta.env.VITE_API_BILLING_SERVICE_URL}/${clientId}/invoice/read_document`,
-        {
-          headers: { Authorization: `Bearer ${token}` },
-          params: { client_id: clientId },
-        }
-      );
-      const invoices = (res.data?.data || []).filter(
-        d => d.order_id?.toString() === orderId?.toString()
-      );
-      if (!invoices.length) return null;
-      invoices.sort(
-        (a, b) =>
-          (b.document_version || 1) - (a.document_version || 1) ||
-          new Date(b.updated_at || b.created_at || 0) - new Date(a.updated_at || a.created_at || 0)
-      );
-      return invoices[0];
-    } catch {
-      return null;
-    }
-  };
 
   const handlePrintBill = async (orderId) => {
-    try {
-      // setLoading(true);
-      const r = await axios.get(
-        `${import.meta.env.VITE_API_ORDER_SERVICE_URL}/${clientId}/dinein/table`,
-        { headers: { Authorization: `Bearer ${token}` } }
-      );
-      const order = (r.data?.data || []).find(o => o.id === orderId);
-      if (!order) { toast.error('Order not found'); return; }
-  
-      const enriched = (order.items || []).map(item => {
-        const inv = inventoryMap[item.item_id] || {};
-        return {
-          ...item,
-          unit_price: item.unit_price ?? inv.unit_price ?? 0,
-          name: item.item_name ?? inv.name ?? 'Unnamed Item',
-        };
-      });
-  
-      const deduplicatedItems = deduplicateOrderItems(enriched);
-  
-      const billingDoc = await fetchBillingDocumentForOrder(orderId);
-      setInvoiceOrderData({
-        ...order,
-        items: deduplicatedItems,
-        customer_id: customerDetails.customer_id || billingDoc?.customer_id || order.customer_id || '',
-        contact_phone: customerDetails.contact_phone || billingDoc?.contact_phone || order.contact_phone || '',
-        contact_email: customerDetails.contact_email || billingDoc?.contact_email || order.contact_email || '',
-        shipping_address: customerDetails.shipping_address || billingDoc?.shipping_address || order.delivery_address || '', // ← add      
-      });
-      setInvoiceModalOpen(true);
-    } catch (e) {
-      console.error(e);
-      toast.error('Failed to load order');
-    } finally {
-      console.log("error");
-      
-      // setLoading(false);
-    }
-  };
+  await openInvoiceForOrder(orderId, customerDetails);
+};
 
-  const handleBillFromCart = async () => {
-    if (!activeOrderId) { toast.error('No active order'); return; }
-    try {
-      // setLoading(true);
-      const r = await axios.get(
-        `${import.meta.env.VITE_API_ORDER_SERVICE_URL}/${clientId}/dinein/table`,
-        { headers: { Authorization: `Bearer ${token}` } }
-      );
-      const order = (r.data?.data || []).find(o => o.id === activeOrderId);
-      if (!order) { toast.error('Order not found'); return; }
-  
-      const enriched = (order.items || []).map(item => {
-        const inv = inventoryMap[item.item_id] || {};
-        return {
-          ...item,
-          unit_price: item.unit_price ?? inv.unit_price ?? 0,
-          name: item.item_name ?? inv.name ?? 'Unnamed',
-        };
-      });
-  
-      const deduplicatedItems = deduplicateOrderItems(enriched);
-  
-      const billingDoc = await fetchBillingDocumentForOrder(activeOrderId);
-      setInvoiceOrderData({
-        ...order,
-        items: deduplicatedItems,
-        customer_id: customerDetails.customer_id || billingDoc?.customer_id || order.customer_id || '',
-        contact_phone: customerDetails.contact_phone || billingDoc?.contact_phone || order.contact_phone || '',
-        contact_email: billingDoc?.contact_email || order.contact_email || '',
-      });
-      setInvoiceModalOpen(true);
-    } catch (e) {
-      console.error(e);
-      toast.error('Failed to load order');
-    } finally {
-      console.log("error");
-      
-      // setLoading(false);
-    }
-  };
+const handleBillFromCart = async () => {
+  if (!activeOrderId) { toast.error('No active order'); return; }
+  await openInvoiceForOrder(activeOrderId, customerDetails);
+};
 
   // ─────────────────────────────────────────────────────────────────────────
   // Derived values
@@ -3730,6 +3637,10 @@ const buildOrderPayload = (items) =>
           orderMode={orderMode}
           tableOrders={tableOrders}
           draftTableIds={draftTableIds}
+          hasDinein={tables.length > takeawayTables.length + walkinTables.length + deliveryTables.length}
+          hasWalkin={walkinTables.length > 0}
+          hasTakeaway={takeawayTables.length > 0}
+          hasDelivery={deliveryTables.length > 0}
           onSelectTable={handleTableSelect}
           onSelectTakeaway={handleTakeawaySelect}
           onSelectDineIn={() => setOrderMode('dinein')}
@@ -4453,8 +4364,7 @@ const buildOrderPayload = (items) =>
           tablesMap={tables.reduce((m, t) => { m[t.id] = t; return m; }, {})}
           inventoryMap={inventoryMap}
           onClose={() => {
-            setInvoiceModalOpen(false);
-            setInvoiceOrderData(null);
+            closeInvoiceModal();
             fetchTables();
           }}
           onSave={id => {
