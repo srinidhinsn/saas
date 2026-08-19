@@ -50,6 +50,7 @@ class BillingDocument(BaseModel):
     approval_date:            Optional[datetime] = None
     gl_account_code:          Optional[str]      = None
     tax_code:                 Optional[str]      = None
+    gst_number:               Optional[str]      = None
     accounting_period:        Optional[str]      = None
     currency_conversion_rate: Optional[float]    = None
     shipping_address:         Optional[str]      = None
