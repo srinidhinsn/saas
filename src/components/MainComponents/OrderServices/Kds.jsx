@@ -1004,6 +1004,11 @@ useEffect(() => {                                      // ← add
           itemsPayload,
           { headers: { Authorization: `Bearer ${tokenRef.current}` } }
         );
+        await axios.post(
+          `${import.meta.env.VITE_API_ORDER_SERVICE_URL}/${clientIdRef.current}/dinein/update`,
+          { id: card.sub_order_id, status: derivedStatus },
+          { headers: { Authorization: `Bearer ${tokenRef.current}` } }
+        );
       }
 
       if (derivedStatus === KDS_CONFIG.STATUS.READY && card.status !== KDS_CONFIG.STATUS.READY) {
