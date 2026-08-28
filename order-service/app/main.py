@@ -6,6 +6,8 @@ import logging
 import logging.config
 import time
 import os
+import socket
+import consul
 from config.settings import LOGGING_CONFIG
 from dotenv import load_dotenv
 from fastapi.middleware.cors import CORSMiddleware
@@ -28,6 +30,36 @@ app.add_middleware(
     allow_headers=["*"]
 )
 app.include_router(routes.router, prefix="/saas/{client_id}")
+
+# --- Consul registration (NEW) ---
+CONSUL_HOST = os.getenv("CONSUL_HOST", "localhost")
+SERVICE_HOST = os.getenv("SERVICE_HOST", "127.0.0.1")
+SERVICE_NAME = "order-service"
+SERVICE_PORT = int(os.getenv("SERVICE_PORT", 8003))
+SERVICE_ID = f"{SERVICE_NAME}-{socket.gethostname()}-{SERVICE_PORT}"
+
+c = consul.Consul(host=CONSUL_HOST, port=8500)
+
+@app.on_event("startup")
+def register_with_consul():
+    c.agent.service.register(
+        name=SERVICE_NAME,
+        service_id=SERVICE_ID,
+        address=SERVICE_HOST,
+        port=SERVICE_PORT,
+        check=consul.Check.http(
+            f"http://{SERVICE_HOST}:{SERVICE_PORT}/",
+            interval="10s",
+            timeout="5s"
+        )
+    )
+    logger.info(f"[Consul] Registered as {SERVICE_ID}")
+
+@app.on_event("shutdown")
+def deregister_from_consul():
+    c.agent.service.deregister(SERVICE_ID)
+    logger.info(f"[Consul] Deregistered {SERVICE_ID}")
+# --- end Consul registration ---
 
 
 @app.get('/')
