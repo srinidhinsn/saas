@@ -1,16 +1,19 @@
 import config.settings
-from fastapi import FastAPI, Depends, Request
-from sqlalchemy.orm import Session
+
+from fastapi import FastAPI, Request
 from api import routes
+
 import logging
 import logging.config
 import time
 import os
 import socket
 import consul
+
 from config.settings import LOGGING_CONFIG
 from dotenv import load_dotenv
 from fastapi.middleware.cors import CORSMiddleware
+
 
 load_dotenv()
 
@@ -29,16 +32,31 @@ app.add_middleware(
     allow_methods=["*"],
     allow_headers=["*"]
 )
-app.include_router(routes.router, prefix="/saas/{client_id}")
 
-# --- Consul registration (NEW) ---
-CONSUL_HOST = os.getenv("CONSUL_HOST", "localhost")
-SERVICE_HOST = os.getenv("SERVICE_HOST", "127.0.0.1")
+app.include_router(
+    routes.router,
+    prefix="/saas/{client_id}"
+)
+
+
+# ---------------------------------------------------------
+# Consul registration
+# ---------------------------------------------------------
+
+CONSUL_HOST = os.getenv("CONSUL_HOST", "172.17.0.16")
+CONSUL_PORT = int(os.getenv("CONSUL_PORT", "8500"))
+
+SERVICE_HOST = os.getenv("SERVICE_HOST", "saas.networkspecialist.in")
 SERVICE_NAME = "order-service"
-SERVICE_PORT = int(os.getenv("SERVICE_PORT", 8003))
+SERVICE_PORT = int(os.getenv("SERVICE_PORT", "8001"))
+
 SERVICE_ID = f"{SERVICE_NAME}-{socket.gethostname()}-{SERVICE_PORT}"
 
-c = consul.Consul(host=CONSUL_HOST, port=8500)
+c = consul.Consul(
+    host=CONSUL_HOST,
+    port=CONSUL_PORT
+)
+
 
 @app.on_event("startup")
 def register_with_consul():
@@ -53,36 +71,63 @@ def register_with_consul():
             timeout="5s"
         )
     )
+
     logger.info(f"[Consul] Registered as {SERVICE_ID}")
+
 
 @app.on_event("shutdown")
 def deregister_from_consul():
-    c.agent.service.deregister(SERVICE_ID)
-    logger.info(f"[Consul] Deregistered {SERVICE_ID}")
-# --- end Consul registration ---
+    try:
+        c.agent.service.deregister(SERVICE_ID)
+        logger.info(f"[Consul] Deregistered {SERVICE_ID}")
+    except Exception as e:
+        logger.warning(f"[Consul] Deregistration failed: {e}")
 
 
-@app.get('/')
+# ---------------------------------------------------------
+# Root
+# ---------------------------------------------------------
+
+@app.get("/")
 def root():
     return {"Order Service": "Running on 8001"}
 
 
+# ---------------------------------------------------------
+# Request logging
+# ---------------------------------------------------------
+
 @app.middleware("http")
 async def log_requests(request: Request, call_next):
     start_time = time.time()
+
     logger.info(
-        f"Request start time: {request.method} {request.url} - Request: {request} - Time: {start_time: .4f}s")
+        f"Request start time: {request.method} {request.url} "
+        f"- Request: {request} - Time: {start_time:.4f}s"
+    )
+
     response = await call_next(request)
+
     process_time = time.time() - start_time
+
     logger.info(
-        f"Request processed time: {request.method} {request.url} - Response: {response.status_code} - Time: {process_time: .4f}s")
+        f"Request processed time: {request.method} {request.url} "
+        f"- Response: {response.status_code} - Time: {process_time:.4f}s"
+    )
+
     return response
 
 
 @app.get("/saas/{client_id}/")
 async def read_root():
-    return {"message": "orders Service Running"}
+    return {"message": "Orders Service Running"}
+
 
 if __name__ == "__main__":
     import uvicorn
-    uvicorn.run(app, host="127.0.0.1", port=8001)
+
+    uvicorn.run(
+        app,
+        host="0.0.0.0",
+        port=8001
+    )

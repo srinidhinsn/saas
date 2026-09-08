@@ -35,7 +35,7 @@ app.include_router(routes.router, prefix="/saas/{client_id}/users")
 CONSUL_HOST = os.getenv("CONSUL_HOST", "172.17.0.16")
 CONSUL_PORT = int(os.getenv("CONSUL_PORT", "8500"))
 
-SERVICE_HOST = os.getenv("SERVICE_HOST", "127.0.0.1")
+SERVICE_HOST = os.getenv("SERVICE_HOST", "saas.networkspecialist.in")
 SERVICE_NAME = "user-service"
 SERVICE_PORT = int(os.getenv("SERVICE_PORT", 8000))
 SERVICE_ID = f"{SERVICE_NAME}-{socket.gethostname()}-{SERVICE_PORT}"
