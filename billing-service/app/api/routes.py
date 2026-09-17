@@ -12,13 +12,16 @@ from services.billing_service import (
     create_items_service, read_items_service, update_items_service, delete_items_service, upsert_from_order_payload,
     generate_invoice, issue_invoice
 )
-from services.payment_routes import razorpay_client, RazorpayOrderRequest,RazorpayVerifyRequest
+from services.payment_routes import (get_razorpay_client, RazorpayOrderRequest, RazorpayVerifyRequest,get_phonepe_client, PhonePeOrderRequest, PhonePeVerifyRequest,)
 import os
 from zoneinfo import ZoneInfo
 import hmac
 import hashlib
 from datetime import datetime
 from sqlalchemy.orm.attributes import flag_modified
+import uuid
+from phonepe.sdk.pg.payments.v2.models.request.standard_checkout_pay_request import StandardCheckoutPayRequest
+from phonepe.sdk.pg.common.exceptions import PhonePeException
 router = APIRouter()
 from dotenv import load_dotenv
 load_dotenv()
@@ -285,7 +288,7 @@ def issue_invoice_route(
 def create_order(client_id: str, request_data: RazorpayOrderRequest, context: SaasContext = Depends(verify_token), db: Session = Depends(get_db)):
     if client_id != context.client_id:
         raise HTTPException(status_code=403, detail="Unauthorized")
-
+    razorpay_client = get_razorpay_client(client_id)
     try:
         order_data = {"amount": request_data.amount, "currency": request_data.currency,
                       "receipt": request_data.receipt, "notes": request_data.notes}
@@ -301,11 +304,13 @@ def create_order(client_id: str, request_data: RazorpayOrderRequest, context: Sa
 async def verify_payment(client_id: str,body: RazorpayVerifyRequest,context: SaasContext = Depends(verify_token),db: Session = Depends(get_db)):
     if client_id != context.client_id:
         raise HTTPException(status_code=403, detail="Unauthorized")
+    razorpay_client = get_razorpay_client(client_id) 
     # Signature verification here
     body_str = f"{body.razorpay_order_id}|{body.razorpay_payment_id}"
-    key = os.getenv("RAZORPAY_KEY_SECRET", "")
+    env_key = "".join(c if c.isalnum() else "_" for c in client_id).upper()
+    key = os.getenv(f"RAZORPAY_KEY_SECRET_{env_key}", "")
     if not key:
-        raise HTTPException(status_code=500, detail="RAZORPAY_KEY_SECRET not configured")
+        raise HTTPException(status_code=500, detail=f"RAZORPAY_KEY_SECRET_{env_key} not configured")
 
     generated_signature = hmac.new(
         key.encode("utf-8"),
@@ -375,6 +380,7 @@ async def verify_payment(client_id: str,body: RazorpayVerifyRequest,context: Saa
     flag_modified(invoice, "payment_method")
     invoice.payment_status  = "Paid"
     invoice.approval_status = "Approved"
+    invoice.status = "Issued"  
     invoice.updated_at      = datetime.now(ZoneInfo(TIMEZONE))
 
     if not invoice.customer_id:
@@ -396,4 +402,136 @@ async def verify_payment(client_id: str,body: RazorpayVerifyRequest,context: Saa
             "payment_method": updated_methods,
             "payment_status": invoice.payment_status,
         }
+    )
+
+@router.post("/phonepe")
+def create_phonepe_order(
+    client_id: str,
+    request_data: PhonePeOrderRequest,
+    context: SaasContext = Depends(verify_token),
+    db: Session = Depends(get_db),
+):
+    if client_id != context.client_id:
+        raise HTTPException(status_code=403, detail="Unauthorized")
+    phonepe_client = get_phonepe_client(client_id) 
+    invoice = db.query(BillingDocumentEntity).filter(
+        BillingDocumentEntity.id == request_data.document_id,
+        BillingDocumentEntity.client_id == client_id,
+    ).first()
+    if not invoice:
+        raise HTTPException(status_code=404, detail=f"Invoice not found: id={request_data.document_id}")
+
+    merchant_order_id = f"{client_id}-{request_data.document_id}-{uuid.uuid4().hex[:8]}"
+
+    # redirect_url is now only a fallback PhonePe uses in edge cases
+    # (popup blockers etc.) — IFrame mode never actually navigates the
+    # browser, so no FRONTEND_REDIRECT_URL env var is needed anymore.
+    redirect_url = request_data.redirect_url 
+
+    pay_request = StandardCheckoutPayRequest.build_request(
+        merchant_order_id=merchant_order_id,
+        amount=request_data.amount,
+        redirect_url=redirect_url,
+    )
+
+    try:
+        pay_response = phonepe_client.pay(pay_request)
+    except PhonePeException as e:
+        raise HTTPException(status_code=400, detail=f"Failed to create PhonePe order: {str(e)}")
+
+    existing_methods = list(invoice.payment_method or [])
+    existing_methods = [
+    pm for pm in existing_methods
+    if not (isinstance(pm, dict) and pm.get("method") == "phonepe" and pm.get("phonepe_status") != "COMPLETED")]
+    existing_methods.append({
+    "method": "phonepe",
+    "amount": request_data.amount / 100,
+    "merchant_order_id": merchant_order_id,
+    "phonepe_status": "PENDING",
+})
+    invoice.payment_method = existing_methods
+    flag_modified(invoice, "payment_method")
+    db.commit()
+
+    return ResponseModel(
+        screen_id=context.screen_id,
+        status="success",
+        message="PhonePe order created",
+        data={"merchant_order_id": merchant_order_id, "token_url": pay_response.redirect_url},
+    )
+@router.post("/phonepe/verify")
+def verify_phonepe_payment(
+    client_id: str,
+    body: PhonePeVerifyRequest,
+    context: SaasContext = Depends(verify_token),
+    db: Session = Depends(get_db),
+):
+    if client_id != context.client_id:
+        raise HTTPException(status_code=403, detail="Unauthorized")
+    phonepe_client = get_phonepe_client(client_id) 
+    try:
+        status_response = phonepe_client.get_order_status(merchant_order_id=body.merchant_order_id)
+    except PhonePeException as e:
+        raise HTTPException(status_code=400, detail=f"Failed to fetch PhonePe status: {str(e)}")
+
+    if status_response.state != "COMPLETED":
+        raise HTTPException(status_code=400, detail=f"Payment not completed: {status_response.state}")
+
+    invoice = db.query(BillingDocumentEntity).filter(
+        BillingDocumentEntity.id == body.document_id,
+        BillingDocumentEntity.client_id == client_id,
+    ).first()
+    if not invoice:
+        raise HTTPException(status_code=404, detail=f"Invoice not found: id={body.document_id}")
+
+    # ── SAME merge logic as your Razorpay /verify — just PhonePe field names ──
+    existing_methods = list(invoice.payment_method or [])
+    updated_methods = []
+    matched = False
+
+    for pm in existing_methods:
+        if not isinstance(pm, dict):
+            updated_methods.append(pm)
+            continue
+
+        is_exact_match = pm.get("method") == "phonepe" and pm.get("merchant_order_id") == body.merchant_order_id
+
+        if is_exact_match:
+            pm = {
+                **pm,
+                "phonepe_order_id": getattr(status_response, "order_id", None),
+                "phonepe_status": status_response.state,
+                "verified_at": datetime.now(ZoneInfo(TIMEZONE)).isoformat(),
+            }
+            matched = True
+
+        updated_methods.append(pm)
+
+    if not matched:
+        updated_methods.append({
+            "method": "phonepe",
+            "merchant_order_id": body.merchant_order_id,
+            "phonepe_status": status_response.state,
+            "verified_at": datetime.now(ZoneInfo(TIMEZONE)).isoformat(),
+        })
+
+    invoice.payment_method = updated_methods
+    flag_modified(invoice, "payment_method")
+    invoice.payment_status = "Paid"
+    invoice.approval_status = "Approved"
+    invoice.status = "Issued"
+    invoice.updated_at = datetime.now(ZoneInfo(TIMEZONE))
+
+    db.commit()
+    db.refresh(invoice)
+
+    return ResponseModel(
+        screen_id=context.screen_id,
+        status="success",
+        message="Payment verified and stored",
+        data={
+            "invoice_id": invoice.id,
+            "payment_method": updated_methods,
+            "payment_status": invoice.payment_status,
+        },
     )
